@@ -37,11 +37,6 @@
 
     {{-- Main Content --}}
     <main class="main flex-grow overflow-auto p-1 bg-white">
-        @hasSection('secondary-navbar')
-            <div class="secondary-navbar w-full border-b bg-surface flex items-center px-4 py-2 mb-4 shadow-sm">
-                @yield('secondary-navbar')
-            </div>
-        @endif
         {{ $slot }}
     </main>
   </div>
