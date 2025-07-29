@@ -1,0 +1,34 @@
+{
+  "name": "platform/core",
+  "description": "Plattform Core Package",
+  "type": "library",
+  "repositories": [
+    {
+      "type": "path",
+      "url": "../shared/activity-log"
+    },
+    {
+      "type": "path",
+      "url": "../shared/notifications"
+    }
+  ],
+  "require": {
+      "platform/activity-log": "*",
+      "platform/notifications": "*",
+      "laravel/sanctum": "^4.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "Platform\\Core\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Platform\\Core\\CoreServiceProvider"
+      ]
+    }
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
+}
