@@ -2,19 +2,7 @@
   "name": "martin3r/platform-core",
   "description": "Plattform Core Package",
   "type": "library",
-  "repositories": [
-    {
-      "type": "path",
-      "url": "../shared/activity-log"
-    },
-    {
-      "type": "path",
-      "url": "../shared/notifications"
-    }
-  ],
   "require": {
-      "platform/activity-log": "*",
-      "platform/notifications": "*",
       "laravel/sanctum": "^4.1"
   },
   "autoload": {
