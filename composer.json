@@ -1,5 +1,5 @@
 {
-  "name": "platform/core",
+  "name": "martin3r/platform-core",
   "description": "Plattform Core Package",
   "type": "library",
   "repositories": [
