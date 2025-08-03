@@ -32,15 +32,17 @@
     {{-- Flex Container --}}
     <div class="pt-16 flex h-screen overflow-hidden">
         {{-- Sidebar --}}
-        <livewire:core.sidebar :module-key="$currentModuleKey" />
+        <x-ui-sidebar>
+            @hasSection('sidebar-content')
+                @yield('sidebar-content')
+            @endif
+        </x-ui-sidebar>
 
         {{-- Main Content --}}
         <main class="flex-1 overflow-y-auto p-6">
             {{ $slot }}
         </main>
     </div>
-
-    <livewire:core.modal-modules/>
 
     @livewireScripts
 </body>

@@ -23,6 +23,9 @@
 
   @php
     $currentModuleKey = explode('.', request()->route()?->getName())[0] ?? null;
+    $class = $currentModuleKey 
+        ? "\\Platform\\".ucfirst($currentModuleKey)."\\Livewire\\Sidebar"
+        : null;
   @endphp
 
   {{-- Fixed Navbar --}}
@@ -30,10 +33,15 @@
   
 
   <div class="layout d-flex h-full pt-16">
-    {{-- Sidebar --}}
-    <livewire:core.sidebar 
-      :module-key="$currentModuleKey" 
-      class="sidebar bg-surface border-r border-border" />
+   
+    <x-ui-sidebar>
+        @if($class && class_exists($class))
+            @livewire($currentModuleKey.'.sidebar')
+        @endif
+    </x-ui-sidebar>
+
+        
+
 
     {{-- Main Content --}}
     <main class="main flex-grow overflow-auto p-1 bg-white">
@@ -45,8 +53,10 @@
     <livewire:core.modal-team/>
     <livewire:core.modal-user/>
     <livewire:core.modal-pricing/>
-  @endauth
     <livewire:core.modal-modules/>
+    <livewire:comms.index />
+  @endauth
+    
     <livewire:notifications.notices.index />
     @if(config('notifications.show_modal'))
         <livewire:notifications.notices.modal />

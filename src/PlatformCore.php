@@ -4,6 +4,7 @@ namespace Platform\Core;
 
 use Platform\Core\Registry\ModuleRegistry;
 use Platform\Core\Models\Team;
+use Platform\Core\Models\Module;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Platform\Core\Enums\TeamRole;
 
@@ -16,6 +17,8 @@ class PlatformCore
         if (!$key) {
             throw new \InvalidArgumentException('Module key is required.');
         }
+
+        
 
         // Basis-Domain aus APP_URL
         $baseUrl = config('app.url');
@@ -33,6 +36,17 @@ class PlatformCore
             : "{$scheme}://{$host}/{$prefix}";
         $moduleConfig['url'] = $url;
 
+        // --- 1. Modul einmalig in die DB schreiben ---
+        Module::updateOrCreate(
+            ['key' => $key],
+            [
+                'title'       => $moduleConfig['title'] ?? ucfirst($key),
+                'description' => $moduleConfig['description'] ?? null,
+                'url'         => $url,
+                'config'      => $moduleConfig,
+            ]
+        );
+
         // Navigation-Daten sicher zusammenführen
         $navigation = $moduleConfig['navigation'] ?? [];
         if (!is_array($navigation)) {
@@ -47,19 +61,6 @@ class PlatformCore
             'icon'  => $navigation['icon'] ?? null,
             'order' => $navigation['order'] ?? 999,
         ], $navigation);
-
-        // Sidebar validieren
-        $moduleConfig['sidebar'] = is_array($moduleConfig['sidebar'] ?? null)
-            ? $moduleConfig['sidebar']
-            : [];
-
-        // Debug-Log (damit du prüfen kannst, ob route jetzt gesetzt ist)
-        \Log::info('Module registered', [
-            'key' => $key,
-            'mode' => $mode,
-            'url' => $url,
-            'route' => $moduleConfig['navigation']['route'] ?? null,
-        ]);
 
         // Modul registrieren
         ModuleRegistry::register($moduleConfig);

@@ -55,4 +55,11 @@ class Team extends Model
     {
         return $this->hasMany(TeamInvitation::class);
     }
+
+    public function modules()
+    {
+        return $this->morphToMany(Module::class, 'modulable')
+            ->withPivot(['role', 'enabled', 'guard'])
+            ->withTimestamps();
+    }
 }

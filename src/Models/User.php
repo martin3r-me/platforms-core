@@ -48,4 +48,11 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Team::class, 'current_team_id');
     }
+
+    public function modules()
+    {
+        return $this->morphToMany(Module::class, 'modulable')
+            ->withPivot(['role', 'enabled', 'guard'])
+            ->withTimestamps();
+    }
 }
