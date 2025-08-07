@@ -3,7 +3,6 @@
         <h2 class="text-2xl font-bold mb-6 text-center text-primary">Registrieren</h2>
 
         <form wire:submit.prevent="register" class="d-flex flex-col gap-3">
-            @csrf
             {{-- Vorname --}}
             <div>
                 <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Vorname</label>
