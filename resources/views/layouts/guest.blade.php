@@ -17,36 +17,42 @@
 
     <link rel="stylesheet" href="{{ asset('vendor/ui/ui.css') }}">
     <x-ui-styles/>
-    
-    
 </head>
 
 <body class="bg-gray-100 text-gray-800 selection:bg-purple-200/60">
 
-    {{-- Fixed Top Navbar --}}
+    {{-- Navbar --}}
     <livewire:core.navbar />
 
     {{-- Flex Container --}}
     <div class="pt-16 flex h-screen overflow-hidden">
-        
-
         {{-- Main Content --}}
         <main class="flex-1 overflow-y-auto p-6">
             {{ $slot }}
         </main>
     </div>
 
+    @php
+        $optionalLivewireComponents = [
+            'core.modal-team'     => \Platform\Core\Livewire\ModalTeam::class,
+            'core.modal-user'     => \Platform\Core\Livewire\ModalUser::class,
+            'core.modal-pricing'  => \Platform\Core\Livewire\ModalPricing::class,
+            'core.modal-modules'  => \Platform\Core\Livewire\ModalModules::class,
+            'comms.comms-modal'   => \Platform\Comms\Livewire\CommsModal::class,
+            'notifications.notices.modal' => \Platform\Notifications\Livewire\Notices\Modal::class,
+        ];
+    @endphp
+
     @auth 
-        <livewire:core.modal-team/>
-        <livewire:core.modal-user/>
-        <livewire:core.modal-pricing/>
-        <livewire:core.modal-modules/>
-        <livewire:comms.comms-modal/>
+        @foreach ($optionalLivewireComponents as $alias => $class)
+            @if (class_exists($class))
+                <livewire:{{ $alias }} />
+            @endif
+        @endforeach
     @endauth
-        
-    <livewire:notifications.notices.index />
-    @if(config('notifications.show_modal'))
-            <livewire:notifications.notices.modal />
+
+    @if (class_exists(\Platform\Notifications\Livewire\Notices\Index::class))
+        <livewire:notifications.notices.index />
     @endif
 
     @livewireScripts
