@@ -22,27 +22,32 @@
 </head>
 
 <body class="bg-gray-100 text-gray-800 selection:bg-purple-200/60">
-    @php
-        $currentModuleKey = explode('.', request()->route()?->getName())[0] ?? null;
-    @endphp
 
     {{-- Fixed Top Navbar --}}
     <livewire:core.navbar />
 
     {{-- Flex Container --}}
     <div class="pt-16 flex h-screen overflow-hidden">
-        {{-- Sidebar --}}
-        <x-ui-sidebar>
-            @hasSection('sidebar-content')
-                @yield('sidebar-content')
-            @endif
-        </x-ui-sidebar>
+        
 
         {{-- Main Content --}}
         <main class="flex-1 overflow-y-auto p-6">
             {{ $slot }}
         </main>
     </div>
+
+    @auth 
+        <livewire:core.modal-team/>
+        <livewire:core.modal-user/>
+        <livewire:core.modal-pricing/>
+        <livewire:core.modal-modules/>
+        <livewire:comms.comms-modal/>
+    @endauth
+        
+    <livewire:notifications.notices.index />
+    @if(config('notifications.show_modal'))
+            <livewire:notifications.notices.modal />
+    @endif
 
     @livewireScripts
 </body>

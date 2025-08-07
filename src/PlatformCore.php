@@ -7,18 +7,22 @@ use Platform\Core\Models\Team;
 use Platform\Core\Models\Module;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Platform\Core\Enums\TeamRole;
+use Illuminate\Support\Facades\Schema;
 
 class PlatformCore
 {
     // --- Module Registry ---
     public static function registerModule(array $moduleConfig): void
     {
+        if (!Schema::hasTable('modules')) {
+            // Tabelle noch nicht migriert – Registrierung überspringen
+            return;
+        }
+
         $key = $moduleConfig['key'] ?? null;
         if (!$key) {
             throw new \InvalidArgumentException('Module key is required.');
         }
-
-        
 
         // Basis-Domain aus APP_URL
         $baseUrl = config('app.url');
@@ -62,7 +66,7 @@ class PlatformCore
             'order' => $navigation['order'] ?? 999,
         ], $navigation);
 
-        // Modul registrieren
+        // Modul registrieren (nur in Registry, nicht DB)
         ModuleRegistry::register($moduleConfig);
     }
 
@@ -73,7 +77,6 @@ class PlatformCore
 
     public static function getModules(): array
     {
-        // Alle Module sortiert nach navigation.order zurückgeben
         return collect(ModuleRegistry::all())
             ->toArray();
     }

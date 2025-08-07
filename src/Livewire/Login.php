@@ -27,7 +27,7 @@ class Login extends Component
         if (Auth::attempt($credentials, $this->remember)) {
             session()->regenerate();
 
-            return redirect()->intended('/');
+            return redirect()->intended('/dashboard');
         }
 
         $this->addError('email', 'Die Anmeldedaten sind ungültig.');

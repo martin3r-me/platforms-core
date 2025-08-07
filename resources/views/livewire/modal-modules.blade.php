@@ -4,7 +4,26 @@
     </x-slot>
 
     @if(!$showMatrix)
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4">
+            <a href="{{ route('platform.dashboard') }}"
+               class="d-flex items-center gap-2 p-4 rounded-md border border-solid border-1 transition hover:border-primary hover:bg-primary-10">
+
+                <div class="text-xs text-gray-500">
+                    Dashboard
+                </div>
+
+                @if(!empty($module['icon']))
+                    <x-dynamic-component :component="$module['icon']" class="w-5 h-5 text-primary" />
+                @else
+                    <x-heroicon-o-cube class="w-5 h-5 text-primary" />
+                @endif
+
+                <span class="font-medium text-secondary">
+                    Dashboard
+                </span>
+            </a>
+        </div>
+        <div class="grid grid-cols-4 gap-4 mt-4">
             @foreach($modules as $module)
                 @php
                     $routeName = $module['navigation']['route'] ?? null;
