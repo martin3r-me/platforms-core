@@ -24,7 +24,7 @@
   @php
     $currentModuleKey = explode('.', request()->route()?->getName())[0] ?? null;
     $class = $currentModuleKey 
-        ? "\\Platform\\".ucfirst($currentModuleKey)."\\Livewire\\Sidebar"
+        ? "\\Platform\\".str_replace('-', '', ucwords($currentModuleKey, '-'))."\\Livewire\\Sidebar"
         : null;
   @endphp
 
@@ -57,7 +57,10 @@
     <livewire:comms.comms-modal/>
   @endauth
     
-    
+    <livewire:notifications.notices.index />
+    @if(config('notifications.show_modal'))
+        <livewire:notifications.notices.modal />
+    @endif
 
     @livewireScripts
 </body>

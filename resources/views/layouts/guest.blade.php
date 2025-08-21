@@ -44,7 +44,10 @@
         <livewire:comms.comms-modal/>
     @endauth
         
-    
+    <livewire:notifications.notices.index />
+    @if(config('notifications.show_modal'))
+            <livewire:notifications.notices.modal />
+    @endif
 
     @livewireScripts
 </body>
