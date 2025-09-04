@@ -19,6 +19,10 @@
 
             {{-- Button --}}
             <div>
+                <a href="{{ route('azure-sso.login') }}"
+                                       class="inline-block rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
+                                        Mit Microsoft anmelden
+                </a>
                 <button type="submit" class="w-full bg-primary text-white py-2 rounded hover:bg-primary/90 transition">
                     Einloggen
                 </button>
@@ -26,10 +30,6 @@
         </form>
 
         <div class="mt-4 text-sm text-center text-secondary">
-            <a href="{{ route('azure-sso.login') }}"
-                class="inline-block rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
-                    Mit Microsoft anmelden
-            </a>
             Noch kein Konto? <a href="{{ route('register') }}" class="text-primary hover:underline">Registrieren</a>
         </div>
     </div>
