@@ -7,6 +7,8 @@ use Livewire\LivewireServiceProvider;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Platform\Core\Contracts\AuthAccessPolicy;
+use Platform\Core\Services\ConfigAuthAccessPolicy;
 
 // Command-Klasse importieren!
 use Platform\Core\Commands\TrackBillableUsage;
@@ -45,6 +47,12 @@ class CoreServiceProvider extends ServiceProvider
     {
         $this->app->register(LivewireServiceProvider::class);
         $this->mergeConfigFrom(__DIR__.'/../config/platform.php', 'platform');
+
+        // Auth Policy Config einbinden und Service binden
+        $this->mergeConfigFrom(__DIR__.'/../config/auth-policy.php', 'auth-policy');
+        $this->app->singleton(AuthAccessPolicy::class, function () {
+            return new ConfigAuthAccessPolicy();
+        });
     }
 
     protected function registerLivewireComponents(): void
