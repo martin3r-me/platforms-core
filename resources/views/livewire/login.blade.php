@@ -38,9 +38,9 @@
 
             {{-- SSO Button --}}
             <div class="d-grid gap-2">
-                <a href="{{ route('azure-sso.login') }}" class="btn btn-outline-primary">
-                    @svg('heroicons.microsoft')
-                    Mit Microsoft anmelden
+                <a href="{{ route('azure-sso.login') }}" class="btn btn-outline-primary d-flex align-items-center justify-content-center gap-2">
+                    @svg('heroicons.arrow-right-on-rectangle')
+                    <span>Mit Microsoft anmelden</span>
                 </a>
             </div>
 
