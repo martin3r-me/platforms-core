@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Platform\Core\Http\Controllers\AzureSsoController;
 
-Route::middleware('azure.tenant')->group(function () {
+Route::middleware('web', 'azure.tenant')->group(function () {
     Route::get('sso/login',    [AzureSsoController::class, 'redirectToProvider'])
          ->name('azure-sso.login');
 
