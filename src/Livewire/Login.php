@@ -5,6 +5,7 @@ namespace Platform\Core\Livewire;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Livewire\Component;
+use Platform\Core\Contracts\AuthAccessPolicy;
 
 class Login extends Component
 {
@@ -19,6 +20,12 @@ class Login extends Component
 
     public function login()
     {
+        /** @var AuthAccessPolicy $policy */
+        $policy = app(AuthAccessPolicy::class);
+        if (! $policy->isPasswordLoginAllowed()) {
+            abort(403, 'Password login disabled');
+        }
+
         $credentials = $this->validate([
             'email'    => 'required|email',
             'password' => 'required|string',

@@ -18,7 +18,10 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('username')->nullable()->unique();
             $table->timestamp('email_verified_at')->nullable();
-            $table->string('password');
+            $table->string('password')->nullable();
+            $table->string('azure_id')->unique()->nullable();
+            $table->string('avatar')->nullable();
+            $table->string('access_token', 1024)->nullable();
             $table->rememberToken();
             $table->foreignId('current_team_id')->nullable();
             $table->string('profile_photo_path', 2048)->nullable();

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Component;
 use Platform\Core\PlatformCore;
+use Platform\Core\Contracts\AuthAccessPolicy;
 
 class Register extends Component
 {
@@ -20,6 +21,11 @@ class Register extends Component
 
     public function register()
     {
+        /** @var AuthAccessPolicy $policy */
+        $policy = app(AuthAccessPolicy::class);
+        if (! $policy->isManualRegistrationAllowed()) {
+            abort(403, 'Registration disabled');
+        }
         $validated = $this->validate([
             'name'                  => 'required|string|max:255',
             'lastname'              => 'nullable|string|max:255',

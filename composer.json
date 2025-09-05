@@ -3,7 +3,9 @@
   "description": "Plattform Core Package",
   "type": "library",
   "require": {
-      "laravel/sanctum": "^4.1"
+      "laravel/sanctum": "^4.1",
+      "laravel/socialite": "^5.0",
+      "socialiteproviders/microsoft": "^5.23"
   },
   "autoload": {
     "psr-4": {
@@ -13,7 +15,8 @@
   "extra": {
     "laravel": {
       "providers": [
-        "Platform\\Core\\CoreServiceProvider"
+        "Platform\\Core\\CoreServiceProvider",
+        "Platform\\Core\\Providers\\AzureSsoServiceProvider"
       ]
     }
   },
