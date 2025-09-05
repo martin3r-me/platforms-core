@@ -1,36 +1,50 @@
-<div class="d-flex justify-center items-center min-h-screen bg-gray-50">
-    <div class="bg-white p-6 rounded shadow max-w-md w-full">
-        <h2 class="text-2xl font-bold mb-6 text-center text-primary">Login</h2>
+@php($policy = app(\Platform\Core\Contracts\AuthAccessPolicy::class))
 
-        <form wire:submit.prevent="login" class="d-flex flex-col gap-y-4">
-            {{-- E-Mail --}}
-            <div>
-                <label for="email" class="block text-sm font-medium text-gray-700 mb-1">E-Mail</label>
-                <input type="email" id="email" wire:model="email" class="form-control w-full border rounded px-3 py-2" required />
-                @error('email') <p class="text-sm text-danger mt-1">{{ $message }}</p> @enderror
-            </div>
+<div class="container-fluid vh-100 d-flex align-items-center justify-content-center bg-light">
+    <div class="card shadow" style="max-width: 480px; width: 100%;">
+        <div class="card-body">
+            <h2 class="h4 mb-4 text-center">Login</h2>
 
-            {{-- Passwort --}}
-            <div>
-                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Passwort</label>
-                <input type="password" id="password" wire:model="password" class="form-control w-full border rounded px-3 py-2" required />
-                @error('password') <p class="text-sm text-danger mt-1">{{ $message }}</p> @enderror
-            </div>
+            @if($policy->isPasswordLoginAllowed())
+                <form wire:submit.prevent="login" class="mb-3">
+                    {{-- E-Mail --}}
+                    <div class="mb-3">
+                        <label for="email" class="form-label">E-Mail</label>
+                        <input type="email" id="email" wire:model="email" class="form-control" required />
+                        @error('email') <div class="form-text text-danger">{{ $message }}</div> @enderror
+                    </div>
 
-            {{-- Button --}}
-            <div>
-                <a href="{{ route('azure-sso.login') }}"
-                                       class="inline-block rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
-                                        Mit Microsoft anmelden
+                    {{-- Passwort --}}
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Passwort</label>
+                        <input type="password" id="password" wire:model="password" class="form-control" required />
+                        @error('password') <div class="form-text text-danger">{{ $message }}</div> @enderror
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">Einloggen</button>
+                    </div>
+                </form>
+            @endif
+
+            {{-- Separator nur zeigen, wenn beides angeboten wird --}}
+            @if($policy->isPasswordLoginAllowed())
+                <div class="text-center text-muted my-3"><small>oder</small></div>
+            @endif
+
+            {{-- SSO Button --}}
+            <div class="d-grid gap-2">
+                <a href="{{ route('azure-sso.login') }}" class="btn btn-outline-primary">
+                    @svg('heroicons.microsoft')
+                    Mit Microsoft anmelden
                 </a>
-                <button type="submit" class="w-full bg-primary text-white py-2 rounded hover:bg-primary/90 transition">
-                    Einloggen
-                </button>
             </div>
-        </form>
 
-        <div class="mt-4 text-sm text-center text-secondary">
-            Noch kein Konto? <a href="{{ route('register') }}" class="text-primary hover:underline">Registrieren</a>
+            @if($policy->isManualRegistrationAllowed())
+                <div class="mt-3 text-center">
+                    <small>Noch kein Konto? <a href="{{ route('register') }}">Registrieren</a></small>
+                </div>
+            @endif
         </div>
     </div>
 </div>
