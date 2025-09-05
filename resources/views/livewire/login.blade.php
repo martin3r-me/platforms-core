@@ -1,4 +1,8 @@
-@php($policy = app(\Platform\Core\Contracts\AuthAccessPolicy::class))
+@php(
+    $policy = app()->bound(\Platform\Core\Contracts\AuthAccessPolicy::class)
+        ? app(\Platform\Core\Contracts\AuthAccessPolicy::class)
+        : new \Platform\Core\Services\ConfigAuthAccessPolicy()
+)
 
 <div class="container-fluid vh-100 d-flex align-items-center justify-content-center bg-light">
     <div class="card shadow" style="max-width: 480px; width: 100%;">
