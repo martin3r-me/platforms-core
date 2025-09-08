@@ -103,16 +103,18 @@
 
     <x-slot name="footer">
         <div class="flex justify-start">
-            <button
-                wire:click="$toggle('showMatrix')"
-                class="px-4 py-2 rounded bg-primary text-white hover:bg-primary-700 transition"
-            >
-                @if($showMatrix)
-                    Zurück zur Modulauswahl
-                @else
-                    Modul-Matrix anzeigen
-                @endif
-            </button>
+            @if(auth()->user()->currentTeam && auth()->user()->currentTeam->user_id === auth()->id())
+                <button
+                    wire:click="$toggle('showMatrix')"
+                    class="px-4 py-2 rounded bg-primary text-white hover:bg-primary-700 transition"
+                >
+                    @if($showMatrix)
+                        Zurück zur Modulauswahl
+                    @else
+                        Modul-Matrix anzeigen
+                    @endif
+                </button>
+            @endif
         </div>
     </x-slot>
 </x-ui-modal>
