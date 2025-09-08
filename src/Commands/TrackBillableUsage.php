@@ -32,9 +32,10 @@ class TrackBillableUsage extends Command
      */
     public function handle()
     {
-        $date = $this->option('date'); // optionales --date=YYYY-MM-DD
+        // optionales --date=YYYY-MM-DD; Standard: heute
+        $date = $this->option('date') ?: now()->toDateString();
 
-        $this->info('Starte Usage-Tracking für '.($date ?: 'heute').' ...');
+        $this->info('Starte Usage-Tracking für '.$date.' ...');
         $this->usageTrackingService->trackAllUsages($date);
         $this->info('Tracking abgeschlossen.');
     }
