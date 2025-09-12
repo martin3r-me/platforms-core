@@ -36,7 +36,7 @@
         
         <x-ui-dashboard-tile
             title="Monatliche Kosten"
-            :count="$monthlyTotal"
+            :count="$monthlyTotal < 1 ? number_format($monthlyTotal, 2, ',', '.') . ' €' : number_format($monthlyTotal, 0, ',', '.') . ' €'"
             subtitle="Aktueller Monat"
             icon="banknotes"
             variant="info"
