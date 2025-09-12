@@ -51,35 +51,35 @@
                             $allowed = in_array($key, $allowedModuleKeys ?? []);
                             $routeName = $module['navigation']['route'] ?? null;
                             $finalUrl = $routeName ? route($routeName) : ($module['url'] ?? '#');
-                            $cost = $moduleCosts[$key]['cost'] ?? 0.0;
+                            $cost = (float)($moduleCosts[$key]['cost'] ?? 0.0);
                             $title = $module['title'] ?? ucfirst($key);
                             $icon = $module['navigation']['icon'] ?? 'heroicon-o-cube';
+                            $variant = $allowed ? 'primary' : 'neutral';
                         @endphp
 
-                        <div class="rounded-lg border p-4 {{ $allowed ? 'bg-gray-50 hover:bg-gray-100 transition' : 'bg-gray-100 opacity-60' }}">
-                            <div class="d-flex items-center gap-3 mb-2">
-                                <div class="w-10 h-10 bg-primary text-on-primary rounded-lg d-flex items-center justify-center">
-                                    @svg($icon, 'w-5 h-5')
-                                </div>
-                                <div class="font-medium text-gray-900">{{ $title }}</div>
+                        @if($allowed && $routeName)
+                            <a href="{{ $finalUrl }}" wire:navigate class="block">
+                                <x-ui-dashboard-tile
+                                    :title="$title"
+                                    :count="$cost"
+                                    subtitle="Monat"
+                                    :icon="$icon"
+                                    :variant="$variant"
+                                    size="lg"
+                                />
+                            </a>
+                        @else
+                            <div class="opacity-70">
+                                <x-ui-dashboard-tile
+                                    :title="$title"
+                                    :count="$cost"
+                                    subtitle="Monat"
+                                    :icon="$icon"
+                                    :variant="$variant"
+                                    size="lg"
+                                />
                             </div>
-                            <div class="text-sm text-gray-600">Gesamt (Monat)</div>
-                            <div class="text-lg font-semibold text-green-600">{{ number_format((float)$cost, 2, ',', '.') }} €</div>
-
-                            <div class="mt-3">
-                                @if($allowed && $routeName)
-                                    <a href="{{ $finalUrl }}" class="inline-flex items-center gap-2 px-3 py-2 bg-primary text-on-primary rounded-md hover:bg-primary-dark transition text-sm" wire:navigate>
-                                        @svg('heroicon-o-arrow-right', 'w-4 h-4')
-                                        <span>Öffnen</span>
-                                    </a>
-                                @else
-                                    <span class="inline-flex items-center gap-2 px-3 py-2 bg-gray-200 text-gray-600 rounded-md text-sm cursor-not-allowed">
-                                        @svg('heroicon-o-lock-closed', 'w-4 h-4')
-                                        <span>Nicht verfügbar</span>
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
+                        @endif
                     @endforeach
                 </div>
             @else
