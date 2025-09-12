@@ -8,7 +8,7 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-3 gap-4 mb-8">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
         <x-ui-dashboard-tile
             title="Verfügbare Module"
             :count="count($modules)"
@@ -39,59 +39,46 @@
 
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
         <div class="p-6 border-b border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-900">Module & Preise</h3>
-            <p class="text-sm text-gray-600 mt-1">Registrierte Module aus der Registry inkl. aktueller Preise</p>
+            <h3 class="text-lg font-semibold text-gray-900">Module</h3>
+            <p class="text-sm text-gray-600 mt-1">Sortiert nach monatlicher Belastung (absteigend). Klickbar, wenn freigegeben.</p>
         </div>
         <div class="p-6">
-            @if(count($modules) > 0)
-                <div class="space-y-3">
-                    @foreach($modules as $moduleKey => $module)
+            @if(count($sortedModules) > 0)
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    @foreach($sortedModules as $module)
                         @php
+                            $key = $module['key'] ?? null;
+                            $allowed = in_array($key, $allowedModuleKeys ?? []);
                             $routeName = $module['navigation']['route'] ?? null;
                             $finalUrl = $routeName ? route($routeName) : ($module['url'] ?? '#');
-                            $pricings = $modulePricings[$moduleKey] ?? [];
+                            $cost = $moduleCosts[$key]['cost'] ?? 0.0;
+                            $title = $module['title'] ?? ucfirst($key);
+                            $icon = $module['navigation']['icon'] ?? 'heroicon-o-cube';
                         @endphp
-                        <div class="d-flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                            <div class="d-flex items-center gap-3">
+
+                        <div class="rounded-lg border p-4 {{ $allowed ? 'bg-gray-50 hover:bg-gray-100 transition' : 'bg-gray-100 opacity-60' }}">
+                            <div class="d-flex items-center gap-3 mb-2">
                                 <div class="w-10 h-10 bg-primary text-on-primary rounded-lg d-flex items-center justify-center">
-                                    @if(!empty($module['navigation']['icon']))
-                                        @svg($module['navigation']['icon'], 'w-5 h-5')
-                                    @else
-                                        @svg('heroicon-o-cube', 'w-5 h-5')
-                                    @endif
+                                    @svg($icon, 'w-5 h-5')
                                 </div>
-                                <div>
-                                    <div class="d-flex items-center gap-2">
-                                        <h4 class="font-medium text-gray-900">{{ $module['title'] ?? ucfirst($moduleKey) }}</h4>
-                                        @if($routeName)
-                                            <a href="{{ $finalUrl }}" class="text-primary text-sm hover:underline" wire:navigate>Öffnen</a>
-                                        @endif
-                                    </div>
-                                    @if(!empty($pricings))
-                                        <div class="text-sm text-gray-700 mt-1">
-                                            @foreach($pricings as $price)
-                                                <div class="d-flex items-center gap-2">
-                                                    <x-ui-badge size="sm" variant="neutral">{{ $price['type'] }}</x-ui-badge>
-                                                    <span class="text-secondary">{{ $price['label'] }}</span>
-                                                    @if($price['price'] !== null)
-                                                        <span class="font-medium">{{ number_format((float)$price['price'], 2, ',', '.') }} € / Tag</span>
-                                                    @else
-                                                        <span class="text-gray-500">kein aktueller Preis</span>
-                                                    @endif
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    @else
-                                        <div class="text-sm text-gray-500 mt-1">Keine Preisangaben vorhanden</div>
-                                    @endif
-                                </div>
+                                <div class="font-medium text-gray-900">{{ $title }}</div>
                             </div>
-                            @if(isset($moduleCosts[$moduleKey]))
-                                <div class="text-right">
-                                    <div class="text-xs text-gray-500">Kosten (Monat)</div>
-                                    <div class="text-lg font-semibold text-green-600">{{ number_format((float)$moduleCosts[$moduleKey]['cost'], 2, ',', '.') }} €</div>
-                                </div>
-                            @endif
+                            <div class="text-sm text-gray-600">Gesamt (Monat)</div>
+                            <div class="text-lg font-semibold text-green-600">{{ number_format((float)$cost, 2, ',', '.') }} €</div>
+
+                            <div class="mt-3">
+                                @if($allowed && $routeName)
+                                    <a href="{{ $finalUrl }}" class="inline-flex items-center gap-2 px-3 py-2 bg-primary text-on-primary rounded-md hover:bg-primary-dark transition text-sm" wire:navigate>
+                                        @svg('heroicon-o-arrow-right', 'w-4 h-4')
+                                        <span>Öffnen</span>
+                                    </a>
+                                @else
+                                    <span class="inline-flex items-center gap-2 px-3 py-2 bg-gray-200 text-gray-600 rounded-md text-sm cursor-not-allowed">
+                                        @svg('heroicon-o-lock-closed', 'w-4 h-4')
+                                        <span>Nicht verfügbar</span>
+                                    </span>
+                                @endif
+                            </div>
                         </div>
                     @endforeach
                 </div>
