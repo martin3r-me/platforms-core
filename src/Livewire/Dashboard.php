@@ -19,12 +19,16 @@ class Dashboard extends Component
     public $usageStats = [];
     public $currentDate;
     public $currentDay;
+    public $modulePricings = [];
 
     public function mount()
     {
         $this->modules = PlatformCore::getModules();
         $this->currentDate = now()->format('d.m.Y');
         $this->currentDay = now()->format('l');
+
+        // Pricing-Aufbereitung unabhängig von Login anzeigen (Registry basiert)
+        $this->modulePricings = $this->buildModulePricings();
         
         if (Auth::check()) {
             $this->currentTeam = Auth::user()->currentTeam;
@@ -57,6 +61,55 @@ class Dashboard extends Component
         
         // Usage-Statistiken
         $this->usageStats = $this->getUsageStats($startOfMonth, $endOfMonth);
+    }
+
+    protected function buildModulePricings(): array
+    {
+        $result = [];
+        $today = now()->toDateString();
+
+        foreach ($this->modules as $moduleKey => $module) {
+            $billables = $module['billables'] ?? [];
+            if (!is_array($billables) || empty($billables)) {
+                continue;
+            }
+
+            $moduleItems = [];
+            foreach ($billables as $billable) {
+                if (isset($billable['active']) && !$billable['active']) {
+                    continue;
+                }
+                $label = $billable['label'] ?? ($billable['type'] ?? 'Billable');
+                $price = $this->getCurrentPricing((array)($billable['pricing'] ?? []), $today);
+                $moduleItems[] = [
+                    'label' => $label,
+                    'type' => $billable['type'] ?? null,
+                    'price' => $price !== null ? (float) $price : null,
+                ];
+            }
+
+            if (!empty($moduleItems)) {
+                $result[$moduleKey] = $moduleItems;
+            }
+        }
+
+        return $result;
+    }
+
+    protected function getCurrentPricing(array $pricingArr, string $date): ?float
+    {
+        foreach ($pricingArr as $price) {
+            $start = $price['start_date'] ?? null;
+            $end = $price['end_date'] ?? null;
+            if (!$start) {
+                continue;
+            }
+            if ($date >= $start && (empty($end) || $date <= $end)) {
+                $value = $price['cost_per_day'] ?? null;
+                return $value !== null ? (float) $value : null;
+            }
+        }
+        return null;
     }
 
     protected function getModuleCosts($startDate, $endDate)
