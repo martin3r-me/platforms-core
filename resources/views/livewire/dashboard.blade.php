@@ -8,13 +8,38 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-4 mb-8">
+    <!-- Team-Info Banner -->
+    @if($currentTeam)
+        <div class="mb-4">
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="d-flex items-center gap-2 mb-2">
+                    @svg('heroicon-o-building-office', 'w-5 h-5 text-blue-600')
+                    <h3 class="text-lg font-semibold text-blue-900">Team-Übersicht</h3>
+                </div>
+                <p class="text-blue-700 text-sm">
+                    Willkommen im {{ $currentTeam->name }} Team. 
+                    {{ count($teamMembers) }} Mitglieder, {{ count($modules) }} verfügbare Module.
+                </p>
+            </div>
+        </div>
+    @endif
+
+    <div class="grid grid-cols-2 gap-4 mb-8">
         <x-ui-dashboard-tile
             title="Verfügbare Module"
             :count="count($modules)"
             subtitle="Tools & Services"
             icon="cube"
             variant="primary"
+            size="lg"
+        />
+        
+        <x-ui-dashboard-tile
+            title="Team-Mitglieder"
+            :count="count($teamMembers)"
+            subtitle="Aktive Nutzer"
+            icon="users"
+            variant="success"
             size="lg"
         />
     </div>
