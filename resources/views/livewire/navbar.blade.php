@@ -39,7 +39,7 @@
                     >
                         <span class="d-flex items-center gap-1">
                             <x-heroicon-o-banknotes class="w-5 h-5" />
-                            <span>{{ number_format($monthlyTotal, 2, ',', '.') }} €</span>
+                            <span>{{ number_format((float)($monthlyTotal ?? 0), 2, ',', '.') }} €</span>
                         </span>
                     </x-ui-button>
                 @endif
