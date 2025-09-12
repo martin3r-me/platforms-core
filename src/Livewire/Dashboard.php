@@ -36,7 +36,12 @@ class Dashboard extends Component
             ->whereBetween('usage_date', [$startOfMonth, $endOfMonth])
             ->sum('total_cost');
             
-        $this->monthlyTotal = is_numeric($sum) ? (float) $sum : 0.0;
+        // Sicherstellen, dass es ein Float ist
+        if (is_numeric($sum)) {
+            $this->monthlyTotal = (float) $sum;
+        } else {
+            $this->monthlyTotal = 0.0;
+        }
     }
 
     public function render()
