@@ -40,7 +40,7 @@
         <!-- Monatliche Kosten -->
         <x-ui-dashboard-tile
             title="Monatliche Kosten"
-            :count="$monthlyTotal ?? 0"
+            :count="($monthlyTotal ?? 0) < 1 ? number_format(($monthlyTotal ?? 0), 2, ',', '.') : number_format(($monthlyTotal ?? 0), 0, ',', '.')"
             subtitle="Aktueller Monat"
             icon="banknotes"
             variant="info"
@@ -99,10 +99,10 @@
                         @endphp
 
                         @if($isLink)
-                            <a href="{{ $finalUrl }}" wire:navigate class="block">
+                            <a href="{{ $finalUrl }}" class="block">
                                 <x-ui-dashboard-tile
                                     :title="$title"
-                                    :count="$cost"
+                                    :count="$cost < 1 ? number_format($cost, 2, ',', '.') : number_format($cost, 0, ',', '.')"
                                     subtitle="Monat"
                                     :icon="$icon"
                                     :variant="$variant"
@@ -113,7 +113,7 @@
                             <div class="opacity-60">
                                 <x-ui-dashboard-tile
                                     :title="$title"
-                                    :count="$cost"
+                                    :count="$cost < 1 ? number_format($cost, 2, ',', '.') : number_format($cost, 0, ',', '.')"
                                     subtitle="Monat"
                                     :icon="$icon"
                                     :variant="$variant"
