@@ -53,7 +53,8 @@
                             $finalUrl = $routeName ? route($routeName) : ($module['url'] ?? '#');
                             $cost = (float)($moduleCosts[$key]['cost'] ?? 0.0);
                             $title = $module['title'] ?? ucfirst($key);
-                            $icon = $module['navigation']['icon'] ?? 'heroicon-o-cube';
+                            $iconRaw = $module['navigation']['icon'] ?? 'cube';
+                            $icon = preg_replace('/^(heroicon-[os]-)/', '', $iconRaw);
                             $variant = $allowed ? 'primary' : 'neutral';
                         @endphp
 
