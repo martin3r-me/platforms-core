@@ -63,7 +63,7 @@ class Dashboard extends Component
         $sum = TeamBillableUsage::where('team_id', $this->currentTeam->id)
             ->whereBetween('usage_date', [$startOfMonth, $endOfMonth])
             ->sum('total_cost');
-        $this->monthlyTotal = (float) ($sum ?? 0);
+        $this->monthlyTotal = is_numeric($sum) ? (float) $sum : 0.0;
 
         $this->moduleCosts = $this->getModuleCosts($startOfMonth, $endOfMonth);
         $this->teamMembers = $this->currentTeam->users()->get()->all();
@@ -168,7 +168,7 @@ class Dashboard extends Component
                 ->where('billable_model', 'like', '%' . $key . '%')
                 ->sum('total_cost');
                 
-            $moduleCost = (float) ($moduleCost ?? 0);
+            $moduleCost = is_numeric($moduleCost) ? (float) $moduleCost : 0.0;
             $costs[$key] = [
                 'title' => $module['title'] ?? ucfirst($key),
                 'cost' => $moduleCost,
