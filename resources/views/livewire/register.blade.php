@@ -1,4 +1,4 @@
-<div class="d-flex justify-center items-center" style="min-height: 100vh;">
+<div class="d-flex justify-center items-start pt-20" style="min-height: 100vh;">
     <div class="bg-white p-6 rounded-lg shadow-md" style="width: 100%; max-width: 28rem;">
         <h2 class="text-2xl font-bold mb-6 text-center text-primary">Registrieren</h2>
 
