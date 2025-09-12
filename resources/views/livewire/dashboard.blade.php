@@ -51,14 +51,20 @@
                             $allowed = in_array($key, $allowedModuleKeys ?? []);
                             $routeName = $module['navigation']['route'] ?? null;
                             $finalUrl = $routeName ? route($routeName) : ($module['url'] ?? '#');
+                            $isLink = $allowed && $finalUrl && $finalUrl !== '#';
                             $cost = (float)($moduleCosts[$key]['cost'] ?? 0.0);
                             $title = $module['title'] ?? ucfirst($key);
                             $iconRaw = $module['navigation']['icon'] ?? 'cube';
                             $icon = preg_replace('/^(heroicon-[os]-)/', '', $iconRaw);
-                            $variant = $allowed ? 'primary' : 'neutral';
+                            // Farb-Logik angelehnt an Planner-Dashboard
+                            $variant = 'neutral';
+                            if ($cost === 0.0) { $variant = 'neutral'; }
+                            elseif ($cost < 25) { $variant = 'success'; }
+                            elseif ($cost < 100) { $variant = 'warning'; }
+                            else { $variant = 'danger'; }
                         @endphp
 
-                        @if($allowed && $routeName)
+                        @if($isLink)
                             <a href="{{ $finalUrl }}" wire:navigate class="block">
                                 <x-ui-dashboard-tile
                                     :title="$title"
