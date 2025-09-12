@@ -35,6 +35,8 @@ class Dashboard extends Component
     protected function loadTeamData()
     {
         if (!$this->currentTeam) {
+            $this->teamMembers = [];
+            $this->monthlyTotal = 0.0;
             return;
         }
 
@@ -42,15 +44,16 @@ class Dashboard extends Component
         $startOfMonth = now()->startOfMonth()->toDateString();
         $endOfMonth = now()->endOfMonth()->toDateString();
         
-        $this->monthlyTotal = TeamBillableUsage::where('team_id', $this->currentTeam->id)
+        $sum = TeamBillableUsage::where('team_id', $this->currentTeam->id)
             ->whereBetween('usage_date', [$startOfMonth, $endOfMonth])
             ->sum('total_cost');
+        $this->monthlyTotal = (float) ($sum ?? 0);
 
         // Kosten pro Modul
         $this->moduleCosts = $this->getModuleCosts($startOfMonth, $endOfMonth);
         
         // Team-Mitglieder
-        $this->teamMembers = $this->currentTeam->users()->get();
+        $this->teamMembers = $this->currentTeam->users()->get()->all();
         
         // Usage-Statistiken
         $this->usageStats = $this->getUsageStats($startOfMonth, $endOfMonth);
@@ -66,6 +69,7 @@ class Dashboard extends Component
                 ->where('billable_model', 'like', '%' . $moduleKey . '%')
                 ->sum('total_cost');
                 
+            $moduleCost = (float) ($moduleCost ?? 0);
             if ($moduleCost > 0) {
                 $costs[$moduleKey] = [
                     'title' => $module['title'] ?? ucfirst($moduleKey),
@@ -88,6 +92,7 @@ class Dashboard extends Component
                 ->where('billable_model', 'like', '%' . $moduleKey . '%')
                 ->sum('count');
                 
+            $usage = (int) ($usage ?? 0);
             if ($usage > 0) {
                 $stats[$moduleKey] = [
                     'title' => $module['title'] ?? ucfirst($moduleKey),

@@ -11,7 +11,7 @@
     <div class="grid grid-cols-3 gap-4 mb-8">
         <x-ui-dashboard-tile
             title="Verfügbare Module"
-            :count="0"
+            :count="count($modules)"
             subtitle="Tools & Services"
             icon="cube"
             variant="primary"
@@ -20,7 +20,7 @@
 
         <x-ui-dashboard-tile
             title="Monatliche Kosten"
-            :count="0"
+            :count="$monthlyTotal ?? 0"
             subtitle="Aktueller Monat"
             icon="banknotes"
             variant="info"
@@ -29,7 +29,7 @@
 
         <x-ui-dashboard-tile
             title="Team-Mitglieder"
-            :count="0"
+            :count="count($teamMembers)"
             subtitle="Aktive Nutzer"
             icon="users"
             variant="success"
