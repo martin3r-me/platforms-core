@@ -24,13 +24,22 @@
         </div>
     @endif
 
-    <div class="grid grid-cols-2 gap-4 mb-8">
+    <div class="grid grid-cols-3 gap-4 mb-8">
         <x-ui-dashboard-tile
             title="Verfügbare Module"
             :count="count($modules)"
             subtitle="Tools & Services"
             icon="cube"
             variant="primary"
+            size="lg"
+        />
+        
+        <x-ui-dashboard-tile
+            title="Monatliche Kosten"
+            :count="$monthlyTotal"
+            subtitle="Aktueller Monat"
+            icon="banknotes"
+            variant="info"
             size="lg"
         />
         
