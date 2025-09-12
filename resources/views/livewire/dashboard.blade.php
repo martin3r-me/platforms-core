@@ -50,7 +50,7 @@
         <!-- Monatliche Kosten -->
         <x-ui-dashboard-tile
             title="Monatliche Kosten"
-            :count="number_format((float)($monthlyTotal ?? 0), 2, ',', '.') . ' €'"
+            :count="'DEBUG: ' . gettype($monthlyTotal) . ' = ' . var_export($monthlyTotal, true)"
             subtitle="Aktueller Monat"
             icon="banknotes"
             variant="info"
@@ -68,8 +68,8 @@
         />
     </div>
 
-    <!-- Kosten-Übersicht -->
-    @if(count($moduleCosts) > 0)
+    <!-- Kosten-Übersicht - TEMPORÄR DEAKTIVIERT ZUM DEBUGGEN -->
+    {{-- @if(count($moduleCosts) > 0)
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
             <div class="p-6 border-b border-gray-200">
                 <div class="d-flex items-center gap-2">
@@ -104,7 +104,7 @@
                 </div>
             </div>
         </div>
-    @endif
+    @endif --}}
 
     <!-- Modul-Übersicht -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
@@ -139,7 +139,7 @@
                                     </h4>
                                     <p class="text-sm text-gray-600">
                                         @if($hasCosts)
-                                            {{ number_format((float)($moduleCosts[$moduleKey]['cost'] ?? 0), 2, ',', '.') }} €
+                                            DEBUG: {{ gettype($moduleCosts[$moduleKey]['cost']) }} = {{ var_export($moduleCosts[$moduleKey]['cost'], true) }}
                                         @elseif($hasUsage)
                                             {{ $usageStats[$moduleKey]['usage'] ?? 0 }} Nutzungen
                                         @else
