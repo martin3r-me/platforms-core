@@ -102,7 +102,7 @@
                             <a href="{{ $finalUrl }}" class="block">
                                 <x-ui-dashboard-tile
                                     :title="$title"
-                                    :count="$cost < 1 ? number_format($cost, 2, ',', '.') : number_format($cost, 0, ',', '.')"
+                                    :count="$cost"
                                     subtitle="Monat"
                                     :icon="$icon"
                                     :variant="$variant"
@@ -113,7 +113,7 @@
                             <div class="opacity-60">
                                 <x-ui-dashboard-tile
                                     :title="$title"
-                                    :count="$cost < 1 ? number_format($cost, 2, ',', '.') : number_format($cost, 0, ',', '.')"
+                                    :count="$cost"
                                     subtitle="Monat"
                                     :icon="$icon"
                                     :variant="$variant"
