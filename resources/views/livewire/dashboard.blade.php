@@ -50,7 +50,7 @@
         <!-- Monatliche Kosten -->
         <x-ui-dashboard-tile
             title="Monatliche Kosten"
-            :count="number_format((float)$monthlyTotal, 2, ',', '.') . ' €'"
+            :count="number_format((float)($monthlyTotal ?? 0), 2, ',', '.') . ' €'"
             subtitle="Aktueller Monat"
             icon="banknotes"
             variant="info"
@@ -95,7 +95,7 @@
                             </div>
                             <div class="text-right">
                                 <div class="text-lg font-semibold text-green-600">
-                                    {{ number_format((float)$module['cost'], 2, ',', '.') }} €
+                                    {{ number_format((float)($module['cost'] ?? 0), 2, ',', '.') }} €
                                 </div>
                                 <div class="text-xs text-gray-500">diesen Monat</div>
                             </div>
@@ -139,9 +139,9 @@
                                     </h4>
                                     <p class="text-sm text-gray-600">
                                         @if($hasCosts)
-                                            {{ number_format((float)$moduleCosts[$moduleKey]['cost'], 2, ',', '.') }} €
+                                            {{ number_format((float)($moduleCosts[$moduleKey]['cost'] ?? 0), 2, ',', '.') }} €
                                         @elseif($hasUsage)
-                                            {{ $usageStats[$moduleKey]['usage'] }} Nutzungen
+                                            {{ $usageStats[$moduleKey]['usage'] ?? 0 }} Nutzungen
                                         @else
                                             Verfügbar
                                         @endif
