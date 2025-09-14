@@ -133,6 +133,9 @@ class ModalTeam extends Component
     {
         $this->authorizeEdit();
         
+        // Sicherstellen, dass $userId ein String/Integer ist
+        $userId = is_array($userId) ? $userId[0] : $userId;
+        
         // Validierung der Rolle
         $validRoles = [TeamRole::OWNER->value, TeamRole::ADMIN->value, TeamRole::MEMBER->value, TeamRole::VIEWER->value];
         if (!in_array($value, $validRoles)) {
@@ -150,8 +153,11 @@ class ModalTeam extends Component
     {
         $this->authorizeEdit();
         
+        // Sicherstellen, dass $userId ein String/Integer ist
+        $userId = is_array($userId) ? $userId[0] : $userId;
+        
         // Verhindern, dass sich der Owner selbst entfernt
-        if ($userId === Auth::id()) {
+        if ($userId == Auth::id()) {
             $this->addError('member', 'Du kannst dich nicht selbst aus dem Team entfernen');
             return;
         }
