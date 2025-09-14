@@ -27,6 +27,11 @@ class Team extends Model
         'name',
         'user_id',
         'personal_team',
+        'mollie_customer_id',
+        'mollie_payment_method_id',
+        'payment_method_last_4',
+        'payment_method_brand',
+        'payment_method_expires_at',
     ];
 
     /**
@@ -36,6 +41,7 @@ class Team extends Model
      */
     protected $casts = [
         'personal_team' => 'boolean',
+        'payment_method_expires_at' => 'datetime',
     ];
 
     /**
