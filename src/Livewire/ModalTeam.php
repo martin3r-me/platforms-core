@@ -123,7 +123,7 @@ class ModalTeam extends Component
         $this->loadTeam();
     }
 
-    public function updatedMemberRoles($value, $userId)
+    public function updateMemberRole($userId, $newRole)
     {
         // Nur Team-Owner kann Rollen ändern
         if (!$this->team || $this->team->user_id !== Auth::id()) {
@@ -132,12 +132,15 @@ class ModalTeam extends Component
         
         // Validierung der Rolle
         $validRoles = [TeamRole::OWNER->value, TeamRole::ADMIN->value, TeamRole::MEMBER->value, TeamRole::VIEWER->value];
-        if (!in_array($value, $validRoles)) {
+        if (!in_array($newRole, $validRoles)) {
             return;
         }
         
         // Rolle in der Datenbank aktualisieren
-        $this->team->users()->updateExistingPivot($userId, ['role' => $value]);
+        $this->team->users()->updateExistingPivot($userId, ['role' => $newRole]);
+        
+        // Member-Rollen neu laden
+        $this->loadTeam();
         
         $this->dispatch('member-role-updated');
     }

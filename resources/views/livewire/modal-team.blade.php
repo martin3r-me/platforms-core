@@ -111,7 +111,8 @@
                                             optionValue="value"
                                             optionLabel="name"
                                             :nullable="false"
-                                            wire:model.live="memberRoles.{{ $member->id }}"
+                                            :value="$member->pivot->role"
+                                            wire:change="updateMemberRole({{ $member->id }}, $event.target.value)"
                                             size="sm"
                                         />
                                     @else
