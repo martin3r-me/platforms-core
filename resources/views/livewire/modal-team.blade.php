@@ -3,16 +3,16 @@
         Team-Verwaltung
     </x-slot>
 
-    <div x-data="{ tab: 'settings' }">
+    <div x-data="{ tab: 'switch' }">
         {{-- Tab Navigation --}}
         <div class="d-flex border-b mb-4">
             <button
                 class="px-4 py-2 border-0 bg-transparent cursor-pointer"
-                :class="{'font-bold border-b-2 border-primary': tab === 'settings'}"
-                @click="tab = 'settings'"
+                :class="{'font-bold border-b-2 border-primary': tab === 'switch'}"
+                @click="tab = 'switch'"
                 type="button"
             >
-                Einstellungen
+                Team wechseln
             </button>
             <button
                 class="px-4 py-2 border-0 bg-transparent cursor-pointer"
@@ -40,15 +40,14 @@
             </button>
         </div>
 
-        {{-- Einstellungen --}}
-        <div x-show="tab === 'settings'" class="space-y-6" x-cloak>
-            {{-- Team wechseln --}}
+        {{-- Team wechseln --}}
+        <div x-show="tab === 'switch'" class="space-y-6" x-cloak>
             @if($allTeams && count($allTeams) > 1)
                 <div class="mb-4">
                     <x-ui-input-select
                         name="user.current_team_id"
                         variant="danger"
-                        label="Team wechseln"
+                        label="Aktuelles Team wechseln"
                         :options="$allTeams"
                         optionValue="id"
                         optionLabel="name"
@@ -56,42 +55,23 @@
                         wire:model.live="user.current_team_id"
                     />
                 </div>
+            @else
+                <div class="text-center py-8">
+                    <p class="text-gray-600">Du bist nur in einem Team. Erstelle ein neues Team, um zwischen Teams wechseln zu können.</p>
+                </div>
             @endif
 
             @if($team && $team->personal_team)
-                <x-ui-badge variant="primary" size="xs">
-                    Persönliches Team
-                </x-ui-badge>
-            @endif
-
-            @can('update', $team)
-                <x-ui-input-text
-                    name="team.name"
-                    label="Team-Name"
-                    wire:model.live.debounce.500ms="team.name"
-                    placeholder="Team-Name eingeben..."
-                    required
-                    :errorKey="'team.name'"
-                />
-            @else
-                <div>
-                    <strong>Team:</strong> {{ $team->name }}
+                <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div class="d-flex items-center gap-2">
+                        @svg('heroicon-o-information-circle', 'w-5 h-5 text-blue-600')
+                        <span class="text-blue-800 font-medium">Persönliches Team</span>
+                    </div>
+                    <p class="text-blue-700 text-sm mt-2">
+                        Dies ist dein persönliches Team. Erstelle ein neues Team, um mit anderen zusammenzuarbeiten.
+                    </p>
                 </div>
-            @endcan
-
-            <hr>
-
-            <div>
-                <strong>Mitglieder:</strong>
-                <ul>
-                    @foreach($team->users as $user)
-                        <li>
-                            {{ $user->fullname ?? $user->name }} 
-                            <span class="text-xs text-gray-500">({{ $user->pivot->role }})</span>
-                        </li>
-                    @endforeach
-                </ul>
-            </div>
+            @endif
         </div>
 
         {{-- Mitglieder --}}
