@@ -116,11 +116,11 @@
                                 <div class="d-flex items-center gap-3">
                                     <div class="w-8 h-8 bg-primary text-on-primary rounded-full d-flex items-center justify-center">
                                         <span class="text-sm font-medium">
-                                            {{ strtoupper(substr($member->name, 0, 2)) }}
+                                            {{ strtoupper(substr($member->fullname ?? $member->name, 0, 2)) }}
                                         </span>
                                     </div>
                                     <div>
-                                        <div class="font-medium text-gray-900">{{ $member->name }}</div>
+                                        <div class="font-medium text-gray-900">{{ $member->fullname ?? $member->name }}</div>
                                         <div class="text-sm text-gray-600">{{ $member->email }}</div>
                                     </div>
                                 </div>

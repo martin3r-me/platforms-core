@@ -40,6 +40,7 @@ class ModalTeam extends Component
     {
         $this->user = Auth::user();
         $this->allTeams = $this->user->teams()->get();
+        $this->memberRoles = [];
         $this->loadTeam();
     }
 
@@ -52,6 +53,8 @@ class ModalTeam extends Component
         // Member-Rollen laden
         if ($this->team) {
             $this->memberRoles = $this->team->users->pluck('pivot.role', 'id')->toArray();
+        } else {
+            $this->memberRoles = [];
         }
         
         // Abrechnungsdaten laden
