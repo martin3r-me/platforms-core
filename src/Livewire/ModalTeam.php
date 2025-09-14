@@ -20,9 +20,6 @@ class ModalTeam extends Component
     public $inviteRole = TeamRole::MEMBER;
     public $allTeams = [];
     public $user;
-    public $memberRoles = [];
-    public $lastInvoiceDate = null;
-    public $nextInvoiceDate = null;
 
     protected $rules = [
         'team.name' => 'required|string|max:255',
@@ -40,7 +37,6 @@ class ModalTeam extends Component
     {
         $this->user = Auth::user();
         $this->allTeams = $this->user->teams()->get();
-        $this->memberRoles = [];
         $this->loadTeam();
     }
 
@@ -49,16 +45,6 @@ class ModalTeam extends Component
         $user = Auth::user();
         $this->team = $user->currentTeam;
         $this->teamTitle = $this->team?->name ?? '';
-        
-        // Member-Rollen laden
-        if ($this->team) {
-            $this->memberRoles = $this->team->users->pluck('pivot.role', 'id')->toArray();
-        } else {
-            $this->memberRoles = [];
-        }
-        
-        // Abrechnungsdaten laden
-        $this->loadBillingInfo();
     }
 
     public function closeModal()
@@ -127,100 +113,6 @@ class ModalTeam extends Component
 
         $this->newTeamName = '';
         $this->loadTeam();
-    }
-
-    public function updatedMemberRoles($value, $userId)
-    {
-        $this->authorizeEdit();
-        
-        // Sicherstellen, dass $userId ein String/Integer ist
-        $userId = is_array($userId) ? $userId[0] : $userId;
-        
-        // Validierung der Rolle
-        $validRoles = [TeamRole::OWNER->value, TeamRole::ADMIN->value, TeamRole::MEMBER->value, TeamRole::VIEWER->value];
-        if (!in_array($value, $validRoles)) {
-            $this->addError('memberRoles.' . $userId, 'Ungültige Rolle');
-            return;
-        }
-        
-        // Rolle in der Datenbank aktualisieren
-        $this->team->users()->updateExistingPivot($userId, ['role' => $value]);
-        
-        $this->dispatch('member-role-updated');
-    }
-
-    public function removeMember($userId)
-    {
-        $this->authorizeEdit();
-        
-        // Sicherstellen, dass $userId ein String/Integer ist
-        $userId = is_array($userId) ? $userId[0] : $userId;
-        
-        // Verhindern, dass sich der Owner selbst entfernt
-        if ($userId == Auth::id()) {
-            $this->addError('member', 'Du kannst dich nicht selbst aus dem Team entfernen');
-            return;
-        }
-        
-        // Mitglied aus dem Team entfernen
-        $this->team->users()->detach($userId);
-        
-        // Member-Rollen neu laden
-        $this->loadTeam();
-        
-        $this->dispatch('member-removed');
-    }
-
-    public function addPaymentMethod()
-    {
-        $this->authorizeEdit();
-        
-        // Hier würde die Mollie-Integration für das Hinzufügen einer Zahlungsmethode implementiert
-        // Für jetzt simulieren wir es
-        $this->dispatch('open-payment-modal', ['action' => 'add']);
-    }
-
-    public function updatePaymentMethod()
-    {
-        $this->authorizeEdit();
-        
-        // Hier würde die Mollie-Integration für das Aktualisieren einer Zahlungsmethode implementiert
-        $this->dispatch('open-payment-modal', ['action' => 'update']);
-    }
-
-    public function removePaymentMethod()
-    {
-        $this->authorizeEdit();
-        
-        // Zahlungsmethode aus der Datenbank entfernen
-        $this->team->update([
-            'mollie_payment_method_id' => null,
-            'payment_method_last_4' => null,
-            'payment_method_brand' => null,
-            'payment_method_expires_at' => null,
-        ]);
-        
-        $this->loadTeam();
-        $this->dispatch('payment-method-removed');
-    }
-
-    private function loadBillingInfo()
-    {
-        if (!$this->team) {
-            return;
-        }
-        
-        // Hier würde die Integration mit dem Billing-System implementiert
-        // Für jetzt simulieren wir die Daten
-        $this->lastInvoiceDate = $this->team->created_at->format('d.m.Y');
-        $this->nextInvoiceDate = now()->addMonth()->format('d.m.Y');
-    }
-
-    private function authorizeEdit()
-    {
-        if (!$this->team || $this->team->user_id !== Auth::id()) {
-            abort(403, 'Keine Berechtigung');
-        }
     }
 
     public function render()
