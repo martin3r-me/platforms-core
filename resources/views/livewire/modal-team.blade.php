@@ -16,6 +16,14 @@
             </button>
             <button
                 class="px-4 py-2 border-0 bg-transparent cursor-pointer"
+                :class="{'font-bold border-b-2 border-primary': tab === 'members'}"
+                @click="tab = 'members'"
+                type="button"
+            >
+                Mitglieder
+            </button>
+            <button
+                class="px-4 py-2 border-0 bg-transparent cursor-pointer"
                 :class="{'font-bold border-b-2 border-primary': tab === 'invites'}"
                 @click="tab = 'invites'"
                 type="button"
@@ -84,6 +92,42 @@
                     @endforeach
                 </ul>
             </div>
+        </div>
+
+        {{-- Mitglieder --}}
+        <div x-show="tab === 'members'" class="space-y-6" x-cloak>
+            @if($team)
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Team-Mitglieder</h3>
+                    <div class="space-y-3">
+                        @foreach($team->users as $member)
+                            <div class="d-flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div class="d-flex items-center gap-3">
+                                    <div class="w-8 h-8 bg-primary text-on-primary rounded-full d-flex items-center justify-center">
+                                        <span class="text-sm font-medium">
+                                            {{ strtoupper(substr($member->name, 0, 2)) }}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <div class="font-medium text-gray-900">{{ $member->name }}</div>
+                                        <div class="text-sm text-gray-600">{{ $member->email }}</div>
+                                    </div>
+                                </div>
+                                <div class="d-flex items-center gap-2">
+                                    <x-ui-badge variant="primary" size="sm">
+                                        {{ ucfirst($member->pivot->role) }}
+                                    </x-ui-badge>
+                                    @if($member->id === auth()->id())
+                                        <x-ui-badge variant="success" size="sm">
+                                            Du
+                                        </x-ui-badge>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
         </div>
 
         {{-- Einladungen --}}
