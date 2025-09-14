@@ -1,6 +1,11 @@
 <x-ui-modal wire:model="modalShow">
     <x-slot name="header">
         Team-Verwaltung
+        @if($team)
+            <div class="text-sm font-normal text-gray-600 mt-1">
+                {{ $team->name }}
+            </div>
+        @endif
     </x-slot>
 
     <div x-data="{ tab: 'switch' }">
@@ -94,13 +99,30 @@
                                     </div>
                                 </div>
                                 <div class="d-flex items-center gap-2">
-                                    <x-ui-badge variant="primary" size="sm">
-                                        {{ ucfirst($member->pivot->role) }}
-                                    </x-ui-badge>
-                                    @if($member->id === auth()->id())
-                                        <x-ui-badge variant="success" size="sm">
-                                            Du
+                                    @if($team->user_id === auth()->id() && $member->id !== auth()->id())
+                                        <x-ui-input-select
+                                            name="member_role_{{ $member->id }}"
+                                            :options="[
+                                                ['value' => 'owner', 'name' => 'Owner'],
+                                                ['value' => 'admin', 'name' => 'Admin'],
+                                                ['value' => 'member', 'name' => 'Member'],
+                                                ['value' => 'viewer', 'name' => 'Viewer']
+                                            ]"
+                                            optionValue="value"
+                                            optionLabel="name"
+                                            :nullable="false"
+                                            wire:model.live="memberRoles.{{ $member->id }}"
+                                            size="sm"
+                                        />
+                                    @else
+                                        <x-ui-badge variant="primary" size="sm">
+                                            {{ ucfirst($member->pivot->role) }}
                                         </x-ui-badge>
+                                        @if($member->id === auth()->id())
+                                            <x-ui-badge variant="success" size="sm">
+                                                Du
+                                            </x-ui-badge>
+                                        @endif
                                     @endif
                                 </div>
                             </div>

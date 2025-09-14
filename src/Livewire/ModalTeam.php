@@ -20,6 +20,7 @@ class ModalTeam extends Component
     public $inviteRole = TeamRole::MEMBER;
     public $allTeams = [];
     public $user;
+    public $memberRoles = [];
 
     protected $rules = [
         'team.name' => 'required|string|max:255',
@@ -45,6 +46,13 @@ class ModalTeam extends Component
         $user = Auth::user();
         $this->team = $user->currentTeam;
         $this->teamTitle = $this->team?->name ?? '';
+        
+        // Member-Rollen laden
+        if ($this->team) {
+            $this->memberRoles = $this->team->users->pluck('pivot.role', 'id')->toArray();
+        } else {
+            $this->memberRoles = [];
+        }
     }
 
     public function closeModal()
@@ -113,6 +121,25 @@ class ModalTeam extends Component
 
         $this->newTeamName = '';
         $this->loadTeam();
+    }
+
+    public function updatedMemberRoles($value, $userId)
+    {
+        // Nur Team-Owner kann Rollen ändern
+        if (!$this->team || $this->team->user_id !== Auth::id()) {
+            return;
+        }
+        
+        // Validierung der Rolle
+        $validRoles = [TeamRole::OWNER->value, TeamRole::ADMIN->value, TeamRole::MEMBER->value, TeamRole::VIEWER->value];
+        if (!in_array($value, $validRoles)) {
+            return;
+        }
+        
+        // Rolle in der Datenbank aktualisieren
+        $this->team->users()->updateExistingPivot($userId, ['role' => $value]);
+        
+        $this->dispatch('member-role-updated');
     }
 
     public function render()
