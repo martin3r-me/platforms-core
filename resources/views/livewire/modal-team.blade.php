@@ -100,21 +100,16 @@
                                 </div>
                                 <div class="d-flex items-center gap-2">
                                     @if($team->user_id === auth()->id() && $member->id !== auth()->id())
-                                        <x-ui-input-select
+                                        <select
                                             name="member_role_{{ $member->id }}"
-                                            :options="[
-                                                ['value' => 'owner', 'name' => 'Owner'],
-                                                ['value' => 'admin', 'name' => 'Admin'],
-                                                ['value' => 'member', 'name' => 'Member'],
-                                                ['value' => 'viewer', 'name' => 'Viewer']
-                                            ]"
-                                            optionValue="value"
-                                            optionLabel="name"
-                                            :nullable="false"
-                                            :value="$member->pivot->role"
+                                            class="min-w-[9rem] px-2 py-1 border rounded"
                                             wire:change="updateMemberRole({{ $member->id }}, $event.target.value)"
-                                            size="sm"
-                                        />
+                                        >
+                                            <option value="owner" {{ $member->pivot->role === 'owner' ? 'selected' : '' }}>Owner</option>
+                                            <option value="admin" {{ $member->pivot->role === 'admin' ? 'selected' : '' }}>Admin</option>
+                                            <option value="member" {{ $member->pivot->role === 'member' ? 'selected' : '' }}>Member</option>
+                                            <option value="viewer" {{ $member->pivot->role === 'viewer' ? 'selected' : '' }}>Viewer</option>
+                                        </select>
                                     @else
                                         <x-ui-badge variant="primary" size="sm">
                                             {{ ucfirst($member->pivot->role) }}
