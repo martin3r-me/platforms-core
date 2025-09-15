@@ -7,6 +7,7 @@ use Platform\Core\Models\Team;
 use Platform\Core\Models\TeamInvitation;
 use Platform\Core\Enums\TeamRole;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
@@ -21,6 +22,8 @@ class ModalTeam extends Component
     public $allTeams = [];
     public $user;
     public $memberRoles = [];
+    public $addingPayment = false;
+    public $mollieKey = null;
 
     protected $rules = [
         'team.name' => 'required|string|max:255',
@@ -39,6 +42,7 @@ class ModalTeam extends Component
         $this->user = Auth::user();
         $this->allTeams = $this->user->teams()->get();
         $this->loadTeam();
+        $this->mollieKey = env('MOLLIE_KEY');
     }
 
     public function loadTeam()
@@ -150,8 +154,7 @@ class ModalTeam extends Component
         if (!$this->team || $this->team->user_id !== Auth::id()) {
             return;
         }
-        // Hier später: Redirect/Flow zu Mollie Setup. Jetzt nur Event.
-        $this->dispatch('payment-method-add');
+        $this->addingPayment = true;
     }
 
     public function updatePaymentMethod()
@@ -159,7 +162,7 @@ class ModalTeam extends Component
         if (!$this->team || $this->team->user_id !== Auth::id()) {
             return;
         }
-        $this->dispatch('payment-method-update');
+        $this->addingPayment = true;
     }
 
     public function removePaymentMethod()
@@ -175,6 +178,74 @@ class ModalTeam extends Component
         ]);
         $this->loadTeam();
         $this->dispatch('payment-method-removed');
+    }
+
+    public function cancelAddPayment()
+    {
+        $this->addingPayment = false;
+    }
+
+    public function savePaymentMethod(string $cardToken)
+    {
+        if (!$this->team || $this->team->user_id !== Auth::id()) {
+            return;
+        }
+
+        $secretKey = env('MOLLIE_KEY');
+        if (!$secretKey) {
+            // Ohne Secret-Key kein Server-Call möglich
+            return;
+        }
+
+        // 1) Customer anlegen (falls nicht vorhanden)
+        if (!$this->team->mollie_customer_id) {
+            $customerResp = Http::withToken($secretKey)
+                ->acceptJson()
+                ->post('https://api.mollie.com/v2/customers', [
+                    'name' => $this->team->name,
+                    'email' => $this->user->email,
+                ]);
+
+            if ($customerResp->failed()) {
+                return;
+            }
+            $this->team->mollie_customer_id = $customerResp->json('id');
+            $this->team->save();
+        }
+
+        // 2) Mandat mit cardToken erstellen
+        $mandateResp = Http::withToken($secretKey)
+            ->acceptJson()
+            ->post('https://api.mollie.com/v2/customers/' . $this->team->mollie_customer_id . '/mandates', [
+                'method' => 'creditcard',
+                'cardToken' => $cardToken,
+                'consumerName' => $this->team->name,
+            ]);
+
+        if ($mandateResp->failed()) {
+            return;
+        }
+
+        // Details aus Mandat (falls verfügbar)
+        $details = $mandateResp->json('details') ?: [];
+        $cardLabel = $details['cardLabel'] ?? ($details['cardHolder'] ?? 'card');
+        $last4 = $details['cardNumber'] ?? null; // kann maskiert sein
+        if (is_string($last4) && strlen($last4) >= 4) {
+            $last4 = substr($last4, -4);
+        } else {
+            $last4 = null;
+        }
+
+        $this->team->update([
+            'mollie_payment_method_id' => $mandateResp->json('id'),
+            'payment_method_brand' => $cardLabel,
+            'payment_method_last_4' => $last4,
+            'payment_method_expires_at' => null,
+        ]);
+
+        $this->addingPayment = false;
+        $this->loadTeam();
+        $this->dispatch('payment-method-saved');
     }
 
     public function render()

@@ -203,11 +203,68 @@
                             </div>
                         </div>
                     @else
-                        <div class="text-center py-8">
+                        <div class="text-center py-8" x-data>
                             <h4 class="text-lg font-medium text-gray-900 mb-2">Keine Zahlungsmethode</h4>
                             <p class="text-gray-600 mb-4">Füge eine Kreditkarte hinzu, um Abrechnungen zu ermöglichen.</p>
-                            <x-ui-button variant="primary" wire:click="addPaymentMethod">Kreditkarte hinzufügen</x-ui-button>
+                            <template x-if="!$wire.addingPayment">
+                                <x-ui-button variant="primary" wire:click="addPaymentMethod">Kreditkarte hinzufügen</x-ui-button>
+                            </template>
+
+                            <template x-if="$wire.addingPayment">
+                                <div class="max-w-md mx-auto text-left">
+                                    <div class="mb-2 text-sm text-gray-700">Kartendaten</div>
+                                    <div id="mollie-card"></div>
+                                    <div class="d-flex items-center gap-2 mt-4">
+                                        <x-ui-button variant="secondary-outline" size="sm" wire:click="cancelAddPayment">Abbrechen</x-ui-button>
+                                        <x-ui-button id="mollie-card-submit" variant="primary" size="sm">Speichern</x-ui-button>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
+                        <script>
+                            document.addEventListener('livewire:init', () => {
+                                Livewire.hook('message.processed', (message, component) => {
+                                    const container = document.getElementById('mollie-card');
+                                    if (!container) return;
+                                    if (container.dataset.mollieInitialized === '1') return;
+                                    if (!window.Mollie) {
+                                        const s = document.createElement('script');
+                                        s.src = 'https://js.mollie.com/v1/mollie.js';
+                                        s.onload = initMollie;
+                                        document.body.appendChild(s);
+                                    } else {
+                                        initMollie();
+                                    }
+
+                                    function initMollie() {
+                                        if (!window.Mollie) return;
+                                        const mollie = Mollie($wire.mollieKey || 'test_xxxxx', { locale: 'de_DE' });
+                                        const card = mollie.createComponent('card');
+                                        card.mount('#mollie-card');
+                                        container.dataset.mollieInitialized = '1';
+
+                                        const btn = document.getElementById('mollie-card-submit');
+                                        if (btn && !btn.dataset.bound) {
+                                            btn.dataset.bound = '1';
+                                            btn.addEventListener('click', async () => {
+                                                const { token, error } = await mollie.createToken();
+                                                if (error) { alert(error.message); return; }
+                                                Livewire.dispatch('invoke-save-payment', { token });
+                                            });
+                                        }
+                                    }
+                                });
+                            });
+                        </script>
+                        <script>
+                            document.addEventListener('livewire:load', () => {
+                                Livewire.on('invoke-save-payment', (e) => {
+                                    const token = e?.token;
+                                    if (!token) return;
+                                    Livewire.find(@this.__instance.id).call('savePaymentMethod', token);
+                                });
+                            });
+                        </script>
                     @endif
                 </div>
             @endif
