@@ -35,6 +35,16 @@
             >
                 Einladungen
             </button>
+            @if($team && $team->user_id === auth()->id())
+                <button
+                    class="px-4 py-2 border-0 bg-transparent cursor-pointer"
+                    :class="{'font-bold border-b-2 border-primary': tab === 'payment'}"
+                    @click="tab = 'payment'"
+                    type="button"
+                >
+                    Zahlungsdetails
+                </button>
+            @endif
             <button
                 class="px-4 py-2 border-0 bg-transparent cursor-pointer"
                 :class="{'font-bold border-b-2 border-primary': tab === 'create'}"
@@ -165,6 +175,40 @@
                 <div class="text-sm text-gray-500 mt-2">
                     <strong>Hinweis:</strong> Dies ist dein persönliches Team.<br>
                     Möchtest du mit anderen zusammenarbeiten, erstelle bitte ein neues Team.
+                </div>
+            @endif
+        </div>
+
+        {{-- Zahlungsdetails --}}
+        <div x-show="tab === 'payment'" class="space-y-6" x-cloak>
+            @if($team && $team->user_id === auth()->id())
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Zahlungsmethode</h3>
+
+                    @if($team->mollie_payment_method_id)
+                        <div class="p-4 bg-gray-50 rounded-lg mb-4">
+                            <div class="d-flex items-center justify-between">
+                                <div>
+                                    <div class="font-medium text-gray-900">
+                                        {{ ucfirst($team->payment_method_brand) }} **** {{ $team->payment_method_last_4 }}
+                                    </div>
+                                    <div class="text-sm text-gray-600">
+                                        Ablaufdatum: {{ $team->payment_method_expires_at?->format('m/Y') }}
+                                    </div>
+                                </div>
+                                <div class="d-flex items-center gap-2">
+                                    <x-ui-button variant="secondary-outline" size="sm" wire:click="updatePaymentMethod">Bearbeiten</x-ui-button>
+                                    <x-ui-button variant="danger-outline" size="sm" wire:click="removePaymentMethod">Löschen</x-ui-button>
+                                </div>
+                            </div>
+                        </div>
+                    @else
+                        <div class="text-center py-8">
+                            <h4 class="text-lg font-medium text-gray-900 mb-2">Keine Zahlungsmethode</h4>
+                            <p class="text-gray-600 mb-4">Füge eine Kreditkarte hinzu, um Abrechnungen zu ermöglichen.</p>
+                            <x-ui-button variant="primary" wire:click="addPaymentMethod">Kreditkarte hinzufügen</x-ui-button>
+                        </div>
+                    @endif
                 </div>
             @endif
         </div>

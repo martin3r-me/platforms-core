@@ -145,6 +145,38 @@ class ModalTeam extends Component
         $this->dispatch('member-role-updated');
     }
 
+    public function addPaymentMethod()
+    {
+        if (!$this->team || $this->team->user_id !== Auth::id()) {
+            return;
+        }
+        // Hier später: Redirect/Flow zu Mollie Setup. Jetzt nur Event.
+        $this->dispatch('payment-method-add');
+    }
+
+    public function updatePaymentMethod()
+    {
+        if (!$this->team || $this->team->user_id !== Auth::id()) {
+            return;
+        }
+        $this->dispatch('payment-method-update');
+    }
+
+    public function removePaymentMethod()
+    {
+        if (!$this->team || $this->team->user_id !== Auth::id()) {
+            return;
+        }
+        $this->team->update([
+            'mollie_payment_method_id' => null,
+            'payment_method_last_4' => null,
+            'payment_method_brand' => null,
+            'payment_method_expires_at' => null,
+        ]);
+        $this->loadTeam();
+        $this->dispatch('payment-method-removed');
+    }
+
     public function render()
     {
         return view('platform::livewire.modal-team', [
