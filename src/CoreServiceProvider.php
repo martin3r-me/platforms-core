@@ -13,6 +13,8 @@ use Platform\Core\Contracts\CrmCompanyResolverInterface;
 use Platform\Core\Contracts\CrmContactResolverInterface;
 use Platform\Core\Services\NullCrmCompanyResolver;
 use Platform\Core\Services\NullCrmContactResolver;
+use Platform\Core\Contracts\CrmCompanyOptionsProviderInterface;
+use Platform\Core\Services\NullCrmCompanyOptionsProvider;
 
 // Command-Klasse importieren!
 use Platform\Core\Commands\TrackBillableUsage;
@@ -64,6 +66,9 @@ class CoreServiceProvider extends ServiceProvider
         });
         $this->app->singleton(CrmContactResolverInterface::class, function () {
             return new NullCrmContactResolver();
+        });
+        $this->app->singleton(CrmCompanyOptionsProviderInterface::class, function () {
+            return new NullCrmCompanyOptionsProvider();
         });
     }
 
