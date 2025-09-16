@@ -9,6 +9,10 @@ use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Platform\Core\Contracts\AuthAccessPolicy;
 use Platform\Core\Services\ConfigAuthAccessPolicy;
+use Platform\Core\Contracts\CrmCompanyResolverInterface;
+use Platform\Core\Contracts\CrmContactResolverInterface;
+use Platform\Core\Services\NullCrmCompanyResolver;
+use Platform\Core\Services\NullCrmContactResolver;
 
 // Command-Klasse importieren!
 use Platform\Core\Commands\TrackBillableUsage;
@@ -52,6 +56,14 @@ class CoreServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/auth-policy.php', 'auth-policy');
         $this->app->singleton(AuthAccessPolicy::class, function () {
             return new ConfigAuthAccessPolicy();
+        });
+
+        // Default-Resolver binden (können vom CRM überschrieben werden)
+        $this->app->singleton(CrmCompanyResolverInterface::class, function () {
+            return new NullCrmCompanyResolver();
+        });
+        $this->app->singleton(CrmContactResolverInterface::class, function () {
+            return new NullCrmContactResolver();
         });
     }
 
