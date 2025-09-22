@@ -4,45 +4,7 @@
     </x-slot>
 
     @if(!$showMatrix)
-        <div x-data="{
-                query: '',
-                view: 'grid', // 'grid' | 'list'
-                normalize(s){ return (s||'').toString().toLowerCase(); },
-                matches(el){
-                    if(!this.query) return true;
-                    const q = this.normalize(this.query);
-                    const hay = this.normalize(el.dataset.search || '');
-                    return hay.includes(q);
-                }
-            }"
-            class="space-y-4"
-        >
-            <div class="d-flex items-center gap-2">
-                <div class="flex-grow-1">
-                    <input
-                        x-model.debounce.200ms="query"
-                        type="text"
-                        placeholder="Module suchen..."
-                        class="w-full px-3 py-2 border rounded"
-                        aria-label="Module suchen"
-                    >
-                </div>
-                <div class="flex-shrink-0 d-flex items-center gap-1" role="group" aria-label="Ansicht umschalten">
-                    <button type="button"
-                            @click="view='grid'"
-                            :class="view==='grid' ? 'bg-primary text-white' : 'bg-white text-secondary'"
-                            class="px-3 py-2 rounded border">
-                        Grid
-                    </button>
-                    <button type="button"
-                            @click="view='list'"
-                            :class="view==='list' ? 'bg-primary text-white' : 'bg-white text-secondary'"
-                            class="px-3 py-2 rounded border">
-                        Liste
-                    </button>
-                </div>
-            </div>
-
+        <div class="space-y-4">
             <div class="grid grid-cols-1 gap-4">
             <a href="{{ route('platform.dashboard') }}"
                class="d-flex items-center gap-2 p-4 rounded-md border border-solid border-1 transition hover:border-primary hover:bg-primary-10">
@@ -63,10 +25,7 @@
             </a>
             </div>
 
-            <div
-                class="mt-2"
-                :class="view==='grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3' : 'flex flex-col gap-2'"
-            >
+            <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 @foreach($modules as $module)
                     @php
                         $title = $module['title'] ?? $module['label'] ?? 'Modul';
@@ -75,11 +34,7 @@
                         $finalUrl = $routeName ? route($routeName) : ($module['url'] ?? '#');
                     @endphp
 
-                    <a href="{{ $finalUrl }}"
-                       x-show="matches($el)"
-                       x-bind:data-search="'{{ Str::of($title.' '.($routeName ?? '').' '.($finalUrl ?? ''))->lower() }}'"
-                       class="d-flex items-center gap-3 p-3 rounded-md border border-solid border-1 transition hover:border-primary hover:bg-primary-10"
-                    >
+                    <a href="{{ $finalUrl }}" class="d-flex items-center gap-3 p-3 rounded-md border border-solid border-1 transition hover:border-primary hover:bg-primary-10">
                         <div class="flex-shrink-0">
                             @if(!empty($icon))
                                 <x-dynamic-component :component="$icon" class="w-6 h-6 text-primary" />
