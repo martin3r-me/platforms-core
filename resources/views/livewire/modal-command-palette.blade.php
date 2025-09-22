@@ -36,7 +36,14 @@
                         <x-ui-badge variant="warning" size="sm">Bestätigung benötigt</x-ui-badge>
                     @endif
                 @else
-                    <x-ui-badge variant="danger" size="sm">LLM: {{ $llm['message'] ?? 'Fehler' }}</x-ui-badge>
+                    <div class="d-flex items-center gap-2">
+                        <x-ui-badge variant="danger" size="sm">LLM: {{ $llm['message'] ?? 'Fehler' }}</x-ui-badge>
+                        @if(!empty($llm['detail']))
+                            <span class="text-xs text-gray-500 truncate max-w-64" title="{{ is_array($llm['detail']) ? json_encode($llm['detail']) : $llm['detail'] }}">
+                                {{ is_array($llm['detail']) ? json_encode($llm['detail']) : $llm['detail'] }}
+                            </span>
+                        @endif
+                    </div>
                 @endif
             @endif
         </div>
