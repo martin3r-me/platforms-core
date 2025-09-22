@@ -67,6 +67,8 @@ class CommandRegistry
         foreach (self::$moduleKeyToCommands as $moduleKey => $commands) {
             foreach ($commands as $cmd) {
                 $name = $cmd['key'];
+                // OpenAI tool name: only a-zA-Z0-9_-
+                $toolName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $name);
                 $desc = trim(($cmd['description'] ?? '') . ' Module: ' . $moduleKey);
                 $props = [];
                 $required = [];
@@ -78,7 +80,7 @@ class CommandRegistry
                     if (!empty($p['required'])) { $required[] = $pname; }
                 }
                 $schema = [
-                    'name' => $name,
+                    'name' => $toolName,
                     'description' => $desc,
                     'parameters' => [
                         'type' => 'object',
