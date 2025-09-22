@@ -16,7 +16,17 @@ class CommandDispatcher
         // Handler-Typen: ['service', 'Class@method'] | ['route', routeName] | ['livewire', event]
         if (is_array($handler) && ($handler[0] ?? null) === 'service') {
             [$type, $callable] = $handler;
-            return $this->callService($callable, $slots);
+            $res = $this->callService($callable, $slots);
+            // Service kann navigate/message setzen, ok muss bool sein
+            if (is_array($res)) {
+                return [
+                    'ok' => (bool)($res['ok'] ?? true),
+                    'navigate' => $res['navigate'] ?? null,
+                    'message' => $res['message'] ?? null,
+                    'data' => $res['data'] ?? null,
+                ];
+            }
+            return ['ok' => true, 'data' => $res];
         }
         if (is_array($handler) && ($handler[0] ?? null) === 'route') {
             [$type, $routeName] = $handler;

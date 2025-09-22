@@ -51,6 +51,16 @@
                             <div class="font-medium">Ergebnis</div>
                             <div>{{ $b['data']['message'] ?? (($b['data']['ok'] ?? false) ? 'OK' : 'Fehler') }}</div>
                         </div>
+                    @elseif(($b['type'] ?? '') === 'tool_call_start')
+                        <div class="text-left text-xs bg-muted-10 px-3 py-2 rounded">
+                            <div class="font-medium">Tool Call gestartet</div>
+                            <div>{{ $b['data']['name'] ?? '' }}: {{ json_encode($b['data']['args'] ?? []) }}</div>
+                        </div>
+                    @elseif(($b['type'] ?? '') === 'tool_call_end')
+                        <div class="text-left text-xs bg-muted-10 px-3 py-2 rounded">
+                            <div class="font-medium">Tool Call beendet</div>
+                            <div>{{ is_array($b['data']) ? json_encode($b['data']) : ($b['data'] ?? '') }}</div>
+                        </div>
                     @elseif(($b['type'] ?? '') === 'error')
                         <div class="text-left text-sm bg-danger-50 px-3 py-2 rounded">
                             <div class="font-medium">Fehler</div>
