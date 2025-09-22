@@ -8,6 +8,7 @@ use Platform\Core\Services\CommandDispatcher;
 use Platform\Core\Services\CommandGateway;
 use Platform\Core\Services\IntentMatcher;
 use Platform\Core\Services\LlmPlanner;
+use Livewire\Attributes\On;
 
 class CursorPanel extends Component
 {
@@ -20,6 +21,12 @@ class CursorPanel extends Component
     public function toggle(): void
     {
         $this->open = !$this->open;
+    }
+
+    #[On('cursor-toggle')]
+    public function openFromNavbar(): void
+    {
+        $this->toggle();
     }
 
     public function run(): void

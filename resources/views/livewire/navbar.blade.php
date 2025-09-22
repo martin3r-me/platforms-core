@@ -67,6 +67,17 @@
                 </x-ui-button>
 
                 <x-ui-button 
+                    variant="primary-outline" 
+                    size="md" 
+                    @click="$dispatch('cursor-toggle')"
+                >
+                    <span class="d-flex items-center gap-1">
+                        <x-heroicon-o-bolt class="w-5 h-5" />
+                        <span>Cursor</span>
+                    </span>
+                </x-ui-button>
+
+                <x-ui-button 
                     variant="secondary-outline" 
                     size="md" 
                     icon-only 
