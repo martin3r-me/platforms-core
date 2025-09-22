@@ -64,5 +64,6 @@
     @endif
 
     @livewireScripts
+    <livewire:core.cursor-panel />
 </body>
 </html>

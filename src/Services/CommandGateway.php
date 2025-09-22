@@ -3,6 +3,7 @@
 namespace Platform\Core\Services;
 
 use Platform\Core\Registry\CommandRegistry;
+use Platform\Core\Models\CoreCommandRun;
 
 class CommandGateway
 {
@@ -32,6 +33,7 @@ class CommandGateway
         // Confirm bei medium/high impact (UI muss Confirm schicken – MVP: abbrechen)
         $confirmRequired = $cmd['confirmRequired'] ?? false;
         if ($confirmRequired && !$overrideConfirm && !request()->boolean('confirm', false)) {
+            $this->logRun($cmd, $matched['slots'], $actor, 'need_confirm', $overrideConfirm);
             return [
                 'ok' => false,
                 'needConfirm' => true,
@@ -40,7 +42,28 @@ class CommandGateway
             ];
         }
 
-        return $this->dispatcher->dispatch($cmd, $matched['slots']);
+        $result = $this->dispatcher->dispatch($cmd, $matched['slots']);
+        $this->logRun($cmd, $matched['slots'], $actor, ($result['ok'] ?? false) ? 'ok' : 'error', $overrideConfirm, $result['navigate'] ?? null, $result['message'] ?? null);
+        return $result;
+    }
+
+    protected function logRun(array $cmd, array $slots, $actor, string $status, bool $forceExecute, ?string $navigate = null, ?string $message = null): void
+    {
+        try {
+            CoreCommandRun::create([
+                'user_id' => $actor?->id ?? null,
+                'team_id' => method_exists($actor, 'currentTeam') ? ($actor->currentTeam?->id ?? null) : null,
+                'command_key' => $cmd['key'] ?? 'unknown',
+                'impact' => $cmd['impact'] ?? 'low',
+                'force_execute' => $forceExecute,
+                'slots' => $slots,
+                'result_status' => $status,
+                'navigate' => $navigate,
+                'message' => $message,
+            ]);
+        } catch (\Throwable $e) {
+            // Logging failures sollten die Ausführung nicht bremsen
+        }
     }
 }
 
