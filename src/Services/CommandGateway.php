@@ -20,7 +20,7 @@ class CommandGateway
         return $this->executeMatched($matched, $actor);
     }
 
-    public function executeMatched(array $matched, $actor = null): array
+    public function executeMatched(array $matched, $actor = null, bool $overrideConfirm = false): array
     {
         $cmd = $matched['command'];
         // Guard/Policy (MVP: nur Guard prüfen)
@@ -31,7 +31,7 @@ class CommandGateway
 
         // Confirm bei medium/high impact (UI muss Confirm schicken – MVP: abbrechen)
         $confirmRequired = $cmd['confirmRequired'] ?? false;
-        if ($confirmRequired && !request()->boolean('confirm', false)) {
+        if ($confirmRequired && !$overrideConfirm && !request()->boolean('confirm', false)) {
             return [
                 'ok' => false,
                 'needConfirm' => true,

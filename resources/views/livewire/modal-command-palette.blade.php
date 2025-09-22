@@ -29,6 +29,10 @@
 
         <div class="d-flex items-center gap-2">
             <x-ui-button variant="secondary-outline" wire:click="executeLlm">KI planen</x-ui-button>
+            <label class="d-flex items-center gap-2 text-sm">
+                <input type="checkbox" wire:model.live="forceExecute" class="border rounded">
+                ohne Rückfrage ausführen
+            </label>
             @if(!empty($llm))
                 @if(($llm['ok'] ?? false) === true)
                     <x-ui-badge variant="info" size="sm">Vorschlag: {{ $llm['intent'] ?? '–' }}</x-ui-badge>

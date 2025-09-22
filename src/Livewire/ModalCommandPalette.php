@@ -15,6 +15,7 @@ class ModalCommandPalette extends Component
     public string $input = '';
     public array $result = [];
     public array $llm = [];
+    public bool $forceExecute = false;
 
     #[On('open-modal-commands')]
     public function open(): void
@@ -55,13 +56,13 @@ class ModalCommandPalette extends Component
 
         if (($plan['ok'] ?? false) && ($plan['intent'] ?? null)) {
             // Bei need confirm nach Impact fragen; MVP: sofort ausführen, wenn keine Bestätigung nötig
-            if (empty($plan['confirmRequired'])) {
+            if (empty($plan['confirmRequired']) || $this->forceExecute) {
                 $gateway = new CommandGateway(new IntentMatcher(), new CommandDispatcher());
                 $matched = [
                     'command' => $this->findCommandByKey($plan['intent']),
                     'slots' => $plan['slots'] ?? [],
                 ];
-                $this->result = $gateway->executeMatched($matched, auth()->user());
+                $this->result = $gateway->executeMatched($matched, auth()->user(), $this->forceExecute);
             }
         }
     }
