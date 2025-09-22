@@ -79,12 +79,14 @@ class CommandRegistry
                     $props[$pname] = [ 'type' => $ptype, 'description' => $p['description'] ?? '' ];
                     if (!empty($p['required'])) { $required[] = $pname; }
                 }
+                // OpenAI erwartet parameters.properties als JSON-Object, nicht leeres Array
+                $propertiesObject = (object) $props;
                 $schema = [
                     'name' => $toolName,
                     'description' => $desc,
                     'parameters' => [
                         'type' => 'object',
-                        'properties' => $props,
+                        'properties' => $propertiesObject,
                         'required' => $required,
                     ],
                 ];
