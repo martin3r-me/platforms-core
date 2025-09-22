@@ -52,22 +52,47 @@
             @endif
         </div>
 
-        @if(!empty($result))
-            <div class="p-3 rounded border bg-muted-5">
-                @if(($result['ok'] ?? false) === true)
-                    <div class="text-success font-medium mb-1">Erfolg</div>
-                    @if(!empty($result['message']))
-                        <div class="text-sm">{{ $result['message'] }}</div>
-                    @endif
-                    @if(!empty($result['navigate']))
-                        <div class="mt-2">
-                            <a href="{{ $result['navigate'] }}" class="text-primary underline" wire:navigate>Öffnen</a>
+        @if(!empty($feed))
+            <div class="p-3 rounded border bg-muted-5 space-y-2 max-h-80 overflow-auto">
+                @foreach($feed as $b)
+                    @if(($b['role'] ?? '') === 'user')
+                        <div class="text-right">
+                            <div class="inline-block bg-primary text-white px-3 py-2 rounded">{{ $b['text'] ?? '' }}</div>
+                        </div>
+                    @elseif(($b['type'] ?? '') === 'plan')
+                        <div class="text-left text-sm bg-muted-10 px-3 py-2 rounded">
+                            <div class="font-medium">Plan</div>
+                            <div>Intent: {{ $b['data']['intent'] ?? '–' }}</div>
+                            @if(!empty($b['data']['slots']))
+                                <div class="text-xs">Slots: {{ json_encode($b['data']['slots']) }}</div>
+                            @endif
+                            @if(!empty($b['data']['impact']))
+                                <div class="text-xs">Impact: {{ $b['data']['impact'] }}</div>
+                            @endif
+                        </div>
+                    @elseif(($b['type'] ?? '') === 'confirm')
+                        <div class="text-left text-sm bg-warning-50 px-3 py-2 rounded">
+                            <div class="font-medium mb-1">Bestätigung erforderlich</div>
+                            <div>Intent: {{ $b['data']['intent'] ?? '' }}</div>
+                            @if(!empty($b['data']['slots']))
+                                <div class="text-xs mt-1">Parameter: {{ json_encode($b['data']['slots']) }}</div>
+                            @endif
+                            <div class="mt-2 d-flex items-center gap-2">
+                                <x-ui-button size="sm" variant="primary" wire:click="confirmAndRun('{{ $b['data']['intent'] ?? '' }}', {{ json_encode($b['data']['slots'] ?? []) }})">Bestätigen</x-ui-button>
+                            </div>
+                        </div>
+                    @elseif(($b['type'] ?? '') === 'result')
+                        <div class="text-left text-sm bg-success-50 px-3 py-2 rounded">
+                            <div class="font-medium">Ergebnis</div>
+                            <div>{{ $b['data']['message'] ?? (($b['data']['ok'] ?? false) ? 'OK' : 'Fehler') }}</div>
+                        </div>
+                    @elseif(($b['type'] ?? '') === 'error')
+                        <div class="text-left text-sm bg-danger-50 px-3 py-2 rounded">
+                            <div class="font-medium">Fehler</div>
+                            <div>{{ is_array($b['data']) ? json_encode($b['data']) : ($b['data'] ?? '') }}</div>
                         </div>
                     @endif
-                @else
-                    <div class="text-danger font-medium mb-1">Fehler</div>
-                    <div class="text-sm">{{ $result['message'] ?? 'Unbekannter Fehler' }}</div>
-                @endif
+                @endforeach
             </div>
         @endif
     </div>

@@ -16,12 +16,14 @@ class ModalCommandPalette extends Component
     public array $result = [];
     public array $llm = [];
     public bool $forceExecute = false;
+    public array $feed = [];
 
     #[On('open-modal-commands')]
     public function open(): void
     {
         $this->resetErrorBag();
         $this->result = [];
+        $this->feed = [];
         $this->modalShow = true;
     }
 
@@ -59,6 +61,8 @@ class ModalCommandPalette extends Component
         $planner = new LlmPlanner();
         $plan = $planner->plan($text);
         $this->llm = $plan;
+        $this->feed[] = ['role' => 'user', 'text' => $text];
+        $this->feed[] = ['role' => 'assistant', 'type' => 'plan', 'data' => $plan];
 
         if (($plan['ok'] ?? false) && ($plan['intent'] ?? null)) {
             // Bei need confirm nach Impact fragen; MVP: sofort ausführen, wenn keine Bestätigung nötig
@@ -69,13 +73,36 @@ class ModalCommandPalette extends Component
                     'slots' => $plan['slots'] ?? [],
                 ];
                 $this->result = $gateway->executeMatched($matched, auth()->user(), $this->forceExecute);
+                $this->feed[] = ['role' => 'tool', 'type' => 'result', 'data' => $this->result];
                 if (($this->result['ok'] ?? false) && !empty($this->result['navigate'])) {
                     $url = $this->result['navigate'];
                     $this->close();
                     $this->redirect($url, navigate: true);
                     return;
                 }
+            } else {
+                $this->feed[] = ['role' => 'assistant', 'type' => 'confirm', 'data' => [
+                    'intent' => $plan['intent'],
+                    'impact' => $plan['impact'] ?? 'medium',
+                    'slots' => $plan['slots'] ?? [],
+                ]];
             }
+        }
+    }
+
+    public function confirmAndRun(string $intent, array $slots = []): void
+    {
+        $gateway = new CommandGateway(new IntentMatcher(), new CommandDispatcher());
+        $matched = [
+            'command' => $this->findCommandByKey($intent),
+            'slots' => $slots,
+        ];
+        $this->result = $gateway->executeMatched($matched, auth()->user(), true);
+        $this->feed[] = ['role' => 'tool', 'type' => 'result', 'data' => $this->result];
+        if (($this->result['ok'] ?? false) && !empty($this->result['navigate'])) {
+            $url = $this->result['navigate'];
+            $this->close();
+            $this->redirect($url, navigate: true);
         }
     }
 
