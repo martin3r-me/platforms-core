@@ -40,6 +40,12 @@ class ModalCommandPalette extends Component
 
         $gateway = new CommandGateway(new IntentMatcher(), new CommandDispatcher());
         $this->result = $gateway->executeText($text, auth()->user());
+        if (($this->result['ok'] ?? false) && !empty($this->result['navigate'])) {
+            $url = $this->result['navigate'];
+            $this->close();
+            redirect()->to($url)->send();
+            exit;
+        }
     }
 
     public function executeLlm(): void
@@ -63,6 +69,12 @@ class ModalCommandPalette extends Component
                     'slots' => $plan['slots'] ?? [],
                 ];
                 $this->result = $gateway->executeMatched($matched, auth()->user(), $this->forceExecute);
+                if (($this->result['ok'] ?? false) && !empty($this->result['navigate'])) {
+                    $url = $this->result['navigate'];
+                    $this->close();
+                    redirect()->to($url)->send();
+                    exit;
+                }
             }
         }
     }
