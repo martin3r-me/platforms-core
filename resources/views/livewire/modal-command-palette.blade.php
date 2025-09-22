@@ -68,11 +68,19 @@
                 this.recognition.interimResults = false;
                 this.recognition.maxAlternatives = 1;
                 this.recognition.onresult = (e) => {
-                    const txt = e.results[0][0].transcript;
-                    // Schreibe in Livewire-Model via DOM input
-                    const el = this.$refs.cmdInput;
-                    if (el){ el.value = txt; el.dispatchEvent(new Event('input', { bubbles: true })); }
+                    try {
+                        const txt = e.results[0][0].transcript;
+                        const el = this.$refs.cmdInput;
+                        if (el){
+                            el.value = txt;
+                            el.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                        if (typeof $wire !== 'undefined' && $wire){
+                            $wire.set('input', txt);
+                        }
+                    } catch(err){ /* noop */ }
                 };
+                this.recognition.onerror = () => { this.listening = false; };
                 this.recognition.onend = () => { this.listening = false; };
             },
             toggle(){
