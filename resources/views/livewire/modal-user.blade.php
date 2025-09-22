@@ -42,17 +42,6 @@
 
             <x-ui-button 
                 variant="secondary-outline"
-                :href="route('profile.show')"
-                wire:navigate
-            >
-                <div class="d-flex items-center gap-2">
-                    @svg('heroicon-o-user', 'w-5 h-5')
-                    Profil & Sicherheit
-                </div>
-            </x-ui-button>
-
-            <x-ui-button 
-                variant="secondary-outline"
                 @click="$dispatch('open-modal-modules')"
             >
                 <div class="d-flex items-center gap-2">
