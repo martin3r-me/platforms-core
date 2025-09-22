@@ -22,8 +22,25 @@ class CommandGateway
 
     public function executeMatched(array $matched, $actor = null): array
     {
-        // TODO: Guard/Policy anhand $matched['command']['guard']
-        return $this->dispatcher->dispatch($matched['command'], $matched['slots']);
+        $cmd = $matched['command'];
+        // Guard/Policy (MVP: nur Guard prüfen)
+        $guard = $cmd['guard'] ?? 'web';
+        if (auth()->getDefaultDriver() !== $guard) {
+            return ['ok' => false, 'message' => 'Nicht erlaubt für diesen Guard'];
+        }
+
+        // Confirm bei medium/high impact (UI muss Confirm schicken – MVP: abbrechen)
+        $confirmRequired = $cmd['confirmRequired'] ?? false;
+        if ($confirmRequired && !request()->boolean('confirm', false)) {
+            return [
+                'ok' => false,
+                'needConfirm' => true,
+                'message' => 'Bestätigung erforderlich',
+                'impact' => $cmd['impact'] ?? 'medium',
+            ];
+        }
+
+        return $this->dispatcher->dispatch($cmd, $matched['slots']);
     }
 }
 

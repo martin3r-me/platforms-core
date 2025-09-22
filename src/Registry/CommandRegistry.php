@@ -26,8 +26,14 @@ class CommandRegistry
             if (!isset($cmd['key'])) {
                 throw new \InvalidArgumentException('Command requires key');
             }
+            // Standard-Felder vorbelegen
+            $cmd['description'] = $cmd['description'] ?? '';
+            $cmd['parameters'] = $cmd['parameters'] ?? [];
+            $cmd['impact'] = $cmd['impact'] ?? 'low'; // low|medium|high
+            $cmd['confirmRequired'] = $cmd['confirmRequired'] ?? in_array(($cmd['impact'] ?? 'low'), ['medium','high'], true);
+            $commandsValidated[] = $cmd;
         }
-        self::$moduleKeyToCommands[$moduleKey] = $commands;
+        self::$moduleKeyToCommands[$moduleKey] = $commandsValidated ?? $commands;
     }
 
     public static function unregister(string $moduleKey): void
@@ -49,6 +55,41 @@ class CommandRegistry
     public static function getByModule(string $moduleKey): array
     {
         return self::$moduleKeyToCommands[$moduleKey] ?? [];
+    }
+
+    /**
+     * Export im Function-Calling-Stil (LLM-Tools):
+     * [{ name, description, parameters: { type: 'object', properties: {...}, required: [...] } }]
+     */
+    public static function exportFunctionSchemas(): array
+    {
+        $tools = [];
+        foreach (self::$moduleKeyToCommands as $moduleKey => $commands) {
+            foreach ($commands as $cmd) {
+                $name = $cmd['key'];
+                $desc = trim(($cmd['description'] ?? '') . ' Module: ' . $moduleKey);
+                $props = [];
+                $required = [];
+                foreach ($cmd['parameters'] as $p) {
+                    $pname = $p['name'] ?? null;
+                    if (!$pname) continue;
+                    $ptype = $p['type'] ?? 'string';
+                    $props[$pname] = [ 'type' => $ptype, 'description' => $p['description'] ?? '' ];
+                    if (!empty($p['required'])) { $required[] = $pname; }
+                }
+                $schema = [
+                    'name' => $name,
+                    'description' => $desc,
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => $props,
+                        'required' => $required,
+                    ],
+                ];
+                $tools[] = $schema;
+            }
+        }
+        return $tools;
     }
 }
 
