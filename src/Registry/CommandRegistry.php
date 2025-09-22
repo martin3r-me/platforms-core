@@ -12,6 +12,11 @@ class CommandRegistry
      * @var array<string, array<int, array>>
      */
     protected static array $moduleKeyToCommands = [];
+    /**
+     * Mappt normalisierte Tool-Namen (OpenAI) zurück auf originale Command-Keys
+     * @var array<string, string>
+     */
+    protected static array $toolNameToCommandKey = [];
 
     /**
      * Registriert eine Menge von Kommandos für ein Modul (überschreibt bestehende).
@@ -64,11 +69,15 @@ class CommandRegistry
     public static function exportFunctionSchemas(): array
     {
         $tools = [];
+        // Mapping bei jedem Export frisch aufbauen
+        self::$toolNameToCommandKey = [];
         foreach (self::$moduleKeyToCommands as $moduleKey => $commands) {
             foreach ($commands as $cmd) {
                 $name = $cmd['key'];
                 // OpenAI tool name: only a-zA-Z0-9_-
                 $toolName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $name);
+                // Rückwärts-Mapping sichern
+                self::$toolNameToCommandKey[$toolName] = $name;
                 $desc = trim(($cmd['description'] ?? '') . ' Module: ' . $moduleKey);
                 $props = [];
                 $required = [];
@@ -94,6 +103,11 @@ class CommandRegistry
             }
         }
         return $tools;
+    }
+
+    public static function resolveKeyFromToolName(string $toolName): ?string
+    {
+        return self::$toolNameToCommandKey[$toolName] ?? null;
     }
 }
 

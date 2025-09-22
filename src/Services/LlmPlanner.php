@@ -48,7 +48,9 @@ class LlmPlanner
         if (!$toolCall) {
             return ['ok' => false, 'message' => 'Kein Tool-Vorschlag'];
         }
-        $intent = $toolCall['function']['name'] ?? null;
+        $toolName = $toolCall['function']['name'] ?? null;
+        // Tool-Name zurück auf originalen Command-Key mappen
+        $intent = $toolName ? CommandRegistry::resolveKeyFromToolName($toolName) : null;
         $argsJson = $toolCall['function']['arguments'] ?? '{}';
         $slots = json_decode($argsJson, true) ?: [];
 
