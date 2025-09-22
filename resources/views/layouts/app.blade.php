@@ -64,6 +64,6 @@
     @endif
 
     @livewireScripts
-    <livewire:core.cursor-panel />
+<livewire:core.modal-cursor />
 </body>
 </html>

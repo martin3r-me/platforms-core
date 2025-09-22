@@ -69,7 +69,7 @@
                 <x-ui-button 
                     variant="primary-outline" 
                     size="md" 
-                    @click="$dispatch('cursor-toggle')"
+                    @click="$dispatch('open-modal-cursor')"
                 >
                     <span class="d-flex items-center gap-1">
                         <x-heroicon-o-bolt class="w-5 h-5" />
