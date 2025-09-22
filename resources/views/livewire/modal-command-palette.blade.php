@@ -29,11 +29,15 @@
 
         <div class="d-flex items-center gap-2">
             <x-ui-button variant="secondary-outline" wire:click="executeLlm">KI planen</x-ui-button>
-            @if(($llm['ok'] ?? false) && ($llm['intent'] ?? false))
-                <x-ui-badge variant="info" size="sm">Vorschlag: {{ $llm['intent'] }}</x-ui-badge>
-            @endif
-            @if(($llm['confirmRequired'] ?? false))
-                <x-ui-badge variant="warning" size="sm">Bestätigung benötigt</x-ui-badge>
+            @if(!empty($llm))
+                @if(($llm['ok'] ?? false) === true)
+                    <x-ui-badge variant="info" size="sm">Vorschlag: {{ $llm['intent'] ?? '–' }}</x-ui-badge>
+                    @if(($llm['confirmRequired'] ?? false))
+                        <x-ui-badge variant="warning" size="sm">Bestätigung benötigt</x-ui-badge>
+                    @endif
+                @else
+                    <x-ui-badge variant="danger" size="sm">LLM: {{ $llm['message'] ?? 'Fehler' }}</x-ui-badge>
+                @endif
             @endif
         </div>
 

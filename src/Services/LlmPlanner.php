@@ -30,12 +30,17 @@ class LlmPlanner
             'tool_choice' => 'auto',
         ];
 
-        $resp = Http::withToken($apiKey)
-            ->acceptJson()
-            ->post($base . '/chat/completions', $payload);
+        try {
+            $resp = Http::withToken($apiKey)
+                ->acceptJson()
+                ->timeout(15)
+                ->post($base . '/chat/completions', $payload);
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'message' => 'LLM Anfrage fehlgeschlagen', 'detail' => $e->getMessage()];
+        }
 
         if ($resp->failed()) {
-            return ['ok' => false, 'message' => 'LLM Fehler', 'detail' => $resp->json()];
+            return ['ok' => false, 'message' => 'LLM Fehler', 'detail' => $resp->json() ?: $resp->body()];
         }
         $data = $resp->json();
         $choice = $data['choices'][0] ?? [];
