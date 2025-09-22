@@ -27,6 +27,16 @@
         </div>
         @error('input')<div class="text-danger text-sm mt-1">{{ $message }}</div>@enderror
 
+        <div class="d-flex items-center gap-2">
+            <x-ui-button variant="secondary-outline" wire:click="executeLlm">KI planen</x-ui-button>
+            @if(($llm['ok'] ?? false) && ($llm['intent'] ?? false))
+                <x-ui-badge variant="info" size="sm">Vorschlag: {{ $llm['intent'] }}</x-ui-badge>
+            @endif
+            @if(($llm['confirmRequired'] ?? false))
+                <x-ui-badge variant="warning" size="sm">Bestätigung benötigt</x-ui-badge>
+            @endif
+        </div>
+
         @if(!empty($result))
             <div class="p-3 rounded border bg-muted-5">
                 @if(($result['ok'] ?? false) === true)
