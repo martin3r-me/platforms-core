@@ -3,13 +3,17 @@
         Cursor
     </x-slot>
 
-    <div class="space-y-3">
+    <div class="space-y-3" x-data="cursorVoice()" x-init="init()">
         <div class="d-flex items-center gap-2">
-            <input type="text" class="flex-grow px-3 py-2 border rounded" placeholder="Befehl eingeben…" wire:model.defer="input" wire:keydown.enter="planAndMaybeRun">
+            <input type="text" class="flex-grow px-3 py-2 border rounded" placeholder="Befehl eingeben…" wire:model.defer="input" wire:keydown.enter="planAndMaybeRun" x-ref="cmdInput">
             <label class="d-flex items-center gap-2 text-sm">
                 <input type="checkbox" wire:model.live="forceExecute" class="border rounded">
                 ohne Rückfrage ausführen
             </label>
+            <button type="button" class="px-3 py-2 rounded border" :class="listening ? 'bg-danger text-white' : 'bg-white text-secondary'" @click="toggle()" :aria-pressed="listening ? 'true' : 'false'" aria-label="Spracheingabe umschalten">
+                <span x-show="!listening">🎙️</span>
+                <span x-show="listening">⏹️</span>
+            </button>
             <x-ui-button variant="primary" wire:click="planAndMaybeRun">Ausführen</x-ui-button>
         </div>
 
@@ -64,5 +68,37 @@
         </div>
     </x-slot>
 </x-ui-modal>
+
+<script>
+    function cursorVoice(){
+        return {
+            listening: false,
+            recognition: null,
+            init(){
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SR) return;
+                this.recognition = new SR();
+                this.recognition.lang = document.documentElement.lang || 'de-DE';
+                this.recognition.interimResults = false;
+                this.recognition.maxAlternatives = 1;
+                this.recognition.onresult = (e) => {
+                    try {
+                        const txt = e.results[0][0].transcript;
+                        const el = this.$refs.cmdInput;
+                        if (el){ el.value = txt; el.dispatchEvent(new Event('input', { bubbles: true })); }
+                        if (typeof $wire !== 'undefined' && $wire){ $wire.set('input', txt); }
+                    } catch(err){}
+                };
+                this.recognition.onerror = () => { this.listening = false; };
+                this.recognition.onend = () => { this.listening = false; };
+            },
+            toggle(){
+                if (!this.recognition) { alert('Spracherkennung wird vom Browser nicht unterstützt.'); return; }
+                if (this.listening){ this.recognition.stop(); this.listening = false; return; }
+                this.listening = true; this.recognition.start();
+            }
+        }
+    }
+</script>
 
 

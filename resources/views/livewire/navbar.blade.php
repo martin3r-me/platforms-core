@@ -44,16 +44,7 @@
                     </x-ui-button>
                 @endif
 
-                <x-ui-button 
-                    variant="secondary-outline" 
-                    size="md" 
-                    @click="$dispatch('open-modal-commands')"
-                >
-                    <span class="d-flex items-center gap-1">
-                        <x-heroicon-o-command-line class="w-5 h-5" />
-                        <span>Befehl</span>
-                    </span>
-                </x-ui-button>
+                
 
                 <x-ui-button 
                     variant="secondary-outline" 
