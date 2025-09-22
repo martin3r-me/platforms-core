@@ -43,8 +43,8 @@ class ModalCommandPalette extends Component
         if (($this->result['ok'] ?? false) && !empty($this->result['navigate'])) {
             $url = $this->result['navigate'];
             $this->close();
-            redirect()->to($url)->send();
-            exit;
+            $this->redirect($url, navigate: true);
+            return;
         }
     }
 
@@ -72,8 +72,8 @@ class ModalCommandPalette extends Component
                 if (($this->result['ok'] ?? false) && !empty($this->result['navigate'])) {
                     $url = $this->result['navigate'];
                     $this->close();
-                    redirect()->to($url)->send();
-                    exit;
+                    $this->redirect($url, navigate: true);
+                    return;
                 }
             }
         }
