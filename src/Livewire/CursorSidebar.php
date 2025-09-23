@@ -157,7 +157,7 @@ class CursorSidebar extends Component
                 foreach ($calls as $call) {
                     $intent = $call['intent'] ?? '';
                     $slots  = $call['slots'] ?? [];
-                    if (($slots['model'] ?? '') === '' && ($intent === 'planner.query' || $intent === 'planner.open' || $intent === 'core.model.query')) {
+                    if (($slots['model'] ?? '') === '' && str_ends_with($intent, '.query') || str_ends_with($intent, '.open') || $intent === 'core.model.query') {
                         $guessed = (new ModelNameResolver())->resolveFromText($this->lastUserText);
                         if ($guessed) { $slots['model'] = $guessed; }
                     }
@@ -170,13 +170,13 @@ class CursorSidebar extends Component
                         if ($norm) { $slots['model'] = $norm; }
                     }
                     // Auto-Vorbelegung für Create-Intents: model & title aus Nutzertext
-                    if ($intent === 'core.model.create' || $intent === 'planner.create') {
+                    if ($intent === 'core.model.create' || str_ends_with($intent, '.create')) {
                         if (($slots['model'] ?? '') === '') {
-                            $slots['model'] = (new ModelNameResolver())->resolveFromText($this->lastUserText) ?: 'planner.tasks';
+                            $slots['model'] = (new ModelNameResolver())->resolveFromText($this->lastUserText);
                         }
                         $data = (array)($slots['data'] ?? []);
                         if (($data['title'] ?? '') === '') {
-                            $data['title'] = $this->extractTitleFromText($this->lastUserText) ?: 'Neue Aufgabe';
+                            $data['title'] = $this->extractTitleFromText($this->lastUserText);
                         }
                         $slots['data'] = $data;
                     }
@@ -219,16 +219,17 @@ class CursorSidebar extends Component
                             }
                         }
                     }
-                    // Generischer Resolver für planner.open mit name/title → planner.query → open
+                    // Generischer Resolver für *.open mit name/title → *.query → open
                     if ((!$result['ok'] || !empty($result['needResolve'] ?? null))
-                        && $intent === 'planner.open'
+                        && str_ends_with($intent, '.open')
                         && (!empty($slots['name'] ?? null) || !empty($slots['title'] ?? null))
                         && !empty($slots['model'] ?? null)) {
                         $gateway = new CommandGateway(new IntentMatcher(), new CommandDispatcher());
+                        $queryIntent = str_replace('.open', '.query', $intent);
                         $resolved = (new CommandResolver())->resolveOpenByName(
                             $gateway,
-                            'planner.query',
-                            'planner.open',
+                            $queryIntent,
+                            $intent,
                             [
                                 'model' => $slots['model'],
                                 'q' => $slots['name'] ?? ($slots['title'] ?? ''),
@@ -339,16 +340,17 @@ class CursorSidebar extends Component
                     'text' => $this->formatItemsFull($items)
                 ]];
             }
-            // Generischer Resolver für planner.open mit name/title + model
+            // Generischer Resolver für *.open mit name/title + model
             if ((!$result['ok'] || !empty($result['needResolve'] ?? null))
-                && $intent === 'planner.open'
+                && str_ends_with($intent, '.open')
                 && (!empty($slots['name'] ?? null) || !empty($slots['title'] ?? null))
                 && !empty($slots['model'] ?? null)) {
                 $gateway = new CommandGateway(new IntentMatcher(), new CommandDispatcher());
+                $queryIntent = str_replace('.open', '.query', $intent);
                 $resolved = (new CommandResolver())->resolveOpenByName(
                     $gateway,
-                    'planner.query',
-                    'planner.open',
+                    $queryIntent,
+                    $intent,
                     [
                         'model' => $slots['model'],
                         'q' => $slots['name'] ?? ($slots['title'] ?? ''),
@@ -436,8 +438,8 @@ class CursorSidebar extends Component
         foreach (['list', 'show', 'get', 'open', 'query'] as $kw) {
             if (str_contains($i, $kw)) return true;
         }
-        if ($i === 'planner.list_my_tasks') return true;
-        if (str_starts_with($i, 'planner.query_')) return true;
+        if (str_ends_with($i, '.list_my_tasks')) return true;
+        if (str_ends_with($i, '.query')) return true;
         return false;
     }
 
@@ -527,8 +529,8 @@ class CursorSidebar extends Component
 
     protected function multiChainOpenProjectByName(string $name): void
     {
-        $list = $this->executeIntent('planner.list_projects', [] , true);
-        $projects = $list['data']['projects'] ?? [];
+        $list = $this->executeIntent('planner.query', ['model' => 'planner.projects'], true);
+        $projects = $list['data']['items'] ?? [];
         if (empty($projects)) {
             $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Keine Projekte gefunden.']];
             return;
@@ -542,7 +544,7 @@ class CursorSidebar extends Component
             }
         }
         if (count($matches) === 1) {
-            $this->executeIntent('planner.open_project', ['id' => $matches[0]['id']], true);
+            $this->executeIntent('planner.open', ['model' => 'planner.projects', 'id' => $matches[0]['id']], true);
             return;
         }
         if (count($matches) > 1) {
@@ -558,7 +560,7 @@ class CursorSidebar extends Component
 
     public function openProjectById(int $id): void
     {
-        $this->executeIntent('planner.open_project', ['id' => $id], true);
+        $this->executeIntent('planner.open', ['model' => 'planner.projects', 'id' => $id], true);
     }
 
     public function render()
