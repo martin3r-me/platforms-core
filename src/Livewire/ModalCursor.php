@@ -48,7 +48,8 @@ class ModalCursor extends Component
         if (($plan['ok'] ?? false) && ($plan['intent'] ?? null)) {
             $conf = (float)($plan['confidence'] ?? 0.0);
             $autoThreshold = 0.8;
-            if ($this->forceExecute || (empty($plan['confirmRequired']) && $conf >= $autoThreshold)) {
+            $autoAllowed = $this->isAutoAllowed($plan['intent']);
+            if ($this->forceExecute || ($autoAllowed && empty($plan['confirmRequired']) && $conf >= $autoThreshold)) {
                 $this->executeIntent($plan['intent'], $plan['slots'] ?? []);
                 $this->assistantFollowUp($text);
             } else {
@@ -92,6 +93,18 @@ class ModalCursor extends Component
             $this->close();
             $this->redirect($url, navigate: true);
         }
+    }
+
+    protected function isAutoAllowed(string $intent): bool
+    {
+        // Whitelist: alles, was 'list', 'show', 'get' enthält
+        $i = mb_strtolower($intent);
+        foreach (['list', 'show', 'get'] as $kw) {
+            if (str_contains($i, $kw)) return true;
+        }
+        // Spezifisch erlauben
+        if ($i === 'planner.list_my_tasks') return true;
+        return false;
     }
 
     protected function assistantFollowUp(string $userText): void
