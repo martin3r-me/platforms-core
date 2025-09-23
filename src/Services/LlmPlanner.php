@@ -39,7 +39,7 @@ class LlmPlanner
     {
         $apiKey = env('OPENAI_API_KEY');
         $base   = rtrim(env('OPENAI_BASE', 'https://api.openai.com/v1'), '/');
-        $model  = env('OPENAI_MODEL', 'gpt-4o-mini');
+        $model  = env('OPENAI_MODEL', 'gpt-4o');
         if (!$apiKey) {
             return ['ok' => false, 'message' => 'OPENAI_API_KEY fehlt'];
         }
@@ -55,6 +55,9 @@ class LlmPlanner
                     'messages' => $messages,
                     'tools' => $tools,
                     'tool_choice' => 'auto',
+                    'temperature' => 0.1,
+                    'presence_penalty' => 0,
+                    'frequency_penalty' => 0,
                 ]);
         } catch (\Throwable $e) {
             return ['ok' => false, 'message' => 'LLM Anfrage fehlgeschlagen', 'detail' => $e->getMessage()];
@@ -100,14 +103,14 @@ class LlmPlanner
     {
         $apiKey = env('OPENAI_API_KEY');
         $base   = rtrim(env('OPENAI_BASE', 'https://api.openai.com/v1'), '/');
-        $model  = env('OPENAI_MODEL', 'gpt-4o-mini');
+        $model  = env('OPENAI_MODEL', 'gpt-4o');
         if (!$apiKey) {
             return ['ok' => false, 'message' => 'OPENAI_API_KEY fehlt'];
         }
 
         $tools = $this->buildToolsFromRegistry($userText);
 
-        $system = "Du bist ein Assistent in einer Business-Plattform. Nutze bereitgestellte Tools, um Nutzerbefehle auszuführen. Wähle genau EIN passendes Tool mit Parametern. Antworte nicht frei, sondern benutze function-calling.";
+        $system = "Du bist ein Assistent in einer Business-Plattform. Nutze bereitgestellte Tools, um Nutzerbefehle auszuführen. Wähle genau EIN passendes Tool mit Parametern. Antworte nicht frei, sondern benutze function-calling. Keine generischen Ratschläge; nach erfolgreichen Aktionen nur kurz bestätigen.";
 
         $payload = [
             'model' => $model,
@@ -123,7 +126,11 @@ class LlmPlanner
             $resp = Http::withToken($apiKey)
                 ->acceptJson()
                 ->timeout(15)
-                ->post($base . '/chat/completions', $payload);
+                ->post($base . '/chat/completions', array_merge($payload, [
+                    'temperature' => 0.1,
+                    'presence_penalty' => 0,
+                    'frequency_penalty' => 0,
+                ]));
         } catch (\Throwable $e) {
             return ['ok' => false, 'message' => 'LLM Anfrage fehlgeschlagen', 'detail' => $e->getMessage()];
         }
@@ -164,12 +171,12 @@ class LlmPlanner
     {
         $apiKey = env('OPENAI_API_KEY');
         $base   = rtrim(env('OPENAI_BASE', 'https://api.openai.com/v1'), '/');
-        $model  = env('OPENAI_MODEL', 'gpt-4o-mini');
+        $model  = env('OPENAI_MODEL', 'gpt-4o');
         if (!$apiKey) {
             return ['ok' => false, 'message' => 'OPENAI_API_KEY fehlt'];
         }
 
-        $system = "Du bist ein hilfreicher Assistent in einer Business-Plattform. Antworte kurz und präzise auf Deutsch. Wenn Kontextdaten (JSON) vorhanden und relevant sind, nutze sie. Falls kein relevanter Kontext nötig ist (z. B. Begrüßung, Smalltalk oder allgemeine Fragen), antworte normal und freundlich. Vermeide Halluzinationen: Wenn eine spezifische Information eindeutig fehlt, sag knapp, dass sie dir fehlt, statt pauschal 'unbekannt' zu sagen.";
+        $system = "Du bist ein hilfreicher Assistent in einer Business-Plattform. Antworte kurz und präzise auf Deutsch. Nutze relevante Kontextdaten (JSON) für deine Antwort. Keine allgemeinen Ratgebertexte nach erfolgreichen Aktionen – bestätige kurz (z. B. 'Angelegt', 'Gefunden', 'Geöffnet'). Wenn Informationen fehlen, frage gezielt nach (needResolve).";
 
         $contextJson = json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $messages = [
@@ -185,6 +192,9 @@ class LlmPlanner
                 ->post($base . '/chat/completions', [
                     'model' => $model,
                     'messages' => $messages,
+                    'temperature' => 0.6,
+                    'presence_penalty' => 0.2,
+                    'frequency_penalty' => 0.2,
                 ]);
         } catch (\Throwable $e) {
             return ['ok' => false, 'message' => 'LLM Anfrage fehlgeschlagen', 'detail' => $e->getMessage()];
