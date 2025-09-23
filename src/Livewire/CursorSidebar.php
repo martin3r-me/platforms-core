@@ -133,6 +133,8 @@ class CursorSidebar extends Component
                     return $wb <=> $wa;
                 });
                 $safeExecuted = 0;
+                $didQuery = false;
+                $didOpen  = false;
                 foreach ($calls as $call) {
                     $intent = $call['intent'] ?? '';
                     $slots  = $call['slots'] ?? [];
@@ -191,11 +193,20 @@ class CursorSidebar extends Component
                         'content' => json_encode($result, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
                         'tool_call_id' => $call['tool_call_id'] ?? null,
                     ];
-                    // tasks werden durch den generischen Resolver ebenfalls abgedeckt (model: planner.tasks)
+                    // Ergebnisse vollständig im Chat listen, falls vorhanden
+                    if (($result['ok'] ?? false) && is_array($result['data']['items'] ?? null)) {
+                        $items = $result['data']['items'];
+                        $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => [
+                            'text' => $this->formatItemsFull($items)
+                        ]];
+                    }
+                    // Spekulative Ausführung: sicherstellen, dass mindestens eine Query UND eine Open ausgeführt wurde
                     if ($autoAllowed) {
+                        if ($this->isQueryIntent($intent)) { $didQuery = true; }
+                        if ($this->isOpenIntent($intent))  { $didOpen  = true; }
                         $safeExecuted++;
-                        if ($safeExecuted >= 2) {
-                            $this->debugLog(['phase' => 'speculative_limit_reached', 'count' => $safeExecuted]);
+                        if ($didQuery && $didOpen) {
+                            $this->debugLog(['phase' => 'speculative_done', 'query' => $didQuery, 'open' => $didOpen, 'count' => $safeExecuted]);
                             break 2;
                         }
                     }
@@ -232,6 +243,12 @@ class CursorSidebar extends Component
                 $this->saveMessage('assistant', json_encode(['navigate' => $result['navigate']], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'navigate']);
                 $this->redirect($result['navigate'], navigate: true);
                 return;
+            }
+            if (($result['ok'] ?? false) && is_array($result['data']['items'] ?? null)) {
+                $items = $result['data']['items'];
+                $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => [
+                    'text' => $this->formatItemsFull($items)
+                ]];
             }
             // Generischer Resolver für planner.open mit name/title + model
             if ((!$result['ok'] || !empty($result['needResolve'] ?? null))
@@ -337,8 +354,8 @@ class CursorSidebar extends Component
     {
         $i = mb_strtolower($intent);
         // höhere Werte = früher ausführen
+        if (str_contains($i, 'list') || str_contains($i, 'get') || str_contains($i, 'query')) return 2.0;
         if (str_contains($i, 'open') || str_contains($i, 'show')) return 2.0;
-        if (str_contains($i, 'list') || str_contains($i, 'get') || str_contains($i, 'query')) return 1.5;
         return 1.0;
     }
 
@@ -348,6 +365,28 @@ class CursorSidebar extends Component
         $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => [
             'text' => '[debug] '.json_encode($data, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
         ]];
+    }
+
+    protected function isQueryIntent(string $intent): bool
+    {
+        $i = mb_strtolower($intent);
+        return str_contains($i, 'list') || str_contains($i, 'get') || str_contains($i, 'query');
+    }
+
+    protected function isOpenIntent(string $intent): bool
+    {
+        $i = mb_strtolower($intent);
+        return str_contains($i, 'open') || str_contains($i, 'show');
+    }
+
+    protected function formatItemsFull(array $items): string
+    {
+        $lines = [];
+        foreach ($items as $it) {
+            $label = $it['title'] ?? ($it['name'] ?? (isset($it['id']) ? ('#'.$it['id']) : ''));
+            $lines[] = '- '.$label;
+        }
+        return implode("\n", $lines);
     }
 
     protected function multiChainOpenProjectByName(string $name): void
