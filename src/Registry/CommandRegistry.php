@@ -82,6 +82,19 @@ class CommandRegistry
                 // Rückwärts-Mapping sichern
                 self::$toolNameToCommandKey[$toolName] = $name;
                 $desc = trim(($cmd['description'] ?? '') . ' Module: ' . $moduleKey);
+                // Beispiele als Teil der Beschreibung anhängen (hilft dem LLM bei Slot-Füllung)
+                $examples = $cmd['examples'] ?? [];
+                if (!empty($examples)) {
+                    $exampleStrings = [];
+                    foreach ($examples as $ex) {
+                        $slots = json_encode($ex['slots'] ?? [], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+                        $exDesc = trim((string)($ex['desc'] ?? ''));
+                        $exampleStrings[] = $exDesc !== '' ? ($exDesc.': '.$slots) : $slots;
+                    }
+                    if (!empty($exampleStrings)) {
+                        $desc .= ' Beispiele: '.implode(' | ', $exampleStrings);
+                    }
+                }
                 $props = [];
                 $required = [];
                 foreach ($cmd['parameters'] as $p) {
