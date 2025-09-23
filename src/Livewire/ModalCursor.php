@@ -15,6 +15,7 @@ class ModalCursor extends Component
     public string $input = '';
     public bool $forceExecute = false;
     public array $feed = [];
+    public string $lastUserText = '';
 
     #[On('open-modal-cursor')]
     public function open(): void
@@ -38,6 +39,7 @@ class ModalCursor extends Component
         }
 
         $this->feed[] = ['role' => 'user', 'text' => $text];
+        $this->lastUserText = $text;
 
         $planner = new LlmPlanner();
         $plan = $planner->plan($text);
@@ -69,6 +71,9 @@ class ModalCursor extends Component
     public function confirmAndRun(string $intent, array $slots = []): void
     {
         $this->executeIntent($intent, $slots, true);
+        if ($this->lastUserText !== '') {
+            $this->assistantFollowUp($this->lastUserText);
+        }
     }
 
     protected function executeIntent(string $intent, array $slots = [], bool $override = false): void
