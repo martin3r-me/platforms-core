@@ -64,6 +64,7 @@ class ModalCursor extends Component
         } else {
             // Kein Tool-Vorschlag: klassisch antworten
             $this->assistantFollowUp($text);
+            return; // keine Fehler-Bubble anhängen
         }
 
         $this->input = '';

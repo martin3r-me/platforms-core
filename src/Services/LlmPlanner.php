@@ -80,7 +80,7 @@ class LlmPlanner
             return ['ok' => false, 'message' => 'OPENAI_API_KEY fehlt'];
         }
 
-        $system = "Du bist ein hilfreicher Assistent in einer Business-Plattform. Antworte kurz und präzise. Nutze die bereitgestellten Kontextdaten (JSON), um die letzte Nutzeranfrage zu beantworten. Keine Halluzinationen, sag 'unbekannt', wenn Informationen fehlen.";
+        $system = "Du bist ein hilfreicher Assistent in einer Business-Plattform. Antworte kurz und präzise auf Deutsch. Wenn Kontextdaten (JSON) vorhanden und relevant sind, nutze sie. Falls kein relevanter Kontext nötig ist (z. B. Begrüßung, Smalltalk oder allgemeine Fragen), antworte normal und freundlich. Vermeide Halluzinationen: Wenn eine spezifische Information eindeutig fehlt, sag knapp, dass sie dir fehlt, statt pauschal 'unbekannt' zu sagen.";
 
         $contextJson = json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $messages = [
