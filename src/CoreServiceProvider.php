@@ -142,6 +142,23 @@ class CoreServiceProvider extends ServiceProvider
                 'scope' => 'write:*',
             ],
         ]);
+
+        // Core-Tools
+        \Platform\Core\Registry\CommandRegistry::append('core', [
+            [
+                'key' => 'core.context_get',
+                'description' => 'Gibt den aktuellen Nutzer-/Routen-/Modulkontext zurück.',
+                'parameters' => [],
+                'impact' => 'low',
+                'confirmRequired' => false,
+                'autoAllowed' => true,
+                'phrases' => [ 'wo bin ich', 'welcher kontext', 'zeige kontext' ],
+                'slots' => [],
+                'guard' => 'web',
+                'handler' => ['service', \Platform\Core\Tools\CoreContextTool::class.'@getContext'],
+                'scope' => 'read:*',
+            ],
+        ]);
     }
 
     protected function registerLivewireComponents(): void

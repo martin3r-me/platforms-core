@@ -6,6 +6,9 @@ use Illuminate\Support\Str;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Schema;
 use Platform\Core\Schema\ModelSchemaRegistry;
+use ReflectionClass;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ModelAutoRegistrar
 {
@@ -67,6 +70,73 @@ class ModelAutoRegistrar
         $filterable = array_values(array_intersect($fields, ['id','uuid','name','title','team_id','user_id','status','is_done']));
         $labelKey = in_array('name', $fields, true) ? 'name' : (in_array('title', $fields, true) ? 'title' : 'id');
 
+        // Required-Felder per Doctrine DBAL (NOT NULL & kein Default, kein PK/AI)
+        $required = [];
+        try {
+            $connection = $model->getConnection();
+            $schemaManager = method_exists($connection, 'getDoctrineSchemaManager')
+                ? $connection->getDoctrineSchemaManager()
+                : ($connection->getDoctrineSchemaManager ?? null);
+            if ($schemaManager) {
+                $doctrineTable = $schemaManager->listTableDetails($table);
+                foreach ($doctrineTable->getColumns() as $col) {
+                    $name = $col->getName();
+                    if ($name === 'id' || $name === 'created_at' || $name === 'updated_at') continue;
+                    if ($doctrineTable->hasPrimaryKey() && in_array($name, (array) ($doctrineTable->getPrimaryKey()?->getColumns() ?? []), true)) continue;
+                    if ($col->getAutoincrement()) continue;
+                    $notNull = $col->getNotnull();
+                    $hasDefault = $col->getDefault() !== null;
+                    if ($notNull && !$hasDefault) {
+                        $required[] = $name;
+                    }
+                }
+                $required = array_values(array_intersect($required, $fields));
+            }
+        } catch (\Throwable $e) {
+            $required = [];
+        }
+
+        // Relationen (belongsTo) per Reflection ermitteln
+        $relations = [];
+        $foreignKeys = [];
+        try {
+            $ref = new ReflectionClass($eloquentClass);
+            foreach ($ref->getMethods() as $method) {
+                if (!$method->isPublic() || $method->isStatic()) continue;
+                if ($method->getNumberOfParameters() > 0) continue;
+                if ($method->getDeclaringClass()->getName() !== $eloquentClass) continue;
+                $name = $method->getName();
+                if (in_array($name, ['getAttribute','setAttribute','newQuery','newModelQuery','newQueryWithoutScopes'], true)) continue;
+                try {
+                    $rel = $model->$name();
+                } catch (\Throwable $e) {
+                    continue;
+                }
+                if ($rel instanceof Relation) {
+                    if ($rel instanceof BelongsTo) {
+                        $fk = method_exists($rel, 'getForeignKeyName') ? $rel->getForeignKeyName() : null;
+                        $ownerKey = method_exists($rel, 'getOwnerKeyName') ? $rel->getOwnerKeyName() : null;
+                        $target = get_class($rel->getRelated());
+                        $relations[$name] = [
+                            'type' => 'belongsTo',
+                            'target' => $target,
+                            'foreign_key' => $fk,
+                            'owner_key' => $ownerKey,
+                            'fields' => ['id', (in_array('name', $fields, true) ? 'name' : (in_array('title', $fields, true) ? 'title' : 'id'))],
+                        ];
+                        if ($fk) {
+                            $foreignKeys[$fk] = [
+                                'target' => $target,
+                                'label_key' => $labelKey,
+                            ];
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
         $entityKey = Str::snake(class_basename($eloquentClass));
         $modelKey = $moduleKey.'.'.$entityKey;
 
@@ -75,17 +145,17 @@ class ModelAutoRegistrar
             'filterable' => $filterable,
             'sortable' => $sortable,
             'selectable' => $selectable,
-            'relations' => [],
-            'required' => [],
+            'relations' => $relations,
+            'required' => $required,
             'writable' => $writable,
-            'foreign_keys' => [],
+            'foreign_keys' => $foreignKeys,
             'meta' => [
                 'eloquent' => $eloquentClass,
                 'show_route' => null,
                 'route_param' => null,
                 'label_key' => $labelKey,
             ],
-        });
+        ]);
     }
 }
 

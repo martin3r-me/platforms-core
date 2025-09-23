@@ -152,6 +152,17 @@ class CursorSidebar extends Component
                         $guessed = (new ModelNameResolver())->resolveFromText($this->lastUserText);
                         if ($guessed) { $slots['model'] = $guessed; }
                     }
+                    // Auto-Vorbelegung für Create-Intents: model & title aus Nutzertext
+                    if ($intent === 'core.model.create' || $intent === 'planner.create') {
+                        if (($slots['model'] ?? '') === '') {
+                            $slots['model'] = (new ModelNameResolver())->resolveFromText($this->lastUserText) ?: 'planner.tasks';
+                        }
+                        $data = (array)($slots['data'] ?? []);
+                        if (($data['title'] ?? '') === '') {
+                            $data['title'] = $this->extractTitleFromText($this->lastUserText) ?: 'Neue Aufgabe';
+                        }
+                        $slots['data'] = $data;
+                    }
                     $autoAllowed = (new CommandPolicy())->isAutoAllowed($intent);
                     if (!$this->forceExecute && !$autoAllowed) {
                         $this->debugLog(['phase' => 'confirm_required', 'intent' => $intent]);
@@ -446,6 +457,28 @@ class CursorSidebar extends Component
             if (is_string($v) && $v !== '') return $v;
         }
         return null;
+    }
+
+    protected function extractTitleFromText(string $text): ?string
+    {
+        $t = trim($text);
+        if ($t === '') return null;
+        // Heuristik: alles nach Komma/“Task/aufgabe/erstelle/neue” als Titel nehmen
+        foreach (['aufgabe', 'task', 'erstelle', 'neue', 'neu'] as $kw) {
+            $pos = mb_stripos($t, $kw);
+            if ($pos !== false) {
+                $rest = trim(mb_substr($t, $pos + mb_strlen($kw)));
+                $rest = ltrim($rest, ':,.- ');
+                if ($rest !== '') return $rest;
+            }
+        }
+        // Fallback: nach Komma teilen
+        if (str_contains($t, ',')) {
+            $parts = array_map('trim', explode(',', $t));
+            $last = end($parts);
+            if ($last !== '') return $last;
+        }
+        return $t;
     }
 
     protected function isQueryIntent(string $intent): bool
