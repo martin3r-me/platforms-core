@@ -55,19 +55,32 @@ class CursorSidebar extends Component
 
         // Iterative Tool-Loop: LLM darf mehrere Tools nacheinander wählen
         $planner = new LlmPlanner();
-        // Chat-Verlauf (nur user/assistant-Plaintext) als Kontext einspeisen
+        // Chat-Verlauf (nur user/assistant-Plaintext) als Kontext einspeisen – letzte Nachrichten bevorzugen
+        // Token-Budget grob: ~4 Zeichen pro Token
+        $approxToken = function(string $s) { return (int) ceil(mb_strlen($s) / 4); };
+        $maxTokens = 3000; // ein großzügiges Kontextbudget
+        $used = 0;
         $history = [];
-        foreach ($this->feed as $b) {
+        for ($i = count($this->feed) - 1; $i >= 0; $i--) {
+            $b = $this->feed[$i];
             if (($b['role'] ?? '') === 'user' && !empty($b['text'] ?? '')) {
-                $history[] = ['role' => 'user', 'content' => $b['text']];
+                $t = $b['text'];
+                $need = $approxToken($t);
+                if ($used + $need > $maxTokens) break;
+                $used += $need;
+                $history[] = ['role' => 'user', 'content' => $t];
             }
             if (($b['role'] ?? '') === 'assistant' && ($b['type'] ?? '') === 'message') {
-                $msg = $b['data']['text'] ?? '';
-                if ($msg !== '') {
-                    $history[] = ['role' => 'assistant', 'content' => $msg];
-                }
+                $t = $b['data']['text'] ?? '';
+                if ($t === '') continue;
+                $need = $approxToken($t);
+                if ($used + $need > $maxTokens) break;
+                $used += $need;
+                $history[] = ['role' => 'assistant', 'content' => $t];
             }
         }
+        // Umkehren, damit die älteren zuerst im Verlauf stehen
+        $history = array_reverse($history);
         $messages = $planner->initialMessages($text, $history);
         $maxSteps = 4;
         for ($i = 0; $i < $maxSteps; $i++) {
@@ -403,9 +416,9 @@ class CursorSidebar extends Component
     {
         $this->feed = [];
         if (!$this->chatId) return;
+        // gesamten Verlauf laden (bei Bedarf später paginieren)
         $messages = CoreChatMessage::where('core_chat_id', $this->chatId)
             ->orderBy('id')
-            ->limit(50)
             ->get();
         foreach ($messages as $m) {
             $meta = (array) ($m->meta ?? []);
