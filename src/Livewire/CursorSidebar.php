@@ -141,6 +141,12 @@ class CursorSidebar extends Component
         if (($resp['ok'] ?? false) && !empty($resp['text'])) {
             $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $resp['text']]];
             $this->saveMessage('assistant', $resp['text'], ['kind' => 'message']);
+        } elseif (!($resp['ok'] ?? true)) {
+            $msg = ($resp['message'] ?? 'LLM Fehler');
+            $detail = is_string($resp['detail'] ?? null) ? $resp['detail'] : json_encode($resp['detail'] ?? [], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+            $text = $detail ? ($msg.': '.$detail) : $msg;
+            $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $text]];
+            $this->saveMessage('assistant', $text, ['kind' => 'error']);
         }
     }
 
