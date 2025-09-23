@@ -42,6 +42,7 @@ class CommandRegistry
             $commandsValidated[] = $cmd;
         }
         self::$moduleKeyToCommands[$moduleKey] = $commandsValidated ?? $commands;
+        \Log::info("CommandRegistry: Registriert {$moduleKey} mit " . count($commandsValidated ?? $commands) . " Commands: " . implode(', ', array_column($commandsValidated ?? $commands, 'key')));
     }
 
     /**
@@ -97,6 +98,10 @@ class CommandRegistry
         $tools = [];
         // Mapping bei jedem Export frisch aufbauen
         self::$toolNameToCommandKey = [];
+        \Log::info("CommandRegistry: Exportiere " . count(self::$moduleKeyToCommands) . " Module: " . implode(', ', array_keys(self::$moduleKeyToCommands)));
+        foreach (self::$moduleKeyToCommands as $moduleKey => $commands) {
+            \Log::info("CommandRegistry: Module {$moduleKey} hat " . count($commands) . " Commands: " . implode(', ', array_column($commands, 'key')));
+        }
         foreach (self::$moduleKeyToCommands as $moduleKey => $commands) {
             foreach ($commands as $cmd) {
                 $name = $cmd['key'];

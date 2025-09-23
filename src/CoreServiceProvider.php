@@ -204,7 +204,10 @@ class CoreServiceProvider extends ServiceProvider
             $serviceProviderClass = 'Platform\\'.Str::studly($moduleKey).'\\'.Str::studly($moduleKey).'ServiceProvider';
             
             if (class_exists($serviceProviderClass)) {
+                \Log::info("CoreServiceProvider: Lade {$serviceProviderClass}");
                 $this->app->register($serviceProviderClass);
+            } else {
+                \Log::info("CoreServiceProvider: Klasse {$serviceProviderClass} nicht gefunden");
             }
         }
     }
