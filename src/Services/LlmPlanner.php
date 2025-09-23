@@ -205,15 +205,17 @@ class LlmPlanner
         $tools = [];
         $text = mb_strtolower($userText ?? '');
         $explicitDashboard = str_contains($text, 'dashboard') || str_contains($text, 'übersicht') || str_contains($text, 'start');
+        $explicitNavigate  = $explicitDashboard || str_contains($text, 'öffne') || str_contains($text, 'open') || str_contains($text, 'gehe') || str_contains($text, 'zeige');
         foreach ($schemas as $s) {
             $name = mb_strtolower($s['name'] ?? '');
-            // Heuristik: vermeide generische *open_dashboard, wenn der Nutzer über Projekte/Aufgaben spricht
-            if (!$explicitDashboard) {
-                if (str_contains($text, 'projekt') || str_contains($text, 'aufgaben') || str_contains($text, 'aufgabe')) {
-                    if (str_ends_with($name, 'open_dashboard')) {
-                        continue; // nicht anbieten
-                    }
-                }
+            // Heuristik: vermeide Route-basierte Tools, wenn keine Navigation gefragt ist
+            $isRouteTool = isset($s['x-handler']) ? $s['x-handler'] === 'route' : (str_contains($name, 'dashboard') || str_contains($name, 'show'));
+            if ($isRouteTool && !$explicitNavigate) {
+                continue;
+            }
+            // Speziell: *open_dashboard nur wenn explizit erwähnt
+            if (!$explicitDashboard && str_ends_with($name, 'open_dashboard')) {
+                continue;
             }
             $tools[] = [
                 'type' => 'function',
