@@ -306,11 +306,9 @@ class CursorSidebar extends Component
             if (($result['ok'] ?? false) && !empty($result['navigate'] ?? null)) {
                 // Sofortige Navigation, aber vorher Eingabe leeren und Feed/Message persistieren
                 $this->input = '';
-                $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Navigiere …']];
-                $this->saveMessage('assistant', json_encode(['navigate' => $result['navigate']], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'navigate']);
-                $this->redirect($result['navigate'], navigate: true);
-                $this->isWorking = false;
-                return;
+                $this->pendingNavigate = $result['navigate'];
+                // Sofort navigieren erst nach Abschluss des Loops
+                break;
             }
             // Fallback für fehlgeschlagene *.show Routen: query → open
             if (!($result['ok'] ?? true) && str_ends_with(mb_strtolower($intent), '.show')) {
@@ -359,11 +357,8 @@ class CursorSidebar extends Component
                 if (($resolved['ok'] ?? false) && !empty($resolved['navigate'] ?? null)) {
                     // Direkte Navigation
                 $this->input = '';
-                $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Navigiere …']];
-                $this->saveMessage('assistant', json_encode(['navigate' => $resolved['navigate']], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'navigate']);
-                    $this->redirect($resolved['navigate'], navigate: true);
-                $this->isWorking = false;
-                return;
+                $this->pendingNavigate = $resolved['navigate'];
+                break;
                 }
                 if (!($resolved['ok'] ?? true) && !empty($resolved['needResolve'] ?? null) && !empty($resolved['choices'] ?? [])) {
                     $this->feed[] = ['role' => 'assistant', 'type' => 'choices', 'data' => [
@@ -403,8 +398,7 @@ class CursorSidebar extends Component
         $this->saveEvent('tool_call_end', ['intent' => $intent, 'slots' => $slots, 'result' => $result]);
         $this->saveMessage('tool', json_encode($result, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'result']);
         if (($result['ok'] ?? false) && !empty($result['navigate'])) {
-            // Direkt navigieren; Sidebar schließt sich durch Seitenwechsel
-            $this->redirect($result['navigate'], navigate: true);
+            $this->pendingNavigate = $result['navigate'];
         }
         return $result;
     }
