@@ -7,6 +7,69 @@ use Platform\Core\Registry\CommandRegistry;
 
 class LlmPlanner
 {
+    public function initialMessages(string $userText): array
+    {
+        $system = "Du bist ein Assistent in einer Business-Plattform. Nutze bereitgestellte Tools, um Nutzerbefehle auszuführen. Wähle Tools und Parameter eigenständig. Wenn kein Tool passt, antworte kurz auf Deutsch.";
+        return [
+            ['role' => 'system', 'content' => $system],
+            ['role' => 'user', 'content' => $userText],
+        ];
+    }
+
+    public function step(array $messages, string $userText = ''): array
+    {
+        $apiKey = env('OPENAI_API_KEY');
+        $base   = rtrim(env('OPENAI_BASE', 'https://api.openai.com/v1'), '/');
+        $model  = env('OPENAI_MODEL', 'gpt-4o-mini');
+        if (!$apiKey) {
+            return ['ok' => false, 'message' => 'OPENAI_API_KEY fehlt'];
+        }
+
+        $tools = $this->buildToolsFromRegistry($userText);
+
+        try {
+            $resp = Http::withToken($apiKey)
+                ->acceptJson()
+                ->timeout(20)
+                ->post($base . '/chat/completions', [
+                    'model' => $model,
+                    'messages' => $messages,
+                    'tools' => $tools,
+                    'tool_choice' => 'auto',
+                ]);
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'message' => 'LLM Anfrage fehlgeschlagen', 'detail' => $e->getMessage()];
+        }
+        if ($resp->failed()) {
+            return ['ok' => false, 'message' => 'LLM Fehler', 'detail' => $resp->json() ?: $resp->body()];
+        }
+        $data = $resp->json();
+        $choice = $data['choices'][0] ?? [];
+        $message = $choice['message'] ?? [];
+        $toolCall = $message['tool_calls'][0] ?? null;
+        if ($toolCall) {
+            $toolName = $toolCall['function']['name'] ?? null;
+            $intent = $toolName ? CommandRegistry::resolveKeyFromToolName($toolName) : null;
+            $argsJson = $toolCall['function']['arguments'] ?? '{}';
+            $slots = json_decode($argsJson, true) ?: [];
+            return [
+                'ok' => true,
+                'type' => 'tool',
+                'intent' => $intent,
+                'slots' => $slots,
+                'tool_call_id' => $toolCall['id'] ?? null,
+                'raw' => $message,
+            ];
+        }
+        $assistant = $message['content'] ?? '';
+        return [
+            'ok' => true,
+            'type' => 'assistant',
+            'text' => $assistant,
+            'raw' => $message,
+        ];
+    }
+
     public function plan(string $userText): array
     {
         $apiKey = env('OPENAI_API_KEY');

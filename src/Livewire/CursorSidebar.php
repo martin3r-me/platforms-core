@@ -53,36 +53,52 @@ class CursorSidebar extends Component
         $this->ensureChat();
         $this->saveMessage('user', $text, ['forceExecute' => $this->forceExecute]);
 
+        // Iterative Tool-Loop: LLM darf mehrere Tools nacheinander wählen
         $planner = new LlmPlanner();
-        $plan = $planner->plan($text);
-        $this->feed[] = ['role' => 'assistant', 'type' => 'plan', 'data' => $plan];
-        $this->saveMessage('assistant', json_encode(['plan' => $plan], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'plan']);
-
-        if (($plan['ok'] ?? false) && ($plan['intent'] ?? null)) {
-            $conf = (float)($plan['confidence'] ?? 0.0);
-            $autoAllowed = $this->isAutoAllowed($plan['intent']);
-            if ($this->forceExecute || $autoAllowed || (empty($plan['confirmRequired']) && $conf >= 0.8)) {
-                $res = $this->executeIntent($plan['intent'], $plan['slots'] ?? [], $autoAllowed);
-                // Bei Navigation sofort beenden, damit keine zusätzliche Assistant-Antwort den Link ausgibt
-                if (($res['ok'] ?? false) && !empty($res['navigate'] ?? null)) {
-                    return;
-                }
-                if (!$res['ok'] && $plan['intent'] === 'planner.open_project' && !empty(($plan['slots'] ?? [])['name'])) {
-                    $this->multiChainOpenProjectByName(($plan['slots'] ?? [])['name']);
-                } else {
-                    $this->assistantFollowUp($text);
-                }
-            } else {
-                $this->feed[] = ['role' => 'assistant', 'type' => 'confirm', 'data' => [
-                    'intent' => $plan['intent'],
-                    'impact' => $plan['impact'] ?? 'medium',
-                    'slots' => $plan['slots'] ?? [],
-                    'confidence' => $conf,
-                ]];
-                $this->assistantFollowUp($text);
+        $messages = $planner->initialMessages($text);
+        $maxSteps = 4;
+        for ($i = 0; $i < $maxSteps; $i++) {
+            $step = $planner->step($messages, $text);
+            // Fehler oder reine Assistant-Antwort → anzeigen und abbrechen
+            if (!($step['ok'] ?? false)) {
+                $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => ($step['message'] ?? 'Fehler')]];
+                $this->saveMessage('assistant', ($step['message'] ?? 'Fehler'), ['kind' => 'message']);
+                break;
             }
-        } else {
-            $this->assistantFollowUp($text);
+            if (($step['type'] ?? '') === 'assistant') {
+                $textOut = trim($step['text'] ?? '');
+                if ($textOut !== '') {
+                    $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $textOut]];
+                    $this->saveMessage('assistant', $textOut, ['kind' => 'message']);
+                }
+                break;
+            }
+            // Tool-Aufruf
+            $intent = $step['intent'] ?? '';
+            $slots  = $step['slots'] ?? [];
+            $autoAllowed = $this->isAutoAllowed($intent);
+            if (!$this->forceExecute && !$autoAllowed) {
+                // Bestätigungs-Bubble und abbrechen
+                $this->feed[] = ['role' => 'assistant', 'type' => 'confirm', 'data' => [
+                    'intent' => $intent,
+                    'impact' => 'medium',
+                    'slots' => $slots,
+                    'confidence' => 0.0,
+                ]];
+                $this->saveMessage('assistant', json_encode(['confirm' => ['intent' => $intent, 'slots' => $slots]], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'confirm']);
+                break;
+            }
+            $result = $this->executeIntent($intent, $slots, true);
+            if (($result['ok'] ?? false) && !empty($result['navigate'] ?? null)) {
+                // Sofortige Navigation
+                return;
+            }
+            // Tool-Resultat in den LLM-Kontext rückführen
+            $messages[] = [
+                'role' => 'tool',
+                'content' => json_encode($result, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
+                'name' => $intent,
+            ];
         }
 
         $this->input = '';

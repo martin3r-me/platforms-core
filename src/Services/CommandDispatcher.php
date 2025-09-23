@@ -49,7 +49,16 @@ class CommandDispatcher
             } else {
                 $params = Arr::only($slots, ['id', 'name']);
             }
-            $url = route($routeName, $params);
+            // Wenn erforderliche Parameter fehlen, nicht crashen, sondern Resolver erlauben
+            try {
+                $url = route($routeName, $params);
+            } catch (\Throwable $e) {
+                return [
+                    'ok' => false,
+                    'message' => 'Route-Parameter unvollständig',
+                    'needResolve' => true,
+                ];
+            }
             return ['ok' => true, 'navigate' => $url, 'message' => 'Navigation bereit'];
         }
         if (is_array($handler) && ($handler[0] ?? null) === 'livewire') {
