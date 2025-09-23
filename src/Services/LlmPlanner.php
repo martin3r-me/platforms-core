@@ -19,8 +19,25 @@ class LlmPlanner
         // Hinweis: Verfügbare Modelle (aus Registry), damit das LLM 'model' korrekt setzt
         try {
             $plannerModels = \Platform\Core\Schema\ModelSchemaRegistry::keysByPrefix('planner.');
+            $crmModels = \Platform\Core\Schema\ModelSchemaRegistry::keysByPrefix('crm.');
             if (!empty($plannerModels)) {
                 $system .= " Verfügbare Modelle (Planner): ".implode(', ', $plannerModels).".";
+            }
+            if (!empty($crmModels)) {
+                $system .= " Verfügbare Modelle (CRM): ".implode(', ', $crmModels).".";
+            }
+            
+            // Modell-Strukturen für besseres Verständnis
+            $allModels = \Platform\Core\Schema\ModelSchemaRegistry::keys();
+            foreach ($allModels as $modelKey) {
+                $schema = \Platform\Core\Schema\ModelSchemaRegistry::get($modelKey);
+                if (!empty($schema['fields'])) {
+                    $system .= " {$modelKey} hat Felder: ".implode(', ', array_slice($schema['fields'], 0, 10)).".";
+                }
+                if (!empty($schema['relations'])) {
+                    $relations = array_keys($schema['relations']);
+                    $system .= " {$modelKey} hat Relations: ".implode(', ', $relations).".";
+                }
             }
         } catch (\Throwable $e) {
             // Registry evtl. nicht geladen – ignorieren
