@@ -110,7 +110,7 @@ class LlmPlanner
 
         $tools = $this->buildToolsFromRegistry($userText);
 
-        $system = "Du bist ein Assistent in einer Business-Plattform. Nutze bereitgestellte Tools, um Nutzerbefehle auszuführen. Wähle genau EIN passendes Tool mit Parametern. Antworte nicht frei, sondern benutze function-calling. Keine generischen Ratschläge; nach erfolgreichen Aktionen nur kurz bestätigen.";
+        $system = "Du bist ein Assistent in einer Business-Plattform. Nutze bereitgestellte Tools, um Nutzerbefehle auszuführen. Du kannst mehrere Tools in Folge verwenden, bis die Aufgabe vollständig erledigt ist. Bei 'mehrere X anlegen' mache so viele separate create-Calls wie nötig. Antworte nicht frei, sondern benutze function-calling. Nach erfolgreichen Aktionen nur kurz bestätigen.";
 
         $payload = [
             'model' => $model,
