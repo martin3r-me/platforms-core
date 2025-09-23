@@ -59,6 +59,17 @@ class CursorSidebar extends Component
 
         // Iterative Tool-Loop: LLM darf mehrere Tools nacheinander wählen
         $planner = new LlmPlanner();
+        // Debug: verfügbare Tools nach Policy anzeigen
+        if (config('agent.debug_log')) {
+            try {
+                $schemasAll = \Platform\Core\Registry\CommandRegistry::exportFunctionSchemas();
+                $filtered = (new \Platform\Core\Services\ToolFilterPolicy())->filter($schemasAll, $text);
+                $toolNames = array_map(fn($s) => $s['name'] ?? '', $filtered);
+                $this->debugLog(['phase' => 'tools.built', 'all' => count($schemasAll), 'filtered' => count($filtered), 'names' => array_slice($toolNames, 0, 10)]);
+            } catch (\Throwable $e) {
+                $this->debugLog(['phase' => 'tools.build_error', 'err' => $e->getMessage()]);
+            }
+        }
         // Chat-Verlauf (nur user/assistant-Plaintext) als Kontext einspeisen – letzte Nachrichten bevorzugen
         // Token-Budget grob: ~4 Zeichen pro Token
         $approxToken = function(string $s) { return (int) ceil(mb_strlen($s) / 4); };
