@@ -12,7 +12,10 @@ class LlmPlanner
         $now = now();
         $system = "Du bist ein Assistent in einer Business-Plattform. Heute ist "
             . $now->translatedFormat('l, d.m.Y H:i') . " " . (config('app.timezone') ?: 'UTC') . ". "
-            . "Nutze bereitgestellte Tools, um Nutzerbefehle auszuführen. Wähle Tools und Parameter eigenständig. Wenn kein Tool passt, antworte kurz auf Deutsch.";
+            . "Nutze bereitgestellte Tools, um Nutzerbefehle auszuführen. Du kannst mehrere Tools in Folge verwenden, bis die Aufgabe vollständig erledigt ist. "
+            . "Bei 'mehrere X anlegen' mache so viele separate create-Calls wie nötig. "
+            . "Du kannst intelligent nachfragen, wenn Informationen fehlen oder unklar sind. "
+            . "Antworte nicht frei, sondern benutze function-calling. Nach erfolgreichen Aktionen nur kurz bestätigen.";
         // Hinweis: Verfügbare Modelle (aus Registry), damit das LLM 'model' korrekt setzt
         try {
             $plannerModels = \Platform\Core\Schema\ModelSchemaRegistry::keysByPrefix('planner.');
