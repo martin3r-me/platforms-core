@@ -8,6 +8,8 @@ use Platform\Core\Services\LlmPlanner;
 use Platform\Core\Services\CommandDispatcher;
 use Platform\Core\Services\CommandGateway;
 use Platform\Core\Services\IntentMatcher;
+use Platform\Core\Services\CommandPolicy;
+use Platform\Core\Services\CommandResolver;
 use Platform\Core\Models\CoreChat;
 use Platform\Core\Models\CoreChatMessage;
 use Platform\Core\Models\CoreChatEvent;
@@ -107,11 +109,18 @@ class CursorSidebar extends Component
                 if (!empty($step['raw'])) {
                     $messages[] = $step['raw'];
                 }
-                // alle Tool-Calls nacheinander ausführen und jeweils eine tool-Nachricht anhängen
-                foreach ($step['calls'] as $call) {
+                // Tool-Calls priorisieren (sichere Read-Intents zuerst) und bis zu 2 davon spekulativ ausführen
+                $calls = $step['calls'];
+                usort($calls, function($a, $b){
+                    $wa = $this->intentWeight((string)($a['intent'] ?? ''));
+                    $wb = $this->intentWeight((string)($b['intent'] ?? ''));
+                    return $wb <=> $wa;
+                });
+                $safeExecuted = 0;
+                foreach ($calls as $call) {
                     $intent = $call['intent'] ?? '';
                     $slots  = $call['slots'] ?? [];
-                    $autoAllowed = $this->isAutoAllowed($intent);
+                    $autoAllowed = (new CommandPolicy())->isAutoAllowed($intent);
                     if (!$this->forceExecute && !$autoAllowed) {
                         $this->feed[] = ['role' => 'assistant', 'type' => 'confirm', 'data' => [
                             'intent' => $intent,
@@ -126,19 +135,29 @@ class CursorSidebar extends Component
                     if (($result['ok'] ?? false) && !empty($result['navigate'] ?? null)) {
                         return; // direkte Navigation
                     }
-                    // Spezialfall Resolver für open_project name
-                    if ((!$result['ok'] || !empty($result['needResolve'] ?? null)) && $intent === 'planner.open_project' && !empty($slots['name'] ?? null)) {
-                        $qp = $this->executeIntent('planner.query_projects', ['q' => $slots['name'], 'limit' => 5], true);
-                        $projects = $qp['data']['projects'] ?? [];
-                        if (count($projects) === 1) {
-                            $this->executeIntent('planner.open_project', ['id' => $projects[0]['id']], true);
+                    // Generischer Resolver für planner.open mit name/title → planner.query → open
+                    if ((!$result['ok'] || !empty($result['needResolve'] ?? null))
+                        && $intent === 'planner.open'
+                        && (!empty($slots['name'] ?? null) || !empty($slots['title'] ?? null))
+                        && !empty($slots['model'] ?? null)) {
+                        $gateway = new CommandGateway(new IntentMatcher(), new CommandDispatcher());
+                        $resolved = (new CommandResolver())->resolveOpenByName(
+                            $gateway,
+                            'planner.query',
+                            'planner.open',
+                            [
+                                'model' => $slots['model'],
+                                'q' => $slots['name'] ?? ($slots['title'] ?? ''),
+                                'limit' => 5,
+                            ]
+                        );
+                        if (($resolved['ok'] ?? false) && !empty($resolved['navigate'] ?? null)) {
                             return;
                         }
-                        if (count($projects) > 1) {
-                            $choices = array_slice($projects, 0, 6);
+                        if (!($resolved['ok'] ?? true) && !empty($resolved['needResolve'] ?? null) && !empty($resolved['choices'] ?? [])) {
                             $this->feed[] = ['role' => 'assistant', 'type' => 'choices', 'data' => [
-                                'title' => 'Mehrere Projekte gefunden – bitte wählen:',
-                                'items' => array_map(fn($p) => ['id' => $p['id'], 'name' => $p['name']], $choices),
+                                'title' => 'Bitte wählen:',
+                                'items' => array_map(fn($c) => ['id' => $c['id'], 'name' => $c['label']], array_slice($resolved['choices'], 0, 6)),
                             ]];
                             break 2;
                         }
@@ -148,20 +167,10 @@ class CursorSidebar extends Component
                         'content' => json_encode($result, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
                         'tool_call_id' => $call['tool_call_id'] ?? null,
                     ];
-                    // Spezialfall Resolver für open_task title
-                    if ((!$result['ok'] || !empty($result['needResolve'] ?? null)) && $intent === 'planner.open_task' && !empty($slots['title'] ?? null)) {
-                        $qt = $this->executeIntent('planner.query_tasks', ['q' => $slots['title'], 'limit' => 5], true);
-                        $tasks = $qt['data']['tasks'] ?? [];
-                        if (count($tasks) === 1) {
-                            $this->executeIntent('planner.open_task', ['id' => $tasks[0]['id']], true);
-                            return;
-                        }
-                        if (count($tasks) > 1) {
-                            $choices = array_slice($tasks, 0, 6);
-                            $this->feed[] = ['role' => 'assistant', 'type' => 'choices', 'data' => [
-                                'title' => 'Mehrere Aufgaben gefunden – bitte wählen:',
-                                'items' => array_map(fn($t) => ['id' => $t['id'], 'name' => $t['title']], $choices),
-                            ]];
+                    // tasks werden durch den generischen Resolver ebenfalls abgedeckt (model: planner.tasks)
+                    if ($autoAllowed) {
+                        $safeExecuted++;
+                        if ($safeExecuted >= 2) {
                             break 2;
                         }
                     }
@@ -172,7 +181,7 @@ class CursorSidebar extends Component
             // Tool-Aufruf
             $intent = $step['intent'] ?? '';
             $slots  = $step['slots'] ?? [];
-            $autoAllowed = $this->isAutoAllowed($intent);
+            $autoAllowed = (new CommandPolicy())->isAutoAllowed($intent);
             if (!$this->forceExecute && !$autoAllowed) {
                 // Bestätigungs-Bubble und abbrechen
                 $this->feed[] = ['role' => 'assistant', 'type' => 'confirm', 'data' => [
@@ -196,19 +205,33 @@ class CursorSidebar extends Component
                 $this->redirect($result['navigate'], navigate: true);
                 return;
             }
-            // Spezialfall: open_project mit name → Resolver-Chain (query_projects → open_project)
-            if ((!$result['ok'] || !empty($result['needResolve'] ?? null)) && $intent === 'planner.open_project' && !empty($slots['name'] ?? null)) {
-                $qp = $this->executeIntent('planner.query_projects', ['q' => $slots['name'], 'limit' => 5], true);
-                $projects = $qp['data']['projects'] ?? [];
-                if (count($projects) === 1) {
-                    $this->executeIntent('planner.open_project', ['id' => $projects[0]['id']], true);
+            // Generischer Resolver für planner.open mit name/title + model
+            if ((!$result['ok'] || !empty($result['needResolve'] ?? null))
+                && $intent === 'planner.open'
+                && (!empty($slots['name'] ?? null) || !empty($slots['title'] ?? null))
+                && !empty($slots['model'] ?? null)) {
+                $gateway = new CommandGateway(new IntentMatcher(), new CommandDispatcher());
+                $resolved = (new CommandResolver())->resolveOpenByName(
+                    $gateway,
+                    'planner.query',
+                    'planner.open',
+                    [
+                        'model' => $slots['model'],
+                        'q' => $slots['name'] ?? ($slots['title'] ?? ''),
+                        'limit' => 5,
+                    ]
+                );
+                if (($resolved['ok'] ?? false) && !empty($resolved['navigate'] ?? null)) {
+                    // Direkte Navigation
+                    $this->input = '';
+                    $this->saveMessage('assistant', json_encode(['navigate' => $resolved['navigate']], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'navigate']);
+                    $this->redirect($resolved['navigate'], navigate: true);
                     return;
                 }
-                if (count($projects) > 1) {
-                    $choices = array_slice($projects, 0, 6);
+                if (!($resolved['ok'] ?? true) && !empty($resolved['needResolve'] ?? null) && !empty($resolved['choices'] ?? [])) {
                     $this->feed[] = ['role' => 'assistant', 'type' => 'choices', 'data' => [
-                        'title' => 'Mehrere Projekte gefunden – bitte wählen:',
-                        'items' => array_map(fn($p) => ['id' => $p['id'], 'name' => $p['name']], $choices),
+                        'title' => 'Bitte wählen:',
+                        'items' => array_map(fn($c) => ['id' => $c['id'], 'name' => $c['label']], array_slice($resolved['choices'], 0, 6)),
                     ]];
                     break;
                 }
@@ -280,6 +303,15 @@ class CursorSidebar extends Component
         if ($i === 'planner.list_my_tasks') return true;
         if (str_starts_with($i, 'planner.query_')) return true;
         return false;
+    }
+
+    protected function intentWeight(string $intent): float
+    {
+        $i = mb_strtolower($intent);
+        // höhere Werte = früher ausführen
+        if (str_contains($i, 'open') || str_contains($i, 'show')) return 2.0;
+        if (str_contains($i, 'list') || str_contains($i, 'get') || str_contains($i, 'query')) return 1.5;
+        return 1.0;
     }
 
     protected function multiChainOpenProjectByName(string $name): void

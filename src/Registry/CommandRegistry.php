@@ -36,6 +36,9 @@ class CommandRegistry
             $cmd['parameters'] = $cmd['parameters'] ?? [];
             $cmd['impact'] = $cmd['impact'] ?? 'low'; // low|medium|high
             $cmd['confirmRequired'] = $cmd['confirmRequired'] ?? in_array(($cmd['impact'] ?? 'low'), ['medium','high'], true);
+            // Optionale Felder: scope, examples, autoAllowed
+            $cmd['scope'] = $cmd['scope'] ?? null; // z. B. read:planner, write:planner.tasks
+            $cmd['examples'] = $cmd['examples'] ?? [];
             $commandsValidated[] = $cmd;
         }
         self::$moduleKeyToCommands[$moduleKey] = $commandsValidated ?? $commands;
@@ -98,6 +101,9 @@ class CommandRegistry
                         'properties' => $propertiesObject,
                         'required' => $required,
                     ],
+                    // Zusatzinfos für interne Heuristik/Filter (vom LLM ignoriert)
+                    'x-scope' => $cmd['scope'] ?? null,
+                    'x-examples' => $cmd['examples'] ?? [],
                 ];
                 $tools[] = $schema;
             }
@@ -108,6 +114,18 @@ class CommandRegistry
     public static function resolveKeyFromToolName(string $toolName): ?string
     {
         return self::$toolNameToCommandKey[$toolName] ?? null;
+    }
+
+    public static function findCommandByKey(string $key): array
+    {
+        foreach (self::$moduleKeyToCommands as $module => $cmds) {
+            foreach ($cmds as $c) {
+                if (($c['key'] ?? null) === $key) {
+                    return $c;
+                }
+            }
+        }
+        return [];
     }
 }
 

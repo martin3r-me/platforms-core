@@ -28,6 +28,11 @@ class CoreServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'platform');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
+        // Konfigurationen veröffentlichen
+        $this->publishes([
+            __DIR__.'/../config/agent.php' => config_path('agent.php'),
+        ], 'config');
+
         // Livewire-Komponenten registrieren (mit Präfix "core")
         $this->registerLivewireComponents();
 
@@ -53,6 +58,7 @@ class CoreServiceProvider extends ServiceProvider
     {
         $this->app->register(LivewireServiceProvider::class);
         $this->mergeConfigFrom(__DIR__.'/../config/platform.php', 'platform');
+        $this->mergeConfigFrom(__DIR__.'/../config/agent.php', 'agent');
 
         // Auth Policy Config einbinden und Service binden
         $this->mergeConfigFrom(__DIR__.'/../config/auth-policy.php', 'auth-policy');
