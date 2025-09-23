@@ -9,7 +9,10 @@ class LlmPlanner
 {
     public function initialMessages(string $userText): array
     {
-        $system = "Du bist ein Assistent in einer Business-Plattform. Nutze bereitgestellte Tools, um Nutzerbefehle auszuführen. Wähle Tools und Parameter eigenständig. Wenn kein Tool passt, antworte kurz auf Deutsch.";
+        $now = now();
+        $system = "Du bist ein Assistent in einer Business-Plattform. Heute ist "
+            . $now->translatedFormat('l, d.m.Y H:i') . " " . (config('app.timezone') ?: 'UTC') . ". "
+            . "Nutze bereitgestellte Tools, um Nutzerbefehle auszuführen. Wähle Tools und Parameter eigenständig. Wenn kein Tool passt, antworte kurz auf Deutsch.";
         return [
             ['role' => 'system', 'content' => $system],
             ['role' => 'user', 'content' => $userText],

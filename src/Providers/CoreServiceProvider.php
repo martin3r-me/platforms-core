@@ -41,6 +41,18 @@ class CoreServiceProvider extends ServiceProvider
                 'guard' => 'web',
                 'handler' => ['service', \Platform\Core\Services\CoreAgentService::class.'@transferAgent'],
             ],
+            [
+                'key' => 'core.get_now',
+                'description' => 'Liefert aktuelle Serverzeit und Zeitzone.',
+                'parameters' => [],
+                'impact' => 'low',
+                'confirmRequired' => false,
+                'autoAllowed' => true,
+                'phrases' => [ 'wie spät ist es', 'welches datum ist heute', 'heute datum' ],
+                'slots' => [],
+                'guard' => 'web',
+                'handler' => ['service', \Platform\Core\Tools\CoreTimeTool::class.'@getNow'],
+            ],
         ]);
     }
 
