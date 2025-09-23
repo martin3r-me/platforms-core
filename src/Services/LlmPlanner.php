@@ -57,18 +57,24 @@ class LlmPlanner
         $data = $resp->json();
         $choice = $data['choices'][0] ?? [];
         $message = $choice['message'] ?? [];
-        $toolCall = $message['tool_calls'][0] ?? null;
-        if ($toolCall) {
-            $toolName = $toolCall['function']['name'] ?? null;
-            $intent = $toolName ? CommandRegistry::resolveKeyFromToolName($toolName) : null;
-            $argsJson = $toolCall['function']['arguments'] ?? '{}';
-            $slots = json_decode($argsJson, true) ?: [];
+        $toolCalls = $message['tool_calls'] ?? [];
+        if (is_array($toolCalls) && count($toolCalls) > 0) {
+            $calls = [];
+            foreach ($toolCalls as $tc) {
+                $toolName = $tc['function']['name'] ?? null;
+                $intent = $toolName ? CommandRegistry::resolveKeyFromToolName($toolName) : null;
+                $argsJson = $tc['function']['arguments'] ?? '{}';
+                $slots = json_decode($argsJson, true) ?: [];
+                $calls[] = [
+                    'intent' => $intent,
+                    'slots' => $slots,
+                    'tool_call_id' => $tc['id'] ?? null,
+                ];
+            }
             return [
                 'ok' => true,
-                'type' => 'tool',
-                'intent' => $intent,
-                'slots' => $slots,
-                'tool_call_id' => $toolCall['id'] ?? null,
+                'type' => 'tools',
+                'calls' => $calls,
                 'raw' => $message,
             ];
         }

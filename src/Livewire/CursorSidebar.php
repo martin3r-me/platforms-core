@@ -89,6 +89,56 @@ class CursorSidebar extends Component
                 }
                 break;
             }
+            if (($step['type'] ?? '') === 'tools') {
+                // ganze Assistant-Nachricht in den Verlauf
+                if (!empty($step['raw'])) {
+                    $messages[] = $step['raw'];
+                }
+                // alle Tool-Calls nacheinander ausführen und jeweils eine tool-Nachricht anhängen
+                foreach ($step['calls'] as $call) {
+                    $intent = $call['intent'] ?? '';
+                    $slots  = $call['slots'] ?? [];
+                    $autoAllowed = $this->isAutoAllowed($intent);
+                    if (!$this->forceExecute && !$autoAllowed) {
+                        $this->feed[] = ['role' => 'assistant', 'type' => 'confirm', 'data' => [
+                            'intent' => $intent,
+                            'impact' => 'medium',
+                            'slots' => $slots,
+                            'confidence' => 0.0,
+                        ]];
+                        $this->saveMessage('assistant', json_encode(['confirm' => ['intent' => $intent, 'slots' => $slots]], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'confirm']);
+                        break 2; // verlasse Loop
+                    }
+                    $result = $this->executeIntent($intent, $slots, true);
+                    if (($result['ok'] ?? false) && !empty($result['navigate'] ?? null)) {
+                        return; // direkte Navigation
+                    }
+                    // Spezialfall Resolver für open_project name
+                    if ((!$result['ok'] || !empty($result['needResolve'] ?? null)) && $intent === 'planner.open_project' && !empty($slots['name'] ?? null)) {
+                        $qp = $this->executeIntent('planner.query_projects', ['q' => $slots['name'], 'limit' => 5], true);
+                        $projects = $qp['data']['projects'] ?? [];
+                        if (count($projects) === 1) {
+                            $this->executeIntent('planner.open_project', ['id' => $projects[0]['id']], true);
+                            return;
+                        }
+                        if (count($projects) > 1) {
+                            $choices = array_slice($projects, 0, 6);
+                            $this->feed[] = ['role' => 'assistant', 'type' => 'choices', 'data' => [
+                                'title' => 'Mehrere Projekte gefunden – bitte wählen:',
+                                'items' => array_map(fn($p) => ['id' => $p['id'], 'name' => $p['name']], $choices),
+                            ]];
+                            break 2;
+                        }
+                    }
+                    $messages[] = [
+                        'role' => 'tool',
+                        'content' => json_encode($result, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
+                        'tool_call_id' => $call['tool_call_id'] ?? null,
+                    ];
+                }
+                // nach Antworten auf alle tool_calls plant das LLM den nächsten Schritt
+                continue;
+            }
             // Tool-Aufruf
             $intent = $step['intent'] ?? '';
             $slots  = $step['slots'] ?? [];
