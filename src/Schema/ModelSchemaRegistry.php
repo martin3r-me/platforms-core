@@ -15,6 +15,9 @@ class ModelSchemaRegistry
             'sortable' => array_values($schema['sortable'] ?? []),
             'selectable' => array_values($schema['selectable'] ?? []),
             'relations' => $schema['relations'] ?? [],
+            'required' => array_values($schema['required'] ?? []),
+            'writable' => array_values($schema['writable'] ?? []),
+            'foreign_keys' => $schema['foreign_keys'] ?? [],
             'meta' => $schema['meta'] ?? [],
         ];
     }
@@ -67,6 +70,21 @@ class ModelSchemaRegistry
     {
         $schema = self::get($modelKey);
         return $schema['meta'][$key] ?? $default;
+    }
+
+    public static function required(string $modelKey): array
+    {
+        return self::get($modelKey)['required'] ?? [];
+    }
+
+    public static function writable(string $modelKey): array
+    {
+        return self::get($modelKey)['writable'] ?? [];
+    }
+
+    public static function foreignKeys(string $modelKey): array
+    {
+        return self::get($modelKey)['foreign_keys'] ?? [];
     }
 }
 
