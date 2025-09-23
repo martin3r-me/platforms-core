@@ -16,21 +16,26 @@ class ModelAutoRegistrar
     {
         // Versuche verschiedene Pfade für die Module
         $possiblePaths = [
-            realpath(__DIR__.'/../../modules'),
-            realpath(base_path('platform/modules')),
-            realpath(__DIR__.'/../../../modules'),
+            __DIR__.'/../../modules',
+            base_path('platform/modules'),
+            __DIR__.'/../../../modules',
         ];
         
+        \Log::info('ModelAutoRegistrar: Versuche Pfade: ' . implode(', ', $possiblePaths));
+        
         foreach ($possiblePaths as $path) {
-            if ($path && is_dir($path)) {
-                $this->modulesPath = $path;
+            $realPath = realpath($path);
+            \Log::info("ModelAutoRegistrar: Prüfe Pfad: {$path} -> {$realPath}");
+            
+            if ($realPath && is_dir($realPath)) {
+                $this->modulesPath = $realPath;
                 \Log::info('ModelAutoRegistrar: Modules-Pfad gefunden: ' . $this->modulesPath);
                 return;
             }
         }
         
         $this->modulesPath = null;
-        \Log::info('ModelAutoRegistrar: Kein Modules-Pfad gefunden. Versuchte Pfade: ' . implode(', ', $possiblePaths));
+        \Log::info('ModelAutoRegistrar: Kein Modules-Pfad gefunden. Alle Pfade fehlgeschlagen.');
     }
 
     public function scanAndRegister(): void
