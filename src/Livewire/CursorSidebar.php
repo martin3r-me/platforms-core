@@ -22,6 +22,7 @@ class CursorSidebar extends Component
     public ?int $chatId = null;
     public int $totalTokensIn = 0;
     public int $totalTokensOut = 0;
+    public int $activeChatsCount = 0;
 
     #[On('cursor-sidebar-toggle')]
     public function toggle(): void
@@ -166,6 +167,12 @@ class CursorSidebar extends Component
                 $this->totalTokensOut = (int) $chat->total_tokens_out;
             }
         }
+        // simple count of active chats for user
+        if (auth()->check()) {
+            $this->activeChatsCount = CoreChat::where('user_id', auth()->id())
+                ->where('status', 'active')
+                ->count();
+        }
         return view('platform::livewire.cursor-sidebar');
     }
 
@@ -205,6 +212,18 @@ class CursorSidebar extends Component
             'type' => $type,
             'payload' => $payload,
         ]);
+    }
+
+    protected function findCommandByKey(string $key): array
+    {
+        foreach (\Platform\Core\Registry\CommandRegistry::all() as $module => $cmds) {
+            foreach ($cmds as $c) {
+                if (($c['key'] ?? null) === $key) {
+                    return $c;
+                }
+            }
+        }
+        return [];
     }
 }
 
