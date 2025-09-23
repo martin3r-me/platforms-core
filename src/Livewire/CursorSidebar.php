@@ -135,6 +135,23 @@ class CursorSidebar extends Component
                         'content' => json_encode($result, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
                         'tool_call_id' => $call['tool_call_id'] ?? null,
                     ];
+                    // Spezialfall Resolver für open_task title
+                    if ((!$result['ok'] || !empty($result['needResolve'] ?? null)) && $intent === 'planner.open_task' && !empty($slots['title'] ?? null)) {
+                        $qt = $this->executeIntent('planner.query_tasks', ['q' => $slots['title'], 'limit' => 5], true);
+                        $tasks = $qt['data']['tasks'] ?? [];
+                        if (count($tasks) === 1) {
+                            $this->executeIntent('planner.open_task', ['id' => $tasks[0]['id']], true);
+                            return;
+                        }
+                        if (count($tasks) > 1) {
+                            $choices = array_slice($tasks, 0, 6);
+                            $this->feed[] = ['role' => 'assistant', 'type' => 'choices', 'data' => [
+                                'title' => 'Mehrere Aufgaben gefunden – bitte wählen:',
+                                'items' => array_map(fn($t) => ['id' => $t['id'], 'name' => $t['title']], $choices),
+                            ]];
+                            break 2;
+                        }
+                    }
                 }
                 // nach Antworten auf alle tool_calls plant das LLM den nächsten Schritt
                 continue;
@@ -160,7 +177,10 @@ class CursorSidebar extends Component
             }
             $result = $this->executeIntent($intent, $slots, true);
             if (($result['ok'] ?? false) && !empty($result['navigate'] ?? null)) {
-                // Sofortige Navigation
+                // Sofortige Navigation, aber vorher Eingabe leeren und Feed/Message persistieren
+                $this->input = '';
+                $this->saveMessage('assistant', json_encode(['navigate' => $result['navigate']], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'navigate']);
+                $this->redirect($result['navigate'], navigate: true);
                 return;
             }
             // Spezialfall: open_project mit name → Resolver-Chain (query_projects → open_project)
