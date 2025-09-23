@@ -82,6 +82,19 @@
                         <div class="text-left text-sm bg-muted-5 px-3 py-2 rounded">
                             <div>{{ $b['data']['text'] ?? '' }}</div>
                         </div>
+                    @elseif(($b['type'] ?? '') === 'choices')
+                        <div class="text-left text-sm bg-muted-5 px-3 py-2 rounded">
+                            <div class="font-medium mb-1">{{ $b['data']['title'] ?? 'Bitte wählen' }}</div>
+                            <ul class="space-y-1">
+                                @foreach(($b['data']['items'] ?? []) as $it)
+                                    <li>
+                                        <x-ui-button size="sm" variant="secondary-outline" wire:click="openProjectById({{ (int)($it['id'] ?? 0) }})">
+                                            {{ $it['name'] ?? 'Unbenannt' }}
+                                        </x-ui-button>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
                     @endif
                 @endforeach
             </div>

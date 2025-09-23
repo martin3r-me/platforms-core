@@ -51,8 +51,13 @@ class ModalCursor extends Component
             $autoAllowed = $this->isAutoAllowed($plan['intent']);
             // Lesen/whitelist: immer automatisch und mit Override
             if ($this->forceExecute || $autoAllowed || (empty($plan['confirmRequired']) && $conf >= $autoThreshold)) {
-                $this->executeIntent($plan['intent'], $plan['slots'] ?? [], $autoAllowed);
-                $this->assistantFollowUp($text);
+                $result = $this->executeIntent($plan['intent'], $plan['slots'] ?? [], $autoAllowed);
+                // Multi-Tool-Chain (einfach): Projekt-Disambiguation bei Namenssuche
+                if (!$result['ok'] && $plan['intent'] === 'planner.open_project' && !empty(($plan['slots'] ?? [])['name'])) {
+                    $this->multiChainOpenProjectByName(($plan['slots'] ?? [])['name']);
+                } else {
+                    $this->assistantFollowUp($text);
+                }
             } else {
                 $this->feed[] = ['role' => 'assistant', 'type' => 'confirm', 'data' => [
                     'intent' => $plan['intent'],
@@ -80,7 +85,7 @@ class ModalCursor extends Component
         }
     }
 
-    protected function executeIntent(string $intent, array $slots = [], bool $override = false): void
+    protected function executeIntent(string $intent, array $slots = [], bool $override = false): array
     {
         $gateway = new CommandGateway(new IntentMatcher(), new CommandDispatcher());
         $matched = [
@@ -94,6 +99,7 @@ class ModalCursor extends Component
             $this->close();
             $this->redirect($url, navigate: true);
         }
+        return $result;
     }
 
     protected function isAutoAllowed(string $intent): bool
@@ -106,6 +112,47 @@ class ModalCursor extends Component
         // Spezifisch erlauben
         if ($i === 'planner.list_my_tasks') return true;
         return false;
+    }
+
+    protected function multiChainOpenProjectByName(string $name): void
+    {
+        // 1) Projekte lesen
+        $list = $this->executeIntent('planner.list_projects', [] , true);
+        $projects = $list['data']['projects'] ?? [];
+        if (empty($projects)) {
+            $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Keine Projekte gefunden.']];
+            return;
+        }
+        // 2) Filtern nach Name (unscharf)
+        $needle = mb_strtolower($name);
+        $matches = [];
+        foreach ($projects as $p) {
+            $pname = mb_strtolower($p['name'] ?? '');
+            if ($pname === $needle || str_contains($pname, $needle)) {
+                $matches[] = $p;
+            }
+        }
+        if (count($matches) === 1) {
+            // 3a) Direkt öffnen
+            $this->executeIntent('planner.open_project', ['id' => $matches[0]['id']], true);
+            return;
+        }
+        if (count($matches) > 1) {
+            // 3b) Auswahl-Bubble anzeigen
+            $choices = array_slice($matches, 0, 6);
+            $this->feed[] = ['role' => 'assistant', 'type' => 'choices', 'data' => [
+                'title' => 'Mehrere Projekte gefunden – bitte wählen:',
+                'items' => array_map(fn($p) => ['id' => $p['id'], 'name' => $p['name']], $choices),
+            ]];
+            return;
+        }
+        // Kein Match: Info ausgeben
+        $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Kein passendes Projekt gefunden.']];
+    }
+
+    public function openProjectById(int $id): void
+    {
+        $this->executeIntent('planner.open_project', ['id' => $id], true);
     }
 
     protected function assistantFollowUp(string $userText): void
