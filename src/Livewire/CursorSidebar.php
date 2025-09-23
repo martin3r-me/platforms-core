@@ -63,6 +63,10 @@ class CursorSidebar extends Component
             $autoAllowed = $this->isAutoAllowed($plan['intent']);
             if ($this->forceExecute || $autoAllowed || (empty($plan['confirmRequired']) && $conf >= 0.8)) {
                 $res = $this->executeIntent($plan['intent'], $plan['slots'] ?? [], $autoAllowed);
+                // Bei Navigation sofort beenden, damit keine zusätzliche Assistant-Antwort den Link ausgibt
+                if (($res['ok'] ?? false) && !empty($res['navigate'] ?? null)) {
+                    return;
+                }
                 if (!$res['ok'] && $plan['intent'] === 'planner.open_project' && !empty(($plan['slots'] ?? [])['name'])) {
                     $this->multiChainOpenProjectByName(($plan['slots'] ?? [])['name']);
                 } else {
@@ -101,7 +105,7 @@ class CursorSidebar extends Component
         $this->saveEvent('tool_call_end', ['intent' => $intent, 'slots' => $slots, 'result' => $result]);
         $this->saveMessage('tool', json_encode($result, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'result']);
         if (($result['ok'] ?? false) && !empty($result['navigate'])) {
-            $this->dispatch('cursor-sidebar-toggle'); // Sidebar einklappen
+            // Direkt navigieren; Sidebar schließt sich durch Seitenwechsel
             $this->redirect($result['navigate'], navigate: true);
         }
         return $result;

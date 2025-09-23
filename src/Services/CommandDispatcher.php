@@ -17,7 +17,7 @@ class CommandDispatcher
         if (is_array($handler) && ($handler[0] ?? null) === 'service') {
             [$type, $callable] = $handler;
             $res = $this->callService($callable, $slots);
-            // Service kann navigate/message setzen, ok muss bool sein
+            // Service gibt ein Array zurück und kann ok/navigate/message/data setzen.
             if (is_array($res)) {
                 return [
                     'ok' => (bool)($res['ok'] ?? true),
@@ -26,11 +26,30 @@ class CommandDispatcher
                     'data' => $res['data'] ?? null,
                 ];
             }
+            // Fallback: beliebige Rückgabe als data verpacken
             return ['ok' => true, 'data' => $res];
         }
         if (is_array($handler) && ($handler[0] ?? null) === 'route') {
-            [$type, $routeName] = $handler;
-            $url = route($routeName, Arr::only($slots, ['id', 'name']));
+            // Varianten:
+            // ['route', 'route.name']
+            // ['route', 'route.name', ['paramName' => 'slot_key', ...]]
+            $type = $handler[0];
+            $routeName = $handler[1] ?? null;
+            $paramMap = $handler[2] ?? null;
+            if (!$routeName) {
+                return ['ok' => false, 'message' => 'Route-Name fehlt'];
+            }
+            $params = [];
+            if (is_array($paramMap)) {
+                foreach ($paramMap as $paramName => $slotKey) {
+                    if (array_key_exists($slotKey, $slots)) {
+                        $params[$paramName] = $slots[$slotKey];
+                    }
+                }
+            } else {
+                $params = Arr::only($slots, ['id', 'name']);
+            }
+            $url = route($routeName, $params);
             return ['ok' => true, 'navigate' => $url, 'message' => 'Navigation bereit'];
         }
         if (is_array($handler) && ($handler[0] ?? null) === 'livewire') {
@@ -52,8 +71,8 @@ class CommandDispatcher
         if (str_contains($callable, '@')) {
             [$class, $method] = explode('@', $callable, 2);
             $svc = app($class);
-            $res = $svc->{$method}($slots);
-            return ['ok' => true, 'data' => $res];
+            // Erwartet: Array mit optionalen Keys ok/navigate/message/data
+            return $svc->{$method}($slots);
         }
         return ['ok' => false, 'message' => 'Service-Callable ungültig'];
     }
