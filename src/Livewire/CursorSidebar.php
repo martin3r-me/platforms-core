@@ -64,8 +64,15 @@ class CursorSidebar extends Component
             try {
                 $schemasAll = \Platform\Core\Registry\CommandRegistry::exportFunctionSchemas();
                 $filtered = (new \Platform\Core\Services\ToolFilterPolicy())->filter($schemasAll, $text);
-                $toolNames = array_map(fn($s) => $s['name'] ?? '', $filtered);
-                $this->debugLog(['phase' => 'tools.built', 'all' => count($schemasAll), 'filtered' => count($filtered), 'names' => array_slice($toolNames, 0, 10)]);
+                $toolNamesAll = array_map(fn($s) => $s['name'] ?? '', $schemasAll);
+                $toolNamesFiltered = array_map(fn($s) => $s['name'] ?? '', $filtered);
+                $this->debugLog([
+                    'phase' => 'tools.built',
+                    'all' => count($schemasAll),
+                    'filtered' => count($filtered),
+                    'names_all' => $toolNamesAll,
+                    'names_filtered' => $toolNamesFiltered,
+                ]);
             } catch (\Throwable $e) {
                 $this->debugLog(['phase' => 'tools.build_error', 'err' => $e->getMessage()]);
             }

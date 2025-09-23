@@ -44,6 +44,29 @@ class CommandRegistry
         self::$moduleKeyToCommands[$moduleKey] = $commandsValidated ?? $commands;
     }
 
+    /**
+     * Hängt zusätzliche Kommandos an ein bestehendes Modul an (überschreibt nicht).
+     *
+     * @param string $moduleKey
+     * @param array<int, array> $commands
+     */
+    public static function append(string $moduleKey, array $commands): void
+    {
+        $existing = self::$moduleKeyToCommands[$moduleKey] ?? [];
+        $validated = [];
+        foreach ($commands as $cmd) {
+            if (!isset($cmd['key'])) { continue; }
+            $cmd['description'] = $cmd['description'] ?? '';
+            $cmd['parameters'] = $cmd['parameters'] ?? [];
+            $cmd['impact'] = $cmd['impact'] ?? 'low';
+            $cmd['confirmRequired'] = $cmd['confirmRequired'] ?? in_array(($cmd['impact'] ?? 'low'), ['medium','high'], true);
+            $cmd['scope'] = $cmd['scope'] ?? null;
+            $cmd['examples'] = $cmd['examples'] ?? [];
+            $validated[] = $cmd;
+        }
+        self::$moduleKeyToCommands[$moduleKey] = array_values(array_merge($existing, $validated));
+    }
+
     public static function unregister(string $moduleKey): void
     {
         unset(self::$moduleKeyToCommands[$moduleKey]);
