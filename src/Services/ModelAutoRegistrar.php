@@ -19,6 +19,7 @@ class ModelAutoRegistrar
             __DIR__.'/../../modules',
             base_path('platform/modules'),
             __DIR__.'/../../../modules',
+            base_path('vendor/martin3r'),
         ];
         
         \Log::info('ModelAutoRegistrar: Versuche Pfade: ' . implode(', ', $possiblePaths));
@@ -53,6 +54,12 @@ class ModelAutoRegistrar
         
         foreach ($modules as $moduleDir) {
             $moduleKey = basename($moduleDir);
+            
+            // Für Vendor-Module: platform-{module} -> {module}
+            if (str_starts_with($moduleKey, 'platform-')) {
+                $moduleKey = str_replace('platform-', '', $moduleKey);
+            }
+            
             $modelsDir = $moduleDir.'/src/Models';
             if (!is_dir($modelsDir)) {
                 \Log::info("ModelAutoRegistrar: Kein Models-Verzeichnis für {$moduleKey}");

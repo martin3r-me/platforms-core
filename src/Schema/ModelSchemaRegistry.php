@@ -18,6 +18,8 @@ class ModelSchemaRegistry
             'required' => array_values($schema['required'] ?? []),
             'writable' => array_values($schema['writable'] ?? []),
             'foreign_keys' => $schema['foreign_keys'] ?? [],
+            'enums' => $schema['enums'] ?? [],
+            'descriptions' => $schema['descriptions'] ?? [],
             'meta' => $schema['meta'] ?? [],
         ];
         \Log::info("ModelSchemaRegistry: Registriert {$modelKey}");
@@ -97,6 +99,21 @@ class ModelSchemaRegistry
             self::$schemas[$modelKey]['meta'] ?? [],
             $metaUpdates
         );
+    }
+
+    public static function enums(string $modelKey): array
+    {
+        return self::$schemas[$modelKey]['enums'] ?? [];
+    }
+
+    public static function descriptions(string $modelKey): array
+    {
+        return self::$schemas[$modelKey]['descriptions'] ?? [];
+    }
+
+    public static function relations(string $modelKey): array
+    {
+        return self::$schemas[$modelKey]['relations'] ?? [];
     }
 }
 
