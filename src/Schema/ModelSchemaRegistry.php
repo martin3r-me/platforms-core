@@ -86,6 +86,17 @@ class ModelSchemaRegistry
     {
         return self::get($modelKey)['foreign_keys'] ?? [];
     }
+
+    public static function updateMeta(string $modelKey, array $metaUpdates): void
+    {
+        if (!isset(self::$schemas[$modelKey])) {
+            return;
+        }
+        self::$schemas[$modelKey]['meta'] = array_merge(
+            self::$schemas[$modelKey]['meta'] ?? [],
+            $metaUpdates
+        );
+    }
 }
 
 
