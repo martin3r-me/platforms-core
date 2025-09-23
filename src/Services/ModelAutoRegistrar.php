@@ -10,11 +10,27 @@ use Illuminate\Filesystem\Filesystem;
 
 class ModelAutoRegistrar
 {
-    protected string $modulesPath;
+    protected ?string $modulesPath;
 
     public function __construct()
     {
-        $this->modulesPath = realpath(__DIR__.'/../../modules');
+        // Versuche verschiedene Pfade für die Module
+        $possiblePaths = [
+            realpath(__DIR__.'/../../modules'),
+            realpath(base_path('platform/modules')),
+            realpath(__DIR__.'/../../../modules'),
+        ];
+        
+        foreach ($possiblePaths as $path) {
+            if ($path && is_dir($path)) {
+                $this->modulesPath = $path;
+                \Log::info('ModelAutoRegistrar: Modules-Pfad gefunden: ' . $this->modulesPath);
+                return;
+            }
+        }
+        
+        $this->modulesPath = null;
+        \Log::info('ModelAutoRegistrar: Kein Modules-Pfad gefunden. Versuchte Pfade: ' . implode(', ', $possiblePaths));
     }
 
     public function scanAndRegister(): void
@@ -23,6 +39,8 @@ class ModelAutoRegistrar
             \Log::info('ModelAutoRegistrar: Modules-Pfad nicht gefunden: ' . $this->modulesPath);
             return;
         }
+        
+        \Log::info('ModelAutoRegistrar: Verwende Modules-Pfad: ' . $this->modulesPath);
 
         $fs = new Filesystem();
         $modules = array_filter(glob($this->modulesPath.'/*'), 'is_dir');
