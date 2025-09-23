@@ -44,13 +44,16 @@ class ModalCursor extends Component
         $this->feed[] = ['role' => 'assistant', 'type' => 'plan', 'data' => $plan];
 
         if (($plan['ok'] ?? false) && ($plan['intent'] ?? null)) {
-            if ($this->forceExecute || empty($plan['confirmRequired'])) {
+            $conf = (float)($plan['confidence'] ?? 0.0);
+            $autoThreshold = 0.8;
+            if ($this->forceExecute || (empty($plan['confirmRequired']) && $conf >= $autoThreshold)) {
                 $this->executeIntent($plan['intent'], $plan['slots'] ?? []);
             } else {
                 $this->feed[] = ['role' => 'assistant', 'type' => 'confirm', 'data' => [
                     'intent' => $plan['intent'],
                     'impact' => $plan['impact'] ?? 'medium',
                     'slots' => $plan['slots'] ?? [],
+                    'confidence' => $conf,
                 ]];
             }
         } else {

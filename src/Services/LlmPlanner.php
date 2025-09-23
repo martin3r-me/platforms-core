@@ -59,12 +59,15 @@ class LlmPlanner
         $impact = $meta['impact'] ?? 'low';
         $confirmRequired = $meta['confirmRequired'] ?? false;
 
+        $confidence = $this->estimateConfidence($userText, (string) $intent, $slots);
         return [
             'ok' => true,
             'intent' => $intent,
             'slots' => $slots,
             'impact' => $impact,
             'confirmRequired' => $confirmRequired,
+            'confidence' => $confidence,
+            'rationale' => null,
         ];
     }
 
@@ -92,6 +95,26 @@ class LlmPlanner
             }
         }
         return [];
+    }
+
+    protected function estimateConfidence(string $userText, string $intent, array $slots): float
+    {
+        $user = mb_strtolower($userText);
+        $intentLower = mb_strtolower($intent);
+        $score = 0.5;
+        $moduleKey = strstr($intentLower, '.', true) ?: $intentLower;
+        if ($moduleKey && str_contains($user, $moduleKey)) {
+            $score += 0.3;
+        }
+        foreach (['öffne', 'open', 'dashboard', 'projekt', 'ticket', 'okr'] as $kw) {
+            if (str_contains($user, $kw)) { $score += 0.1; break; }
+        }
+        foreach (array_keys($slots) as $slotName) {
+            if (str_contains($user, mb_strtolower($slotName))) { $score += 0.05; }
+        }
+        if ($score < 0) $score = 0.0;
+        if ($score > 1) $score = 1.0;
+        return $score;
     }
 }
 
