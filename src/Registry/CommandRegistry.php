@@ -26,6 +26,7 @@ class CommandRegistry
      */
     public static function register(string $moduleKey, array $commands): void
     {
+        \Log::info("CommandRegistry: Registriere {$moduleKey} mit " . count($commands) . " Commands");
         // Optional: Schema-Validierung minimal absichern
         foreach ($commands as $cmd) {
             if (!isset($cmd['key'])) {
@@ -97,6 +98,7 @@ class CommandRegistry
         $tools = [];
         // Mapping bei jedem Export frisch aufbauen
         self::$toolNameToCommandKey = [];
+        \Log::info("CommandRegistry: Exportiere " . count(self::$moduleKeyToCommands) . " Module: " . implode(', ', array_keys(self::$moduleKeyToCommands)));
         foreach (self::$moduleKeyToCommands as $moduleKey => $commands) {
             foreach ($commands as $cmd) {
                 $name = $cmd['key'];

@@ -28,6 +28,9 @@ class CoreServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'platform');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
+        // Module ServiceProvider automatisch laden
+        $this->loadModuleServiceProviders();
+
         // Konfigurationen veröffentlichen
         $this->publishes([
             __DIR__.'/../config/agent.php' => config_path('agent.php'),
@@ -184,6 +187,24 @@ class CoreServiceProvider extends ServiceProvider
             if (class_exists($class)) {
                 $alias = $prefix.'.'.Str::kebab(pathinfo($file, PATHINFO_FILENAME));
                 Livewire::component($alias, $class);
+            }
+        }
+    }
+
+    protected function loadModuleServiceProviders(): void
+    {
+        $modulesPath = realpath(__DIR__.'/../../modules');
+        if (!$modulesPath || !is_dir($modulesPath)) {
+            return;
+        }
+
+        $modules = array_filter(glob($modulesPath.'/*'), 'is_dir');
+        foreach ($modules as $moduleDir) {
+            $moduleKey = basename($moduleDir);
+            $serviceProviderClass = 'Platform\\'.Str::studly($moduleKey).'\\'.Str::studly($moduleKey).'ServiceProvider';
+            
+            if (class_exists($serviceProviderClass)) {
+                $this->app->register($serviceProviderClass);
             }
         }
     }
