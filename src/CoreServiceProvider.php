@@ -52,6 +52,13 @@ class CoreServiceProvider extends ServiceProvider
                 CreateMonthlyInvoices::class,
             ]);
         }
+
+        // Automatische Modell-Registrierung (nach Migrations/Boot der Module)
+        try {
+            (new \Platform\Core\Services\ModelAutoRegistrar())->scanAndRegister();
+        } catch (\Throwable $e) {
+            // still halten, falls Module/Tabellen noch nicht geladen
+        }
     }
 
     public function register(): void
@@ -76,6 +83,65 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(CrmCompanyOptionsProviderInterface::class, function () {
             return new NullCrmCompanyOptionsProvider();
         });
+
+        // Generische Model-Commands registrieren
+        \Platform\Core\Registry\CommandRegistry::register('core.model', [
+            [
+                'key' => 'core.model.query',
+                'description' => 'Generische Abfrage für beliebige registrierte Modelle.',
+                'parameters' => [
+                    ['name' => 'model', 'type' => 'string', 'required' => true],
+                    ['name' => 'q', 'type' => 'string', 'required' => false],
+                    ['name' => 'filters', 'type' => 'object', 'required' => false],
+                    ['name' => 'sort', 'type' => 'string', 'required' => false],
+                    ['name' => 'order', 'type' => 'string', 'required' => false],
+                    ['name' => 'limit', 'type' => 'integer', 'required' => false],
+                    ['name' => 'fields', 'type' => 'string', 'required' => false],
+                ],
+                'impact' => 'low',
+                'confirmRequired' => false,
+                'autoAllowed' => true,
+                'phrases' => [ 'zeige {model}', 'suche {model} {q}', 'liste {model}' ],
+                'slots' => [ ['name' => 'model'], ['name' => 'q'] ],
+                'guard' => 'web',
+                'handler' => ['service', \Platform\Core\Services\GenericModelCommandService::class.'@query'],
+                'scope' => 'read:*',
+            ],
+            [
+                'key' => 'core.model.open',
+                'description' => 'Generisches Öffnen (Navigation) für registrierte Modelle.',
+                'parameters' => [
+                    ['name' => 'model', 'type' => 'string', 'required' => true],
+                    ['name' => 'id', 'type' => 'integer', 'required' => false],
+                    ['name' => 'uuid', 'type' => 'string', 'required' => false],
+                    ['name' => 'name', 'type' => 'string', 'required' => false],
+                ],
+                'impact' => 'low',
+                'confirmRequired' => false,
+                'autoAllowed' => true,
+                'phrases' => [ 'öffne {model} {id}', 'öffne {model} {name}' ],
+                'slots' => [ ['name' => 'model'], ['name' => 'id'], ['name' => 'name'] ],
+                'guard' => 'web',
+                'handler' => ['service', \Platform\Core\Services\GenericModelCommandService::class.'@open'],
+                'scope' => 'read:*',
+            ],
+            [
+                'key' => 'core.model.create',
+                'description' => 'Generisches Anlegen (schema-validiert) für registrierte Modelle.',
+                'parameters' => [
+                    ['name' => 'model', 'type' => 'string', 'required' => true],
+                    ['name' => 'data', 'type' => 'object', 'required' => true],
+                ],
+                'impact' => 'medium',
+                'confirmRequired' => true,
+                'autoAllowed' => false,
+                'phrases' => [ 'erstelle {model}', 'lege {model} an' ],
+                'slots' => [ ['name' => 'model'], ['name' => 'data'] ],
+                'guard' => 'web',
+                'handler' => ['service', \Platform\Core\Services\GenericModelCommandService::class.'@create'],
+                'scope' => 'write:*',
+            ],
+        ]);
     }
 
     protected function registerLivewireComponents(): void
