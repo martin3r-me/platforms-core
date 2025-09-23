@@ -24,6 +24,15 @@ class CursorSidebar extends Component
     public int $totalTokensOut = 0;
     public int $activeChatsCount = 0;
 
+    public function mount(): void
+    {
+        // Aktiven Chat aus Session wiederherstellen
+        $sid = session('core_chat_id');
+        if ($sid) {
+            $this->chatId = (int) $sid;
+        }
+    }
+
     #[On('cursor-sidebar-toggle')]
     public function toggle(): void
     {
@@ -189,6 +198,7 @@ class CursorSidebar extends Component
             'status' => 'active',
         ]);
         $this->chatId = $chat->id;
+        session(['core_chat_id' => $this->chatId]);
     }
 
     protected function saveMessage(string $role, string $content, array $meta = []): void
