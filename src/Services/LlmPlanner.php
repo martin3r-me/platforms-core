@@ -13,6 +13,15 @@ class LlmPlanner
         $system = "Du bist ein Assistent in einer Business-Plattform. Heute ist "
             . $now->translatedFormat('l, d.m.Y H:i') . " " . (config('app.timezone') ?: 'UTC') . ". "
             . "Nutze bereitgestellte Tools, um Nutzerbefehle auszuführen. Wähle Tools und Parameter eigenständig. Wenn kein Tool passt, antworte kurz auf Deutsch.";
+        // Hinweis: Verfügbare Modelle (aus Registry), damit das LLM 'model' korrekt setzt
+        try {
+            $plannerModels = \Platform\Core\Schema\ModelSchemaRegistry::keysByPrefix('planner.');
+            if (!empty($plannerModels)) {
+                $system .= " Verfügbare Modelle (Planner): ".implode(', ', $plannerModels).".";
+            }
+        } catch (\Throwable $e) {
+            // Registry evtl. nicht geladen – ignorieren
+        }
         $messages = [ ['role' => 'system', 'content' => $system] ];
         // Erwartet: $history ist eine Liste aus ['role' => 'user'|'assistant', 'content' => string]
         foreach ($history as $h) {
