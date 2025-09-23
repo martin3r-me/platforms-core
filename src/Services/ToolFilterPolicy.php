@@ -17,6 +17,12 @@ class ToolFilterPolicy
         $text = mb_strtolower($userText ?? '');
         $weightsCfg = (array) config('agent.weights', []);
 
+        // Listen-/Übersicht-Heuristik
+        $isListPrompt = $this->isListLikePrompt($text);
+        $mentionsTasks = $this->matchesAnyWord($text, ['aufgaben','aufgabe','tasks','task','aufaben','aufgaben']);
+        $mentionsProjects = $this->matchesAnyWord($text, ['projekte','projekt','projects','project','oprojekte','projkete','proejkte']);
+        $mentionsBoth = $mentionsTasks && $mentionsProjects;
+
         $filtered = [];
         foreach ($schemas as $schema) {
             $toolName = (string) ($schema['name'] ?? '');
@@ -41,6 +47,11 @@ class ToolFilterPolicy
             if ($mode === 'read_only' && $this->looksLikeMutation($commandKey)) {
                 continue;
             }
+            // Listen-/Übersichtsanfrage → Route-Tools unterdrücken
+            if (($isListPrompt || $mentionsBoth) && $this->looksLikeRouteTool($toolName)) {
+                continue;
+            }
+
             // Score durch Keyword-Gewichte
             $score = 1.0;
             foreach ($weightsCfg as $kw => $cfg) {
@@ -108,6 +119,12 @@ class ToolFilterPolicy
         return false;
     }
 
+    protected function looksLikeRouteTool(string $toolName): bool
+    {
+        $k = mb_strtolower($toolName);
+        return str_contains($k, 'show') || str_contains($k, 'dashboard') || str_contains($k, 'my-tasks');
+    }
+
     protected function isScopeAllowed(string $required, array $scopesByRole): bool
     {
         if (empty($scopesByRole)) return true; // kein Scope-Setup → nicht einschränken
@@ -121,6 +138,22 @@ class ToolFilterPolicy
         if (in_array('*', $allowed, true)) return true;
         // Wildcard-Matching für Scopes: read:* etc.
         return $this->matchesAny($required, $allowed);
+    }
+
+    protected function isListLikePrompt(string $text): bool
+    {
+        foreach (['liste','list','zeige','alle','übersicht','uebersicht','nenn','nenne'] as $w) {
+            if (str_contains($text, $w)) return true;
+        }
+        return false;
+    }
+
+    protected function matchesAnyWord(string $text, array $words): bool
+    {
+        foreach ($words as $w) {
+            if ($w !== '' && str_contains($text, mb_strtolower($w))) return true;
+        }
+        return false;
     }
 }
 
