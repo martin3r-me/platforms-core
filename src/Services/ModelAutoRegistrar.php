@@ -62,6 +62,8 @@ class ModelAutoRegistrar
         if (!Schema::hasTable($table)) {
             return;
         }
+        // Für ModelKey-Ableitung (planner_tasks -> planner.tasks)
+        $tablePrefix = $moduleKey.'_';
         $columns = Schema::getColumnListing($table);
         $fields = array_values($columns);
         $selectable = array_values(array_slice($fields, 0, 6));
@@ -112,24 +114,38 @@ class ModelAutoRegistrar
                 } catch (\Throwable $e) {
                     continue;
                 }
-                if ($rel instanceof Relation) {
-                    if ($rel instanceof BelongsTo) {
-                        $fk = method_exists($rel, 'getForeignKeyName') ? $rel->getForeignKeyName() : null;
-                        $ownerKey = method_exists($rel, 'getOwnerKeyName') ? $rel->getOwnerKeyName() : null;
-                        $target = get_class($rel->getRelated());
-                        $relations[$name] = [
-                            'type' => 'belongsTo',
-                            'target' => $target,
-                            'foreign_key' => $fk,
-                            'owner_key' => $ownerKey,
-                            'fields' => ['id', (in_array('name', $fields, true) ? 'name' : (in_array('title', $fields, true) ? 'title' : 'id'))],
+                if ($rel instanceof Relation && $rel instanceof BelongsTo) {
+                    $fk = method_exists($rel, 'getForeignKeyName') ? $rel->getForeignKeyName() : null;
+                    $ownerKey = method_exists($rel, 'getOwnerKeyName') ? $rel->getOwnerKeyName() : null;
+                    $targetClass = get_class($rel->getRelated());
+                    $targetModelKey = null;
+                    $targetLabel = 'id';
+                    try {
+                        /** @var \Illuminate\Database\Eloquent\Model $targetModel */
+                        $targetModel = new $targetClass();
+                        $targetTable = $targetModel->getTable();
+                        $targetEntity = Str::startsWith($targetTable, $tablePrefix)
+                            ? Str::after($targetTable, $tablePrefix)
+                            : Str::snake(class_basename($targetClass));
+                        $targetModelKey = $moduleKey.'.'.$targetEntity;
+                        $targetFields = Schema::hasTable($targetTable) ? Schema::getColumnListing($targetTable) : [];
+                        $targetLabel = in_array('name', $targetFields, true) ? 'name' : (in_array('title', $targetFields, true) ? 'title' : 'id');
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                    $relations[$name] = [
+                        'type' => 'belongsTo',
+                        'target' => $targetClass,
+                        'foreign_key' => $fk,
+                        'owner_key' => $ownerKey,
+                        'fields' => ['id', (in_array('name', $fields, true) ? 'name' : (in_array('title', $fields, true) ? 'title' : 'id'))],
+                    ];
+                    if ($fk) {
+                        $foreignKeys[$fk] = [
+                            // wichtig: als ModelKey referenzieren, nicht Klassenname
+                            'references' => $targetModelKey,
+                            'label_key' => $targetLabel,
                         ];
-                        if ($fk) {
-                            $foreignKeys[$fk] = [
-                                'target' => $target,
-                                'label_key' => $labelKey,
-                            ];
-                        }
                     }
                 }
             }
@@ -137,7 +153,10 @@ class ModelAutoRegistrar
             // ignore
         }
 
-        $entityKey = Str::snake(class_basename($eloquentClass));
+        // EntityKey bevorzugt aus Tabellenname ableiten
+        $entityKey = Str::startsWith($table, $tablePrefix)
+            ? Str::after($table, $tablePrefix)
+            : Str::snake(class_basename($eloquentClass));
         $modelKey = $moduleKey.'.'.$entityKey;
 
         ModelSchemaRegistry::register($modelKey, [
