@@ -73,6 +73,7 @@ class ModelAutoRegistrar
             /** @var \Illuminate\Database\Eloquent\Model $model */
             $model = new $eloquentClass();
         } catch (\Throwable $e) {
+            \Log::info("ModelAutoRegistrar: Fehler beim Instanziieren von {$eloquentClass}: " . $e->getMessage());
             return;
         }
         $table = $model->getTable();
@@ -80,11 +81,13 @@ class ModelAutoRegistrar
             \Log::info("ModelAutoRegistrar: Tabelle {$table} existiert nicht");
             return;
         }
+        \Log::info("ModelAutoRegistrar: Tabelle {$table} existiert");
         \Log::info("ModelAutoRegistrar: Registriere Schema für {$table}");
         // Für ModelKey-Ableitung (planner_tasks -> planner.tasks)
         $tablePrefix = $moduleKey.'_';
         $columns = Schema::getColumnListing($table);
         $fields = array_values($columns);
+        \Log::info("ModelAutoRegistrar: Spalten für {$table}: " . implode(', ', $fields));
         $selectable = array_values(array_slice($fields, 0, 6));
         $writable = method_exists($model, 'getFillable') ? (array) $model->getFillable() : [];
         $sortable = array_values(array_intersect($fields, ['id','name','title','created_at','updated_at']));
