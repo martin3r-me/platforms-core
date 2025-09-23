@@ -113,6 +113,23 @@ class CursorSidebar extends Component
                 // Sofortige Navigation
                 return;
             }
+            // Spezialfall: open_project mit name → Resolver-Chain (query_projects → open_project)
+            if ((!$result['ok'] || !empty($result['needResolve'] ?? null)) && $intent === 'planner.open_project' && !empty($slots['name'] ?? null)) {
+                $qp = $this->executeIntent('planner.query_projects', ['q' => $slots['name'], 'limit' => 5], true);
+                $projects = $qp['data']['projects'] ?? [];
+                if (count($projects) === 1) {
+                    $this->executeIntent('planner.open_project', ['id' => $projects[0]['id']], true);
+                    return;
+                }
+                if (count($projects) > 1) {
+                    $choices = array_slice($projects, 0, 6);
+                    $this->feed[] = ['role' => 'assistant', 'type' => 'choices', 'data' => [
+                        'title' => 'Mehrere Projekte gefunden – bitte wählen:',
+                        'items' => array_map(fn($p) => ['id' => $p['id'], 'name' => $p['name']], $choices),
+                    ]];
+                    break;
+                }
+            }
             // Tool-Resultat in den LLM-Kontext rückführen
             $messages[] = [
                 'role' => 'tool',
