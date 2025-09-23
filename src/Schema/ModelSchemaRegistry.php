@@ -24,6 +24,16 @@ class ModelSchemaRegistry
         return self::$schemas[$modelKey] ?? [];
     }
 
+    public static function keys(): array
+    {
+        return array_keys(self::$schemas);
+    }
+
+    public static function keysByPrefix(string $prefix): array
+    {
+        return array_values(array_filter(self::keys(), fn($k) => str_starts_with($k, $prefix)));
+    }
+
     public static function validateFields(string $modelKey, array $requested, array $fallback): array
     {
         $schema = self::get($modelKey);
