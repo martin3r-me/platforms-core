@@ -20,6 +20,7 @@ class ModelSchemaRegistry
             'foreign_keys' => $schema['foreign_keys'] ?? [],
             'meta' => $schema['meta'] ?? [],
         ];
+        \Log::info("ModelSchemaRegistry: Registriert {$modelKey}");
     }
 
     public static function get(string $modelKey): array

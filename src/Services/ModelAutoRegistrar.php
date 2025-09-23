@@ -26,16 +26,22 @@ class ModelAutoRegistrar
         }
         $fs = new Filesystem();
         $modules = array_filter(glob($this->modulesPath.'/*'), 'is_dir');
+        \Log::info('ModelAutoRegistrar: Scanne Module: ' . implode(', ', array_map('basename', $modules)));
         foreach ($modules as $moduleDir) {
             $moduleKey = basename($moduleDir);
             $modelsDir = $moduleDir.'/src/Models';
-            if (!is_dir($modelsDir)) continue;
+            if (!is_dir($modelsDir)) {
+                \Log::info("ModelAutoRegistrar: Kein Models-Verzeichnis für {$moduleKey}");
+                continue;
+            }
+            \Log::info("ModelAutoRegistrar: Scanne Models in {$moduleKey}");
             foreach ($fs->files($modelsDir) as $file) {
                 if ($file->getExtension() !== 'php') continue;
                 $class = $this->classFromFile($file->getPathname(), $moduleKey);
                 if (!$class || !class_exists($class)) continue;
                 // Nur Eloquent Models
                 if (!is_subclass_of($class, \Illuminate\Database\Eloquent\Model::class)) continue;
+                \Log::info("ModelAutoRegistrar: Registriere {$class}");
                 $this->registerModelSchema($moduleKey, $class);
             }
         }
@@ -60,8 +66,10 @@ class ModelAutoRegistrar
         }
         $table = $model->getTable();
         if (!Schema::hasTable($table)) {
+            \Log::info("ModelAutoRegistrar: Tabelle {$table} existiert nicht");
             return;
         }
+        \Log::info("ModelAutoRegistrar: Registriere Schema für {$table}");
         // Für ModelKey-Ableitung (planner_tasks -> planner.tasks)
         $tablePrefix = $moduleKey.'_';
         $columns = Schema::getColumnListing($table);
