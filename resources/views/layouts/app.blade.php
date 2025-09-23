@@ -47,6 +47,8 @@
     <main class="main flex-grow overflow-auto p-1 bg-white">
         {{ $slot }}
     </main>
+    {{-- Rechte Cursor-Sidebar parallel zur linken Sidebar und Main --}}
+    <livewire:core.cursor-sidebar/>
   </div>
 
   @auth 
@@ -55,7 +57,6 @@
     <livewire:core.modal-pricing/>
     <livewire:core.modal-modules/>
     <livewire:comms.comms-modal/>
-    <livewire:core.cursor-sidebar/>
   @endauth
     
     <livewire:notifications.notices.index />

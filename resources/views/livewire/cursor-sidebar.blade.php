@@ -1,5 +1,5 @@
-<div x-data="{ open: $wire.entangle('open') }" class="fixed inset-y-0 right-0 z-40">
-    <div x-show="open" x-cloak class="h-full">
+<div x-data="{ open: $wire.entangle('open') }" class="h-full d-flex">
+    <div x-show="open" x-cloak class="h-full d-flex">
         <x-ui-right-sidebar>
         <div class="sticky top-0 z-10 px-3 py-2 border-bottom-1 d-flex items-center gap-2 bg-white">
             <div class="font-medium">Cursor</div>
