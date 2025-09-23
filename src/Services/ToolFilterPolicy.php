@@ -30,7 +30,7 @@ class ToolFilterPolicy
             }
             // Scope-Prüfung (optional): user->role -> erlaubte Scopes
             $requiredScope = (string) ($schema['x-scope'] ?? '');
-            if ($requiredScope !== '' && !$this->isScopeAllowed($requiredScope, $scopesByRole)) {
+            if (!empty($scopesByRole) && $requiredScope !== '' && !$this->isScopeAllowed($requiredScope, $scopesByRole)) {
                 continue;
             }
             // Modus: navigation_only → nur *show und exportierte GET-Routen (Heuristik)
@@ -105,6 +105,7 @@ class ToolFilterPolicy
 
     protected function isScopeAllowed(string $required, array $scopesByRole): bool
     {
+        if (empty($scopesByRole)) return true; // kein Scope-Setup → nicht einschränken
         $user = auth()->user();
         if (!$user) return false;
         $roles = method_exists($user, 'getRoleNames') ? (array) $user->getRoleNames() : [(string) ($user->role ?? 'user')];
