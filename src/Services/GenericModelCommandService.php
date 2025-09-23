@@ -95,6 +95,7 @@ class GenericModelCommandService
     {
         $modelKey = (string)($slots['model'] ?? '');
         $data = (array)($slots['data'] ?? []);
+        $confirmed = (bool)($slots['confirmed'] ?? false);
         $eloquent = Schemas::meta($modelKey, 'eloquent');
         if (!$eloquent || !class_exists($eloquent)) return ['ok' => false, 'message' => 'Unbekanntes Modell'];
         $required = Schemas::required($modelKey);
@@ -105,6 +106,17 @@ class GenericModelCommandService
         }
         if (isset($data['name'])) {
             $data['name'] = $this->sanitizeTitle((string) $data['name']);
+        }
+        // Titel-Guard: zu kurz oder nur Stopwörter → needResolve
+        if (isset($data['title'])) {
+            $t = trim((string)$data['title']);
+            if (mb_strlen($t) < 3 || preg_match('/^(anlegen|aufgabe|bitte|ok|okay)$/i', $t)) {
+                return ['ok' => false, 'message' => 'Titel bestätigen', 'needResolve' => true, 'missing' => array_unique(array_merge(['title'], $required)), 'data' => ['proposed' => $data]];
+            }
+        }
+        // Due-Date Parsing (einfach, DE-Keywords)
+        if (!empty($data['due_date'])) {
+            $data['due_date'] = $this->parseDueDate((string)$data['due_date']);
         }
         // Fremdschlüssel (belongsTo) per Label auflösen, falls String übergeben
         $fkMap = Schemas::foreignKeys($modelKey);
@@ -146,6 +158,16 @@ class GenericModelCommandService
                 ];
             }
         }
+        // Confirm-Gate: ohne bestätigtes Flag keine Speicherung
+        if ($confirmed !== true) {
+            return [
+                'ok' => false,
+                'message' => 'Bestätigung erforderlich',
+                'needResolve' => true,
+                'confirmRequired' => true,
+                'data' => ['proposed' => $data, 'required' => $required],
+            ];
+        }
         foreach ($required as $f) {
             if (!array_key_exists($f, $data) || $data[$f] === null || $data[$f] === '') {
                 return ['ok' => false, 'message' => 'Pflichtfelder fehlen', 'needResolve' => true, 'missing' => $required, 'data' => ['proposed' => $data]];
@@ -184,6 +206,25 @@ class GenericModelCommandService
             $t = mb_substr($t, 0, 180);
         }
         return $t;
+    }
+
+    protected function parseDueDate(string $input): string
+    {
+        $s = mb_strtolower(trim($input));
+        try {
+            if ($s === 'heute') return \Carbon\Carbon::today()->toDateString();
+            if ($s === 'morgen') return \Carbon\Carbon::tomorrow()->toDateString();
+            if ($s === 'übermorgen' || $s === 'uebermorgen') return \Carbon\Carbon::today()->addDays(2)->toDateString();
+            // Versuche einfache deutsche Formate TT.MM.JJJJ
+            if (preg_match('/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/', $s, $m)) {
+                $d = sprintf('%04d-%02d-%02d', (int)($m[3] < 100 ? 2000 + (int)$m[3] : (int)$m[3]), (int)$m[2], (int)$m[1]);
+                return $d;
+            }
+            // Fallback: strtotime
+            $ts = strtotime($input);
+            if ($ts) return date('Y-m-d', $ts);
+        } catch (\Throwable $e) {}
+        return $input; // ungeändert, wenn unklar
     }
 }
 
