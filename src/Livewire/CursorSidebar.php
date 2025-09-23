@@ -8,6 +8,9 @@ use Platform\Core\Services\LlmPlanner;
 use Platform\Core\Services\CommandDispatcher;
 use Platform\Core\Services\CommandGateway;
 use Platform\Core\Services\IntentMatcher;
+use Platform\Core\Models\CoreChat;
+use Platform\Core\Models\CoreChatMessage;
+use Platform\Core\Models\CoreChatEvent;
 
 class CursorSidebar extends Component
 {
@@ -16,11 +19,17 @@ class CursorSidebar extends Component
     public bool $forceExecute = false;
     public array $feed = [];
     public string $lastUserText = '';
+    public ?int $chatId = null;
+    public int $totalTokensIn = 0;
+    public int $totalTokensOut = 0;
 
     #[On('cursor-sidebar-toggle')]
     public function toggle(): void
     {
         $this->open = !$this->open;
+        if ($this->open) {
+            $this->ensureChat();
+        }
     }
 
     public function send(): void
@@ -29,10 +38,13 @@ class CursorSidebar extends Component
         if ($text === '') return;
         $this->feed[] = ['role' => 'user', 'text' => $text];
         $this->lastUserText = $text;
+        $this->ensureChat();
+        $this->saveMessage('user', $text, ['forceExecute' => $this->forceExecute]);
 
         $planner = new LlmPlanner();
         $plan = $planner->plan($text);
         $this->feed[] = ['role' => 'assistant', 'type' => 'plan', 'data' => $plan];
+        $this->saveMessage('assistant', json_encode(['plan' => $plan], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'plan']);
 
         if (($plan['ok'] ?? false) && ($plan['intent'] ?? null)) {
             $conf = (float)($plan['confidence'] ?? 0.0);
@@ -74,6 +86,7 @@ class CursorSidebar extends Component
         $matched = [ 'command' => $this->findCommandByKey($intent), 'slots' => $slots ];
         $result = $gateway->executeMatched($matched, auth()->user(), $override || $this->forceExecute);
         $this->feed[] = ['role' => 'tool', 'type' => 'result', 'data' => $result];
+        $this->saveEvent('tool_call_end', ['intent' => $intent, 'slots' => $slots, 'result' => $result]);
         if (($result['ok'] ?? false) && !empty($result['navigate'])) {
             $this->dispatch('cursor-sidebar-toggle'); // Sidebar einklappen
             $this->redirect($result['navigate'], navigate: true);
@@ -94,6 +107,7 @@ class CursorSidebar extends Component
         $resp = $planner->assistantRespond($userText, $context);
         if (($resp['ok'] ?? false) && !empty($resp['text'])) {
             $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $resp['text']]];
+            $this->saveMessage('assistant', $resp['text'], ['kind' => 'message']);
         }
     }
 
@@ -145,7 +159,52 @@ class CursorSidebar extends Component
 
     public function render()
     {
+        if ($this->chatId) {
+            $chat = CoreChat::find($this->chatId);
+            if ($chat) {
+                $this->totalTokensIn = (int) $chat->total_tokens_in;
+                $this->totalTokensOut = (int) $chat->total_tokens_out;
+            }
+        }
         return view('platform::livewire.cursor-sidebar');
+    }
+
+    protected function ensureChat(): void
+    {
+        if ($this->chatId) return;
+        $user = auth()->user();
+        $chat = CoreChat::create([
+            'user_id' => $user?->id,
+            'team_id' => $user?->currentTeam?->id,
+            'title' => null,
+            'total_tokens_in' => 0,
+            'total_tokens_out' => 0,
+            'status' => 'active',
+        ]);
+        $this->chatId = $chat->id;
+    }
+
+    protected function saveMessage(string $role, string $content, array $meta = []): void
+    {
+        if (!$this->chatId) return;
+        CoreChatMessage::create([
+            'core_chat_id' => $this->chatId,
+            'role' => $role,
+            'content' => $content,
+            'meta' => $meta,
+            'tokens_in' => 0,
+            'tokens_out' => 0,
+        ]);
+    }
+
+    protected function saveEvent(string $type, array $payload = []): void
+    {
+        if (!$this->chatId) return;
+        CoreChatEvent::create([
+            'core_chat_id' => $this->chatId,
+            'type' => $type,
+            'payload' => $payload,
+        ]);
     }
 }
 

@@ -1,8 +1,9 @@
 <div x-data="{ open: $wire.entangle('open') }" class="fixed inset-y-0 right-0 z-40">
-    <aside x-show="open" x-cloak class="w-96 h-full bg-white border-left-1 border-muted d-flex flex-col shadow-lg">
+    <div x-show="open" x-cloak class="h-full">
+        <x-ui-right-sidebar>
         <div class="sticky top-0 z-10 px-3 py-2 border-bottom-1 d-flex items-center gap-2 bg-white">
             <div class="font-medium">Cursor</div>
-            <div class="ml-auto text-xs text-gray-500">Tokens: —</div>
+            <div class="ml-auto text-xs text-gray-500">Tokens: {{ $totalTokensIn }} / {{ $totalTokensOut }}</div>
             <x-ui-button size="sm" variant="secondary-outline" @click="$wire.toggle()">Schließen</x-ui-button>
         </div>
         <div class="flex-1 overflow-auto p-3 space-y-2">
@@ -79,7 +80,8 @@
             </label>
             <x-ui-button size="sm" variant="primary" wire:click="send">Senden</x-ui-button>
         </div>
-    </aside>
+        </x-ui-right-sidebar>
+    </div>
 </div>
 
 
