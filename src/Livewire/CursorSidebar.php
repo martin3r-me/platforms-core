@@ -153,10 +153,11 @@ class CursorSidebar extends Component
     protected function isAutoAllowed(string $intent): bool
     {
         $i = mb_strtolower($intent);
-        foreach (['list', 'show', 'get', 'open'] as $kw) {
+        foreach (['list', 'show', 'get', 'open', 'query'] as $kw) {
             if (str_contains($i, $kw)) return true;
         }
         if ($i === 'planner.list_my_tasks') return true;
+        if (str_starts_with($i, 'planner.query_')) return true;
         return false;
     }
 
