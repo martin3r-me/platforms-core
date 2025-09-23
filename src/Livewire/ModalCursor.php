@@ -91,7 +91,7 @@ class ModalCursor extends Component
     {
         // Kontext aus den letzten Result-Bubbles sammeln (z. B. tasks)
         $context = [];
-        foreach (array_reverse($this->bubbles, true) as $b) {
+        foreach (array_reverse($this->feed, true) as $b) {
             if (($b['type'] ?? '') === 'result' && !empty($b['data']['data'])) {
                 $context[] = $b['data']['data'];
             }
