@@ -62,7 +62,8 @@ class ModalCursor extends Component
                 $this->assistantFollowUp($text);
             }
         } else {
-            $this->feed[] = ['role' => 'assistant', 'type' => 'error', 'data' => $plan];
+            // Kein Tool-Vorschlag: klassisch antworten
+            $this->assistantFollowUp($text);
         }
 
         $this->input = '';
