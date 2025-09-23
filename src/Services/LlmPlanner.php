@@ -16,7 +16,7 @@ class LlmPlanner
             return ['ok' => false, 'message' => 'OPENAI_API_KEY fehlt'];
         }
 
-        $tools = $this->buildToolsFromRegistry();
+        $tools = $this->buildToolsFromRegistry($userText);
 
         $system = "Du bist ein Assistent in einer Business-Plattform. Nutze bereitgestellte Tools, um Nutzerbefehle auszuführen. Wähle genau EIN passendes Tool mit Parametern. Antworte nicht frei, sondern benutze function-calling.";
 
@@ -110,11 +110,22 @@ class LlmPlanner
         return ['ok' => true, 'text' => $assistant];
     }
 
-    protected function buildToolsFromRegistry(): array
+    protected function buildToolsFromRegistry(string $userText = ''): array
     {
         $schemas = CommandRegistry::exportFunctionSchemas();
         $tools = [];
+        $text = mb_strtolower($userText ?? '');
+        $explicitDashboard = str_contains($text, 'dashboard') || str_contains($text, 'übersicht') || str_contains($text, 'start');
         foreach ($schemas as $s) {
+            $name = mb_strtolower($s['name'] ?? '');
+            // Heuristik: vermeide generische *open_dashboard, wenn der Nutzer über Projekte/Aufgaben spricht
+            if (!$explicitDashboard) {
+                if (str_contains($text, 'projekt') || str_contains($text, 'aufgaben') || str_contains($text, 'aufgabe')) {
+                    if (str_ends_with($name, 'open_dashboard')) {
+                        continue; // nicht anbieten
+                    }
+                }
+            }
             $tools[] = [
                 'type' => 'function',
                 'function' => $s,

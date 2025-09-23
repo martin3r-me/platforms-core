@@ -55,7 +55,7 @@
     <livewire:core.modal-pricing/>
     <livewire:core.modal-modules/>
     <livewire:comms.comms-modal/>
-    <livewire:core.modal-cursor/>
+    <livewire:core.cursor-sidebar/>
   @endauth
     
     <livewire:notifications.notices.index />
