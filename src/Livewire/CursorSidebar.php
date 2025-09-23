@@ -13,6 +13,7 @@ use Platform\Core\Services\CommandResolver;
 use Platform\Core\Models\CoreChat;
 use Platform\Core\Models\CoreChatMessage;
 use Platform\Core\Models\CoreChatEvent;
+use Platform\Core\Services\ModelNameResolver;
 
 class CursorSidebar extends Component
 {
@@ -120,6 +121,10 @@ class CursorSidebar extends Component
                 foreach ($calls as $call) {
                     $intent = $call['intent'] ?? '';
                     $slots  = $call['slots'] ?? [];
+                    if (($slots['model'] ?? '') === '' && ($intent === 'planner.query' || $intent === 'planner.open' || $intent === 'core.model.query')) {
+                        $guessed = (new ModelNameResolver())->resolveFromText($this->lastUserText);
+                        if ($guessed) { $slots['model'] = $guessed; }
+                    }
                     $autoAllowed = (new CommandPolicy())->isAutoAllowed($intent);
                     if (!$this->forceExecute && !$autoAllowed) {
                         $this->feed[] = ['role' => 'assistant', 'type' => 'confirm', 'data' => [
@@ -132,6 +137,7 @@ class CursorSidebar extends Component
                         break 2; // verlasse Loop
                     }
                     $result = $this->executeIntent($intent, $slots, true);
+                    $this->debugLog(['intent' => $intent, 'slots' => $slots, 'result_ok' => $result['ok'] ?? null, 'navigate' => $result['navigate'] ?? null]);
                     if (($result['ok'] ?? false) && !empty($result['navigate'] ?? null)) {
                         return; // direkte Navigation
                     }
@@ -198,6 +204,7 @@ class CursorSidebar extends Component
                 $messages[] = $step['raw'];
             }
             $result = $this->executeIntent($intent, $slots, true);
+            $this->debugLog(['intent' => $intent, 'slots' => $slots, 'result_ok' => $result['ok'] ?? null, 'navigate' => $result['navigate'] ?? null]);
             if (($result['ok'] ?? false) && !empty($result['navigate'] ?? null)) {
                 // Sofortige Navigation, aber vorher Eingabe leeren und Feed/Message persistieren
                 $this->input = '';
@@ -312,6 +319,14 @@ class CursorSidebar extends Component
         if (str_contains($i, 'open') || str_contains($i, 'show')) return 2.0;
         if (str_contains($i, 'list') || str_contains($i, 'get') || str_contains($i, 'query')) return 1.5;
         return 1.0;
+    }
+
+    protected function debugLog(array $data): void
+    {
+        if (!config('agent.debug_log')) return;
+        $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => [
+            'text' => '[debug] '.json_encode($data, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
+        ]];
     }
 
     protected function multiChainOpenProjectByName(string $name): void

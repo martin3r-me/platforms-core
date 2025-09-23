@@ -39,6 +39,9 @@ return [
         // 'admin' => ['*'],
         // 'user'  => ['read:*'],
     ],
+
+    // Debug-Log in Chat-Feed ausgeben
+    'debug_log' => env('AGENT_DEBUG_LOG', false),
 ];
 
 ?>
