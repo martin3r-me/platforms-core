@@ -100,7 +100,7 @@ class ModalCursor extends Component
     {
         // Whitelist: alles, was 'list', 'show', 'get' enthält
         $i = mb_strtolower($intent);
-        foreach (['list', 'show', 'get'] as $kw) {
+        foreach (['list', 'show', 'get', 'open'] as $kw) {
             if (str_contains($i, $kw)) return true;
         }
         // Spezifisch erlauben
