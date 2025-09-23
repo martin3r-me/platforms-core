@@ -28,6 +28,7 @@ class CursorSidebar extends Component
     public int $activeChatsCount = 0;
     public array $recentChats = [];
     public bool $isWorking = false;
+    public ?string $pendingNavigate = null;
 
     public function mount(): void
     {
@@ -383,6 +384,7 @@ class CursorSidebar extends Component
 
     public function confirmAndRun(string $intent, array $slots = []): void
     {
+        $slots['confirmed'] = true;
         $this->executeIntent($intent, $slots, true);
         if ($this->lastUserText !== '') {
             $this->assistantFollowUp($this->lastUserText);
@@ -398,7 +400,9 @@ class CursorSidebar extends Component
         $this->saveEvent('tool_call_end', ['intent' => $intent, 'slots' => $slots, 'result' => $result]);
         $this->saveMessage('tool', json_encode($result, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'result']);
         if (($result['ok'] ?? false) && !empty($result['navigate'])) {
-            $this->pendingNavigate = $result['navigate'];
+            $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Navigiere …']];
+            $this->saveMessage('assistant', json_encode(['navigate' => $result['navigate']], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'navigate']);
+            $this->redirect($result['navigate'], navigate: true);
         }
         return $result;
     }
