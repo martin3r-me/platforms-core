@@ -38,9 +38,19 @@ class ModelAutoRegistrar
             foreach ($fs->files($modelsDir) as $file) {
                 if ($file->getExtension() !== 'php') continue;
                 $class = $this->classFromFile($file->getPathname(), $moduleKey);
-                if (!$class || !class_exists($class)) continue;
+                if (!$class) {
+                    \Log::info("ModelAutoRegistrar: Keine Klasse für {$file->getPathname()}");
+                    continue;
+                }
+                if (!class_exists($class)) {
+                    \Log::info("ModelAutoRegistrar: Klasse {$class} existiert nicht");
+                    continue;
+                }
                 // Nur Eloquent Models
-                if (!is_subclass_of($class, \Illuminate\Database\Eloquent\Model::class)) continue;
+                if (!is_subclass_of($class, \Illuminate\Database\Eloquent\Model::class)) {
+                    \Log::info("ModelAutoRegistrar: {$class} ist kein Eloquent Model");
+                    continue;
+                }
                 \Log::info("ModelAutoRegistrar: Registriere {$class}");
                 $this->registerModelSchema($moduleKey, $class);
             }
@@ -53,6 +63,7 @@ class ModelAutoRegistrar
         $fileName = pathinfo($path, PATHINFO_FILENAME);
         $nsModule = Str::studly($moduleKey);
         $class = 'Platform\\'.$nsModule.'\\Models\\'.$fileName;
+        \Log::info("ModelAutoRegistrar: Versuche Klasse {$class} für Datei {$path}");
         return $class;
     }
 
