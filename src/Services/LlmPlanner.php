@@ -7,16 +7,23 @@ use Platform\Core\Registry\CommandRegistry;
 
 class LlmPlanner
 {
-    public function initialMessages(string $userText): array
+    public function initialMessages(string $userText, array $history = []): array
     {
         $now = now();
         $system = "Du bist ein Assistent in einer Business-Plattform. Heute ist "
             . $now->translatedFormat('l, d.m.Y H:i') . " " . (config('app.timezone') ?: 'UTC') . ". "
             . "Nutze bereitgestellte Tools, um Nutzerbefehle auszuführen. Wähle Tools und Parameter eigenständig. Wenn kein Tool passt, antworte kurz auf Deutsch.";
-        return [
-            ['role' => 'system', 'content' => $system],
-            ['role' => 'user', 'content' => $userText],
-        ];
+        $messages = [ ['role' => 'system', 'content' => $system] ];
+        // Erwartet: $history ist eine Liste aus ['role' => 'user'|'assistant', 'content' => string]
+        foreach ($history as $h) {
+            $r = $h['role'] ?? '';
+            $c = $h['content'] ?? '';
+            if (($r === 'user' || $r === 'assistant') && $c !== '') {
+                $messages[] = ['role' => $r, 'content' => $c];
+            }
+        }
+        $messages[] = ['role' => 'user', 'content' => $userText];
+        return $messages;
     }
 
     public function step(array $messages, string $userText = ''): array

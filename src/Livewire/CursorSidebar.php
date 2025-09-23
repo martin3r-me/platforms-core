@@ -55,7 +55,20 @@ class CursorSidebar extends Component
 
         // Iterative Tool-Loop: LLM darf mehrere Tools nacheinander wählen
         $planner = new LlmPlanner();
-        $messages = $planner->initialMessages($text);
+        // Chat-Verlauf (nur user/assistant-Plaintext) als Kontext einspeisen
+        $history = [];
+        foreach ($this->feed as $b) {
+            if (($b['role'] ?? '') === 'user' && !empty($b['text'] ?? '')) {
+                $history[] = ['role' => 'user', 'content' => $b['text']];
+            }
+            if (($b['role'] ?? '') === 'assistant' && ($b['type'] ?? '') === 'message') {
+                $msg = $b['data']['text'] ?? '';
+                if ($msg !== '') {
+                    $history[] = ['role' => 'assistant', 'content' => $msg];
+                }
+            }
+        }
+        $messages = $planner->initialMessages($text, $history);
         $maxSteps = 4;
         for ($i = 0; $i < $maxSteps; $i++) {
             $step = $planner->step($messages, $text);
