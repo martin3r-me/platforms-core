@@ -31,6 +31,7 @@ class CursorSidebar extends Component
         $sid = session('core_chat_id');
         if ($sid) {
             $this->chatId = (int) $sid;
+            $this->loadFeedFromChat();
         }
     }
 
@@ -98,6 +99,7 @@ class CursorSidebar extends Component
         $result = $gateway->executeMatched($matched, auth()->user(), $override || $this->forceExecute);
         $this->feed[] = ['role' => 'tool', 'type' => 'result', 'data' => $result];
         $this->saveEvent('tool_call_end', ['intent' => $intent, 'slots' => $slots, 'result' => $result]);
+        $this->saveMessage('tool', json_encode($result, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'result']);
         if (($result['ok'] ?? false) && !empty($result['navigate'])) {
             $this->dispatch('cursor-sidebar-toggle'); // Sidebar einklappen
             $this->redirect($result['navigate'], navigate: true);
@@ -251,9 +253,7 @@ class CursorSidebar extends Component
         if (!$chat) return;
         $this->chatId = $chat->id;
         session(['core_chat_id' => $this->chatId]);
-        // UI: Feed zurücksetzen und Startnachricht anzeigen
-        $this->feed = [];
-        $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Chat gewechselt: '.$chat->title ?: ('Chat #'.$chat->id)]];
+        $this->loadFeedFromChat();
     }
 
     public function newChat(): void
@@ -262,6 +262,38 @@ class CursorSidebar extends Component
         $this->ensureChat();
         $this->feed = [];
         $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Neuer Chat gestartet.']];
+    }
+
+    protected function loadFeedFromChat(): void
+    {
+        $this->feed = [];
+        if (!$this->chatId) return;
+        $messages = CoreChatMessage::where('core_chat_id', $this->chatId)
+            ->orderBy('id')
+            ->limit(50)
+            ->get();
+        foreach ($messages as $m) {
+            $meta = (array) ($m->meta ?? []);
+            if ($m->role === 'user') {
+                $this->feed[] = ['role' => 'user', 'text' => $m->content];
+                continue;
+            }
+            if ($m->role === 'assistant') {
+                if (($meta['kind'] ?? '') === 'plan') {
+                    $data = json_decode($m->content, true);
+                    $plan = $data['plan'] ?? [];
+                    $this->feed[] = ['role' => 'assistant', 'type' => 'plan', 'data' => $plan];
+                } else {
+                    $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $m->content]];
+                }
+                continue;
+            }
+            if ($m->role === 'tool') {
+                $res = json_decode($m->content, true) ?: [];
+                $this->feed[] = ['role' => 'tool', 'type' => 'result', 'data' => $res];
+                continue;
+            }
+        }
     }
 }
 
