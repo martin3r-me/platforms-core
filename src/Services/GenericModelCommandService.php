@@ -148,7 +148,7 @@ class GenericModelCommandService
         }
         foreach ($required as $f) {
             if (!array_key_exists($f, $data) || $data[$f] === null || $data[$f] === '') {
-                return ['ok' => false, 'message' => 'Pflichtfeld fehlt: '.$f, 'needResolve' => true, 'missing' => $required];
+                return ['ok' => false, 'message' => 'Pflichtfelder fehlen', 'needResolve' => true, 'missing' => $required, 'data' => ['proposed' => $data]];
             }
         }
         $payload = [];

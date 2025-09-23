@@ -127,7 +127,7 @@ class CoreServiceProvider extends ServiceProvider
             ],
             [
                 'key' => 'core.model.create',
-                'description' => 'Generisches Anlegen (schema-validiert) für registrierte Modelle.',
+                'description' => 'Generisches Anlegen (schema-validiert) für registrierte Modelle. Befülle die Slots aus dem Nutzertext. Verwende für Titel prägnante Formulierungen und vermeide Füllwörter (z. B. "bitte", "anlegen").',
                 'parameters' => [
                     ['name' => 'model', 'type' => 'string', 'required' => true],
                     ['name' => 'data', 'type' => 'object', 'required' => true],
@@ -140,6 +140,10 @@ class CoreServiceProvider extends ServiceProvider
                 'guard' => 'web',
                 'handler' => ['service', \Platform\Core\Services\GenericModelCommandService::class.'@create'],
                 'scope' => 'write:*',
+                'examples' => [
+                    ['desc' => 'Einfache Aufgabe', 'slots' => ['model' => 'planner.tasks', 'data' => ['title' => 'Friseurtermin']]],
+                    ['desc' => 'Aufgabe in Projekt', 'slots' => ['model' => 'planner.tasks', 'data' => ['title' => 'Laptop Bestellung vorbereiten', 'project_id' => 'webviduell']]],
+                ],
             ],
         ]);
 
