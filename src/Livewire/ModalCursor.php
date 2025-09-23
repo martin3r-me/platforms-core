@@ -49,8 +49,9 @@ class ModalCursor extends Component
             $conf = (float)($plan['confidence'] ?? 0.0);
             $autoThreshold = 0.8;
             $autoAllowed = $this->isAutoAllowed($plan['intent']);
-            if ($this->forceExecute || ($autoAllowed && empty($plan['confirmRequired']) && $conf >= $autoThreshold)) {
-                $this->executeIntent($plan['intent'], $plan['slots'] ?? []);
+            // Lesen/whitelist: immer automatisch und mit Override
+            if ($this->forceExecute || $autoAllowed || (empty($plan['confirmRequired']) && $conf >= $autoThreshold)) {
+                $this->executeIntent($plan['intent'], $plan['slots'] ?? [], $autoAllowed);
                 $this->assistantFollowUp($text);
             } else {
                 $this->feed[] = ['role' => 'assistant', 'type' => 'confirm', 'data' => [
