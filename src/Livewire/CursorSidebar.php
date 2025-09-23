@@ -61,8 +61,11 @@ class CursorSidebar extends Component
             $step = $planner->step($messages, $text);
             // Fehler oder reine Assistant-Antwort → anzeigen und abbrechen
             if (!($step['ok'] ?? false)) {
-                $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => ($step['message'] ?? 'Fehler')]];
-                $this->saveMessage('assistant', ($step['message'] ?? 'Fehler'), ['kind' => 'message']);
+                $msg = ($step['message'] ?? 'LLM Fehler');
+                $detail = is_string($step['detail'] ?? null) ? $step['detail'] : json_encode($step['detail'] ?? [], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+                $textErr = $detail ? ($msg.': '.$detail) : $msg;
+                $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $textErr]];
+                $this->saveMessage('assistant', $textErr, ['kind' => 'error']);
                 break;
             }
             if (($step['type'] ?? '') === 'assistant') {

@@ -44,7 +44,8 @@ class LlmPlanner
             return ['ok' => false, 'message' => 'LLM Anfrage fehlgeschlagen', 'detail' => $e->getMessage()];
         }
         if ($resp->failed()) {
-            return ['ok' => false, 'message' => 'LLM Fehler', 'detail' => $resp->json() ?: $resp->body()];
+            $json = $resp->json();
+            return ['ok' => false, 'message' => 'LLM Fehler', 'detail' => $json ?: $resp->body()];
         }
         $data = $resp->json();
         $choice = $data['choices'][0] ?? [];
