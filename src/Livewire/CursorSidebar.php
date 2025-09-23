@@ -23,6 +23,7 @@ class CursorSidebar extends Component
     public int $totalTokensIn = 0;
     public int $totalTokensOut = 0;
     public int $activeChatsCount = 0;
+    public array $recentChats = [];
 
     public function mount(): void
     {
@@ -181,6 +182,13 @@ class CursorSidebar extends Component
             $this->activeChatsCount = CoreChat::where('user_id', auth()->id())
                 ->where('status', 'active')
                 ->count();
+            $this->recentChats = CoreChat::where('user_id', auth()->id())
+                ->where('status', 'active')
+                ->latest('updated_at')
+                ->limit(5)
+                ->get(['id','title'])
+                ->map(fn($c) => ['id' => $c->id, 'title' => $c->title ?: ('Chat #'.$c->id)])
+                ->toArray();
         }
         return view('platform::livewire.cursor-sidebar');
     }
@@ -212,6 +220,7 @@ class CursorSidebar extends Component
             'tokens_in' => 0,
             'tokens_out' => 0,
         ]);
+        CoreChat::where('id', $this->chatId)->update(['updated_at' => now()]);
     }
 
     protected function saveEvent(string $type, array $payload = []): void
@@ -234,6 +243,25 @@ class CursorSidebar extends Component
             }
         }
         return [];
+    }
+
+    public function switchChat(int $id): void
+    {
+        $chat = CoreChat::find($id);
+        if (!$chat) return;
+        $this->chatId = $chat->id;
+        session(['core_chat_id' => $this->chatId]);
+        // UI: Feed zurücksetzen und Startnachricht anzeigen
+        $this->feed = [];
+        $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Chat gewechselt: '.$chat->title ?: ('Chat #'.$chat->id)]];
+    }
+
+    public function newChat(): void
+    {
+        $this->chatId = null;
+        $this->ensureChat();
+        $this->feed = [];
+        $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Neuer Chat gestartet.']];
     }
 }
 
