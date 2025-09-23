@@ -167,6 +167,27 @@ class CursorSidebar extends Component
                     if (($result['ok'] ?? false) && !empty($result['navigate'] ?? null)) {
                         return; // direkte Navigation
                     }
+                    // Fallback für fehlgeschlagene *.show Routen: query → open
+                    if (!($result['ok'] ?? true) && str_ends_with(mb_strtolower($intent), '.show')) {
+                        $modelFromIntent = $this->inferModelFromShowIntent($intent);
+                        if ($modelFromIntent) {
+                            $queryTerm = $this->extractBestQueryFromSlots($slots) ?: $this->lastUserText;
+                            $qr = $this->executeIntent('core.model.query', ['model' => $modelFromIntent, 'q' => $queryTerm, 'limit' => 5], true);
+                            $items = (array)($qr['data']['items'] ?? []);
+                            if (count($items) === 1) {
+                                $this->executeIntent('core.model.open', ['model' => $modelFromIntent, 'id' => $items[0]['id'] ?? null], true);
+                                return;
+                            }
+                            if (count($items) > 1) {
+                                $choices = array_slice($items, 0, 6);
+                                $this->feed[] = ['role' => 'assistant', 'type' => 'choices', 'data' => [
+                                    'title' => 'Mehrere Treffer – bitte wählen:',
+                                    'items' => array_map(fn($it) => ['id' => $it['id'] ?? null, 'name' => ($it['name'] ?? ($it['title'] ?? (string)($it['id'] ?? '')))], $choices),
+                                ]];
+                                break 2;
+                            }
+                        }
+                    }
                     // Generischer Resolver für planner.open mit name/title → planner.query → open
                     if ((!$result['ok'] || !empty($result['needResolve'] ?? null))
                         && $intent === 'planner.open'
@@ -250,6 +271,27 @@ class CursorSidebar extends Component
                 $this->saveMessage('assistant', json_encode(['navigate' => $result['navigate']], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'navigate']);
                 $this->redirect($result['navigate'], navigate: true);
                 return;
+            }
+            // Fallback für fehlgeschlagene *.show Routen: query → open
+            if (!($result['ok'] ?? true) && str_ends_with(mb_strtolower($intent), '.show')) {
+                $modelFromIntent = $this->inferModelFromShowIntent($intent);
+                if ($modelFromIntent) {
+                    $queryTerm = $this->extractBestQueryFromSlots($slots) ?: $this->lastUserText;
+                    $qr = $this->executeIntent('core.model.query', ['model' => $modelFromIntent, 'q' => $queryTerm, 'limit' => 5], true);
+                    $items = (array)($qr['data']['items'] ?? []);
+                    if (count($items) === 1) {
+                        $this->executeIntent('core.model.open', ['model' => $modelFromIntent, 'id' => $items[0]['id'] ?? null], true);
+                        return;
+                    }
+                    if (count($items) > 1) {
+                        $choices = array_slice($items, 0, 6);
+                        $this->feed[] = ['role' => 'assistant', 'type' => 'choices', 'data' => [
+                            'title' => 'Mehrere Treffer – bitte wählen:',
+                            'items' => array_map(fn($it) => ['id' => $it['id'] ?? null, 'name' => ($it['name'] ?? ($it['title'] ?? (string)($it['id'] ?? '')))], $choices),
+                        ]];
+                        return;
+                    }
+                }
             }
             if (($result['ok'] ?? false) && is_array($result['data']['items'] ?? null)) {
                 $items = $result['data']['items'];
@@ -372,6 +414,29 @@ class CursorSidebar extends Component
         $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => [
             'text' => '[debug] '.json_encode($data, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
         ]];
+    }
+
+    protected function inferModelFromShowIntent(string $intent): ?string
+    {
+        // z. B. planner.projects.show -> planner.projects
+        $i = mb_strtolower($intent);
+        if (!str_ends_with($i, '.show')) return null;
+        $base = mb_substr($i, 0, -5);
+        // base sollte module.entity sein
+        return $base;
+    }
+
+    protected function extractBestQueryFromSlots(array $slots): ?string
+    {
+        foreach (['name','title','q'] as $k) {
+            $v = (string)($slots[$k] ?? '');
+            if ($v !== '') return $v;
+        }
+        // Falls Route-Parameter als String mitgegeben wurde (z. B. plannerProject => 'webviduell')
+        foreach ($slots as $v) {
+            if (is_string($v) && $v !== '') return $v;
+        }
+        return null;
     }
 
     protected function isQueryIntent(string $intent): bool
