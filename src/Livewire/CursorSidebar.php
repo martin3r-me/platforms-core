@@ -91,6 +91,10 @@ class CursorSidebar extends Component
                 $this->saveMessage('assistant', json_encode(['confirm' => ['intent' => $intent, 'slots' => $slots]], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'confirm']);
                 break;
             }
+            // Assistant-Nachricht (mit tool_calls) muss in den Verlauf, bevor das Tool-Ergebnis folgt
+            if (!empty($step['raw'])) {
+                $messages[] = $step['raw'];
+            }
             $result = $this->executeIntent($intent, $slots, true);
             if (($result['ok'] ?? false) && !empty($result['navigate'] ?? null)) {
                 // Sofortige Navigation
@@ -100,7 +104,8 @@ class CursorSidebar extends Component
             $messages[] = [
                 'role' => 'tool',
                 'content' => json_encode($result, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
-                'name' => $intent,
+                // Muss die tool_call_id der vorherigen Assistant-Nachricht referenzieren
+                'tool_call_id' => $step['tool_call_id'] ?? null,
             ];
         }
 
