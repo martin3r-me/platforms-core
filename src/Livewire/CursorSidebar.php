@@ -107,6 +107,14 @@ class CursorSidebar extends Component
         // Umkehren, damit die älteren zuerst im Verlauf stehen
         $history = array_reverse($history);
         $messages = $planner->initialMessages($text, $history);
+        // Kontext-Modul holen (für Modell-Normalisierung)
+        $contextModule = null;
+        try {
+            $ctx = $this->executeIntent('core.context_get', [], true);
+            $contextModule = $ctx['data']['module'] ?? null;
+        } catch (\Throwable $e) {
+            $contextModule = null;
+        }
         $maxSteps = 4;
         for ($i = 0; $i < $maxSteps; $i++) {
             $step = $planner->step($messages, $text);
@@ -151,6 +159,14 @@ class CursorSidebar extends Component
                     if (($slots['model'] ?? '') === '' && ($intent === 'planner.query' || $intent === 'planner.open' || $intent === 'core.model.query')) {
                         $guessed = (new ModelNameResolver())->resolveFromText($this->lastUserText);
                         if ($guessed) { $slots['model'] = $guessed; }
+                    }
+                    // Modell normalisieren (ohne Modulpräfix) mit Kontext
+                    if (!empty($slots['model'] ?? null) && !str_contains((string) $slots['model'], '.')) {
+                        $norm = (new ModelNameResolver())->resolveFromText((string) $slots['model']);
+                        if (!$norm && is_string($contextModule) && $contextModule !== '') {
+                            $norm = $contextModule . '.' . (string) $slots['model'];
+                        }
+                        if ($norm) { $slots['model'] = $norm; }
                     }
                     // Auto-Vorbelegung für Create-Intents: model & title aus Nutzertext
                     if ($intent === 'core.model.create' || $intent === 'planner.create') {
@@ -275,6 +291,14 @@ class CursorSidebar extends Component
             // Assistant-Nachricht (mit tool_calls) muss in den Verlauf, bevor das Tool-Ergebnis folgt
             if (!empty($step['raw'])) {
                 $messages[] = $step['raw'];
+            }
+            // Modell normalisieren (single tool call)
+            if (!empty($slots['model'] ?? null) && !str_contains((string) $slots['model'], '.')) {
+                $norm = (new ModelNameResolver())->resolveFromText((string) $slots['model']);
+                if (!$norm && is_string($contextModule) && $contextModule !== '') {
+                    $norm = $contextModule . '.' . (string) $slots['model'];
+                }
+                if ($norm) { $slots['model'] = $norm; }
             }
             $result = $this->executeIntent($intent, $slots, true);
             $this->debugLog(['phase' => 'tool_call_single', 'intent' => $intent, 'slots' => $slots, 'ok' => $result['ok'] ?? null, 'navigate' => $result['navigate'] ?? null]);
