@@ -71,6 +71,45 @@ class LlmPlanner
         ];
     }
 
+    public function assistantRespond(string $userText, array $context): array
+    {
+        $apiKey = env('OPENAI_API_KEY');
+        $base   = rtrim(env('OPENAI_BASE', 'https://api.openai.com/v1'), '/');
+        $model  = env('OPENAI_MODEL', 'gpt-4o-mini');
+        if (!$apiKey) {
+            return ['ok' => false, 'message' => 'OPENAI_API_KEY fehlt'];
+        }
+
+        $system = "Du bist ein hilfreicher Assistent in einer Business-Plattform. Antworte kurz und präzise. Nutze die bereitgestellten Kontextdaten (JSON), um die letzte Nutzeranfrage zu beantworten. Keine Halluzinationen, sag 'unbekannt', wenn Informationen fehlen.";
+
+        $contextJson = json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $messages = [
+            ['role' => 'system', 'content' => $system],
+            ['role' => 'user', 'content' => $userText],
+            ['role' => 'system', 'content' => "Kontext:\n" . $contextJson],
+        ];
+
+        try {
+            $resp = Http::withToken($apiKey)
+                ->acceptJson()
+                ->timeout(15)
+                ->post($base . '/chat/completions', [
+                    'model' => $model,
+                    'messages' => $messages,
+                ]);
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'message' => 'LLM Anfrage fehlgeschlagen', 'detail' => $e->getMessage()];
+        }
+
+        if ($resp->failed()) {
+            return ['ok' => false, 'message' => 'LLM Fehler', 'detail' => $resp->json() ?: $resp->body()];
+        }
+        $data = $resp->json();
+        $choice = $data['choices'][0] ?? [];
+        $assistant = $choice['message']['content'] ?? '';
+        return ['ok' => true, 'text' => $assistant];
+    }
+
     protected function buildToolsFromRegistry(): array
     {
         $schemas = CommandRegistry::exportFunctionSchemas();

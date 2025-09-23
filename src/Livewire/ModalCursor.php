@@ -48,6 +48,7 @@ class ModalCursor extends Component
             $autoThreshold = 0.8;
             if ($this->forceExecute || (empty($plan['confirmRequired']) && $conf >= $autoThreshold)) {
                 $this->executeIntent($plan['intent'], $plan['slots'] ?? []);
+                $this->assistantFollowUp($text);
             } else {
                 $this->feed[] = ['role' => 'assistant', 'type' => 'confirm', 'data' => [
                     'intent' => $plan['intent'],
@@ -55,6 +56,8 @@ class ModalCursor extends Component
                     'slots' => $plan['slots'] ?? [],
                     'confidence' => $conf,
                 ]];
+                // Auch ohne Auto-Run kann das Modell schon eine kurze Antwort geben
+                $this->assistantFollowUp($text);
             }
         } else {
             $this->feed[] = ['role' => 'assistant', 'type' => 'error', 'data' => $plan];
@@ -81,6 +84,23 @@ class ModalCursor extends Component
             $url = $result['navigate'];
             $this->close();
             $this->redirect($url, navigate: true);
+        }
+    }
+
+    protected function assistantFollowUp(string $userText): void
+    {
+        // Kontext aus den letzten Result-Bubbles sammeln (z. B. tasks)
+        $context = [];
+        foreach (array_reverse($this->bubbles, true) as $b) {
+            if (($b['type'] ?? '') === 'result' && !empty($b['data']['data'])) {
+                $context[] = $b['data']['data'];
+            }
+            if (count($context) >= 3) break;
+        }
+        $planner = new LlmPlanner();
+        $resp = $planner->assistantRespond($userText, $context);
+        if (($resp['ok'] ?? false) && !empty($resp['text'])) {
+            $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $resp['text']]];
         }
     }
 

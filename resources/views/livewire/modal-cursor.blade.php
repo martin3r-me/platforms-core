@@ -50,6 +50,18 @@
                         <div class="text-left text-sm bg-success-50 px-3 py-2 rounded">
                             <div class="font-medium">Ergebnis</div>
                             <div>{{ $b['data']['message'] ?? (($b['data']['ok'] ?? false) ? 'OK' : 'Fehler') }}</div>
+                            @if(!empty($b['data']['data']['tasks']))
+                                <ul class="mt-2 text-xs list-disc pl-4 space-y-1">
+                                    @foreach($b['data']['data']['tasks'] as $t)
+                                        <li>
+                                            <span class="{{ !empty($t['is_done']) ? 'line-through text-gray-400' : '' }}">{{ $t['title'] ?? '–' }}</span>
+                                            @if(!empty($t['due_date']))
+                                                <span class="ml-1 text-gray-500">(fällig: {{ $t['due_date'] }})</span>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
                         </div>
                     @elseif(($b['type'] ?? '') === 'tool_call_start')
                         <div class="text-left text-xs bg-muted-10 px-3 py-2 rounded">
@@ -65,6 +77,10 @@
                         <div class="text-left text-sm bg-danger-50 px-3 py-2 rounded">
                             <div class="font-medium">Fehler</div>
                             <div>{{ is_array($b['data']) ? json_encode($b['data']) : ($b['data'] ?? '') }}</div>
+                        </div>
+                    @elseif(($b['type'] ?? '') === 'message')
+                        <div class="text-left text-sm bg-muted-5 px-3 py-2 rounded">
+                            <div>{{ $b['data']['text'] ?? '' }}</div>
                         </div>
                     @endif
                 @endforeach
