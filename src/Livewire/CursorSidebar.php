@@ -351,7 +351,7 @@ class CursorSidebar extends Component
                 ]];
             }
             // Intelligente Nachfrage: Sprachmodell kann selbst entscheiden
-            if (!empty($result['needResolve'] ?? null) && !empty($result['message'] ?? null)) {
+            if (!empty($result['needResolve'] ?? null) && !empty($result['message'] ?? null) && !$result['ok']) {
                 $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => [
                     'text' => $result['message']
                 ]];
