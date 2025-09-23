@@ -2,31 +2,32 @@
 
 namespace Platform\Core\Services;
 
-use Illuminate\Support\Str;
-use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Schema;
-use Platform\Core\Schema\ModelSchemaRegistry;
-use ReflectionClass;
-use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Platform\Core\Schema\ModelSchemaRegistry;
+use Illuminate\Filesystem\Filesystem;
 
 class ModelAutoRegistrar
 {
     protected string $modulesPath;
 
-    public function __construct(?string $modulesPath = null)
+    public function __construct()
     {
-        $this->modulesPath = $modulesPath ?: realpath(__DIR__.'/../../modules');
+        $this->modulesPath = realpath(__DIR__.'/../../modules');
     }
 
     public function scanAndRegister(): void
     {
         if (!$this->modulesPath || !is_dir($this->modulesPath)) {
+            \Log::info('ModelAutoRegistrar: Modules-Pfad nicht gefunden: ' . $this->modulesPath);
             return;
         }
+
         $fs = new Filesystem();
         $modules = array_filter(glob($this->modulesPath.'/*'), 'is_dir');
         \Log::info('ModelAutoRegistrar: Scanne Module: ' . implode(', ', array_map('basename', $modules)));
+        
         foreach ($modules as $moduleDir) {
             $moduleKey = basename($moduleDir);
             $modelsDir = $moduleDir.'/src/Models';
@@ -35,6 +36,7 @@ class ModelAutoRegistrar
                 continue;
             }
             \Log::info("ModelAutoRegistrar: Scanne Models in {$moduleKey}");
+            
             foreach ($fs->files($modelsDir) as $file) {
                 if ($file->getExtension() !== 'php') continue;
                 $class = $this->classFromFile($file->getPathname(), $moduleKey);
@@ -69,27 +71,26 @@ class ModelAutoRegistrar
 
     protected function registerModelSchema(string $moduleKey, string $eloquentClass): void
     {
-        try {
-            /** @var \Illuminate\Database\Eloquent\Model $model */
-            $model = new $eloquentClass();
-        } catch (\Throwable $e) {
-            \Log::info("ModelAutoRegistrar: Fehler beim Instanziieren von {$eloquentClass}: " . $e->getMessage());
+        // Tabellennamen ohne Instanziierung ermitteln
+        $table = $this->getTableNameFromClass($eloquentClass);
+        if (!$table) {
+            \Log::info("ModelAutoRegistrar: Keine Tabelle für {$eloquentClass} gefunden");
             return;
         }
-        $table = $model->getTable();
+        
         if (!Schema::hasTable($table)) {
             \Log::info("ModelAutoRegistrar: Tabelle {$table} existiert nicht");
             return;
         }
         \Log::info("ModelAutoRegistrar: Tabelle {$table} existiert");
         \Log::info("ModelAutoRegistrar: Registriere Schema für {$table}");
-        // Für ModelKey-Ableitung (planner_tasks -> planner.tasks)
-        $tablePrefix = $moduleKey.'_';
+        
         $columns = Schema::getColumnListing($table);
         $fields = array_values($columns);
         \Log::info("ModelAutoRegistrar: Spalten für {$table}: " . implode(', ', $fields));
+        
         $selectable = array_values(array_slice($fields, 0, 6));
-        $writable = method_exists($model, 'getFillable') ? (array) $model->getFillable() : [];
+        $writable = $this->getFillableFromClass($eloquentClass);
         $sortable = array_values(array_intersect($fields, ['id','name','title','created_at','updated_at']));
         $filterable = array_values(array_intersect($fields, ['id','uuid','name','title','team_id','user_id','status','is_done']));
         $labelKey = in_array('name', $fields, true) ? 'name' : (in_array('title', $fields, true) ? 'title' : 'id');
@@ -97,18 +98,14 @@ class ModelAutoRegistrar
         // Required-Felder per Doctrine DBAL (NOT NULL & kein Default, kein PK/AI)
         $required = [];
         try {
-            $connection = $model->getConnection();
+            $connection = \DB::connection();
             $schemaManager = method_exists($connection, 'getDoctrineSchemaManager')
                 ? $connection->getDoctrineSchemaManager()
                 : ($connection->getDoctrineSchemaManager ?? null);
             if ($schemaManager) {
                 $doctrineTable = $schemaManager->listTableDetails($table);
-                foreach ($doctrineTable->getColumns() as $col) {
-                    $name = $col->getName();
-                    if ($name === 'id' || $name === 'created_at' || $name === 'updated_at') continue;
-                    if ($doctrineTable->hasPrimaryKey() && in_array($name, (array) ($doctrineTable->getPrimaryKey()?->getColumns() ?? []), true)) continue;
-                    if ($col->getAutoincrement()) continue;
-                    $notNull = $col->getNotnull();
+                foreach ($doctrineTable->getColumns() as $name => $col) {
+                    $notNull = !$col->getNotnull();
                     $hasDefault = $col->getDefault() !== null;
                     if ($notNull && !$hasDefault) {
                         $required[] = $name;
@@ -120,7 +117,7 @@ class ModelAutoRegistrar
             $required = [];
         }
 
-        // Relationen (belongsTo) per Reflection ermitteln
+        // Relationen (belongsTo) per Reflection ermitteln - OHNE Instanziierung
         $relations = [];
         $foreignKeys = [];
         try {
@@ -131,55 +128,44 @@ class ModelAutoRegistrar
                 if ($method->getDeclaringClass()->getName() !== $eloquentClass) continue;
                 $name = $method->getName();
                 if (in_array($name, ['getAttribute','setAttribute','newQuery','newModelQuery','newQueryWithoutScopes'], true)) continue;
-                try {
-                    $rel = $model->$name();
-                } catch (\Throwable $e) {
-                    continue;
-                }
-                if ($rel instanceof Relation && $rel instanceof BelongsTo) {
-                    $fk = method_exists($rel, 'getForeignKeyName') ? $rel->getForeignKeyName() : null;
-                    $ownerKey = method_exists($rel, 'getOwnerKeyName') ? $rel->getOwnerKeyName() : null;
-                    $targetClass = get_class($rel->getRelated());
-                    $targetModelKey = null;
-                    $targetLabel = 'id';
-                    try {
-                        /** @var \Illuminate\Database\Eloquent\Model $targetModel */
-                        $targetModel = new $targetClass();
-                        $targetTable = $targetModel->getTable();
-                        $targetEntity = Str::startsWith($targetTable, $tablePrefix)
-                            ? Str::after($targetTable, $tablePrefix)
-                            : Str::snake(class_basename($targetClass));
-                        $targetModelKey = $moduleKey.'.'.$targetEntity;
-                        $targetFields = Schema::hasTable($targetTable) ? Schema::getColumnListing($targetTable) : [];
-                        $targetLabel = in_array('name', $targetFields, true) ? 'name' : (in_array('title', $targetFields, true) ? 'title' : 'id');
-                    } catch (\Throwable $e) {
-                        // ignore
-                    }
-                    $relations[$name] = [
-                        'type' => 'belongsTo',
-                        'target' => $targetClass,
-                        'foreign_key' => $fk,
-                        'owner_key' => $ownerKey,
-                        'fields' => ['id', (in_array('name', $fields, true) ? 'name' : (in_array('title', $fields, true) ? 'title' : 'id'))],
-                    ];
-                    if ($fk) {
-                        $foreignKeys[$fk] = [
-                            // wichtig: als ModelKey referenzieren, nicht Klassenname
-                            'references' => $targetModelKey,
-                            'label_key' => $targetLabel,
+                
+                // Prüfe DocComment für Relation-Hinweise
+                $docComment = $method->getDocComment();
+                if ($docComment && preg_match('/@return\s+BelongsTo<([^,>]+),([^>]+)>/', $docComment, $matches)) {
+                    $targetClass = $matches[1];
+                    $foreignKey = $matches[2] ?? null;
+                    
+                    // Ableitung des targetModelKey aus dem Tabellennamen des Zielmodells
+                    $targetTable = $this->getTableNameFromClass($targetClass);
+                    if ($targetTable) {
+                        $targetModuleKey = Str::before($targetTable, '_'); // Annahme: planner_tasks -> planner
+                        $targetEntityKey = Str::after($targetTable, '_'); // Annahme: planner_tasks -> tasks
+                        $targetModelKey = $targetModuleKey . '.' . $targetEntityKey;
+
+                        $relations[$name] = [
+                            'type' => 'belongsTo',
+                            'target' => $targetModelKey,
+                            'foreign_key' => $foreignKey,
+                            'owner_key' => 'id',
+                            'fields' => ['id', 'name', 'title'],
                         ];
+                        
+                        if ($foreignKey) {
+                            $foreignKeys[$foreignKey] = [
+                                'references' => $targetModelKey,
+                                'field' => 'id',
+                                'label_key' => 'name',
+                            ];
+                        }
                     }
                 }
             }
         } catch (\Throwable $e) {
-            // ignore
+            \Log::info("ModelAutoRegistrar: Fehler beim Analysieren der Relationen für {$eloquentClass}: " . $e->getMessage());
         }
 
-        // EntityKey bevorzugt aus Tabellenname ableiten
-        $entityKey = Str::startsWith($table, $tablePrefix)
-            ? Str::after($table, $tablePrefix)
-            : Str::snake(class_basename($eloquentClass));
-        $modelKey = $moduleKey.'.'.$entityKey;
+        // ModelKey ableiten (planner_tasks -> planner.tasks)
+        $modelKey = Str::before($table, '_') . '.' . Str::after($table, '_');
 
         ModelSchemaRegistry::register($modelKey, [
             'fields' => $fields,
@@ -198,7 +184,41 @@ class ModelAutoRegistrar
             ],
         ]);
     }
+    
+    protected function getTableNameFromClass(string $eloquentClass): ?string
+    {
+        // Versuche Tabellennamen ohne Instanziierung zu ermitteln
+        try {
+            $reflection = new \ReflectionClass($eloquentClass);
+            $defaultTable = Str::snake(Str::pluralStudly(class_basename($eloquentClass)));
+            
+            // Prüfe ob $table Property existiert
+            if ($reflection->hasProperty('table')) {
+                $tableProperty = $reflection->getProperty('table');
+                $tableProperty->setAccessible(true);
+                $table = $tableProperty->getDefaultValue();
+                return $table ?: $defaultTable;
+            }
+            
+            return $defaultTable;
+        } catch (\Throwable $e) {
+            \Log::info("ModelAutoRegistrar: Fehler beim Ermitteln der Tabelle für {$eloquentClass}: " . $e->getMessage());
+            return null;
+        }
+    }
+    
+    protected function getFillableFromClass(string $eloquentClass): array
+    {
+        try {
+            $reflection = new \ReflectionClass($eloquentClass);
+            if ($reflection->hasProperty('fillable')) {
+                $fillableProperty = $reflection->getProperty('fillable');
+                $fillableProperty->setAccessible(true);
+                return $fillableProperty->getDefaultValue() ?: [];
+            }
+            return [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
 }
-
-?>
-
