@@ -51,6 +51,7 @@ class CursorSidebar extends Component
     {
         $text = trim($this->input);
         if ($text === '') return;
+        $this->debugLog(['phase' => 'input', 'text' => $text, 'force' => $this->forceExecute, 'mode' => config('agent.mode'), 'include' => config('agent.include'), 'exclude' => config('agent.exclude')]);
         $this->feed[] = ['role' => 'user', 'text' => $text];
         $this->lastUserText = $text;
         $this->ensureChat();
@@ -88,6 +89,7 @@ class CursorSidebar extends Component
         $maxSteps = 4;
         for ($i = 0; $i < $maxSteps; $i++) {
             $step = $planner->step($messages, $text);
+            $this->debugLog(['phase' => 'llm.step', 'index' => $i, 'type' => $step['type'] ?? 'unknown']);
             // Fehler oder reine Assistant-Antwort → anzeigen und abbrechen
             if (!($step['ok'] ?? false)) {
                 $msg = ($step['message'] ?? 'LLM Fehler');
@@ -100,6 +102,7 @@ class CursorSidebar extends Component
             if (($step['type'] ?? '') === 'assistant') {
                 $textOut = trim($step['text'] ?? '');
                 if ($textOut !== '') {
+                    $this->debugLog(['phase' => 'llm.assistant_only', 'len' => mb_strlen($textOut)]);
                     $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $textOut]];
                     $this->saveMessage('assistant', $textOut, ['kind' => 'message']);
                 }
@@ -112,6 +115,7 @@ class CursorSidebar extends Component
                 }
                 // Tool-Calls priorisieren (sichere Read-Intents zuerst) und bis zu 2 davon spekulativ ausführen
                 $calls = $step['calls'];
+                $this->debugLog(['phase' => 'llm.tools_received', 'count' => count($calls), 'intents' => array_map(fn($c) => $c['intent'] ?? '', $calls)]);
                 usort($calls, function($a, $b){
                     $wa = $this->intentWeight((string)($a['intent'] ?? ''));
                     $wb = $this->intentWeight((string)($b['intent'] ?? ''));
@@ -127,6 +131,7 @@ class CursorSidebar extends Component
                     }
                     $autoAllowed = (new CommandPolicy())->isAutoAllowed($intent);
                     if (!$this->forceExecute && !$autoAllowed) {
+                        $this->debugLog(['phase' => 'confirm_required', 'intent' => $intent]);
                         $this->feed[] = ['role' => 'assistant', 'type' => 'confirm', 'data' => [
                             'intent' => $intent,
                             'impact' => 'medium',
@@ -137,6 +142,7 @@ class CursorSidebar extends Component
                         break 2; // verlasse Loop
                     }
                     $result = $this->executeIntent($intent, $slots, true);
+                    $this->debugLog(['phase' => 'tool_call', 'intent' => $intent, 'slots' => $slots, 'ok' => $result['ok'] ?? null, 'navigate' => $result['navigate'] ?? null]);
                     $this->debugLog(['intent' => $intent, 'slots' => $slots, 'result_ok' => $result['ok'] ?? null, 'navigate' => $result['navigate'] ?? null]);
                     if (($result['ok'] ?? false) && !empty($result['navigate'] ?? null)) {
                         return; // direkte Navigation
@@ -157,6 +163,7 @@ class CursorSidebar extends Component
                                 'limit' => 5,
                             ]
                         );
+                        $this->debugLog(['phase' => 'resolver', 'intent' => $intent, 'resolved_ok' => $resolved['ok'] ?? null, 'choices' => count($resolved['choices'] ?? [])]);
                         if (($resolved['ok'] ?? false) && !empty($resolved['navigate'] ?? null)) {
                             return;
                         }
@@ -177,11 +184,13 @@ class CursorSidebar extends Component
                     if ($autoAllowed) {
                         $safeExecuted++;
                         if ($safeExecuted >= 2) {
+                            $this->debugLog(['phase' => 'speculative_limit_reached', 'count' => $safeExecuted]);
                             break 2;
                         }
                     }
                 }
                 // nach Antworten auf alle tool_calls plant das LLM den nächsten Schritt
+                $this->debugLog(['phase' => 'llm.next_after_tools']);
                 continue;
             }
             // Tool-Aufruf
@@ -204,6 +213,7 @@ class CursorSidebar extends Component
                 $messages[] = $step['raw'];
             }
             $result = $this->executeIntent($intent, $slots, true);
+            $this->debugLog(['phase' => 'tool_call_single', 'intent' => $intent, 'slots' => $slots, 'ok' => $result['ok'] ?? null, 'navigate' => $result['navigate'] ?? null]);
             $this->debugLog(['intent' => $intent, 'slots' => $slots, 'result_ok' => $result['ok'] ?? null, 'navigate' => $result['navigate'] ?? null]);
             if (($result['ok'] ?? false) && !empty($result['navigate'] ?? null)) {
                 // Sofortige Navigation, aber vorher Eingabe leeren und Feed/Message persistieren
