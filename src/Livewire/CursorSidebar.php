@@ -63,6 +63,16 @@ class CursorSidebar extends Component
 
         // Iterative Tool-Loop: LLM darf mehrere Tools nacheinander wählen
         $planner = new LlmPlanner();
+        
+        // DEBUG: CRM Debug-Info in Chat ausgeben
+        $crmDebugInfo = session('crm_debug_info');
+        if ($crmDebugInfo) {
+            $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => [
+                'text' => "🔍 **CRM Debug-Info:**\n" . implode("\n", $crmDebugInfo)
+            ]];
+            session()->forget('crm_debug_info'); // Einmalig anzeigen
+        }
+        
         // Debug: verfügbare Tools nach Policy anzeigen
         if (config('agent.debug_log')) {
             try {
