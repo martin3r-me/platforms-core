@@ -27,6 +27,7 @@ class CursorSidebar extends Component
     public int $totalTokensOut = 0;
     public int $activeChatsCount = 0;
     public array $recentChats = [];
+    public bool $isWorking = false;
 
     public function mount(): void
     {
@@ -56,6 +57,8 @@ class CursorSidebar extends Component
         $this->lastUserText = $text;
         $this->ensureChat();
         $this->saveMessage('user', $text, ['forceExecute' => $this->forceExecute]);
+        $this->isWorking = true;
+        $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Arbeite …']];
 
         // Iterative Tool-Loop: LLM darf mehrere Tools nacheinander wählen
         $planner = new LlmPlanner();
@@ -268,8 +271,10 @@ class CursorSidebar extends Component
             if (($result['ok'] ?? false) && !empty($result['navigate'] ?? null)) {
                 // Sofortige Navigation, aber vorher Eingabe leeren und Feed/Message persistieren
                 $this->input = '';
+                $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Navigiere …']];
                 $this->saveMessage('assistant', json_encode(['navigate' => $result['navigate']], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'navigate']);
                 $this->redirect($result['navigate'], navigate: true);
+                $this->isWorking = false;
                 return;
             }
             // Fallback für fehlgeschlagene *.show Routen: query → open
@@ -281,7 +286,8 @@ class CursorSidebar extends Component
                     $items = (array)($qr['data']['items'] ?? []);
                     if (count($items) === 1) {
                         $this->executeIntent('core.model.open', ['model' => $modelFromIntent, 'id' => $items[0]['id'] ?? null], true);
-                        return;
+                            $this->isWorking = false;
+                            return;
                     }
                     if (count($items) > 1) {
                         $choices = array_slice($items, 0, 6);
@@ -317,10 +323,12 @@ class CursorSidebar extends Component
                 );
                 if (($resolved['ok'] ?? false) && !empty($resolved['navigate'] ?? null)) {
                     // Direkte Navigation
-                    $this->input = '';
-                    $this->saveMessage('assistant', json_encode(['navigate' => $resolved['navigate']], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'navigate']);
+                $this->input = '';
+                $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Navigiere …']];
+                $this->saveMessage('assistant', json_encode(['navigate' => $resolved['navigate']], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'navigate']);
                     $this->redirect($resolved['navigate'], navigate: true);
-                    return;
+                $this->isWorking = false;
+                return;
                 }
                 if (!($resolved['ok'] ?? true) && !empty($resolved['needResolve'] ?? null) && !empty($resolved['choices'] ?? [])) {
                     $this->feed[] = ['role' => 'assistant', 'type' => 'choices', 'data' => [
@@ -340,6 +348,7 @@ class CursorSidebar extends Component
         }
 
         $this->input = '';
+        $this->isWorking = false;
     }
 
     public function confirmAndRun(string $intent, array $slots = []): void
@@ -403,7 +412,7 @@ class CursorSidebar extends Component
     {
         $i = mb_strtolower($intent);
         // höhere Werte = früher ausführen
-        if (str_contains($i, 'list') || str_contains($i, 'get') || str_contains($i, 'query')) return 2.0;
+        if (str_contains($i, 'list') || str_contains($i, 'get') || str_contains($i, 'query')) return 2.1; // Query minimal bevorzugen
         if (str_contains($i, 'open') || str_contains($i, 'show')) return 2.0;
         return 1.0;
     }
