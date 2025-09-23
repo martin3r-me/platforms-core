@@ -47,7 +47,7 @@ class RouteToolExporter
             ];
         }
         if (!empty($items)) {
-            CommandRegistry::register($moduleKeyPrefix, $items);
+            CommandRegistry::append($moduleKeyPrefix, $items);
         }
     }
 }
