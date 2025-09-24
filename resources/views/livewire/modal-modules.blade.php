@@ -312,7 +312,6 @@
 
         {{-- Matrix Tab --}}
         <div class="mt-2" x-show="tab === 'matrix'" x-cloak>
-            @if($showMatrix)
             <div class="overflow-auto">
                 <table class="min-w-full border bg-white rounded shadow">
                     <thead>
@@ -347,7 +346,6 @@
                     </tbody>
                 </table>
             </div>
-            @endif
         </div>
 
         <x-slot name="footer">
