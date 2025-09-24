@@ -32,7 +32,7 @@
   <livewire:core.navbar/>
   
 
-  <div class="layout d-flex h-full">
+  <div class="layout d-flex h-full w-full min-h-0">
    
     <x-ui-sidebar>
         @if($class && class_exists($class))
@@ -44,7 +44,7 @@
 
 
     {{-- Main Content --}}
-    <main class="main flex-grow overflow-auto p-1 bg-white">
+    <main class="main flex-grow-1 min-w-0 overflow-auto p-1 bg-white">
         {{ $slot }}
     </main>
     {{-- Rechte Cursor-Sidebar parallel zur linken Sidebar und Main --}}
