@@ -4,6 +4,7 @@ namespace Platform\Core\Services;
 
 use Illuminate\Routing\Route;
 use Platform\Core\Registry\CommandRegistry;
+use Platform\Core\Registry\ModuleRegistry;
 
 class RouteToolExporter
 {
@@ -48,6 +49,19 @@ class RouteToolExporter
         }
         if (!empty($items)) {
             CommandRegistry::append($moduleKeyPrefix, $items);
+        }
+    }
+
+    /**
+     * Registriert GET-Routen für alle bekannten Module basierend auf deren Prefix (routing.prefix oder Modulschlüssel).
+     */
+    public static function registerAllModuleRoutes(): void
+    {
+        $modules = ModuleRegistry::all();
+        foreach ($modules as $key => $config) {
+            $prefix = $config['routing']['prefix'] ?? $key;
+            // Benannte Routen verwenden in der Regel das Modulpräfix als Namespace (z. B. planner.*, crm.*)
+            self::registerModuleRoutes($prefix);
         }
     }
 }

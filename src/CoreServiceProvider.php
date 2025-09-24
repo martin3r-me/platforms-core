@@ -48,6 +48,13 @@ class CoreServiceProvider extends ServiceProvider
             ->middleware(['web', 'auth'])
             ->group(__DIR__.'/../routes/web.php');
 
+        // Nach Laden der Module und Routen: alle Modul-GET-Routen als Tools exportieren
+        try {
+            \Platform\Core\Services\RouteToolExporter::registerAllModuleRoutes();
+        } catch (\Throwable $e) {
+            \Log::info('CoreServiceProvider: RouteToolExporter registerAllModuleRoutes() übersprungen: '.$e->getMessage());
+        }
+
         // Command registrieren (nur in der Konsole)
         if ($this->app->runningInConsole()) {
             $this->commands([

@@ -34,14 +34,57 @@ class GenericModelCommandService
         }
         if ($q !== '') {
             $schemaFields = Schemas::get($modelKey)['fields'] ?? [];
+            $applied = false;
             foreach (['title','name'] as $candidate) {
                 if (in_array($candidate, $schemaFields, true)) {
                     $query->where($candidate, 'LIKE', '%'.$q.'%');
+                    // Fuzzy-Fallback via SOUNDEX zusätzlich erlauben
+                    $query->orWhereRaw('SOUNDEX('.$candidate.') = SOUNDEX(?)', [$q]);
+                    $applied = true;
                     break;
                 }
             }
         }
-        $filters = Schemas::validateFilters($modelKey, (array)($slots['filters'] ?? []));
+        // Filters: FK-Strings in IDs auflösen (needResolve bei Mehrtreffern)
+        $fkMap = Schemas::foreignKeys($modelKey);
+        $filtersInput = (array)($slots['filters'] ?? []);
+        foreach ($filtersInput as $k => $v) {
+            if ($v === null || $v === '') continue;
+            if (array_key_exists($k, $fkMap) && is_string($v) && !ctype_digit($v)) {
+                $meta = $fkMap[$k];
+                $targetModelKey = $meta['references'] ?? ($meta['target'] ?? null);
+                if ($targetModelKey) {
+                    $labelKey = $meta['label_key'] ?? Schemas::meta($targetModelKey, 'label_key') ?? 'name';
+                    $targetClass = Schemas::meta($targetModelKey, 'eloquent');
+                    if ($targetClass && class_exists($targetClass)) {
+                        try {
+                            $matches = $targetClass::where($labelKey, 'LIKE', '%'.$v.'%')
+                                ->orderByRaw('CASE WHEN '.$labelKey.' = ? THEN 0 ELSE 1 END', [$v])
+                                ->orderBy($labelKey)
+                                ->limit(5)
+                                ->get(['id', $labelKey]);
+                            if ($matches->count() === 1) {
+                                $filtersInput[$k] = $matches->first()->id;
+                            } elseif ($matches->count() > 1) {
+                                return [
+                                    'ok' => false,
+                                    'message' => 'Bitte wählen: '.$k,
+                                    'needResolve' => true,
+                                    'choices' => $matches->map(fn($m) => ['id' => $m->id, 'label' => $m->{$labelKey} ?? (string)$m->id])->toArray(),
+                                ];
+                            } else {
+                                return [
+                                    'ok' => false,
+                                    'message' => 'Referenz nicht gefunden: '.$k,
+                                    'needResolve' => true,
+                                ];
+                            }
+                        } catch (\Throwable $e) {}
+                    }
+                }
+            }
+        }
+        $filters = Schemas::validateFilters($modelKey, $filtersInput);
         foreach ($filters as $k => $v) {
             if ($v === null || $v === '') continue;
             $query->where($k, $v);
