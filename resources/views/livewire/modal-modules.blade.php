@@ -1,9 +1,47 @@
 <x-ui-modal size="lg" wire:model="modalShow">
     <x-slot name="header">
-        Module wechseln
-    </x-slot>
+        <div x-data="{ tab: 'modules' }" x-init="
+            window.addEventListener('open-modal-modules', (e) => {
+                tab = e?.detail?.tab || 'modules';
+            });
+        " class="w-full">
+            <div class="d-flex items-center justify-between w-full">
+                <div class="font-medium">Zentrale Steuerung</div>
+                <div class="text-xs text-gray-500">Drücke ⌘K / M zum Öffnen</div>
+            </div>
 
-    @if(!$showMatrix)
+            <div class="d-flex gap-3 mt-3 border-b pb-1">
+                <button type="button" class="px-2 py-1 bg-transparent border-0 cursor-pointer"
+                        :class="{ 'font-bold border-b-2 border-primary' : tab === 'modules' }"
+                        @click="tab = 'modules'">
+                    Module
+                </button>
+                <button type="button" class="px-2 py-1 bg-transparent border-0 cursor-pointer"
+                        :class="{ 'font-bold border-b-2 border-primary' : tab === 'team' }"
+                        @click="tab = 'team'">
+                    Team
+                </button>
+                <button type="button" class="px-2 py-1 bg-transparent border-0 cursor-pointer"
+                        :class="{ 'font-bold border-b-2 border-primary' : tab === 'billing' }"
+                        @click="tab = 'billing'">
+                    Abrechnung
+                </button>
+                <button type="button" class="px-2 py-1 bg-transparent border-0 cursor-pointer"
+                        :class="{ 'font-bold border-b-2 border-primary' : tab === 'account' }"
+                        @click="tab = 'account'">
+                    Konto
+                </button>
+                @if(auth()->user()?->currentTeam && auth()->user()->currentTeam->user_id === auth()->id())
+                <button type="button" class="px-2 py-1 bg-transparent border-0 cursor-pointer ml-auto"
+                        :class="{ 'font-bold border-b-2 border-primary' : tab === 'matrix' }"
+                        @click="tab = 'matrix'">
+                    Matrix
+                </button>
+                @endif
+            </div>
+
+            <div class="mt-4" x-show="tab === 'modules'" x-cloak>
+                @if(!$showMatrix)
         <div class="space-y-4">
             <div class="grid grid-cols-1 gap-4">
             <a href="{{ route('platform.dashboard') }}"
@@ -53,7 +91,57 @@
                 @endforeach
             </div>
         </div>
-    @else
+                @endif
+            </div>
+
+            {{-- Team Tab (delegiert aktuell auf bestehendes Modal) --}}
+            <div class="mt-4" x-show="tab === 'team'" x-cloak>
+                <div class="p-4 bg-muted-5 rounded border">
+                    <div class="d-flex items-center justify-between">
+                        <div>
+                            <div class="font-medium">Team verwalten</div>
+                            <div class="text-sm text-gray-600">Öffnet die Team-Verwaltung im selben Dialog künftig. Bis dahin: eigenes Modal.</div>
+                        </div>
+                        <x-ui-button variant="secondary-outline" @click="$dispatch('open-modal-team')">
+                            Öffnen
+                        </x-ui-button>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Billing Tab (delegiert auf bestehendes Modal) --}}
+            <div class="mt-4" x-show="tab === 'billing'" x-cloak>
+                <div class="p-4 bg-muted-5 rounded border">
+                    <div class="d-flex items-center justify-between">
+                        <div>
+                            <div class="font-medium">Abrechnung & Kosten</div>
+                            <div class="text-sm text-gray-600">Kostenübersicht und Zahlungsmethoden.</div>
+                        </div>
+                        <x-ui-button variant="secondary-outline" @click="$dispatch('open-modal-pricing')">
+                            Öffnen
+                        </x-ui-button>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Account Tab (delegiert auf bestehendes Modal) --}}
+            <div class="mt-4" x-show="tab === 'account'" x-cloak>
+                <div class="p-4 bg-muted-5 rounded border">
+                    <div class="d-flex items-center justify-between">
+                        <div>
+                            <div class="font-medium">Benutzerkonto</div>
+                            <div class="text-sm text-gray-600">Profil und schnelle Aktionen.</div>
+                        </div>
+                        <x-ui-button variant="secondary-outline" @click="$dispatch('open-modal-user')">
+                            Öffnen
+                        </x-ui-button>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Matrix Tab (bestehende Matrix-Ansicht) --}}
+            <div class="mt-4" x-show="tab === 'matrix'" x-cloak>
+                @if(true)
         {{-- Leere Matrix-Seite --}}
         <div class="flex flex-col justify-center items-center h-64">
             @if($showMatrix)
@@ -100,7 +188,10 @@
             @endif
 
         </div>
-    @endif
+            @endif
+            </div>
+        </div>
+    </x-slot>
 
     <x-slot name="footer">
         <div class="flex justify-start">

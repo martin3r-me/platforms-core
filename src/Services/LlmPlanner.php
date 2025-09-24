@@ -15,7 +15,8 @@ class LlmPlanner
             . "Nutze bereitgestellte Tools, um Nutzerbefehle auszuführen. Du kannst mehrere Tools in Folge verwenden, bis die Aufgabe vollständig erledigt ist. "
             . "Bei 'mehrere X anlegen' mache so viele separate create-Calls wie nötig. "
             . "Du kannst intelligent nachfragen, wenn Informationen fehlen oder unklar sind. "
-            . "Antworte nicht frei, sondern benutze function-calling. Nach erfolgreichen Aktionen nur kurz bestätigen.";
+            . "Antworte nicht frei, sondern benutze function-calling. Nach erfolgreichen Aktionen nur kurz bestätigen. "
+            . "Verwende nur die verfügbaren Felder aus den Modell-Schemas!";
         // Hinweis: Verfügbare Modelle (aus Registry), damit das LLM 'model' korrekt setzt
         try {
             $plannerModels = \Platform\Core\Schema\ModelSchemaRegistry::keysByPrefix('planner.');
@@ -27,18 +28,22 @@ class LlmPlanner
                 $system .= " Verfügbare Modelle (CRM): ".implode(', ', $crmModels).".";
             }
             
-            // Modell-Strukturen für besseres Verständnis
-            $allModels = \Platform\Core\Schema\ModelSchemaRegistry::keys();
-            foreach ($allModels as $modelKey) {
-                $schema = \Platform\Core\Schema\ModelSchemaRegistry::get($modelKey);
-                if (!empty($schema['fields'])) {
-                    $system .= " {$modelKey} hat Felder: ".implode(', ', array_slice($schema['fields'], 0, 10)).".";
-                }
-                if (!empty($schema['relations'])) {
-                    $relations = array_keys($schema['relations']);
-                    $system .= " {$modelKey} hat Relations: ".implode(', ', $relations).".";
-                }
+        // Modell-Strukturen für besseres Verständnis
+        $allModels = \Platform\Core\Schema\ModelSchemaRegistry::keys();
+        foreach ($allModels as $modelKey) {
+            $schema = \Platform\Core\Schema\ModelSchemaRegistry::get($modelKey);
+            if (!empty($schema['fields'])) {
+                $system .= " {$modelKey} hat Felder: ".implode(', ', array_slice($schema['fields'], 0, 10)).".";
             }
+            if (!empty($schema['relations'])) {
+                $relations = array_keys($schema['relations']);
+                $system .= " {$modelKey} hat Relations: ".implode(', ', $relations).".";
+            }
+            if (!empty($schema['writable'])) {
+                $writable = $schema['writable'];
+                $system .= " {$modelKey} schreibbare Felder: ".implode(', ', array_slice($writable, 0, 8)).".";
+            }
+        }
         } catch (\Throwable $e) {
             // Registry evtl. nicht geladen – ignorieren
         }

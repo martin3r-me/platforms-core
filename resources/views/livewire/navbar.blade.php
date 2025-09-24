@@ -1,5 +1,14 @@
 <nav class="position-fixed top-0 left-0 right-0 z-50 bg-white border-bottom-1 border-bottom-solid border-muted">
-    <div class="container mx-auto px-5 d-flex items-center justify-between h-16">
+    <div class="container mx-auto px-5 d-flex items-center justify-between h-16" x-data x-init="
+        document.addEventListener('keydown', (e) => {
+            const metaOrCtrl = e.metaKey || e.ctrlKey;
+            const key = e.key?.toLowerCase();
+            if ((metaOrCtrl && key === 'k') || key === 'm') {
+                e.preventDefault();
+                $dispatch('open-modal-modules');
+            }
+        });
+    ">
 
         {{-- Links: Logo + ggf. Modul-Titel --}}
         <div class="d-flex items-center">
@@ -35,7 +44,7 @@
                     <x-ui-button
                         variant="info-outline"
                         size="md"
-                        @click="$dispatch('open-modal-pricing')"
+                        @click="$dispatch('open-modal-modules', { tab: 'billing' })"
                     >
                         <span class="d-flex items-center gap-1">
                             <x-heroicon-o-banknotes class="w-5 h-5" />
@@ -49,7 +58,7 @@
                 <x-ui-button 
                     variant="secondary-outline" 
                     size="md" 
-                    @click="$dispatch('open-modal-team')"
+                    @click="$dispatch('open-modal-modules', { tab: 'team' })"
                 >
                     <span class="d-flex items-center gap-1">
                         <x-heroicon-o-users class="w-5 h-5" />
@@ -71,14 +80,14 @@
                     variant="secondary-outline" 
                     size="md" 
                     icon-only 
-                    @click="$dispatch('open-modal-user')"
+                    @click="$dispatch('open-modal-modules', { tab: 'account' })"
                 >
                     <x-heroicon-o-user />
                 </x-ui-button>
             @endauth
 
             @guest
-                <a href="{{ route('login') }}" class="text-sm font-medium text-secondary hover:text-primary">
+                <a href="{{ route('login') }}" class="text-sm font-medium text-secondary hover:text-primary" title="Tipp: ⌘K oder M öffnet das Modul-Menü">
                     Login
                 </a>
                 <a href="{{ route('register') }}" class="text-sm font-medium text-secondary hover:text-primary">
