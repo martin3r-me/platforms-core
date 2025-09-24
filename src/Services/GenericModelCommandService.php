@@ -44,6 +44,25 @@ class GenericModelCommandService
                     break;
                 }
             }
+            // Generischer OR-Filter über belongsTo-FKs: Ziel label_key ~ q → FK IN (Treffer)
+            $fkMap = Schemas::foreignKeys($modelKey);
+            foreach ($fkMap as $fkField => $meta) {
+                $targetModelKey = $meta['references'] ?? ($meta['target'] ?? null);
+                if (!$targetModelKey) continue;
+                $labelKey = $meta['label_key'] ?? Schemas::meta($targetModelKey, 'label_key') ?? 'name';
+                $targetClass = Schemas::meta($targetModelKey, 'eloquent');
+                if (!$targetClass || !class_exists($targetClass)) continue;
+                try {
+                    $ids = $targetClass::where($labelKey, 'LIKE', '%'.$q.'%')
+                        ->orWhereRaw('SOUNDEX('.$labelKey.') = SOUNDEX(?)', [$q])
+                        ->limit(25)
+                        ->pluck('id')
+                        ->all();
+                    if (!empty($ids)) {
+                        $query->orWhereIn($fkField, $ids);
+                    }
+                } catch (\Throwable $e) { /* ignore */ }
+            }
         }
         // Filters: FK-Strings in IDs auflösen (needResolve bei Mehrtreffern)
         $fkMap = Schemas::foreignKeys($modelKey);
