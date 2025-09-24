@@ -312,52 +312,42 @@
 
         {{-- Matrix Tab --}}
         <div class="mt-2" x-show="tab === 'matrix'" x-cloak>
-        {{-- Leere Matrix-Seite --}}
-        <div class="flex flex-col justify-center items-center h-64">
             @if($showMatrix)
-                <div class="overflow-auto">
-                    <table class="min-w-full border bg-white rounded shadow">
-                        <thead>
+            <div class="overflow-auto">
+                <table class="min-w-full border bg-white rounded shadow">
+                    <thead>
+                        <tr>
+                            <th class="py-2 px-4 border-b text-left">User</th>
+                            @foreach($matrixModules as $module)
+                                <th class="py-2 px-4 border-b text-center">{{ $module->title ?? 'Modul' }}</th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($matrixUsers as $user)
                             <tr>
-                                <th class="py-2 px-4 border-b text-left">User</th>
+                                <td class="py-2 px-4 border-b font-medium">{{ $user->name }}</td>
                                 @foreach($matrixModules as $module)
-                                    <th class="py-2 px-4 border-b text-center">
-                                        {{ $module->title ?? 'Modul' }}
-                                    </th>
+                                    @php
+                                        $hasModule = in_array($module->id, $userModuleMap[$user->id] ?? []);
+                                        $variant = $hasModule ? 'success-outline' : 'danger-outline';
+                                    @endphp
+                                    <td class="py-2 px-4 border-b text-center">
+                                        <x-ui-button :variant="$variant" size="sm" wire:click="toggleMatrix({{ $user->id }}, {{ $module->id }})">
+                                            @if($hasModule)
+                                                @svg('heroicon-o-hand-thumb-up', 'w-4 h-4 text-success')
+                                            @else
+                                                @svg('heroicon-o-hand-thumb-down', 'w-4 h-4 text-danger')
+                                            @endif
+                                        </x-ui-button>
+                                    </td>
                                 @endforeach
                             </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($matrixUsers as $user)
-                                <tr>
-                                    <td class="py-2 px-4 border-b font-medium">{{ $user->name }}</td>
-                                    @foreach($matrixModules as $module)
-                                        @php
-                                            $hasModule = in_array($module->id, $userModuleMap[$user->id] ?? []);
-                                            $variant = $hasModule ? 'success-outline' : 'danger-outline';
-                                        @endphp
-                                        <td class="py-2 px-4 border-b text-center">
-                                            <x-ui-button
-                                                :variant="$variant"
-                                                size="sm"
-                                                wire:click="toggleMatrix({{ $user->id }}, {{ $module->id }})"
-                                            >
-                                                @if($hasModule)
-                                                    @svg('heroicon-o-hand-thumb-up', 'w-4 h-4 text-success')
-                                                @else
-                                                    @svg('heroicon-o-hand-thumb-down', 'w-4 h-4 text-danger')
-                                                @endif
-                                            </x-ui-button>
-                                        </td>
-                                    @endforeach
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
             @endif
-
-        </div>
         </div>
 
         <x-slot name="footer">
