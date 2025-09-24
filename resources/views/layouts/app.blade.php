@@ -32,7 +32,7 @@
   <livewire:core.navbar/>
   
 
-  <div class="layout d-flex h-full pt-16">
+  <div class="layout d-flex h-full">
    
     <x-ui-sidebar>
         @if($class && class_exists($class))
