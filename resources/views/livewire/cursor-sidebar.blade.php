@@ -10,6 +10,24 @@
                 @endforeach
                 <x-ui-button size="xs" variant="secondary-outline" wire:click="newChat">+</x-ui-button>
             </div>
+            @php
+                // Einfacher Workflow-Pill: zeige Fortschritt des letzten Plans
+                $plans = array_values(array_filter($feed, fn($b) => (($b['type'] ?? '') === 'plan')));
+                $lastPlan = !empty($plans) ? end($plans) : null;
+                $items = is_array($lastPlan['data'] ?? null) ? ($lastPlan['data'] ?? []) : [];
+                $total = count($items);
+                $done = collect($items)->where('done', true)->count();
+                $pct = $total > 0 ? (int) floor(($done / $total) * 100) : 0;
+            @endphp
+            @if($total > 0)
+                <div class="ml-2 d-flex items-center gap-2 px-2 py-0.5 rounded bg-muted-10">
+                    <x-heroicon-o-clipboard-document-check class="w-4 h-4 text-primary" />
+                    <div class="text-xs">Workflow: {{ $done }}/{{ $total }} ({{ $pct }}%)</div>
+                    <div class="w-16 h-1 rounded bg-muted-20 overflow-hidden">
+                        <div class="h-1 bg-primary" style="width: {{ $pct }}%"></div>
+                    </div>
+                </div>
+            @endif
             <div class="ml-auto text-xs text-gray-500 truncate">
                 <span class="px-2 py-0.5 rounded bg-muted-10">{{ $totalTokensIn }}</span>
                 <span class="px-2 py-0.5 rounded bg-muted-10">{{ $totalTokensOut }}</span>
@@ -24,12 +42,30 @@
                     </div>
                 @elseif(($b['type'] ?? '') === 'plan')
                     <div class="text-left text-xs bg-muted-10 px-2 py-2 rounded">
-                        <div class="font-medium mb-1">ToDo-Liste</div>
-                        @php $items = is_array($b['data']) ? $b['data'] : []; @endphp
+                        @php 
+                            $items = is_array($b['data']) ? $b['data'] : []; 
+                            $total = count($items);
+                            $done = collect($items)->where('done', true)->count();
+                            $pct = $total > 0 ? (int) floor(($done / $total) * 100) : 0;
+                        @endphp
+                        <div class="d-flex items-center justify-between mb-1">
+                            <div class="font-medium">ToDo-Liste</div>
+                            <div class="d-flex items-center gap-2">
+                                <span class="text-muted-70">{{ $done }}/{{ $total }}</span>
+                                <span class="px-2 py-0.5 rounded bg-muted-20">{{ $pct }}%</span>
+                            </div>
+                        </div>
+                        <div class="w-full h-1 rounded bg-muted-20 overflow-hidden mb-2">
+                            <div class="h-1 bg-primary" style="width: {{ $pct }}%"></div>
+                        </div>
                         <ul class="space-y-1">
                             @foreach($items as $it)
                                 <li class="d-flex items-center gap-2">
-                                    <span class="inline-block w-3 h-3 rounded {{ !empty($it['done']) ? 'bg-success-600' : 'bg-muted-30' }}"></span>
+                                    @if(!empty($it['done']))
+                                        <x-heroicon-o-check class="w-4 h-4 text-success-600" />
+                                    @else
+                                        <x-heroicon-o-clock class="w-4 h-4 text-muted-50" />
+                                    @endif
                                     <span class="{{ !empty($it['done']) ? 'line-through text-gray-400' : '' }}">{{ $it['step'] ?? '' }}</span>
                                 </li>
                             @endforeach
