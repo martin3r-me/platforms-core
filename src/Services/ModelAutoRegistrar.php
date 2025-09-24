@@ -67,9 +67,9 @@ class ModelAutoRegistrar
             }
             \Log::info("ModelAutoRegistrar: Scanne Models in {$moduleKey}");
             
-            foreach ($fs->files($modelsDir) as $file) {
+            foreach ($fs->allFiles($modelsDir) as $file) {
                 if ($file->getExtension() !== 'php') continue;
-                $class = $this->classFromFile($file->getPathname(), $moduleKey);
+                $class = $this->classFromFile($file->getPathname(), $moduleKey, $modelsDir);
                 if (!$class) {
                     \Log::info("ModelAutoRegistrar: Keine Klasse für {$file->getPathname()}");
                     continue;
@@ -89,12 +89,14 @@ class ModelAutoRegistrar
         }
     }
 
-    protected function classFromFile(string $path, string $moduleKey): ?string
+    protected function classFromFile(string $path, string $moduleKey, string $modelsDirBase): ?string
     {
-        // Erwartet PSR-4 Namespace: Platform\\<Module>\\Models\\<Class>
-        $fileName = pathinfo($path, PATHINFO_FILENAME);
+        // PSR-4 Namespace inkl. Unterordner: Platform\\<Module>\\Models\\<SubPath>\\<Class>
+        $relative = Str::after($path, rtrim($modelsDirBase, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR);
+        $relative = str_replace(['/', '\\'], '\\', $relative);
+        $relative = Str::replaceLast('.php', '', $relative);
         $nsModule = Str::studly($moduleKey);
-        $class = 'Platform\\'.$nsModule.'\\Models\\'.$fileName;
+        $class = 'Platform\\'.$nsModule.'\\Models\\'.$relative;
         \Log::info("ModelAutoRegistrar: Versuche Klasse {$class} für Datei {$path}");
         return $class;
     }
@@ -147,11 +149,11 @@ class ModelAutoRegistrar
             $required = [];
         }
 
-        // Relationen (belongsTo) per Reflection ermitteln - OHNE Instanziierung
+        // Relationen (belongsTo/hasMany/belongsToMany) per Reflection ermitteln - OHNE Instanziierung
         $relations = [];
         $foreignKeys = [];
         try {
-            $ref = new ReflectionClass($eloquentClass);
+            $ref = new \ReflectionClass($eloquentClass);
             foreach ($ref->getMethods() as $method) {
                 if (!$method->isPublic() || $method->isStatic()) continue;
                 if ($method->getNumberOfParameters() > 0) continue;
@@ -161,9 +163,9 @@ class ModelAutoRegistrar
                 
                 // Prüfe DocComment für Relation-Hinweise
                 $docComment = $method->getDocComment();
-                if ($docComment && preg_match('/@return\s+BelongsTo<([^,>]+),([^>]+)>/', $docComment, $matches)) {
-                    $targetClass = $matches[1];
-                    $foreignKey = $matches[2] ?? null;
+                if ($docComment && (preg_match('/@return\\s+BelongsTo<([^>]+)>/i', $docComment, $matches) || preg_match('/@return\\s+\\\\?Illuminate\\\\\\\\Database\\\\\\\\Eloquent\\\\\\\\Relations\\\\\\\\BelongsTo<([^>]+)>/i', $docComment, $matches))) {
+                    $targetClass = trim($matches[1]);
+                    $foreignKey = null; // FK wird unten heuristisch gesetzt
                     
                     // Ableitung des targetModelKey aus dem Tabellennamen des Zielmodells
                     $targetTable = $this->getTableNameFromClass($targetClass);
@@ -172,21 +174,49 @@ class ModelAutoRegistrar
                         $targetEntityKey = Str::after($targetTable, '_'); // Annahme: planner_tasks -> tasks
                         $targetModelKey = $targetModuleKey . '.' . $targetEntityKey;
 
+                        // FK-Heuristik
+                        $fkGuess = Str::snake($name).'_id';
+                        if (in_array($fkGuess, $fields, true)) {
+                            $foreignKey = $fkGuess;
+                        }
+
                         $relations[$name] = [
                             'type' => 'belongsTo',
                             'target' => $targetModelKey,
                             'foreign_key' => $foreignKey,
                             'owner_key' => 'id',
-                            'fields' => ['id', 'name', 'title'],
+                            'fields' => ['id', $labelKey],
                         ];
                         
                         if ($foreignKey) {
                             $foreignKeys[$foreignKey] = [
                                 'references' => $targetModelKey,
                                 'field' => 'id',
-                                'label_key' => 'name',
+                                'label_key' => $labelKey,
                             ];
                         }
+                    }
+                }
+                // HasMany
+                if ($docComment && (preg_match('/@return\\s+HasMany<([^>]+)>/i', $docComment, $m2) || preg_match('/@return\\s+\\\\?Illuminate\\\\\\\\Database\\\\\\\\Eloquent\\\\\\\\Relations\\\\\\\\HasMany<([^>]+)>/i', $docComment, $m2))) {
+                    $targetClass = trim($m2[1]);
+                    $targetTable = $this->getTableNameFromClass($targetClass);
+                    if ($targetTable) {
+                        $relations[$name] = [
+                            'type' => 'hasMany',
+                            'target' => Str::before($targetTable, '_') . '.' . Str::after($targetTable, '_'),
+                        ];
+                    }
+                }
+                // BelongsToMany
+                if ($docComment && (preg_match('/@return\\s+BelongsToMany<([^>]+)>/i', $docComment, $m3) || preg_match('/@return\\s+\\\\?Illuminate\\\\\\\\Database\\\\\\\\Eloquent\\\\\\\\Relations\\\\\\\\BelongsToMany<([^>]+)>/i', $docComment, $m3))) {
+                    $targetClass = trim($m3[1]);
+                    $targetTable = $this->getTableNameFromClass($targetClass);
+                    if ($targetTable) {
+                        $relations[$name] = [
+                            'type' => 'belongsToMany',
+                            'target' => Str::before($targetTable, '_') . '.' . Str::after($targetTable, '_'),
+                        ];
                     }
                 }
             }
