@@ -44,6 +44,19 @@ class GenericModelCommandService
                     break;
                 }
             }
+            // Relationsbasiertes Matching via whereHas (belongsTo/hasMany/belongsToMany)
+            $relations = (array) (Schemas::get($modelKey)['relations'] ?? []);
+            foreach ($relations as $relName => $relMeta) {
+                $type = strtolower((string)($relMeta['type'] ?? ''));
+                $targetModelKey = (string)($relMeta['target'] ?? '');
+                if ($targetModelKey === '') continue;
+                $labelKey = Schemas::meta($targetModelKey, 'label_key') ?? 'name';
+                // whereHas für alle Relationstypen; Label-Feld im Ziel matchen
+                $query->orWhereHas($relName, function(Builder $q2) use ($labelKey, $q) {
+                    $q2->where($labelKey, 'LIKE', '%'.$q.'%')
+                       ->orWhereRaw('SOUNDEX('.$labelKey.') = SOUNDEX(?)', [$q]);
+                });
+            }
             // Generischer OR-Filter über belongsTo-FKs: Ziel label_key ~ q → FK IN (Treffer)
             $fkMap = Schemas::foreignKeys($modelKey);
             foreach ($fkMap as $fkField => $meta) {
