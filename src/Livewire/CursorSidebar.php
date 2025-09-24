@@ -208,11 +208,20 @@ class CursorSidebar extends Component
                         $this->saveMessage('assistant', json_encode(['confirm' => ['intent' => $intent, 'slots' => $slots]], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'confirm']);
                         break 2; // verlasse Loop
                     }
-                    $result = $this->executeIntent($intent, $slots, true);
+                    $override = !$this->isWriteIntent($intent) || !(!empty($slots['confirmed']) ? false : true);
+                    // override = true für Reads; für Writes nur wenn confirmed=true
+                    if ($this->isWriteIntent($intent) && empty($slots['confirmed'])) {
+                        $override = false;
+                    }
+                    $result = $this->executeIntent($intent, $slots, $override);
                     $this->debugLog(['phase' => 'tool_call', 'intent' => $intent, 'slots' => $slots, 'ok' => $result['ok'] ?? null, 'navigate' => $result['navigate'] ?? null]);
                     $this->debugLog(['intent' => $intent, 'slots' => $slots, 'result_ok' => $result['ok'] ?? null, 'navigate' => $result['navigate'] ?? null]);
                     if (($result['ok'] ?? false) && !empty($result['navigate'] ?? null)) {
                         return; // direkte Navigation
+                    }
+                    // Nach erfolgreichem Write-Intent keine weiteren LLM-Schritte mehr zulassen
+                    if ($this->isWriteIntent($intent) && ($result['ok'] ?? false)) {
+                        break 2;
                     }
                     // Fallback für fehlgeschlagene *.show Routen: query → open
                     if (!($result['ok'] ?? true) && str_ends_with(mb_strtolower($intent), '.show')) {
@@ -318,7 +327,11 @@ class CursorSidebar extends Component
                 }
                 if ($norm) { $slots['model'] = $norm; }
             }
-            $result = $this->executeIntent($intent, $slots, true);
+            $override = !$this->isWriteIntent($intent) || !(!empty($slots['confirmed']) ? false : true);
+            if ($this->isWriteIntent($intent) && empty($slots['confirmed'])) {
+                $override = false;
+            }
+            $result = $this->executeIntent($intent, $slots, $override);
             $this->debugLog(['phase' => 'tool_call_single', 'intent' => $intent, 'slots' => $slots, 'ok' => $result['ok'] ?? null, 'navigate' => $result['navigate'] ?? null]);
             $this->debugLog(['intent' => $intent, 'slots' => $slots, 'result_ok' => $result['ok'] ?? null, 'navigate' => $result['navigate'] ?? null]);
             if (($result['ok'] ?? false) && !empty($result['navigate'] ?? null)) {
@@ -326,6 +339,10 @@ class CursorSidebar extends Component
                 $this->input = '';
                 $this->pendingNavigate = $result['navigate'];
                 // Sofort navigieren erst nach Abschluss des Loops
+                break;
+            }
+            // Nach erfolgreichem Write-Intent keine weiteren LLM-Schritte mehr zulassen
+            if ($this->isWriteIntent($intent) && ($result['ok'] ?? false)) {
                 break;
             }
             // Fallback für fehlgeschlagene *.show Routen: query → open
@@ -545,6 +562,12 @@ class CursorSidebar extends Component
     {
         $i = mb_strtolower($intent);
         return str_contains($i, 'open') || str_contains($i, 'show');
+    }
+
+    protected function isWriteIntent(string $intent): bool
+    {
+        $i = mb_strtolower($intent);
+        return str_contains($i, 'create') || str_contains($i, 'update') || str_contains($i, 'delete');
     }
 
     protected function formatItemsFull(array $items): string
