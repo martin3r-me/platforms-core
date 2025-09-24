@@ -1,4 +1,15 @@
-<div x-data="{ open: $wire.entangle('open') }" class="h-full d-flex">
+<div x-data="{
+    open: $wire.entangle('open'),
+    init() {
+        const saved = localStorage.getItem('cursorSidebarOpen');
+        if (saved !== null) {
+            this.open = saved === '1';
+            if (this.open && !$wire.open) { $wire.toggle(); }
+        }
+        this.$watch('open', (v) => localStorage.setItem('cursorSidebarOpen', v ? '1' : '0'));
+        window.addEventListener('cursor-sidebar-toggle', () => { this.open = !this.open; $wire.toggle(); });
+    }
+}" class="h-full d-flex">
     <div x-show="open" x-cloak class="h-full d-flex">
         <x-ui-right-sidebar>
         <div class="sticky top-0 z-10 px-2 py-2 border-bottom-1 d-flex items-center gap-2 bg-white overflow-x-hidden">
