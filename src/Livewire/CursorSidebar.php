@@ -118,22 +118,7 @@ class CursorSidebar extends Component
         // Umkehren, damit die älteren zuerst im Verlauf stehen
         $history = array_reverse($history);
         $messages = $planner->initialMessages($text, $history);
-        // Optionales kurzes Reasoning/Plan-Preview als ToDo-Liste
-        try {
-            if (config('agent.reason_first', true)) {
-                $plan = [
-                    ['step' => 'Analysieren', 'done' => true],
-                    ['step' => 'Fehlende Infos klären (needResolve)', 'done' => false],
-                    ['step' => 'Befehl ausführen', 'done' => false],
-                    ['step' => 'Ergebnis bestätigen / navigieren', 'done' => false],
-                ];
-                $this->feed[] = ['role' => 'assistant', 'type' => 'plan', 'data' => $plan];
-                $this->saveMessage('assistant', json_encode(['plan' => $plan], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'plan']);
-                $this->saveEvent('plan', ['text' => $text, 'plan' => $plan]);
-            }
-        } catch (\Throwable $e) {
-            // Plan-Anzeige ist optional – Fehler hier ignorieren
-        }
+        $planShown = false;
         // Kontext-Modul holen (für Modell-Normalisierung)
         $contextModule = null;
         try {
@@ -171,6 +156,21 @@ class CursorSidebar extends Component
                 break;
             }
             if (($step['type'] ?? '') === 'tools') {
+                // Plan erst anzeigen, wenn tatsächlich Tools verwendet werden
+                if (!$planShown && config('agent.reason_first', true)) {
+                    try {
+                        $plan = [
+                            ['step' => 'Analysieren', 'done' => true],
+                            ['step' => 'Fehlende Infos klären (needResolve)', 'done' => false],
+                            ['step' => 'Befehl ausführen', 'done' => false],
+                            ['step' => 'Ergebnis bestätigen / navigieren', 'done' => false],
+                        ];
+                        $this->feed[] = ['role' => 'assistant', 'type' => 'plan', 'data' => $plan];
+                        $this->saveMessage('assistant', json_encode(['plan' => $plan], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'plan']);
+                        $this->saveEvent('plan', ['text' => $text, 'plan' => $plan]);
+                        $planShown = true;
+                    } catch (\Throwable $e) {}
+                }
                 // ganze Assistant-Nachricht in den Verlauf
                 if (!empty($step['raw'])) {
                     $messages[] = $step['raw'];
