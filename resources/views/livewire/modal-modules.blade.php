@@ -21,16 +21,18 @@
         {{-- Tabs: Inhalte --}}
         {{-- Module --}}
         <div class="mt-2" x-show="tab === 'modules'" x-cloak>
-            @php($availableModules = \\Platform\\Core\\PlatformCore::getModules())
+            @php
+                $availableModules = \Platform\Core\PlatformCore::getModules();
+            @endphp
             <div class="space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     @foreach($availableModules as $key => $module)
                         @php
                             $title = $module['title'] ?? $module['label'] ?? ucfirst($key);
                             $icon  = $module['navigation']['icon'] ?? ($module['icon'] ?? null);
-                        $routeName = $module['navigation']['route'] ?? null;
-                        $finalUrl = $routeName ? route($routeName) : ($module['url'] ?? '#');
-                    @endphp
+                            $routeName = $module['navigation']['route'] ?? null;
+                            $finalUrl = $routeName ? route($routeName) : ($module['url'] ?? '#');
+                        @endphp
                     <a href="{{ $finalUrl }}" class="d-flex items-center gap-3 p-3 rounded-md border border-solid border-1 transition hover:border-primary hover:bg-primary-10">
                         <div class="flex-shrink-0">
                             @if(!empty($icon))
@@ -47,9 +49,9 @@
                         </div>
                         <div class="flex-shrink-0 text-xs text-gray-400 hidden md:block">Öffnen</div>
                     </a>
-                @endforeach
+                    @endforeach
+                </div>
             </div>
-        </div>
         </div>
 
         {{-- Matrix --}}
