@@ -55,7 +55,6 @@
     <livewire:core.modal-team/>
     <livewire:core.modal-user/>
     <livewire:core.modal-pricing/>
-    <livewire:core.modal-modules/>
     <livewire:comms.comms-modal/>
   @endauth
     
