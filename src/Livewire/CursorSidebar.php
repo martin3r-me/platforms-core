@@ -118,6 +118,22 @@ class CursorSidebar extends Component
         // Umkehren, damit die älteren zuerst im Verlauf stehen
         $history = array_reverse($history);
         $messages = $planner->initialMessages($text, $history);
+        // Optionales kurzes Reasoning/Plan-Preview als ToDo-Liste
+        try {
+            if (config('agent.reason_first', true)) {
+                $plan = [
+                    ['step' => 'Analysieren', 'done' => true],
+                    ['step' => 'Fehlende Infos klären (needResolve)', 'done' => false],
+                    ['step' => 'Befehl ausführen', 'done' => false],
+                    ['step' => 'Ergebnis bestätigen / navigieren', 'done' => false],
+                ];
+                $this->feed[] = ['role' => 'assistant', 'type' => 'plan', 'data' => $plan];
+                $this->saveMessage('assistant', json_encode(['plan' => $plan], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ['kind' => 'plan']);
+                $this->saveEvent('plan', ['text' => $text, 'plan' => $plan]);
+            }
+        } catch (\Throwable $e) {
+            // Plan-Anzeige ist optional – Fehler hier ignorieren
+        }
         // Kontext-Modul holen (für Modell-Normalisierung)
         $contextModule = null;
         try {
@@ -126,7 +142,7 @@ class CursorSidebar extends Component
         } catch (\Throwable $e) {
             $contextModule = null;
         }
-        $maxSteps = 4;
+        $maxSteps = 12;
         for ($i = 0; $i < $maxSteps; $i++) {
             $step = $planner->step($messages, $text);
             $this->debugLog(['phase' => 'llm.step', 'index' => $i, 'type' => $step['type'] ?? 'unknown']);
@@ -219,9 +235,13 @@ class CursorSidebar extends Component
                     if (($result['ok'] ?? false) && !empty($result['navigate'] ?? null)) {
                         return; // direkte Navigation
                     }
-                    // Nach erfolgreichem Write-Intent keine weiteren LLM-Schritte mehr zulassen
+                    // Erfolgreichen Write loggen, aber Chain nicht abbrechen (weitere Schritte erlaubt)
                     if ($this->isWriteIntent($intent) && ($result['ok'] ?? false)) {
-                        break 2;
+                        $this->saveEvent('write_ok', [
+                            'intent' => $intent,
+                            'slots' => $slots,
+                            'result' => ['id' => $result['data']['id'] ?? null],
+                        ]);
                     }
                     // Fallback für fehlgeschlagene *.show Routen: query → open
                     if (!($result['ok'] ?? true) && str_ends_with(mb_strtolower($intent), '.show')) {
@@ -266,6 +286,13 @@ class CursorSidebar extends Component
                             return;
                         }
                         if (!($resolved['ok'] ?? true) && !empty($resolved['needResolve'] ?? null) && !empty($resolved['choices'] ?? [])) {
+                            // DB-Event: needResolve mit Auswahl
+                            $this->saveEvent('need_resolve', [
+                                'intent' => $intent,
+                                'slots' => $slots,
+                                'message' => $resolved['message'] ?? 'Bitte wählen',
+                                'choices' => array_slice($resolved['choices'], 0, 6),
+                            ]);
                             $this->feed[] = ['role' => 'assistant', 'type' => 'choices', 'data' => [
                                 'title' => 'Bitte wählen:',
                                 'items' => array_map(fn($c) => ['id' => $c['id'], 'name' => $c['label']], array_slice($resolved['choices'], 0, 6)),
@@ -341,9 +368,13 @@ class CursorSidebar extends Component
                 // Sofort navigieren erst nach Abschluss des Loops
                 break;
             }
-            // Nach erfolgreichem Write-Intent keine weiteren LLM-Schritte mehr zulassen
+            // Erfolgreichen Write loggen, aber Chain nicht abbrechen (weitere Schritte erlaubt)
             if ($this->isWriteIntent($intent) && ($result['ok'] ?? false)) {
-                break;
+                $this->saveEvent('write_ok', [
+                    'intent' => $intent,
+                    'slots' => $slots,
+                    'result' => ['id' => $result['data']['id'] ?? null],
+                ]);
             }
             // Fallback für fehlgeschlagene *.show Routen: query → open
             if (!($result['ok'] ?? true) && str_ends_with(mb_strtolower($intent), '.show')) {
@@ -375,6 +406,13 @@ class CursorSidebar extends Component
             }
             // Intelligente Nachfrage: Sprachmodell kann selbst entscheiden
             if (!empty($result['needResolve'] ?? null) && !empty($result['message'] ?? null) && !$result['ok']) {
+                // DB-Event: needResolve ohne Auswahl
+                $this->saveEvent('need_resolve', [
+                    'intent' => $intent,
+                    'slots' => $slots,
+                    'message' => $result['message'],
+                    'missing' => $result['missing'] ?? null,
+                ]);
                 $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => [
                     'text' => $result['message']
                 ]];
@@ -405,6 +443,13 @@ class CursorSidebar extends Component
                 break;
                 }
                 if (!($resolved['ok'] ?? true) && !empty($resolved['needResolve'] ?? null) && !empty($resolved['choices'] ?? [])) {
+                    // DB-Event: needResolve mit Auswahl (single-call Zweig)
+                    $this->saveEvent('need_resolve', [
+                        'intent' => $intent,
+                        'slots' => $slots,
+                        'message' => $resolved['message'] ?? 'Bitte wählen',
+                        'choices' => array_slice($resolved['choices'], 0, 6),
+                    ]);
                     $this->feed[] = ['role' => 'assistant', 'type' => 'choices', 'data' => [
                         'title' => 'Bitte wählen:',
                         'items' => array_map(fn($c) => ['id' => $c['id'], 'name' => $c['label']], array_slice($resolved['choices'], 0, 6)),

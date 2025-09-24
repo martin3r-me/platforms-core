@@ -23,12 +23,22 @@
                         <div class="inline-block bg-primary text-white px-2 py-1 rounded max-w-64 truncate">{{ $b['text'] ?? '' }}</div>
                     </div>
                 @elseif(($b['type'] ?? '') === 'plan')
-                    <div class="text-left text-xs bg-muted-10 px-2 py-1 rounded">
-                        <div class="font-medium">Plan</div>
-                        <div class="truncate">Intent: {{ $b['data']['intent'] ?? '–' }}</div>
-                        @if(!empty($b['data']['impact']))
-                            <div>Impact: {{ $b['data']['impact'] }}</div>
-                        @endif
+                    <div class="text-left text-xs bg-muted-10 px-2 py-2 rounded">
+                        <div class="font-medium mb-1">ToDo-Liste</div>
+                        @php $items = is_array($b['data']) ? $b['data'] : []; @endphp
+                        <ul class="space-y-1">
+                            @foreach($items as $it)
+                                <li class="d-flex items-center gap-2">
+                                    <span class="inline-block w-3 h-3 rounded {{ !empty($it['done']) ? 'bg-success-600' : 'bg-muted-30' }}"></span>
+                                    <span class="{{ !empty($it['done']) ? 'line-through text-gray-400' : '' }}">{{ $it['step'] ?? '' }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @elseif(($b['type'] ?? '') === 'plan_status')
+                    <div class="text-left text-2xs bg-muted-5 px-2 py-1 rounded">
+                        <span class="font-medium">Plan-Status:</span>
+                        <span>{{ $b['data']['text'] ?? '' }}</span>
                     </div>
                 @elseif(($b['type'] ?? '') === 'confirm')
                     <div class="text-left text-sm bg-warning-50 px-2 py-1 rounded">
