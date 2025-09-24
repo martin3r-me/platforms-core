@@ -1,5 +1,5 @@
-<nav class="position-fixed top-0 left-0 right-0 z-50">
-    <div class="d-flex items-center justify-center pt-3 px-3" x-data x-init="
+<nav class="position-fixed top-0 z-60" style="left:50%; transform:translateX(-50%);">
+    <div class="d-flex items-center justify-center pt-3 px-3 pointer-events-none" x-data x-init="
         document.addEventListener('keydown', (e) => {
             const metaOrCtrl = e.metaKey || e.ctrlKey;
             const key = e.key?.toLowerCase();
@@ -9,7 +9,7 @@
             }
         });
     ">
-        <div class="d-flex items-center gap-2 px-3 py-1 rounded-full border border-solid border-1 bg-white shadow-sm">
+        <div class="d-flex items-center gap-2 px-3 py-1 rounded-full border border-solid border-1 bg-white shadow-sm pointer-events-auto w-80">
             @auth
                 <button type="button" class="border-0 bg-transparent cursor-pointer d-flex items-center gap-2" @click="$dispatch('open-modal-modules')" title="Modulmenü (⌘K / M)">
                     <img src="{{ asset('logo.png') }}" alt="Logo" class="h-6">
