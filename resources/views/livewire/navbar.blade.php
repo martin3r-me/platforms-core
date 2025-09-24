@@ -23,23 +23,7 @@
                     @endif
                 </button>
 
-                @if(isset($monthlyTotal) && $monthlyTotal > 0)
-                    <x-ui-button variant="info-outline" size="sm" icon-only @click="$dispatch('open-modal-modules', { tab: 'billing' })" title="Kosten & Abrechnung">
-                        <x-heroicon-o-banknotes class="w-5 h-5" />
-                    </x-ui-button>
-                @endif
-
-                <x-ui-button variant="secondary-outline" size="sm" icon-only @click="$dispatch('open-modal-modules', { tab: 'team' })" title="Team verwalten">
-                    <x-heroicon-o-users class="w-5 h-5" />
-                </x-ui-button>
-
-                <x-ui-button variant="primary-outline" size="sm" icon-only @click="$dispatch('cursor-sidebar-toggle')" title="Cursor-Sidebar">
-                    <x-heroicon-o-bolt class="w-5 h-5" />
-                </x-ui-button>
-
-                <x-ui-button variant="secondary-outline" size="sm" icon-only @click="$dispatch('open-modal-modules', { tab: 'account' })" title="Benutzerkonto">
-                    <x-heroicon-o-user />
-                </x-ui-button>
+                {{-- Nodge: nur Logo, keine weiteren Icons --}}
             @endauth
 
             @guest

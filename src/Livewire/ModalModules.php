@@ -162,7 +162,13 @@ class ModalModules extends Component
     {
         $this->validateOnly("user.$property");
         $this->user?->save();
-        $this->redirect('/');
+        // Nach Teamwechsel: Daten aktualisieren und Modal schließen
+        $this->loadTeam();
+        $this->refreshMatrix();
+        $this->loadMonthlyUsages();
+        $this->modalShow = false;
+        // Auf die aktuelle Seite zurück, damit Guards/Sidebar etc. korrekt neu laden
+        $this->redirect(request()->fullUrl());
     }
 
     public function inviteToTeam(): void
