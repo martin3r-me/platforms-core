@@ -143,7 +143,7 @@
                         <tbody>
                             @foreach($monthlyUsages as $usage)
                                 <tr>
-                                    <td class="px-2 py-1">{{ \\Illuminate\\Support\\Carbon::parse($usage->usage_date)->format('d.m.Y') }}</td>
+                                    <td class="px-2 py-1">{{ \Illuminate\Support\Carbon::parse($usage->usage_date)->format('d.m.Y') }}</td>
                                     <td class="px-2 py-1">{{ $usage->label }}</td>
                                     <td class="px-2 py-1">{{ $usage->billable_type }}</td>
                                     <td class="px-2 py-1 text-right">{{ $usage->count }}</td>
