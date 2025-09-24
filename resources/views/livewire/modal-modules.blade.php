@@ -70,6 +70,7 @@
                 @endforeach
             </div>
         </div>
+        @endif
         </div>
 
         {{-- Team Tab (Teil 1: Wechsel & Erstellen) --}}
