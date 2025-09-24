@@ -358,7 +358,6 @@
             @endif
 
         </div>
-            @endif
         </div>
 
         <x-slot name="footer">
