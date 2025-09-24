@@ -64,6 +64,7 @@
                             <div class="text-xs text-gray-500 truncate">
                                 {{ $routeName ? $routeName : ($finalUrl ?? '') }}
                             </div>
+        @endif
                         </div>
                         <div class="flex-shrink-0 text-xs text-gray-400 hidden md:block">Öffnen</div>
                     </a>
