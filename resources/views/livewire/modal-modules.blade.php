@@ -1,8 +1,7 @@
-
+<div x-data="{ tab: 'modules' }" x-init="
+    window.addEventListener('open-modal-modules', (e) => { tab = e?.detail?.tab || 'modules'; });
+">
 <x-ui-modal size="lg" wire:model="modalShow">
-    <div x-data="{ tab: 'modules' }" x-init="
-        window.addEventListener('open-modal-modules', (e) => { tab = e?.detail?.tab || 'modules'; });
-    ">
         <x-slot name="header">
             <div class="d-flex items-center justify-between w-full">
                 <div class="font-medium">Zentrale Steuerung</div>
@@ -37,5 +36,5 @@
                 @endif
             </div>
         </x-slot>
-    </div>
-</x-ui-modal>
+    </x-ui-modal>
+</div>
