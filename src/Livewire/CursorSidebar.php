@@ -400,6 +400,12 @@ class CursorSidebar extends Component
 
         $this->input = '';
         $this->isWorking = false;
+        // Konsumiere pendingNavigate nach Abschluss des Loops
+        if (is_string($this->pendingNavigate) && $this->pendingNavigate !== '') {
+            $url = $this->pendingNavigate;
+            $this->pendingNavigate = null;
+            $this->redirect($url, navigate: true);
+        }
     }
 
     public function confirmAndRun(string $intent, array $slots = []): void
