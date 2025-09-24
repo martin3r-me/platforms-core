@@ -236,7 +236,7 @@ class CursorSidebar extends Component
                         }
                     }
                     // Generischer Resolver für *.open mit name/title → *.query → open
-                    if ((!$result['ok'] || !empty($result['needResolve'] ?? null))
+                    if ((!$result['ok'])
                         && str_ends_with($intent, '.open')
                         && (!empty($slots['name'] ?? null) || !empty($slots['title'] ?? null))
                         && !empty($slots['model'] ?? null)) {
@@ -365,7 +365,7 @@ class CursorSidebar extends Component
             }
             
             // Generischer Resolver für *.open mit name/title + model
-            if ((!$result['ok'] || !empty($result['needResolve'] ?? null))
+            if ((!$result['ok'])
                 && str_ends_with($intent, '.open')
                 && (!empty($slots['name'] ?? null) || !empty($slots['title'] ?? null))
                 && !empty($slots['model'] ?? null)) {

@@ -43,6 +43,10 @@ class CommandGateway
         }
 
         $result = $this->dispatcher->dispatch($cmd, $matched['slots']);
+        // Ergebnis normalisieren: Bei Erfolg keine Resolver-Flags/Listen
+        if (is_array($result) && ($result['ok'] ?? false)) {
+            unset($result['needResolve'], $result['needConfirm'], $result['choices'], $result['missing'], $result['confirmRequired']);
+        }
         $this->logRun($cmd, $matched['slots'], $actor, ($result['ok'] ?? false) ? 'ok' : 'error', $overrideConfirm, $result['navigate'] ?? null, $result['message'] ?? null);
         return $result;
     }
