@@ -1,17 +1,4 @@
---}}
-    <x-slot name="header">
-        Module
-    </x-slot>
 
-    <div class="p-4 text-sm text-gray-600">
-        Dieses Modul-Modal ist vorübergehend leer (Debug).
-    </div>
-
-    <x-slot name="footer">
-        <x-ui-button type="button" wire:click="closeModal">Schließen</x-ui-button>
-    </x-slot>
-</x-ui-modal>
-{{-- ORIGINAL BELOW TEMPORARILY DISABLED
 <x-ui-modal size="lg" wire:model="modalShow">
     <div x-data="{ tab: 'modules' }" x-init="
         window.addEventListener('open-modal-modules', (e) => { tab = e?.detail?.tab || 'modules'; });
