@@ -59,6 +59,42 @@ class CommandResolver
             ];
         }
 
+        // Fuzzy-Fallback: phonetische Ähnlichkeit auf Label-Feld versuchen
+        try {
+            $targetModelKey = (string)($slots['model'] ?? '');
+            if ($targetModelKey !== '') {
+                $labelKey = \Platform\Core\Schema\ModelSchemaRegistry::meta($targetModelKey, 'label_key') ?? 'name';
+                $eloquent = \Platform\Core\Schema\ModelSchemaRegistry::meta($targetModelKey, 'eloquent');
+                if ($eloquent && class_exists($eloquent)) {
+                    if (\Illuminate\Support\Facades\Schema::hasColumn((new $eloquent)->getTable(), $labelKey)) {
+                        $fuzzy = $eloquent::whereRaw('SOUNDEX('.$labelKey.') = SOUNDEX(?)', [$q])
+                            ->orderBy($labelKey)
+                            ->limit(5)
+                            ->get(['id', $labelKey]);
+                        if ($fuzzy->count() === 1) {
+                            $id = $fuzzy->first()->id;
+                            $openResult = $gateway->executeMatched([
+                                'command' => $this->findCommandByKey($openIntent),
+                                'slots' => ['id' => $id],
+                            ], auth()->user(), true);
+                            return $openResult;
+                        }
+                        if ($fuzzy->count() > 1) {
+                            $choices = $fuzzy->map(function($m) use ($labelKey){
+                                return ['id' => $m->id, 'label' => $m->{$labelKey} ?? (string)$m->id];
+                            })->toArray();
+                            return [
+                                'ok' => false,
+                                'needResolve' => true,
+                                'message' => 'Meintest du …?',
+                                'choices' => $choices,
+                            ];
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
         return [ 'ok' => false, 'message' => 'Kein passender Eintrag gefunden' ];
     }
 
