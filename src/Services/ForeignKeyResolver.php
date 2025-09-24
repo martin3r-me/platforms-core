@@ -14,6 +14,15 @@ class ForeignKeyResolver
      */
     public function coerce(string $modelKey, array $data): array
     {
+        return $this->coerceWithContext($modelKey, $data);
+    }
+
+    /**
+     * Wie coerce(), zusätzlich werden Ziel-Suchen anhand gleichnamiger *_id Felder aus $data eingeschränkt
+     * (z. B. sprint_slot.name mit sprint_id aus $data).
+     */
+    public function coerceWithContext(string $modelKey, array $data): array
+    {
         $fkMap = Schemas::foreignKeys($modelKey);
         $needResolve = null;
         foreach ($fkMap as $fkField => $fkMeta) {
@@ -33,7 +42,15 @@ class ForeignKeyResolver
             $term = trim((string) $data[$fkField]);
             if ($term === '') continue;
             try {
-                $matches = $targetClass::where($labelKey, 'LIKE', '%'.$term.'%')
+                $query = $targetClass::query();
+                // Kontext-Constraints: gleiche *_id Felder im aktuellen $data einschränkend anwenden
+                $targetForeigns = Schemas::foreignKeys($targetModelKey);
+                foreach ($targetForeigns as $childFkField => $_) {
+                    if (array_key_exists($childFkField, $data) && (is_int($data[$childFkField]) || ctype_digit((string)$data[$childFkField]))) {
+                        $query->where($childFkField, (int) $data[$childFkField]);
+                    }
+                }
+                $matches = $query->where($labelKey, 'LIKE', '%'.$term.'%')
                     ->orderByRaw('CASE WHEN '.$labelKey.' = ? THEN 0 ELSE 1 END', [$term])
                     ->orderBy($labelKey)
                     ->limit(5)
