@@ -22,55 +22,56 @@
         {{-- Body: Modules Tab --}}
         <div class="mt-2" x-show="tab === 'modules'" x-cloak>
             @if(!$showMatrix)
-        <div class="space-y-4">
-            <div class="grid grid-cols-1 gap-4">
-            <a href="{{ route('platform.dashboard') }}"
-               class="d-flex items-center gap-2 p-4 rounded-md border border-solid border-1 transition hover:border-primary hover:bg-primary-10">
+            <div class="space-y-4">
+                <div class="grid grid-cols-1 gap-4">
+                <a href="{{ route('platform.dashboard') }}"
+                class="d-flex items-center gap-2 p-4 rounded-md border border-solid border-1 transition hover:border-primary hover:bg-primary-10">
 
-                <div class="text-xs text-gray-500">
-                    Dashboard
+                    <div class="text-xs text-gray-500">
+                        Dashboard
+                    </div>
+
+                    @if(!empty($module['icon']))
+                        <x-dynamic-component :component="$module['icon']" class="w-5 h-5 text-primary" />
+                    @else
+                        <x-heroicon-o-cube class="w-5 h-5 text-primary" />
+                    @endif
+
+                    <span class="font-medium text-secondary">
+                        Dashboard
+                    </span>
+                </a>
                 </div>
 
-                @if(!empty($module['icon']))
-                    <x-dynamic-component :component="$module['icon']" class="w-5 h-5 text-primary" />
-                @else
-                    <x-heroicon-o-cube class="w-5 h-5 text-primary" />
-                @endif
+                <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    @foreach($modules as $module)
+                        @php
+                            $title = $module['title'] ?? $module['label'] ?? 'Modul';
+                            $icon  = $module['icon'] ?? null;
+                            $routeName = $module['navigation']['route'] ?? null;
+                            $finalUrl = $routeName ? route($routeName) : ($module['url'] ?? '#');
+                        @endphp
 
-                <span class="font-medium text-secondary">
-                    Dashboard
-                </span>
-            </a>
-            </div>
-
-            <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                @foreach($modules as $module)
-                    @php
-                        $title = $module['title'] ?? $module['label'] ?? 'Modul';
-                        $icon  = $module['icon'] ?? null;
-                        $routeName = $module['navigation']['route'] ?? null;
-                        $finalUrl = $routeName ? route($routeName) : ($module['url'] ?? '#');
-                    @endphp
-
-                    <a href="{{ $finalUrl }}" class="d-flex items-center gap-3 p-3 rounded-md border border-solid border-1 transition hover:border-primary hover:bg-primary-10">
-                        <div class="flex-shrink-0">
-                            @if(!empty($icon))
-                                <x-dynamic-component :component="$icon" class="w-6 h-6 text-primary" />
-                            @else
-                                @svg('heroicon-o-cube', 'w-6 h-6 text-primary')
-                            @endif
-                        </div>
-                        <div class="min-w-0 flex-grow-1">
-                            <div class="font-medium text-secondary truncate">{{ $title }}</div>
-                            <div class="text-xs text-gray-500 truncate">
-                                {{ $routeName ? $routeName : ($finalUrl ?? '') }}
+                        <a href="{{ $finalUrl }}" class="d-flex items-center gap-3 p-3 rounded-md border border-solid border-1 transition hover:border-primary hover:bg-primary-10">
+                            <div class="flex-shrink-0">
+                                @if(!empty($icon))
+                                    <x-dynamic-component :component="$icon" class="w-6 h-6 text-primary" />
+                                @else
+                                    @svg('heroicon-o-cube', 'w-6 h-6 text-primary')
+                                @endif
                             </div>
-                        </div>
-                        <div class="flex-shrink-0 text-xs text-gray-400 hidden md:block">Öffnen</div>
-                    </a>
-                @endforeach
+                            <div class="min-w-0 flex-grow-1">
+                                <div class="font-medium text-secondary truncate">{{ $title }}</div>
+                                <div class="text-xs text-gray-500 truncate">
+                                    {{ $routeName ? $routeName : ($finalUrl ?? '') }}
+                                </div>
+                            </div>
+                            <div class="flex-shrink-0 text-xs text-gray-400 hidden md:block">Öffnen</div>
+                        </a>
+                    @endforeach
+                </div>
             </div>
-        </div>
+            @endif
         </div>
 
         {{-- Team Tab (Teil 1: Wechsel & Erstellen) --}}
