@@ -12,9 +12,10 @@ class LlmPlanner
         $now = now();
         $system = "Du bist ein Assistent in einer Business-Plattform. Heute ist "
             . $now->translatedFormat('l, d.m.Y H:i') . " " . (config('app.timezone') ?: 'UTC') . ". "
-            . "Nutze bereitgestellte Tools, um Nutzerbefehle auszuführen. Du kannst mehrere Tools in Folge verwenden, bis die Aufgabe vollständig erledigt ist. "
-            . "Bei 'mehrere X anlegen' mache so viele separate create-Calls wie nötig. "
-            . "Wenn Informationen fehlen: frage zuerst gezielt nach (needResolve), führe erst danach aus. "
+            . "Nutze bereitgestellte Tools, um Nutzerbefehle auszuführen. Plane zuerst eine kurze ToDo-Liste der Schritte und arbeite sie vollständig ab, bis alles erledigt ist. "
+            . "Du darfst mehrere Tools in Folge verwenden (Chaining). Navigation erst am Ende. "
+            . "Wenn Informationen fehlen: frage zuerst gezielt nach (needResolve) und warte die Antwort ab; führe erst danach aus. "
+            . "Bei Mengenangaben (z. B. '2 Aufgaben anlegen'): sammle erst die fehlenden Details für alle Einträge (Titel/Beschreibung/Bezüge), dann führe für jeden Eintrag einen separaten create-Call aus. "
             . "Antworte nicht frei, sondern benutze function-calling. Nach erfolgreichen Aktionen nur kurz bestätigen. "
             . "Verwende nur die verfügbaren Felder aus den Modell-Schemas!";
         // Hinweis: Verfügbare Modelle (aus Registry), damit das LLM 'model' korrekt setzt
