@@ -143,8 +143,14 @@ class CursorSidebar extends Component
                 $textOut = trim($step['text'] ?? '');
                 if ($textOut !== '') {
                     $this->debugLog(['phase' => 'llm.assistant_only', 'len' => mb_strlen($textOut)]);
-                    $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $textOut]];
-                    $this->saveMessage('assistant', $textOut, ['kind' => 'message']);
+                    // Falls die Assistant-Antwort eine Navigation als JSON enthält, direkt übernehmen
+                    $maybe = json_decode($textOut, true);
+                    if (is_array($maybe) && !empty($maybe['navigate'] ?? null) && is_string($maybe['navigate'])) {
+                        $this->pendingNavigate = $maybe['navigate'];
+                    } else {
+                        $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $textOut]];
+                        $this->saveMessage('assistant', $textOut, ['kind' => 'message']);
+                    }
                 }
                 break;
             }
