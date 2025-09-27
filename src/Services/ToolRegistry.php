@@ -16,6 +16,9 @@ class ToolRegistry
      */
     public function getAllTools(): array
     {
+        // Cache automatisch leeren wenn sich Code ändert
+        $this->clearCacheIfNeeded();
+        
         if (empty($this->cachedTools)) {
             $this->cachedTools = Cache::remember('agent_tools', 86400, function() {
                 return $this->generateTools();
@@ -194,9 +197,11 @@ class ToolRegistry
         
         $properties = [];
         foreach ($fillable as $field) {
+            $description = $this->generateFieldDescription($field, $modelClass, $modelName);
+            
             $properties[$field] = [
                 'type' => 'string',
-                'description' => "{$field} für {$modelName}"
+                'description' => $description
             ];
         }
         
@@ -230,9 +235,11 @@ class ToolRegistry
         ];
         
         foreach ($fillable as $field) {
+            $description = $this->generateFieldDescription($field, $modelClass, $modelName, 'Neuer Wert für');
+            
             $properties[$field] = [
                 'type' => 'string',
-                'description' => "Neuer Wert für {$field}"
+                'description' => $description
             ];
         }
         
@@ -312,11 +319,125 @@ class ToolRegistry
     }
     
     /**
+     * Generiere intelligente Field-Beschreibungen
+     */
+    protected function generateFieldDescription(string $field, string $modelClass, string $modelName, string $prefix = ''): string
+    {
+        $description = $prefix ? "{$prefix} {$field}" : "{$field} für {$modelName}";
+        
+        // Dynamisch Enum-Werte finden
+        $enumValues = $this->getEnumValues($field, $modelClass);
+        if ($enumValues) {
+            $description .= " - Verfügbare Werte: " . implode(', ', $enumValues);
+        }
+        
+        // Dynamisch Relations finden
+        $relations = $this->getFieldRelations($field, $modelClass);
+        if ($relations) {
+            $description .= " - Relations: " . implode(', ', $relations);
+        }
+        
+        return $description;
+    }
+    
+    /**
+     * Finde Enum-Werte dynamisch
+     */
+    protected function getEnumValues(string $field, string $modelClass): ?array
+    {
+        try {
+            $model = new $modelClass();
+            $reflection = new \ReflectionClass($model);
+            
+            // Suche nach Enum-Properties
+            foreach ($reflection->getProperties() as $property) {
+                if ($property->getName() === $field) {
+                    $type = $property->getType();
+                    if ($type && $type instanceof \ReflectionNamedType) {
+                        $enumClass = $type->getName();
+                        if (enum_exists($enumClass)) {
+                            $cases = $enumClass::cases();
+                            return array_map(fn($case) => $case->value, $cases);
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Ignore errors
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Finde Relations dynamisch
+     */
+    protected function getFieldRelations(string $field, string $modelClass): ?array
+    {
+        try {
+            $model = new $modelClass();
+            $relations = [];
+            
+            // Suche nach Relations die das Field verwenden
+            foreach (['belongsTo', 'hasMany', 'hasOne', 'belongsToMany'] as $relationType) {
+                $methods = get_class_methods($model);
+                foreach ($methods as $method) {
+                    if (str_contains($method, $field)) {
+                        $relations[] = $method;
+                    }
+                }
+            }
+            
+            return !empty($relations) ? $relations : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+    
+    /**
      * Tools Cache leeren
      */
     public function clearCache(): void
     {
         Cache::forget('agent_tools');
         $this->cachedTools = [];
+        \Log::info('🔧 ToolRegistry Cache geleert');
+    }
+    
+    /**
+     * Cache automatisch leeren wenn sich Code ändert
+     */
+    public function clearCacheIfNeeded(): void
+    {
+        $cacheKey = 'agent_tools_last_modified';
+        $currentHash = $this->getCodeHash();
+        $lastHash = Cache::get($cacheKey);
+        
+        if ($currentHash !== $lastHash) {
+            $this->clearCache();
+            Cache::put($cacheKey, $currentHash, 86400);
+            \Log::info('🔧 ToolRegistry Cache automatisch geleert - Code geändert');
+        }
+    }
+    
+    /**
+     * Generiere Hash des aktuellen Codes
+     */
+    protected function getCodeHash(): string
+    {
+        $files = [
+            __FILE__, // ToolRegistry.php
+            __DIR__ . '/AgentOrchestrator.php',
+            __DIR__ . '/IntelligentAgent.php',
+        ];
+        
+        $hash = '';
+        foreach ($files as $file) {
+            if (file_exists($file)) {
+                $hash .= md5_file($file);
+            }
+        }
+        
+        return md5($hash);
     }
 }
