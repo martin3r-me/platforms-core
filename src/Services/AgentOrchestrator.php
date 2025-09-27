@@ -101,6 +101,12 @@ class AgentOrchestrator
         5. Für Task-Anfragen: Erst Tasks abrufen, dann Relations (project, projectslot, etc.)
         6. Kombiniere die Ergebnisse zu einer vollständigen Antwort
         
+        BEISPIELE für Tool-Auswahl:
+        - 'aufgaben fällig' → get_current_time + plannertask_get_all
+        - 'projekte anzeigen' → plannerproject_get_all
+        - 'slots anzeigen' → plannerprojectslot_get_all
+        - 'aufgaben anzeigen' → plannertask_get_all
+        
         WICHTIG: 
         - Führe ALLE Tools AUS ohne den User zu fragen!
         - KEINE Zwischenantworten oder 'ok' Fragen!
@@ -117,7 +123,8 @@ class AgentOrchestrator
         \Log::info("🤖 SENDING TO OPENAI:", [
             'tools_count' => count($tools),
             'tools_names' => array_map(fn($t) => $t['function']['name'] ?? 'unknown', $tools),
-            'query' => $query
+            'query' => $query,
+            'planner_tools' => array_filter(array_map(fn($t) => $t['function']['name'] ?? 'unknown', $tools), fn($name) => str_contains($name, 'planner'))
         ]);
         
         // OpenAI API mit Tools
@@ -125,7 +132,7 @@ class AgentOrchestrator
             'model' => 'gpt-4o-mini',
             'messages' => $messages,
             'tools' => $tools,
-            'tool_choice' => 'required',  // FORDERE Tool-Calls!
+            'tool_choice' => 'auto',  // OpenAI entscheidet intelligent!
             'max_tokens' => 2000,
             'temperature' => 0.7,
         ]);
