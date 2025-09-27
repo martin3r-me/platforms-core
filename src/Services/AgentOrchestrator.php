@@ -103,7 +103,7 @@ class AgentOrchestrator
         
         WICHTIG: 
         - Führe ALLE Tools AUS ohne den User zu fragen!
-        - KEINE Zwischenantworten oder "ok" Fragen!
+        - KEINE Zwischenantworten oder 'ok' Fragen!
         - Verwende IMMER mehrere Tools für komplexe Anfragen!
         - Gib erst am Ende eine vollständige Antwort!
         - Arbeite direkt und effizient!";
