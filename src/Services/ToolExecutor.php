@@ -110,6 +110,14 @@ class ToolExecutor
         
         $results = $query->limit(50)->get();
         
+        // DEBUG: Logge die Ergebnisse
+        \Log::info("🔧 TOOL EXECUTOR GET_ALL:", [
+            'tool' => $toolName,
+            'model' => $modelClass,
+            'count' => $results->count(),
+            'items' => $results->toArray()
+        ]);
+        
         return [
             'ok' => true,
             'data' => [
