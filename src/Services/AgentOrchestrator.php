@@ -3,7 +3,7 @@
 namespace Platform\Core\Services;
 
 use Illuminate\Support\Facades\Log;
-use Livewire\Livewire;
+use Illuminate\Support\Facades\Event;
 
 class AgentOrchestrator
 {
@@ -72,7 +72,7 @@ class AgentOrchestrator
         $this->notifyActivity($activityCallback);
         
         // Completion Event
-        Livewire::dispatch('agent-activity-complete');
+        Event::dispatch('agent.activity.complete');
         
         return [
             'ok' => true,
@@ -91,10 +91,10 @@ class AgentOrchestrator
             $activityCallback($this->getLastActivity());
         }
         
-        // Livewire Event für Real-time Updates
+        // Laravel Event für Real-time Updates
         if (!empty($this->activities)) {
             $lastActivity = $this->getLastActivity();
-            Livewire::dispatch('agent-activity-update', [
+            Event::dispatch('agent.activity.update', [
                 'step' => $lastActivity->step,
                 'tool' => $lastActivity->tool,
                 'status' => $lastActivity->status,

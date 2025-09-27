@@ -3,7 +3,7 @@
         <aside 
             x-cloak
             :class="collapsed ? 'w-16 is-collapsed' : 'w-96 is-expanded'"
-            class="relative flex-shrink-0 h-full bg-white border-left-1 border-left-solid border-muted transition-all duration-300 d-flex flex-col overflow-x-hidden"
+            class="relative flex-shrink-0 h-screen bg-white border-left-1 border-left-solid border-muted transition-all duration-300 d-flex flex-col overflow-hidden"
         >
         <!-- Toggle -->
         <div class="sticky top-0 z-10 bg-white border-bottom-1 border-muted">
