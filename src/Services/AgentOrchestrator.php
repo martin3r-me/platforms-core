@@ -101,6 +101,13 @@ class AgentOrchestrator
         5. Für Task-Anfragen: Erst Tasks abrufen, dann Relations (project, projectslot, etc.)
         6. Kombiniere die Ergebnisse zu einer vollständigen Antwort
         
+        KRITISCHE UNTERSCHEIDUNG:
+        - plannerproject_create = NEUES PROJEKT erstellen
+        - plannerprojectslot_create = SLOT IN EINEM PROJEKT erstellen (benötigt project_id!)
+        - plannertask_create = AUFGABE IN EINEM PROJEKT erstellen (benötigt project_id!)
+        
+        WICHTIG: Slots sind KEINE Projekte! Slots sind Container IN Projekten!
+        
         BEISPIELE für Tool-Auswahl:
         - 'aufgaben fällig' → get_current_time + plannerproject_get_all + plannerprojectslot_get_all + plannertask_get_all
         - 'projekte anzeigen' → plannerproject_get_all
@@ -139,10 +146,50 @@ class AgentOrchestrator
         - Gib erst am Ende eine vollständige Antwort!
         - Arbeite direkt und effizient!";
         
+        // Chat-Historie laden für besseren Kontext (Token-basiert)
+        $chatHistory = $this->loadChatHistory();
+        
+        // System Prompt Token schätzen
+        $systemTokens = $this->estimateTokens($systemPrompt);
+        $availableTokens = 12000 - $systemTokens; // 16k - 4k für Tools = 12k verfügbar
+        
+        // Messages für OpenAI
         $messages = [
-            ['role' => 'system', 'content' => $systemPrompt],
-            ['role' => 'user', 'content' => $query]
+            ['role' => 'system', 'content' => $systemPrompt]
         ];
+        
+        $usedTokens = $systemTokens;
+        
+        // Chat-Historie hinzufügen (Token-basiert)
+        foreach ($chatHistory as $message) {
+            $messageTokens = $message['tokens'] ?? $this->estimateTokens($message['content']);
+            
+            if ($usedTokens + $messageTokens > $availableTokens) {
+                \Log::info("📚 Token-Limit erreicht, stoppe bei Nachricht:", [
+                    'used_tokens' => $usedTokens,
+                    'available_tokens' => $availableTokens,
+                    'message_tokens' => $messageTokens
+                ]);
+                break;
+            }
+            
+            $messages[] = [
+                'role' => $message['role'],
+                'content' => $message['content']
+            ];
+            
+            $usedTokens += $messageTokens;
+        }
+        
+        // Aktuelle Query hinzufügen
+        $messages[] = ['role' => 'user', 'content' => $query];
+        
+        \Log::info("📚 Finale Token-Verwendung:", [
+            'system_tokens' => $systemTokens,
+            'history_tokens' => $usedTokens - $systemTokens,
+            'total_tokens' => $usedTokens,
+            'available_tokens' => $availableTokens
+        ]);
         
         // DEBUG: Logge was OpenAI bekommt
         \Log::info("🤖 SENDING TO OPENAI:", [
@@ -624,5 +671,66 @@ class AgentOrchestrator
     public function getActivities(): array
     {
         return $this->activities;
+    }
+    
+    /**
+     * Lade Chat-Historie für besseren Kontext (Token-basiert)
+     */
+    private function loadChatHistory(): array
+    {
+        try {
+            // Token-Limits für verschiedene Modelle
+            $maxTokens = 4000; // GPT-4o-mini hat ~16k context, wir reservieren Platz für Tools
+            $currentTokens = 0;
+            $messages = [];
+            
+            // Lade Nachrichten rückwärts bis Token-Limit erreicht
+            $chatMessages = \DB::table('core_chat_messages')
+                ->orderBy('created_at', 'desc')
+                ->get();
+                
+            foreach ($chatMessages as $message) {
+                $messageTokens = $this->estimateTokens($message->content);
+                
+                // Prüfe ob wir noch Platz haben
+                if ($currentTokens + $messageTokens > $maxTokens) {
+                    break;
+                }
+                
+                $messages[] = [
+                    'role' => $message->role,
+                    'content' => $message->content,
+                    'created_at' => $message->created_at,
+                    'tokens' => $messageTokens
+                ];
+                
+                $currentTokens += $messageTokens;
+            }
+            
+            // Nachrichten in richtiger Reihenfolge (älteste zuerst)
+            $messages = array_reverse($messages);
+            
+            \Log::info("📚 Chat-Kontext geladen:", [
+                'messages_count' => count($messages),
+                'total_tokens' => $currentTokens,
+                'max_tokens' => $maxTokens
+            ]);
+            
+            return $messages;
+            
+        } catch (\Exception $e) {
+            \Log::warning("Chat-Historie konnte nicht geladen werden: " . $e->getMessage());
+            return [];
+        }
+    }
+    
+    /**
+     * Schätze Token-Anzahl für Text (grobe Schätzung)
+     */
+    private function estimateTokens(string $text): int
+    {
+        // Grobe Schätzung: 1 Token ≈ 4 Zeichen für Deutsch
+        // Besser wäre tiktoken, aber für jetzt reicht das
+        return ceil(strlen($text) / 4);
     }
 }
