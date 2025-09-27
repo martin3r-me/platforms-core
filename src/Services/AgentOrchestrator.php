@@ -35,52 +35,51 @@ class AgentOrchestrator
     }
     
     /**
-     * OpenAI Agent führt die Query aus
+     * OpenAI Orchestrierung mit Live Updates
      */
     protected function executeWithOpenAI(string $query, callable $activityCallback = null): array
     {
         // Lade alle verfügbaren Tools
         $tools = app(\Platform\Core\Services\ToolRegistry::class)->getAllTools();
         
-        // OpenAI Client direkt erstellen (wie in IntelligentAgent)
+        // OpenAI Client
         $factory = (new \OpenAI\Factory())->withApiKey(env('OPENAI_API_KEY'));
-        
         if (env('OPENAI_ORGANIZATION')) {
             $factory->withOrganization(env('OPENAI_ORGANIZATION'));
         }
-        
         $client = $factory->make();
         
-        // System Prompt für den Agent
-        $systemPrompt = "Du bist ein intelligenter Agent. Du hast Zugriff auf verschiedene Tools um Daten abzurufen und Aktionen auszuführen. 
-        Analysiere die User-Anfrage und entscheide selbst welche Tools du benötigst. 
-        Du kannst mehrere Tools nacheinander ausführen um komplexe Anfragen zu beantworten.";
+        // System Prompt für intelligente Orchestrierung
+        $systemPrompt = "Du bist ein intelligenter Agent mit Zugriff auf verschiedene Tools. 
+        Analysiere die User-Anfrage und führe die notwendigen Tools in der richtigen Reihenfolge aus.
+        Du kannst mehrere Tools nacheinander verwenden um komplexe Anfragen zu beantworten.
+        Führe Tools sequenziell aus und verwende die Ergebnisse für weitere Schritte.";
         
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
             ['role' => 'user', 'content' => $query]
         ];
         
-        // OpenAI API aufrufen mit Tools
+        // OpenAI API mit Tools
         $response = $client->chat()->create([
             'model' => 'gpt-4o-mini',
             'messages' => $messages,
             'tools' => $tools,
-            'tool_choice' => 'auto',
+            'tool_choice' => 'auto',  // OpenAI entscheidet!
             'max_tokens' => 2000,
             'temperature' => 0.7,
         ]);
         
         $assistantMessage = $response->choices[0]->message;
         
-        // Tool-Calls verarbeiten
+        // Tool-Calls mit Live Updates verarbeiten
         if (!empty($assistantMessage->toolCalls)) {
-            $this->addActivity('Führe Tools aus...', '', [], [], 'running', 'OpenAI Agent führt Tools aus');
+            $this->addActivity('OpenAI orchestriert Tools...', '', [], [], 'running', 'OpenAI plant die Ausführung');
             $this->notifyActivity($activityCallback);
             
-            $toolResults = $this->executeToolCalls($assistantMessage->toolCalls, $activityCallback);
+            $toolResults = $this->executeToolCallsWithLiveUpdates($assistantMessage->toolCalls, $activityCallback);
             
-            // Tool-Ergebnisse an OpenAI senden für finale Antwort
+            // Tool-Ergebnisse an OpenAI für finale Antwort
             $messages[] = [
                 'role' => 'assistant',
                 'content' => $assistantMessage->content,
@@ -96,6 +95,9 @@ class AgentOrchestrator
             }
             
             // Finale Antwort generieren
+            $this->addActivity('Generiere finale Antwort...', '', [], [], 'running', 'OpenAI erstellt Antwort');
+            $this->notifyActivity($activityCallback);
+            
             $finalResponse = $client->chat()->create([
                 'model' => 'gpt-4o-mini',
                 'messages' => $messages,
@@ -104,6 +106,8 @@ class AgentOrchestrator
             ]);
             
             $finalContent = $finalResponse->choices[0]->message->content;
+            $this->updateLastActivity('success', 'Antwort erstellt');
+            $this->notifyActivity($activityCallback);
         } else {
             $finalContent = $assistantMessage->content;
         }
@@ -117,9 +121,61 @@ class AgentOrchestrator
     }
     
     /**
-     * Führe Tool-Calls aus
+     * Erstelle intelligenten Plan basierend auf Query
      */
-    protected function executeToolCalls(array $toolCalls, callable $activityCallback = null): array
+    protected function createIntelligentPlan(string $query): array
+    {
+        $plan = [];
+        $query = strtolower($query);
+        
+        // Projekte + Aufgaben + Story Points
+        if (str_contains($query, 'projekt') && str_contains($query, 'aufgabe')) {
+            $plan[] = [
+                'tool' => 'plannerproject_get_all',
+                'parameters' => [],
+                'description' => 'Alle Projekte abrufen'
+            ];
+            $plan[] = [
+                'tool' => 'plannertask_get_all',
+                'parameters' => [],
+                'description' => 'Alle Aufgaben abrufen'
+            ];
+        }
+        
+        // Nur Projekte
+        elseif (str_contains($query, 'projekt')) {
+            $plan[] = [
+                'tool' => 'plannerproject_get_all',
+                'parameters' => [],
+                'description' => 'Alle Projekte abrufen'
+            ];
+        }
+        
+        // Nur Aufgaben
+        elseif (str_contains($query, 'aufgabe') || str_contains($query, 'task')) {
+            $plan[] = [
+                'tool' => 'plannertask_get_all',
+                'parameters' => [],
+                'description' => 'Alle Aufgaben abrufen'
+            ];
+        }
+        
+        // Fallback: Kontext abrufen
+        else {
+            $plan[] = [
+                'tool' => 'get_context',
+                'parameters' => [],
+                'description' => 'Aktuellen Kontext abrufen'
+            ];
+        }
+        
+        return $plan;
+    }
+    
+    /**
+     * Führe Tool-Calls mit Live Updates aus
+     */
+    protected function executeToolCallsWithLiveUpdates(array $toolCalls, callable $activityCallback = null): array
     {
         $results = [];
         
@@ -133,7 +189,7 @@ class AgentOrchestrator
                 $parameters,
                 [],
                 'running',
-                "OpenAI Agent führt {$toolName} aus"
+                "OpenAI orchestriert {$toolName}"
             );
             $this->notifyActivity($activityCallback);
             

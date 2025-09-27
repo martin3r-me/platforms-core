@@ -112,24 +112,8 @@ class ToolRegistry
         $models = [];
         
         // Core Models
-        $coreModels = [
-            'Platform\\Core\\Models\\CoreChat',
-            'Platform\\Core\\Models\\CoreChatMessage',
-            'Platform\\Core\\Models\\CoreChatEvent',
-            'Platform\\Core\\Models\\Team',
-            'Platform\\Core\\Models\\User',
-        ];
-        
-        // Planner Models (nur wenn verfügbar)
-        if (Schema::hasTable('planner_projects')) {
-            $coreModels[] = 'Platform\\Planner\\Models\\PlannerProject';
-        }
-        if (Schema::hasTable('planner_tasks')) {
-            $coreModels[] = 'Platform\\Planner\\Models\\PlannerTask';
-        }
-        if (Schema::hasTable('planner_sprints')) {
-            $coreModels[] = 'Platform\\Planner\\Models\\PlannerSprint';
-        }
+        // Dynamisch alle Models finden
+        $coreModels = $this->discoverAllModels();
         
         // CRM Models (nur wenn verfügbar)
         if (Schema::hasTable('crm_contacts')) {
@@ -392,6 +376,48 @@ class ToolRegistry
         } catch (\Throwable $e) {
             return null;
         }
+    }
+    
+    /**
+     * Entdecke alle Models dynamisch
+     */
+    protected function discoverAllModels(): array
+    {
+        $models = [];
+        $modulesPath = base_path('platform/modules');
+        
+        // Alle Module scannen
+        foreach (File::directories($modulesPath) as $moduleDir) {
+            $moduleName = basename($moduleDir);
+            $modelsPath = $moduleDir . '/src/Models';
+            $namespace = 'Platform\\' . Str::studly($moduleName) . '\\Models\\';
+            
+            if (!File::exists($modelsPath)) {
+                continue;
+            }
+            
+            // Alle Model-Dateien scannen
+            foreach (File::files($modelsPath) as $file) {
+                $modelName = $file->getFilenameWithoutExtension();
+                $fullClassName = $namespace . $modelName;
+                
+                if (class_exists($fullClassName) && is_subclass_of($fullClassName, \Illuminate\Database\Eloquent\Model::class)) {
+                    $models[] = $fullClassName;
+                    \Log::info("🔍 DISCOVERED MODEL:", ['model' => $fullClassName]);
+                }
+            }
+        }
+        
+        // Core Models hinzufügen
+        $coreModels = [
+            'Platform\\Core\\Models\\CoreChat',
+            'Platform\\Core\\Models\\CoreChatMessage',
+            'Platform\\Core\\Models\\CoreChatEvent',
+            'Platform\\Core\\Models\\Team',
+            'Platform\\Core\\Models\\User',
+        ];
+        
+        return array_merge($models, $coreModels);
     }
     
     /**
