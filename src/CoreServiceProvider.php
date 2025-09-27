@@ -18,6 +18,7 @@ use Platform\Core\Services\NullCrmCompanyOptionsProvider;
 use Platform\Core\Services\IntelligentAgent;
 use Platform\Core\Services\ToolRegistry;
 use Platform\Core\Services\ToolExecutor;
+use Platform\Core\Services\AgentOrchestrator;
 
 // Command-Klasse importieren!
 use Platform\Core\Commands\TrackBillableUsage;
@@ -97,6 +98,7 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(IntelligentAgent::class);
         $this->app->singleton(ToolRegistry::class);
         $this->app->singleton(ToolExecutor::class);
+        $this->app->singleton(AgentOrchestrator::class);
 
         // CommandRegistry entfernt - Sidebar soll leer sein
     }
