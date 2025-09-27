@@ -18,7 +18,7 @@
 
         <!-- Content -->
         <div class="flex-1 overflow-y-auto p-2 d-flex flex-col gap-2">
-            {{-- Zugefahrener Zustand: Dummy Icons --}}
+            {{-- Zugefahrener Zustand: Nur Icons --}}
             <div x-show="collapsed" class="d-flex flex-col gap-2">
                 {{-- Chat Icon --}}
                 <button 

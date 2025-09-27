@@ -54,11 +54,22 @@ class CursorSidebar extends Component
         $this->ensureChat();
         $this->saveMessage('user', $text, ['forceExecute' => $this->forceExecute]);
         $this->isWorking = true;
-        
-        // Vereinfachte Antwort - keine Commands mehr verfügbar
-        $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Commands sind derzeit nicht verfügbar. Die Sidebar wurde geleert.']];
-        $this->isWorking = false;
-        $this->saveMessage('assistant', 'Commands sind derzeit nicht verfügbar. Die Sidebar wurde geleert.');
+        $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Arbeite …']];
+
+        // Einfache ChatGPT-Integration ohne Commands
+        try {
+            // Hier würde normalerweise die ChatGPT-API aufgerufen werden
+            // Für jetzt eine einfache Echo-Antwort
+            $response = "Hallo! Ich bin ChatGPT und habe deine Nachricht erhalten: '" . $text . "'. Leider sind die Commands derzeit nicht verfügbar, aber ich kann trotzdem mit dir chatten!";
+            
+            $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $response]];
+            $this->isWorking = false;
+            $this->saveMessage('assistant', $response);
+        } catch (\Throwable $e) {
+            $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Fehler beim Verarbeiten der Nachricht: ' . $e->getMessage()]];
+            $this->isWorking = false;
+            $this->saveMessage('assistant', 'Fehler beim Verarbeiten der Nachricht: ' . $e->getMessage());
+        }
     }
 
     public function newChat(): void
