@@ -21,75 +21,132 @@ class AgentOrchestrator
     public function executeComplexQuery(string $query, callable $activityCallback = null): array
     {
         $this->activities = [];
-        
-        // 1. Query analysieren
-        $this->addActivity('Analysiere Anfrage...', '', [], [], 'running', 'Verstehe was der User möchte');
-        $this->notifyActivity($activityCallback);
-        $intent = $this->analyzeIntent($query);
-        $this->updateLastActivity('success', 'Anfrage verstanden: ' . $intent['action']);
+
+        // 1. OpenAI Agent entscheidet selbst welche Tools er nutzt
+        $this->addActivity('Analysiere Anfrage mit KI...', '', [], [], 'running', 'OpenAI Agent versteht die Anfrage');
         $this->notifyActivity($activityCallback);
         
-        // 2. Execution Plan erstellen
-        $this->addActivity('Erstelle Ausführungsplan...', '', [], [], 'running', 'Plane die notwendigen Schritte');
-        $this->notifyActivity($activityCallback);
-        $plan = $this->createExecutionPlan($intent);
-        $this->updateLastActivity('success', 'Plan erstellt: ' . count($plan) . ' Schritte');
-        $this->notifyActivity($activityCallback);
-        
-        // 3. Tools sequenziell ausführen
-        $results = [];
-        foreach ($plan as $index => $step) {
-            \Log::info("🔧 EXECUTING STEP {$index}:", $step);
-            
-            $this->addActivity(
-                "Führe {$step['tool']} aus...",
-                $step['tool'],
-                $step['parameters'],
-                [],
-                'running',
-                $step['description']
-            );
-            $this->notifyActivity($activityCallback);
-
-            $startTime = microtime(true);
-            $result = $this->toolExecutor->executeTool($step['tool'], $step['parameters']);
-            $duration = (microtime(true) - $startTime) * 1000;
-
-            \Log::info("🔧 TOOL RESULT:", [
-                'tool' => $step['tool'],
-                'ok' => $result['ok'],
-                'duration' => $duration,
-                'data' => $result['data'] ?? 'no data'
-            ]);
-
-            if ($result['ok']) {
-                $this->updateLastActivity('success', 'Erfolgreich ausgeführt', $duration);
-                $results[] = $result;
-            } else {
-                $this->updateLastActivity('error', 'Fehler: ' . $result['error'], $duration);
-                \Log::error("❌ TOOL FAILED:", $result);
-                break;
-            }
-
-            $this->notifyActivity($activityCallback);
-        }
-        
-        // 4. Ergebnisse intelligent zusammenfassen
-        $this->addActivity('Fasse Ergebnisse zusammen...', '', [], [], 'running', 'Erstelle finale Antwort');
-        $this->notifyActivity($activityCallback);
-        $finalResult = $this->synthesizeResults($results, $intent);
-        $this->updateLastActivity('success', 'Antwort erstellt');
-        $this->notifyActivity($activityCallback);
+        $result = $this->executeWithOpenAI($query, $activityCallback);
         
         // Completion Event
         Event::dispatch('agent.activity.complete');
+
+        return $result;
+    }
+    
+    /**
+     * OpenAI Agent führt die Query aus
+     */
+    protected function executeWithOpenAI(string $query, callable $activityCallback = null): array
+    {
+        // Lade alle verfügbaren Tools
+        $tools = app(\Platform\Core\Services\ToolRegistry::class)->getAllTools();
+        
+        // OpenAI Client
+        $client = app(\OpenAI\Client::class);
+        
+        // System Prompt für den Agent
+        $systemPrompt = "Du bist ein intelligenter Agent. Du hast Zugriff auf verschiedene Tools um Daten abzurufen und Aktionen auszuführen. 
+        Analysiere die User-Anfrage und entscheide selbst welche Tools du benötigst. 
+        Du kannst mehrere Tools nacheinander ausführen um komplexe Anfragen zu beantworten.";
+        
+        $messages = [
+            ['role' => 'system', 'content' => $systemPrompt],
+            ['role' => 'user', 'content' => $query]
+        ];
+        
+        // OpenAI API aufrufen mit Tools
+        $response = $client->chat()->create([
+            'model' => 'gpt-4o-mini',
+            'messages' => $messages,
+            'tools' => $tools,
+            'tool_choice' => 'auto',
+            'max_tokens' => 2000,
+            'temperature' => 0.7,
+        ]);
+        
+        $assistantMessage = $response->choices[0]->message;
+        
+        // Tool-Calls verarbeiten
+        if (!empty($assistantMessage->toolCalls)) {
+            $this->addActivity('Führe Tools aus...', '', [], [], 'running', 'OpenAI Agent führt Tools aus');
+            $this->notifyActivity($activityCallback);
+            
+            $toolResults = $this->executeToolCalls($assistantMessage->toolCalls, $activityCallback);
+            
+            // Tool-Ergebnisse an OpenAI senden für finale Antwort
+            $messages[] = [
+                'role' => 'assistant',
+                'content' => $assistantMessage->content,
+                'tool_calls' => $assistantMessage->toolCalls
+            ];
+            
+            foreach ($toolResults as $result) {
+                $messages[] = [
+                    'role' => 'tool',
+                    'content' => json_encode($result),
+                    'tool_call_id' => $result['tool_call_id']
+                ];
+            }
+            
+            // Finale Antwort generieren
+            $finalResponse = $client->chat()->create([
+                'model' => 'gpt-4o-mini',
+                'messages' => $messages,
+                'max_tokens' => 1000,
+                'temperature' => 0.7,
+            ]);
+            
+            $finalContent = $finalResponse->choices[0]->message->content;
+        } else {
+            $finalContent = $assistantMessage->content;
+        }
         
         return [
             'ok' => true,
-            'content' => $finalResult,
+            'content' => $finalContent,
             'activities' => $this->activities,
-            'usage' => ['prompt_tokens' => 0, 'completion_tokens' => 0]
+            'usage' => $response->usage->toArray()
         ];
+    }
+    
+    /**
+     * Führe Tool-Calls aus
+     */
+    protected function executeToolCalls(array $toolCalls, callable $activityCallback = null): array
+    {
+        $results = [];
+        
+        foreach ($toolCalls as $toolCall) {
+            $toolName = $toolCall->function->name;
+            $parameters = json_decode($toolCall->function->arguments, true);
+            
+            $this->addActivity(
+                "Führe {$toolName} aus...",
+                $toolName,
+                $parameters,
+                [],
+                'running',
+                "OpenAI Agent führt {$toolName} aus"
+            );
+            $this->notifyActivity($activityCallback);
+            
+            $startTime = microtime(true);
+            $result = app(\Platform\Core\Services\ToolExecutor::class)->executeTool($toolName, $parameters);
+            $duration = (microtime(true) - $startTime) * 1000;
+            
+            if ($result['ok']) {
+                $this->updateLastActivity('success', 'Erfolgreich ausgeführt', $duration);
+                $result['tool_call_id'] = $toolCall->id;
+                $results[] = $result;
+            } else {
+                $this->updateLastActivity('error', 'Fehler: ' . $result['error'], $duration);
+            }
+            
+            $this->notifyActivity($activityCallback);
+        }
+        
+        return $results;
     }
     
     /**
@@ -126,22 +183,40 @@ class AgentOrchestrator
         
         $query = strtolower($query);
         
-        // Einfache Intent-Erkennung
-        if (str_contains($query, 'zeige') || str_contains($query, 'liste')) {
+        // Erweiterte Intent-Erkennung
+        if (str_contains($query, 'zeige') || str_contains($query, 'liste') || 
+            str_contains($query, 'aufgaben') || str_contains($query, 'tasks') ||
+            str_contains($query, 'projekte') || str_contains($query, 'projects') ||
+            str_contains($query, 'alle') || str_contains($query, 'all')) {
             $intent = ['action' => 'list', 'entity' => $this->extractEntity($query)];
             \Log::info('🎯 INTENT DETECTED:', $intent);
             return $intent;
         }
         
-        if (str_contains($query, 'erstelle') || str_contains($query, 'neue')) {
+        if (str_contains($query, 'erstelle') || str_contains($query, 'neue') ||
+            str_contains($query, 'create') || str_contains($query, 'new')) {
             $intent = ['action' => 'create', 'entity' => $this->extractEntity($query)];
             \Log::info('🎯 INTENT DETECTED:', $intent);
             return $intent;
         }
         
-        if (str_contains($query, 'aktualisiere') || str_contains($query, 'update')) {
+        if (str_contains($query, 'aktualisiere') || str_contains($query, 'update') ||
+            str_contains($query, 'bearbeite') || str_contains($query, 'edit')) {
             $intent = ['action' => 'update', 'entity' => $this->extractEntity($query)];
             \Log::info('🎯 INTENT DETECTED:', $intent);
+            return $intent;
+        }
+        
+        // Fallback: Wenn "aufgaben" oder "tasks" erwähnt wird, aber kein klarer Action
+        if (str_contains($query, 'aufgaben') || str_contains($query, 'tasks')) {
+            $intent = ['action' => 'list', 'entity' => 'task'];
+            \Log::info('🎯 FALLBACK INTENT (tasks):', $intent);
+            return $intent;
+        }
+        
+        if (str_contains($query, 'projekte') || str_contains($query, 'projects')) {
+            $intent = ['action' => 'list', 'entity' => 'project'];
+            \Log::info('🎯 FALLBACK INTENT (projects):', $intent);
             return $intent;
         }
         
