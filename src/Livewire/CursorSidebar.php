@@ -84,10 +84,6 @@ class CursorSidebar extends Component
         $this->ensureChat();
         $this->saveMessage('user', $text, ['forceExecute' => $this->forceExecute]);
         
-        // WICHTIG: Feed komplett neu laden um Duplikate zu vermeiden
-        $this->feed = [];
-        $this->loadFeedFromChat();
-        
         // SOFORT: Agent Activities zurücksetzen und erste Aktivität anzeigen
         $this->agentActivities = [];
         $this->currentStep = 0;
@@ -127,8 +123,7 @@ class CursorSidebar extends Component
             $this->showActivityStream = false;
             $this->agentActivities = [];
             
-            // WICHTIG: Feed komplett neu laden für Live-Updates
-            $this->feed = [];
+            // WICHTIG: Feed EINMAL neu laden nach Agent-Antwort
             $this->loadFeedFromChat();
     }
 
