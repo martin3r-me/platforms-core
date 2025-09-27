@@ -232,16 +232,9 @@ class AgentFallbackService
                 return false;
             }
             
-            // Prüfe Internet-Verbindung (einfacher Test)
-            $context = stream_context_create([
-                'http' => [
-                    'timeout' => 5,
-                    'method' => 'HEAD'
-                ]
-            ]);
-            
-            $result = @file_get_contents('https://api.openai.com', false, $context);
-            return $result !== false;
+            // API Key ist vorhanden, verwende IntelligentAgent
+            Log::info("🤖 OpenAI API Key gefunden, verwende IntelligentAgent");
+            return true;
             
         } catch (\Exception $e) {
             Log::warning("🔄 OPENAI AVAILABILITY CHECK FAILED:", [
