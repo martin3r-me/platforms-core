@@ -186,6 +186,14 @@ class ToolRegistry
             $tools[] = $this->generateCreateTools($modelClass, $modelName);
             $tools[] = $this->generateUpdateTools($modelClass, $modelName);
             $tools[] = $this->generateDeleteTools($modelClass, $modelName);
+            
+            // Relation Tools generieren (LOOSE!)
+            $relationTools = $this->generateRelationTools($modelClass, $modelName);
+            $tools = array_merge($tools, $relationTools);
+            
+            // Enum Tools generieren (LOOSE!)
+            $enumTools = $this->generateEnumTools($modelClass, $modelName);
+            $tools = array_merge($tools, $enumTools);
         }
         
         return $tools;
@@ -244,11 +252,25 @@ class ToolRegistry
             ];
         }
         
+        // Model-Dokumentation aus DocComment (LOOSE!)
+        $documentation = $this->getModelDocumentation($modelClass);
+        
+        // Beschreibung aus DocComment
+        $description = "Alle {$modelName} Einträge abrufen";
+        if (!empty($documentation['description'])) {
+            $description = $documentation['description'];
+        }
+        
+        // Hints hinzufügen
+        if (!empty($documentation['hints'])) {
+            $description .= " - Hints: " . implode(', ', $documentation['hints']);
+        }
+        
         return [
             'type' => 'function',
             'function' => [
                 'name' => strtolower($modelName) . '_get_all',
-                'description' => "Alle {$modelName} Einträge abrufen",
+                'description' => $description,
                 'parameters' => [
                     'type' => 'object',
                     'properties' => $properties,
@@ -256,6 +278,15 @@ class ToolRegistry
                 ]
             ]
         ];
+    }
+    
+    /**
+     * Intelligente Tool-Beschreibungen (LOOSE!)
+     */
+    protected function getIntelligentDescription(string $modelName): string
+    {
+        // Fallback: Standard-Beschreibung
+        return "Alle {$modelName} Einträge abrufen";
     }
     
     /**
@@ -412,6 +443,264 @@ class ToolRegistry
     }
     
     /**
+     * Hole Model-Dokumentation (LOOSE!)
+     */
+    protected function getModelDocumentation(string $modelClass): array
+    {
+        $documentation = [];
+        
+        try {
+            $reflection = new \ReflectionClass($modelClass);
+            
+            // DocComment auslesen
+            $docComment = $reflection->getDocComment();
+            if ($docComment) {
+                $documentation['description'] = $this->extractDescriptionFromDocComment($docComment);
+                $documentation['hints'] = $this->extractHintsFromDocComment($docComment);
+            }
+            
+            // Laravel-Konventionen erkennen
+            $documentation['conventions'] = $this->detectLaravelConventions($modelClass);
+            
+            // Business-Logic-Hints
+            $documentation['business_logic'] = $this->detectBusinessLogic($modelClass);
+            
+        } catch (\Exception $e) {
+            \Log::warning("🔍 DOCUMENTATION FAILED:", ['model' => $modelClass, 'error' => $e->getMessage()]);
+        }
+        
+        return $documentation;
+    }
+    
+    /**
+     * Extrahiere Beschreibung aus DocComment
+     */
+    protected function extractDescriptionFromDocComment(string $docComment): string
+    {
+        $lines = explode("\n", $docComment);
+        $description = '';
+        
+        foreach ($lines as $line) {
+            $line = trim($line, " \t\n\r\0\x0B*");
+            if (str_starts_with($line, '@') || empty($line)) {
+                continue;
+            }
+            $description .= $line . ' ';
+        }
+        
+        return trim($description);
+    }
+    
+    /**
+     * Extrahiere Hints aus DocComment
+     */
+    protected function extractHintsFromDocComment(string $docComment): array
+    {
+        $hints = [];
+        $lines = explode("\n", $docComment);
+        
+        foreach ($lines as $line) {
+            $line = trim($line, " \t\n\r\0\x0B*");
+            if (str_starts_with($line, '@hint')) {
+                $hints[] = trim(substr($line, 5));
+            }
+        }
+        
+        return $hints;
+    }
+    
+    /**
+     * Erkenne Laravel-Konventionen
+     */
+    protected function detectLaravelConventions(string $modelClass): array
+    {
+        $conventions = [];
+        
+        try {
+            $model = new $modelClass();
+            $reflection = new \ReflectionClass($model);
+            
+            // Table-Name Konvention
+            $conventions['table'] = $model->getTable();
+            
+            // Primary Key Konvention
+            $conventions['primary_key'] = $model->getKeyName();
+            
+            // Timestamps Konvention
+            $conventions['timestamps'] = $model->usesTimestamps();
+            
+            // Fillable Konvention
+            $conventions['fillable'] = $model->getFillable();
+            
+            // Relations Konvention
+            $conventions['relations'] = $this->detectRelationConventions($reflection);
+            
+        } catch (\Exception $e) {
+            \Log::warning("🔍 CONVENTION DETECTION FAILED:", ['model' => $modelClass, 'error' => $e->getMessage()]);
+        }
+        
+        return $conventions;
+    }
+    
+    /**
+     * Erkenne Relation-Konventionen
+     */
+    protected function detectRelationConventions(\ReflectionClass $reflection): array
+    {
+        $relations = [];
+        
+        foreach ($reflection->getMethods() as $method) {
+            $methodName = $method->getName();
+            
+            // Laravel Relation Patterns
+            if (preg_match('/^(hasOne|hasMany|belongsTo|belongsToMany|morphTo|morphMany|morphOne)$/', $methodName)) {
+                $relations[] = [
+                    'name' => $methodName,
+                    'type' => $this->detectRelationType($methodName),
+                    'convention' => 'Laravel Standard'
+                ];
+            }
+        }
+        
+        return $relations;
+    }
+    
+    /**
+     * Erkenne Business-Logic
+     */
+    protected function detectBusinessLogic(string $modelClass): array
+    {
+        $businessLogic = [];
+        
+        try {
+            $reflection = new \ReflectionClass($modelClass);
+            
+            // Scopes erkennen
+            $scopes = [];
+            foreach ($reflection->getMethods() as $method) {
+                if (str_starts_with($method->getName(), 'scope')) {
+                    $scopes[] = $method->getName();
+                }
+            }
+            if (!empty($scopes)) {
+                $businessLogic['scopes'] = $scopes;
+            }
+            
+            // Accessors/Mutators erkennen
+            $accessors = [];
+            foreach ($reflection->getMethods() as $method) {
+                if (str_starts_with($method->getName(), 'get') && str_ends_with($method->getName(), 'Attribute')) {
+                    $accessors[] = $method->getName();
+                }
+            }
+            if (!empty($accessors)) {
+                $businessLogic['accessors'] = $accessors;
+            }
+            
+        } catch (\Exception $e) {
+            \Log::warning("🔍 BUSINESS LOGIC DETECTION FAILED:", ['model' => $modelClass, 'error' => $e->getMessage()]);
+        }
+        
+        return $businessLogic;
+    }
+    
+    /**
+     * Generiere Relation Tools für ein Model (LOOSE!)
+     */
+    protected function generateRelationTools(string $modelClass, string $modelName): array
+    {
+        $tools = [];
+        $relations = $this->discoverModelRelations($modelClass);
+        
+        foreach ($relations as $relation) {
+            $relationName = $relation['name'];
+            $relationType = $relation['type'];
+            
+            // Relation-Beschreibung aus Model-Dokumentation (LOOSE!)
+            $description = $this->getRelationDescriptionFromModel($modelClass, $relationName, $relationType);
+            
+            // Generiere Tool für jede Relation
+            $tools[] = [
+                'type' => 'function',
+                'function' => [
+                    'name' => strtolower($modelName) . '_' . $relationName,
+                    'description' => $description,
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'id' => [
+                                'type' => 'string',
+                                'description' => "ID des {$modelName}"
+                            ]
+                        ],
+                        'required' => ['id']
+                    ]
+                ]
+            ];
+        }
+        
+        return $tools;
+    }
+    
+    /**
+     * Relation-Beschreibung aus Model-Dokumentation (LOOSE!)
+     */
+    protected function getRelationDescriptionFromModel(string $modelClass, string $relationName, string $relationType): string
+    {
+        try {
+            $reflection = new \ReflectionClass($modelClass);
+            $method = $reflection->getMethod($relationName);
+            $docComment = $method->getDocComment();
+            
+            if ($docComment) {
+                // Extrahiere Beschreibung aus DocComment
+                $lines = explode("\n", $docComment);
+                foreach ($lines as $line) {
+                    $line = trim($line, " \t\n\r\0\x0B*");
+                    if (str_starts_with($line, '@hint')) {
+                        return trim(substr($line, 5));
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            \Log::warning("🔍 RELATION DESCRIPTION FAILED:", ['model' => $modelClass, 'relation' => $relationName, 'error' => $e->getMessage()]);
+        }
+        
+        // Fallback: Standard-Beschreibung
+        return "{$relationName} Relation ({$relationType})";
+    }
+    
+    /**
+     * Generiere Enum Tools für ein Model (LOOSE!)
+     */
+    protected function generateEnumTools(string $modelClass, string $modelName): array
+    {
+        $tools = [];
+        $enums = $this->discoverModelEnums($modelClass);
+        
+        foreach ($enums as $enum) {
+            $enumName = $enum['name'];
+            $enumValues = $enum['values'];
+            
+            // Generiere Tool für jeden Enum
+            $tools[] = [
+                'type' => 'function',
+                'function' => [
+                    'name' => strtolower($modelName) . '_' . strtolower($enumName) . '_values',
+                    'description' => "Verfügbare Werte für {$enumName} in {$modelName}",
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => (object)[],
+                        'required' => []
+                    ]
+                ]
+            ];
+        }
+        
+        return $tools;
+    }
+    
+    /**
      * Finde Enum-Werte dynamisch
      */
     protected function getEnumValues(string $field, string $modelClass): ?array
@@ -498,6 +787,87 @@ class ToolRegistry
     }
     
     /**
+     * Entdecke alle Relations für ein Model (LOOSE!)
+     */
+    protected function discoverModelRelations(string $modelClass): array
+    {
+        $relations = [];
+        
+        try {
+            $model = new $modelClass();
+            $reflection = new \ReflectionClass($model);
+            
+            // Alle Methoden durchgehen
+            foreach ($reflection->getMethods() as $method) {
+                $methodName = $method->getName();
+                
+                // Relations haben typischerweise diese Patterns
+                if (preg_match('/^(hasOne|hasMany|belongsTo|belongsToMany|morphTo|morphMany|morphOne)$/', $methodName) ||
+                    str_contains($methodName, 'Relation') ||
+                    str_contains($methodName, 'Through')) {
+                    
+                    $relations[] = [
+                        'name' => $methodName,
+                        'type' => $this->detectRelationType($methodName),
+                        'description' => "Relation: {$methodName}"
+                    ];
+                }
+            }
+        } catch (\Exception $e) {
+            \Log::warning("🔍 RELATION DISCOVERY FAILED:", ['model' => $modelClass, 'error' => $e->getMessage()]);
+        }
+        
+        return $relations;
+    }
+    
+    /**
+     * Entdecke alle Enums für ein Model (LOOSE!)
+     */
+    protected function discoverModelEnums(string $modelClass): array
+    {
+        $enums = [];
+        
+        try {
+            $model = new $modelClass();
+            $reflection = new \ReflectionClass($model);
+            
+            // Alle Properties durchgehen
+            foreach ($reflection->getProperties() as $property) {
+                $propertyName = $property->getName();
+                
+                // Prüfe ob es ein Enum ist
+                if (class_exists($propertyName) && is_subclass_of($propertyName, 'BackedEnum')) {
+                    $enums[] = [
+                        'name' => $propertyName,
+                        'values' => $this->getEnumValues($propertyName),
+                        'description' => "Enum: {$propertyName}"
+                    ];
+                }
+            }
+        } catch (\Exception $e) {
+            \Log::warning("🔍 ENUM DISCOVERY FAILED:", ['model' => $modelClass, 'error' => $e->getMessage()]);
+        }
+        
+        return $enums;
+    }
+    
+    /**
+     * Erkenne Relation Type
+     */
+    protected function detectRelationType(string $methodName): string
+    {
+        if (str_contains($methodName, 'hasOne')) return 'hasOne';
+        if (str_contains($methodName, 'hasMany')) return 'hasMany';
+        if (str_contains($methodName, 'belongsTo')) return 'belongsTo';
+        if (str_contains($methodName, 'belongsToMany')) return 'belongsToMany';
+        if (str_contains($methodName, 'morphTo')) return 'morphTo';
+        if (str_contains($methodName, 'morphMany')) return 'morphMany';
+        if (str_contains($methodName, 'morphOne')) return 'morphOne';
+        
+        return 'unknown';
+    }
+    
+    /**
      * Filtere wichtige Tools (OpenAI Limit)
      */
     protected function filterImportantTools(array $tools, int $limit): array
@@ -573,6 +943,16 @@ class ToolRegistry
             str_contains($query, 'task') || str_contains($query, 'sprint') ||
             str_contains($query, 'slot') || str_contains($query, 'planning')) {
             $modules[] = 'planner';
+        }
+        
+        // Spezielle Mapping für "slots" → "projectslots"
+        if (str_contains($query, 'slot')) {
+            $modules[] = 'plannerprojectslot'; // Slots sind Project Slots
+        }
+        
+        // Spezielle Mapping für "aufgaben" → "tasks"
+        if (str_contains($query, 'aufgabe') || str_contains($query, 'task')) {
+            $modules[] = 'plannertask'; // Aufgaben sind Tasks
         }
         
         // CRM Module

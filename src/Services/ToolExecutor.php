@@ -42,6 +42,18 @@ class ToolExecutor
                 return $this->executeDelete($toolName, $parameters);
             }
             
+            // Relation Tools (LOOSE!)
+            if (str_contains($toolName, '_') && !str_contains($toolName, '_get_all') && 
+                !str_contains($toolName, '_create') && !str_contains($toolName, '_update') && 
+                !str_contains($toolName, '_delete') && !str_contains($toolName, '_values')) {
+                return $this->executeRelation($toolName, $parameters);
+            }
+            
+            // Enum Tools (LOOSE!)
+            if (str_contains($toolName, '_values')) {
+                return $this->executeEnumValues($toolName, $parameters);
+            }
+            
             return [
                 'ok' => false,
                 'error' => "Tool '$toolName' nicht gefunden"
@@ -275,5 +287,109 @@ class ToolExecutor
         ];
         
         return $modelMapping[$modelName] ?? null;
+    }
+    
+    /**
+     * Führe Relation Tool aus (LOOSE!)
+     */
+    protected function executeRelation(string $toolName, array $parameters): array
+    {
+        try {
+            // Tool-Name: plannerproject_tasks -> Model: PlannerProject, Relation: tasks
+            $parts = explode('_', $toolName);
+            $modelName = ucfirst($parts[0]);
+            $relationName = $parts[1];
+            
+            // Model finden
+            $modelClass = $this->getModelClass($modelName);
+            if (!$modelClass) {
+                return ['ok' => false, 'error' => "Model für Tool '$toolName' nicht gefunden"];
+            }
+            
+            // Model laden
+            $model = $modelClass::find($parameters['id']);
+            if (!$model) {
+                return ['ok' => false, 'error' => "Model mit ID {$parameters['id']} nicht gefunden"];
+            }
+            
+            // Relation ausführen
+            $relation = $model->$relationName();
+            $items = $relation->get();
+            
+            return [
+                'ok' => true,
+                'data' => $items->toArray(),
+                'count' => $items->count(),
+                'relation' => $relationName
+            ];
+            
+        } catch (\Exception $e) {
+            return [
+                'ok' => false,
+                'error' => "Relation Fehler: " . $e->getMessage()
+            ];
+        }
+    }
+    
+    /**
+     * Führe Enum Values Tool aus (LOOSE!)
+     */
+    protected function executeEnumValues(string $toolName, array $parameters): array
+    {
+        try {
+            // Tool-Name: plannerproject_status_values -> Model: PlannerProject, Enum: status
+            $parts = explode('_', $toolName);
+            $modelName = ucfirst($parts[0]);
+            $enumName = $parts[1];
+            
+            // Model finden
+            $modelClass = $this->getModelClass($modelName);
+            if (!$modelClass) {
+                return ['ok' => false, 'error' => "Model für Tool '$toolName' nicht gefunden"];
+            }
+            
+            // Enum-Werte finden
+            $enumValues = $this->getEnumValues($enumName, $modelClass);
+            
+            return [
+                'ok' => true,
+                'data' => $enumValues,
+                'enum' => $enumName
+            ];
+            
+        } catch (\Exception $e) {
+            return [
+                'ok' => false,
+                'error' => "Enum Fehler: " . $e->getMessage()
+            ];
+        }
+    }
+    
+    /**
+     * Hole Enum-Werte für ein Model
+     */
+    protected function getEnumValues(string $enumName, string $modelClass): array
+    {
+        try {
+            $model = new $modelClass();
+            $reflection = new \ReflectionClass($model);
+            
+            // Suche nach Enum-Property
+            foreach ($reflection->getProperties() as $property) {
+                if ($property->getName() === $enumName) {
+                    $type = $property->getType();
+                    if ($type && $type instanceof \ReflectionNamedType) {
+                        $enumClass = $type->getName();
+                        if (class_exists($enumClass) && is_subclass_of($enumClass, 'BackedEnum')) {
+                            return array_map(fn($case) => $case->value, $enumClass::cases());
+                        }
+                    }
+                }
+            }
+            
+            return [];
+        } catch (\Exception $e) {
+            return [];
+        }
     }
 }
