@@ -306,6 +306,12 @@ class ToolExecutor
         $parts = explode('_', $toolName);
         $modelName = ucfirst($parts[0]);
         
+        \Log::info("🔍 TOOL NAME MAPPING:", [
+            'toolName' => $toolName,
+            'parts' => $parts,
+            'modelName' => $modelName
+        ]);
+        
         // Mapping für bekannte Models
         $modelMapping = [
             'Plannerproject' => 'Platform\\Planner\\Models\\PlannerProject',
