@@ -49,6 +49,7 @@ class CursorSidebar extends Component
             $this->agentActivities[] = $data;
             $this->currentStep++;
             $this->showActivityStream = true;
+            $this->isWorking = true;
             
             // Force Livewire re-render
             $this->dispatch('$refresh');
@@ -83,7 +84,8 @@ class CursorSidebar extends Component
         $this->ensureChat();
         $this->saveMessage('user', $text, ['forceExecute' => $this->forceExecute]);
         
-        // WICHTIG: Feed aus DB laden (nicht manuell hinzufügen!)
+        // WICHTIG: Feed komplett neu laden um Duplikate zu vermeiden
+        $this->feed = [];
         $this->loadFeedFromChat();
         
         // SOFORT: Agent Activities zurücksetzen und erste Aktivität anzeigen
@@ -125,7 +127,8 @@ class CursorSidebar extends Component
             $this->showActivityStream = false;
             $this->agentActivities = [];
             
-            // WICHTIG: Feed neu laden für Live-Updates
+            // WICHTIG: Feed komplett neu laden für Live-Updates
+            $this->feed = [];
             $this->loadFeedFromChat();
     }
 
