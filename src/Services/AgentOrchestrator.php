@@ -102,10 +102,21 @@ class AgentOrchestrator
         6. Kombiniere die Ergebnisse zu einer vollständigen Antwort
         
         BEISPIELE für Tool-Auswahl:
-        - 'aufgaben fällig' → get_current_time + plannertask_get_all
+        - 'aufgaben fällig' → get_current_time + plannerproject_get_all + plannerprojectslot_get_all + plannertask_get_all
         - 'projekte anzeigen' → plannerproject_get_all
         - 'slots anzeigen' → plannerprojectslot_get_all
         - 'aufgaben anzeigen' → plannertask_get_all
+        - 'slots anlegen' → plannerprojectslot_create (mehrfach)
+        - 'aufgaben anlegen' → plannertask_create (mehrfach)
+        
+        WICHTIG: 
+        - Für 'aufgaben fällig' IMMER alle 4 Tools verwenden!
+        - Für 'slots anlegen' IMMER plannerprojectslot_create verwenden!
+        - Für 'aufgaben anlegen' IMMER plannertask_create verwenden!
+        
+        REGEL: Wenn der User um Slots bittet, verwende plannerprojectslot_create!
+        REGEL: Wenn der User um Aufgaben bittet, verwende plannertask_create!
+        REGEL: Führe die CREATE Tools AUS, nicht nur GET Tools!
         
         WICHTIG: 
         - Führe ALLE Tools AUS ohne den User zu fragen!
@@ -147,7 +158,8 @@ class AgentOrchestrator
                 'name' => $tc->function->name ?? 'unknown',
                 'arguments' => $tc->function->arguments ?? '{}'
             ], $assistantMessage->toolCalls ?? []),
-            'content' => $assistantMessage->content
+            'content' => $assistantMessage->content,
+            'why_only_2_tools' => 'DEBUG: Warum nur 2 Tools?'
         ]);
         
         // Tool-Calls mit Live Updates verarbeiten
