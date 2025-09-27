@@ -39,6 +39,8 @@ class AgentOrchestrator
         // 3. Tools sequenziell ausführen
         $results = [];
         foreach ($plan as $index => $step) {
+            \Log::info("🔧 EXECUTING STEP {$index}:", $step);
+            
             $this->addActivity(
                 "Führe {$step['tool']} aus...",
                 $step['tool'],
@@ -48,19 +50,27 @@ class AgentOrchestrator
                 $step['description']
             );
             $this->notifyActivity($activityCallback);
-            
+
             $startTime = microtime(true);
             $result = $this->toolExecutor->executeTool($step['tool'], $step['parameters']);
             $duration = (microtime(true) - $startTime) * 1000;
-            
+
+            \Log::info("🔧 TOOL RESULT:", [
+                'tool' => $step['tool'],
+                'ok' => $result['ok'],
+                'duration' => $duration,
+                'data' => $result['data'] ?? 'no data'
+            ]);
+
             if ($result['ok']) {
                 $this->updateLastActivity('success', 'Erfolgreich ausgeführt', $duration);
                 $results[] = $result;
             } else {
                 $this->updateLastActivity('error', 'Fehler: ' . $result['error'], $duration);
+                \Log::error("❌ TOOL FAILED:", $result);
                 break;
             }
-            
+
             $this->notifyActivity($activityCallback);
         }
         
@@ -111,22 +121,33 @@ class AgentOrchestrator
      */
     protected function analyzeIntent(string $query): array
     {
+        // DEBUG: Logge die Query
+        \Log::info('🔍 ANALYZE INTENT:', ['query' => $query]);
+        
         $query = strtolower($query);
         
         // Einfache Intent-Erkennung
         if (str_contains($query, 'zeige') || str_contains($query, 'liste')) {
-            return ['action' => 'list', 'entity' => $this->extractEntity($query)];
+            $intent = ['action' => 'list', 'entity' => $this->extractEntity($query)];
+            \Log::info('🎯 INTENT DETECTED:', $intent);
+            return $intent;
         }
         
         if (str_contains($query, 'erstelle') || str_contains($query, 'neue')) {
-            return ['action' => 'create', 'entity' => $this->extractEntity($query)];
+            $intent = ['action' => 'create', 'entity' => $this->extractEntity($query)];
+            \Log::info('🎯 INTENT DETECTED:', $intent);
+            return $intent;
         }
         
         if (str_contains($query, 'aktualisiere') || str_contains($query, 'update')) {
-            return ['action' => 'update', 'entity' => $this->extractEntity($query)];
+            $intent = ['action' => 'update', 'entity' => $this->extractEntity($query)];
+            \Log::info('🎯 INTENT DETECTED:', $intent);
+            return $intent;
         }
         
-        return ['action' => 'unknown', 'entity' => 'unknown'];
+        $intent = ['action' => 'unknown', 'entity' => 'unknown'];
+        \Log::info('❓ UNKNOWN INTENT:', $intent);
+        return $intent;
     }
     
     /**
@@ -146,6 +167,9 @@ class AgentOrchestrator
      */
     protected function createExecutionPlan(array $intent): array
     {
+        // DEBUG: Logge Intent
+        \Log::info('📋 CREATE EXECUTION PLAN:', $intent);
+        
         $plan = [];
         
         // Immer zuerst Kontext abrufen
@@ -154,6 +178,7 @@ class AgentOrchestrator
             'parameters' => [],
             'description' => 'Aktuellen Kontext abrufen'
         ];
+        \Log::info('✅ ADDED TO PLAN: get_context');
         
         // Je nach Intent weitere Schritte
         switch ($intent['action']) {
@@ -164,12 +189,14 @@ class AgentOrchestrator
                         'parameters' => [],
                         'description' => 'Alle Tasks abrufen'
                     ];
+                    \Log::info('✅ ADDED TO PLAN: plannertask_get_all');
                 } elseif ($intent['entity'] === 'project') {
                     $plan[] = [
                         'tool' => 'plannerproject_get_all',
                         'parameters' => [],
                         'description' => 'Alle Projekte abrufen'
                     ];
+                    \Log::info('✅ ADDED TO PLAN: plannerproject_get_all');
                 }
                 break;
                 
@@ -180,10 +207,12 @@ class AgentOrchestrator
                         'parameters' => ['name' => 'Neue Task', 'description' => 'Erstellt vom Agent'],
                         'description' => 'Neue Task erstellen'
                     ];
+                    \Log::info('✅ ADDED TO PLAN: plannertask_create');
                 }
                 break;
         }
         
+        \Log::info('📋 FINAL PLAN:', $plan);
         return $plan;
     }
     
@@ -199,9 +228,17 @@ class AgentOrchestrator
                 $data = $result['data'];
                 
                 if (isset($data['items'])) {
-                    $response .= "**Gefunden: " . count($data['items']) . " Einträge**\n";
-                    foreach ($data['items'] as $item) {
+                    $items = $data['items'];
+                    $filteredItems = $this->filterTestTasks($items);
+                    
+                    $response .= "**Gefunden: " . count($filteredItems) . " relevante Einträge** (von " . count($items) . " total)\n";
+                    foreach ($filteredItems as $item) {
                         $response .= "- " . ($item['name'] ?? $item['title'] ?? 'Unbekannt') . "\n";
+                    }
+                    
+                    if (count($items) > count($filteredItems)) {
+                        $testCount = count($items) - count($filteredItems);
+                        $response .= "\n*" . $testCount . " Test-Aufgaben wurden ausgeblendet*\n";
                     }
                 } elseif (isset($data['item'])) {
                     $response .= "**Erstellt:** " . ($data['item']['name'] ?? $data['item']['title'] ?? 'Unbekannt') . "\n";
@@ -210,6 +247,39 @@ class AgentOrchestrator
         }
         
         return $response;
+    }
+    
+    /**
+     * Filtere Test-Aufgaben heraus
+     */
+    protected function filterTestTasks(array $items): array
+    {
+        $testKeywords = [
+            'test', 'TEST', 'Test',
+            'neue aufgabe', 'Neue Aufgabe',
+            'einkaufen', 'Einkaufen',
+            'dummy', 'Dummy',
+            'beispiel', 'Beispiel',
+            'sample', 'Sample'
+        ];
+        
+        return array_filter($items, function($item) use ($testKeywords) {
+            $name = strtolower($item['name'] ?? $item['title'] ?? '');
+            
+            // Prüfe auf Test-Keywords
+            foreach ($testKeywords as $keyword) {
+                if (str_contains($name, strtolower($keyword))) {
+                    return false; // Filtere Test-Aufgaben heraus
+                }
+            }
+            
+            // Prüfe auf sehr generische Namen
+            if (strlen($name) < 5 || $name === 'aufgabe' || $name === 'task') {
+                return false;
+            }
+            
+            return true; // Behalte relevante Aufgaben
+        });
     }
     
     /**
