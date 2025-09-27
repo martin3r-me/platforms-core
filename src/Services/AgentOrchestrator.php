@@ -193,6 +193,9 @@ class AgentOrchestrator
      */
     private function formatToolResultForLLM(array $result): string
     {
+        // Debug: Logge die Result-Struktur
+        \Log::info("🔍 Tool Result Structure:", ['result' => $result]);
+        
         if (isset($result['data']) && is_array($result['data'])) {
             $data = $result['data'];
             
@@ -230,12 +233,15 @@ class AgentOrchestrator
                     $formatted .= "\n";
                 }
                 
+                \Log::info("📝 Formatted Result:", ['formatted' => $formatted]);
                 return $formatted;
             }
         }
         
         // Fallback: JSON-String
-        return json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        $fallback = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        \Log::info("🔄 Using Fallback:", ['fallback' => $fallback]);
+        return $fallback;
     }
     
     /**

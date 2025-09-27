@@ -81,7 +81,8 @@ class IntelligentAgent
         $complexKeywords = [
             'zeige', 'liste', 'alle', 'übersicht', 'summe', 'berechnen',
             'tasks', 'projekte', 'okrs', 'sprints', 'story points',
-            'aufgaben', 'projekt', 'zusammenfassung', 'statistik'
+            'aufgaben', 'projekt', 'zusammenfassung', 'statistik',
+            'kannst', 'gib', 'geben', 'slots', 'aufgabe'
         ];
         $message = strtolower($message);
 
