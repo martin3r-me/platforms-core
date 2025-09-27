@@ -119,6 +119,13 @@ class AgentOrchestrator
             ['role' => 'user', 'content' => $query]
         ];
         
+        // DEBUG: Logge was OpenAI bekommt
+        \Log::info("🤖 SENDING TO OPENAI:", [
+            'tools_count' => count($tools),
+            'tools_names' => array_map(fn($t) => $t['function']['name'] ?? 'unknown', $tools),
+            'query' => $query
+        ]);
+        
         // OpenAI API mit Tools
         $response = $client->chat()->create([
             'model' => 'gpt-4o-mini',
@@ -130,6 +137,17 @@ class AgentOrchestrator
         ]);
         
         $assistantMessage = $response->choices[0]->message;
+        
+        // DEBUG: Logge OpenAI's Response
+        \Log::info("🤖 OPENAI RESPONSE:", [
+            'has_tool_calls' => !empty($assistantMessage->toolCalls),
+            'tool_calls_count' => count($assistantMessage->toolCalls ?? []),
+            'tool_calls' => array_map(fn($tc) => [
+                'name' => $tc->function->name ?? 'unknown',
+                'arguments' => $tc->function->arguments ?? '{}'
+            ], $assistantMessage->toolCalls ?? []),
+            'content' => $assistantMessage->content
+        ]);
         
         // Tool-Calls mit Live Updates verarbeiten
         if (!empty($assistantMessage->toolCalls)) {
