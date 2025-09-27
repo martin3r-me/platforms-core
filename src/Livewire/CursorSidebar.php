@@ -8,6 +8,7 @@ use Livewire\Component;
 use Platform\Core\Models\CoreChat;
 use Platform\Core\Models\CoreChatMessage;
 use Platform\Core\Models\CoreChatEvent;
+use Platform\Core\Services\IntelligentAgent;
 
 class CursorSidebar extends Component
 {
@@ -56,20 +57,24 @@ class CursorSidebar extends Component
         $this->isWorking = true;
         $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Arbeite …']];
 
-        // Einfache ChatGPT-Integration ohne Commands
+        // IntelligentAgent verwenden für echte ChatGPT-Integration
         try {
-            // Hier würde normalerweise die ChatGPT-API aufgerufen werden
-            // Für jetzt eine einfache Echo-Antwort
-            $response = "Hallo! Ich bin ChatGPT und habe deine Nachricht erhalten: '" . $text . "'. Leider sind die Commands derzeit nicht verfügbar, aber ich kann trotzdem mit dir chatten!";
+            $agent = app(IntelligentAgent::class);
+            $response = $agent->processMessage($text, $this->chatId);
             
-            $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $response]];
-            $this->isWorking = false;
-            $this->saveMessage('assistant', $response);
+            if ($response['ok']) {
+                $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $response['content']]];
+                $this->saveMessage('assistant', $response['content']);
+            } else {
+                $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Fehler: ' . $response['error']]];
+                $this->saveMessage('assistant', 'Fehler: ' . $response['error']);
+            }
         } catch (\Throwable $e) {
-            $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Fehler beim Verarbeiten der Nachricht: ' . $e->getMessage()]];
-            $this->isWorking = false;
-            $this->saveMessage('assistant', 'Fehler beim Verarbeiten der Nachricht: ' . $e->getMessage());
+            $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Fehler beim Verarbeiten: ' . $e->getMessage()]];
+            $this->saveMessage('assistant', 'Fehler beim Verarbeiten: ' . $e->getMessage());
         }
+        
+        $this->isWorking = false;
     }
 
     public function newChat(): void
