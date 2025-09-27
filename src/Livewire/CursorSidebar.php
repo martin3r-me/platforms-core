@@ -109,7 +109,17 @@ class CursorSidebar extends Component
 
                 if ($response['ok']) {
                     // Response-Struktur: ['ok' => true, 'data' => ...]
-                    $content = $response['data'] ?? $response['message'] ?? 'Antwort erhalten';
+                    $data = $response['data'] ?? $response['message'] ?? 'Antwort erhalten';
+                    
+                    // Prüfe ob data ein Array ist (Tool-Response) oder String (Chat-Response)
+                    if (is_array($data)) {
+                        // Tool-Response: Formatiere Array zu String
+                        $content = $this->formatToolResponse($data);
+                    } else {
+                        // Chat-Response: Direkt verwenden
+                        $content = $data;
+                    }
+                    
                     $this->saveMessage('assistant', $content);
                 } else {
                     // Nur in DB speichern, nicht in Feed hinzufügen
@@ -238,5 +248,72 @@ class CursorSidebar extends Component
                 continue;
             }
         }
+    }
+    
+    /**
+     * Formatiere Tool-Response Array zu String
+     */
+    protected function formatToolResponse(array $data): string
+    {
+        // Prüfe ob es eine Tool-Response ist
+        if (isset($data['data']) && is_array($data['data'])) {
+            $items = $data['data'];
+            $count = $data['count'] ?? count($items);
+            
+            if (empty($items)) {
+                return "Keine Daten gefunden.";
+            }
+            
+            // Formatiere basierend auf Item-Typ
+            $formatted = "Gefunden: {$count} Einträge\n\n";
+            
+            foreach ($items as $index => $item) {
+                if ($index >= 10) { // Limit für bessere Lesbarkeit
+                    $remaining = count($items) - 10;
+                    $formatted .= "... und {$remaining} weitere Einträge\n";
+                    break;
+                }
+                
+                if (is_array($item)) {
+                    // Formatiere Array-Item
+                    $formatted .= $this->formatArrayItem($item, $index + 1);
+                } else {
+                    $formatted .= ($index + 1) . ". " . $item . "\n";
+                }
+            }
+            
+            return $formatted;
+        }
+        
+        // Fallback: JSON-String
+        return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    }
+    
+    /**
+     * Formatiere einzelnes Array-Item
+     */
+    protected function formatArrayItem(array $item, int $index): string
+    {
+        $formatted = "{$index}. ";
+        
+        // Priorisiere wichtige Felder
+        $priorityFields = ['name', 'title', 'id', 'uuid', 'description'];
+        $displayFields = [];
+        
+        foreach ($priorityFields as $field) {
+            if (isset($item[$field])) {
+                $displayFields[] = $field . ': ' . $item[$field];
+            }
+        }
+        
+        if (!empty($displayFields)) {
+            $formatted .= implode(', ', $displayFields);
+        } else {
+            // Fallback: Erste paar Felder
+            $fields = array_slice($item, 0, 3);
+            $formatted .= implode(', ', array_map(fn($k, $v) => "{$k}: {$v}", array_keys($fields), $fields));
+        }
+        
+        return $formatted . "\n";
     }
 }
