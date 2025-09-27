@@ -42,8 +42,14 @@ class AgentOrchestrator
         // Lade alle verfügbaren Tools
         $tools = app(\Platform\Core\Services\ToolRegistry::class)->getAllTools();
         
-        // OpenAI Client
-        $client = app(\OpenAI\Client::class);
+        // OpenAI Client direkt erstellen (wie in IntelligentAgent)
+        $factory = (new \OpenAI\Factory())->withApiKey(env('OPENAI_API_KEY'));
+        
+        if (env('OPENAI_ORGANIZATION')) {
+            $factory->withOrganization(env('OPENAI_ORGANIZATION'));
+        }
+        
+        $client = $factory->make();
         
         // System Prompt für den Agent
         $systemPrompt = "Du bist ein intelligenter Agent. Du hast Zugriff auf verschiedene Tools um Daten abzurufen und Aktionen auszuführen. 
