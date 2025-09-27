@@ -274,6 +274,15 @@ class ToolRegistry
             $description = $documentation['description'];
         }
         
+        // Spezifische Beschreibungen für bessere Tool-Auswahl
+        if (str_contains($modelName, 'ProjectSlot')) {
+            $description = "Alle Project Slots (Container für Tasks) abrufen. Verwende für GTD-Slots wie Backlog, Aktiv, Nächste Schritte, Warten auf, Erledigt.";
+        } elseif (str_contains($modelName, 'Task')) {
+            $description = "Alle Tasks (Aufgaben) abrufen. Verwende für Aufgaben-Management und fällige Aufgaben.";
+        } elseif (str_contains($modelName, 'Project')) {
+            $description = "Alle Projekte abrufen. Verwende für Projekt-Übersicht und Projekt-Management.";
+        }
+        
         // Hints hinzufügen
         if (!empty($documentation['hints'])) {
             $description .= " - Hints: " . implode(', ', $documentation['hints']);
@@ -320,11 +329,21 @@ class ToolRegistry
             ];
         }
         
+        // Spezifische Beschreibungen für CREATE Tools
+        $description = "Neuen {$modelName} erstellen";
+        if (str_contains($modelName, 'ProjectSlot')) {
+            $description = "Neuen Project Slot (Container für Tasks) erstellen. Verwende für GTD-Slots wie Backlog, Aktiv, Nächste Schritte, Warten auf, Erledigt. Benötigt project_id!";
+        } elseif (str_contains($modelName, 'Task')) {
+            $description = "Neue Task (Aufgabe) erstellen. Verwende für Aufgaben-Management. Benötigt name und project_id!";
+        } elseif (str_contains($modelName, 'Project')) {
+            $description = "Neues Projekt erstellen. Verwende für Projekt-Management. Benötigt name!";
+        }
+        
         return [
             'type' => 'function',
             'function' => [
                 'name' => strtolower($modelName) . '_create',
-                'description' => "Neuen {$modelName} erstellen",
+                'description' => $description,
                 'parameters' => [
                     'type' => 'object',
                     'properties' => $properties,
