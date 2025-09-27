@@ -19,31 +19,34 @@
         <!-- Content -->
         <div class="flex-1 overflow-y-auto p-2 d-flex flex-col gap-2">
             {{-- Zugefahrener Zustand: Nur Icons --}}
-            <div x-show="collapsed" class="d-flex flex-col gap-2">
-                {{-- Chat Icon --}}
-                <button 
-                    class="relative d-flex items-center p-2 my-1 rounded-md font-medium transition text-black hover:bg-primary-10 hover:text-primary hover:shadow-md justify-center"
-                    title="Chat">
-                    <x-heroicon-o-chat-bubble-left-right class="w-6 h-6 flex-shrink-0"/>
-                </button>
+            <template x-if="collapsed">
+                <div class="d-flex flex-col gap-2">
+                    {{-- Chat Icon --}}
+                    <button 
+                        class="relative d-flex items-center p-2 my-1 rounded-md font-medium transition text-black hover:bg-primary-10 hover:text-primary hover:shadow-md justify-center"
+                        title="Chat">
+                        <x-heroicon-o-chat-bubble-left-right class="w-6 h-6 flex-shrink-0"/>
+                    </button>
 
-                {{-- Commands Icon --}}
-                <button 
-                    class="relative d-flex items-center p-2 my-1 rounded-md font-medium transition text-black hover:bg-primary-10 hover:text-primary hover:shadow-md justify-center"
-                    title="Commands">
-                    <x-heroicon-o-command-line class="w-6 h-6 flex-shrink-0"/>
-                </button>
+                    {{-- Commands Icon --}}
+                    <button 
+                        class="relative d-flex items-center p-2 my-1 rounded-md font-medium transition text-black hover:bg-primary-10 hover:text-primary hover:shadow-md justify-center"
+                        title="Commands">
+                        <x-heroicon-o-command-line class="w-6 h-6 flex-shrink-0"/>
+                    </button>
 
-                {{-- Tools Icon --}}
-                <button 
-                    class="relative d-flex items-center p-2 my-1 rounded-md font-medium transition text-black hover:bg-primary-10 hover:text-primary hover:shadow-md justify-center"
-                    title="Tools">
-                    <x-heroicon-o-wrench-screwdriver class="w-6 h-6 flex-shrink-0"/>
-                </button>
-            </div>
+                    {{-- Tools Icon --}}
+                    <button 
+                        class="relative d-flex items-center p-2 my-1 rounded-md font-medium transition text-black hover:bg-primary-10 hover:text-primary hover:shadow-md justify-center"
+                        title="Tools">
+                        <x-heroicon-o-wrench-screwdriver class="w-6 h-6 flex-shrink-0"/>
+                    </button>
+                </div>
+            </template>
 
             {{-- Ausgeklappter Zustand: Chat-Funktionalität --}}
-            <div x-show="!collapsed" class="d-flex flex-col h-full">
+            <template x-if="!collapsed">
+                <div class="d-flex flex-col h-full">
                 {{-- Chat Header --}}
                 <div class="sticky top-0 z-10 px-2 py-2 border-bottom-1 d-flex items-center gap-2 bg-white overflow-x-hidden">
                     <x-heroicon-o-bolt class="w-5 h-5 text-primary" />
@@ -80,7 +83,8 @@
                     <input type="text" class="flex-grow border rounded px-2 py-1" placeholder="Nachricht…" wire:model.defer="input" wire:keydown.enter="send">
                     <x-ui-button size="sm" variant="primary" wire:click="send">Senden</x-ui-button>
                 </div>
-            </div>
+                </div>
+            </template>
         </div>
     </aside>
 </div>
