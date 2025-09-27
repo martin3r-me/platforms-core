@@ -49,11 +49,7 @@ class CoreServiceProvider extends ServiceProvider
             ->group(__DIR__.'/../routes/web.php');
 
         // Nach Laden der Module und Routen: alle Modul-GET-Routen als Tools exportieren
-        try {
-            \Platform\Core\Services\RouteToolExporter::registerAllModuleRoutes();
-        } catch (\Throwable $e) {
-            \Log::info('CoreServiceProvider: RouteToolExporter registerAllModuleRoutes() übersprungen: '.$e->getMessage());
-        }
+        // RouteToolExporter entfernt - Sidebar soll leer sein
 
         // Command registrieren (nur in der Konsole)
         if ($this->app->runningInConsole()) {
