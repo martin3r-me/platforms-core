@@ -132,31 +132,31 @@
         </div>
         </aside>
     </div>
-</div>
+    
+    <style>
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+        animation: fadeIn 0.3s ease-in-out;
+    }
+    </style>
 
-<style>
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-.animate-fade-in {
-    animation: fadeIn 0.3s ease-in-out;
-}
-</style>
-
-<script>
-function rightSidebarState() {
-    return {
-        collapsed: true, // Standardmäßig zugefahren
-        init() {
-            this.collapsed = localStorage.getItem('sidebar-cursor-collapsed') === 'true' || true;
-            window.dispatchEvent(new CustomEvent('ui:right-sidebar-toggle', { detail: { collapsed: this.collapsed } }));
-        },
-        toggle() {
-            this.collapsed = !this.collapsed;
-            localStorage.setItem('sidebar-cursor-collapsed', this.collapsed);
-            window.dispatchEvent(new CustomEvent('ui:right-sidebar-toggle', { detail: { collapsed: this.collapsed } }));
+    <script>
+    function rightSidebarState() {
+        return {
+            collapsed: true, // Standardmäßig zugefahren
+            init() {
+                this.collapsed = localStorage.getItem('sidebar-cursor-collapsed') === 'true' || true;
+                window.dispatchEvent(new CustomEvent('ui:right-sidebar-toggle', { detail: { collapsed: this.collapsed } }));
+            },
+            toggle() {
+                this.collapsed = !this.collapsed;
+                localStorage.setItem('sidebar-cursor-collapsed', this.collapsed);
+                window.dispatchEvent(new CustomEvent('ui:right-sidebar-toggle', { detail: { collapsed: this.collapsed } }));
+            }
         }
     }
-}
-</script>
+    </script>
+</div>
