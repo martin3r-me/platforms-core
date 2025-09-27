@@ -45,15 +45,23 @@ class CursorSidebar extends Component
     {
         // Laravel Event Listener registrieren
         Event::listen('agent.activity.update', function($data) {
+            // Update existing activity or add new one
             $this->agentActivities[] = $data;
             $this->currentStep++;
             $this->showActivityStream = true;
+            
+            // Force Livewire re-render
+            $this->dispatch('$refresh');
         });
         
         Event::listen('agent.activity.complete', function() {
             $this->showActivityStream = false;
             $this->agentActivities = [];
             $this->currentStep = 0;
+            $this->isWorking = false;
+            
+            // Force Livewire re-render
+            $this->dispatch('$refresh');
         });
         
         // Aktiven Chat aus Session wiederherstellen
@@ -69,19 +77,30 @@ class CursorSidebar extends Component
         $text = trim($this->input);
         if (empty($text)) return;
         
+        // SOFORT: Input clearen und User-Message anzeigen
         $this->input = '';
         $this->feed[] = ['role' => 'user', 'text' => $text];
         $this->lastUserText = $text;
         $this->ensureChat();
         $this->saveMessage('user', $text, ['forceExecute' => $this->forceExecute]);
-        // Reset Agent Activities
+        
+        // SOFORT: Agent Activities zurücksetzen und erste Aktivität anzeigen
         $this->agentActivities = [];
         $this->currentStep = 0;
         $this->totalSteps = 0;
         $this->isWorking = true;
+        $this->showActivityStream = true;
         
-        // Show initial loading message
-        $this->feed[] = ['role' => 'assistant', 'type' => 'activity', 'data' => ['text' => '🔄 Analysiere Anfrage...']];
+        // SOFORT: Erste Aktivität anzeigen
+        $this->agentActivities[] = [
+            'step' => 'Analysiere Anfrage...',
+            'tool' => '',
+            'status' => 'running',
+            'message' => 'Verstehe was der User möchte',
+            'duration' => 0,
+            'icon' => '🔄',
+            'timestamp' => now()->format('H:i:s')
+        ];
 
         // IntelligentAgent verwenden für echte ChatGPT-Integration
         try {
@@ -102,6 +121,7 @@ class CursorSidebar extends Component
         }
         
         $this->isWorking = false;
+        $this->showActivityStream = false;
         $this->agentActivities = [];
     }
 
