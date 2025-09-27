@@ -9,7 +9,7 @@ use Platform\Core\Contracts\CrmCompanyResolverInterface;
 use Platform\Core\Contracts\CrmContactResolverInterface;
 use Platform\Core\Services\NullCrmCompanyResolver;
 use Platform\Core\Services\NullCrmContactResolver;
-use Platform\Core\Registry\CommandRegistry;
+// CommandRegistry entfernt
 
 class CoreServiceProvider extends ServiceProvider
 {
@@ -27,33 +27,7 @@ class CoreServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Core-Commands registrieren (z. B. Agent-Handoff)
-        CommandRegistry::register('core', [
-            [
-                'key' => 'core.transfer_agent',
-                'description' => 'Wechselt zum Ziel-Agent/Modul (Handoff).',
-                'parameters' => [
-                    ['name' => 'destination', 'type' => 'string', 'required' => true, 'description' => 'Modulschlüssel, z. B. planner, okr, hcm'],
-                ],
-                'impact' => 'low',
-                'phrases' => [ 'wechsle zu {destination}', 'öffne {destination}', 'agent {destination}' ],
-                'slots' => [ ['name' => 'destination'] ],
-                'guard' => 'web',
-                'handler' => ['service', \Platform\Core\Services\CoreAgentService::class.'@transferAgent'],
-            ],
-            [
-                'key' => 'core.get_now',
-                'description' => 'Liefert aktuelle Serverzeit und Zeitzone.',
-                'parameters' => [],
-                'impact' => 'low',
-                'confirmRequired' => false,
-                'autoAllowed' => true,
-                'phrases' => [ 'wie spät ist es', 'welches datum ist heute', 'heute datum' ],
-                'slots' => [],
-                'guard' => 'web',
-                'handler' => ['service', \Platform\Core\Tools\CoreTimeTool::class.'@getNow'],
-            ],
-        ]);
+        // Commands entfernt - Sidebar soll leer sein
     }
 
     private function registerModules(): void
