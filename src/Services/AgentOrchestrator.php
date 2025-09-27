@@ -101,50 +101,21 @@ class AgentOrchestrator
         5. Für Task-Anfragen: Erst Tasks abrufen, dann Relations (project, projectslot, etc.)
         6. Kombiniere die Ergebnisse zu einer vollständigen Antwort
         
-        KRITISCHE UNTERSCHEIDUNG:
-        - plannerproject_create = NEUES PROJEKT erstellen
-        - plannerprojectslot_create = SLOT IN EINEM PROJEKT erstellen (benötigt project_id!)
-        - plannertask_create = AUFGABE IN EINEM PROJEKT erstellen (benötigt project_id!)
+        WICHTIGE PRINZIPIEN:
+        - Du bist ein intelligenter Agent, der selbst entscheidet welche Tools zu verwenden
+        - Analysiere die Anfrage und wähle die passenden Tools aus
+        - Führe alle notwendigen Tools aus um die Anfrage zu beantworten
+        - Verwende die verfügbaren Tools intelligent und in der richtigen Reihenfolge
         
-        WICHTIG: Slots sind KEINE Projekte! Slots sind Container IN Projekten!
-        
-        BEISPIELE für Tool-Auswahl:
-        - 'aufgaben fällig' → get_current_time + plannerproject_get_all + plannerprojectslot_get_all + plannertask_get_all
-        - 'projekte anzeigen' → plannerproject_get_all
-        - 'slots anzeigen' → plannerprojectslot_get_all
-        - 'aufgaben anzeigen' → plannertask_get_all
-        - 'slots anlegen' → plannerprojectslot_create (mehrfach)
-        - 'aufgaben anlegen' → plannertask_create (mehrfach)
+        VERFÜGBARE TOOLS:
+        - Du hast Zugriff auf alle verfügbaren Tools für Datenbankoperationen
+        - Verwende die Tools die für die Anfrage relevant sind
+        - Führe alle notwendigen Schritte aus um die Anfrage zu beantworten
         
         WICHTIG: 
-        - Für 'aufgaben fällig' IMMER alle 4 Tools verwenden!
-        - Für 'slots anlegen' IMMER plannerprojectslot_create verwenden!
-        - Für 'aufgaben anlegen' IMMER plannertask_create verwenden!
-        
-        REGEL: Wenn der User um Slots bittet, verwende plannerprojectslot_create!
-        REGEL: Wenn der User um Aufgaben bittet, verwende plannertask_create!
-        REGEL: Führe die CREATE Tools AUS, nicht nur GET Tools!
-        
-        BEISPIEL für 'Slots anlegen':
-        1. plannerproject_get_all - Projekt finden
-        2. plannerprojectslot_create - Slot 1 anlegen (Backlog)
-        3. plannerprojectslot_create - Slot 2 anlegen (Aktiv)
-        4. plannerprojectslot_create - Slot 3 anlegen (Nächste Schritte)
-        5. plannerprojectslot_create - Slot 4 anlegen (Warten auf)
-        6. plannerprojectslot_create - Slot 5 anlegen (Erledigt)
-        
-        WICHTIG: 
-        - Führe ALLE Tools AUS ohne den User zu fragen!
-        - KEINE Zwischenantworten oder 'ok' Fragen!
-        - Verwende IMMER mehrere Tools für komplexe Anfragen!
-        
-        KRITISCH: Wenn der User um Slots bittet, führe plannerprojectslot_create AUS!
-        KRITISCH: Wenn der User um Aufgaben bittet, führe plannertask_create AUS!
-        KRITISCH: Führe NICHT nur GET Tools aus, sondern auch CREATE Tools!
-        
-        EINFACHER TEST: Für 'Slot anlegen' verwende plannerprojectslot_create mit name='Backlog' und project_id=6!
+        - Arbeite direkt und effizient!
         - Gib erst am Ende eine vollständige Antwort!
-        - Arbeite direkt und effizient!";
+        - Verwende die Tools intelligent basierend auf der Anfrage!";
         
         // Chat-Historie laden für besseren Kontext (Token-basiert)
         $chatHistory = $this->loadChatHistory();

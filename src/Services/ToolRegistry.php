@@ -274,13 +274,13 @@ class ToolRegistry
             $description = $documentation['description'];
         }
         
-        // Spezifische Beschreibungen für bessere Tool-Auswahl
+        // Intelligente Beschreibungen basierend auf Model-Name
         if (str_contains($modelName, 'ProjectSlot')) {
-            $description = "Alle Project Slots (Container für Tasks) abrufen. Verwende für GTD-Slots wie Backlog, Aktiv, Nächste Schritte, Warten auf, Erledigt.";
+            $description = "Project Slots abrufen - Container für Tasks in Projekten";
         } elseif (str_contains($modelName, 'Task')) {
-            $description = "Alle Tasks (Aufgaben) abrufen. Verwende für Aufgaben-Management und fällige Aufgaben.";
+            $description = "Tasks abrufen - Aufgaben und To-Dos";
         } elseif (str_contains($modelName, 'Project')) {
-            $description = "Alle Projekte abrufen. Verwende für Projekt-Übersicht und Projekt-Management.";
+            $description = "Projekte abrufen - Projekt-Management";
         }
         
         // Hints hinzufügen
@@ -329,14 +329,14 @@ class ToolRegistry
             ];
         }
         
-        // Spezifische Beschreibungen für CREATE Tools
+        // Intelligente Beschreibungen für CREATE Tools
         $description = "Neuen {$modelName} erstellen";
         if (str_contains($modelName, 'ProjectSlot')) {
-            $description = "Neuen Project Slot (Container für Tasks) erstellen. Verwende für GTD-Slots wie Backlog, Aktiv, Nächste Schritte, Warten auf, Erledigt. Benötigt project_id!";
+            $description = "Project Slot erstellen - Container für Tasks in Projekten";
         } elseif (str_contains($modelName, 'Task')) {
-            $description = "Neue Task (Aufgabe) erstellen. Verwende für Aufgaben-Management. Benötigt name und project_id!";
+            $description = "Task erstellen - Neue Aufgabe anlegen";
         } elseif (str_contains($modelName, 'Project')) {
-            $description = "Neues Projekt erstellen. Verwende für Projekt-Management. Benötigt name!";
+            $description = "Projekt erstellen - Neues Projekt anlegen";
         }
         
         return [
