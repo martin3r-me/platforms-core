@@ -84,6 +84,9 @@ class CursorSidebar extends Component
         $this->ensureChat();
         $this->saveMessage('user', $text, ['forceExecute' => $this->forceExecute]);
         
+        // WICHTIG: Feed neu laden um Duplikate zu vermeiden
+        $this->loadFeedFromChat();
+        
         // SOFORT: Agent Activities zurücksetzen und erste Aktivität anzeigen
         $this->agentActivities = [];
         $this->currentStep = 0;
@@ -102,27 +105,30 @@ class CursorSidebar extends Component
             'timestamp' => now()->format('H:i:s')
         ];
 
-        // IntelligentAgent verwenden für echte ChatGPT-Integration
-        try {
-            $agent = app(IntelligentAgent::class);
-            $response = $agent->processMessage($text, $this->chatId);
-            
-            if ($response['ok']) {
-                // Add final response
-                $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $response['content']]];
-                $this->saveMessage('assistant', $response['content']);
-            } else {
-                $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Fehler: ' . $response['error']]];
-                $this->saveMessage('assistant', 'Fehler: ' . $response['error']);
+            // IntelligentAgent verwenden für echte ChatGPT-Integration
+            try {
+                $agent = app(IntelligentAgent::class);
+                $response = $agent->processMessage($text, $this->chatId);
+
+                if ($response['ok']) {
+                    // Add final response
+                    $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $response['content']]];
+                    $this->saveMessage('assistant', $response['content']);
+                } else {
+                    $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Fehler: ' . $response['error']]];
+                    $this->saveMessage('assistant', 'Fehler: ' . $response['error']);
+                }
+            } catch (\Throwable $e) {
+                $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Fehler beim Verarbeiten: ' . $e->getMessage()]];
+                $this->saveMessage('assistant', 'Fehler beim Verarbeiten: ' . $e->getMessage());
             }
-        } catch (\Throwable $e) {
-            $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Fehler beim Verarbeiten: ' . $e->getMessage()]];
-            $this->saveMessage('assistant', 'Fehler beim Verarbeiten: ' . $e->getMessage());
-        }
-        
-        $this->isWorking = false;
-        $this->showActivityStream = false;
-        $this->agentActivities = [];
+
+            $this->isWorking = false;
+            $this->showActivityStream = false;
+            $this->agentActivities = [];
+            
+            // WICHTIG: Feed neu laden für Live-Updates
+            $this->loadFeedFromChat();
     }
 
     public function newChat(): void
