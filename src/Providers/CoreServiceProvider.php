@@ -10,6 +10,8 @@ use Platform\Core\Contracts\CrmContactResolverInterface;
 use Platform\Core\Services\NullCrmCompanyResolver;
 use Platform\Core\Services\NullCrmContactResolver;
 use Platform\Core\Services\IntelligentAgent;
+use Platform\Core\Services\ToolRegistry;
+use Platform\Core\Services\ToolExecutor;
 // CommandRegistry entfernt
 
 class CoreServiceProvider extends ServiceProvider
@@ -21,7 +23,9 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(CrmCompanyResolverInterface::class, fn() => new NullCrmCompanyResolver());
         $this->app->singleton(CrmContactResolverInterface::class, fn() => new NullCrmContactResolver());
         
-        // IntelligentAgent Service registrieren
+        // Agent Services registrieren
+        $this->app->singleton(ToolRegistry::class);
+        $this->app->singleton(ToolExecutor::class);
         $this->app->singleton(IntelligentAgent::class);
         
         // Registriere Module beim Booten

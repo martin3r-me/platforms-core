@@ -15,6 +15,9 @@ use Platform\Core\Services\NullCrmCompanyResolver;
 use Platform\Core\Services\NullCrmContactResolver;
 use Platform\Core\Contracts\CrmCompanyOptionsProviderInterface;
 use Platform\Core\Services\NullCrmCompanyOptionsProvider;
+use Platform\Core\Services\IntelligentAgent;
+use Platform\Core\Services\ToolRegistry;
+use Platform\Core\Services\ToolExecutor;
 
 // Command-Klasse importieren!
 use Platform\Core\Commands\TrackBillableUsage;
@@ -89,6 +92,11 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(CrmCompanyOptionsProviderInterface::class, function () {
             return new NullCrmCompanyOptionsProvider();
         });
+
+        // AI Agent Services
+        $this->app->singleton(IntelligentAgent::class);
+        $this->app->singleton(ToolRegistry::class);
+        $this->app->singleton(ToolExecutor::class);
 
         // CommandRegistry entfernt - Sidebar soll leer sein
     }
