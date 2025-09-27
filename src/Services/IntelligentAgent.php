@@ -150,9 +150,12 @@ class IntelligentAgent
             ];
             
             foreach ($toolResults as $result) {
+                // Tool-Result als lesbaren Text formatieren
+                $formattedContent = $this->formatToolResultForLLM($result);
+                
                 $messages[] = [
                     'role' => 'tool',
-                    'content' => json_encode($result),
+                    'content' => $formattedContent,
                     'tool_call_id' => $result['tool_call_id']
                 ];
             }
@@ -177,6 +180,62 @@ class IntelligentAgent
             'data' => $finalContent,
             'usage' => $response->usage->toArray(),
         ];
+    }
+    
+    /**
+     * Formatiere Tool-Result für das Sprachmodell
+     */
+    private function formatToolResultForLLM(array $result): string
+    {
+        // Debug: Logge die Result-Struktur
+        \Log::info("🔍 Tool Result Structure:", ['result' => $result]);
+        
+        if (isset($result['data']) && is_array($result['data'])) {
+            $data = $result['data'];
+            
+            if (isset($data['items']) && is_array($data['items'])) {
+                // Liste von Items formatieren
+                $formatted = "Gefunden: " . ($data['count'] ?? count($data['items'])) . " Einträge\n\n";
+                
+                foreach ($data['items'] as $index => $item) {
+                    if ($index >= 5) { // Limit für bessere Lesbarkeit
+                        $remaining = count($data['items']) - 5;
+                        $formatted .= "... und {$remaining} weitere Einträge\n";
+                        break;
+                    }
+                    
+                    $formatted .= ($index + 1) . ". ";
+                    
+                    // Priorisiere wichtige Felder
+                    $priorityFields = ['name', 'title', 'id', 'uuid', 'description'];
+                    $displayFields = [];
+                    
+                    foreach ($priorityFields as $field) {
+                        if (isset($item[$field])) {
+                            $displayFields[] = $field . ': ' . $item[$field];
+                        }
+                    }
+                    
+                    if (!empty($displayFields)) {
+                        $formatted .= implode(', ', $displayFields);
+                    } else {
+                        // Fallback: Erste paar Felder
+                        $fields = array_slice($item, 0, 3);
+                        $formatted .= implode(', ', array_map(fn($k, $v) => "{$k}: {$v}", array_keys($fields), $fields));
+                    }
+                    
+                    $formatted .= "\n";
+                }
+                
+                \Log::info("📝 Formatted Result:", ['formatted' => $formatted]);
+                return $formatted;
+            }
+        }
+        
+        // Fallback: JSON-String
+        $fallback = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        \Log::info("🔄 Using Fallback:", ['fallback' => $fallback]);
+        return $fallback;
     }
     
     /**
