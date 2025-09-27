@@ -4,6 +4,8 @@ namespace Platform\Core\Services;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Model;
 use ReflectionClass;
 
