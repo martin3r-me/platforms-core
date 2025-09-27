@@ -39,8 +39,8 @@ class AgentOrchestrator
      */
     protected function executeWithOpenAI(string $query, callable $activityCallback = null): array
     {
-        // Lade alle verfügbaren Tools
-        $tools = app(\Platform\Core\Services\ToolRegistry::class)->getAllTools();
+        // Lade contextual Tools basierend auf Query
+        $tools = app(\Platform\Core\Services\ToolRegistry::class)->getContextualTools($query);
         
         // OpenAI Client
         $factory = (new \OpenAI\Factory())->withApiKey(env('OPENAI_API_KEY'));

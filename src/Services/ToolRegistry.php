@@ -31,6 +31,67 @@ class ToolRegistry
     }
     
     /**
+     * Lade Tools für spezifisches Modul
+     */
+    public function getToolsForModule(string $module): array
+    {
+        $allTools = $this->getAllTools();
+        $moduleTools = [];
+        
+        foreach ($allTools as $tool) {
+            $toolName = $tool['function']['name'] ?? '';
+            
+            // Filtere nach Modul
+            if (str_starts_with($toolName, $module)) {
+                $moduleTools[] = $tool;
+            }
+        }
+        
+        \Log::info("🔧 MODULE TOOLS:", [
+            'module' => $module,
+            'count' => count($moduleTools)
+        ]);
+        
+        return $moduleTools;
+    }
+    
+    /**
+     * Lade Tools basierend auf Query-Kontext
+     */
+    public function getContextualTools(string $query): array
+    {
+        $allTools = $this->getAllTools();
+        $contextualTools = [];
+        
+        // Analysiere Query für relevante Module
+        $relevantModules = $this->detectRelevantModules($query);
+        
+        foreach ($allTools as $tool) {
+            $toolName = $tool['function']['name'] ?? '';
+            
+            // Prüfe ob Tool zu relevanten Modulen gehört
+            foreach ($relevantModules as $module) {
+                if (str_starts_with($toolName, $module)) {
+                    $contextualTools[] = $tool;
+                    break;
+                }
+            }
+        }
+        
+        // Fallback: Core Tools immer hinzufügen
+        $coreTools = $this->getCoreTools();
+        $contextualTools = array_merge($coreTools, $contextualTools);
+        
+        \Log::info("🔧 CONTEXTUAL TOOLS:", [
+            'query' => $query,
+            'modules' => $relevantModules,
+            'count' => count($contextualTools)
+        ]);
+        
+        return $contextualTools;
+    }
+    
+    /**
      * Generiere alle Tools dynamisch (mit OpenAI Limit)
      */
     protected function generateTools(): array
@@ -497,6 +558,46 @@ class ToolRegistry
         ]);
         
         return $filteredTools;
+    }
+    
+    /**
+     * Erkenne relevante Module basierend auf Query
+     */
+    protected function detectRelevantModules(string $query): array
+    {
+        $query = strtolower($query);
+        $modules = [];
+        
+        // Planner Module
+        if (str_contains($query, 'projekt') || str_contains($query, 'aufgabe') || 
+            str_contains($query, 'task') || str_contains($query, 'sprint') ||
+            str_contains($query, 'slot') || str_contains($query, 'planning')) {
+            $modules[] = 'planner';
+        }
+        
+        // CRM Module
+        if (str_contains($query, 'kontakt') || str_contains($query, 'kunde') || 
+            str_contains($query, 'company') || str_contains($query, 'lead') ||
+            str_contains($query, 'crm')) {
+            $modules[] = 'crm';
+        }
+        
+        // OKR Module
+        if (str_contains($query, 'okr') || str_contains($query, 'objective') || 
+            str_contains($query, 'key result') || str_contains($query, 'ziel')) {
+            $modules[] = 'okr';
+        }
+        
+        // CMS Module
+        if (str_contains($query, 'content') || str_contains($query, 'cms') || 
+            str_contains($query, 'board') || str_contains($query, 'page')) {
+            $modules[] = 'cms';
+        }
+        
+        // Core Module (immer relevant)
+        $modules[] = 'core';
+        
+        return array_unique($modules);
     }
     
     /**
