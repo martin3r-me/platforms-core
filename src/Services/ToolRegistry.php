@@ -54,7 +54,7 @@ class ToolRegistry
                     'description' => 'Aktuelle Zeit abrufen',
                     'parameters' => [
                         'type' => 'object',
-                        'properties' => [],
+                        'properties' => (object)[],
                         'required' => []
                     ]
                 ]
@@ -66,7 +66,7 @@ class ToolRegistry
                     'description' => 'Aktuellen Kontext abrufen (User, Team, etc.)',
                     'parameters' => [
                         'type' => 'object',
-                        'properties' => [],
+                        'properties' => (object)[],
                         'required' => []
                     ]
                 ]
