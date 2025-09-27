@@ -82,11 +82,7 @@ class IntelligentAgent
             }
         });
         
-        // Chat speichern
-        if ($chatId) {
-            $this->saveMessage($chatId, 'user', $message);
-            $this->saveMessage($chatId, 'assistant', $result['content']);
-        }
+        // Chat wird von CursorSidebar gespeichert - NICHT hier!
         
         return $result;
     }
@@ -147,11 +143,7 @@ class IntelligentAgent
             $finalContent = $assistantMessage->content;
         }
         
-        // Chat speichern
-        if ($chatId) {
-            $this->saveMessage($chatId, 'user', $message);
-            $this->saveMessage($chatId, 'assistant', $finalContent);
-        }
+            // Chat wird von CursorSidebar gespeichert - NICHT hier!
         
         return [
             'ok' => true,
