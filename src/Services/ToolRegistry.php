@@ -48,21 +48,27 @@ class ToolRegistry
     {
         return [
             [
-                'name' => 'get_current_time',
-                'description' => 'Aktuelle Zeit abrufen',
-                'parameters' => [
-                    'type' => 'object',
-                    'properties' => [],
-                    'required' => []
+                'type' => 'function',
+                'function' => [
+                    'name' => 'get_current_time',
+                    'description' => 'Aktuelle Zeit abrufen',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [],
+                        'required' => []
+                    ]
                 ]
             ],
             [
-                'name' => 'get_context',
-                'description' => 'Aktuellen Kontext abrufen (User, Team, etc.)',
-                'parameters' => [
-                    'type' => 'object',
-                    'properties' => [],
-                    'required' => []
+                'type' => 'function',
+                'function' => [
+                    'name' => 'get_context',
+                    'description' => 'Aktuellen Kontext abrufen (User, Team, etc.)',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [],
+                        'required' => []
+                    ]
                 ]
             ]
         ];
@@ -165,12 +171,15 @@ class ToolRegistry
         }
         
         return [
-            'name' => strtolower($modelName) . '_get_all',
-            'description' => "Alle {$modelName} Einträge abrufen",
-            'parameters' => [
-                'type' => 'object',
-                'properties' => $properties,
-                'required' => []
+            'type' => 'function',
+            'function' => [
+                'name' => strtolower($modelName) . '_get_all',
+                'description' => "Alle {$modelName} Einträge abrufen",
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => $properties,
+                    'required' => []
+                ]
             ]
         ];
     }
@@ -192,12 +201,15 @@ class ToolRegistry
         }
         
         return [
-            'name' => strtolower($modelName) . '_create',
-            'description' => "Neuen {$modelName} erstellen",
-            'parameters' => [
-                'type' => 'object',
-                'properties' => $properties,
-                'required' => $this->getRequiredFields($modelClass)
+            'type' => 'function',
+            'function' => [
+                'name' => strtolower($modelName) . '_create',
+                'description' => "Neuen {$modelName} erstellen",
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => $properties,
+                    'required' => $this->getRequiredFields($modelClass)
+                ]
             ]
         ];
     }
@@ -225,12 +237,15 @@ class ToolRegistry
         }
         
         return [
-            'name' => strtolower($modelName) . '_update',
-            'description' => "{$modelName} aktualisieren",
-            'parameters' => [
-                'type' => 'object',
-                'properties' => $properties,
-                'required' => ['id']
+            'type' => 'function',
+            'function' => [
+                'name' => strtolower($modelName) . '_update',
+                'description' => "{$modelName} aktualisieren",
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => $properties,
+                    'required' => ['id']
+                ]
             ]
         ];
     }
@@ -241,17 +256,20 @@ class ToolRegistry
     protected function generateDeleteTools(string $modelClass, string $modelName): array
     {
         return [
-            'name' => strtolower($modelName) . '_delete',
-            'description' => "{$modelName} löschen",
-            'parameters' => [
-                'type' => 'object',
-                'properties' => [
-                    'id' => [
-                        'type' => 'integer',
-                        'description' => "ID des {$modelName} zum Löschen"
-                    ]
-                ],
-                'required' => ['id']
+            'type' => 'function',
+            'function' => [
+                'name' => strtolower($modelName) . '_delete',
+                'description' => "{$modelName} löschen",
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'id' => [
+                            'type' => 'integer',
+                            'description' => "ID des {$modelName} zum Löschen"
+                        ]
+                    ],
+                    'required' => ['id']
+                ]
             ]
         ];
     }
