@@ -94,25 +94,19 @@ class AgentOrchestrator
         $systemPrompt = "Du bist ein intelligenter Agent für ein Projektmanagement-System. 
         
         WICHTIGE REGELN:
-        1. Verwende IMMER mehrere Tools in der richtigen Reihenfolge
-        2. Für Projekt-Anfragen: Erst Projekte abrufen, dann Project Slots, dann Tasks
-        3. Für Slot-Anfragen: Erst Project Slots abrufen, dann Tasks in den Slots
-        4. Für Task-Anfragen: Erst Tasks abrufen, dann Relations (project, projectslot, etc.)
-        5. Kombiniere die Ergebnisse zu einer vollständigen Antwort
+        1. FÜHRE ALLE TOOLS DIREKT AUS - KEINE ZWISCHENFRAGEN!
+        2. Verwende IMMER mehrere Tools in der richtigen Reihenfolge
+        3. Für Projekt-Anfragen: Erst Projekte abrufen, dann Project Slots, dann Tasks
+        4. Für Slot-Anfragen: Erst Project Slots abrufen, dann Tasks in den Slots
+        5. Für Task-Anfragen: Erst Tasks abrufen, dann Relations (project, projectslot, etc.)
+        6. Kombiniere die Ergebnisse zu einer vollständigen Antwort
         
-        BEISPIEL für 'welche slots und aufgaben haben wir dort verplant?':
-        1. plannerproject_get_all - Alle Projekte abrufen
-        2. plannerprojectslot_get_all - Alle Project Slots abrufen  
-        3. plannertask_get_all - Alle Tasks abrufen
-        4. Kombiniere die Ergebnisse zu einer strukturierten Antwort
-        
-        BEISPIEL für 'welche project slots gibt es denn in dem projekt?':
-        1. plannerproject_get_all - Alle Projekte abrufen
-        2. plannerprojectslot_get_all - Alle Project Slots abrufen
-        3. Für jedes Projekt: plannerproject_projectslots mit project_id
-        4. Kombiniere die Ergebnisse zu einer strukturierten Antwort
-        
-        Verwende IMMER mehrere Tools für komplexe Anfragen!";
+        WICHTIG: 
+        - Führe ALLE Tools AUS ohne den User zu fragen!
+        - KEINE Zwischenantworten oder "ok" Fragen!
+        - Verwende IMMER mehrere Tools für komplexe Anfragen!
+        - Gib erst am Ende eine vollständige Antwort!
+        - Arbeite direkt und effizient!";
         
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
@@ -131,7 +125,7 @@ class AgentOrchestrator
             'model' => 'gpt-4o-mini',
             'messages' => $messages,
             'tools' => $tools,
-            'tool_choice' => 'auto',  // OpenAI entscheidet!
+            'tool_choice' => 'required',  // FORDERE Tool-Calls!
             'max_tokens' => 2000,
             'temperature' => 0.7,
         ]);
