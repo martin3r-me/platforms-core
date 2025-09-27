@@ -23,7 +23,20 @@ class ToolRegistry
         
         if (empty($this->cachedTools)) {
             $this->cachedTools = Cache::remember('agent_tools', 86400, function() {
-                return $this->generateTools();
+                \Log::info("🔧 GENERATING TOOLS:", ['timestamp' => now()]);
+                $startTime = microtime(true);
+                
+                $tools = $this->generateTools();
+                
+                $endTime = microtime(true);
+                $executionTime = ($endTime - $startTime) * 1000; // in ms
+                
+                \Log::info("🔧 TOOLS GENERATED:", [
+                    'count' => count($tools),
+                    'execution_time_ms' => round($executionTime, 2)
+                ]);
+                
+                return $tools;
             });
         }
         
@@ -755,35 +768,96 @@ class ToolRegistry
     }
     
     /**
-     * Entdecke alle Models LOOSE - nur über Composer Autoload
+     * Entdecke alle Models LOOSE - nur über Composer Autoload (Performance optimiert)
      */
     protected function discoverAllModels(): array
     {
-        $models = [];
-        
-        // Loose: Nur über Composer Autoload alle Klassen scannen
-        $autoloader = require base_path('vendor/autoload.php');
-        $classMap = $autoloader->getClassMap();
-        
-        foreach ($classMap as $className => $filePath) {
-            // Nur Platform Models
-            if (!str_starts_with($className, 'Platform\\')) {
-                continue;
+        // Cache für Model Discovery
+        return Cache::remember('discovered_models', 3600, function() {
+            $models = [];
+            $startTime = microtime(true);
+            
+            try {
+                // Loose: Nur über Composer Autoload alle Klassen scannen
+                $autoloader = require base_path('vendor/autoload.php');
+                $classMap = $autoloader->getClassMap();
+                
+                if (empty($classMap)) {
+                    \Log::warning("🔍 EMPTY CLASS MAP:", ['message' => 'Composer autoloader returned empty class map']);
+                    return $this->getFallbackModels();
+                }
+                
+                // Performance: Filtere vorher nach Platform Namespace
+                $platformClasses = array_filter($classMap, function($className) {
+                    return str_starts_with($className, 'Platform\\');
+                }, ARRAY_FILTER_USE_KEY);
+                
+                foreach ($platformClasses as $className => $filePath) {
+                    try {
+                        // Nur Models (endet mit Model oder ist in Models Namespace)
+                        if (!str_ends_with($className, 'Model') && !str_contains($className, '\\Models\\')) {
+                            continue;
+                        }
+                        
+                        // Prüfe ob es ein Eloquent Model ist
+                        if (class_exists($className) && is_subclass_of($className, \Illuminate\Database\Eloquent\Model::class)) {
+                            $models[] = $className;
+                        }
+                    } catch (\Exception $e) {
+                        \Log::warning("🔍 MODEL DISCOVERY FAILED:", [
+                            'model' => $className,
+                            'error' => $e->getMessage()
+                        ]);
+                        continue;
+                    }
+                }
+                
+                if (empty($models)) {
+                    \Log::warning("🔍 NO MODELS FOUND:", ['message' => 'No models discovered, using fallback']);
+                    return $this->getFallbackModels();
+                }
+                
+                $endTime = microtime(true);
+                $executionTime = ($endTime - $startTime) * 1000; // in ms
+                
+                \Log::info("🔍 MODELS DISCOVERED:", [
+                    'count' => count($models),
+                    'execution_time_ms' => round($executionTime, 2)
+                ]);
+                
+            } catch (\Exception $e) {
+                \Log::error("🔍 MODEL DISCOVERY CRITICAL ERROR:", [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                return $this->getFallbackModels();
             }
             
-            // Nur Models (endet mit Model oder ist in Models Namespace)
-            if (!str_ends_with($className, 'Model') && !str_contains($className, '\\Models\\')) {
-                continue;
-            }
-            
-            // Prüfe ob es ein Eloquent Model ist
-            if (class_exists($className) && is_subclass_of($className, \Illuminate\Database\Eloquent\Model::class)) {
-                $models[] = $className;
-                \Log::info("🔍 LOOSE DISCOVERED MODEL:", ['model' => $className]);
+            return $models;
+        });
+    }
+    
+    /**
+     * Fallback Models wenn Discovery fehlschlägt
+     */
+    protected function getFallbackModels(): array
+    {
+        $fallbackModels = [
+            'Platform\\Planner\\Models\\PlannerProject',
+            'Platform\\Planner\\Models\\PlannerTask',
+            'Platform\\Core\\Models\\User',
+            'Platform\\Core\\Models\\Team',
+        ];
+        
+        $validModels = [];
+        foreach ($fallbackModels as $modelClass) {
+            if (class_exists($modelClass)) {
+                $validModels[] = $modelClass;
             }
         }
         
-        return $models;
+        \Log::info("🔍 FALLBACK MODELS:", ['models' => $validModels]);
+        return $validModels;
     }
     
     /**

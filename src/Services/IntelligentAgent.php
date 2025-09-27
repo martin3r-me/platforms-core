@@ -7,6 +7,7 @@ use OpenAI\Factory;
 use Platform\Core\Models\CoreChat;
 use Platform\Core\Models\CoreChatMessage;
 use Platform\Core\Services\AgentOrchestrator;
+use Platform\Core\Services\AgentFallbackService;
 
 class IntelligentAgent
 {
@@ -14,12 +15,14 @@ class IntelligentAgent
     protected ToolRegistry $toolRegistry;
     protected ToolExecutor $toolExecutor;
     protected AgentOrchestrator $orchestrator;
+    protected AgentFallbackService $fallbackService;
     
-    public function __construct(ToolRegistry $toolRegistry, ToolExecutor $toolExecutor, AgentOrchestrator $orchestrator)
+    public function __construct(ToolRegistry $toolRegistry, ToolExecutor $toolExecutor, AgentOrchestrator $orchestrator, AgentFallbackService $fallbackService)
     {
         $this->toolRegistry = $toolRegistry;
         $this->toolExecutor = $toolExecutor;
         $this->orchestrator = $orchestrator;
+        $this->fallbackService = $fallbackService;
         
         $factory = (new Factory())->withApiKey(env('OPENAI_API_KEY'));
         
@@ -37,6 +40,12 @@ class IntelligentAgent
     public function processMessage(string $message, ?int $chatId = null): array
     {
         try {
+            // Prüfe ob OpenAI verfügbar ist
+            if (!$this->fallbackService->isOpenAIAvailable()) {
+                \Log::warning("🤖 OPENAI NOT AVAILABLE, USING FALLBACK");
+                return $this->fallbackService->executeFallback($message);
+            }
+            
             // Prüfe ob es eine komplexe Query ist
             if ($this->isComplexQuery($message)) {
                 return $this->processComplexQuery($message, $chatId);
@@ -46,10 +55,21 @@ class IntelligentAgent
             return $this->processSimpleQuery($message, $chatId);
             
         } catch (\Exception $e) {
-            return [
-                'ok' => false,
+            \Log::error('IntelligentAgent Fehler:', [
                 'error' => $e->getMessage(),
-            ];
+                'message' => $message
+            ]);
+            
+            // Versuche Fallback bei kritischen Fehlern
+            try {
+                return $this->fallbackService->executeFallback($message);
+            } catch (\Exception $fallbackError) {
+                return [
+                    'ok' => false,
+                    'error' => 'Fehler beim Verarbeiten: ' . $e->getMessage(),
+                    'fallback_error' => $fallbackError->getMessage()
+                ];
+            }
         }
     }
     

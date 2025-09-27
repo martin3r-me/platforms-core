@@ -20,6 +20,20 @@ class ToolExecutor
     public function executeTool(string $toolName, array $parameters): array
     {
         try {
+            // Input Validation
+            if (empty($toolName)) {
+                return $this->createErrorResponse('Tool name is required');
+            }
+            
+            if (!is_array($parameters)) {
+                return $this->createErrorResponse('Parameters must be an array');
+            }
+            
+            \Log::info("🔧 EXECUTING TOOL:", [
+                'tool' => $toolName,
+                'parameters' => $parameters
+            ]);
+            
             // Core Tools
             if (in_array($toolName, ['get_current_time', 'get_context'])) {
                 return $this->executeCoreTool($toolName, $parameters);
@@ -54,17 +68,38 @@ class ToolExecutor
                 return $this->executeEnumValues($toolName, $parameters);
             }
             
-            return [
-                'ok' => false,
-                'error' => "Tool '$toolName' nicht gefunden"
-            ];
+            return $this->createErrorResponse("Tool '$toolName' nicht gefunden");
             
         } catch (\Exception $e) {
-            return [
-                'ok' => false,
-                'error' => $e->getMessage()
-            ];
+            \Log::error("🔧 TOOL EXECUTION ERROR:", [
+                'tool' => $toolName,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return $this->createErrorResponse("Tool execution failed: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            \Log::error("🔧 TOOL EXECUTION CRITICAL ERROR:", [
+                'tool' => $toolName,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return $this->createErrorResponse("Critical tool execution error: " . $e->getMessage());
         }
+    }
+    
+    /**
+     * Erstelle standardisierte Error Response
+     */
+    protected function createErrorResponse(string $message, array $data = []): array
+    {
+        return [
+            'ok' => false,
+            'error' => $message,
+            'data' => $data,
+            'timestamp' => now()->toISOString()
+        ];
     }
     
     /**
@@ -274,8 +309,15 @@ class ToolExecutor
         // Mapping für bekannte Models
         $modelMapping = [
             'Plannerproject' => 'Platform\\Planner\\Models\\PlannerProject',
+            'Plannerprojectslot' => 'Platform\\Planner\\Models\\PlannerProjectSlot',
             'Plannertask' => 'Platform\\Planner\\Models\\PlannerTask',
             'Plannersprint' => 'Platform\\Planner\\Models\\PlannerSprint',
+            'Plannersprintslot' => 'Platform\\Planner\\Models\\PlannerSprintSlot',
+            'Plannertaskgroup' => 'Platform\\Planner\\Models\\PlannerTaskGroup',
+            'Plannerprojectuser' => 'Platform\\Planner\\Models\\PlannerProjectUser',
+            'Plannercustomerproject' => 'Platform\\Planner\\Models\\PlannerCustomerProject',
+            'Plannercustomerprojectbillingitem' => 'Platform\\Planner\\Models\\PlannerCustomerProjectBillingItem',
+            'Plannercustomerprojectparty' => 'Platform\\Planner\\Models\\PlannerCustomerProjectParty',
             'Crmcontact' => 'Platform\\Crm\\Models\\CrmContact',
             'Crmcompany' => 'Platform\\Crm\\Models\\CrmCompany',
             'Okrobjective' => 'Platform\\Okr\\Models\\OkrObjective',
@@ -301,7 +343,7 @@ class ToolExecutor
             $relationName = $parts[1];
             
             // Model finden
-            $modelClass = $this->getModelClass($modelName);
+            $modelClass = $this->getModelClassFromToolName($toolName);
             if (!$modelClass) {
                 return ['ok' => false, 'error' => "Model für Tool '$toolName' nicht gefunden"];
             }
@@ -343,7 +385,7 @@ class ToolExecutor
             $enumName = $parts[1];
             
             // Model finden
-            $modelClass = $this->getModelClass($modelName);
+            $modelClass = $this->getModelClassFromToolName($toolName);
             if (!$modelClass) {
                 return ['ok' => false, 'error' => "Model für Tool '$toolName' nicht gefunden"];
             }

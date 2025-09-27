@@ -4,15 +4,18 @@ namespace Platform\Core\Services;
 
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Event;
+use Platform\Core\Services\AgentPerformanceMonitor;
 
 class AgentOrchestrator
 {
     protected ToolExecutor $toolExecutor;
+    protected AgentPerformanceMonitor $performanceMonitor;
     protected array $activities = [];
     
-    public function __construct(ToolExecutor $toolExecutor)
+    public function __construct(ToolExecutor $toolExecutor, AgentPerformanceMonitor $performanceMonitor)
     {
         $this->toolExecutor = $toolExecutor;
+        $this->performanceMonitor = $performanceMonitor;
     }
     
     /**
@@ -22,11 +25,20 @@ class AgentOrchestrator
     {
         $this->activities = [];
 
+        // Performance Tracking starten
+        $this->performanceMonitor->startTracking('complex_query_execution');
+
         // 1. OpenAI Agent entscheidet selbst welche Tools er nutzt
         $this->addActivity('Analysiere Anfrage mit KI...', '', [], [], 'running', 'OpenAI Agent versteht die Anfrage');
         $this->notifyActivity($activityCallback);
         
         $result = $this->executeWithOpenAI($query, $activityCallback);
+        
+        // Performance Tracking beenden
+        $performanceMetrics = $this->performanceMonitor->endTracking('complex_query_execution', [
+            'query_length' => strlen($query),
+            'result_success' => $result['ok'] ?? false
+        ]);
         
         // Completion Event
         Event::dispatch('agent.activity.complete');
@@ -39,21 +51,68 @@ class AgentOrchestrator
      */
     protected function executeWithOpenAI(string $query, callable $activityCallback = null): array
     {
-        // Lade contextual Tools basierend auf Query
-        $tools = app(\Platform\Core\Services\ToolRegistry::class)->getContextualTools($query);
-        
-        // OpenAI Client
-        $factory = (new \OpenAI\Factory())->withApiKey(env('OPENAI_API_KEY'));
-        if (env('OPENAI_ORGANIZATION')) {
-            $factory->withOrganization(env('OPENAI_ORGANIZATION'));
+        try {
+            // Input Validation
+            if (empty($query)) {
+                throw new \InvalidArgumentException('Query cannot be empty');
+            }
+            
+            // Lade contextual Tools basierend auf Query
+            $tools = app(\Platform\Core\Services\ToolRegistry::class)->getContextualTools($query);
+            
+            if (empty($tools)) {
+                throw new \RuntimeException('No tools available for query');
+            }
+            
+            // OpenAI API Key Validation
+            $apiKey = env('OPENAI_API_KEY');
+            if (empty($apiKey)) {
+                throw new \RuntimeException('OpenAI API key not configured');
+            }
+            
+            // OpenAI Client
+            $factory = (new \OpenAI\Factory())->withApiKey($apiKey);
+            if (env('OPENAI_ORGANIZATION')) {
+                $factory->withOrganization(env('OPENAI_ORGANIZATION'));
+            }
+            $client = $factory->make();
+            
+        } catch (\Exception $e) {
+            \Log::error("🤖 ORCHESTRATOR SETUP ERROR:", [
+                'error' => $e->getMessage(),
+                'query' => $query
+            ]);
+            
+            return [
+                'ok' => false,
+                'error' => 'Orchestrator setup failed: ' . $e->getMessage(),
+                'data' => []
+            ];
         }
-        $client = $factory->make();
         
         // System Prompt für intelligente Orchestrierung
-        $systemPrompt = "Du bist ein intelligenter Agent mit Zugriff auf verschiedene Tools. 
-        Analysiere die User-Anfrage und führe die notwendigen Tools in der richtigen Reihenfolge aus.
-        Du kannst mehrere Tools nacheinander verwenden um komplexe Anfragen zu beantworten.
-        Führe Tools sequenziell aus und verwende die Ergebnisse für weitere Schritte.";
+        $systemPrompt = "Du bist ein intelligenter Agent für ein Projektmanagement-System. 
+        
+        WICHTIGE REGELN:
+        1. Verwende IMMER mehrere Tools in der richtigen Reihenfolge
+        2. Für Projekt-Anfragen: Erst Projekte abrufen, dann Project Slots, dann Tasks
+        3. Für Slot-Anfragen: Erst Project Slots abrufen, dann Tasks in den Slots
+        4. Für Task-Anfragen: Erst Tasks abrufen, dann Relations (project, projectslot, etc.)
+        5. Kombiniere die Ergebnisse zu einer vollständigen Antwort
+        
+        BEISPIEL für 'welche slots und aufgaben haben wir dort verplant?':
+        1. plannerproject_get_all - Alle Projekte abrufen
+        2. plannerprojectslot_get_all - Alle Project Slots abrufen  
+        3. plannertask_get_all - Alle Tasks abrufen
+        4. Kombiniere die Ergebnisse zu einer strukturierten Antwort
+        
+        BEISPIEL für 'welche project slots gibt es denn in dem projekt?':
+        1. plannerproject_get_all - Alle Projekte abrufen
+        2. plannerprojectslot_get_all - Alle Project Slots abrufen
+        3. Für jedes Projekt: plannerproject_projectslots mit project_id
+        4. Kombiniere die Ergebnisse zu einer strukturierten Antwort
+        
+        Verwende IMMER mehrere Tools für komplexe Anfragen!";
         
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
