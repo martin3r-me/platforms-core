@@ -4,6 +4,7 @@ namespace Platform\Core\Livewire;
 
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Livewire\Attributes\Reactive;
 // Command-Services entfernt - Sidebar soll leer sein
 use Platform\Core\Models\CoreChat;
 use Platform\Core\Models\CoreChatMessage;
@@ -27,6 +28,7 @@ class CursorSidebar extends Component
     public array $agentActivities = [];
     public int $currentStep = 0;
     public int $totalSteps = 0;
+    public bool $showActivityStream = false;
 
     public function mount(): void
     {
@@ -45,6 +47,22 @@ class CursorSidebar extends Component
         if ($this->open) {
             $this->ensureChat();
         }
+    }
+    
+    #[On('agent-activity-update')]
+    public function updateActivity($data): void
+    {
+        $this->agentActivities[] = $data;
+        $this->currentStep++;
+        $this->showActivityStream = true;
+    }
+    
+    #[On('agent-activity-complete')]
+    public function completeActivity(): void
+    {
+        $this->showActivityStream = false;
+        $this->agentActivities = [];
+        $this->currentStep = 0;
     }
 
     public function send(): void

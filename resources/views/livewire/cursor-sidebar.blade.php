@@ -84,18 +84,21 @@
                                      @endif
                                  @endforeach
                                  
-                                 {{-- Agent Activities Stream --}}
-                                 @if($isWorking && !empty($agentActivities))
-                                     <div class="space-y-1">
-                                         @foreach($agentActivities as $activity)
-                                             <div class="text-xs bg-gray-50 px-2 py-1 rounded border-l-2 border-gray-300">
+                                 {{-- Live Agent Activities Stream --}}
+                                 @if($showActivityStream && !empty($agentActivities))
+                                     <div class="space-y-1 max-h-32 overflow-y-auto">
+                                         @foreach($agentActivities as $index => $activity)
+                                             <div class="text-xs bg-blue-50 px-2 py-1 rounded border-l-2 border-blue-300 animate-fade-in">
                                                  <div class="flex items-center gap-2">
                                                      <span class="{{ $activity['status'] === 'running' ? 'animate-pulse' : '' }}">
-                                                         {{ $activity['status'] === 'running' ? '🔄' : ($activity['status'] === 'success' ? '✅' : '❌') }}
+                                                         {{ $activity['icon'] ?? '🔄' }}
                                                      </span>
-                                                     <span class="text-gray-700">{{ $activity['message'] ?? $activity['step'] }}</span>
-                                                     @if($activity['duration'] > 0)
-                                                         <span class="text-gray-500 text-xs">({{ number_format($activity['duration'], 0) }}ms)</span>
+                                                     <span class="text-blue-700 font-medium">{{ $activity['step'] ?? $activity['message'] }}</span>
+                                                     @if(isset($activity['duration']) && $activity['duration'] > 0)
+                                                         <span class="text-blue-500 text-xs">({{ number_format($activity['duration'], 0) }}ms)</span>
+                                                     @endif
+                                                     @if(isset($activity['timestamp']))
+                                                         <span class="text-blue-400 text-xs ml-auto">{{ $activity['timestamp'] }}</span>
                                                      @endif
                                                  </div>
                                              </div>
@@ -128,6 +131,16 @@
         </div>
     </aside>
 </div>
+
+<style>
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+}
+</style>
 
 <script>
 function rightSidebarState() {

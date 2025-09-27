@@ -3,6 +3,7 @@
 namespace Platform\Core\Services;
 
 use Illuminate\Support\Facades\Log;
+use Livewire\Livewire;
 
 class AgentOrchestrator
 {
@@ -70,6 +71,9 @@ class AgentOrchestrator
         $this->updateLastActivity('success', 'Antwort erstellt');
         $this->notifyActivity($activityCallback);
         
+        // Completion Event
+        Livewire::dispatch('agent-activity-complete');
+        
         return [
             'ok' => true,
             'content' => $finalResult,
@@ -85,6 +89,20 @@ class AgentOrchestrator
     {
         if ($activityCallback && !empty($this->activities)) {
             $activityCallback($this->getLastActivity());
+        }
+        
+        // Livewire Event für Real-time Updates
+        if (!empty($this->activities)) {
+            $lastActivity = $this->getLastActivity();
+            Livewire::dispatch('agent-activity-update', [
+                'step' => $lastActivity->step,
+                'tool' => $lastActivity->tool,
+                'status' => $lastActivity->status,
+                'message' => $lastActivity->message,
+                'duration' => $lastActivity->duration,
+                'icon' => $lastActivity->getStatusIcon(),
+                'timestamp' => now()->format('H:i:s')
+            ]);
         }
     }
     
