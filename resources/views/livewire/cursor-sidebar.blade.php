@@ -63,20 +63,60 @@
                     </div>
                 </div>
 
-                {{-- Chat Messages --}}
-                <div class="flex-1 overflow-auto p-2 space-y-2">
-                    @foreach($feed as $b)
-                        @if(($b['role'] ?? '') === 'user')
-                            <div class="text-right">
-                                <div class="inline-block bg-primary text-white px-2 py-1 rounded max-w-64 truncate">{{ $b['text'] ?? '' }}</div>
-                            </div>
-                        @elseif(($b['type'] ?? '') === 'message')
-                            <div class="text-left text-sm bg-muted-5 px-2 py-1 rounded">
-                                <div class="truncate">{{ $b['data']['text'] ?? '' }}</div>
-                            </div>
-                        @endif
-                    @endforeach
-                </div>
+                             {{-- Chat Messages --}}
+                             <div class="flex-1 overflow-auto p-2 space-y-2">
+                                 @foreach($feed as $b)
+                                     @if(($b['role'] ?? '') === 'user')
+                                         <div class="text-right">
+                                             <div class="inline-block bg-primary text-white px-2 py-1 rounded max-w-64 truncate">{{ $b['text'] ?? '' }}</div>
+                                         </div>
+                                     @elseif(($b['type'] ?? '') === 'message')
+                                         <div class="text-left text-sm bg-muted-5 px-2 py-1 rounded">
+                                             <div class="truncate">{{ $b['data']['text'] ?? '' }}</div>
+                                         </div>
+                                     @elseif(($b['type'] ?? '') === 'activity')
+                                         <div class="text-left text-xs bg-blue-50 px-2 py-1 rounded border-l-2 border-blue-300">
+                                             <div class="flex items-center gap-2">
+                                                 <span class="animate-pulse">🔄</span>
+                                                 <span class="text-blue-700">{{ $b['data']['text'] ?? '' }}</span>
+                                             </div>
+                                         </div>
+                                     @endif
+                                 @endforeach
+                                 
+                                 {{-- Agent Activities Stream --}}
+                                 @if($isWorking && !empty($agentActivities))
+                                     <div class="space-y-1">
+                                         @foreach($agentActivities as $activity)
+                                             <div class="text-xs bg-gray-50 px-2 py-1 rounded border-l-2 border-gray-300">
+                                                 <div class="flex items-center gap-2">
+                                                     <span class="{{ $activity['status'] === 'running' ? 'animate-pulse' : '' }}">
+                                                         {{ $activity['status'] === 'running' ? '🔄' : ($activity['status'] === 'success' ? '✅' : '❌') }}
+                                                     </span>
+                                                     <span class="text-gray-700">{{ $activity['message'] ?? $activity['step'] }}</span>
+                                                     @if($activity['duration'] > 0)
+                                                         <span class="text-gray-500 text-xs">({{ number_format($activity['duration'], 0) }}ms)</span>
+                                                     @endif
+                                                 </div>
+                                             </div>
+                                         @endforeach
+                                     </div>
+                                 @endif
+                                 
+                                 {{-- Progress Bar --}}
+                                 @if($isWorking && $totalSteps > 0)
+                                     <div class="bg-gray-100 rounded p-2">
+                                         <div class="flex justify-between text-xs text-gray-600 mb-1">
+                                             <span>Agent arbeitet...</span>
+                                             <span>{{ $currentStep }} / {{ $totalSteps }}</span>
+                                         </div>
+                                         <div class="w-full bg-gray-200 rounded-full h-2">
+                                             <div class="bg-blue-500 h-2 rounded-full transition-all duration-300" 
+                                                  style="width: {{ $totalSteps > 0 ? ($currentStep / $totalSteps) * 100 : 0 }}%"></div>
+                                         </div>
+                                     </div>
+                                 @endif
+                             </div>
 
                 {{-- Chat Input --}}
                 <div class="px-3 py-2 border-top-1 d-flex items-center gap-2">

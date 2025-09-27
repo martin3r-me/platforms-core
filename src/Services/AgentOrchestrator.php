@@ -23,17 +23,21 @@ class AgentOrchestrator
         
         // 1. Query analysieren
         $this->addActivity('Analysiere Anfrage...', '', [], [], 'running', 'Verstehe was der User möchte');
+        $this->notifyActivity($activityCallback);
         $intent = $this->analyzeIntent($query);
         $this->updateLastActivity('success', 'Anfrage verstanden: ' . $intent['action']);
+        $this->notifyActivity($activityCallback);
         
         // 2. Execution Plan erstellen
         $this->addActivity('Erstelle Ausführungsplan...', '', [], [], 'running', 'Plane die notwendigen Schritte');
+        $this->notifyActivity($activityCallback);
         $plan = $this->createExecutionPlan($intent);
         $this->updateLastActivity('success', 'Plan erstellt: ' . count($plan) . ' Schritte');
+        $this->notifyActivity($activityCallback);
         
         // 3. Tools sequenziell ausführen
         $results = [];
-        foreach ($plan as $step) {
+        foreach ($plan as $index => $step) {
             $this->addActivity(
                 "Führe {$step['tool']} aus...",
                 $step['tool'],
@@ -42,6 +46,7 @@ class AgentOrchestrator
                 'running',
                 $step['description']
             );
+            $this->notifyActivity($activityCallback);
             
             $startTime = microtime(true);
             $result = $this->toolExecutor->executeTool($step['tool'], $step['parameters']);
@@ -55,16 +60,15 @@ class AgentOrchestrator
                 break;
             }
             
-            // Activity Callback für Live Updates
-            if ($activityCallback) {
-                $activityCallback($this->getLastActivity());
-            }
+            $this->notifyActivity($activityCallback);
         }
         
         // 4. Ergebnisse intelligent zusammenfassen
         $this->addActivity('Fasse Ergebnisse zusammen...', '', [], [], 'running', 'Erstelle finale Antwort');
+        $this->notifyActivity($activityCallback);
         $finalResult = $this->synthesizeResults($results, $intent);
         $this->updateLastActivity('success', 'Antwort erstellt');
+        $this->notifyActivity($activityCallback);
         
         return [
             'ok' => true,
@@ -72,6 +76,16 @@ class AgentOrchestrator
             'activities' => $this->activities,
             'usage' => ['prompt_tokens' => 0, 'completion_tokens' => 0]
         ];
+    }
+    
+    /**
+     * Benachrichtige über Activity
+     */
+    protected function notifyActivity(callable $activityCallback = null): void
+    {
+        if ($activityCallback && !empty($this->activities)) {
+            $activityCallback($this->getLastActivity());
+        }
     }
     
     /**

@@ -24,6 +24,9 @@ class CursorSidebar extends Component
     public array $recentChats = [];
     public bool $isWorking = false;
     public ?string $pendingNavigate = null;
+    public array $agentActivities = [];
+    public int $currentStep = 0;
+    public int $totalSteps = 0;
 
     public function mount(): void
     {
@@ -54,8 +57,14 @@ class CursorSidebar extends Component
         $this->lastUserText = $text;
         $this->ensureChat();
         $this->saveMessage('user', $text, ['forceExecute' => $this->forceExecute]);
+        // Reset Agent Activities
+        $this->agentActivities = [];
+        $this->currentStep = 0;
+        $this->totalSteps = 0;
         $this->isWorking = true;
-        $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Arbeite …']];
+        
+        // Show initial loading message
+        $this->feed[] = ['role' => 'assistant', 'type' => 'activity', 'data' => ['text' => '🔄 Analysiere Anfrage...']];
 
         // IntelligentAgent verwenden für echte ChatGPT-Integration
         try {
@@ -63,6 +72,7 @@ class CursorSidebar extends Component
             $response = $agent->processMessage($text, $this->chatId);
             
             if ($response['ok']) {
+                // Add final response
                 $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $response['content']]];
                 $this->saveMessage('assistant', $response['content']);
             } else {
@@ -75,6 +85,7 @@ class CursorSidebar extends Component
         }
         
         $this->isWorking = false;
+        $this->agentActivities = [];
     }
 
     public function newChat(): void
