@@ -1015,7 +1015,9 @@ class ToolRegistry
         // Planner Module
         if (str_contains($query, 'projekt') || str_contains($query, 'aufgabe') || 
             str_contains($query, 'task') || str_contains($query, 'sprint') ||
-            str_contains($query, 'slot') || str_contains($query, 'planning')) {
+            str_contains($query, 'slot') || str_contains($query, 'planning') ||
+            str_contains($query, 'fällig') || str_contains($query, 'due') ||
+            str_contains($query, 'deadline') || str_contains($query, 'termin')) {
             $modules[] = 'planner';
         }
         
@@ -1027,6 +1029,11 @@ class ToolRegistry
         // Spezielle Mapping für "aufgaben" → "tasks"
         if (str_contains($query, 'aufgabe') || str_contains($query, 'task')) {
             $modules[] = 'plannertask'; // Aufgaben sind Tasks
+        }
+        
+        // Spezielle Mapping für "projekte" → "projects"
+        if (str_contains($query, 'projekt')) {
+            $modules[] = 'plannerproject'; // Projekte sind Projects
         }
         
         // CRM Module
