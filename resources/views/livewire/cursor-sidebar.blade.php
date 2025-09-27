@@ -88,9 +88,9 @@
 <script>
 function rightSidebarState() {
     return {
-        collapsed: false,
+        collapsed: true, // Standardmäßig zugefahren
         init() {
-            this.collapsed = localStorage.getItem('sidebar-cursor-collapsed') === 'true';
+            this.collapsed = localStorage.getItem('sidebar-cursor-collapsed') === 'true' || true;
             window.dispatchEvent(new CustomEvent('ui:right-sidebar-toggle', { detail: { collapsed: this.collapsed } }));
         },
         toggle() {
