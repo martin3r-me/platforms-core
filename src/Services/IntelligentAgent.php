@@ -58,15 +58,21 @@ class IntelligentAgent
      */
     protected function isComplexQuery(string $message): bool
     {
-        $complexKeywords = ['zeige', 'liste', 'alle', 'tasks', 'projekte', 'okrs', 'sprints'];
+        $complexKeywords = [
+            'zeige', 'liste', 'alle', 'übersicht', 'summe', 'berechnen',
+            'tasks', 'projekte', 'okrs', 'sprints', 'story points',
+            'aufgaben', 'projekt', 'zusammenfassung', 'statistik'
+        ];
         $message = strtolower($message);
-        
+
         foreach ($complexKeywords as $keyword) {
             if (str_contains($message, $keyword)) {
+                \Log::info("🎯 COMPLEX QUERY DETECTED:", ['keyword' => $keyword, 'message' => $message]);
                 return true;
             }
         }
-        
+
+        \Log::info("❓ SIMPLE QUERY:", ['message' => $message]);
         return false;
     }
     
