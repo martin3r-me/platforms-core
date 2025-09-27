@@ -31,17 +31,41 @@ class ToolRegistry
     }
     
     /**
-     * Generiere alle Tools dynamisch
+     * Generiere alle Tools dynamisch (mit OpenAI Limit)
      */
     protected function generateTools(): array
     {
         $tools = [];
         
         // Core Tools
-        $tools = array_merge($tools, $this->getCoreTools());
+        $coreTools = $this->getCoreTools();
+        $tools = array_merge($tools, $coreTools);
         
-        // Dynamische Model-Tools
-        $tools = array_merge($tools, $this->generateModelTools());
+        // Dynamische Model-Tools mit Limit
+        $modelTools = $this->generateModelTools();
+        
+        // OpenAI Limit: Maximal 128 Tools
+        $maxTools = 128;
+        $availableSlots = $maxTools - count($coreTools);
+        
+        if (count($modelTools) > $availableSlots) {
+            \Log::warning("🔧 TOO MANY TOOLS:", [
+                'total' => count($modelTools),
+                'limit' => $availableSlots,
+                'filtering' => true
+            ]);
+            
+            // Intelligente Filterung: Nur die wichtigsten Tools
+            $modelTools = $this->filterImportantTools($modelTools, $availableSlots);
+        }
+        
+        $tools = array_merge($tools, $modelTools);
+        
+        \Log::info("🔧 FINAL TOOLS:", [
+            'total' => count($tools),
+            'core' => count($coreTools),
+            'models' => count($modelTools)
+        ]);
         
         return $tools;
     }
@@ -412,6 +436,68 @@ class ToolRegistry
         return $models;
     }
     
+    /**
+     * Filtere wichtige Tools (OpenAI Limit)
+     */
+    protected function filterImportantTools(array $tools, int $limit): array
+    {
+        // Priorisiere Tools nach Wichtigkeit
+        $priorities = [
+            // Höchste Priorität: CRUD für wichtige Models
+            'plannerproject' => 10,
+            'plannertask' => 10,
+            'plannersprint' => 8,
+            'crmcontact' => 8,
+            'crmcompany' => 8,
+            'okrobjective' => 6,
+            'okrkeyresult' => 6,
+            'corechat' => 4,
+            'team' => 4,
+            'user' => 4,
+        ];
+        
+        // Gruppiere Tools nach Model
+        $groupedTools = [];
+        foreach ($tools as $tool) {
+            $toolName = $tool['function']['name'] ?? '';
+            $modelName = explode('_', $toolName)[0] ?? '';
+            $groupedTools[$modelName][] = $tool;
+        }
+        
+        // Sortiere Models nach Priorität
+        uksort($groupedTools, function($a, $b) use ($priorities) {
+            $priorityA = $priorities[$a] ?? 1;
+            $priorityB = $priorities[$b] ?? 1;
+            return $priorityB - $priorityA;
+        });
+        
+        // Nimm Tools bis zum Limit
+        $filteredTools = [];
+        $count = 0;
+        
+        foreach ($groupedTools as $modelName => $modelTools) {
+            if ($count + count($modelTools) > $limit) {
+                // Nimm nur die wichtigsten Tools für dieses Model
+                $remaining = $limit - $count;
+                $modelTools = array_slice($modelTools, 0, $remaining);
+            }
+            
+            $filteredTools = array_merge($filteredTools, $modelTools);
+            $count += count($modelTools);
+            
+            if ($count >= $limit) {
+                break;
+            }
+        }
+        
+        \Log::info("🔧 FILTERED TOOLS:", [
+            'original' => count($tools),
+            'filtered' => count($filteredTools),
+            'limit' => $limit
+        ]);
+        
+        return $filteredTools;
+    }
     
     /**
      * Tools Cache leeren
