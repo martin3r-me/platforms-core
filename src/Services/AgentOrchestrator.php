@@ -118,10 +118,24 @@ class AgentOrchestrator
         REGEL: Wenn der User um Aufgaben bittet, verwende plannertask_create!
         REGEL: Führe die CREATE Tools AUS, nicht nur GET Tools!
         
+        BEISPIEL für 'Slots anlegen':
+        1. plannerproject_get_all - Projekt finden
+        2. plannerprojectslot_create - Slot 1 anlegen (Backlog)
+        3. plannerprojectslot_create - Slot 2 anlegen (Aktiv)
+        4. plannerprojectslot_create - Slot 3 anlegen (Nächste Schritte)
+        5. plannerprojectslot_create - Slot 4 anlegen (Warten auf)
+        6. plannerprojectslot_create - Slot 5 anlegen (Erledigt)
+        
         WICHTIG: 
         - Führe ALLE Tools AUS ohne den User zu fragen!
         - KEINE Zwischenantworten oder 'ok' Fragen!
         - Verwende IMMER mehrere Tools für komplexe Anfragen!
+        
+        KRITISCH: Wenn der User um Slots bittet, führe plannerprojectslot_create AUS!
+        KRITISCH: Wenn der User um Aufgaben bittet, führe plannertask_create AUS!
+        KRITISCH: Führe NICHT nur GET Tools aus, sondern auch CREATE Tools!
+        
+        EINFACHER TEST: Für 'Slot anlegen' verwende plannerprojectslot_create mit name='Backlog' und project_id=6!
         - Gib erst am Ende eine vollständige Antwort!
         - Arbeite direkt und effizient!";
         
@@ -135,7 +149,8 @@ class AgentOrchestrator
             'tools_count' => count($tools),
             'tools_names' => array_map(fn($t) => $t['function']['name'] ?? 'unknown', $tools),
             'query' => $query,
-            'planner_tools' => array_filter(array_map(fn($t) => $t['function']['name'] ?? 'unknown', $tools), fn($name) => str_contains($name, 'planner'))
+            'planner_tools' => array_filter(array_map(fn($t) => $t['function']['name'] ?? 'unknown', $tools), fn($name) => str_contains($name, 'planner')),
+            'create_tools' => array_filter(array_map(fn($t) => $t['function']['name'] ?? 'unknown', $tools), fn($name) => str_contains($name, '_create'))
         ]);
         
         // OpenAI API mit Tools
