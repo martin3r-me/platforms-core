@@ -381,46 +381,37 @@ class ToolRegistry
     }
     
     /**
-     * Entdecke alle Models dynamisch
+     * Entdecke alle Models LOOSE - nur über Composer Autoload
      */
     protected function discoverAllModels(): array
     {
         $models = [];
-        $modulesPath = base_path('platform/modules');
         
-        // Alle Module scannen
-        foreach (File::directories($modulesPath) as $moduleDir) {
-            $moduleName = basename($moduleDir);
-            $modelsPath = $moduleDir . '/src/Models';
-            $namespace = 'Platform\\' . Str::studly($moduleName) . '\\Models\\';
-            
-            if (!File::exists($modelsPath)) {
+        // Loose: Nur über Composer Autoload alle Klassen scannen
+        $autoloader = require base_path('vendor/autoload.php');
+        $classMap = $autoloader->getClassMap();
+        
+        foreach ($classMap as $className => $filePath) {
+            // Nur Platform Models
+            if (!str_starts_with($className, 'Platform\\')) {
                 continue;
             }
             
-            // Alle Model-Dateien scannen
-            foreach (File::files($modelsPath) as $file) {
-                $modelName = $file->getFilenameWithoutExtension();
-                $fullClassName = $namespace . $modelName;
-                
-                if (class_exists($fullClassName) && is_subclass_of($fullClassName, \Illuminate\Database\Eloquent\Model::class)) {
-                    $models[] = $fullClassName;
-                    \Log::info("🔍 DISCOVERED MODEL:", ['model' => $fullClassName]);
-                }
+            // Nur Models (endet mit Model oder ist in Models Namespace)
+            if (!str_ends_with($className, 'Model') && !str_contains($className, '\\Models\\')) {
+                continue;
+            }
+            
+            // Prüfe ob es ein Eloquent Model ist
+            if (class_exists($className) && is_subclass_of($className, \Illuminate\Database\Eloquent\Model::class)) {
+                $models[] = $className;
+                \Log::info("🔍 LOOSE DISCOVERED MODEL:", ['model' => $className]);
             }
         }
         
-        // Core Models hinzufügen
-        $coreModels = [
-            'Platform\\Core\\Models\\CoreChat',
-            'Platform\\Core\\Models\\CoreChatMessage',
-            'Platform\\Core\\Models\\CoreChatEvent',
-            'Platform\\Core\\Models\\Team',
-            'Platform\\Core\\Models\\User',
-        ];
-        
-        return array_merge($models, $coreModels);
+        return $models;
     }
+    
     
     /**
      * Tools Cache leeren
