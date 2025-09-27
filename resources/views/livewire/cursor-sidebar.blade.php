@@ -1,9 +1,10 @@
-<div x-data="rightSidebarState()" x-init="init()" class="d-flex">
-    <aside 
-        x-cloak
-        :class="collapsed ? 'w-16 is-collapsed' : 'w-96 is-expanded'"
-        class="relative flex-shrink-0 h-full bg-white border-left-1 border-left-solid border-muted transition-all duration-300 d-flex flex-col overflow-x-hidden"
-    >
+<div>
+    <div x-data="rightSidebarState()" x-init="init()" class="d-flex">
+        <aside 
+            x-cloak
+            :class="collapsed ? 'w-16 is-collapsed' : 'w-96 is-expanded'"
+            class="relative flex-shrink-0 h-full bg-white border-left-1 border-left-solid border-muted transition-all duration-300 d-flex flex-col overflow-x-hidden"
+        >
         <!-- Toggle -->
         <div class="sticky top-0 z-10 bg-white border-bottom-1 border-muted">
             <button 
@@ -129,7 +130,8 @@
                 </div>
             </template>
         </div>
-    </aside>
+        </aside>
+    </div>
 </div>
 
 <style>
