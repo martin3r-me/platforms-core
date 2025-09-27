@@ -13,10 +13,14 @@ class IntelligentAgent
     
     public function __construct()
     {
-        $this->client = (new Factory())
-            ->withApiKey(config('app.openai_api_key'))
-            ->withOrganization(config('app.openai_organization'))
-            ->make();
+        $factory = (new Factory())->withApiKey(env('OPENAI_API_KEY'));
+        
+        // Organization nur hinzufügen wenn gesetzt
+        if (env('OPENAI_ORGANIZATION')) {
+            $factory->withOrganization(env('OPENAI_ORGANIZATION'));
+        }
+        
+        $this->client = $factory->make();
     }
     
     /**
