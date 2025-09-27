@@ -39,6 +39,11 @@ class IntelligentAgent
      */
     public function processMessage(string $message, ?int $chatId = null): array
     {
+        \Log::info("🚀 IntelligentAgent::processMessage START", [
+            'message' => $message,
+            'chatId' => $chatId
+        ]);
+        
         try {
             // Prüfe ob OpenAI verfügbar ist
             if (!$this->fallbackService->isOpenAIAvailable()) {
@@ -47,11 +52,18 @@ class IntelligentAgent
             }
             
             // Prüfe ob es eine komplexe Query ist
-            if ($this->isComplexQuery($message)) {
+            $isComplex = $this->isComplexQuery($message);
+            \Log::info("🔍 Query Type Detection", [
+                'isComplex' => $isComplex,
+                'message' => $message
+            ]);
+            
+            if ($isComplex) {
+                \Log::info("🎯 Using COMPLEX Query Processing");
                 return $this->processComplexQuery($message, $chatId);
             }
             
-            // Standard ChatGPT Verarbeitung
+            \Log::info("💬 Using SIMPLE Query Processing");
             return $this->processSimpleQuery($message, $chatId);
             
         } catch (\Exception $e) {
@@ -119,12 +131,18 @@ class IntelligentAgent
      */
     protected function processSimpleQuery(string $message, ?int $chatId = null): array
     {
+        \Log::info("💬 processSimpleQuery START", [
+            'message' => $message,
+            'chatId' => $chatId
+        ]);
+        
         // Chat-Verlauf laden
         $messages = $this->loadChatHistory($chatId);
         $messages[] = ['role' => 'user', 'content' => $message];
         
         // Tools laden
         $tools = $this->toolRegistry->getAllTools();
+        \Log::info("🔧 Tools loaded", ['count' => count($tools)]);
         
         // OpenAI API aufrufen mit Tools
         $response = $this->client->chat()->create([
@@ -137,10 +155,22 @@ class IntelligentAgent
         ]);
         
         $assistantMessage = $response->choices[0]->message;
+        \Log::info("🤖 OpenAI Response", [
+            'hasToolCalls' => !empty($assistantMessage->toolCalls),
+            'toolCallsCount' => count($assistantMessage->toolCalls ?? []),
+            'content' => $assistantMessage->content
+        ]);
         
         // Tool-Calls verarbeiten
         if (!empty($assistantMessage->toolCalls)) {
+            \Log::info("🔧 Executing Tool Calls", [
+                'count' => count($assistantMessage->toolCalls)
+            ]);
             $toolResults = $this->executeTools($assistantMessage->toolCalls);
+            \Log::info("✅ Tool Results", [
+                'count' => count($toolResults),
+                'results' => $toolResults
+            ]);
             
             // Tool-Ergebnisse an OpenAI senden
             $messages[] = [
@@ -161,6 +191,10 @@ class IntelligentAgent
             }
             
             // Finale Antwort generieren
+            \Log::info("🔄 Generating Final Response", [
+                'messagesCount' => count($messages)
+            ]);
+            
             $finalResponse = $this->client->chat()->create([
                 'model' => 'gpt-4o-mini',
                 'messages' => $messages,
@@ -169,6 +203,9 @@ class IntelligentAgent
             ]);
             
             $finalContent = $finalResponse->choices[0]->message->content;
+            \Log::info("✅ Final Response Generated", [
+                'content' => $finalContent
+            ]);
         } else {
             $finalContent = $assistantMessage->content;
         }
