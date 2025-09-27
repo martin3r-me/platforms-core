@@ -77,14 +77,13 @@ class CursorSidebar extends Component
         $text = trim($this->input);
         if (empty($text)) return;
         
-        // SOFORT: Input clearen und User-Message anzeigen
+        // SOFORT: Input clearen und User-Message speichern
         $this->input = '';
-        $this->feed[] = ['role' => 'user', 'text' => $text];
         $this->lastUserText = $text;
         $this->ensureChat();
         $this->saveMessage('user', $text, ['forceExecute' => $this->forceExecute]);
         
-        // WICHTIG: Feed neu laden um Duplikate zu vermeiden
+        // WICHTIG: Feed aus DB laden (nicht manuell hinzufügen!)
         $this->loadFeedFromChat();
         
         // SOFORT: Agent Activities zurücksetzen und erste Aktivität anzeigen
@@ -111,15 +110,14 @@ class CursorSidebar extends Component
                 $response = $agent->processMessage($text, $this->chatId);
 
                 if ($response['ok']) {
-                    // Add final response
-                    $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => $response['content']]];
+                    // Nur in DB speichern, nicht in Feed hinzufügen
                     $this->saveMessage('assistant', $response['content']);
                 } else {
-                    $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Fehler: ' . $response['error']]];
+                    // Nur in DB speichern, nicht in Feed hinzufügen
                     $this->saveMessage('assistant', 'Fehler: ' . $response['error']);
                 }
             } catch (\Throwable $e) {
-                $this->feed[] = ['role' => 'assistant', 'type' => 'message', 'data' => ['text' => 'Fehler beim Verarbeiten: ' . $e->getMessage()]];
+                // Nur in DB speichern, nicht in Feed hinzufügen
                 $this->saveMessage('assistant', 'Fehler beim Verarbeiten: ' . $e->getMessage());
             }
 
