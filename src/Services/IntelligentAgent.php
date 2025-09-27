@@ -173,7 +173,7 @@ class IntelligentAgent
         
         return [
             'ok' => true,
-            'content' => $finalContent,
+            'data' => $finalContent,
             'usage' => $response->usage->toArray(),
         ];
     }

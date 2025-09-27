@@ -173,7 +173,7 @@ class AgentOrchestrator
         
         return [
             'ok' => true,
-            'content' => $finalContent,
+            'data' => $finalContent,
             'activities' => $this->activities,
             'usage' => $response->usage->toArray()
         ];

@@ -108,11 +108,12 @@ class CursorSidebar extends Component
                 $response = $agent->processMessage($text, $this->chatId);
 
                 if ($response['ok']) {
-                    // Nur in DB speichern, nicht in Feed hinzufügen
-                    $this->saveMessage('assistant', $response['content']);
+                    // Response-Struktur: ['ok' => true, 'data' => ...]
+                    $content = $response['data'] ?? $response['message'] ?? 'Antwort erhalten';
+                    $this->saveMessage('assistant', $content);
                 } else {
                     // Nur in DB speichern, nicht in Feed hinzufügen
-                    $this->saveMessage('assistant', 'Fehler: ' . $response['error']);
+                    $this->saveMessage('assistant', 'Fehler: ' . ($response['error'] ?? 'Unbekannter Fehler'));
                 }
             } catch (\Throwable $e) {
                 // Nur in DB speichern, nicht in Feed hinzufügen
