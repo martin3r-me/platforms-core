@@ -59,7 +59,9 @@ class CursorSidebar extends Component
         \Log::info("🔍 COMMS EVENT EMPFANGEN:", [
             'payload' => $payload,
             'payload_keys' => array_keys($payload),
-            'payload_count' => count($payload)
+            'payload_count' => count($payload),
+            'timestamp' => now(),
+            'source' => 'CursorSidebar::prepareCommsContext'
         ]);
         
         $this->currentContext = $payload;
@@ -73,7 +75,15 @@ class CursorSidebar extends Component
             'currentModel' => $this->currentModel,
             'currentModelId' => $this->currentModelId,
             'currentSubject' => $this->currentSubject,
-            'currentUrl' => $this->currentUrl
+            'currentUrl' => $this->currentUrl,
+            'timestamp' => now(),
+            'source' => 'CursorSidebar::prepareCommsContext'
+        ]);
+        
+        // DEBUG: Log dass $refresh gesendet wird
+        \Log::info("🔍 LIVEWIRE REFRESH GESENDET:", [
+            'timestamp' => now(),
+            'source' => 'CursorSidebar::prepareCommsContext'
         ]);
         
         // Force Livewire re-render
