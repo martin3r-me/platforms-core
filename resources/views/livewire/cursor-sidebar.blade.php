@@ -19,6 +19,20 @@
 
         <!-- Content -->
         <div class="flex-1 overflow-y-auto p-2 d-flex flex-col gap-2">
+            
+            {{-- DEBUG: Context Info --}}
+            @if(!$collapsed && !empty($currentContext))
+            <div class="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs">
+                <div class="font-bold text-yellow-800 mb-1">🔍 DEBUG CONTEXT:</div>
+                <div class="text-yellow-700">
+                    <div><strong>Model:</strong> {{ $currentModel ?? 'null' }}</div>
+                    <div><strong>Model ID:</strong> {{ $currentModelId ?? 'null' }}</div>
+                    <div><strong>Subject:</strong> {{ $currentSubject ?? 'null' }}</div>
+                    <div><strong>URL:</strong> {{ $currentUrl ?? 'null' }}</div>
+                    <div><strong>Source:</strong> {{ $currentContext['source'] ?? 'null' }}</div>
+                </div>
+            </div>
+            @endif
             {{-- Zugefahrener Zustand: Nur Icons --}}
             <template x-if="collapsed">
                 <div class="d-flex flex-col gap-2">
