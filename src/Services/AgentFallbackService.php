@@ -26,6 +26,9 @@ class AgentFallbackService
             'project_query' => [$this, 'handleProjectQuery'],
             'task_query' => [$this, 'handleTaskQuery'],
             'slot_query' => [$this, 'handleSlotQuery'],
+            'okr_query' => [$this, 'handleOkrQuery'],
+            'cycle_query' => [$this, 'handleCycleQuery'],
+            'objective_query' => [$this, 'handleObjectiveQuery'],
             'default' => [$this, 'handleDefaultFallback']
         ];
     }
@@ -81,6 +84,21 @@ class AgentFallbackService
         // Slot-spezifische Queries
         if (str_contains($query, 'slot')) {
             return $this->fallbackStrategies['slot_query'];
+        }
+        
+        // OKR-spezifische Queries
+        if (str_contains($query, 'okr') || str_contains($query, 'objective') || str_contains($query, 'ziel')) {
+            return $this->fallbackStrategies['okr_query'];
+        }
+        
+        // Cycle-spezifische Queries
+        if (str_contains($query, 'cycle') || str_contains($query, 'zyklus')) {
+            return $this->fallbackStrategies['cycle_query'];
+        }
+        
+        // Objective-spezifische Queries
+        if (str_contains($query, 'objective') || str_contains($query, 'ziel')) {
+            return $this->fallbackStrategies['objective_query'];
         }
         
         // Einfache Queries
@@ -182,6 +200,72 @@ class AgentFallbackService
     }
     
     /**
+     * Handle OKR-Queries
+     */
+    protected function handleOkrQuery(string $query): array
+    {
+        $result = $this->toolExecutor->executeTool('okrok_get_all', []);
+        
+        if ($result['ok']) {
+            $okrs = $result['data'] ?? [];
+            
+            return [
+                'ok' => true,
+                'data' => $okrs,
+                'message' => 'Fallback: OKRs abgerufen (OpenAI nicht verfügbar)',
+                'fallback' => true,
+                'count' => count($okrs)
+            ];
+        }
+        
+        return $this->handleDefaultFallback($query);
+    }
+    
+    /**
+     * Handle Cycle-Queries
+     */
+    protected function handleCycleQuery(string $query): array
+    {
+        $result = $this->toolExecutor->executeTool('okrcycle_get_all', []);
+        
+        if ($result['ok']) {
+            $cycles = $result['data'] ?? [];
+            
+            return [
+                'ok' => true,
+                'data' => $cycles,
+                'message' => 'Fallback: OKR Cycles abgerufen (OpenAI nicht verfügbar)',
+                'fallback' => true,
+                'count' => count($cycles)
+            ];
+        }
+        
+        return $this->handleDefaultFallback($query);
+    }
+    
+    /**
+     * Handle Objective-Queries
+     */
+    protected function handleObjectiveQuery(string $query): array
+    {
+        $result = $this->toolExecutor->executeTool('okrobjective_get_all', []);
+        
+        if ($result['ok']) {
+            $objectives = $result['data'] ?? [];
+            
+            return [
+                'ok' => true,
+                'data' => $objectives,
+                'message' => 'Fallback: OKR Objectives abgerufen (OpenAI nicht verfügbar)',
+                'fallback' => true,
+                'count' => count($objectives)
+            ];
+        }
+        
+        return $this->handleDefaultFallback($query);
+    }
+    
+    /**
      * Handle Default Fallback
      */
     protected function handleDefaultFallback(string $query): array
@@ -228,7 +312,14 @@ class AgentFallbackService
         try {
             // Prüfe API Key
             $apiKey = env('OPENAI_API_KEY');
+            Log::info("🔍 OPENAI API KEY CHECK:", [
+                'hasKey' => !empty($apiKey),
+                'keyLength' => strlen($apiKey ?? ''),
+                'keyStart' => substr($apiKey ?? '', 0, 10) . '...'
+            ]);
+            
             if (empty($apiKey)) {
+                Log::warning("🔄 OPENAI API KEY NOT SET");
                 return false;
             }
             
