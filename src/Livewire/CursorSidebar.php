@@ -52,43 +52,18 @@ class CursorSidebar extends Component
         }
     }
 
-    #[On('comms')]
-    public function prepareCommsContext(array $payload = []): void
-    {
-        // DEBUG: Log den empfangenen Payload
-        \Log::info("🔍 COMMS EVENT EMPFANGEN:", [
-            'payload' => $payload,
-            'payload_keys' => array_keys($payload),
-            'payload_count' => count($payload),
-            'timestamp' => now(),
-            'source' => 'CursorSidebar::prepareCommsContext'
-        ]);
-        
-        $this->currentContext = $payload;
-        $this->currentModel = $payload['model'] ?? null;
-        $this->currentModelId = $payload['modelId'] ?? null;
-        $this->currentSubject = $payload['subject'] ?? null;
-        $this->currentUrl = $payload['url'] ?? null;
-        
-        // DEBUG: Log die gesetzten Werte
-        \Log::info("🔍 CONTEXT GESETZT:", [
-            'currentModel' => $this->currentModel,
-            'currentModelId' => $this->currentModelId,
-            'currentSubject' => $this->currentSubject,
-            'currentUrl' => $this->currentUrl,
-            'timestamp' => now(),
-            'source' => 'CursorSidebar::prepareCommsContext'
-        ]);
-        
-        // DEBUG: Log dass $refresh gesendet wird
-        \Log::info("🔍 LIVEWIRE REFRESH GESENDET:", [
-            'timestamp' => now(),
-            'source' => 'CursorSidebar::prepareCommsContext'
-        ]);
-        
-        // Force Livewire re-render
-        $this->dispatch('$refresh');
-    }
+        #[On('comms')]
+        public function prepareCommsContext(array $payload = []): void
+        {
+            $this->currentContext = $payload;
+            $this->currentModel = $payload['model'] ?? null;
+            $this->currentModelId = $payload['modelId'] ?? null;
+            $this->currentSubject = $payload['subject'] ?? null;
+            $this->currentUrl = $payload['url'] ?? null;
+            
+            // Force Livewire re-render
+            $this->dispatch('$refresh');
+        }
     
     public function mount(): void
     {
@@ -114,28 +89,13 @@ class CursorSidebar extends Component
             $this->dispatch('$refresh');
         });
         
-        // DEBUG: Laravel Event Listener für comms
+        // Laravel Event Listener für comms (als Fallback)
         Event::listen('comms', function($payload) {
-            \Log::info("🔍 LARAVEL COMMS EVENT EMPFANGEN:", [
-                'payload' => $payload,
-                'timestamp' => now(),
-                'source' => 'Laravel Event Listener'
-            ]);
-            
             $this->currentContext = $payload;
             $this->currentModel = $payload['model'] ?? null;
             $this->currentModelId = $payload['modelId'] ?? null;
             $this->currentSubject = $payload['subject'] ?? null;
             $this->currentUrl = $payload['url'] ?? null;
-            
-            \Log::info("🔍 LARAVEL CONTEXT GESETZT:", [
-                'currentModel' => $this->currentModel,
-                'currentModelId' => $this->currentModelId,
-                'currentSubject' => $this->currentSubject,
-                'currentUrl' => $this->currentUrl,
-                'timestamp' => now(),
-                'source' => 'Laravel Event Listener'
-            ]);
             
             // Force Livewire re-render
             $this->dispatch('$refresh');
