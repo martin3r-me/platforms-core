@@ -401,6 +401,17 @@ class CursorSidebar extends Component
             }
         }
         
+        // DEBUG: Log den Context-Text
+        \Log::info("🔍 BUILD CONTEXT TEXT:", [
+            'currentContext' => $this->currentContext,
+            'currentModel' => $this->currentModel,
+            'currentModelId' => $this->currentModelId,
+            'currentSubject' => $this->currentSubject,
+            'currentUrl' => $this->currentUrl,
+            'contextText' => implode(', ', $context),
+            'timestamp' => now()
+        ]);
+        
         return implode(', ', $context);
     }
     
