@@ -310,16 +310,28 @@ class AgentFallbackService
     public function isOpenAIAvailable(): bool
     {
         try {
-            // Prüfe API Key
+            // Detailliertes Debugging
             $apiKey = env('OPENAI_API_KEY');
-            Log::info("🔍 OPENAI API KEY CHECK:", [
-                'hasKey' => !empty($apiKey),
-                'keyLength' => strlen($apiKey ?? ''),
-                'keyStart' => substr($apiKey ?? '', 0, 10) . '...'
+            $configKey = config('app.openai_api_key');
+            $directEnv = $_ENV['OPENAI_API_KEY'] ?? null;
+            
+            Log::info("🔍 DETAILLIERTE OPENAI DEBUG INFO:", [
+                'env_openai_api_key' => $apiKey ? 'SET (' . strlen($apiKey) . ' chars)' : 'NOT SET',
+                'config_app_openai_api_key' => $configKey ? 'SET (' . strlen($configKey) . ' chars)' : 'NOT SET',
+                'direct_env_openai_api_key' => $directEnv ? 'SET (' . strlen($directEnv) . ' chars)' : 'NOT SET',
+                'key_start' => substr($apiKey ?? '', 0, 10) . '...',
+                'all_env_keys' => array_keys($_ENV),
+                'env_file_exists' => file_exists(base_path('.env')),
+                'env_file_readable' => is_readable(base_path('.env'))
             ]);
             
             if (empty($apiKey)) {
-                Log::warning("🔄 OPENAI API KEY NOT SET");
+                Log::warning("🔄 OPENAI API KEY NOT SET - DETAILED DEBUG:");
+                Log::warning("🔍 ENV FILE CHECK:", [
+                    'file_exists' => file_exists(base_path('.env')),
+                    'file_size' => file_exists(base_path('.env')) ? filesize(base_path('.env')) : 'N/A',
+                    'file_permissions' => file_exists(base_path('.env')) ? substr(sprintf('%o', fileperms(base_path('.env'))), -4) : 'N/A'
+                ]);
                 return false;
             }
             

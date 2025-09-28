@@ -145,6 +145,15 @@ class IntelligentAgent
         \Log::info("🔧 Core Tools loaded", ['count' => count($tools), 'type' => 'core-only']);
         
         // OpenAI API aufrufen mit Tools
+        \Log::info("🤖 OPENAI API REQUEST DEBUG:", [
+            'model' => 'gpt-4o-mini',
+            'messages_count' => count($messages),
+            'tools_count' => count($tools),
+            'tool_choice' => 'auto',
+            'max_tokens' => 2000,
+            'temperature' => 0.7
+        ]);
+        
         $response = $this->client->chat()->create([
             'model' => 'gpt-4o-mini',
             'messages' => $messages,
@@ -152,6 +161,13 @@ class IntelligentAgent
             'tool_choice' => 'auto',
             'max_tokens' => 2000,
             'temperature' => 0.7,
+        ]);
+        
+        \Log::info("🤖 OPENAI API RESPONSE DEBUG:", [
+            'has_choices' => !empty($response->choices),
+            'choices_count' => count($response->choices ?? []),
+            'has_usage' => !empty($response->usage),
+            'usage_tokens' => $response->usage?->toArray() ?? 'N/A'
         ]);
         
         $assistantMessage = $response->choices[0]->message;
