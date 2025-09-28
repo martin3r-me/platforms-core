@@ -117,8 +117,9 @@ class AgentOrchestrator
         WICHTIGE REGELN:
         1. FÜHRE ALLE TOOLS DIREKT AUS - KEINE ZWISCHENFRAGEN!
         2. Verwende IMMER mehrere Tools in der richtigen Reihenfolge
-        3. Für Projekt-Anfragen: Erst Projekte abrufen, dann Project Slots, dann Tasks
-        4. Für Slot-Anfragen: Erst Project Slots abrufen, dann Tasks in den Slots
+        3. Für Projekt-Anfragen: Erst discover_tools('planner'), dann Projekte abrufen, dann Project Slots, dann Tasks
+        4. Für Slot-Anfragen: Erst discover_tools('planner'), dann Project Slots abrufen, dann Tasks in den Slots
+        5. KRITISCH: Verwende discover_tools('planner') für ALLE Planner-bezogenen Anfragen!
         5. Für Task-Anfragen: Erst Tasks abrufen, dann Relations (project, projectslot, etc.)
         6. Kombiniere die Ergebnisse zu einer vollständigen Antwort
         
@@ -156,6 +157,9 @@ class AgentOrchestrator
         - Verwende Context nur wenn er hilfreich ist
         - Ignoriere Context wenn er nicht relevant ist
         - Sei flexibel und intelligent in der Context-Nutzung
+        - NUTZE den Context aktiv: Wenn der User auf einer Projekt-Seite ist, kannst du über das Projekt sprechen
+        - NUTZE den Context aktiv: Wenn der User auf einer Task-Seite ist, kannst du über die Task sprechen
+        - NUTZE den Context aktiv: Wenn der User auf dem Dashboard ist, kannst du über die Übersicht sprechen
         
         VERFÜGBARE TOOLS:
         - Du hast Zugriff auf alle verfügbaren Tools für Datenbankoperationen
