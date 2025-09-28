@@ -1,4 +1,4 @@
-<x-ui.right-sidebar>
+<x-ui-right-sidebar>
     <!-- Chat Content -->
     <div x-show="!collapsed" class="flex-1 flex flex-col">
         <!-- Messages Area -->
@@ -192,4 +192,4 @@
             </svg>
         </button>
     </div>
-</x-ui.right-sidebar>
+</x-ui-right-sidebar>
