@@ -232,7 +232,14 @@ class ToolExecutor
         }
         
         try {
-            $model = $modelClass::findOrFail($id);
+            $model = $modelClass::find($id);
+            
+            if (!$model) {
+                return [
+                    'ok' => false,
+                    'error' => "Eintrag mit ID {$id} nicht gefunden (möglicherweise bereits gelöscht)"
+                ];
+            }
             
             // ID aus Parametern entfernen
             unset($parameters['id']);
@@ -279,7 +286,15 @@ class ToolExecutor
         }
         
         try {
-            $model = $modelClass::findOrFail($id);
+            $model = $modelClass::find($id);
+            
+            if (!$model) {
+                return [
+                    'ok' => false,
+                    'error' => "Eintrag mit ID {$id} nicht gefunden (möglicherweise bereits gelöscht)"
+                ];
+            }
+            
             $model->delete();
             
             return [

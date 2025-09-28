@@ -107,6 +107,12 @@ class AgentOrchestrator
         - Führe alle notwendigen Tools aus um die Anfrage zu beantworten
         - Verwende die verfügbaren Tools intelligent und in der richtigen Reihenfolge
         
+        KONTEXT-MANAGEMENT:
+        - Achte auf die IDs von gerade erstellten/aktualisierten Items
+        - Verwende IMMER die aktuellen IDs aus den Tool-Ergebnissen
+        - Wenn du Items aktualisieren möchtest, verwende die IDs aus den vorherigen Tool-Calls
+        - Prüfe die Tool-Ergebnisse auf "WICHTIGER KONTEXT" für aktuelle IDs
+        
         VERFÜGBARE TOOLS:
         - Du hast Zugriff auf alle verfügbaren Tools für Datenbankoperationen
         - Verwende die Tools die für die Anfrage relevant sind
@@ -213,6 +219,11 @@ class AgentOrchestrator
                 // Tool-Result als lesbaren Text formatieren
                 $formattedContent = $this->formatToolResultForLLM($result);
                 
+                // WICHTIG: Füge Kontext über erstellte/aktualisierte Items hinzu
+                if (isset($result['data']['item']['id'])) {
+                    $formattedContent .= "\n\nWICHTIGER KONTEXT: Diese Aufgabe hat die ID {$result['data']['item']['id']} und wurde gerade erstellt/aktualisiert.";
+                }
+                
                 $messages[] = [
                     'role' => 'tool',
                     'content' => $formattedContent,
@@ -262,6 +273,18 @@ class AgentOrchestrator
         
         if (isset($result['data']) && is_array($result['data'])) {
             $data = $result['data'];
+            
+            // Einzelnes Item (CREATE/UPDATE)
+            if (isset($data['item']) && is_array($data['item'])) {
+                $item = $data['item'];
+                $formatted = "Erfolgreich: " . ($data['message'] ?? 'Operation abgeschlossen') . "\n";
+                $formatted .= "ID: " . ($item['id'] ?? 'N/A') . "\n";
+                $formatted .= "Titel: " . ($item['title'] ?? $item['name'] ?? 'N/A') . "\n";
+                if (isset($item['description'])) {
+                    $formatted .= "Beschreibung: " . $item['description'] . "\n";
+                }
+                return $formatted;
+            }
             
             if (isset($data['items']) && is_array($data['items'])) {
                 // Liste von Items formatieren
