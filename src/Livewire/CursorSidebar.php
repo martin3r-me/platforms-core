@@ -51,6 +51,19 @@ class CursorSidebar extends Component
             $this->ensureChat();
         }
     }
+
+    #[On('comms')]
+    public function prepareCommsContext(array $payload = []): void
+    {
+        $this->currentContext = $payload;
+        $this->currentModel = $payload['model'] ?? null;
+        $this->currentModelId = $payload['modelId'] ?? null;
+        $this->currentSubject = $payload['subject'] ?? null;
+        $this->currentUrl = $payload['url'] ?? null;
+        
+        // Force Livewire re-render
+        $this->dispatch('$refresh');
+    }
     
     public function mount(): void
     {
@@ -76,17 +89,7 @@ class CursorSidebar extends Component
             $this->dispatch('$refresh');
         });
         
-        // Event-Listener für Context-Updates (Livewire Event)
-        $this->listen('comms', function($context) {
-            $this->currentContext = $context;
-            $this->currentModel = $context['model'] ?? null;
-            $this->currentModelId = $context['modelId'] ?? null;
-            $this->currentSubject = $context['subject'] ?? null;
-            $this->currentUrl = $context['url'] ?? null;
-            
-            // Force Livewire re-render
-            $this->dispatch('$refresh');
-        });
+        // Event-Listener für Context-Updates wird über #[On('comms')] implementiert
         
         // Aktiven Chat aus Session wiederherstellen
         $sid = session('core_chat_id');
