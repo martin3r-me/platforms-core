@@ -232,11 +232,17 @@ class ToolRegistry
         }
         
         // OKR Models (nur wenn verfügbar)
+        if (Schema::hasTable('okr_cycles')) {
+            $coreModels[] = 'Platform\\Okr\\Models\\Cycle';
+        }
         if (Schema::hasTable('okr_objectives')) {
-            $coreModels[] = 'Platform\\Okr\\Models\\OkrObjective';
+            $coreModels[] = 'Platform\\Okr\\Models\\Objective';
         }
         if (Schema::hasTable('okr_key_results')) {
-            $coreModels[] = 'Platform\\Okr\\Models\\OkrKeyResult';
+            $coreModels[] = 'Platform\\Okr\\Models\\KeyResult';
+        }
+        if (Schema::hasTable('okr_okrs')) {
+            $coreModels[] = 'Platform\\Okr\\Models\\Okr';
         }
         
         // Nur existierende Models zurückgeben
@@ -818,6 +824,13 @@ class ToolRegistry
                             continue;
                         }
                         
+                        // Ausschluss nur von echten Support Models (nicht Performance!)
+                        if (str_contains($className, 'Template') ||
+                            str_contains($className, 'Party') ||
+                            str_contains($className, 'Billing')) {
+                            continue;
+                        }
+                        
                         // Prüfe ob es ein Eloquent Model ist
                         if (class_exists($className) && is_subclass_of($className, \Illuminate\Database\Eloquent\Model::class)) {
                             $models[] = $className;
@@ -965,30 +978,29 @@ class ToolRegistry
      */
     protected function filterImportantTools(array $tools, int $limit): array
     {
-        // Priorisiere Tools nach Wichtigkeit
+        // LOOSE: Dynamische Prioritäten basierend auf Modul-Importanz
         $priorities = [
-            // Höchste Priorität: CRUD für wichtige Models
-            'plannerproject' => 10,
-            'plannertask' => 10,
-            'plannersprint' => 8,
-            'crmcontact' => 8,
-            'crmcompany' => 8,
-            'okrobjective' => 6,
-            'okrkeyresult' => 6,
-            'corechat' => 4,
-            'team' => 4,
-            'user' => 4,
+            // Höchste Priorität: Planner (wichtigstes Modul)
+            'planner' => 10,
+            // CRM und OKR gleich wichtig
+            'crm' => 8,
+            'okr' => 8,
+            // Core Tools
+            'core' => 4,
         ];
         
-        // Gruppiere Tools nach Model
+        // LOOSE: Gruppiere Tools nach Modul (nicht nach Model)
         $groupedTools = [];
         foreach ($tools as $tool) {
             $toolName = $tool['function']['name'] ?? '';
             $modelName = explode('_', $toolName)[0] ?? '';
-            $groupedTools[$modelName][] = $tool;
+            
+            // Bestimme Modul basierend auf Model-Name
+            $module = $this->getModuleFromModelName($modelName);
+            $groupedTools[$module][] = $tool;
         }
         
-        // Sortiere Models nach Priorität
+        // Sortiere Module nach Priorität
         uksort($groupedTools, function($a, $b) use ($priorities) {
             $priorityA = $priorities[$a] ?? 1;
             $priorityB = $priorities[$b] ?? 1;
@@ -1024,6 +1036,32 @@ class ToolRegistry
     }
     
     /**
+     * Bestimme Modul basierend auf Model-Name (LOOSE!)
+     */
+    protected function getModuleFromModelName(string $modelName): string
+    {
+        // Konvertiere zu lowercase für Vergleich
+        $name = strtolower($modelName);
+        
+        // Bestimme Modul basierend auf Prefix
+        if (str_starts_with($name, 'planner')) {
+            return 'planner';
+        }
+        if (str_starts_with($name, 'crm')) {
+            return 'crm';
+        }
+        if (str_starts_with($name, 'okr')) {
+            return 'okr';
+        }
+        if (str_starts_with($name, 'core')) {
+            return 'core';
+        }
+        
+        // Fallback: core
+        return 'core';
+    }
+    
+    /**
      * Erkenne relevante Module basierend auf Query
      */
     protected function detectRelevantModules(string $query): array
@@ -1053,6 +1091,18 @@ class ToolRegistry
         // Spezielle Mapping für "projekte" → "projects"
         if (str_contains($query, 'projekt')) {
             $modules[] = 'plannerproject'; // Projekte sind Projects
+        }
+        
+        // OKR Module
+        if (str_contains($query, 'okr') || str_contains($query, 'objective') || str_contains($query, 'ziel')) {
+            $modules[] = 'okrok';
+            $modules[] = 'okrobjective';
+        }
+        if (str_contains($query, 'cycle') || str_contains($query, 'zyklus')) {
+            $modules[] = 'okrcycle';
+        }
+        if (str_contains($query, 'key result') || str_contains($query, 'keyresult')) {
+            $modules[] = 'okrkeyresult';
         }
         
         // CRM Module

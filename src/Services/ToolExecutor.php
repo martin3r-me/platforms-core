@@ -327,29 +327,77 @@ class ToolExecutor
             'modelName' => $modelName
         ]);
         
-        // Mapping für bekannte Models
-        $modelMapping = [
-            'Plannerproject' => 'Platform\\Planner\\Models\\PlannerProject',
-            'Plannerprojectslot' => 'Platform\\Planner\\Models\\PlannerProjectSlot',
-            'Plannertask' => 'Platform\\Planner\\Models\\PlannerTask',
-            'Plannersprint' => 'Platform\\Planner\\Models\\PlannerSprint',
-            'Plannersprintslot' => 'Platform\\Planner\\Models\\PlannerSprintSlot',
-            'Plannertaskgroup' => 'Platform\\Planner\\Models\\PlannerTaskGroup',
-            'Plannerprojectuser' => 'Platform\\Planner\\Models\\PlannerProjectUser',
-            'Plannercustomerproject' => 'Platform\\Planner\\Models\\PlannerCustomerProject',
-            'Plannercustomerprojectbillingitem' => 'Platform\\Planner\\Models\\PlannerCustomerProjectBillingItem',
-            'Plannercustomerprojectparty' => 'Platform\\Planner\\Models\\PlannerCustomerProjectParty',
-            'Crmcontact' => 'Platform\\Crm\\Models\\CrmContact',
-            'Crmcompany' => 'Platform\\Crm\\Models\\CrmCompany',
-            'Okrobjective' => 'Platform\\Okr\\Models\\OkrObjective',
-            'Okrkeyresult' => 'Platform\\Okr\\Models\\OkrKeyResult',
-            'Corechat' => 'Platform\\Core\\Models\\CoreChat',
-            'Corechatmessage' => 'Platform\\Core\\Models\\CoreChatMessage',
-            'Team' => 'Platform\\Core\\Models\\Team',
-            'User' => 'Platform\\Core\\Models\\User',
-        ];
+        // LOOSE: Dynamisch alle Models finden und mappen
+        $allModels = $this->getAllModels();
         
-        return $modelMapping[$modelName] ?? null;
+        foreach ($allModels as $modelClass) {
+            $className = class_basename($modelClass);
+            $tableName = $this->getTableName($modelClass);
+            
+            // Konvertiere Tabellenname zu Model-Name
+            $tableToModelName = $this->convertTableNameToModelName($tableName);
+            
+            if ($tableToModelName === $modelName) {
+                \Log::info("🔍 LOOSE MAPPING FOUND:", [
+                    'toolName' => $toolName,
+                    'modelName' => $modelName,
+                    'modelClass' => $modelClass,
+                    'tableName' => $tableName
+                ]);
+                return $modelClass;
+            }
+        }
+        
+        \Log::warning("🔍 NO MAPPING FOUND:", [
+            'toolName' => $toolName,
+            'modelName' => $modelName
+        ]);
+        
+        return null;
+    }
+    
+    /**
+     * Hole alle Models (LOOSE!)
+     */
+    protected function getAllModels(): array
+    {
+        // Verwende den ToolRegistry um alle Models zu bekommen
+        $toolRegistry = app(\Platform\Core\Services\ToolRegistry::class);
+        return $toolRegistry->getAllModels();
+    }
+    
+    /**
+     * Hole Tabellenname für Model (LOOSE!)
+     */
+    protected function getTableName(string $modelClass): string
+    {
+        $model = new $modelClass();
+        return $model->getTable();
+    }
+    
+    /**
+     * Konvertiere Tabellenname zu Model-Name (LOOSE!)
+     */
+    protected function convertTableNameToModelName(string $tableName): string
+    {
+        // Entferne Prefixes und konvertiere zu PascalCase
+        $name = $tableName;
+        
+        // Entferne bekannte Prefixes
+        $prefixes = ['planner_', 'crm_', 'okr_', 'core_'];
+        foreach ($prefixes as $prefix) {
+            if (str_starts_with($name, $prefix)) {
+                $name = substr($name, strlen($prefix));
+                break;
+            }
+        }
+        
+        // Konvertiere snake_case zu PascalCase
+        $name = str_replace('_', ' ', $name);
+        $name = ucwords($name);
+        $name = str_replace(' ', '', $name);
+        
+        return $name;
     }
     
     /**
