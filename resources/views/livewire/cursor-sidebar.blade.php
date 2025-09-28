@@ -130,25 +130,6 @@
                                         </div>
                                     </div>
                                 @endif
-                                     <div class="space-y-1 max-h-32 overflow-y-auto">
-                                         @foreach($agentActivities as $index => $activity)
-                                             <div class="text-xs bg-blue-50 px-2 py-1 rounded border-l-2 border-blue-300 animate-fade-in">
-                                                 <div class="flex items-center gap-2">
-                                                     <span class="{{ $activity['status'] === 'running' ? 'animate-pulse' : '' }}">
-                                                         {{ $activity['icon'] ?? '🔄' }}
-                                                     </span>
-                                                     <span class="text-blue-700 font-medium">{{ $activity['step'] ?? $activity['message'] }}</span>
-                                                     @if(isset($activity['duration']) && $activity['duration'] > 0)
-                                                         <span class="text-blue-500 text-xs">({{ number_format($activity['duration'], 0) }}ms)</span>
-                                                     @endif
-                                                     @if(isset($activity['timestamp']))
-                                                         <span class="text-blue-400 text-xs ml-auto">{{ $activity['timestamp'] }}</span>
-                                                     @endif
-                                                 </div>
-                                             </div>
-                                         @endforeach
-                                     </div>
-                                 @endif
                                  
                                  {{-- Progress Bar --}}
                                  @if($isWorking && $totalSteps > 0)
