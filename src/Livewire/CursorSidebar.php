@@ -64,6 +64,19 @@ class CursorSidebar extends Component
             // Force Livewire re-render
             $this->dispatch('$refresh');
         }
+        
+        #[On('agent.step')]
+        public function handleAgentStep($data): void
+        {
+            $this->currentStep = $data['message'];
+            $this->stepNumber = $data['step'];
+            $this->totalSteps = $data['total'];
+            $this->isWorking = true;
+            $this->showActivityStream = true;
+            
+            // Force Livewire re-render
+            $this->dispatch('$refresh');
+        }
     
     public function mount(): void
     {

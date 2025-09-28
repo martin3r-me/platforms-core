@@ -99,8 +99,37 @@
                                      @endif
                                  @endforeach
                                  
-                                 {{-- Live Agent Activities Stream --}}
-                                 @if($showActivityStream && !empty($agentActivities))
+                                {{-- Live Agent Activities Stream --}}
+                                @if($showActivityStream && !empty($agentActivities))
+                                    <div class="space-y-1 max-h-32 overflow-y-auto">
+                                        @foreach($agentActivities as $index => $activity)
+                                            <div class="text-xs bg-blue-50 px-2 py-1 rounded border-l-2 border-blue-300 animate-fade-in">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="{{ $activity['status'] === 'running' ? 'animate-pulse' : '' }}">
+                                                        {{ $activity['icon'] ?? '🔄' }}
+                                                    </span>
+                                                    <span class="text-blue-700 font-medium">{{ $activity['step'] ?? $activity['message'] }}</span>
+                                                    @if(isset($activity['duration']) && $activity['duration'] > 0)
+                                                        <span class="text-gray-500">({{ number_format($activity['duration'], 2) }}s)</span>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                                
+                                {{-- Current Step Display --}}
+                                @if($isWorking && $currentStep)
+                                    <div class="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                                        <div class="flex items-center gap-2">
+                                            <span class="animate-pulse">🔄</span>
+                                            <span class="text-green-700 font-medium">{{ $currentStep }}</span>
+                                            @if($stepNumber && $totalSteps)
+                                                <span class="text-gray-500">({{ $stepNumber }}/{{ $totalSteps }})</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endif
                                      <div class="space-y-1 max-h-32 overflow-y-auto">
                                          @foreach($agentActivities as $index => $activity)
                                              <div class="text-xs bg-blue-50 px-2 py-1 rounded border-l-2 border-blue-300 animate-fade-in">

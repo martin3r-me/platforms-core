@@ -8,6 +8,7 @@ use Platform\Core\Models\CoreChat;
 use Platform\Core\Models\CoreChatMessage;
 use Platform\Core\Services\AgentOrchestrator;
 use Platform\Core\Services\AgentFallbackService;
+use Illuminate\Support\Facades\Event;
 
 class IntelligentAgent
 {
@@ -45,11 +46,25 @@ class IntelligentAgent
         ]);
         
         try {
+            // Event: Start der Verarbeitung
+            Event::dispatch('agent.step', [
+                'message' => '🔄 Analysiere Anfrage...',
+                'step' => 1,
+                'total' => 5
+            ]);
+            
             // Prüfe ob OpenAI verfügbar ist
             if (!$this->fallbackService->isOpenAIAvailable()) {
                 \Log::warning("🤖 OPENAI NOT AVAILABLE, USING FALLBACK");
                 return $this->fallbackService->executeFallback($message);
             }
+            
+            // Event: OpenAI verfügbar
+            Event::dispatch('agent.step', [
+                'message' => '✅ OpenAI verfügbar',
+                'step' => 2,
+                'total' => 5
+            ]);
             
             // Prüfe ob es eine komplexe Query ist
             $isComplex = $this->isComplexQuery($message);
@@ -60,10 +75,20 @@ class IntelligentAgent
             
             if ($isComplex) {
                 \Log::info("🎯 Using COMPLEX Query Processing");
+                Event::dispatch('agent.step', [
+                    'message' => '🎭 Verwende Orchestrierung...',
+                    'step' => 3,
+                    'total' => 5
+                ]);
                 return $this->processComplexQuery($message, $chatId);
             }
             
             \Log::info("💬 Using SIMPLE Query Processing");
+            Event::dispatch('agent.step', [
+                'message' => '💬 Verwende einfache Verarbeitung...',
+                'step' => 3,
+                'total' => 5
+            ]);
             return $this->processSimpleQuery($message, $chatId);
             
         } catch (\Exception $e) {
