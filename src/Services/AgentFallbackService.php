@@ -270,11 +270,21 @@ class AgentFallbackService
      */
     protected function handleDefaultFallback(string $query): array
     {
+        // Debug-Info für API Key
+        $apiKey = env('OPENAI_API_KEY');
+        $debugInfo = [
+            'env_openai_api_key' => $apiKey ? 'SET (' . strlen($apiKey) . ' chars)' : 'NOT SET',
+            'key_start' => substr($apiKey ?? '', 0, 10) . '...',
+            'env_file_exists' => file_exists(base_path('.env')),
+            'env_file_readable' => is_readable(base_path('.env'))
+        ];
+        
         return [
             'ok' => false,
             'error' => 'OpenAI Service nicht verfügbar. Fallback-Modus aktiviert.',
             'message' => 'Entschuldigung, der KI-Service ist derzeit nicht verfügbar. Bitte versuchen Sie es später erneut.',
             'fallback' => true,
+            'debug_info' => $debugInfo,
             'suggestions' => [
                 'Versuchen Sie eine einfachere Anfrage',
                 'Kontaktieren Sie den Administrator',
@@ -315,15 +325,16 @@ class AgentFallbackService
             $configKey = config('app.openai_api_key');
             $directEnv = $_ENV['OPENAI_API_KEY'] ?? null;
             
-            Log::info("🔍 DETAILLIERTE OPENAI DEBUG INFO:", [
+            $debugInfo = [
                 'env_openai_api_key' => $apiKey ? 'SET (' . strlen($apiKey) . ' chars)' : 'NOT SET',
                 'config_app_openai_api_key' => $configKey ? 'SET (' . strlen($configKey) . ' chars)' : 'NOT SET',
                 'direct_env_openai_api_key' => $directEnv ? 'SET (' . strlen($directEnv) . ' chars)' : 'NOT SET',
                 'key_start' => substr($apiKey ?? '', 0, 10) . '...',
-                'all_env_keys' => array_keys($_ENV),
                 'env_file_exists' => file_exists(base_path('.env')),
                 'env_file_readable' => is_readable(base_path('.env'))
-            ]);
+            ];
+            
+            Log::info("🔍 DETAILLIERTE OPENAI DEBUG INFO:", $debugInfo);
             
             if (empty($apiKey)) {
                 Log::warning("🔄 OPENAI API KEY NOT SET - DETAILED DEBUG:");
