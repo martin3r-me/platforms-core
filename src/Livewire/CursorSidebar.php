@@ -114,6 +114,33 @@ class CursorSidebar extends Component
             $this->dispatch('$refresh');
         });
         
+        // DEBUG: Laravel Event Listener für comms
+        Event::listen('comms', function($payload) {
+            \Log::info("🔍 LARAVEL COMMS EVENT EMPFANGEN:", [
+                'payload' => $payload,
+                'timestamp' => now(),
+                'source' => 'Laravel Event Listener'
+            ]);
+            
+            $this->currentContext = $payload;
+            $this->currentModel = $payload['model'] ?? null;
+            $this->currentModelId = $payload['modelId'] ?? null;
+            $this->currentSubject = $payload['subject'] ?? null;
+            $this->currentUrl = $payload['url'] ?? null;
+            
+            \Log::info("🔍 LARAVEL CONTEXT GESETZT:", [
+                'currentModel' => $this->currentModel,
+                'currentModelId' => $this->currentModelId,
+                'currentSubject' => $this->currentSubject,
+                'currentUrl' => $this->currentUrl,
+                'timestamp' => now(),
+                'source' => 'Laravel Event Listener'
+            ]);
+            
+            // Force Livewire re-render
+            $this->dispatch('$refresh');
+        });
+        
         // Event-Listener für Context-Updates wird über #[On('comms')] implementiert
         
         // Aktiven Chat aus Session wiederherstellen
