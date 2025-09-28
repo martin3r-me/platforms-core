@@ -39,12 +39,14 @@ class CursorSidebar extends Component
     public ?string $currentUrl = null;
     public bool $contextPanelOpen = false;
     public bool $includeContext = true;
+    public bool $collapsed = true;
 
 
     #[On('cursor-sidebar-toggle')]
     public function toggle(): void
     {
         $this->open = !$this->open;
+        $this->collapsed = !$this->collapsed;
         if ($this->open) {
             $this->ensureChat();
         }
