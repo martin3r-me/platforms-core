@@ -21,7 +21,7 @@
         <div class="flex-1 overflow-y-auto p-2 d-flex flex-col gap-2">
             
             {{-- DEBUG: Context Info --}}
-            @if(!$collapsed && !empty($currentContext))
+            @if(!empty($currentContext))
             <div class="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs">
                 <div class="font-bold text-yellow-800 mb-1">🔍 DEBUG CONTEXT:</div>
                 <div class="text-yellow-700">
