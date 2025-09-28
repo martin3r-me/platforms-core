@@ -142,7 +142,11 @@ class IntelligentAgent
         
         // Tools laden (IMMER nur Core Tools für 2-Step System)
         $tools = $this->toolRegistry->getCoreToolsOnly();
-        \Log::info("🔧 Core Tools loaded", ['count' => count($tools), 'type' => 'core-only']);
+        \Log::info("🔧 Core Tools loaded", [
+            'count' => count($tools), 
+            'type' => 'core-only',
+            'tool_names' => array_column($tools, 'function.name')
+        ]);
         
         // OpenAI API aufrufen mit Tools
         \Log::info("🤖 OPENAI API REQUEST DEBUG:", [
