@@ -55,11 +55,26 @@ class CursorSidebar extends Component
     #[On('comms')]
     public function prepareCommsContext(array $payload = []): void
     {
+        // DEBUG: Log den empfangenen Payload
+        \Log::info("🔍 COMMS EVENT EMPFANGEN:", [
+            'payload' => $payload,
+            'payload_keys' => array_keys($payload),
+            'payload_count' => count($payload)
+        ]);
+        
         $this->currentContext = $payload;
         $this->currentModel = $payload['model'] ?? null;
         $this->currentModelId = $payload['modelId'] ?? null;
         $this->currentSubject = $payload['subject'] ?? null;
         $this->currentUrl = $payload['url'] ?? null;
+        
+        // DEBUG: Log die gesetzten Werte
+        \Log::info("🔍 CONTEXT GESETZT:", [
+            'currentModel' => $this->currentModel,
+            'currentModelId' => $this->currentModelId,
+            'currentSubject' => $this->currentSubject,
+            'currentUrl' => $this->currentUrl
+        ]);
         
         // Force Livewire re-render
         $this->dispatch('$refresh');
