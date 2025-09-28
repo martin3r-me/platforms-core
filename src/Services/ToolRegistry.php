@@ -215,7 +215,7 @@ class ToolRegistry
     /**
      * Hole alle Models aus der Anwendung
      */
-    protected function getAllModels(): array
+    public function getAllModels(): array
     {
         $models = [];
         
