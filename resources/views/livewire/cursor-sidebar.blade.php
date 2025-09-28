@@ -6,7 +6,22 @@
             @foreach($feed as $message)
                 <div class="flex {{ $message['role'] === 'user' ? 'justify-end' : 'justify-start' }}">
                     <div class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg {{ $message['role'] === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-900' }}">
-                        <div class="text-sm">{{ $message['text'] ?? $message['content'] ?? '' }}</div>
+                        <div class="text-sm">
+                            @if($message['role'] === 'user')
+                                {{ $message['text'] ?? $message['content'] ?? '' }}
+                            @elseif($message['role'] === 'assistant')
+                                @if(isset($message['data']['text']))
+                                    {{ $message['data']['text'] }}
+                                @else
+                                    {{ $message['text'] ?? $message['content'] ?? '' }}
+                                @endif
+                            @elseif($message['role'] === 'tool')
+                                <div class="text-xs text-gray-600">
+                                    <strong>Tool Result:</strong><br>
+                                    {{ json_encode($message['data'] ?? [], JSON_PRETTY_PRINT) }}
+                                </div>
+                            @endif
+                        </div>
                         <div class="text-xs mt-1 opacity-70">
                             {{ isset($message['created_at']) ? \Carbon\Carbon::parse($message['created_at'])->format('H:i') : '' }}
                         </div>
@@ -30,6 +45,24 @@
                             </div>
                         </div>
                     @endforeach
+                </div>
+            @endif
+
+            <!-- Debug: Show all feed messages -->
+            @if(config('app.debug'))
+                <div class="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                    <div class="font-bold text-yellow-800 mb-1">🔍 DEBUG FEED:</div>
+                    <div class="text-yellow-700">
+                        <div><strong>Feed Count:</strong> {{ count($feed) }}</div>
+                        @foreach($feed as $index => $msg)
+                            <div class="mt-1">
+                                <strong>Message {{ $index + 1 }}:</strong> 
+                                Role: {{ $msg['role'] ?? 'unknown' }}, 
+                                Type: {{ $msg['type'] ?? 'none' }}, 
+                                Has Data: {{ isset($msg['data']) ? 'yes' : 'no' }}
+                            </div>
+                        @endforeach
+                    </div>
                 </div>
             @endif
             
