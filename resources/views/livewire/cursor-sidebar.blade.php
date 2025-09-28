@@ -148,7 +148,7 @@
 
                 {{-- Chat Input --}}
                 <div class="px-3 py-2 border-top-1 d-flex items-center gap-2">
-                    <input type="text" class="flex-grow border rounded px-2 py-1" placeholder="Nachricht…" wire:model.defer="input" wire:keydown.enter="send">
+                    <input type="text" class="flex-grow border rounded px-2 py-1" placeholder="Nachricht…" wire:model.live="input" wire:keydown.enter="send">
                     <x-ui-button size="sm" variant="primary" wire:click="send">Senden</x-ui-button>
                 </div>
                 </div>
