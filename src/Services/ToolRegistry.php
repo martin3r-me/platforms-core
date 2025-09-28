@@ -1049,23 +1049,6 @@ class ToolRegistry
         ];
     }
     
-    /**
-     * Hole Tools für spezifisches Modul
-     */
-    public function getToolsForModule(string $module): array
-    {
-        $allTools = $this->getAllTools();
-        $moduleTools = [];
-        
-        foreach ($allTools as $tool) {
-            $toolName = $tool['function']['name'] ?? '';
-            if (str_starts_with($toolName, $module)) {
-                $moduleTools[] = $tool;
-            }
-        }
-        
-        return $moduleTools;
-    }
     
     /**
      * Aktuelle Zeit Tool
