@@ -227,7 +227,7 @@ class AgentOrchestrator
                 
                 // WICHTIG: Füge Kontext über erstellte/aktualisierte Items hinzu
                 if (isset($result['data']['item']['id'])) {
-                    $formattedContent .= "\n\nWICHTIGER KONTEXT: Diese Aufgabe hat die ID {$result['data']['item']['id']} und wurde gerade erstellt/aktualisiert.";
+                    $formattedContent .= "\n\nWICHTIGER KONTEXT: Diese Aufgabe hat die ID " . $result['data']['item']['id'] . " und wurde gerade erstellt/aktualisiert.";
                 }
                 
                 $messages[] = [
