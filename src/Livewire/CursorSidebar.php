@@ -76,8 +76,8 @@ class CursorSidebar extends Component
             $this->dispatch('$refresh');
         });
         
-        // Event-Listener für Context-Updates
-        Event::listen('comms', function($context) {
+        // Event-Listener für Context-Updates (Livewire Event)
+        $this->listen('comms', function($context) {
             $this->currentContext = $context;
             $this->currentModel = $context['model'] ?? null;
             $this->currentModelId = $context['modelId'] ?? null;
