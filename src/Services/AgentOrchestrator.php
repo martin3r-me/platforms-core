@@ -105,7 +105,9 @@ class AgentOrchestrator
         STEP 1: ENTDECKE WAS VERFÜGBAR IST
         - Verwende get_modules() um alle verfügbaren Module zu sehen
         - Verwende get_context() um den aktuellen User/Team Kontext zu verstehen
-        - Verwende discover_tools('modul') um spezifische Tools für ein Modul zu finden
+        - Verwende discover_tools('planner') für Projekt/Aufgaben-Anfragen
+        - Verwende discover_tools('okr') für OKR-Anfragen
+        - Verwende discover_tools('crm') für CRM-Anfragen
         
         STEP 2: FÜHRE DIE RICHTIGEN TOOLS AUS
         - Basierend auf der Anfrage wähle die passenden Tools aus
