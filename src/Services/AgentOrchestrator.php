@@ -113,6 +113,12 @@ class AgentOrchestrator
         - Wenn du Items aktualisieren möchtest, verwende die IDs aus den vorherigen Tool-Calls
         - Prüfe die Tool-Ergebnisse auf "WICHTIGER KONTEXT" für aktuelle IDs
         
+        WICHTIG: Context ist nur ein HINWEIS, nicht eine Einschränkung!
+        - Beantworte ALLE Fragen normal, auch wenn sie nicht mit dem Context zusammenhängen
+        - Verwende Context nur wenn er hilfreich ist
+        - Ignoriere Context wenn er nicht relevant ist
+        - Sei flexibel und intelligent in der Context-Nutzung
+        
         VERFÜGBARE TOOLS:
         - Du hast Zugriff auf alle verfügbaren Tools für Datenbankoperationen
         - Verwende die Tools die für die Anfrage relevant sind

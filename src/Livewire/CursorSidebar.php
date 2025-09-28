@@ -131,7 +131,7 @@ class CursorSidebar extends Component
                 if ($this->includeContext) {
                     $contextText = $this->buildContextText();
                     if ($contextText) {
-                        $text = "KONTEXT: {$contextText}\n\nANFRAGE: {$text}";
+                        $text = "KONTEXT: {$contextText}\n\nANFRAGE: {$text}\n\nWICHTIG: Der Context ist nur ein Hinweis. Beantworte ALLE Fragen normal, auch wenn sie nicht mit dem Context zusammenhängen. Verwende den Context nur wenn er hilfreich ist.";
                     }
                 }
                 
