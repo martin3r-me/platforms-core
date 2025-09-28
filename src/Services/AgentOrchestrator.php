@@ -58,7 +58,14 @@ class AgentOrchestrator
             }
             
             // Lade contextual Tools basierend auf Query
-            $tools = app(\Platform\Core\Services\ToolRegistry::class)->getContextualTools($query);
+            // IMMER nur Core Tools für 2-Step System
+            $tools = app(\Platform\Core\Services\ToolRegistry::class)->getCoreToolsOnly();
+            
+            \Log::info("🔧 AgentOrchestrator Core Tools loaded", [
+                'count' => count($tools), 
+                'type' => 'core-only',
+                'tool_names' => array_column($tools, 'function.name')
+            ]);
             
             if (empty($tools)) {
                 throw new \RuntimeException('No tools available for query');
