@@ -111,7 +111,7 @@ class AgentOrchestrator
         - Achte auf die IDs von gerade erstellten/aktualisierten Items
         - Verwende IMMER die aktuellen IDs aus den Tool-Ergebnissen
         - Wenn du Items aktualisieren möchtest, verwende die IDs aus den vorherigen Tool-Calls
-        - Prüfe die Tool-Ergebnisse auf "WICHTIGER KONTEXT" für aktuelle IDs
+        - Prüfe die Tool-Ergebnisse auf WICHTIGER KONTEXT für aktuelle IDs
         
         WICHTIG: Context ist nur ein HINWEIS, nicht eine Einschränkung!
         - Beantworte ALLE Fragen normal, auch wenn sie nicht mit dem Context zusammenhängen
