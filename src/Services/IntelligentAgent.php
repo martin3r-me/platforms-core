@@ -142,6 +142,15 @@ class IntelligentAgent
         
         // Tools laden (IMMER nur Core Tools für 2-Step System)
         $tools = $this->toolRegistry->getCoreToolsOnly();
+        
+        // DEBUG: Prüfe ob wirklich nur Core Tools geladen werden
+        if (count($tools) > 5) {
+            \Log::error("🚨 FEHLER: Agent bekommt zu viele Tools!", [
+                'count' => count($tools),
+                'expected' => 5,
+                'tools' => array_column($tools, 'function.name')
+            ]);
+        }
         \Log::info("🔧 Core Tools loaded", [
             'count' => count($tools), 
             'type' => 'core-only',
