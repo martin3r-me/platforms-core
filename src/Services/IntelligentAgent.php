@@ -140,9 +140,9 @@ class IntelligentAgent
         $messages = $this->loadChatHistory($chatId);
         $messages[] = ['role' => 'user', 'content' => $message];
         
-        // Tools laden (nur beim ersten Chat oder wenn explizit angefragt)
-        $tools = $this->getToolsForChat($chatId);
-        \Log::info("🔧 Tools loaded", ['count' => count($tools), 'type' => count($tools) <= 5 ? 'core' : 'discovered']);
+        // Tools laden (IMMER nur Core Tools für 2-Step System)
+        $tools = $this->toolRegistry->getCoreToolsOnly();
+        \Log::info("🔧 Core Tools loaded", ['count' => count($tools), 'type' => 'core-only']);
         
         // OpenAI API aufrufen mit Tools
         $response = $this->client->chat()->create([
