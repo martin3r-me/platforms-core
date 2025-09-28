@@ -121,19 +121,19 @@ class AgentOrchestrator
         
         🎯 KONKRETE BEISPIELE:
         
-        BEISPIEL 1: "Zeige mir alle Projekte"
-        - STEP 1: get_modules() → sehe dass 'planner' verfügbar ist
-        - STEP 1: discover_tools('planner') → finde plannerproject_get_all
+        BEISPIEL 1: Zeige mir alle Projekte
+        - STEP 1: get_modules() → sehe dass planner verfügbar ist
+        - STEP 1: discover_tools(planner) → finde plannerproject_get_all
         - STEP 2: führe plannerproject_get_all aus
         
-        BEISPIEL 2: "Welche Aufgaben sind heute fällig?"
+        BEISPIEL 2: Welche Aufgaben sind heute fällig?
         - STEP 1: get_current_time() → aktuelle Zeit
-        - STEP 1: discover_tools('planner') → finde plannertask_get_all
+        - STEP 1: discover_tools(planner) → finde plannertask_get_all
         - STEP 2: führe plannertask_get_all aus und filtere nach Fälligkeit
         
-        BEISPIEL 3: "Erstelle ein neues Projekt"
+        BEISPIEL 3: Erstelle ein neues Projekt
         - STEP 1: get_context() → verstehe aktuellen User/Team
-        - STEP 1: discover_tools('planner') → finde plannerproject_create
+        - STEP 1: discover_tools(planner) → finde plannerproject_create
         - STEP 2: führe plannerproject_create mit den richtigen Parametern aus
         
         KONTEXT-MANAGEMENT:
