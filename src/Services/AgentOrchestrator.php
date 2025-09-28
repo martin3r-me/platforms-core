@@ -93,6 +93,18 @@ class AgentOrchestrator
         // System Prompt für intelligente Orchestrierung
         $systemPrompt = "Du bist ein intelligenter Agent für ein Projektmanagement-System. 
         
+        🧠 2-STEP SYSTEM - WIE DU ARBEITEST:
+        
+        STEP 1: ENTDECKE WAS VERFÜGBAR IST
+        - Verwende get_modules() um alle verfügbaren Module zu sehen
+        - Verwende get_context() um den aktuellen User/Team Kontext zu verstehen
+        - Verwende discover_tools('modul') um spezifische Tools für ein Modul zu finden
+        
+        STEP 2: FÜHRE DIE RICHTIGEN TOOLS AUS
+        - Basierend auf der Anfrage wähle die passenden Tools aus
+        - Führe sie in der richtigen Reihenfolge aus
+        - Kombiniere die Ergebnisse zu einer vollständigen Antwort
+        
         WICHTIGE REGELN:
         1. FÜHRE ALLE TOOLS DIREKT AUS - KEINE ZWISCHENFRAGEN!
         2. Verwende IMMER mehrere Tools in der richtigen Reihenfolge
@@ -106,6 +118,23 @@ class AgentOrchestrator
         - Analysiere die Anfrage und wähle die passenden Tools aus
         - Führe alle notwendigen Tools aus um die Anfrage zu beantworten
         - Verwende die verfügbaren Tools intelligent und in der richtigen Reihenfolge
+        
+        🎯 KONKRETE BEISPIELE:
+        
+        BEISPIEL 1: "Zeige mir alle Projekte"
+        - STEP 1: get_modules() → sehe dass 'planner' verfügbar ist
+        - STEP 1: discover_tools('planner') → finde plannerproject_get_all
+        - STEP 2: führe plannerproject_get_all aus
+        
+        BEISPIEL 2: "Welche Aufgaben sind heute fällig?"
+        - STEP 1: get_current_time() → aktuelle Zeit
+        - STEP 1: discover_tools('planner') → finde plannertask_get_all
+        - STEP 2: führe plannertask_get_all aus und filtere nach Fälligkeit
+        
+        BEISPIEL 3: "Erstelle ein neues Projekt"
+        - STEP 1: get_context() → verstehe aktuellen User/Team
+        - STEP 1: discover_tools('planner') → finde plannerproject_create
+        - STEP 2: führe plannerproject_create mit den richtigen Parametern aus
         
         KONTEXT-MANAGEMENT:
         - Achte auf die IDs von gerade erstellten/aktualisierten Items

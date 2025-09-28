@@ -16,16 +16,27 @@ class CoreContextTool
         if (is_string($routeName) && str_contains($routeName, '.')) {
             $module = strstr($routeName, '.', true);
         }
+        
         return [
             'ok' => true,
             'data' => [
-                'user' => $user ? ['id' => $user->id, 'name' => $user->name ?? null] : null,
-                'team' => $team ? ['id' => $team->id, 'name' => $team->name ?? null] : null,
+                'user' => $user ? [
+                    'id' => $user->id, 
+                    'name' => $user->name ?? null,
+                    'email' => $user->email ?? null
+                ] : null,
+                'team' => $team ? [
+                    'id' => $team->id, 
+                    'name' => $team->name ?? null,
+                    'slug' => $team->slug ?? null
+                ] : null,
                 'route' => $routeName,
                 'module' => $module,
                 'url' => $url,
+                'current_time' => now()->format('Y-m-d H:i:s'),
+                'timezone' => config('app.timezone')
             ],
-            'message' => 'Kontext bereit',
+            'message' => 'Aktueller User und Team Kontext geladen'
         ];
     }
 }

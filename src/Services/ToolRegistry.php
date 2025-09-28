@@ -1036,6 +1036,138 @@ class ToolRegistry
     }
     
     /**
+     * Hole nur Core Tools (für 2-Step Approach)
+     */
+    public function getCoreToolsOnly(): array
+    {
+        return [
+            $this->getCurrentTimeTool(),
+            $this->getContextTool(),
+            $this->getModulesTool(),
+            $this->getHelpTool(),
+            $this->getToolDiscoveryTool()
+        ];
+    }
+    
+    /**
+     * Hole Tools für spezifisches Modul
+     */
+    public function getToolsForModule(string $module): array
+    {
+        $allTools = $this->getAllTools();
+        $moduleTools = [];
+        
+        foreach ($allTools as $tool) {
+            $toolName = $tool['function']['name'] ?? '';
+            if (str_starts_with($toolName, $module)) {
+                $moduleTools[] = $tool;
+            }
+        }
+        
+        return $moduleTools;
+    }
+    
+    /**
+     * Aktuelle Zeit Tool
+     */
+    protected function getCurrentTimeTool(): array
+    {
+        return [
+            'type' => 'function',
+            'function' => [
+                'name' => 'get_current_time',
+                'description' => 'Aktuelle Zeit und Datum abrufen',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => (object)[],
+                    'required' => []
+                ]
+            ]
+        ];
+    }
+    
+    /**
+     * Context Tool
+     */
+    protected function getContextTool(): array
+    {
+        return [
+            'type' => 'function',
+            'function' => [
+                'name' => 'get_context',
+                'description' => 'Aktuellen Kontext abrufen (welche Seite, welches Modell)',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => (object)[],
+                    'required' => []
+                ]
+            ]
+        ];
+    }
+    
+    /**
+     * Modules Tool
+     */
+    protected function getModulesTool(): array
+    {
+        return [
+            'type' => 'function',
+            'function' => [
+                'name' => 'get_modules',
+                'description' => 'Verfügbare Module und deren Tools abrufen',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => (object)[],
+                    'required' => []
+                ]
+            ]
+        ];
+    }
+    
+    /**
+     * Help Tool
+     */
+    protected function getHelpTool(): array
+    {
+        return [
+            'type' => 'function',
+            'function' => [
+                'name' => 'get_help',
+                'description' => 'Hilfe und verfügbare Funktionen anzeigen',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => (object)[],
+                    'required' => []
+                ]
+            ]
+        ];
+    }
+    
+    /**
+     * Tool Discovery Tool
+     */
+    protected function getToolDiscoveryTool(): array
+    {
+        return [
+            'type' => 'function',
+            'function' => [
+                'name' => 'discover_tools',
+                'description' => 'Tools für spezifisches Modul entdecken (z.B. "planner", "okr", "crm")',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'module' => [
+                            'type' => 'string',
+                            'description' => 'Modul-Name (planner, okr, crm, core)'
+                        ]
+                    ],
+                    'required' => ['module']
+                ]
+            ]
+        ];
+    }
+    
+    /**
      * Bestimme Modul basierend auf Model-Name (LOOSE!)
      */
     protected function getModuleFromModelName(string $modelName): string

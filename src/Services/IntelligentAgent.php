@@ -140,9 +140,9 @@ class IntelligentAgent
         $messages = $this->loadChatHistory($chatId);
         $messages[] = ['role' => 'user', 'content' => $message];
         
-        // Tools laden
-        $tools = $this->toolRegistry->getAllTools();
-        \Log::info("🔧 Tools loaded", ['count' => count($tools)]);
+        // Tools laden (nur beim ersten Chat oder wenn explizit angefragt)
+        $tools = $this->getToolsForChat($chatId);
+        \Log::info("🔧 Tools loaded", ['count' => count($tools), 'type' => count($tools) <= 5 ? 'core' : 'discovered']);
         
         // OpenAI API aufrufen mit Tools
         $response = $this->client->chat()->create([
@@ -316,6 +316,41 @@ class IntelligentAgent
         }
         
         return $history;
+    }
+    
+    /**
+     * Bestimme welche Tools für diesen Chat geladen werden sollen
+     */
+    protected function getToolsForChat(int $chatId): array
+    {
+        // Prüfe ob bereits Module-spezifische Tools geladen wurden
+        $chat = \Platform\Core\Models\CoreChat::find($chatId);
+        if (!$chat) {
+            return $this->toolRegistry->getCoreToolsOnly();
+        }
+        
+        // Prüfe Chat-Historie auf discover_tools Calls
+        $messages = \Platform\Core\Models\CoreChatMessage::where('chat_id', $chatId)
+            ->where('role', 'assistant')
+            ->where('content', 'like', '%discover_tools%')
+            ->latest()
+            ->first();
+            
+        if ($messages) {
+            // Extrahiere das Modul aus dem discover_tools Call
+            $content = $messages->content;
+            if (preg_match('/discover_tools\(["\']([^"\']+)["\']\)/', $content, $matches)) {
+                $module = $matches[1];
+                $moduleTools = $this->toolRegistry->getToolsForModule($module);
+                if (!empty($moduleTools)) {
+                    \Log::info("🔧 Using discovered tools for module", ['module' => $module, 'count' => count($moduleTools)]);
+                    return $moduleTools;
+                }
+            }
+        }
+        
+        // Fallback: Nur Core Tools
+        return $this->toolRegistry->getCoreToolsOnly();
     }
     
     /**

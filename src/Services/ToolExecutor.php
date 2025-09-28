@@ -35,7 +35,7 @@ class ToolExecutor
             ]);
             
             // Core Tools
-            if (in_array($toolName, ['get_current_time', 'get_context'])) {
+            if (in_array($toolName, ['get_current_time', 'get_context', 'get_modules', 'get_help', 'discover_tools'])) {
                 return $this->executeCoreTool($toolName, $parameters);
             }
             
@@ -109,26 +109,28 @@ class ToolExecutor
     {
         switch ($toolName) {
             case 'get_current_time':
-                return [
-                    'ok' => true,
-                    'data' => [
-                        'time' => now()->format('Y-m-d H:i:s'),
-                        'timezone' => config('app.timezone')
-                    ]
-                ];
+                $tool = app(\Platform\Core\Tools\CoreTimeTool::class);
+                return $tool->getNow($parameters);
                 
             case 'get_context':
-                $user = auth()->user();
-                return [
-                    'ok' => true,
-                    'data' => [
-                        'user_id' => $user?->id,
-                        'user_name' => $user?->name,
-                        'team_id' => $user?->currentTeam?->id,
-                        'team_name' => $user?->currentTeam?->name,
-                        'current_time' => now()->format('Y-m-d H:i:s')
-                    ]
-                ];
+                $tool = app(\Platform\Core\Tools\CoreContextTool::class);
+                return $tool->getContext();
+                
+            case 'get_modules':
+                $tool = app(\Platform\Core\Tools\CoreModulesTool::class);
+                return $tool->getModules();
+                
+            case 'get_help':
+                $tool = app(\Platform\Core\Tools\CoreHelpTool::class);
+                return $tool->getHelp();
+                
+            case 'discover_tools':
+                $module = $parameters['module'] ?? '';
+                $tool = app(\Platform\Core\Tools\CoreDiscoverTool::class);
+                return $tool->discoverTools($module);
+                
+            default:
+                return $this->createErrorResponse("Unknown core tool: {$toolName}");
         }
     }
     
@@ -383,11 +385,20 @@ class ToolExecutor
         // Entferne Prefixes und konvertiere zu PascalCase
         $name = $tableName;
         
+        \Log::info("🔍 CONVERT TABLE NAME:", [
+            'original' => $tableName,
+            'name' => $name
+        ]);
+        
         // Entferne bekannte Prefixes
         $prefixes = ['planner_', 'crm_', 'okr_', 'core_'];
         foreach ($prefixes as $prefix) {
             if (str_starts_with($name, $prefix)) {
                 $name = substr($name, strlen($prefix));
+                \Log::info("🔍 REMOVED PREFIX:", [
+                    'prefix' => $prefix,
+                    'name' => $name
+                ]);
                 break;
             }
         }
@@ -396,6 +407,11 @@ class ToolExecutor
         $name = str_replace('_', ' ', $name);
         $name = ucwords($name);
         $name = str_replace(' ', '', $name);
+        
+        \Log::info("🔍 FINAL CONVERSION:", [
+            'original' => $tableName,
+            'converted' => $name
+        ]);
         
         return $name;
     }
