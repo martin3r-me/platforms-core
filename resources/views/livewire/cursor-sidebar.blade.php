@@ -152,7 +152,7 @@
         @endif
 
         <!-- Input Area - Fixed at Bottom -->
-        <div class="border-t border-gray-200 bg-white p-4">
+        <div class="border-t border-gray-200 bg-white p-4 sticky bottom-0 z-10">
             <div class="flex gap-2">
                 <div class="flex-1">
                     <textarea 
