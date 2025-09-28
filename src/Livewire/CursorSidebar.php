@@ -30,6 +30,15 @@ class CursorSidebar extends Component
     public int $currentStep = 0;
     public int $totalSteps = 0;
     public bool $showActivityStream = false;
+    
+    // Context-Management
+    public array $currentContext = [];
+    public ?string $currentModel = null;
+    public ?int $currentModelId = null;
+    public ?string $currentSubject = null;
+    public ?string $currentUrl = null;
+    public bool $contextPanelOpen = false;
+    public bool $includeContext = true;
 
 
     #[On('cursor-sidebar-toggle')]
@@ -60,6 +69,18 @@ class CursorSidebar extends Component
             $this->agentActivities = [];
             $this->currentStep = 0;
             $this->isWorking = false;
+            
+            // Force Livewire re-render
+            $this->dispatch('$refresh');
+        });
+        
+        // Event-Listener für Context-Updates
+        Event::listen('comms', function($context) {
+            $this->currentContext = $context;
+            $this->currentModel = $context['model'] ?? null;
+            $this->currentModelId = $context['modelId'] ?? null;
+            $this->currentSubject = $context['subject'] ?? null;
+            $this->currentUrl = $context['url'] ?? null;
             
             // Force Livewire re-render
             $this->dispatch('$refresh');
@@ -105,6 +126,15 @@ class CursorSidebar extends Component
             // IntelligentAgent verwenden für echte ChatGPT-Integration
             try {
                 $agent = app(IntelligentAgent::class);
+                
+                // Context an Agent weiterleiten (nur wenn aktiviert)
+                if ($this->includeContext) {
+                    $contextText = $this->buildContextText();
+                    if ($contextText) {
+                        $text = "KONTEXT: {$contextText}\n\nANFRAGE: {$text}";
+                    }
+                }
+                
                 $response = $agent->processMessage($text, $this->chatId);
 
                 if ($response['ok']) {
@@ -315,5 +345,73 @@ class CursorSidebar extends Component
         }
         
         return $formatted . "\n";
+    }
+    
+    /**
+     * Baue Context-Text aus aktuellen Context-Daten
+     */
+    private function buildContextText(): string
+    {
+        if (empty($this->currentContext)) {
+            return '';
+        }
+        
+        $context = [];
+        
+        if ($this->currentModel) {
+            $context[] = "Aktuelles Model: {$this->currentModel}";
+        }
+        
+        if ($this->currentModelId) {
+            $context[] = "Model ID: {$this->currentModelId}";
+        }
+        
+        if ($this->currentSubject) {
+            $context[] = "Betreff: {$this->currentSubject}";
+        }
+        
+        if ($this->currentUrl) {
+            $context[] = "URL: {$this->currentUrl}";
+        }
+        
+        // Meta-Daten hinzufügen
+        if (isset($this->currentContext['meta'])) {
+            $meta = $this->currentContext['meta'];
+            foreach ($meta as $key => $value) {
+                if ($value) {
+                    $context[] = ucfirst($key) . ": {$value}";
+                }
+            }
+        }
+        
+        return implode(', ', $context);
+    }
+    
+    /**
+     * Context-Panel umschalten
+     */
+    public function toggleContextPanel(): void
+    {
+        $this->contextPanelOpen = !$this->contextPanelOpen;
+    }
+    
+    /**
+     * Context ein-/ausschalten
+     */
+    public function toggleContext(): void
+    {
+        $this->includeContext = !$this->includeContext;
+    }
+    
+    /**
+     * Context leeren
+     */
+    public function clearContext(): void
+    {
+        $this->currentContext = [];
+        $this->currentModel = null;
+        $this->currentModelId = null;
+        $this->currentSubject = null;
+        $this->currentUrl = null;
     }
 }

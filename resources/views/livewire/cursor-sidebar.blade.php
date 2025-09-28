@@ -159,4 +159,88 @@
         }
     }
     </script>
+    
+    <!-- Context Panel -->
+    @if(!$collapsed)
+    <div class="border-t border-gray-200 bg-gray-50">
+        <!-- Context Panel Toggle -->
+        <div class="flex items-center justify-between p-2">
+            <button 
+                wire:click="toggleContextPanel" 
+                class="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-800"
+            >
+                <span>📋</span>
+                <span>Context</span>
+                <span class="text-xs">{{ $contextPanelOpen ? '▼' : '▶' }}</span>
+            </button>
+            
+            @if(!empty($currentContext))
+            <div class="flex space-x-1">
+                <button 
+                    wire:click="toggleContext" 
+                    class="text-xs px-2 py-1 rounded {{ $includeContext ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600' }}"
+                >
+                    {{ $includeContext ? 'Aktiv' : 'Aus' }}
+                </button>
+                <button 
+                    wire:click="clearContext" 
+                    class="text-xs px-2 py-1 rounded bg-red-100 text-red-800 hover:bg-red-200"
+                >
+                    ✕
+                </button>
+            </div>
+            @endif
+        </div>
+        
+        <!-- Context Panel Content -->
+        @if($contextPanelOpen && !empty($currentContext))
+        <div class="p-3 bg-white border-t border-gray-200 text-xs">
+            <div class="space-y-2">
+                @if($currentModel)
+                <div>
+                    <span class="font-medium text-gray-700">Model:</span>
+                    <span class="text-gray-600">{{ $currentModel }}</span>
+                </div>
+                @endif
+                
+                @if($currentModelId)
+                <div>
+                    <span class="font-medium text-gray-700">ID:</span>
+                    <span class="text-gray-600">{{ $currentModelId }}</span>
+                </div>
+                @endif
+                
+                @if($currentSubject)
+                <div>
+                    <span class="font-medium text-gray-700">Betreff:</span>
+                    <span class="text-gray-600">{{ $currentSubject }}</span>
+                </div>
+                @endif
+                
+                @if($currentUrl)
+                <div>
+                    <span class="font-medium text-gray-700">URL:</span>
+                    <span class="text-gray-600 text-xs break-all">{{ $currentUrl }}</span>
+                </div>
+                @endif
+                
+                @if(isset($currentContext['meta']))
+                <div>
+                    <span class="font-medium text-gray-700">Meta:</span>
+                    <div class="mt-1 space-y-1">
+                        @foreach($currentContext['meta'] as $key => $value)
+                        @if($value)
+                        <div class="text-gray-600">
+                            <span class="capitalize">{{ $key }}:</span> {{ $value }}
+                        </div>
+                        @endif
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+            </div>
+        </div>
+        @endif
+    </div>
+    @endif
 </div>
