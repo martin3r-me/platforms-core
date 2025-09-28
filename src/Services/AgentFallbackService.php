@@ -38,14 +38,34 @@ class AgentFallbackService
      */
     public function executeFallback(string $query): array
     {
-        Log::warning("🔄 FALLBACK ACTIVATED:", ['query' => $query]);
+        // Debug-Info für API Key
+        $apiKey = env('OPENAI_API_KEY');
+        $debugInfo = [
+            'env_openai_api_key' => $apiKey ? 'SET (' . strlen($apiKey) . ' chars)' : 'NOT SET',
+            'key_start' => substr($apiKey ?? '', 0, 10) . '...',
+            'env_file_exists' => file_exists(base_path('.env')),
+            'env_file_readable' => is_readable(base_path('.env'))
+        ];
+        
+        Log::warning("🔄 FALLBACK ACTIVATED:", [
+            'query' => $query,
+            'debug_info' => $debugInfo
+        ]);
         
         try {
             // Bestimme Fallback-Strategie basierend auf Query
             $strategy = $this->determineFallbackStrategy($query);
             
+            Log::info("🔄 FALLBACK STRATEGY:", [
+                'strategy' => $strategy[1],
+                'debug_info' => $debugInfo
+            ]);
+            
             // Führe Fallback aus
             $result = call_user_func($strategy, $query);
+            
+            // Debug-Info zu allen Fallback-Ergebnissen hinzufügen
+            $result['debug_info'] = $debugInfo;
             
             Log::info("🔄 FALLBACK SUCCESS:", [
                 'strategy' => $strategy[1],
