@@ -29,9 +29,9 @@
                 @foreach($feed as $message)
                     <div class="flex {{ $message['role'] === 'user' ? 'justify-end' : 'justify-start' }}">
                         <div class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg {{ $message['role'] === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-900' }}">
-                            <div class="text-sm">{{ $message['content'] }}</div>
+                            <div class="text-sm">{{ $message['text'] ?? $message['content'] ?? '' }}</div>
                             <div class="text-xs mt-1 opacity-70">
-                                {{ \Carbon\Carbon::parse($message['created_at'])->format('H:i') }}
+                                {{ isset($message['created_at']) ? \Carbon\Carbon::parse($message['created_at'])->format('H:i') : '' }}
                             </div>
                         </div>
                     </div>
