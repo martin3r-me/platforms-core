@@ -28,8 +28,7 @@
         : null;
   @endphp
 
-  {{-- Fixed Navbar --}}
-  <livewire:core.navbar/>
+  {{-- Navbar entfernt --}}
   
 
   <div class="layout d-flex h-full w-full min-h-0">
