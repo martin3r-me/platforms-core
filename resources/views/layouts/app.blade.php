@@ -34,6 +34,17 @@
 
   <div class="layout d-flex h-full w-full min-h-0">
    
+    <!-- Grid-Icon über der Sidebar -->
+    <div class="fixed top-0 left-0 z-50" style="top: 50px;">
+        <button 
+            @click="$dispatch('toggle-sidebar')" 
+            class="w-16 h-16 d-flex items-center justify-center bg-white border border-muted hover:bg-gray-50 transition"
+            title="Sidebar umschalten"
+        >
+            @svg('heroicon-o-squares-2x2', 'w-6 h-6 text-primary')
+        </button>
+    </div>
+
     <x-ui-sidebar>
         @if($class && class_exists($class))
             @livewire($currentModuleKey.'.sidebar')
