@@ -34,12 +34,13 @@
   <div class="layout d-flex h-full w-full min-h-0">
    
     <!-- Grid-Icon über der Sidebar -->
-    <div class="h-full bg-primary p-2" x-data @click="$dispatch('open-modal-modules')">
+    <div class="h-full bg-primary p-2" x-data>
         <button 
-            class="w-14 h-14 d-flex items-center justify-center bg-black border border-muted hover:bg-gray-800 transition"
+            @click="$dispatch('open-modal-modules')"
+            class="w-16 h-16 d-flex items-center justify-center bg-black border border-muted hover:bg-gray-800 transition"
             title="Module öffnen"
         >
-            @svg('heroicon-o-squares-2x2', 'w-5 h-5 text-white')
+            @svg('heroicon-o-squares-2x2', 'w-6 h-6 text-white')
         </button>
     </div>
 
