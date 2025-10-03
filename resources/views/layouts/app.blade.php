@@ -36,9 +36,9 @@
     <!-- Grid-Icon über der Sidebar -->
     <div class="fixed top-0 left-0 z-50" style="top: 50px;">
         <button 
-            @click="$dispatch('toggle-sidebar')" 
-            class="w-14 h-14 d-flex items-center justify-center bg-black border border-gray-700 hover:bg-gray-800 transition"
-            title="Sidebar umschalten"
+            @click="$dispatch('open-modal-modules', { tab: 'modules' })" 
+            class="w-14 h-14 d-flex items-center justify-center bg-black border border-muted hover:bg-gray-800 transition"
+            title="Module öffnen"
         >
             @svg('heroicon-o-squares-2x2', 'w-5 h-5 text-white')
         </button>
