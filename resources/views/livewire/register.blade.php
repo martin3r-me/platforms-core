@@ -1,7 +1,26 @@
+@php(
+    $policy = app()->bound(\Platform\Core\Contracts\AuthAccessPolicy::class)
+        ? app(\Platform\Core\Contracts\AuthAccessPolicy::class)
+        : new \Platform\Core\Services\ConfigAuthAccessPolicy()
+)
+
 <div class="d-flex justify-center items-start pt-20" style="min-height: 100vh;">
     <div class="bg-white p-6 rounded-lg shadow-md" style="width: 100%; max-width: 28rem;">
         <h2 class="text-2xl font-bold mb-6 text-center text-primary">Registrieren</h2>
 
+        @if(! $policy->isManualRegistrationAllowed())
+            <div class="alert alert-warning mb-4">
+                Die manuelle Registrierung ist deaktiviert.
+                @if($policy->isSsoOnly())
+                    Bitte melden Sie sich über Single Sign-On an.
+                    <div class="mt-3">
+                        <a href="{{ route('azure-sso.login') }}" class="w-full border border-primary text-primary py-2 px-4 rounded hover:bg-primary/10 transition text-center block">Mit Microsoft anmelden</a>
+                    </div>
+                @endif
+            </div>
+        @endif
+
+        @if($policy->isManualRegistrationAllowed())
         <form wire:submit.prevent="register" class="d-flex flex-col gap-3">
             {{-- Vorname --}}
             <div>
@@ -57,6 +76,7 @@
                 Registrieren
             </button>
         </form>
+        @endif
 
         <div class="mt-4 text-sm text-center text-secondary">
             Bereits registriert?

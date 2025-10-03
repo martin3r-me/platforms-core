@@ -19,6 +19,19 @@ class Register extends Component
     public string $password = '';
     public string $password_confirmation = '';
 
+    public function mount()
+    {
+        /** @var AuthAccessPolicy $policy */
+        $policy = app(AuthAccessPolicy::class);
+        if (! $policy->isManualRegistrationAllowed()) {
+            // Wenn SSO-only aktiv ist oder Registration global deaktiviert → wegleiten
+            if ($policy->isSsoOnly()) {
+                return redirect()->route('azure-sso.login');
+            }
+            return redirect()->route('login');
+        }
+    }
+
     public function register()
     {
         /** @var AuthAccessPolicy $policy */
