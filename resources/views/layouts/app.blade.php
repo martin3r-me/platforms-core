@@ -34,9 +34,8 @@
   <div class="layout d-flex h-full w-full min-h-0">
    
     <!-- Grid-Icon über der Sidebar -->
-    <div class="h-full bg-black">
-        <button 
-            @click="$dispatch('open-modal-modules')" 
+    <div class="h-full bg-black p-3" @click="$dispatch('open-modal-modules')">
+        <button  
             class="w-14 h-14 d-flex items-center justify-center bg-black border border-muted hover:bg-gray-800 transition"
             title="Module öffnen"
         >
