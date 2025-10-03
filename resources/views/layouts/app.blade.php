@@ -44,7 +44,7 @@
         </button>
     </div>
 
-    <x-ui-sidebar>
+    <x-ui-sidebar style = "left:50px;">
         @if($class && class_exists($class))
             @livewire($currentModuleKey.'.sidebar')
         @endif
