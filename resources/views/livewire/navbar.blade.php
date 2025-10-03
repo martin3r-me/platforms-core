@@ -1,5 +1,5 @@
-<nav class="position-fixed top-0 z-60" style="left:50%; transform:translateX(-50%);">
-    <div class="d-flex items-center justify-center pt-3 px-3 pointer-events-none">
+<nav class="position-fixed top-0 right-0 z-60" style="transform:none;">
+    <div class="d-flex items-center justify-end pt-3 px-3 pointer-events-none">
         <div class="d-flex items-center gap-2 px-3 py-1 rounded-full border border-solid border-1 bg-white shadow-sm pointer-events-auto w-80">
             @auth
                 <button type="button" class="border-0 bg-transparent cursor-pointer d-flex items-center gap-2" @click="$dispatch('open-modal-modules')" title="Modulmenü (⌘K / M)">
@@ -8,13 +8,17 @@
                         $modules = \Platform\Core\PlatformCore::getModules();
                         $currentModuleKey = explode('.', request()->route()?->getName())[0] ?? null;
                         $currentModule = $modules[$currentModuleKey] ?? null;
+                        $teamName = auth()->user()?->currentTeam?->name;
                     @endphp
                     @if($currentModule)
                         <span class="text-sm text-secondary truncate max-w-[10rem]">{{ $currentModule['title'] ?? '' }}</span>
                     @endif
+                    @if($teamName)
+                        <span class="text-xs text-muted truncate max-w-[8rem]">{{ $teamName }}</span>
+                    @endif
                 </button>
 
-                {{-- Nodge: nur Logo, keine weiteren Icons --}}
+                {{-- Nodge: nur Logo, mit kleinem Teamnamen --}}
             @endauth
 
             @guest
