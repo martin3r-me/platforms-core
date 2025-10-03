@@ -50,8 +50,7 @@ class CoreServiceProvider extends ServiceProvider
             ->middleware(['web', 'auth'])
             ->group(__DIR__.'/../routes/web.php');
 
-        // Nach Laden der Module und Routen: alle Modul-GET-Routen als Tools exportieren
-        // RouteToolExporter entfernt - Sidebar soll leer sein
+        // Keine Agent/Schema Logs mehr
 
         // Command registrieren (nur in der Konsole)
         if ($this->app->runningInConsole()) {
@@ -61,12 +60,7 @@ class CoreServiceProvider extends ServiceProvider
             ]);
         }
 
-        // Automatische Modell-Registrierung (nach Migrations/Boot der Module)
-        try {
-            (new \Platform\Core\Services\ModelAutoRegistrar())->scanAndRegister();
-        } catch (\Throwable $e) {
-            // still halten, falls Module/Tabellen noch nicht geladen
-        }
+        // Automatische Modell-Registrierung entfernt
     }
 
     public function register(): void
