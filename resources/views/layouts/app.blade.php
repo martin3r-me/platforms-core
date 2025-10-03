@@ -34,7 +34,7 @@
   <div class="layout d-flex h-full w-full min-h-0">
    
     <!-- Grid-Icon über der Sidebar -->
-    <div class="h-full bg-warning p-2" x-data>
+    <div class="h-full bg-black p-2" x-data>
         <button 
             @click="$dispatch('open-modal-modules')"
             class="d-flex items-center justify-center border border-muted hover:bg-gray-800 transition"
