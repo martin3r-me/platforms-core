@@ -47,8 +47,7 @@
     <main class="main flex-grow-1 min-w-0 overflow-auto p-1 bg-white">
         {{ $slot }}
     </main>
-    {{-- Rechte Cursor-Sidebar parallel zur linken Sidebar und Main --}}
-    <livewire:core.cursor-sidebar/>
+    {{-- Rechte Cursor-Sidebar entfernt --}}
   </div>
 
   @auth 

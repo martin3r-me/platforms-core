@@ -36,9 +36,7 @@ class CoreServiceProvider extends ServiceProvider
         $this->loadModuleServiceProviders();
 
         // Konfigurationen veröffentlichen
-        $this->publishes([
-            __DIR__.'/../config/agent.php' => config_path('agent.php'),
-        ], 'config');
+        // Agent-Config Publishes entfernt – Agent ausgelagert
 
         // Livewire-Komponenten registrieren (mit Präfix "core")
         $this->registerLivewireComponents();
@@ -75,7 +73,7 @@ class CoreServiceProvider extends ServiceProvider
     {
         $this->app->register(LivewireServiceProvider::class);
         $this->mergeConfigFrom(__DIR__.'/../config/platform.php', 'platform');
-        $this->mergeConfigFrom(__DIR__.'/../config/agent.php', 'agent');
+        // Agent-Config entfernt – Agent ausgelagert
 
         // Auth Policy Config einbinden und Service binden
         $this->mergeConfigFrom(__DIR__.'/../config/auth-policy.php', 'auth-policy');
@@ -94,11 +92,7 @@ class CoreServiceProvider extends ServiceProvider
             return new NullCrmCompanyOptionsProvider();
         });
 
-        // AI Agent Services
-        $this->app->singleton(IntelligentAgent::class);
-        $this->app->singleton(ToolRegistry::class);
-        $this->app->singleton(ToolExecutor::class);
-        $this->app->singleton(AgentOrchestrator::class);
+        // AI Agent Services entfernt – kommen in separates Modul
 
         // CommandRegistry entfernt - Sidebar soll leer sein
     }
