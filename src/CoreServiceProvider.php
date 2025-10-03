@@ -57,6 +57,7 @@ class CoreServiceProvider extends ServiceProvider
             $this->commands([
                 TrackBillableUsage::class,
                 CreateMonthlyInvoices::class,
+                \Platform\Core\Console\Commands\SecurityHashKeyCommand::class,
             ]);
         }
 
@@ -67,6 +68,7 @@ class CoreServiceProvider extends ServiceProvider
     {
         $this->app->register(LivewireServiceProvider::class);
         $this->mergeConfigFrom(__DIR__.'/../config/platform.php', 'platform');
+        $this->mergeConfigFrom(__DIR__.'/../config/security.php', 'security');
         // Agent-Config entfernt – Agent ausgelagert
 
         // Auth Policy Config einbinden und Service binden
