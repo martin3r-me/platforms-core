@@ -18,7 +18,7 @@
   <script src="https://unpkg.com/@wotz/livewire-sortablejs@1.0.0/dist/livewire-sortable.js"></script>
 </head>
 
-<body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)]">
+<body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)] overflow-hidden">
 
   @php
     $currentModuleKey = explode('.', request()->route()?->getName())[0] ?? null;
@@ -27,7 +27,7 @@
         : null;
   @endphp
 
-  <div class="flex min-h-screen w-full">
+  <div class="flex h-screen w-full">
     <!-- Sidebar -->
     <x-ui-sidebar>
         @if($class && class_exists($class))
@@ -36,7 +36,7 @@
     </x-ui-sidebar>
 
     <!-- Main Content -->
-    <main class="flex-1 min-w-0 overflow-y-auto p-3 bg-white">
+    <main class="flex-1 min-w-0 h-screen overflow-y-auto p-3 bg-white">
         {{ $slot }}
     </main>
   </div>
