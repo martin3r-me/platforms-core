@@ -21,6 +21,10 @@
 
 <body class="bg-[color:var(--ui-body-bg)] text-[color:var(--ui-body-color)] flex flex-col h-full">
 
+  <div style="position:fixed;z-index:99999;top:6px;right:6px;font-size:10px;padding:3px 6px;border-radius:4px;background:#111;color:#fff;opacity:0.85">
+    CORE LAYOUT ACTIVE
+  </div>
+
   @if((bool) (env('UI_TW_DEBUG', app()->environment('local'))))
     <div class="fixed z-[9999] top-2 right-2 text-xs px-2 py-1 rounded bg-[rgb(var(--ui-primary-rgb))] text-[var(--ui-on-primary)] shadow">
       Tailwind active
