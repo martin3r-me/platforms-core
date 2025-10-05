@@ -21,6 +21,12 @@
 
 <body class="bg-[color:var(--ui-body-bg)] text-[color:var(--ui-body-color)] flex flex-col h-full">
 
+  @if((bool) (env('UI_TW_DEBUG', app()->environment('local'))))
+    <div class="fixed z-[9999] top-2 right-2 text-xs px-2 py-1 rounded bg-[rgb(var(--ui-primary-rgb))] text-[var(--ui-on-primary)] shadow">
+      Tailwind active
+    </div>
+  @endif
+
   @php
     $currentModuleKey = explode('.', request()->route()?->getName())[0] ?? null;
     $class = $currentModuleKey 
