@@ -9,7 +9,6 @@
   <title>{{ config('app.name', 'Platform') }}</title>
 
   {{-- UI Token & Utility CSS --}}
-  {{-- entfernt: <link rel="stylesheet" href="{{ asset('vendor/ui/ui.css') }}"> --}}
   <x-ui-styles />
 
   {{-- optional: eigenes JS / Livewire --}}
@@ -19,17 +18,7 @@
   <script src="https://unpkg.com/@wotz/livewire-sortablejs@1.0.0/dist/livewire-sortable.js"></script>
 </head>
 
-<body class="bg-[color:var(--ui-body-bg)] text-[color:var(--ui-body-color)] flex flex-col h-full">
-
-  <div style="position:fixed;z-index:99999;top:6px;right:6px;font-size:10px;padding:3px 6px;border-radius:4px;background:#111;color:#fff;opacity:0.85">
-    CORE LAYOUT ACTIVE
-  </div>
-
-  @if((bool) (env('UI_TW_DEBUG', app()->environment('local'))))
-    <div class="fixed z-[9999] top-2 right-2 text-xs px-2 py-1 rounded bg-[rgb(var(--ui-primary-rgb))] text-[var(--ui-on-primary)] shadow">
-      Tailwind active
-    </div>
-  @endif
+<body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)]">
 
   @php
     $currentModuleKey = explode('.', request()->route()?->getName())[0] ?? null;
@@ -38,33 +27,18 @@
         : null;
   @endphp
 
-  {{-- Navbar entfernt --}}
-  
-
-  <div class="layout flex h-full w-full min-h-0">
-   
-    <!-- Grid-Icon über der Sidebar -->
-    <div class="h-full bg-black p-2" x-data>
-        <button 
-            @click="$dispatch('open-modal-modules')"
-            class="flex items-center justify-center border border-[color:var(--ui-border)] hover:bg-gray-800 transition"
-            title="Module öffnen"
-        >
-            <div class="w-3 h-3 bg-white rounded-full"></div>
-        </button>
-    </div>
-
+  <div class="flex min-h-screen w-full">
+    <!-- Sidebar -->
     <x-ui-sidebar>
         @if($class && class_exists($class))
             @livewire($currentModuleKey.'.sidebar')
         @endif
     </x-ui-sidebar>
 
-    {{-- Main Content --}}
-    <main class="main flex-1 min-w-0 overflow-auto p-1 bg-white">
+    <!-- Main Content -->
+    <main class="flex-1 min-w-0 overflow-y-auto p-3 bg-white">
         {{ $slot }}
     </main>
-    {{-- Rechte Cursor-Sidebar entfernt --}}
   </div>
 
   @auth 
@@ -75,12 +49,12 @@
     <livewire:core.modal-modules/>
   @endauth
     
-    <livewire:notifications.notices.index />
-    @if(config('notifications.show_modal'))
-        <livewire:notifications.notices.modal />
-    @endif
+  <livewire:notifications.notices.index />
+  @if(config('notifications.show_modal'))
+      <livewire:notifications.notices.modal />
+  @endif
 
-    @livewireScripts
+  @livewireScripts
 
 </body>
 </html>
