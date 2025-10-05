@@ -57,5 +57,6 @@
     @endif
 
     @livewireScripts
+    @include('tw_safelist')
 </body>
 </html>
