@@ -15,13 +15,12 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 
-    <link rel="stylesheet" href="{{ asset('vendor/ui/ui.css') }}">
     <x-ui-styles/>
     
     
 </head>
 
-<body class="bg-gray-100 text-gray-800 selection:bg-purple-200/60">
+<body class="bg-[color:var(--ui-body-bg)] text-[color:var(--ui-body-color)] selection:bg-[color:rgba(var(--ui-primary-rgb),0.2)]">
 
     {{-- Fixed Top Navbar --}}
     <livewire:core.navbar />

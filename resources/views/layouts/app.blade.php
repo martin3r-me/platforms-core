@@ -9,7 +9,7 @@
   <title>{{ config('app.name', 'Platform') }}</title>
 
   {{-- UI Token & Utility CSS --}}
-  <link rel="stylesheet" href="{{ asset('vendor/ui/ui.css') }}">
+  {{-- entfernt: <link rel="stylesheet" href="{{ asset('vendor/ui/ui.css') }}"> --}}
   <x-ui-styles />
 
   {{-- optional: eigenes JS / Livewire --}}
@@ -19,7 +19,7 @@
   <script src="https://unpkg.com/@wotz/livewire-sortablejs@1.0.0/dist/livewire-sortable.js"></script>
 </head>
 
-<body class="bg-body-bg text-body-color d-flex flex-col h-full">
+<body class="bg-[color:var(--ui-body-bg)] text-[color:var(--ui-body-color)] flex flex-col h-full">
 
   @php
     $currentModuleKey = explode('.', request()->route()?->getName())[0] ?? null;
@@ -31,13 +31,13 @@
   {{-- Navbar entfernt --}}
   
 
-  <div class="layout d-flex h-full w-full min-h-0">
+  <div class="layout flex h-full w-full min-h-0">
    
     <!-- Grid-Icon über der Sidebar -->
     <div class="h-full bg-black p-2" x-data>
         <button 
             @click="$dispatch('open-modal-modules')"
-            class="d-flex items-center justify-center border border-muted hover:bg-gray-800 transition"
+            class="flex items-center justify-center border border-[color:var(--ui-border)] hover:bg-gray-800 transition"
             title="Module öffnen"
         >
             <div class="w-3 h-3 bg-white rounded-full"></div>
@@ -50,11 +50,8 @@
         @endif
     </x-ui-sidebar>
 
-        
-
-
     {{-- Main Content --}}
-    <main class="main flex-grow-1 min-w-0 overflow-auto p-1 bg-white">
+    <main class="main flex-1 min-w-0 overflow-auto p-1 bg-white">
         {{ $slot }}
     </main>
     {{-- Rechte Cursor-Sidebar entfernt --}}
