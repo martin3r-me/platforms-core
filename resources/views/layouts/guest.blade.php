@@ -24,8 +24,8 @@
     <livewire:core.navbar />
 
     {{-- Auth-Container --}}
-    <div class="pt-16 flex h-screen overflow-hidden">
-        <main class="flex-1 overflow-y-auto p-6">
+    <div class="pt-16 min-h-screen flex items-center justify-center">
+        <main class="w-full max-w-5xl p-6">
             {{ $slot }}
         </main>
     </div>

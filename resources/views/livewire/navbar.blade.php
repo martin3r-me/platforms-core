@@ -1,6 +1,6 @@
-<nav class="fixed top-0 right-0 z-[60]">
-    <div class="flex items-center justify-end pt-3 px-3 pointer-events-none">
-        <div class="flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--ui-border)] bg-white shadow-sm pointer-events-auto w-80">
+<nav class="w-full">
+    <div class="flex items-center justify-end py-3 px-3">
+        <div class="flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--ui-border)] bg-white shadow-sm">
             @auth
                 <button type="button" class="border-0 bg-transparent cursor-pointer flex items-center gap-2" @click="$dispatch('open-modal-modules')" title="Modulmenü (⌘K / M)">
                     <img src="{{ asset('logo.png') }}" alt="Logo" class="h-6">
