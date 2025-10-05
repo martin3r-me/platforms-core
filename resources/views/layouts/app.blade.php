@@ -13,7 +13,7 @@
   <x-ui-styles />
 
   {{-- optional: eigenes JS / Livewire --}}
-  @vite(['resources/css/taiste.css', 'resources/js/app.js'])
+  @vite(['resources/css/app.css', 'resources/js/app.js'])
   @livewireStyles
 
   <script src="https://unpkg.com/@wotz/livewire-sortablejs@1.0.0/dist/livewire-sortable.js"></script>
