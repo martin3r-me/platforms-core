@@ -36,7 +36,7 @@
     </x-ui-sidebar>
 
     <!-- Main Content -->
-    <main class="flex-1 min-w-0 h-screen overflow-y-auto p-3 bg-white">
+    <main class="flex-1 min-w-0 h-screen overflow-y-auto bg-white">
         {{ $slot }}
     </main>
   </div>
