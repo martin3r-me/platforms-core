@@ -1,31 +1,33 @@
 <div x-data="{ tab: 'modules' }" x-init="
     window.addEventListener('open-modal-modules', (e) => { tab = e?.detail?.tab || 'modules'; });
 ">
-<x-ui-modal size="lg" wire:model="modalShow">
+<x-ui-modal size="xl" wire:model="modalShow">
     <x-slot name="header">
-            <div class="d-flex items-center justify-between w-full">
-                <div class="font-medium">Zentrale Steuerung</div>
-                <div class="text-xs text-gray-500">Tipp: ⌘K / M öffnet dieses Menü</div>
-                </div>
-            <div class="d-flex gap-3 mt-3 border-b pb-1">
-                <button type="button" class="px-2 py-1 bg-transparent border-0 cursor-pointer" :class="{ 'font-bold border-b-2 border-primary' : tab === 'modules' }" @click="tab = 'modules'">Module</button>
-                <button type="button" class="px-2 py-1 bg-transparent border-0 cursor-pointer" :class="{ 'font-bold border-b-2 border-primary' : tab === 'team' }" @click="tab = 'team'">Team</button>
-                <button type="button" class="px-2 py-1 bg-transparent border-0 cursor-pointer" :class="{ 'font-bold border-b-2 border-primary' : tab === 'billing' }" @click="tab = 'billing'">Abrechnung</button>
-                <button type="button" class="px-2 py-1 bg-transparent border-0 cursor-pointer" :class="{ 'font-bold border-b-2 border-primary' : tab === 'account' }" @click="tab = 'account'">Konto</button>
-                @if(auth()->user()?->currentTeam && auth()->user()->currentTeam->user_id === auth()->id())
-                    <button type="button" class="px-2 py-1 bg-transparent border-0 cursor-pointer ml-auto" :class="{ 'font-bold border-b-2 border-primary' : tab === 'matrix' }" @click="tab = 'matrix'">Matrix</button>
-                @endif
+        <div class="flex items-center justify-between w-full">
+            <div class="flex items-center gap-3">
+                <h2 class="text-xl font-semibold text-[var(--ui-secondary)] m-0">Zentrale Steuerung</h2>
+                <span class="text-xs text-[var(--ui-muted)] bg-[var(--ui-muted-5)] px-2 py-1 rounded-full">⌘K / M</span>
             </div>
-        </x-slot>
+        </div>
+        <div class="flex gap-1 mt-4 border-b border-[var(--ui-border)]/60">
+            <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : tab === 'modules', 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' : tab !== 'modules' }" @click="tab = 'modules'">Module</button>
+            <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : tab === 'team', 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' : tab !== 'team' }" @click="tab = 'team'">Team</button>
+            <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : tab === 'billing', 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' : tab !== 'billing' }" @click="tab = 'billing'">Abrechnung</button>
+            <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : tab === 'account', 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' : tab !== 'account' }" @click="tab = 'account'">Konto</button>
+            @if(auth()->user()?->currentTeam && auth()->user()->currentTeam->user_id === auth()->id())
+                <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors ml-auto" :class="{ 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : tab === 'matrix', 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' : tab !== 'matrix' }" @click="tab = 'matrix'">Matrix</button>
+            @endif
+        </div>
+    </x-slot>
         
         {{-- Tabs: Inhalte --}}
         {{-- Module --}}
-        <div class="mt-2" x-show="tab === 'modules'" x-cloak>
+        <div class="mt-6" x-show="tab === 'modules'" x-cloak>
             @php
                 $availableModules = $modules ?? [];
             @endphp
-            <div class="space-y-4">
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div class="space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     @foreach($availableModules as $key => $module)
                         @php
                             $title = $module['title'] ?? $module['label'] ?? ucfirst($key);
@@ -35,21 +37,23 @@
                                 ? route($routeName)
                                 : ($module['url'] ?? '#');
                         @endphp
-                    <a href="{{ $finalUrl }}" class="d-flex items-center gap-3 p-3 rounded-md border border-solid border-1 transition hover:border-primary hover:bg-primary-10">
+                    <a href="{{ $finalUrl }}" class="group flex items-center gap-4 p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-all duration-200">
                         <div class="flex-shrink-0">
                             @if(!empty($icon))
-                                <x-dynamic-component :component="$icon" class="w-6 h-6 text-primary" />
+                                <x-dynamic-component :component="$icon" class="w-8 h-8 text-[var(--ui-primary)] group-hover:scale-110 transition-transform" />
                             @else
-                                @svg('heroicon-o-cube', 'w-6 h-6 text-primary')
+                                @svg('heroicon-o-cube', 'w-8 h-8 text-[var(--ui-primary)] group-hover:scale-110 transition-transform')
                             @endif
                         </div>
-                        <div class="min-w-0 flex-grow-1">
-                            <div class="font-medium text-secondary truncate">{{ $title }}</div>
-                            <div class="text-xs text-gray-500 truncate">
+                        <div class="min-w-0 flex-1">
+                            <div class="font-semibold text-[var(--ui-secondary)] truncate">{{ $title }}</div>
+                            <div class="text-xs text-[var(--ui-muted)] truncate">
                                 {{ $routeName ? $routeName : ($finalUrl ?? '') }}
                             </div>
                         </div>
-                        <div class="flex-shrink-0 text-xs text-gray-400 hidden md:block">Öffnen</div>
+                        <div class="flex-shrink-0">
+                            @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)] transition-colors')
+                        </div>
                     </a>
                     @endforeach
                 </div>
@@ -57,33 +61,33 @@
         </div>
 
         {{-- Matrix --}}
-        <div class="mt-2" x-show="tab === 'matrix'" x-cloak>
+        <div class="mt-6" x-show="tab === 'matrix'" x-cloak>
             @if(!empty($matrixUsers) && !empty($matrixModules))
-                <div class="overflow-auto">
-                    <table class="min-w-full border bg-white rounded shadow">
-                        <thead>
+                <div class="overflow-auto rounded-lg border border-[var(--ui-border)]/60">
+                    <table class="min-w-full bg-[var(--ui-surface)]">
+                        <thead class="bg-[var(--ui-muted-5)]">
                             <tr>
-                                <th class="py-2 px-4 border-b text-left">User</th>
+                                <th class="py-3 px-4 border-b border-[var(--ui-border)]/60 text-left font-semibold text-[var(--ui-secondary)]">User</th>
                                 @foreach($matrixModules as $module)
-                                    <th class="py-2 px-4 border-b text-center">{{ $module->title ?? 'Modul' }}</th>
+                                    <th class="py-3 px-4 border-b border-[var(--ui-border)]/60 text-center font-semibold text-[var(--ui-secondary)]">{{ $module->title ?? 'Modul' }}</th>
                                 @endforeach
                             </tr>
                         </thead>
                         <tbody>
                             @foreach($matrixUsers as $user)
-                                <tr>
-                                    <td class="py-2 px-4 border-b font-medium">{{ $user->name }}</td>
+                                <tr class="hover:bg-[var(--ui-muted-5)]/50 transition-colors">
+                                    <td class="py-3 px-4 border-b border-[var(--ui-border)]/60 font-medium text-[var(--ui-secondary)]">{{ $user->name }}</td>
                                     @foreach($matrixModules as $module)
                                         @php
                                             $hasModule = in_array($module->id, $userModuleMap[$user->id] ?? []);
                                             $variant = $hasModule ? 'success-outline' : 'danger-outline';
                                         @endphp
-                                        <td class="py-2 px-4 border-b text-center">
+                                        <td class="py-3 px-4 border-b border-[var(--ui-border)]/60 text-center">
                                             <x-ui-button :variant="$variant" size="sm" wire:click="toggleMatrix({{ $user->id }}, {{ $module->id }})">
                                                 @if($hasModule)
-                                                    @svg('heroicon-o-hand-thumb-up', 'w-4 h-4 text-success')
+                                                    @svg('heroicon-o-hand-thumb-up', 'w-4 h-4 text-[var(--ui-success)]')
                                                 @else
-                                                    @svg('heroicon-o-hand-thumb-down', 'w-4 h-4 text-danger')
+                                                    @svg('heroicon-o-hand-thumb-down', 'w-4 h-4 text-[var(--ui-danger)]')
                                                 @endif
                                             </x-ui-button>
                                         </td>
@@ -94,79 +98,105 @@
                     </table>
                 </div>
             @else
-                <div class="text-sm text-gray-600 p-4">Matrix-Daten nicht verfügbar.</div>
+                <div class="text-sm text-[var(--ui-muted)] p-6 text-center bg-[var(--ui-muted-5)] rounded-lg">Matrix-Daten nicht verfügbar.</div>
             @endif
         </div>
 
         {{-- Account --}}
-        <div class="mt-2" x-show="tab === 'account'" x-cloak>
+        <div class="mt-6" x-show="tab === 'account'" x-cloak>
             <div class="space-y-6">
-                <div class="d-flex items-center gap-3 p-3 bg-muted-5 rounded">
-                    <div class="w-10 h-10 rounded-full bg-primary text-on-primary d-flex items-center justify-center">
-                        <span class="font-semibold">{{ strtoupper(mb_substr((auth()->user()->fullname ?? auth()->user()->name ?? 'U'), 0, 2)) }}</span>
+                <div class="flex items-center gap-4 p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                    <div class="w-12 h-12 rounded-full bg-[var(--ui-primary)] text-[var(--ui-on-primary)] flex items-center justify-center">
+                        <span class="font-semibold text-lg">{{ strtoupper(mb_substr((auth()->user()->fullname ?? auth()->user()->name ?? 'U'), 0, 2)) }}</span>
                     </div>
-                    <div class="min-w-0">
-                        <div class="font-medium text-secondary truncate">{{ auth()->user()->fullname ?? auth()->user()->name }}</div>
-                        <div class="text-sm text-gray-600 truncate">{{ auth()->user()->email }}</div>
+                    <div class="min-w-0 flex-1">
+                        <div class="font-semibold text-[var(--ui-secondary)] truncate">{{ auth()->user()->fullname ?? auth()->user()->name }}</div>
+                        <div class="text-sm text-[var(--ui-muted)] truncate">{{ auth()->user()->email }}</div>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <x-ui-button variant="secondary-outline" @click="tab = 'team'"><div class="d-flex items-center gap-2">@svg('heroicon-o-users', 'w-5 h-5') Team verwalten</div></x-ui-button>
-                    <x-ui-button variant="secondary-outline" @click="tab = 'billing'"><div class="d-flex items-center gap-2">@svg('heroicon-o-banknotes', 'w-5 h-5') Abrechnung & Kosten</div></x-ui-button>
-                    <x-ui-button variant="secondary-outline" @click="tab = 'modules'"><div class="d-flex items-center gap-2">@svg('heroicon-o-squares-2x2', 'w-5 h-5') Module wechseln</div></x-ui-button>
+                    <x-ui-button variant="secondary-outline" @click="tab = 'team'" class="w-full">
+                        <div class="flex items-center gap-2">
+                            @svg('heroicon-o-users', 'w-5 h-5')
+                            Team verwalten
+                        </div>
+                    </x-ui-button>
+                    <x-ui-button variant="secondary-outline" @click="tab = 'billing'" class="w-full">
+                        <div class="flex items-center gap-2">
+                            @svg('heroicon-o-banknotes', 'w-5 h-5')
+                            Abrechnung & Kosten
+                        </div>
+                    </x-ui-button>
+                    <x-ui-button variant="secondary-outline" @click="tab = 'modules'" class="w-full">
+                        <div class="flex items-center gap-2">
+                            @svg('heroicon-o-squares-2x2', 'w-5 h-5')
+                            Module wechseln
+                        </div>
+                    </x-ui-button>
                 </div>
 
-                <div class="d-flex items-center justify-between w-full">
-                    <div class="text-xs text-gray-500">Angemeldet als {{ auth()->user()->email }}</div>
+                <div class="flex items-center justify-between w-full pt-4 border-t border-[var(--ui-border)]/60">
+                    <div class="text-xs text-[var(--ui-muted)]">Angemeldet als {{ auth()->user()->email }}</div>
                     <form method="POST" action="{{ route('logout') }}" class="m-0">@csrf
-                        <x-ui-button variant="danger" type="submit"><div class="d-flex items-center gap-2">@svg('heroicon-o-arrow-right-start-on-rectangle', 'w-5 h-5') Logout</div></x-ui-button>
+                        <x-ui-button variant="danger" type="submit">
+                            <div class="flex items-center gap-2">
+                                @svg('heroicon-o-arrow-right-start-on-rectangle', 'w-5 h-5')
+                                Logout
+                            </div>
+                        </x-ui-button>
                     </form>
                 </div>
             </div>
         </div>
 
         {{-- Billing --}}
-        <div class="mt-2" x-show="tab === 'billing'" x-cloak>
-            <div class="p-4">
-                <h2 class="text-lg font-semibold mb-2">Kostenübersicht für diesen Monat</h2>
+        <div class="mt-6" x-show="tab === 'billing'" x-cloak>
+            <div class="space-y-6">
+                <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">Kostenübersicht für diesen Monat</h2>
                 @if(!empty($monthlyUsages) && count($monthlyUsages))
-                    <table class="w-full text-sm border rounded">
-                        <thead class="bg-gray-100">
-                            <tr>
-                                <th class="px-2 py-1 text-left">Datum</th>
-                                <th class="px-2 py-1 text-left">Modul</th>
-                                <th class="px-2 py-1 text-left">Typ</th>
-                                <th class="px-2 py-1 text-right">Anzahl</th>
-                                <th class="px-2 py-1 text-right">Einzelpreis</th>
-                                <th class="px-2 py-1 text-right">Gesamt</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($monthlyUsages as $usage)
+                    <div class="overflow-auto rounded-lg border border-[var(--ui-border)]/60">
+                        <table class="w-full text-sm bg-[var(--ui-surface)]">
+                            <thead class="bg-[var(--ui-muted-5)]">
                                 <tr>
-                                    <td class="px-2 py-1">{{ \Illuminate\Support\Carbon::parse($usage->usage_date)->format('d.m.Y') }}</td>
-                                    <td class="px-2 py-1">{{ $usage->label }}</td>
-                                    <td class="px-2 py-1">{{ $usage->billable_type }}</td>
-                                    <td class="px-2 py-1 text-right">{{ $usage->count }}</td>
-                                    <td class="px-2 py-1 text-right">{{ number_format($usage->cost_per_unit, 4, ',', '.') }} €</td>
-                                    <td class="px-2 py-1 text-right">{{ number_format($usage->total_cost, 2, ',', '.') }} €</td>
+                                    <th class="px-4 py-3 text-left font-semibold text-[var(--ui-secondary)]">Datum</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-[var(--ui-secondary)]">Modul</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-[var(--ui-secondary)]">Typ</th>
+                                    <th class="px-4 py-3 text-right font-semibold text-[var(--ui-secondary)]">Anzahl</th>
+                                    <th class="px-4 py-3 text-right font-semibold text-[var(--ui-secondary)]">Einzelpreis</th>
+                                    <th class="px-4 py-3 text-right font-semibold text-[var(--ui-secondary)]">Gesamt</th>
                                 </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                    <div class="mt-4 font-bold text-right">Monatssumme: {{ number_format((float)($monthlyTotal ?? 0), 2, ',', '.') }} €</div>
+                            </thead>
+                            <tbody>
+                                @foreach($monthlyUsages as $usage)
+                                    <tr class="hover:bg-[var(--ui-muted-5)]/50 transition-colors">
+                                        <td class="px-4 py-3 text-[var(--ui-secondary)]">{{ \Illuminate\Support\Carbon::parse($usage->usage_date)->format('d.m.Y') }}</td>
+                                        <td class="px-4 py-3 text-[var(--ui-secondary)]">{{ $usage->label }}</td>
+                                        <td class="px-4 py-3 text-[var(--ui-muted)]">{{ $usage->billable_type }}</td>
+                                        <td class="px-4 py-3 text-right text-[var(--ui-secondary)]">{{ $usage->count }}</td>
+                                        <td class="px-4 py-3 text-right text-[var(--ui-muted)]">{{ number_format($usage->cost_per_unit, 4, ',', '.') }} €</td>
+                                        <td class="px-4 py-3 text-right font-semibold text-[var(--ui-secondary)]">{{ number_format($usage->total_cost, 2, ',', '.') }} €</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-end">
+                        <div class="px-4 py-2 bg-[var(--ui-primary-5)] rounded-lg border border-[var(--ui-primary)]/20">
+                            <span class="font-bold text-[var(--ui-primary)]">Monatssumme: {{ number_format((float)($monthlyTotal ?? 0), 2, ',', '.') }} €</span>
+                        </div>
+                    </div>
                 @else
-                    <div class="text-gray-500 text-sm py-4">Für diesen Monat liegen noch keine Nutzungsdaten vor.</div>
+                    <div class="text-[var(--ui-muted)] text-sm p-6 text-center bg-[var(--ui-muted-5)] rounded-lg">Für diesen Monat liegen noch keine Nutzungsdaten vor.</div>
                 @endif
             </div>
         </div>
 
         {{-- Team --}}
-        <div class="mt-2" x-show="tab === 'team'" x-cloak>
+        <div class="mt-6" x-show="tab === 'team'" x-cloak>
             <div class="space-y-6">
                 <div>
-                    <h3 class="text-lg font-semibold mb-3">Aktuelles Team wechseln</h3>
+                    <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Aktuelles Team wechseln</h3>
                     @if(!empty($allTeams) && count($allTeams) > 1)
                         <x-ui-input-select
                             name="user.current_team_id"
@@ -178,12 +208,12 @@
                             wire:model.live="user.current_team_id"
                         />
                     @else
-                        <div class="text-sm text-gray-600">Nur ein Team vorhanden. Lege unten ein neues Team an.</div>
+                        <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">Nur ein Team vorhanden. Lege unten ein neues Team an.</div>
                     @endif
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-semibold mb-3">Neues Team erstellen</h3>
+                    <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Neues Team erstellen</h3>
                     <form wire:submit.prevent="createTeam" class="space-y-4">
                         <x-ui-input-text
                             name="newTeamName"
@@ -199,22 +229,22 @@
 
                 @isset($team)
                 <div>
-                    <h3 class="text-lg font-semibold mb-3">Team-Mitglieder</h3>
+                    <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Team-Mitglieder</h3>
                     <div class="space-y-3">
                         @foreach($team->users ?? [] as $member)
-                            <div class="d-flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <div class="d-flex items-center gap-3">
-                                    <div class="w-8 h-8 bg-primary text-on-primary rounded-full d-flex items-center justify-center">
-                                        <span class="text-sm font-medium">{{ strtoupper(mb_substr(($member->fullname ?? $member->name), 0, 2)) }}</span>
+                            <div class="flex items-center justify-between p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 bg-[var(--ui-primary)] text-[var(--ui-on-primary)] rounded-full flex items-center justify-center">
+                                        <span class="text-sm font-semibold">{{ strtoupper(mb_substr(($member->fullname ?? $member->name), 0, 2)) }}</span>
                                     </div>
                                     <div>
-                                        <div class="font-medium text-gray-900">{{ $member->fullname ?? $member->name }}</div>
-                                        <div class="text-sm text-gray-600">{{ $member->email }}</div>
+                                        <div class="font-semibold text-[var(--ui-secondary)]">{{ $member->fullname ?? $member->name }}</div>
+                                        <div class="text-sm text-[var(--ui-muted)]">{{ $member->email }}</div>
                                     </div>
                                 </div>
-                                <div class="d-flex items-center gap-2">
+                                <div class="flex items-center gap-2">
                                     @if(($team->user_id ?? null) === auth()->id() && ($member->id ?? null) !== auth()->id())
-                                        <select name="member_role_{{ $member->id }}" class="min-w-[9rem] px-2 py-1 border rounded" wire:change="updateMemberRole({{ $member->id }}, $event.target.value)">
+                                        <select name="member_role_{{ $member->id }}" class="min-w-[9rem] px-3 py-2 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-[var(--ui-primary)]" wire:change="updateMemberRole({{ $member->id }}, $event.target.value)">
                                             <option value="owner" {{ ($member->pivot->role ?? '') === 'owner' ? 'selected' : '' }}>Owner</option>
                                             <option value="admin" {{ ($member->pivot->role ?? '') === 'admin' ? 'selected' : '' }}>Admin</option>
                                             <option value="member" {{ ($member->pivot->role ?? '') === 'member' ? 'selected' : '' }}>Member</option>
@@ -235,31 +265,31 @@
 
                 @if(isset($team) && !($team->personal_team ?? true))
                 <div>
-                    <h3 class="text-lg font-semibold mb-3">Mitglied einladen</h3>
+                    <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Mitglied einladen</h3>
                     @php($roles = \Platform\Core\Enums\TeamRole::cases())
                     <form wire:submit.prevent="inviteToTeam" class="space-y-4">
                         <x-ui-input-text name="inviteEmail" label="E-Mail" wire:model.live="inviteEmail" placeholder="E-Mail-Adresse" required :errorKey="'inviteEmail'" />
                         <x-ui-input-select name="inviteRole" label="Rolle" :options="$roles" optionValue="value" optionLabel="name" :nullable="false" wire:model.live="inviteRole" />
                         <x-ui-button type="submit">Einladung senden</x-ui-button>
                     </form>
-        </div>
-    @endif
+                </div>
+                @endif
             </div>
         </div>
 
     <x-slot name="footer">
         <div class="flex justify-start">
             @if(auth()->user()->currentTeam && auth()->user()->currentTeam->user_id === auth()->id())
-                <button
+                <x-ui-button
                     wire:click="$toggle('showMatrix')"
-                    class="px-4 py-2 rounded bg-primary text-white hover:bg-primary-700 transition"
+                    variant="primary"
                 >
                     @if($showMatrix)
                         Zurück zur Modulauswahl
                     @else
                         Modul-Matrix anzeigen
                     @endif
-                </button>
+                </x-ui-button>
             @endif
         </div>
     </x-slot>
