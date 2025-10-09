@@ -171,13 +171,7 @@
                     <x-ui-input-select
                         name="billing.payment_method"
                         label="Zahlungsmethode"
-                        :options="[
-                            ['value' => 'sepa', 'label' => 'SEPA-Lastschrift'],
-                            ['value' => 'invoice', 'label' => 'Rechnung'],
-                            ['value' => 'credit_card', 'label' => 'Kreditkarte'],
-                        ]"
-                        optionValue="value"
-                        optionLabel="label"
+                        :options="$paymentMethodOptions"
                         :nullable="false"
                         wire:model.live="billing.payment_method"
                     />

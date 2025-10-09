@@ -29,6 +29,13 @@ class ModalTeam extends Component
     public $monthlyTotal = 0;
     public $lastMonthTotal = 0;
     public $yearlyTotal = 0;
+    
+    // Payment method options
+    public $paymentMethodOptions = [
+        'sepa' => 'SEPA-Lastschrift',
+        'invoice' => 'Rechnung',
+        'credit_card' => 'Kreditkarte',
+    ];
 
     protected $listeners = ['open-modal-team' => 'openModal'];
 
