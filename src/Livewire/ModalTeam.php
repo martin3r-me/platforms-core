@@ -30,6 +30,9 @@ class ModalTeam extends Component
     public $lastMonthTotal = 0;
     public $yearlyTotal = 0;
     
+    // Detailed billing data
+    public $monthlyUsages = [];
+    
     // Payment method options
     public $paymentMethodOptions = [
         'sepa' => 'SEPA-Lastschrift',
@@ -121,6 +124,26 @@ class ModalTeam extends Component
         $this->monthlyTotal = 0;
         $this->lastMonthTotal = 0;
         $this->yearlyTotal = 0;
+        
+        // Dummy-Daten für die detaillierte Abrechnungstabelle
+        $this->monthlyUsages = collect([
+            (object) [
+                'usage_date' => now()->format('Y-m-d'),
+                'label' => 'Planner-Aufgabe',
+                'billable_type' => 'Platform\Planner\Models\PlannerTask',
+                'count' => 5,
+                'cost_per_unit' => 0.0025,
+                'total_cost' => 0.0125,
+            ],
+            (object) [
+                'usage_date' => now()->subDay()->format('Y-m-d'),
+                'label' => 'Planner-Projekt',
+                'billable_type' => 'Platform\Planner\Models\PlannerProject',
+                'count' => 2,
+                'cost_per_unit' => 0.005,
+                'total_cost' => 0.01,
+            ],
+        ]);
     }
     
     public function saveBillingDetails()

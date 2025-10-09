@@ -35,9 +35,6 @@ class ModalModules extends Component
     public $addingPayment = false;
     public $mollieKey = null;
 
-    // Pricing
-    public $monthlyUsages = [];
-    public $monthlyTotal = 0;
 
     #[On('open-modal-modules')] 
     public function openModalModules()
@@ -85,8 +82,6 @@ class ModalModules extends Component
         $this->matrixModules = \Platform\Core\Models\Module::all();
         $this->refreshMatrix();
 
-        // Pricing initial laden
-        $this->loadMonthlyUsages();
     }
 
     public function toggleMatrix($userId, $moduleId)
@@ -165,7 +160,6 @@ class ModalModules extends Component
         // Nach Teamwechsel: Daten aktualisieren und Modal schließen
         $this->loadTeam();
         $this->refreshMatrix();
-        $this->loadMonthlyUsages();
         $this->modalShow = false;
         // Auf die aktuelle Seite zurück, damit Guards/Sidebar etc. korrekt neu laden
         $this->redirect(request()->fullUrl());
@@ -312,27 +306,6 @@ class ModalModules extends Component
         }
     }
 
-    // --- Pricing Logik (aus ModalPricing) ---
-    protected function loadMonthlyUsages(): void
-    {
-        $team = auth()->user()->currentTeam;
-        if (!$team) {
-            $this->monthlyUsages = [];
-            $this->monthlyTotal = 0;
-            return;
-        }
-
-        $startOfMonth = Carbon::now()->startOfMonth()->toDateString();
-        $endOfMonth = Carbon::now()->endOfMonth()->toDateString();
-
-        $usages = TeamBillableUsage::where('team_id', $team->id)
-            ->whereBetween('usage_date', [$startOfMonth, $endOfMonth])
-            ->orderBy('usage_date')
-            ->get();
-
-        $this->monthlyUsages = $usages;
-        $this->monthlyTotal = $usages->sum('total_cost');
-    }
 
     public function closeModal()
     {

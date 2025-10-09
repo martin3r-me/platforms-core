@@ -126,6 +126,46 @@
                 </div>
             </div>
 
+            {{-- Detailed Billing Table --}}
+            <div>
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Kostenübersicht für diesen Monat</h3>
+                @if(!empty($monthlyUsages) && count($monthlyUsages))
+                    <div class="overflow-auto rounded-lg border border-[var(--ui-border)]/60">
+                        <table class="w-full text-sm bg-[var(--ui-surface)]">
+                            <thead class="bg-[var(--ui-muted-5)]">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold text-[var(--ui-secondary)]">Datum</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-[var(--ui-secondary)]">Modul</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-[var(--ui-secondary)]">Typ</th>
+                                    <th class="px-4 py-3 text-right font-semibold text-[var(--ui-secondary)]">Anzahl</th>
+                                    <th class="px-4 py-3 text-right font-semibold text-[var(--ui-secondary)]">Einzelpreis</th>
+                                    <th class="px-4 py-3 text-right font-semibold text-[var(--ui-secondary)]">Gesamt</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($monthlyUsages as $usage)
+                                    <tr class="hover:bg-[var(--ui-muted-5)]/50 transition-colors">
+                                        <td class="px-4 py-3 text-[var(--ui-secondary)]">{{ \Illuminate\Support\Carbon::parse($usage->usage_date)->format('d.m.Y') }}</td>
+                                        <td class="px-4 py-3 text-[var(--ui-secondary)]">{{ $usage->label }}</td>
+                                        <td class="px-4 py-3 text-[var(--ui-muted)]">{{ $usage->billable_type }}</td>
+                                        <td class="px-4 py-3 text-right text-[var(--ui-secondary)]">{{ $usage->count }}</td>
+                                        <td class="px-4 py-3 text-right text-[var(--ui-muted)]">{{ number_format($usage->cost_per_unit, 4, ',', '.') }} €</td>
+                                        <td class="px-4 py-3 text-right font-semibold text-[var(--ui-secondary)]">{{ number_format($usage->total_cost, 2, ',', '.') }} €</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-end">
+                        <div class="px-4 py-2 bg-[var(--ui-primary-5)] rounded-lg border border-[var(--ui-primary)]/20">
+                            <span class="font-bold text-[var(--ui-primary)]">Monatssumme: {{ number_format((float)($monthlyTotal ?? 0), 2, ',', '.') }} €</span>
+                        </div>
+                    </div>
+                @else
+                    <div class="text-[var(--ui-muted)] text-sm p-6 text-center bg-[var(--ui-muted-5)] rounded-lg">Für diesen Monat liegen noch keine Nutzungsdaten vor.</div>
+                @endif
+            </div>
+
             {{-- Billing Details --}}
             <div>
                 <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Rechnungsdetails</h3>
