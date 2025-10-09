@@ -46,6 +46,6 @@ class Dashboard extends Component
 
     public function render()
     {
-        return view('platform::livewire.dashboard')->layout('platform::layouts.app');
+        return view('core::livewire.dashboard')->layout('core::layouts.app');
     }
 }

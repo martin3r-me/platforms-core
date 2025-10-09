@@ -29,7 +29,7 @@ class CoreServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Views & Migrations
-        $this->loadViewsFrom(__DIR__.'/../resources/views', 'platform');
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'core');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
         // Module ServiceProvider automatisch laden
