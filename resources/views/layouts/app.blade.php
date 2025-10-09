@@ -36,8 +36,9 @@
     </x-ui-sidebar>
 
     <!-- Main Content -->
-    <main class="flex-1 min-w-0 h-screen overflow-y-auto bg-white">
+    <main class="flex-1 min-w-0 h-screen overflow-y-auto bg-white relative">
         {{ $slot }}
+      <x-ui-terminal />
     </main>
   </div>
 
