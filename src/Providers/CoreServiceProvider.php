@@ -36,7 +36,20 @@ class CoreServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Commands entfernt - Sidebar soll leer sein
+        // Views für Core-Package registrieren
+        $this->loadViewsFrom(__DIR__ . '/../../resources/views', 'core');
+        
+        // Livewire-Komponenten registrieren
+        if (class_exists(\Livewire\Livewire::class)) {
+            \Livewire\Livewire::component('core.modal-team', \Platform\Core\Livewire\ModalTeam::class);
+            \Livewire\Livewire::component('core.modal-user', \Platform\Core\Livewire\ModalUser::class);
+            \Livewire\Livewire::component('core.modal-modules', \Platform\Core\Livewire\ModalModules::class);
+            \Livewire\Livewire::component('core.modal-pricing', \Platform\Core\Livewire\ModalPricing::class);
+            \Livewire\Livewire::component('core.navbar', \Platform\Core\Livewire\Navbar::class);
+            \Livewire\Livewire::component('core.dashboard', \Platform\Core\Livewire\Dashboard::class);
+            \Livewire\Livewire::component('core.login', \Platform\Core\Livewire\Login::class);
+            \Livewire\Livewire::component('core.register', \Platform\Core\Livewire\Register::class);
+        }
     }
 
     private function registerModules(): void
