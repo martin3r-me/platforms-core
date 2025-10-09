@@ -3,33 +3,43 @@
 namespace Platform\Core\Livewire;
 
 use Livewire\Component;
-use Platform\Core\PlatformCore;
-use Livewire\Attributes\On; 
+use Illuminate\Support\Facades\Auth;
 
 class ModalUser extends Component
 {
-    public $modalShow;
+    public $modalShow = false;
+    public $user = [];
 
-    #[On('open-modal-user')] 
-    public function openModalUser()
+    protected $listeners = ['open-modal-user' => 'openModal'];
+
+    public function mount()
+    {
+        $this->user = auth()->user()->toArray();
+    }
+
+    public function openModal()
     {
         $this->modalShow = true;
     }
 
-    
-
-    public function mount()
+    public function save()
     {
-        $this->modalShow = false;
-    }
+        $this->validate([
+            'user.fullname' => 'nullable|string|max:255',
+            'user.email' => 'required|email|unique:users,email,' . auth()->id(),
+        ]);
 
-    public function closeModal()
-    {
-        $this->modalShow = false;
+        $user = Auth::user();
+        $user->update([
+            'fullname' => $this->user['fullname'] ?? null,
+            'email' => $this->user['email'],
+        ]);
+
+        $this->dispatch('user-updated');
     }
 
     public function render()
     {
-        return view('platform::livewire.modal-user');
+        return view('core::livewire.modal-user');
     }
 }
