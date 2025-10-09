@@ -35,7 +35,10 @@ class ModalUser extends Component
             'email' => $this->user['email'],
         ]);
 
-        $this->dispatch('user-updated');
+        $this->dispatch('notice', [
+            'type' => 'success',
+            'message' => 'Benutzerdaten erfolgreich gespeichert!'
+        ]);
     }
 
     public function render()
