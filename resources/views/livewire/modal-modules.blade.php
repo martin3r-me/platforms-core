@@ -278,19 +278,10 @@
         </div>
 
     <x-slot name="footer">
-        <div class="flex justify-start">
-            @if(auth()->user()->currentTeam && auth()->user()->currentTeam->user_id === auth()->id())
-                <x-ui-button
-                    wire:click="$toggle('showMatrix')"
-                    variant="primary"
-                >
-                    @if($showMatrix)
-                        Zurück zur Modulauswahl
-                    @else
-                        Modul-Matrix anzeigen
-                    @endif
-                </x-ui-button>
-            @endif
+        <div class="flex justify-end">
+            <x-ui-button variant="secondary-outline" @click="modalShow = false">
+                Schließen
+            </x-ui-button>
         </div>
     </x-slot>
 </x-ui-modal>
