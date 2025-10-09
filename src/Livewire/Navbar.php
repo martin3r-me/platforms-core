@@ -41,7 +41,7 @@ class Navbar extends Component
 
     public function render()
     {
-        return view('core::livewire.navbar', [
+        return view('platform::livewire.navbar', [
             'monthlyTotal' => $this->monthlyTotal,
         ]);
     }

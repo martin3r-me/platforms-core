@@ -56,7 +56,7 @@ class ModalPricing extends Component
 
     public function render()
     {
-        return view('core::livewire.modal-pricing', [
+        return view('platform::livewire.modal-pricing', [
             'monthlyUsages' => $this->monthlyUsages,
             'monthlyTotal'  => $this->monthlyTotal,
         ]);

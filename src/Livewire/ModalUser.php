@@ -40,6 +40,6 @@ class ModalUser extends Component
 
     public function render()
     {
-        return view('core::livewire.modal-user');
+        return view('platform::livewire.modal-user');
     }
 }

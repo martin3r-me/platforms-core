@@ -78,6 +78,6 @@ class ModalTeam extends Component
 
     public function render()
     {
-        return view('core::livewire.modal-team');
+        return view('platform::livewire.modal-team');
     }
 }

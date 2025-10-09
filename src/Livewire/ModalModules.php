@@ -341,7 +341,7 @@ class ModalModules extends Component
 
     public function render()
     {
-        return view('core::livewire.modal-modules');
+        return view('platform::livewire.modal-modules');
     }
 }
 
