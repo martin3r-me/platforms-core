@@ -28,34 +28,13 @@
   @endphp
 
   <div class="flex h-screen w-full">
-    <!-- Sidebar -->
-    <x-ui-sidebar>
-        @if($class && class_exists($class))
-            @livewire($currentModuleKey.'.sidebar')
-        @endif
-    </x-ui-sidebar>
-
-    <!-- Main Content -->
+    <!-- Main Content only (ohne Sidebar) -->
     <main class="flex-1 min-w-0 h-screen bg-white flex flex-col overflow-hidden">
       <div class="flex-1 min-h-0 overflow-y-auto">
         @yield('content')
       </div>
-      <x-ui-terminal />
     </main>
   </div>
-
-  @auth 
-    @livewire('core.modal-team')
-    @livewire('core.modal-user')
-    @livewire('core.modal-pricing')
-    @livewire('comms.comms-modal')
-    @livewire('core.modal-modules')
-  @endauth
-    
-  <livewire:notifications.notices.index />
-  @if(config('notifications.show_modal'))
-      <livewire:notifications.notices.modal />
-  @endif
 
   @livewireScripts
 
