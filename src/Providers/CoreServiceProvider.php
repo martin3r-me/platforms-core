@@ -39,6 +39,15 @@ class CoreServiceProvider extends ServiceProvider
         // Views für Core-Package registrieren
         $this->loadViewsFrom(__DIR__ . '/../../resources/views', 'core');
         
+        // Teams SSO Routes laden
+        $this->loadRoutesFrom(__DIR__ . '/../../routes/teams-sso.php');
+        
+        // Teams SSO Middleware registrieren
+        $this->app->make(\Illuminate\Routing\Router::class)->aliasMiddleware(
+            'teams.sso',
+            \Platform\Core\Middleware\TeamsSsoMiddleware::class
+        );
+        
         // Livewire-Komponenten registrieren
         if (class_exists(\Livewire\Livewire::class)) {
             \Livewire\Livewire::component('core.modal-team', \Platform\Core\Livewire\ModalTeam::class);

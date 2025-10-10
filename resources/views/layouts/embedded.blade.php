@@ -40,6 +40,9 @@
 
   @livewireScripts
   
+  {{-- Teams SSO Integration --}}
+  @include('core::components.teams-sso-script')
+  
   {{-- Wichtige Livewire-Komponenten für embedded Kontext --}}
   @auth 
     @livewire('core.modal-team')
