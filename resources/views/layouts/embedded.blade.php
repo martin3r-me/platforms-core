@@ -41,7 +41,7 @@
   @livewireScripts
   
   {{-- Teams SSO Integration --}}
-  @include('core::components.teams-sso-script')
+  @include('platform::components.teams-sso-script')
   
   {{-- Wichtige Livewire-Komponenten für embedded Kontext --}}
   @auth 
