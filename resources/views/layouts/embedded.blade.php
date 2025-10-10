@@ -16,6 +16,8 @@
   @livewireStyles
 
   <script src="https://unpkg.com/@wotz/livewire-sortablejs@1.0.0/dist/livewire-sortable.js"></script>
+  <!-- Microsoft Teams JavaScript SDK (für Tabs/Settings) -->
+  <script src="https://res.cdn.office.net/teams-js/2.0.0/js/MicrosoftTeams.min.js" crossorigin="anonymous"></script>
 </head>
 
 <body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)] overflow-hidden">
