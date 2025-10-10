@@ -17,9 +17,9 @@ class TeamsSsoMiddleware
             return $next($request);
         }
 
-        // Config-Routes: Einloggen aber nicht weiterleiten
+        // Config-Routes: Einloggen aber Seite normal laden
         if ($this->isConfigRoute($request)) {
-            // Versuche SSO, aber leite nicht weiter
+            // Versuche SSO, aber lade Seite normal
             $this->attemptSsoLogin($request);
             return $next($request);
         }
