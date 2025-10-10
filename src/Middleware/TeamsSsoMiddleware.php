@@ -17,10 +17,8 @@ class TeamsSsoMiddleware
             return $next($request);
         }
 
-        // Config-Routes: Einloggen aber Seite normal laden
+        // Config-Routes: Teams SSO komplett überspringen
         if ($this->isConfigRoute($request)) {
-            // Versuche SSO, aber lade Seite normal
-            $this->attemptSsoLogin($request);
             return $next($request);
         }
 
@@ -51,36 +49,6 @@ class TeamsSsoMiddleware
         return $next($request);
     }
 
-    private function attemptSsoLogin(Request $request): void
-    {
-        // Nur versuchen wenn noch nicht eingeloggt
-        if (Auth::check()) {
-            return;
-        }
-
-        // Teams SSO Token aus Request extrahieren
-        $teamsToken = $this->extractTeamsToken($request);
-        
-        if (!$teamsToken) {
-            Log::info('Teams SSO: No token found for config route');
-            return;
-        }
-
-        try {
-            // Token validieren und User authentifizieren (ohne Redirect)
-            $user = $this->authenticateWithTeamsToken($teamsToken, $request);
-            
-            if ($user) {
-                Auth::login($user, true);
-                Log::info('Teams SSO: User authenticated for config route', ['user_id' => $user->id]);
-            } else {
-                Log::warning('Teams SSO: Authentication failed for config route');
-            }
-        } catch (\Throwable $e) {
-            Log::error('Teams SSO: Error during config route authentication', ['error' => $e->getMessage()]);
-            // Bei Fehlern einfach weitermachen, kein Redirect
-        }
-    }
 
     private function isTeamsRequest(Request $request): bool
     {
