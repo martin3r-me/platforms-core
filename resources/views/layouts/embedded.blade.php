@@ -14,7 +14,7 @@
 
 <body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)] min-h-screen">
   <main class="min-h-screen">
-    {{ $slot }}
+    @yield('content')
   </main>
 
   @livewireScripts
