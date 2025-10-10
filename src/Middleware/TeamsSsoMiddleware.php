@@ -66,14 +66,19 @@ class TeamsSsoMiddleware
             return;
         }
 
-        // Token validieren und User authentifizieren (ohne Redirect)
-        $user = $this->authenticateWithTeamsToken($teamsToken, $request);
-        
-        if ($user) {
-            Auth::login($user, true);
-            Log::info('Teams SSO: User authenticated for config route', ['user_id' => $user->id]);
-        } else {
-            Log::warning('Teams SSO: Authentication failed for config route');
+        try {
+            // Token validieren und User authentifizieren (ohne Redirect)
+            $user = $this->authenticateWithTeamsToken($teamsToken, $request);
+            
+            if ($user) {
+                Auth::login($user, true);
+                Log::info('Teams SSO: User authenticated for config route', ['user_id' => $user->id]);
+            } else {
+                Log::warning('Teams SSO: Authentication failed for config route');
+            }
+        } catch (\Throwable $e) {
+            Log::error('Teams SSO: Error during config route authentication', ['error' => $e->getMessage()]);
+            // Bei Fehlern einfach weitermachen, kein Redirect
         }
     }
 
