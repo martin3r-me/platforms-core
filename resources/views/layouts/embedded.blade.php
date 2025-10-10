@@ -22,8 +22,22 @@
       <div class="flex-1 min-h-0 overflow-y-auto">
         @yield('content')
       </div>
+      <x-ui-terminal />
     </main>
   </div>
+
+  @auth 
+    @livewire('core.modal-team')
+    @livewire('core.modal-user')
+    @livewire('core.modal-pricing')
+    @livewire('comms.comms-modal')
+    @livewire('core.modal-modules')
+  @endauth
+    
+  <livewire:notifications.notices.index />
+  @if(config('notifications.show_modal'))
+      <livewire:notifications.notices.modal />
+  @endif
 
   @livewireScripts
 </body>
