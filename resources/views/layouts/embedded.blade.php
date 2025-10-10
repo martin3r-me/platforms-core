@@ -39,6 +39,20 @@
   </div>
 
   @livewireScripts
+  
+  {{-- Wichtige Livewire-Komponenten für embedded Kontext --}}
+  @auth 
+    @livewire('core.modal-team')
+    @livewire('core.modal-user')
+    @livewire('core.modal-pricing')
+    @livewire('comms.comms-modal')
+    @livewire('core.modal-modules')
+  @endauth
+    
+  <livewire:notifications.notices.index />
+  @if(config('notifications.show_modal'))
+      <livewire:notifications.notices.modal />
+  @endif
 
 </body>
 </html>
