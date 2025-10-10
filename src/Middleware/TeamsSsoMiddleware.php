@@ -12,8 +12,15 @@ class TeamsSsoMiddleware
 {
     public function handle(Request $request, Closure $next)
     {
-        // Nur für Teams-Embedded-Routes aktivieren
+        // Nur für Teams-Embedded-Routes aktivieren (außer Config-Routes)
         if (!$this->isTeamsRequest($request)) {
+            return $next($request);
+        }
+
+        // Config-Routes: Einloggen aber nicht weiterleiten
+        if ($this->isConfigRoute($request)) {
+            // Versuche SSO, aber leite nicht weiter
+            $this->attemptSsoLogin($request);
             return $next($request);
         }
 
@@ -44,6 +51,32 @@ class TeamsSsoMiddleware
         return $next($request);
     }
 
+    private function attemptSsoLogin(Request $request): void
+    {
+        // Nur versuchen wenn noch nicht eingeloggt
+        if (Auth::check()) {
+            return;
+        }
+
+        // Teams SSO Token aus Request extrahieren
+        $teamsToken = $this->extractTeamsToken($request);
+        
+        if (!$teamsToken) {
+            Log::info('Teams SSO: No token found for config route');
+            return;
+        }
+
+        // Token validieren und User authentifizieren (ohne Redirect)
+        $user = $this->authenticateWithTeamsToken($teamsToken, $request);
+        
+        if ($user) {
+            Auth::login($user, true);
+            Log::info('Teams SSO: User authenticated for config route', ['user_id' => $user->id]);
+        } else {
+            Log::warning('Teams SSO: Authentication failed for config route');
+        }
+    }
+
     private function isTeamsRequest(Request $request): bool
     {
         // Prüfen ob Request von Teams kommt
@@ -53,6 +86,15 @@ class TeamsSsoMiddleware
         return str_contains($userAgent, 'Teams') || 
                str_contains($referer, 'teams.microsoft.com') ||
                $request->has('teams_context');
+    }
+
+    private function isConfigRoute(Request $request): bool
+    {
+        // Config-Routes identifizieren (dort soll User Projekt auswählen können)
+        $path = $request->path();
+        return str_contains($path, '/embedded/teams/config') ||
+               str_contains($path, '/embedded/planner/teams/config') ||
+               str_contains($path, '/embedded/test');
     }
 
     private function extractTeamsToken(Request $request): ?string
