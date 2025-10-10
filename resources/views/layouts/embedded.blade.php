@@ -12,10 +12,15 @@
   @livewireStyles
 </head>
 
-<body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)] min-h-screen">
-  <main class="min-h-screen">
-    @yield('content')
-  </main>
+<body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)] overflow-hidden">
+  <div class="flex h-screen w-full">
+    <main class="flex-1 min-w-0 h-screen bg-white flex flex-col overflow-hidden">
+      <div class="flex-1 min-h-0 overflow-y-auto">
+        @yield('content')
+      </div>
+    </main>
+  </div>
+  <script src="https://unpkg.com/@wotz/livewire-sortablejs@1.0.0/dist/livewire-sortable.js"></script>
 
   @livewireScripts
 </body>
