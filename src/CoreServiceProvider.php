@@ -31,6 +31,15 @@ class CoreServiceProvider extends ServiceProvider
         // Views & Migrations
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'platform');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        
+        // Teams SSO Routes laden
+        $this->loadRoutesFrom(__DIR__.'/../routes/teams-sso.php');
+        
+        // Teams SSO Middleware registrieren
+        $this->app->make(\Illuminate\Routing\Router::class)->aliasMiddleware(
+            'teams.sso',
+            \Platform\Core\Middleware\TeamsSsoMiddleware::class
+        );
 
         // Module ServiceProvider automatisch laden
         $this->loadModuleServiceProviders();
