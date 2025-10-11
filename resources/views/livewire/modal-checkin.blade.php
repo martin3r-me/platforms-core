@@ -110,7 +110,7 @@
                 {{-- Datum und Grunddaten --}}
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
                     <div class="flex items-center gap-3 mb-4">
-                        @svg('heroicon-o-target', 'w-5 h-5 text-[var(--ui-primary)]')
+                        @svg('heroicon-o-flag', 'w-5 h-5 text-[var(--ui-primary)]')
                         <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">
                             {{ \Carbon\Carbon::parse($selectedDate)->locale('de')->isoFormat('dddd, DD. MMMM YYYY') }}
                         </h3>
