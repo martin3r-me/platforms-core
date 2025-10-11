@@ -174,7 +174,7 @@
                         <label class="group flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-[var(--ui-primary)]/5 transition-colors">
                             <input type="checkbox" wire:model.live="checkinData.hydrated" class="w-4 h-4 text-[var(--ui-primary)] rounded border-[var(--ui-border)] focus:ring-2 focus:ring-[var(--ui-primary)]/20">
                             <div class="flex items-center gap-2">
-                                @svg('heroicon-o-droplet', 'w-4 h-4 text-[var(--ui-primary)]')
+                                @svg('heroicon-o-beaker', 'w-4 h-4 text-[var(--ui-primary)]')
                                 <span class="text-sm text-[var(--ui-secondary)] group-hover:text-[var(--ui-primary)]">Genug getrunken</span>
                             </div>
                         </label>
@@ -182,7 +182,7 @@
                         <label class="group flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-[var(--ui-primary)]/5 transition-colors">
                             <input type="checkbox" wire:model.live="checkinData.exercised" class="w-4 h-4 text-[var(--ui-primary)] rounded border-[var(--ui-border)] focus:ring-2 focus:ring-[var(--ui-primary)]/20">
                             <div class="flex items-center gap-2">
-                                @svg('heroicon-o-bolt', 'w-4 h-4 text-[var(--ui-primary)]')
+                                @svg('heroicon-o-fire', 'w-4 h-4 text-[var(--ui-primary)]')
                                 <span class="text-sm text-[var(--ui-secondary)] group-hover:text-[var(--ui-primary)]">Sich bewegt</span>
                             </div>
                         </label>
@@ -214,7 +214,7 @@
                         <label class="group flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-[var(--ui-primary)]/5 transition-colors">
                             <input type="checkbox" wire:model.live="checkinData.needs_support" class="w-4 h-4 text-[var(--ui-primary)] rounded border-[var(--ui-border)] focus:ring-2 focus:ring-[var(--ui-primary)]/20">
                             <div class="flex items-center gap-2">
-                                @svg('heroicon-o-hand-raised', 'w-4 h-4 text-[var(--ui-primary)]')
+                                @svg('heroicon-o-question-mark-circle', 'w-4 h-4 text-[var(--ui-primary)]')
                                 <span class="text-sm text-[var(--ui-secondary)] group-hover:text-[var(--ui-primary)]">Unterstützung nötig</span>
                             </div>
                         </label>
