@@ -246,13 +246,13 @@
                     </div>
 
                     {{-- Neue Aufgabe hinzufügen --}}
-                    <div class="flex gap-2 mb-4">
+                    <div class="flex gap-2 mb-4" x-data="{ todoTitle: '' }">
                         <input
                             type="text"
-                            id="newTodoInput"
+                            x-model="todoTitle"
                             placeholder="Neue Aufgabe hinzufügen..."
                             class="flex-1 px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
-                            onkeydown="if(event.key==='Enter'){event.preventDefault();event.stopPropagation();const input = document.getElementById('newTodoInput');$wire.set('newTodoTitle', input.value);$wire.addTodo();input.value='';return false;}"
+                            @keydown.enter.prevent="$wire.set('newTodoTitle', todoTitle); $wire.addTodo(); todoTitle = '';"
                         >
                         <x-ui-button wire:click="addTodo" variant="primary" class="px-4">
                             @svg('heroicon-o-plus', 'w-4 h-4')
