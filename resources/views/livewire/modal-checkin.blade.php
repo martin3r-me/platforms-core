@@ -251,7 +251,7 @@
                             name="newTodoTitle"
                             x-model="todoTitle"
                             placeholder="Neue Aufgabe hinzufügen..."
-                            class="flex-1 w-full"
+                            class="flex-1"
                             @keydown.enter="$wire.set('newTodoTitle', todoTitle); $wire.addTodo(); todoTitle = '';"
                         />
                         <x-ui-button wire:click="addTodo" variant="primary" iconOnly>
