@@ -122,10 +122,12 @@ class ModalCheckin extends Component
             'checkinData.notes' => 'nullable|string|max:2000',
         ]);
 
-        $checkinData = array_merge($this->checkinData, [
-            'user_id' => auth()->id(),
-            'date' => $this->selectedDate,
-        ]);
+            $checkinData = array_merge($this->checkinData, [
+                'user_id' => auth()->id(),
+                'date' => $this->selectedDate,
+                'mood' => $this->checkinData['mood'] ? (int)$this->checkinData['mood'] : null,
+                'happiness' => $this->checkinData['happiness'] ? (int)$this->checkinData['happiness'] : null,
+            ]);
 
         if ($this->checkin) {
             $this->checkin->update($checkinData);
