@@ -75,15 +75,15 @@
                             $dateString = $currentDate->format('Y-m-d');
                         @endphp
 
-                        <button 
-                            wire:click="selectDate('{{ $dateString }}')"
-                            class="group relative p-2 text-sm rounded-lg transition-all duration-200 hover:scale-105
-                                {{ $isCurrentMonth ? 'text-[var(--ui-secondary)]' : 'text-[var(--ui-muted)]' }}
-                                {{ $isToday ? 'bg-gradient-to-br from-[var(--ui-primary)] to-[var(--ui-primary)]/80 text-[var(--ui-on-primary)] font-semibold shadow-md' : '' }}
-                                {{ $isSelected && !$isToday ? 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] font-semibold border border-[var(--ui-primary)]/20' : '' }}
-                                {{ !$isSelected && !$isToday ? 'hover:bg-[var(--ui-muted-5)] hover:border hover:border-[var(--ui-border)]/40' : '' }}
-                            "
-                        >
+                            <button
+                                wire:click="selectDate('{{ $dateString }}')"
+                                class="group relative p-2 text-sm rounded-lg transition-colors duration-200
+                                    {{ $isCurrentMonth ? 'text-[var(--ui-secondary)]' : 'text-[var(--ui-muted)]' }}
+                                    {{ $isToday ? 'bg-gradient-to-br from-[var(--ui-primary)] to-[var(--ui-primary)]/80 text-[var(--ui-on-primary)] font-semibold shadow-md' : '' }}
+                                    {{ $isSelected && !$isToday ? 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] font-semibold border border-[var(--ui-primary)]/20' : '' }}
+                                    {{ !$isSelected && !$isToday ? 'hover:bg-[var(--ui-primary)]/5 hover:text-[var(--ui-primary)]' : '' }}
+                                "
+                            >
                             <span class="relative z-10">{{ $currentDate->day }}</span>
                             @if($hasCheckin)
                                 <div class="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-[var(--ui-primary)] rounded-full shadow-sm"></div>
