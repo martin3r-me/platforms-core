@@ -1,4 +1,4 @@
-    <x-ui-modal size="full" wire:model="modalShow">
+    <x-ui-modal size="xl" wire:model="modalShow">
     <x-slot name="header">
         <div class="flex items-center justify-between w-full">
             <div class="flex items-center gap-3">
