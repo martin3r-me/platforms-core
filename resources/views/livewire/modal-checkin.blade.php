@@ -116,6 +116,61 @@
                         </div>
                     </div>
                 </div>
+
+                {{-- To-Do Liste --}}
+                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm mt-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        @svg('heroicon-o-clipboard-document-list', 'w-5 h-5 text-[var(--ui-primary)]')
+                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Tagesaufgaben</h3>
+                    </div>
+
+                    {{-- Neue Aufgabe hinzufügen --}}
+                    <div class="flex gap-2 mb-4">
+                        <input
+                            type="text"
+                            wire:model="newTodoTitle"
+                            wire:keydown.enter="addTodo"
+                            placeholder="Neue Aufgabe hinzufügen..."
+                            class="flex-1 px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
+                        >
+                        <x-ui-button wire:click="addTodo" variant="primary" class="px-4">
+                            @svg('heroicon-o-plus', 'w-4 h-4')
+                        </x-ui-button>
+                    </div>
+
+                    {{-- To-Do Liste --}}
+                    <div class="space-y-2 max-h-48 overflow-y-auto">
+                        @forelse($todos as $todo)
+                            <div class="group flex items-center gap-3 p-3 bg-[var(--ui-muted-5)] rounded-lg hover:bg-[var(--ui-primary)]/5 transition-colors">
+                                <input
+                                    type="checkbox"
+                                    wire:click="toggleTodo({{ $todo['id'] }})"
+                                    {{ $todo['done'] ? 'checked' : '' }}
+                                    class="w-4 h-4 text-[var(--ui-primary)] rounded border-[var(--ui-border)] focus:ring-2 focus:ring-[var(--ui-primary)]/20"
+                                >
+                                <span
+                                    wire:click="toggleTodo({{ $todo['id'] }})"
+                                    class="flex-1 text-sm cursor-pointer {{ $todo['done'] ? 'line-through text-[var(--ui-muted)]' : 'text-[var(--ui-secondary)]' }} hover:text-[var(--ui-primary)] transition-colors"
+                                >
+                                    {{ $todo['title'] }}
+                                </span>
+                                <button
+                                    wire:click="deleteTodo({{ $todo['id'] }})"
+                                    class="opacity-0 group-hover:opacity-100 p-1 hover:bg-[var(--ui-danger)] hover:text-[var(--ui-on-danger)] rounded transition-all duration-200"
+                                >
+                                    @svg('heroicon-o-trash', 'w-4 h-4')
+                                </button>
+                            </div>
+                        @empty
+                            <div class="text-center py-6">
+                                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-[var(--ui-muted-5)] flex items-center justify-center">
+                                    @svg('heroicon-o-clipboard-document-list', 'w-6 h-6 text-[var(--ui-muted)]')
+                                </div>
+                                <p class="text-sm text-[var(--ui-muted)]">Noch keine Aufgaben für heute</p>
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -243,61 +298,6 @@
                                 <span class="text-sm text-[var(--ui-secondary)] group-hover:text-[var(--ui-primary)]">Unterstützung nötig</span>
                             </div>
                         </label>
-                    </div>
-                </div>
-
-                {{-- To-Do Liste --}}
-                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
-                    <div class="flex items-center gap-3 mb-4">
-                        @svg('heroicon-o-clipboard-document-list', 'w-5 h-5 text-[var(--ui-primary)]')
-                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Tagesaufgaben</h3>
-                    </div>
-                    
-                    {{-- Neue Aufgabe hinzufügen --}}
-                    <div class="flex gap-2 mb-4">
-                        <input 
-                            type="text" 
-                            wire:model="newTodoTitle" 
-                            wire:keydown.enter="addTodo"
-                            placeholder="Neue Aufgabe hinzufügen..."
-                            class="flex-1 px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
-                        >
-                        <x-ui-button wire:click="addTodo" variant="primary" class="px-4">
-                            @svg('heroicon-o-plus', 'w-4 h-4')
-                        </x-ui-button>
-                    </div>
-
-                    {{-- To-Do Liste --}}
-                    <div class="space-y-2 max-h-48 overflow-y-auto">
-                        @forelse($todos as $todo)
-                            <div class="group flex items-center gap-3 p-3 bg-[var(--ui-muted-5)] rounded-lg hover:bg-[var(--ui-primary)]/5 transition-colors">
-                                <input 
-                                    type="checkbox" 
-                                    wire:click="toggleTodo({{ $todo['id'] }})"
-                                    {{ $todo['done'] ? 'checked' : '' }}
-                                    class="w-4 h-4 text-[var(--ui-primary)] rounded border-[var(--ui-border)] focus:ring-2 focus:ring-[var(--ui-primary)]/20"
-                                >
-                                <span 
-                                    wire:click="toggleTodo({{ $todo['id'] }})"
-                                    class="flex-1 text-sm cursor-pointer {{ $todo['done'] ? 'line-through text-[var(--ui-muted)]' : 'text-[var(--ui-secondary)]' }} hover:text-[var(--ui-primary)] transition-colors"
-                                >
-                                    {{ $todo['title'] }}
-                                </span>
-                                <button 
-                                    wire:click="deleteTodo({{ $todo['id'] }})"
-                                    class="opacity-0 group-hover:opacity-100 p-1 hover:bg-[var(--ui-danger)] hover:text-[var(--ui-on-danger)] rounded transition-all duration-200"
-                                >
-                                    @svg('heroicon-o-trash', 'w-4 h-4')
-                                </button>
-                            </div>
-                        @empty
-                            <div class="text-center py-6">
-                                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-[var(--ui-muted-5)] flex items-center justify-center">
-                                    @svg('heroicon-o-clipboard-document-list', 'w-6 h-6 text-[var(--ui-muted)]')
-                                </div>
-                                <p class="text-sm text-[var(--ui-muted)]">Noch keine Aufgaben für heute</p>
-                            </div>
-                        @endforelse
                     </div>
                 </div>
 
