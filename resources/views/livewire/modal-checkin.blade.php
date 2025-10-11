@@ -97,25 +97,6 @@
                     @endwhile
                 </div>
 
-                {{-- Check-in Status --}}
-                <div class="mt-4 pt-4 border-t border-[var(--ui-border)]/60">
-                    <div class="flex items-center justify-between text-sm">
-                        <span class="text-[var(--ui-muted)]">Heute:</span>
-                        <div class="flex items-center gap-2">
-                            @if(in_array(now()->format('Y-m-d'), $checkins))
-                                <div class="flex items-center gap-1 text-[var(--ui-success)]">
-                                    @svg('heroicon-o-check-circle', 'w-4 h-4')
-                                    <span class="font-medium">Check-in erledigt</span>
-                                </div>
-                            @else
-                                <div class="flex items-center gap-1 text-[var(--ui-warning)]">
-                                    @svg('heroicon-o-clock', 'w-4 h-4')
-                                    <span class="font-medium">Noch ausstehend</span>
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                </div>
 
             </div>
         </div>
