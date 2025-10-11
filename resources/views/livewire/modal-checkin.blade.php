@@ -1,12 +1,20 @@
     <x-ui-modal size="xl" wire:model="modalShow">
-    <x-slot name="header">
-        <div class="flex items-center justify-between w-full">
-            <div class="flex items-center gap-3">
-                <h2 class="text-xl font-semibold text-[var(--ui-secondary)] m-0">Täglicher Check-in</h2>
-                <span class="text-xs text-[var(--ui-muted)] bg-[var(--ui-muted-5)] px-2 py-1 rounded-full">SELBSTREFLEXION</span>
+        <x-slot name="header">
+            <div class="flex items-center justify-between w-full">
+                <div class="flex items-center gap-3">
+                    <h2 class="text-xl font-semibold text-[var(--ui-secondary)] m-0">Täglicher Check-in</h2>
+                    <span class="text-xs text-[var(--ui-muted)] bg-[var(--ui-muted-5)] px-2 py-1 rounded-full">SELBSTREFLEXION</span>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm font-medium text-[var(--ui-secondary)]">
+                        {{ \Carbon\Carbon::parse($selectedDate)->locale('de')->isoFormat('dddd, DD. MMMM YYYY') }}
+                    </div>
+                    <div class="text-xs text-[var(--ui-muted)]">
+                        {{ \Carbon\Carbon::parse($selectedDate)->locale('de')->isoFormat('HH:mm') }}
+                    </div>
+                </div>
             </div>
-        </div>
-    </x-slot>
+        </x-slot>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
             {{-- Kalender (1/3) --}}
