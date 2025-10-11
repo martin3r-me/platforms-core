@@ -248,6 +248,7 @@
                     {{-- Neue Aufgabe hinzufügen --}}
                     <div class="flex items-center gap-2 mb-4" x-data="{ todoTitle: '' }" @keydown.enter.stop>
                         <x-ui-input-text
+                            name="newTodoTitle"
                             x-model="todoTitle"
                             placeholder="Neue Aufgabe hinzufügen..."
                             class="flex-1"
