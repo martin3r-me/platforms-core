@@ -6,7 +6,7 @@
                     <span class="text-xs text-[var(--ui-muted)] bg-[var(--ui-muted-5)] px-2 py-1 rounded-full">SELBSTREFLEXION</span>
                 </div>
                 <div class="text-right">
-                    <div class="text-sm font-medium text-[var(--ui-secondary)] bg-[var(--ui-primary)]/10 px-3 py-1 rounded-lg">
+                    <div class="text-xs text-[var(--ui-muted)] bg-[var(--ui-muted-5)] px-2 py-1 rounded-full">
                         {{ \Carbon\Carbon::parse($selectedDate)->locale('de')->isoFormat('DD. MMMM YYYY') }}
                     </div>
                 </div>
