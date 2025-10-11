@@ -8,14 +8,14 @@
         </div>
     </x-slot>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {{-- Kalender --}}
-        <div class="order-2 lg:order-1">
-            <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
-                <div class="flex items-center gap-3 mb-6">
-                    @svg('heroicon-o-calendar-days', 'w-6 h-6 text-[var(--ui-primary)]')
-                    <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Kalender</h3>
-                </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {{-- Kalender --}}
+            <div class="order-2 lg:order-1">
+                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
+                    <div class="flex items-center gap-3 mb-6">
+                        @svg('heroicon-o-calendar-days', 'w-6 h-6 text-[var(--ui-primary)]')
+                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Kalender</h3>
+                    </div>
                 
                 {{-- Monats-Navigation --}}
                 <div class="flex items-center justify-between mb-6">
@@ -120,7 +120,7 @@
         </div>
 
         {{-- Check-in Formular --}}
-        <div class="order-1 lg:order-2 lg:col-span-2">
+        <div class="order-1 lg:order-2">
             <div class="space-y-4">
                 {{-- Datum und Grunddaten --}}
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
