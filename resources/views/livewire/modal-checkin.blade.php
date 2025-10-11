@@ -252,7 +252,7 @@
                             wire:model="newTodoTitle"
                             placeholder="Neue Aufgabe hinzufügen..."
                             class="flex-1 px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
-                            onkeydown="if(event.key==='Enter'){event.preventDefault();event.stopPropagation();$wire.addTodo();}"
+                            onkeydown="if(event.key==='Enter'){event.preventDefault();event.stopPropagation();setTimeout(() => $wire.addTodo(), 10);return false;}"
                         >
                         <x-ui-button wire:click="addTodo" variant="primary" class="px-4">
                             @svg('heroicon-o-plus', 'w-4 h-4')
