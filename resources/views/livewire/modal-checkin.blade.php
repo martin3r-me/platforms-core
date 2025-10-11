@@ -250,7 +250,8 @@
                         <input
                             type="text"
                             wire:model="newTodoTitle"
-                            wire:keydown.enter.prevent="addTodo"
+                            wire:keydown.enter.prevent.stop="addTodo"
+                            @keydown.enter.prevent="$wire.addTodo()"
                             placeholder="Neue Aufgabe hinzufügen..."
                             class="flex-1 px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
                         >
