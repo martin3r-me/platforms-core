@@ -130,6 +130,9 @@ class ModalCheckin extends Component
         ]);
 
         $this->loadCheckins();
+        
+        // Dispatch Event für Badge-Update
+        $this->dispatch('checkin-updated');
     }
 
     public function addTodo()
@@ -156,6 +159,9 @@ class ModalCheckin extends Component
         if ($todo) {
             $todo->update(['done' => !$todo->done]);
             $this->loadCheckinForDate($this->selectedDate);
+            
+            // Dispatch Event für Badge-Update
+            $this->dispatch('checkin-updated');
         }
     }
 
@@ -163,6 +169,9 @@ class ModalCheckin extends Component
     {
         CheckinTodo::find($todoId)?->delete();
         $this->loadCheckinForDate($this->selectedDate);
+        
+        // Dispatch Event für Badge-Update
+        $this->dispatch('checkin-updated');
     }
 
     public function getMoodOptions()
