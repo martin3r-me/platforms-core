@@ -13,8 +13,8 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->date('date');
             $table->text('daily_goal')->nullable();
-            $table->enum('mood', ['excellent', 'good', 'okay', 'tired', 'stressed', 'frustrated'])->nullable();
-            $table->integer('happiness')->nullable(); // 1-10
+            $table->integer('mood')->nullable(); // 1-5
+            $table->integer('happiness')->nullable(); // 1-5
             $table->boolean('needs_support')->default(false);
             $table->boolean('hydrated')->default(false);
             $table->boolean('exercised')->default(false);

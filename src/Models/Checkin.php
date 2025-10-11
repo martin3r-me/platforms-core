@@ -34,33 +34,27 @@ class Checkin extends Model
         'social_time' => 'boolean',
     ];
 
-    public static function getMoodOptions(): array
-    {
-        return [
-            'excellent' => 'Ausgezeichnet',
-            'good' => 'Gut',
-            'okay' => 'Okay',
-            'tired' => 'Müde',
-            'stressed' => 'Gestresst',
-            'frustrated' => 'Frustriert',
-        ];
-    }
+        public static function getMoodOptions(): array
+        {
+            return [
+                1 => 'Sehr schlecht',
+                2 => 'Schlecht',
+                3 => 'Okay',
+                4 => 'Gut',
+                5 => 'Ausgezeichnet',
+            ];
+        }
 
-    public static function getHappinessOptions(): array
-    {
-        return [
-            1 => 'Sehr unzufrieden',
-            2 => 'Unzufrieden',
-            3 => 'Eher unzufrieden',
-            4 => 'Neutral',
-            5 => 'Eher zufrieden',
-            6 => 'Zufrieden',
-            7 => 'Sehr zufrieden',
-            8 => 'Glücklich',
-            9 => 'Sehr glücklich',
-            10 => 'Extrem glücklich',
-        ];
-    }
+        public static function getHappinessOptions(): array
+        {
+            return [
+                1 => 'Sehr unzufrieden',
+                2 => 'Unzufrieden',
+                3 => 'Neutral',
+                4 => 'Zufrieden',
+                5 => 'Sehr zufrieden',
+            ];
+        }
 
     public function user(): BelongsTo
     {

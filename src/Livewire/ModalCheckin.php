@@ -109,10 +109,10 @@ class ModalCheckin extends Component
 
     public function save()
     {
-        $this->validate([
-            'checkinData.daily_goal' => 'nullable|string|max:1000',
-            'checkinData.mood' => 'nullable|in:excellent,good,okay,tired,stressed,frustrated',
-            'checkinData.happiness' => 'nullable|integer|min:1|max:10',
+            $this->validate([
+                'checkinData.daily_goal' => 'nullable|string|max:1000',
+                'checkinData.mood' => 'nullable|integer|min:1|max:5',
+                'checkinData.happiness' => 'nullable|integer|min:1|max:5',
             'checkinData.hydrated' => 'boolean',
             'checkinData.exercised' => 'boolean',
             'checkinData.slept_well' => 'boolean',
