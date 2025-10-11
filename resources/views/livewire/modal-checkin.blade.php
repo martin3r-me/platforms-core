@@ -8,9 +8,9 @@
         </div>
     </x-slot>
 
-        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 h-full">
-            {{-- Kalender (1/5) --}}
-            <div class="order-3 lg:order-1 lg:col-span-1 h-full overflow-y-auto">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+            {{-- Kalender (1/3) --}}
+            <div class="order-3 lg:order-1 h-full overflow-y-auto">
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
                     <div class="flex items-center gap-3 mb-6">
                         @svg('heroicon-o-calendar-days', 'w-6 h-6 text-[var(--ui-primary)]')
@@ -117,24 +117,11 @@
                     </div>
                 </div>
 
-                {{-- Notizen --}}
-                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm mt-6">
-                    <div class="flex items-center gap-3 mb-4">
-                        @svg('heroicon-o-document-text', 'w-5 h-5 text-[var(--ui-primary)]')
-                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Zusätzliche Notizen</h3>
-                    </div>
-                    <textarea
-                        wire:model.live.debounce.500ms="checkinData.notes"
-                        placeholder="Weitere Gedanken oder Notizen..."
-                        class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent resize-none"
-                        rows="3"
-                    ></textarea>
-                </div>
             </div>
         </div>
 
-        {{-- Check-in Formular (2/5) --}}
-        <div class="order-1 lg:order-2 lg:col-span-2">
+        {{-- Check-in Formular (1/3) --}}
+        <div class="order-1 lg:order-2">
             <div class="space-y-4 h-full overflow-y-auto">
                 {{-- Datum und Grunddaten --}}
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
@@ -262,8 +249,8 @@
             </div>
         </div>
 
-        {{-- Aufgaben (2/5) --}}
-        <div class="order-2 lg:order-3 lg:col-span-2">
+        {{-- Aufgaben (1/3) --}}
+        <div class="order-2 lg:order-3">
             <div class="h-full overflow-y-auto">
                 {{-- To-Do Liste --}}
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
@@ -318,6 +305,20 @@
                             </div>
                         @endforelse
                     </div>
+                </div>
+
+                {{-- Notizen --}}
+                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm mt-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        @svg('heroicon-o-document-text', 'w-5 h-5 text-[var(--ui-primary)]')
+                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Zusätzliche Notizen</h3>
+                    </div>
+                    <textarea
+                        wire:model.live.debounce.500ms="checkinData.notes"
+                        placeholder="Weitere Gedanken oder Notizen..."
+                        class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent resize-none"
+                        rows="3"
+                    ></textarea>
                 </div>
             </div>
         </div>
