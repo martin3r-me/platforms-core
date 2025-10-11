@@ -8,9 +8,9 @@
         </div>
     </x-slot>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
-            {{-- Kalender --}}
-            <div class="order-2 lg:order-1 h-full overflow-y-auto">
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 h-full">
+            {{-- Kalender (1/5) --}}
+            <div class="order-3 lg:order-1 lg:col-span-1 h-full overflow-y-auto">
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
                     <div class="flex items-center gap-3 mb-6">
                         @svg('heroicon-o-calendar-days', 'w-6 h-6 text-[var(--ui-primary)]')
@@ -133,8 +133,8 @@
             </div>
         </div>
 
-        {{-- Check-in Formular --}}
-        <div class="order-1 lg:order-2">
+        {{-- Check-in Formular (2/5) --}}
+        <div class="order-1 lg:order-2 lg:col-span-2">
             <div class="space-y-4 h-full overflow-y-auto">
                 {{-- Datum und Grunddaten --}}
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
@@ -259,7 +259,12 @@
                         </label>
                     </div>
                 </div>
+            </div>
+        </div>
 
+        {{-- Aufgaben (2/5) --}}
+        <div class="order-2 lg:order-3 lg:col-span-2">
+            <div class="h-full overflow-y-auto">
                 {{-- To-Do Liste --}}
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
                     <div class="flex items-center gap-3 mb-4">
@@ -282,7 +287,7 @@
                     </div>
 
                     {{-- To-Do Liste --}}
-                    <div class="space-y-2 max-h-48 overflow-y-auto">
+                    <div class="space-y-2 max-h-96 overflow-y-auto">
                         @forelse($todos as $todo)
                             <div class="group flex items-center gap-3 p-3 bg-[var(--ui-muted-5)] rounded-lg hover:bg-[var(--ui-primary)]/5 transition-colors">
                                 <input
