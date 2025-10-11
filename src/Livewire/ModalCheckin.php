@@ -149,12 +149,44 @@ class ModalCheckin extends Component
             $this->modalShow = false;
     }
 
+    public function saveWithoutClosing()
+    {
+        $this->validate([
+            'checkinData.daily_goal' => 'nullable|string|max:1000',
+            'checkinData.mood' => 'nullable|integer|min:1|max:5',
+            'checkinData.happiness' => 'nullable|integer|min:1|max:5',
+            'checkinData.hydrated' => 'boolean',
+            'checkinData.exercised' => 'boolean',
+            'checkinData.slept_well' => 'boolean',
+            'checkinData.focused_work' => 'boolean',
+            'checkinData.social_time' => 'boolean',
+            'checkinData.needs_support' => 'boolean',
+            'checkinData.notes' => 'nullable|string|max:2000',
+        ]);
+
+        $checkinData = array_merge($this->checkinData, [
+            'user_id' => auth()->id(),
+            'date' => $this->selectedDate,
+            'mood' => $this->checkinData['mood'] ? (int)$this->checkinData['mood'] : null,
+            'happiness' => $this->checkinData['happiness'] ? (int)$this->checkinData['happiness'] : null,
+        ]);
+
+        if ($this->checkin) {
+            $this->checkin->update($checkinData);
+        } else {
+            $this->checkin = Checkin::create($checkinData);
+        }
+
+        $this->loadCheckins();
+        $this->dispatch('checkin-updated');
+    }
+
     public function addTodo()
     {
         if (empty($this->newTodoTitle)) return;
 
         if (!$this->checkin) {
-            $this->save();
+            $this->saveWithoutClosing();
         }
 
         CheckinTodo::create([
