@@ -8,9 +8,9 @@
         </div>
     </x-slot>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
             {{-- Kalender --}}
-            <div class="order-2 lg:order-1">
+            <div class="order-2 lg:order-1 h-full overflow-y-auto">
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
                     <div class="flex items-center gap-3 mb-6">
                         @svg('heroicon-o-calendar-days', 'w-6 h-6 text-[var(--ui-primary)]')
@@ -117,66 +117,25 @@
                     </div>
                 </div>
 
-                {{-- To-Do Liste --}}
+                {{-- Notizen --}}
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm mt-6">
                     <div class="flex items-center gap-3 mb-4">
-                        @svg('heroicon-o-clipboard-document-list', 'w-5 h-5 text-[var(--ui-primary)]')
-                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Tagesaufgaben</h3>
+                        @svg('heroicon-o-document-text', 'w-5 h-5 text-[var(--ui-primary)]')
+                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Zusätzliche Notizen</h3>
                     </div>
-
-                    {{-- Neue Aufgabe hinzufügen --}}
-                    <div class="flex gap-2 mb-4">
-                        <input
-                            type="text"
-                            wire:model="newTodoTitle"
-                            wire:keydown.enter="addTodo"
-                            placeholder="Neue Aufgabe hinzufügen..."
-                            class="flex-1 px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
-                        >
-                        <x-ui-button wire:click="addTodo" variant="primary" class="px-4">
-                            @svg('heroicon-o-plus', 'w-4 h-4')
-                        </x-ui-button>
-                    </div>
-
-                    {{-- To-Do Liste --}}
-                    <div class="space-y-2 max-h-48 overflow-y-auto">
-                        @forelse($todos as $todo)
-                            <div class="group flex items-center gap-3 p-3 bg-[var(--ui-muted-5)] rounded-lg hover:bg-[var(--ui-primary)]/5 transition-colors">
-                                <input
-                                    type="checkbox"
-                                    wire:click="toggleTodo({{ $todo['id'] }})"
-                                    {{ $todo['done'] ? 'checked' : '' }}
-                                    class="w-4 h-4 text-[var(--ui-primary)] rounded border-[var(--ui-border)] focus:ring-2 focus:ring-[var(--ui-primary)]/20"
-                                >
-                                <span
-                                    wire:click="toggleTodo({{ $todo['id'] }})"
-                                    class="flex-1 text-sm cursor-pointer {{ $todo['done'] ? 'line-through text-[var(--ui-muted)]' : 'text-[var(--ui-secondary)]' }} hover:text-[var(--ui-primary)] transition-colors"
-                                >
-                                    {{ $todo['title'] }}
-                                </span>
-                                <button
-                                    wire:click="deleteTodo({{ $todo['id'] }})"
-                                    class="opacity-0 group-hover:opacity-100 p-1 hover:bg-[var(--ui-danger)] hover:text-[var(--ui-on-danger)] rounded transition-all duration-200"
-                                >
-                                    @svg('heroicon-o-trash', 'w-4 h-4')
-                                </button>
-                            </div>
-                        @empty
-                            <div class="text-center py-6">
-                                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-[var(--ui-muted-5)] flex items-center justify-center">
-                                    @svg('heroicon-o-clipboard-document-list', 'w-6 h-6 text-[var(--ui-muted)]')
-                                </div>
-                                <p class="text-sm text-[var(--ui-muted)]">Noch keine Aufgaben für heute</p>
-                            </div>
-                        @endforelse
-                    </div>
+                    <textarea
+                        wire:model.live.debounce.500ms="checkinData.notes"
+                        placeholder="Weitere Gedanken oder Notizen..."
+                        class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent resize-none"
+                        rows="3"
+                    ></textarea>
                 </div>
             </div>
         </div>
 
         {{-- Check-in Formular --}}
         <div class="order-1 lg:order-2">
-            <div class="space-y-4">
+            <div class="space-y-4 h-full overflow-y-auto">
                 {{-- Datum und Grunddaten --}}
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
                     <div class="flex items-center gap-3 mb-4">
@@ -301,18 +260,59 @@
                     </div>
                 </div>
 
-                {{-- Notizen --}}
+                {{-- To-Do Liste --}}
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
                     <div class="flex items-center gap-3 mb-4">
-                        @svg('heroicon-o-document-text', 'w-5 h-5 text-[var(--ui-primary)]')
-                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Zusätzliche Notizen</h3>
+                        @svg('heroicon-o-clipboard-document-list', 'w-5 h-5 text-[var(--ui-primary)]')
+                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Tagesaufgaben</h3>
                     </div>
-                    <textarea 
-                        wire:model.live.debounce.500ms="checkinData.notes"
-                        placeholder="Weitere Gedanken oder Notizen..."
-                        class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent resize-none"
-                        rows="3"
-                    ></textarea>
+
+                    {{-- Neue Aufgabe hinzufügen --}}
+                    <div class="flex gap-2 mb-4">
+                        <input
+                            type="text"
+                            wire:model="newTodoTitle"
+                            wire:keydown.enter="addTodo"
+                            placeholder="Neue Aufgabe hinzufügen..."
+                            class="flex-1 px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
+                        >
+                        <x-ui-button wire:click="addTodo" variant="primary" class="px-4">
+                            @svg('heroicon-o-plus', 'w-4 h-4')
+                        </x-ui-button>
+                    </div>
+
+                    {{-- To-Do Liste --}}
+                    <div class="space-y-2 max-h-48 overflow-y-auto">
+                        @forelse($todos as $todo)
+                            <div class="group flex items-center gap-3 p-3 bg-[var(--ui-muted-5)] rounded-lg hover:bg-[var(--ui-primary)]/5 transition-colors">
+                                <input
+                                    type="checkbox"
+                                    wire:click="toggleTodo({{ $todo['id'] }})"
+                                    {{ $todo['done'] ? 'checked' : '' }}
+                                    class="w-4 h-4 text-[var(--ui-primary)] rounded border-[var(--ui-border)] focus:ring-2 focus:ring-[var(--ui-primary)]/20"
+                                >
+                                <span
+                                    wire:click="toggleTodo({{ $todo['id'] }})"
+                                    class="flex-1 text-sm cursor-pointer {{ $todo['done'] ? 'line-through text-[var(--ui-muted)]' : 'text-[var(--ui-secondary)]' }} hover:text-[var(--ui-primary)] transition-colors"
+                                >
+                                    {{ $todo['title'] }}
+                                </span>
+                                <button
+                                    wire:click="deleteTodo({{ $todo['id'] }})"
+                                    class="opacity-0 group-hover:opacity-100 p-1 hover:bg-[var(--ui-danger)] hover:text-[var(--ui-on-danger)] rounded transition-all duration-200"
+                                >
+                                    @svg('heroicon-o-trash', 'w-4 h-4')
+                                </button>
+                            </div>
+                        @empty
+                            <div class="text-center py-6">
+                                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-[var(--ui-muted-5)] flex items-center justify-center">
+                                    @svg('heroicon-o-clipboard-document-list', 'w-6 h-6 text-[var(--ui-muted)]')
+                                </div>
+                                <p class="text-sm text-[var(--ui-muted)]">Noch keine Aufgaben für heute</p>
+                            </div>
+                        @endforelse
+                    </div>
                 </div>
             </div>
         </div>
