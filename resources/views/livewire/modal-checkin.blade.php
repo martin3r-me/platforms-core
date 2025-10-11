@@ -35,6 +35,21 @@
                     </button>
                 </div>
 
+                {{-- Heute-Button --}}
+                <div class="mb-4">
+                    <x-ui-button 
+                        wire:click="goToToday()" 
+                        variant="secondary-outline" 
+                        size="sm" 
+                        class="w-full"
+                    >
+                        <div class="flex items-center gap-2">
+                            @svg('heroicon-o-calendar-days', 'w-4 h-4')
+                            Heute ({{ now()->format('d.m.') }})
+                        </div>
+                    </x-ui-button>
+                </div>
+
                 {{-- Kalender-Grid --}}
                 <div class="grid grid-cols-7 gap-1 mb-3">
                     @foreach(['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'] as $day)
@@ -134,30 +149,40 @@
                         <div class="grid grid-cols-2 gap-4">
                             {{-- Stimmung --}}
                             <div>
-                                <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2 flex items-center gap-2">
-                                    @svg('heroicon-o-face-smile', 'w-4 h-4 text-[var(--ui-primary)]')
-                                    Stimmung
-                                </label>
-                                <select wire:model.live="checkinData.mood" class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent">
-                                    <option value="">Stimmung wählen</option>
-                                    @foreach($this->getMoodOptions() as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
+                                <x-ui-input-select
+                                    name="checkinData.mood"
+                                    label="Stimmung"
+                                    wire:model.live="checkinData.mood"
+                                    :options="$this->getMoodOptions()"
+                                    placeholder="Stimmung wählen"
+                                    :errorKey="'checkinData.mood'"
+                                >
+                                    <x-slot name="label">
+                                        <div class="flex items-center gap-2">
+                                            @svg('heroicon-o-face-smile', 'w-4 h-4 text-[var(--ui-primary)]')
+                                            Stimmung
+                                        </div>
+                                    </x-slot>
+                                </x-ui-input-select>
                             </div>
 
                             {{-- Glücksskala --}}
                             <div>
-                                <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2 flex items-center gap-2">
-                                    @svg('heroicon-o-heart', 'w-4 h-4 text-[var(--ui-primary)]')
-                                    Glück (1-10)
-                                </label>
-                                <select wire:model.live="checkinData.happiness" class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent">
-                                    <option value="">Glückslevel wählen</option>
-                                    @foreach($this->getHappinessOptions() as $value => $label)
-                                        <option value="{{ $value }}">{{ $value }} - {{ $label }}</option>
-                                    @endforeach
-                                </select>
+                                <x-ui-input-select
+                                    name="checkinData.happiness"
+                                    label="Glück (1-10)"
+                                    wire:model.live="checkinData.happiness"
+                                    :options="$this->getHappinessOptions()"
+                                    placeholder="Glückslevel wählen"
+                                    :errorKey="'checkinData.happiness'"
+                                >
+                                    <x-slot name="label">
+                                        <div class="flex items-center gap-2">
+                                            @svg('heroicon-o-heart', 'w-4 h-4 text-[var(--ui-primary)]')
+                                            Glück (1-10)
+                                        </div>
+                                    </x-slot>
+                                </x-ui-input-select>
                             </div>
                         </div>
                     </div>
@@ -291,7 +316,7 @@
     </div>
 
     <x-slot name="footer">
-        <div class="flex justify-between">
+        <div class="flex justify-between gap-4">
             <x-ui-button variant="secondary-outline" wire:click="$set('modalShow', false)">
                 <div class="flex items-center gap-2">
                     @svg('heroicon-o-x-mark', 'w-4 h-4')

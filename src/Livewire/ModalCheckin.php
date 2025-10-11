@@ -30,6 +30,15 @@ class ModalCheckin extends Component
         $this->loadCheckinForDate($this->selectedDate);
     }
 
+    public function goToToday()
+    {
+        $this->selectedDate = now()->format('Y-m-d');
+        $this->currentMonth = now()->month;
+        $this->currentYear = now()->year;
+        $this->loadCheckins();
+        $this->loadCheckinForDate($this->selectedDate);
+    }
+
     public function openModal()
     {
         $this->modalShow = true;
