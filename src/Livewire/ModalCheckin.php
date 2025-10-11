@@ -133,15 +133,18 @@ class ModalCheckin extends Component
             $this->checkin = Checkin::create($checkinData);
         }
 
-        $this->dispatch('notice', [
-            'type' => 'success',
-            'message' => 'Check-in erfolgreich gespeichert!'
-        ]);
+            $this->dispatch('notice', [
+                'type' => 'success',
+                'message' => 'Check-in erfolgreich gespeichert!'
+            ]);
 
-        $this->loadCheckins();
-        
-        // Dispatch Event für Badge-Update
-        $this->dispatch('checkin-updated');
+            $this->loadCheckins();
+
+            // Dispatch Event für Badge-Update
+            $this->dispatch('checkin-updated');
+            
+            // Modal schließen
+            $this->modalShow = false;
     }
 
     public function addTodo()
