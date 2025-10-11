@@ -47,6 +47,7 @@
   @auth 
     @livewire('core.modal-team')
     @livewire('core.modal-user')
+    @livewire('core.modal-checkin')
     @livewire('core.modal-pricing')
     @livewire('comms.comms-modal')
     @livewire('core.modal-modules')
