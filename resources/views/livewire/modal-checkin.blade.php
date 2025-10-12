@@ -232,6 +232,76 @@
                         </label>
                     </div>
                 </div>
+
+                {{-- Pomodoro Timer --}}
+                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
+                    <div class="flex items-center gap-3 mb-4">
+                        @svg('heroicon-o-clock', 'w-5 h-5 text-[var(--ui-primary)]')
+                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Pomodoro Timer</h3>
+                    </div>
+
+                    <div x-data="pomodoroTimer()" x-init="init()" class="text-center">
+                        {{-- Timer Display --}}
+                        <div class="mb-6">
+                            <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2" x-text="formatTime(timeLeft)"></div>
+                            <div class="text-sm text-[var(--ui-muted)]" x-text="currentMode === 'work' ? 'Fokuszeit' : currentMode === 'shortBreak' ? 'Kurze Pause' : 'Lange Pause'"></div>
+                        </div>
+
+                        {{-- Progress Ring --}}
+                        <div class="relative w-32 h-32 mx-auto mb-6">
+                            <svg class="w-32 h-32 transform -rotate-90" viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="45" stroke="var(--ui-border)" stroke-width="8" fill="none"/>
+                                <circle 
+                                    cx="50" 
+                                    cy="50" 
+                                    r="45" 
+                                    stroke="var(--ui-primary)" 
+                                    stroke-width="8" 
+                                    fill="none"
+                                    stroke-dasharray="283"
+                                    :stroke-dashoffset="283 - (283 * progress)"
+                                    class="transition-all duration-1000 ease-linear"
+                                />
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold text-[var(--ui-secondary)]" x-text="Math.ceil(timeLeft / 60)"></div>
+                                    <div class="text-xs text-[var(--ui-muted)]">Minuten</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Controls --}}
+                        <div class="flex items-center justify-center gap-3 mb-4">
+                            <button 
+                                @click="startTimer()" 
+                                x-show="!isRunning"
+                                class="px-6 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-[var(--ui-primary)]/90 transition-colors"
+                            >
+                                Start
+                            </button>
+                            <button 
+                                @click="pauseTimer()" 
+                                x-show="isRunning"
+                                class="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                            >
+                                Pause
+                            </button>
+                            <button 
+                                @click="resetTimer()" 
+                                class="px-6 py-2 bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-muted)]/80 transition-colors"
+                            >
+                                Reset
+                            </button>
+                        </div>
+
+                        {{-- Session Info --}}
+                        <div class="text-sm text-[var(--ui-muted)]">
+                            <div>Session: <span x-text="sessionCount"></span> / 4</div>
+                            <div>Pomodoros heute: <span x-text="pomodoroCount"></span></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -327,3 +397,148 @@
         </div>
     </x-slot>
 </x-ui-modal>
+
+<script>
+function pomodoroTimer() {
+    return {
+        // Timer Settings
+        workTime: 25 * 60, // 25 minutes
+        shortBreakTime: 5 * 60, // 5 minutes
+        longBreakTime: 15 * 60, // 15 minutes
+        
+        // Current State
+        timeLeft: 25 * 60,
+        isRunning: false,
+        currentMode: 'work', // 'work', 'shortBreak', 'longBreak'
+        sessionCount: 1,
+        pomodoroCount: 0,
+        
+        // Timer Interval
+        timer: null,
+        
+        // Computed Properties
+        get progress() {
+            const totalTime = this.currentMode === 'work' ? this.workTime : 
+                            this.currentMode === 'shortBreak' ? this.shortBreakTime : this.longBreakTime;
+            return (totalTime - this.timeLeft) / totalTime;
+        },
+        
+        init() {
+            this.loadFromStorage();
+            this.updateDisplay();
+        },
+        
+        startTimer() {
+            if (this.isRunning) return;
+            
+            this.isRunning = true;
+            this.timer = setInterval(() => {
+                this.timeLeft--;
+                this.updateDisplay();
+                
+                if (this.timeLeft <= 0) {
+                    this.completeSession();
+                }
+            }, 1000);
+        },
+        
+        pauseTimer() {
+            this.isRunning = false;
+            if (this.timer) {
+                clearInterval(this.timer);
+                this.timer = null;
+            }
+        },
+        
+        resetTimer() {
+            this.pauseTimer();
+            this.currentMode = 'work';
+            this.timeLeft = this.workTime;
+            this.sessionCount = 1;
+            this.updateDisplay();
+        },
+        
+        completeSession() {
+            this.pauseTimer();
+            
+            // Play notification sound (if available)
+            this.playNotification();
+            
+            if (this.currentMode === 'work') {
+                this.pomodoroCount++;
+                this.sessionCount++;
+                
+                if (this.sessionCount <= 4) {
+                    // Short break
+                    this.currentMode = 'shortBreak';
+                    this.timeLeft = this.shortBreakTime;
+                } else {
+                    // Long break after 4 work sessions
+                    this.currentMode = 'longBreak';
+                    this.timeLeft = this.longBreakTime;
+                    this.sessionCount = 1; // Reset for next cycle
+                }
+            } else {
+                // Break finished, back to work
+                this.currentMode = 'work';
+                this.timeLeft = this.workTime;
+            }
+            
+            this.saveToStorage();
+            this.updateDisplay();
+        },
+        
+        formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        },
+        
+        updateDisplay() {
+            // Update page title with timer
+            if (this.isRunning && this.currentMode === 'work') {
+                document.title = `${this.formatTime(this.timeLeft)} - Pomodoro Timer`;
+            } else if (!this.isRunning) {
+                document.title = 'Check-in Modal';
+            }
+        },
+        
+        playNotification() {
+            // Try to play notification sound
+            try {
+                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+                audio.volume = 0.3;
+                audio.play().catch(() => {
+                    // Fallback: use system beep
+                    console.log('\u0007'); // ASCII bell character
+                });
+            } catch (e) {
+                console.log('\u0007'); // Fallback beep
+            }
+        },
+        
+        saveToStorage() {
+            const data = {
+                pomodoroCount: this.pomodoroCount,
+                sessionCount: this.sessionCount,
+                currentMode: this.currentMode,
+                timeLeft: this.timeLeft
+            };
+            localStorage.setItem('pomodoroTimer', JSON.stringify(data));
+        },
+        
+        loadFromStorage() {
+            try {
+                const data = JSON.parse(localStorage.getItem('pomodoroTimer') || '{}');
+                this.pomodoroCount = data.pomodoroCount || 0;
+                this.sessionCount = data.sessionCount || 1;
+                this.currentMode = data.currentMode || 'work';
+                this.timeLeft = data.timeLeft || this.workTime;
+            } catch (e) {
+                // Reset to defaults if storage is corrupted
+                this.resetTimer();
+            }
+        }
+    }
+}
+</script>
