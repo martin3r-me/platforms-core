@@ -262,7 +262,7 @@
                             <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2">
                                 <span x-text="formatTime(timeLeft)"></span> Min
                             </div>
-                            <div class="text-sm text-[var(--ui-muted)]" x-text="currentMode === 'work' ? 'Fokuszeit' : 'Pause'"></div>
+                            <div class="text-sm text-[var(--ui-muted)]">Fokuszeit</div>
                         </div>
 
                         {{-- Progress Ring --}}
@@ -287,6 +287,34 @@
                                         <div class="text-xs text-[var(--ui-muted)]">Min</div>
                                     </div>
                                 </div>
+                        </div>
+
+                        {{-- Time Selection --}}
+                        <div class="flex items-center justify-center gap-2 mb-4">
+                            <button 
+                                @click="setTime(15)" 
+                                class="px-3 py-1 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-muted)]/80 transition-colors"
+                            >
+                                15 Min
+                            </button>
+                            <button 
+                                @click="setTime(25)" 
+                                class="px-3 py-1 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-muted)]/80 transition-colors"
+                            >
+                                25 Min
+                            </button>
+                            <button 
+                                @click="setTime(45)" 
+                                class="px-3 py-1 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-muted)]/80 transition-colors"
+                            >
+                                45 Min
+                            </button>
+                            <button 
+                                @click="setTime(60)" 
+                                class="px-3 py-1 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-muted)]/80 transition-colors"
+                            >
+                                60 Min
+                            </button>
                         </div>
 
                         {{-- Controls --}}
@@ -433,13 +461,11 @@
 function pomodoroTimer() {
     return {
         // Timer Settings
-        workTime: 25 * 60, // 25 minutes
-        breakTime: 5 * 60, // 5 minutes
+        workTime: 25 * 60, // 25 minutes (default)
         
         // Current State
         timeLeft: 25 * 60,
         isRunning: false,
-        currentMode: 'work', // 'work', 'break'
         sessionCount: 1,
         pomodoroCount: 0,
         
@@ -448,8 +474,7 @@ function pomodoroTimer() {
         
         // Computed Properties
         get progress() {
-            const totalTime = this.currentMode === 'work' ? this.workTime : this.breakTime;
-            return (totalTime - this.timeLeft) / totalTime;
+            return (this.workTime - this.timeLeft) / this.workTime;
         },
         
         init() {
@@ -473,7 +498,6 @@ function pomodoroTimer() {
             
             if (sessionData && sessionData !== 'null') {
                 const session = JSON.parse(sessionData);
-                this.currentMode = session.type;
                 this.timeLeft = (session.remaining_minutes || 0) * 60; // Convert to seconds for internal calculation
                 this.isRunning = session.is_active;
                 this.pomodoroCount = statsData ? JSON.parse(statsData).today_count : 0;
@@ -517,9 +541,15 @@ function pomodoroTimer() {
         
         resetTimer() {
             this.pauseTimer();
-            this.currentMode = 'work';
             this.timeLeft = this.workTime;
             this.sessionCount = 1;
+            this.updateDisplay();
+        },
+        
+        setTime(minutes) {
+            this.pauseTimer();
+            this.timeLeft = minutes * 60;
+            this.workTime = minutes * 60;
             this.updateDisplay();
         },
         
@@ -529,18 +559,9 @@ function pomodoroTimer() {
             // Play notification sound (if available)
             this.playNotification();
             
-            if (this.currentMode === 'work') {
-                this.pomodoroCount++;
-                this.sessionCount++;
-                
-                // Always break after work
-                this.currentMode = 'break';
-                this.timeLeft = this.breakTime;
-            } else {
-                // Break finished, back to work
-                this.currentMode = 'work';
-                this.timeLeft = this.workTime;
-            }
+            // Just increment counters, no break logic
+            this.pomodoroCount++;
+            this.sessionCount++;
             
             // Trigger Livewire to update database
             this.$wire.stopPomodoro();
@@ -554,10 +575,8 @@ function pomodoroTimer() {
         
         updateDisplay() {
             // Update page title with timer
-            if (this.isRunning && this.currentMode === 'work') {
-                document.title = `${this.formatTime(this.timeLeft)} - Pomodoro Timer`;
-            } else if (this.isRunning && this.currentMode === 'break') {
-                document.title = `${this.formatTime(this.timeLeft)} - Pause`;
+            if (this.isRunning) {
+                document.title = `${this.formatTime(this.timeLeft)} - Fokuszeit`;
             } else {
                 // Reset to original title when timer is not running
                 document.title = this.originalTitle || 'Check-in Modal';
@@ -582,7 +601,6 @@ function pomodoroTimer() {
             if (confirm('Alle Pomodoro-Daten löschen?')) {
                 this.pomodoroCount = 0;
                 this.sessionCount = 1;
-                this.currentMode = 'work';
                 this.timeLeft = this.workTime;
                 this.pauseTimer();
                 this.updateDisplay();
