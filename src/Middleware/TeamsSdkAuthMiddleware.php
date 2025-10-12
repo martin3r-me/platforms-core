@@ -20,11 +20,17 @@ class TeamsSdkAuthMiddleware
             return $next($request);
         }
 
+        Log::info('Teams SDK Auth: Processing request', [
+            'path' => $request->getPathInfo(),
+            'headers' => $request->headers->all(),
+            'query' => $request->query->all()
+        ]);
+
         // Teams SDK Context aus Request extrahieren
         $teamsContext = $this->extractTeamsContext($request);
         
         if (!$teamsContext) {
-            Log::info('Teams SDK Auth: No context found, allowing request');
+            Log::info('Teams SDK Auth: No context found, allowing request (Teams SDK will handle auth)');
             return $next($request);
         }
 
@@ -32,7 +38,7 @@ class TeamsSdkAuthMiddleware
         $userInfo = $this->validateTeamsContext($teamsContext);
         
         if (!$userInfo) {
-            Log::warning('Teams SDK Auth: Invalid context');
+            Log::warning('Teams SDK Auth: Invalid context, allowing request (Teams SDK will handle auth)');
             return $next($request);
         }
 
