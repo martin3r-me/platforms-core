@@ -327,7 +327,6 @@
                             <button 
                                 @click="startTimer()" 
                                 x-show="!isRunning"
-                                :wire:click="`startPomodoro('work', ${Math.ceil(timeLeft / 60)})`"
                                 class="px-6 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-[var(--ui-primary)]/90 transition-colors"
                             >
                                 Start
@@ -550,19 +549,23 @@ function pomodoroTimer() {
             this.updateDisplay();
         },
         
-        startTimer() {
-            if (this.isRunning) return;
-            
-            this.isRunning = true;
-            this.timer = setInterval(() => {
-                this.timeLeft -= 30; // Update every 30 seconds
-                this.updateDisplay();
+            startTimer() {
+                if (this.isRunning) return;
                 
-                if (this.timeLeft <= 0) {
-                    this.completeSession();
-                }
-            }, 30000); // Update every 30 seconds
-        },
+                // Get the current time setting and start Livewire session
+                const minutes = Math.ceil(this.timeLeft / 60);
+                this.$wire.startPomodoro('work', minutes);
+                
+                this.isRunning = true;
+                this.timer = setInterval(() => {
+                    this.timeLeft -= 30; // Update every 30 seconds
+                    this.updateDisplay();
+                    
+                    if (this.timeLeft <= 0) {
+                        this.completeSession();
+                    }
+                }, 30000); // Update every 30 seconds
+            },
         
         pauseTimer() {
             this.isRunning = false;
