@@ -1,4 +1,4 @@
-    <x-ui-modal size="xl" wire:model="modalShow" :escClosable="false" wire:poll.30s="loadPomodoroStats">
+    <x-ui-modal size="xl" wire:model="modalShow" :escClosable="false">
         <x-slot name="header">
             <div class="flex items-center justify-between w-full">
                 <div class="flex items-center gap-3">
@@ -243,9 +243,7 @@
         <div x-data="pomodoroTimer()" x-init="init()" class="text-center" 
              x-pomodoro-session='@json($pomodoroStats["active_session"])'
              x-pomodoro-stats='@json($pomodoroStats)'
-             @if($modalShow)
-                 wire:poll.30s="loadPomodoroStats"
-             @endif>
+             wire:poll.30s="loadPomodoroStats">
                         {{-- Timer Display --}}
                         <div class="mb-6">
                             <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2">
@@ -488,7 +486,8 @@ function pomodoroTimer() {
                     this.completeSession();
                 }
             } else {
-                this.resetTimer();
+                // No active session - reset to default state
+                this.resetToDefault();
             }
             
             this.updateDisplay();
@@ -531,6 +530,15 @@ function pomodoroTimer() {
             this.updateDisplay();
         },
         
+        resetToDefault() {
+            this.pauseTimer();
+            this.timeLeft = 25 * 60; // Reset to 25 minutes
+            this.workTime = 25 * 60; // Reset work time to 25 minutes
+            this.isRunning = false;
+            this.sessionCount = 1;
+            this.updateDisplay();
+        },
+        
         setTime(minutes) {
             this.pauseTimer();
             this.timeLeft = minutes * 60;
@@ -551,7 +559,9 @@ function pomodoroTimer() {
                 
                 // Trigger Livewire to update database
                 this.$wire.stopPomodoro();
-                this.updateDisplay();
+                
+                // Reset to default state after completion
+                this.resetToDefault();
             },
         
         formatTime(seconds) {
