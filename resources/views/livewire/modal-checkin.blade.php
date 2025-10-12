@@ -240,7 +240,9 @@
                         <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Pomodoro Timer</h3>
                     </div>
 
-                    <div x-data="pomodoroTimer()" x-init="init()" class="text-center">
+                    <div x-data="pomodoroTimer()" x-init="init()" class="text-center" 
+                         x-pomodoro-session='@json($pomodoroStats["active_session"])'
+                         x-pomodoro-stats='@json($pomodoroStats)'>
                         {{-- Timer Display --}}
                         <div class="mb-6">
                             <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2" x-text="formatTime(timeLeft)"></div>
@@ -276,6 +278,7 @@
                             <button 
                                 @click="startTimer()" 
                                 x-show="!isRunning"
+                                wire:click="startPomodoro('work')"
                                 class="px-6 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-[var(--ui-primary)]/90 transition-colors"
                             >
                                 Start
@@ -283,12 +286,14 @@
                             <button 
                                 @click="pauseTimer()" 
                                 x-show="isRunning"
+                                wire:click="stopPomodoro()"
                                 class="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
                             >
                                 Pause
                             </button>
                             <button 
                                 @click="resetTimer()" 
+                                wire:click="stopActivePomodoro()"
                                 class="px-6 py-2 bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-muted)]/80 transition-colors"
                             >
                                 Reset
@@ -304,7 +309,7 @@
                         {{-- Clear Data Button --}}
                         <div class="mt-4 pt-4 border-t border-[var(--ui-border)]">
                             <button 
-                                @click="clearData()" 
+                                wire:click="clearPomodoroData()" 
                                 class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-danger)] transition-colors"
                             >
                                 Daten löschen
@@ -432,7 +437,25 @@ function pomodoroTimer() {
         },
         
         init() {
-            this.loadFromStorage();
+            // Load from server data
+            const sessionData = this.$el.getAttribute('x-pomodoro-session');
+            const statsData = this.$el.getAttribute('x-pomodoro-stats');
+            
+            if (sessionData && sessionData !== 'null') {
+                const session = JSON.parse(sessionData);
+                this.currentMode = session.type;
+                this.timeLeft = session.remaining_seconds || 0;
+                this.isRunning = session.is_active;
+                this.pomodoroCount = statsData ? JSON.parse(statsData).today_count : 0;
+                
+                // Start timer if session is active
+                if (this.isRunning && this.timeLeft > 0) {
+                    this.startTimer();
+                }
+            } else {
+                this.resetTimer();
+            }
+            
             this.updateDisplay();
         },
         
@@ -440,7 +463,6 @@ function pomodoroTimer() {
             if (this.isRunning) return;
             
             this.isRunning = true;
-            this.saveToStorage();
             this.timer = setInterval(() => {
                 this.timeLeft--;
                 this.updateDisplay();
@@ -457,7 +479,6 @@ function pomodoroTimer() {
                 clearInterval(this.timer);
                 this.timer = null;
             }
-            this.saveToStorage();
         },
         
         resetTimer() {
@@ -465,7 +486,6 @@ function pomodoroTimer() {
             this.currentMode = 'work';
             this.timeLeft = this.workTime;
             this.sessionCount = 1;
-            this.saveToStorage();
             this.updateDisplay();
         },
         
@@ -521,44 +541,8 @@ function pomodoroTimer() {
             }
         },
         
-        saveToStorage() {
-            const data = {
-                pomodoroCount: this.pomodoroCount,
-                sessionCount: this.sessionCount,
-                currentMode: this.currentMode,
-                timeLeft: this.timeLeft,
-                isRunning: this.isRunning,
-                startTime: this.isRunning ? Date.now() : null
-            };
-            localStorage.setItem('pomodoroTimer', JSON.stringify(data));
-        },
-        
-        loadFromStorage() {
-            try {
-                const data = JSON.parse(localStorage.getItem('pomodoroTimer') || '{}');
-                this.pomodoroCount = data.pomodoroCount || 0;
-                this.sessionCount = data.sessionCount || 1;
-                this.currentMode = data.currentMode || 'work';
-                this.timeLeft = data.timeLeft || this.workTime;
-                this.isRunning = data.isRunning || false;
-                
-                // If timer was running, calculate elapsed time
-                if (this.isRunning && data.startTime) {
-                    const elapsed = Math.floor((Date.now() - data.startTime) / 1000);
-                    this.timeLeft = Math.max(0, this.timeLeft - elapsed);
-                    
-                    if (this.timeLeft <= 0) {
-                        this.completeSession();
-                    }
-                }
-            } catch (e) {
-                this.resetTimer();
-            }
-        },
-        
         clearData() {
             if (confirm('Alle Pomodoro-Daten löschen?')) {
-                localStorage.removeItem('pomodoroTimer');
                 this.pomodoroCount = 0;
                 this.sessionCount = 1;
                 this.currentMode = 'work';

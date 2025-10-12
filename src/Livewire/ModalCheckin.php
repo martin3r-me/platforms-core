@@ -5,6 +5,7 @@ namespace Platform\Core\Livewire;
 use Livewire\Component;
 use Platform\Core\Models\Checkin;
 use Platform\Core\Models\CheckinTodo;
+use Platform\Core\Models\PomodoroSession;
 use Carbon\Carbon;
 
 class ModalCheckin extends Component
@@ -19,6 +20,9 @@ class ModalCheckin extends Component
     public $currentYear;
     public $checkins = [];
 
+    // Pomodoro Properties
+    public $pomodoroSession = null;
+    public $pomodoroStats = [];
 
     protected $listeners = ['open-modal-checkin' => 'openModal'];
 
@@ -231,8 +235,78 @@ class ModalCheckin extends Component
         return Checkin::getHappinessOptions();
     }
 
+    // Pomodoro Methods
+    public function startPomodoro($type = 'work')
+    {
+        // Stop any active session first
+        $this->stopActivePomodoro();
+        
+        $duration = $type === 'work' ? 25 * 60 : 5 * 60; // 25 min work, 5 min break
+        
+        $this->pomodoroSession = PomodoroSession::create([
+            'user_id' => auth()->id(),
+            'type' => $type,
+            'duration_seconds' => $duration,
+            'started_at' => now(),
+            'is_active' => true,
+        ]);
+        
+        $this->loadPomodoroStats();
+    }
+    
+    public function stopPomodoro()
+    {
+        if ($this->pomodoroSession && $this->pomodoroSession->is_active) {
+            $this->pomodoroSession->complete();
+            $this->pomodoroSession = null;
+        }
+    }
+    
+    public function stopActivePomodoro()
+    {
+        PomodoroSession::where('user_id', auth()->id())
+            ->where('is_active', true)
+            ->update(['is_active' => false, 'completed_at' => now()]);
+    }
+    
+    public function loadPomodoroStats()
+    {
+        $today = now()->startOfDay();
+        
+        $this->pomodoroStats = [
+            'today_count' => PomodoroSession::where('user_id', auth()->id())
+                ->where('type', 'work')
+                ->where('started_at', '>=', $today)
+                ->count(),
+            'active_session' => PomodoroSession::where('user_id', auth()->id())
+                ->where('is_active', true)
+                ->first(),
+        ];
+    }
+    
+    public function getActivePomodoro()
+    {
+        $active = PomodoroSession::where('user_id', auth()->id())
+            ->where('is_active', true)
+            ->first();
+            
+        if ($active && $active->is_expired) {
+            $active->complete();
+            return null;
+        }
+        
+        return $active;
+    }
+    
+    public function clearPomodoroData()
+    {
+        PomodoroSession::where('user_id', auth()->id())->delete();
+        $this->loadPomodoroStats();
+    }
+
     public function render()
     {
+        $this->loadPomodoroStats();
         return view('platform::livewire.modal-checkin');
     }
 }
