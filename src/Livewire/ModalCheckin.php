@@ -21,7 +21,6 @@ class ModalCheckin extends Component
     public $checkins = [];
 
     // Pomodoro Properties
-    public $pomodoroSession = null;
     public $pomodoroStats = [];
 
     protected $listeners = ['open-modal-checkin' => 'openModal'];
@@ -239,7 +238,7 @@ class ModalCheckin extends Component
         
         $duration = $minutes * 60; // Convert minutes to seconds
         
-        $this->pomodoroSession = PomodoroSession::create([
+        PomodoroSession::create([
             'user_id' => auth()->id(),
             'type' => $type,
             'duration_seconds' => $duration,
@@ -252,10 +251,14 @@ class ModalCheckin extends Component
     
     public function stopPomodoro()
     {
-        if ($this->pomodoroSession && $this->pomodoroSession->is_active) {
-            $this->pomodoroSession->complete();
-            $this->pomodoroSession = null;
+        $activeSession = PomodoroSession::where('user_id', auth()->id())
+            ->where('is_active', true)
+            ->first();
+            
+        if ($activeSession) {
+            $activeSession->complete();
         }
+        $this->loadPomodoroStats();
     }
     
     public function stopActivePomodoro()
@@ -263,6 +266,7 @@ class ModalCheckin extends Component
         PomodoroSession::where('user_id', auth()->id())
             ->where('is_active', true)
             ->update(['is_active' => false, 'completed_at' => now()]);
+        $this->loadPomodoroStats();
     }
     
     public function loadPomodoroStats()
