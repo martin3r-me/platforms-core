@@ -5,12 +5,7 @@
                     <h2 class="text-xl font-semibold text-[var(--ui-secondary)] m-0">Täglicher Check-in</h2>
                     <span class="text-xs text-[var(--ui-muted)] bg-[var(--ui-muted-5)] px-2 py-1 rounded-full">SELBSTREFLEXION</span>
                 </div>
-                <div class="text-right flex items-center gap-3">
-                    @if($this->getRemainingTime() > 0)
-                        <div class="text-xs text-[var(--ui-primary)] bg-[var(--ui-primary)]/10 px-3 py-1 rounded-full font-medium">
-                            🍅 {{ $this->getRemainingTime() }} Min
-                        </div>
-                    @endif
+                <div class="text-right">
                     <div class="text-xs text-[var(--ui-muted)] bg-[var(--ui-muted-5)] px-2 py-1 rounded-full">
                         {{ \Carbon\Carbon::parse($selectedDate)->locale('de')->isoFormat('DD. MMMM YYYY') }}
                     </div>
@@ -243,25 +238,6 @@
                     <div class="flex items-center gap-3 mb-4">
                         @svg('heroicon-o-clock', 'w-5 h-5 text-[var(--ui-primary)]')
                         <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Pomodoro Timer</h3>
-                        @if($this->getRemainingTime() > 0)
-                            <div class="ml-auto flex items-center gap-2">
-                                <div class="text-xs text-[var(--ui-primary)] bg-[var(--ui-primary)]/10 px-3 py-1 rounded-full font-medium">
-                                    🍅 {{ $this->getRemainingTime() }} Min
-                                </div>
-                            </div>
-                        @elseif($pomodoroStats['active_session'])
-                            <div class="ml-auto flex items-center gap-2">
-                                <div class="w-8 h-8 rounded-full border-2 border-[var(--ui-primary)] overflow-hidden">
-                                    <div 
-                                        class="w-full h-full bg-[var(--ui-primary)] transition-all duration-1000"
-                                        style="transform: translateY({{ 100 - $pomodoroStats['active_session']['progress_percentage'] }}%)"
-                                    ></div>
-                                </div>
-                                <span class="text-sm text-[var(--ui-primary)] font-medium">
-                                    {{ round($pomodoroStats['active_session']['progress_percentage']) }}%
-                                </span>
-                            </div>
-                        @endif
                     </div>
 
         <div x-data="pomodoroTimer()" x-init="init()" class="text-center" 
@@ -276,30 +252,6 @@
                                 <span x-text="formatTime(timeLeft)"></span> Min
                             </div>
                             <div class="text-sm text-[var(--ui-muted)]">Fokuszeit</div>
-                        </div>
-
-                        {{-- Progress Ring --}}
-                        <div class="relative w-32 h-32 mx-auto mb-6">
-                            <svg class="w-32 h-32 transform -rotate-90" viewBox="0 0 100 100">
-                                <circle cx="50" cy="50" r="45" stroke="var(--ui-border)" stroke-width="8" fill="none"/>
-                                <circle 
-                                    cx="50" 
-                                    cy="50" 
-                                    r="45" 
-                                    stroke="var(--ui-primary)" 
-                                    stroke-width="8" 
-                                    fill="none"
-                                    stroke-dasharray="283"
-                                    :stroke-dashoffset="283 - (283 * progress)"
-                                    class="transition-all duration-1000 ease-linear"
-                                />
-                            </svg>
-                                <div class="absolute inset-0 flex items-center justify-center">
-                                    <div class="text-center">
-                                        <div class="text-2xl font-bold text-[var(--ui-secondary)]" x-text="formatTime(timeLeft)"></div>
-                                        <div class="text-xs text-[var(--ui-muted)]">Min</div>
-                                    </div>
-                                </div>
                         </div>
 
                         {{-- Time Selection --}}
@@ -362,21 +314,6 @@
                             </button>
                         </div>
 
-                        {{-- Session Info --}}
-                        <div class="text-sm text-[var(--ui-muted)]">
-                            <div>Pomodoros heute: <span x-text="pomodoroCount"></span></div>
-                            <div>Session: <span x-text="sessionCount"></span></div>
-                        </div>
-
-                        {{-- Clear Data Button --}}
-                        <div class="mt-4 pt-4 border-t border-[var(--ui-border)]">
-                            <button 
-                                wire:click="clearPomodoroData()" 
-                                class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-danger)] transition-colors"
-                            >
-                                Daten löschen
-                            </button>
-                        </div>
                     </div>
                 </div>
             </div>
