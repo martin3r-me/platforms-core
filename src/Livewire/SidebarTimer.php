@@ -17,21 +17,30 @@ class SidebarTimer extends Component
     public function loadPomodoroStats()
     {
         $today = now()->startOfDay();
+        
+        // Get all active sessions for this user
+        $activeSessions = PomodoroSession::where('user_id', auth()->id())
+            ->where('is_active', true)
+            ->get();
+        
+        // Check each active session and complete expired ones
+        foreach ($activeSessions as $session) {
+            if ($session->is_expired) {
+                $session->complete();
+                $this->dispatch('timer-expired');
+            }
+        }
+        
+        // Get the current active session (after completing expired ones)
         $activeSession = PomodoroSession::where('user_id', auth()->id())
             ->where('is_active', true)
             ->first();
-        
-        // Check if session is expired and auto-complete it
-        if ($activeSession && $activeSession->is_expired) {
-            $activeSession->complete();
-            $this->dispatch('timer-expired');
-            $activeSession = null;
-        }
         
         $this->pomodoroStats = [
             'today_count' => PomodoroSession::where('user_id', auth()->id())
                 ->where('type', 'work')
                 ->where('started_at', '>=', $today)
+                ->where('is_active', false) // Only count completed sessions
                 ->count(),
             'active_session' => $activeSession ? [
                 'id' => $activeSession->id,

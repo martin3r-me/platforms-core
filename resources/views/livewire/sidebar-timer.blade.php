@@ -2,9 +2,7 @@
      x-pomodoro-session='@json($pomodoroStats["active_session"])'
      x-show="isActive"
      class="px-3 text-xs text-[var(--ui-primary)] font-medium"
-     @if($pomodoroStats['active_session'])
-         wire:poll.30s="loadPomodoroStats"
-     @endif
+     wire:poll.30s="loadPomodoroStats"
      @pomodoro-started.window="loadFromServer()"
      @pomodoro-stopped.window="loadFromServer()">
     <span x-text="formatTime(timeLeft)"></span>
@@ -37,6 +35,11 @@ function sidebarTimer() {
                 const session = JSON.parse(sessionData);
                 this.timeLeft = (session.remaining_minutes || 0) * 60;
                 this.isActive = session.is_active && this.timeLeft > 0;
+                
+                // If session is active but has no time left, it's expired
+                if (session.is_active && this.timeLeft <= 0) {
+                    this.isActive = false;
+                }
             } else {
                 this.isActive = false;
             }
