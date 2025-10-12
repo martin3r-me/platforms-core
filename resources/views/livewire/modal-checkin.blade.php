@@ -258,7 +258,9 @@
                          x-pomodoro-stats='@json($pomodoroStats)'>
                         {{-- Timer Display --}}
                         <div class="mb-6">
-                            <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2" x-text="formatTime(timeLeft)"></div>
+                            <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2">
+                                <span x-text="formatTime(timeLeft)"></span> Min
+                            </div>
                             <div class="text-sm text-[var(--ui-muted)]" x-text="currentMode === 'work' ? 'Fokuszeit' : 'Pause'"></div>
                         </div>
 
@@ -278,12 +280,12 @@
                                     class="transition-all duration-1000 ease-linear"
                                 />
                             </svg>
-                            <div class="absolute inset-0 flex items-center justify-center">
-                                <div class="text-center">
-                                    <div class="text-2xl font-bold text-[var(--ui-secondary)]" x-text="Math.ceil(timeLeft / 60)"></div>
-                                    <div class="text-xs text-[var(--ui-muted)]">Minuten</div>
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <div class="text-center">
+                                        <div class="text-2xl font-bold text-[var(--ui-secondary)]" x-text="formatTime(timeLeft)"></div>
+                                        <div class="text-xs text-[var(--ui-muted)]">Min</div>
+                                    </div>
                                 </div>
-                            </div>
                         </div>
 
                         {{-- Controls --}}
@@ -462,7 +464,7 @@ function pomodoroTimer() {
             if (sessionData && sessionData !== 'null') {
                 const session = JSON.parse(sessionData);
                 this.currentMode = session.type;
-                this.timeLeft = session.remaining_seconds || 0;
+                this.timeLeft = (session.remaining_minutes || 0) * 60; // Convert to seconds for internal calculation
                 this.isRunning = session.is_active;
                 this.pomodoroCount = statsData ? JSON.parse(statsData).today_count : 0;
                 
@@ -485,13 +487,13 @@ function pomodoroTimer() {
             
             this.isRunning = true;
             this.timer = setInterval(() => {
-                this.timeLeft--;
+                this.timeLeft -= 30; // Update every 30 seconds
                 this.updateDisplay();
                 
                 if (this.timeLeft <= 0) {
                     this.completeSession();
                 }
-            }, 1000);
+            }, 30000); // Update every 30 seconds
         },
         
         pauseTimer() {
@@ -536,9 +538,8 @@ function pomodoroTimer() {
         },
         
         formatTime(seconds) {
-            const minutes = Math.floor(seconds / 60);
-            const remainingSeconds = seconds % 60;
-            return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+            const minutes = Math.ceil(seconds / 60);
+            return `${minutes}`;
         },
         
         updateDisplay() {

@@ -287,7 +287,7 @@ class ModalCheckin extends Component
                 'duration_seconds' => $activeSession->duration_seconds,
                 'started_at' => $activeSession->started_at->toISOString(),
                 'is_active' => $activeSession->is_active,
-                'remaining_seconds' => $activeSession->remaining_seconds,
+                'remaining_minutes' => $activeSession->remaining_minutes,
                 'progress_percentage' => $activeSession->progress_percentage,
             ] : null,
         ];

@@ -37,6 +37,11 @@ class PomodoroSession extends Model
         $remaining = $this->duration_seconds - $elapsed;
         return max(0, $remaining);
     }
+    
+    public function getRemainingMinutesAttribute(): int
+    {
+        return ceil($this->remaining_seconds / 60);
+    }
 
     public function getIsExpiredAttribute(): bool
     {
