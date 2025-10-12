@@ -41,6 +41,12 @@ class CoreServiceProvider extends ServiceProvider
             \Platform\Core\Middleware\TeamsSsoMiddleware::class
         );
 
+        // Teams SDK Auth Middleware registrieren (ohne Laravel Auth)
+        $this->app->make(\Illuminate\Routing\Router::class)->aliasMiddleware(
+            'teams.sdk.auth',
+            \Platform\Core\Middleware\TeamsSdkAuthMiddleware::class
+        );
+
         // Module ServiceProvider automatisch laden
         $this->loadModuleServiceProviders();
 
