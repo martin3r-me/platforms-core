@@ -1,7 +1,5 @@
     <x-ui-modal size="xl" wire:model="modalShow" :escClosable="false"
-                @if($modalShow)
-                    wire:poll.30s="loadPomodoroStats"
-                @endif>
+                @if($modalShow) wire:poll.30s="loadPomodoroStats" @endif>
         <x-slot name="header">
             <div class="flex items-center justify-between w-full">
                 <div class="flex items-center gap-3">
