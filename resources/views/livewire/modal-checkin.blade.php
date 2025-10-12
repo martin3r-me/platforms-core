@@ -255,8 +255,7 @@
 
                     <div x-data="pomodoroTimer()" x-init="init()" class="text-center" 
                          x-pomodoro-session='@json($pomodoroStats["active_session"])'
-                         x-pomodoro-stats='@json($pomodoroStats)'
-                         wire:poll.30s="loadPomodoroStats">
+                         x-pomodoro-stats='@json($pomodoroStats)'>
                         {{-- Timer Display --}}
                         <div class="mb-6">
                             <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2">
@@ -489,6 +488,18 @@ function pomodoroTimer() {
             this.$el.addEventListener('livewire:updated', () => {
                 this.loadFromServer();
             });
+            
+            // Smart polling - only if timer is running
+            this.startSmartPolling();
+        },
+        
+        startSmartPolling() {
+            // Check every 30 seconds if we need to poll
+            setInterval(() => {
+                if (this.isRunning) {
+                    this.$wire.loadPomodoroStats();
+                }
+            }, 30000);
         },
         
         loadFromServer() {
