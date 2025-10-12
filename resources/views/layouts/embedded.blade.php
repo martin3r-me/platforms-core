@@ -20,7 +20,7 @@
   <script src="https://res.cdn.office.net/teams-js/2.0.0/js/MicrosoftTeams.min.js" crossorigin="anonymous"></script>
 </head>
 
-<body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)] overflow-hidden" data-embedded="1">
+<body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)] overflow-hidden">
 
   @php
     $currentModuleKey = explode('.', request()->route()?->getName())[0] ?? null;
