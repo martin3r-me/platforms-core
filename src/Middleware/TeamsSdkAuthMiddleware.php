@@ -20,10 +20,13 @@ class TeamsSdkAuthMiddleware
             return $next($request);
         }
 
-        Log::info('Teams SDK Auth: Processing request', [
+        Log::info('🔍 TEAMS SDK AUTH MIDDLEWARE RUNNING', [
             'path' => $request->getPathInfo(),
             'headers' => $request->headers->all(),
-            'query' => $request->query->all()
+            'query' => $request->query->all(),
+            'method' => $request->getMethod(),
+            'referer' => $request->header('referer'),
+            'user_agent' => $request->header('user-agent')
         ]);
 
         // Teams SDK Context aus Request extrahieren
@@ -66,9 +69,18 @@ class TeamsSdkAuthMiddleware
     private function isTeamsRequest(Request $request): bool
     {
         $path = $request->getPathInfo();
-        return str_contains($path, '/embedded/') || 
-               $request->header('X-Teams-Embedded') === 'true' ||
-               $request->query('teams_embedded') === 'true';
+        $isEmbedded = str_contains($path, '/embedded/') || 
+                      $request->header('X-Teams-Embedded') === 'true' ||
+                      $request->query('teams_embedded') === 'true';
+        
+        Log::info('🔍 TEAMS REQUEST CHECK', [
+            'path' => $path,
+            'is_embedded' => $isEmbedded,
+            'x_teams_embedded' => $request->header('X-Teams-Embedded'),
+            'teams_embedded_query' => $request->query('teams_embedded')
+        ]);
+        
+        return $isEmbedded;
     }
 
     private function extractTeamsContext(Request $request): ?array
