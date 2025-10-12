@@ -25,6 +25,17 @@ class ModalCheckin extends Component
 
     protected $listeners = ['open-modal-checkin' => 'openModal'];
 
+    // Computed Properties
+    public function getRemainingTime()
+    {
+        if (isset($this->pomodoroStats['active_session']) && $this->pomodoroStats['active_session']) {
+            $session = $this->pomodoroStats['active_session'];
+            $remainingMinutes = $session['remaining_minutes'] ?? 0;
+            return max(0, $remainingMinutes);
+        }
+        return 0;
+    }
+
     public function mount()
     {
         $this->selectedDate = now()->format('Y-m-d');

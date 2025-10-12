@@ -1,11 +1,16 @@
-    <x-ui-modal size="xl" wire:model="modalShow" :escClosable="false">
+    <x-ui-modal size="xl" wire:model="modalShow" :escClosable="false" wire:poll.30s="loadPomodoroStats">
         <x-slot name="header">
             <div class="flex items-center justify-between w-full">
                 <div class="flex items-center gap-3">
                     <h2 class="text-xl font-semibold text-[var(--ui-secondary)] m-0">Täglicher Check-in</h2>
                     <span class="text-xs text-[var(--ui-muted)] bg-[var(--ui-muted-5)] px-2 py-1 rounded-full">SELBSTREFLEXION</span>
                 </div>
-                <div class="text-right">
+                <div class="text-right flex items-center gap-3">
+                    @if($this->getRemainingTime() > 0)
+                        <div class="text-xs text-[var(--ui-primary)] bg-[var(--ui-primary)]/10 px-3 py-1 rounded-full font-medium">
+                            🍅 {{ $this->getRemainingTime() }} Min
+                        </div>
+                    @endif
                     <div class="text-xs text-[var(--ui-muted)] bg-[var(--ui-muted-5)] px-2 py-1 rounded-full">
                         {{ \Carbon\Carbon::parse($selectedDate)->locale('de')->isoFormat('DD. MMMM YYYY') }}
                     </div>
