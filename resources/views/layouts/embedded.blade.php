@@ -29,10 +29,8 @@
         : null;
   @endphp
 
-  <div class="h-screen w-full overflow-hidden">
-    <div class="h-full overflow-y-auto">
-      @yield('content')
-    </div>
+  <div class="h-screen w-full">
+    @yield('content')
   </div>
 
   @livewireScripts
