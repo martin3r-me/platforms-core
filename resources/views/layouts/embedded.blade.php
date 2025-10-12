@@ -20,7 +20,7 @@
   <script src="https://res.cdn.office.net/teams-js/2.0.0/js/MicrosoftTeams.min.js" crossorigin="anonymous"></script>
 </head>
 
-<body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)] overflow-hidden" data-embedded="1">
+<body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)] h-full" data-embedded="1">
 
   @php
     $currentModuleKey = explode('.', request()->route()?->getName())[0] ?? null;
@@ -29,10 +29,10 @@
         : null;
   @endphp
 
-  <div class="flex h-screen w-full">
+  <div class="flex h-full w-full">
     <!-- Main Content only (ohne Sidebar) -->
-    <main class="flex-1 min-w-0 h-screen bg-white flex flex-col overflow-hidden">
-      <div class="flex-1 min-h-0 overflow-y-auto">
+    <main class="flex-1 min-w-0 h-full bg-white flex flex-col">
+      <div class="flex-1 min-h-0">
         @yield('content')
       </div>
     </main>
