@@ -19,6 +19,7 @@ class ModalCheckin extends Component
     public $currentYear;
     public $checkins = [];
 
+
     protected $listeners = ['open-modal-checkin' => 'openModal'];
 
     public function mount()

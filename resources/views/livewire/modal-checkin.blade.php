@@ -440,6 +440,7 @@ function pomodoroTimer() {
             if (this.isRunning) return;
             
             this.isRunning = true;
+            this.saveToStorage();
             this.timer = setInterval(() => {
                 this.timeLeft--;
                 this.updateDisplay();
@@ -456,6 +457,7 @@ function pomodoroTimer() {
                 clearInterval(this.timer);
                 this.timer = null;
             }
+            this.saveToStorage();
         },
         
         resetTimer() {
@@ -463,6 +465,7 @@ function pomodoroTimer() {
             this.currentMode = 'work';
             this.timeLeft = this.workTime;
             this.sessionCount = 1;
+            this.saveToStorage();
             this.updateDisplay();
         },
         
@@ -523,7 +526,9 @@ function pomodoroTimer() {
                 pomodoroCount: this.pomodoroCount,
                 sessionCount: this.sessionCount,
                 currentMode: this.currentMode,
-                timeLeft: this.timeLeft
+                timeLeft: this.timeLeft,
+                isRunning: this.isRunning,
+                startTime: this.isRunning ? Date.now() : null
             };
             localStorage.setItem('pomodoroTimer', JSON.stringify(data));
         },
@@ -535,8 +540,18 @@ function pomodoroTimer() {
                 this.sessionCount = data.sessionCount || 1;
                 this.currentMode = data.currentMode || 'work';
                 this.timeLeft = data.timeLeft || this.workTime;
+                this.isRunning = data.isRunning || false;
+                
+                // If timer was running, calculate elapsed time
+                if (this.isRunning && data.startTime) {
+                    const elapsed = Math.floor((Date.now() - data.startTime) / 1000);
+                    this.timeLeft = Math.max(0, this.timeLeft - elapsed);
+                    
+                    if (this.timeLeft <= 0) {
+                        this.completeSession();
+                    }
+                }
             } catch (e) {
-                // Reset to defaults if storage is corrupted
                 this.resetTimer();
             }
         },
