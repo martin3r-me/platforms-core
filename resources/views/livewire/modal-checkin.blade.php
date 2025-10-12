@@ -255,7 +255,8 @@
 
         <div x-data="pomodoroTimer()" x-init="init()" class="text-center" 
              x-pomodoro-session='@json($pomodoroStats["active_session"])'
-             x-pomodoro-stats='@json($pomodoroStats)'>
+             x-pomodoro-stats='@json($pomodoroStats)'
+             wire:poll.30s="loadPomodoroStats">
                         {{-- Timer Display --}}
                         <div class="mb-6">
                             <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2">
@@ -467,11 +468,12 @@ function pomodoroTimer() {
         // Timer Settings
         workTime: 25 * 60, // 25 minutes (default)
         
-        // Current State
-        timeLeft: 25 * 60,
-        isRunning: false,
-        sessionCount: 1,
-        pomodoroCount: 0,
+            // Current State
+            timeLeft: 25 * 60,
+            isRunning: false,
+            sessionCount: 1,
+            pomodoroCount: 0,
+            syncInterval: null,
         
         // Timer Interval
         timer: null,
@@ -494,15 +496,24 @@ function pomodoroTimer() {
                 this.completeSession();
             });
             
-            // No polling needed
+            // Start server sync for real-time updates
+            this.startServerSync();
         },
         
-            startSmartPolling() {
-                // No polling needed
+            startServerSync() {
+                // Sync with server every 30 seconds when timer is running
+                this.syncInterval = setInterval(() => {
+                    if (this.isRunning) {
+                        this.$wire.loadPomodoroStats();
+                    }
+                }, 30000);
             },
             
-            stopSmartPolling() {
-                // No polling needed
+            stopServerSync() {
+                if (this.syncInterval) {
+                    clearInterval(this.syncInterval);
+                    this.syncInterval = null;
+                }
             },
         
         loadFromServer() {
@@ -559,6 +570,7 @@ function pomodoroTimer() {
                 clearInterval(this.timer);
                 this.timer = null;
             }
+            this.stopServerSync();
             this.updateDisplay();
         },
         
@@ -578,6 +590,7 @@ function pomodoroTimer() {
         
             completeSession() {
                 this.pauseTimer();
+                this.stopServerSync();
                 
                 // Play notification sound (if available)
                 this.playNotification();
