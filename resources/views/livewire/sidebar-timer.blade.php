@@ -1,8 +1,11 @@
 <div x-data="sidebarTimer()" x-init="init()" 
      x-pomodoro-session='@json($pomodoroStats["active_session"])'
      x-show="isActive"
-     class="px-3 text-xs text-[var(--ui-primary)] font-medium"
-     wire:poll.30s="loadPomodoroStats">
+     class="text-xs text-[var(--ui-primary)] font-medium"
+     :class="$parent.collapsed ? 'px-2' : 'px-3'"
+     @if($pomodoroStats['active_session'])
+         wire:poll.30s="loadPomodoroStats"
+     @endif>
     <span x-text="formatTime(timeLeft)"></span>
 </div>
 

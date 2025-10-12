@@ -485,11 +485,6 @@ function pomodoroTimer() {
         },
         
         init() {
-            // Store original title
-            if (!this.originalTitle) {
-                this.originalTitle = document.title;
-            }
-            
             this.loadFromServer();
             
             // Listen for Livewire updates
@@ -619,15 +614,9 @@ function pomodoroTimer() {
             return `${minutes}`;
         },
         
-        updateDisplay() {
-            // Update page title with timer
-            if (this.isRunning) {
-                document.title = `${this.formatTime(this.timeLeft)} - Fokuszeit`;
-            } else {
-                // Reset to original title when timer is not running
-                document.title = this.originalTitle || 'Check-in Modal';
-            }
-        },
+            updateDisplay() {
+                // No tab title updates - timer only in sidebar
+            },
         
         playNotification() {
             // Try to play notification sound
