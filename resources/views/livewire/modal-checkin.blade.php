@@ -1,5 +1,4 @@
-    <x-ui-modal size="xl" wire:model="modalShow" :escClosable="false"
-                @if($modalShow) wire:poll.30s="loadPomodoroStats" @endif>
+    <x-ui-modal size="xl" wire:model="modalShow" :escClosable="false">
         <x-slot name="header">
             <div class="flex items-center justify-between w-full">
                 <div class="flex items-center gap-3">
@@ -495,18 +494,15 @@ function pomodoroTimer() {
                 this.completeSession();
             });
             
-            // Smart polling - only if timer is running
-            this.startSmartPolling();
+            // No polling needed
         },
         
             startSmartPolling() {
-                // Polling is now handled by Livewire on modal level
-                // No need for manual polling here
+                // No polling needed
             },
             
             stopSmartPolling() {
-                // Polling is now handled by Livewire on modal level
-                // No need to stop manual polling here
+                // No polling needed
             },
         
         loadFromServer() {
@@ -554,8 +550,7 @@ function pomodoroTimer() {
                     }
                 }, 30000); // Update every 30 seconds
                 
-                // Start smart polling
-                this.startSmartPolling();
+                // Timer started
             },
         
         pauseTimer() {
@@ -564,7 +559,6 @@ function pomodoroTimer() {
                 clearInterval(this.timer);
                 this.timer = null;
             }
-            this.stopSmartPolling();
             this.updateDisplay();
         },
         
@@ -582,21 +576,20 @@ function pomodoroTimer() {
             this.updateDisplay();
         },
         
-        completeSession() {
-            this.pauseTimer();
-            this.stopSmartPolling();
-            
-            // Play notification sound (if available)
-            this.playNotification();
-            
-            // Just increment counters, no break logic
-            this.pomodoroCount++;
-            this.sessionCount++;
-            
-            // Trigger Livewire to update database
-            this.$wire.stopPomodoro();
-            this.updateDisplay();
-        },
+            completeSession() {
+                this.pauseTimer();
+                
+                // Play notification sound (if available)
+                this.playNotification();
+                
+                // Just increment counters, no break logic
+                this.pomodoroCount++;
+                this.sessionCount++;
+                
+                // Trigger Livewire to update database
+                this.$wire.stopPomodoro();
+                this.updateDisplay();
+            },
         
         formatTime(seconds) {
             const minutes = Math.ceil(seconds / 60);
