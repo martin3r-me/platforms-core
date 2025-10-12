@@ -495,11 +495,23 @@ function pomodoroTimer() {
         
         startSmartPolling() {
             // Check every 30 seconds if we need to poll
-            setInterval(() => {
-                if (this.isRunning) {
-                    this.$wire.loadPomodoroStats();
+            this.pollInterval = setInterval(() => {
+                // Check if there's an active session in the database
+                const sessionData = this.$el.getAttribute('x-pomodoro-session');
+                if (sessionData && sessionData !== 'null') {
+                    const session = JSON.parse(sessionData);
+                    if (session.is_active) {
+                        this.$wire.loadPomodoroStats();
+                    }
                 }
             }, 30000);
+        },
+        
+        stopSmartPolling() {
+            if (this.pollInterval) {
+                clearInterval(this.pollInterval);
+                this.pollInterval = null;
+            }
         },
         
         loadFromServer() {
@@ -547,6 +559,7 @@ function pomodoroTimer() {
                 clearInterval(this.timer);
                 this.timer = null;
             }
+            this.stopSmartPolling();
             this.updateDisplay();
         },
         
@@ -566,6 +579,7 @@ function pomodoroTimer() {
         
         completeSession() {
             this.pauseTimer();
+            this.stopSmartPolling();
             
             // Play notification sound (if available)
             this.playNotification();
