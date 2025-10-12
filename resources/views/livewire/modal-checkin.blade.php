@@ -244,7 +244,7 @@
                         {{-- Timer Display --}}
                         <div class="mb-6">
                             <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2" x-text="formatTime(timeLeft)"></div>
-                            <div class="text-sm text-[var(--ui-muted)]" x-text="currentMode === 'work' ? 'Fokuszeit' : currentMode === 'shortBreak' ? 'Kurze Pause' : 'Lange Pause'"></div>
+                            <div class="text-sm text-[var(--ui-muted)]" x-text="currentMode === 'work' ? 'Fokuszeit' : 'Pause'"></div>
                         </div>
 
                         {{-- Progress Ring --}}
@@ -297,8 +297,18 @@
 
                         {{-- Session Info --}}
                         <div class="text-sm text-[var(--ui-muted)]">
-                            <div>Session: <span x-text="sessionCount"></span> / 4</div>
                             <div>Pomodoros heute: <span x-text="pomodoroCount"></span></div>
+                            <div>Session: <span x-text="sessionCount"></span></div>
+                        </div>
+
+                        {{-- Clear Data Button --}}
+                        <div class="mt-4 pt-4 border-t border-[var(--ui-border)]">
+                            <button 
+                                @click="clearData()" 
+                                class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-danger)] transition-colors"
+                            >
+                                Daten löschen
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -403,13 +413,12 @@ function pomodoroTimer() {
     return {
         // Timer Settings
         workTime: 25 * 60, // 25 minutes
-        shortBreakTime: 5 * 60, // 5 minutes
-        longBreakTime: 15 * 60, // 15 minutes
+        breakTime: 5 * 60, // 5 minutes
         
         // Current State
         timeLeft: 25 * 60,
         isRunning: false,
-        currentMode: 'work', // 'work', 'shortBreak', 'longBreak'
+        currentMode: 'work', // 'work', 'break'
         sessionCount: 1,
         pomodoroCount: 0,
         
@@ -418,8 +427,7 @@ function pomodoroTimer() {
         
         // Computed Properties
         get progress() {
-            const totalTime = this.currentMode === 'work' ? this.workTime : 
-                            this.currentMode === 'shortBreak' ? this.shortBreakTime : this.longBreakTime;
+            const totalTime = this.currentMode === 'work' ? this.workTime : this.breakTime;
             return (totalTime - this.timeLeft) / totalTime;
         },
         
@@ -468,16 +476,9 @@ function pomodoroTimer() {
                 this.pomodoroCount++;
                 this.sessionCount++;
                 
-                if (this.sessionCount <= 4) {
-                    // Short break
-                    this.currentMode = 'shortBreak';
-                    this.timeLeft = this.shortBreakTime;
-                } else {
-                    // Long break after 4 work sessions
-                    this.currentMode = 'longBreak';
-                    this.timeLeft = this.longBreakTime;
-                    this.sessionCount = 1; // Reset for next cycle
-                }
+                // Always break after work
+                this.currentMode = 'break';
+                this.timeLeft = this.breakTime;
             } else {
                 // Break finished, back to work
                 this.currentMode = 'work';
@@ -537,6 +538,18 @@ function pomodoroTimer() {
             } catch (e) {
                 // Reset to defaults if storage is corrupted
                 this.resetTimer();
+            }
+        },
+        
+        clearData() {
+            if (confirm('Alle Pomodoro-Daten löschen?')) {
+                localStorage.removeItem('pomodoroTimer');
+                this.pomodoroCount = 0;
+                this.sessionCount = 1;
+                this.currentMode = 'work';
+                this.timeLeft = this.workTime;
+                this.pauseTimer();
+                this.updateDisplay();
             }
         }
     }
