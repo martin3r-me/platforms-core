@@ -33,7 +33,18 @@ class TeamsSdkAuthMiddleware
         $teamsContext = $this->extractTeamsContext($request);
         
         if (!$teamsContext) {
-            Log::info('Teams SDK Auth: No context found, allowing request (Teams SDK will handle auth)');
+            Log::info('Teams SDK Auth: No context found, trying SSO headers');
+            
+            // Fallback: Versuche SSO Headers zu extrahieren
+            $ssoUser = $this->extractSsoUser($request);
+            if ($ssoUser) {
+                Log::info('Teams SDK Auth: SSO user found', ['email' => $ssoUser['email']]);
+                $request->attributes->set('teams_user', $ssoUser);
+                $request->attributes->set('teams_context', ['user' => $ssoUser]);
+                return $next($request);
+            }
+            
+            Log::info('Teams SDK Auth: No context or SSO found, allowing request (Teams SDK will handle auth)');
             return $next($request);
         }
 
@@ -41,7 +52,18 @@ class TeamsSdkAuthMiddleware
         $userInfo = $this->validateTeamsContext($teamsContext);
         
         if (!$userInfo) {
-            Log::warning('Teams SDK Auth: Invalid context, allowing request (Teams SDK will handle auth)');
+            Log::warning('Teams SDK Auth: Invalid context, trying SSO headers');
+            
+            // Fallback: Versuche SSO Headers zu extrahieren
+            $ssoUser = $this->extractSsoUser($request);
+            if ($ssoUser) {
+                Log::info('Teams SDK Auth: SSO user found as fallback', ['email' => $ssoUser['email']]);
+                $request->attributes->set('teams_user', $ssoUser);
+                $request->attributes->set('teams_context', ['user' => $ssoUser]);
+                return $next($request);
+            }
+            
+            Log::warning('Teams SDK Auth: Invalid context and no SSO, allowing request (Teams SDK will handle auth)');
             return $next($request);
         }
 
@@ -103,6 +125,38 @@ class TeamsSdkAuthMiddleware
             $context = $request->input('teams_context');
         }
 
+        // 4. Aus Microsoft Teams SDK Headers (falls verfügbar)
+        if (!$context) {
+            $teamsHeaders = [
+                'X-Teams-User-Id' => $request->header('X-Teams-User-Id'),
+                'X-Teams-User-Email' => $request->header('X-Teams-User-Email'),
+                'X-Teams-User-Name' => $request->header('X-Teams-User-Name'),
+                'X-Teams-Tenant-Id' => $request->header('X-Teams-Tenant-Id'),
+                'X-Teams-Team-Id' => $request->header('X-Teams-Team-Id'),
+                'X-Teams-Channel-Id' => $request->header('X-Teams-Channel-Id'),
+            ];
+            
+            $hasTeamsHeaders = array_filter($teamsHeaders);
+            if (!empty($hasTeamsHeaders)) {
+                $context = [
+                    'user' => [
+                        'id' => $teamsHeaders['X-Teams-User-Id'],
+                        'email' => $teamsHeaders['X-Teams-User-Email'],
+                        'name' => $teamsHeaders['X-Teams-User-Name'],
+                    ],
+                    'tenant' => $teamsHeaders['X-Teams-Tenant-Id'],
+                    'team' => $teamsHeaders['X-Teams-Team-Id'],
+                    'channel' => $teamsHeaders['X-Teams-Channel-Id'],
+                ];
+            }
+        }
+
+        Log::info('Teams SDK Auth: Context extraction', [
+            'has_context' => !is_null($context),
+            'context_keys' => $context ? array_keys($context) : null,
+            'user_email' => $context['user']['email'] ?? null
+        ]);
+
         return $context;
     }
 
@@ -134,6 +188,55 @@ class TeamsSdkAuthMiddleware
             Log::error('Teams SDK Auth: Context validation failed', [
                 'error' => $e->getMessage(),
                 'context_preview' => json_encode(array_slice($context, 0, 3))
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Extrahiert SSO User aus Request Headers
+     */
+    private function extractSsoUser(Request $request): ?array
+    {
+        try {
+            // Microsoft Teams SSO Headers
+            $email = $request->header('X-User-Email') ?: 
+                     $request->header('X-User-Principal-Name') ?: 
+                     $request->query('user_email') ?: 
+                     $request->query('user_principal_name');
+            
+            $name = $request->header('X-User-Name') ?: 
+                    $request->header('X-User-Display-Name') ?: 
+                    $request->query('user_name') ?: 
+                    $request->query('user_display_name');
+            
+            $userId = $request->header('X-User-Id') ?: 
+                      $request->header('X-User-Object-Id') ?: 
+                      $request->query('user_id') ?: 
+                      $request->query('user_object_id');
+            
+            if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                return null;
+            }
+            
+            Log::info('Teams SDK Auth: SSO user extracted', [
+                'email' => $email,
+                'name' => $name,
+                'user_id' => $userId
+            ]);
+            
+            return [
+                'id' => $userId,
+                'email' => $email,
+                'name' => $name ?: $email,
+                'tenant_id' => $request->header('X-Tenant-Id'),
+                'team_id' => $request->header('X-Team-Id'),
+                'channel_id' => $request->header('X-Channel-Id'),
+            ];
+            
+        } catch (\Throwable $e) {
+            Log::error('Teams SDK Auth: SSO extraction failed', [
+                'error' => $e->getMessage()
             ]);
             return null;
         }
