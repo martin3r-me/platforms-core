@@ -1,4 +1,7 @@
-    <x-ui-modal size="xl" wire:model="modalShow" :escClosable="false">
+    <x-ui-modal size="xl" wire:model="modalShow" :escClosable="false"
+                @if($modalShow)
+                    wire:poll.30s="loadPomodoroStats"
+                @endif>
         <x-slot name="header">
             <div class="flex items-center justify-between w-full">
                 <div class="flex items-center gap-3">
@@ -255,10 +258,7 @@
 
         <div x-data="pomodoroTimer()" x-init="init()" class="text-center" 
              x-pomodoro-session='@json($pomodoroStats["active_session"])'
-             x-pomodoro-stats='@json($pomodoroStats)'
-             @if($pomodoroStats['active_session'])
-                 wire:poll.30s="loadPomodoroStats"
-             @endif>
+             x-pomodoro-stats='@json($pomodoroStats)'>
                         {{-- Timer Display --}}
                         <div class="mb-6">
                             <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2">
@@ -502,22 +502,13 @@ function pomodoroTimer() {
         },
         
             startSmartPolling() {
-                // Only start polling if timer is running
-                if (this.isRunning) {
-                    this.pollInterval = setInterval(() => {
-                        // Only poll if timer is still running
-                        if (this.isRunning) {
-                            this.$wire.loadPomodoroStats();
-                        }
-                    }, 30000);
-                }
+                // Polling is now handled by Livewire on modal level
+                // No need for manual polling here
             },
             
             stopSmartPolling() {
-                if (this.pollInterval) {
-                    clearInterval(this.pollInterval);
-                    this.pollInterval = null;
-                }
+                // Polling is now handled by Livewire on modal level
+                // No need to stop manual polling here
             },
         
         loadFromServer() {
