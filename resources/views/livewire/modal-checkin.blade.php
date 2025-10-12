@@ -253,9 +253,12 @@
                         @endif
                     </div>
 
-                    <div x-data="pomodoroTimer()" x-init="init()" class="text-center" 
-                         x-pomodoro-session='@json($pomodoroStats["active_session"])'
-                         x-pomodoro-stats='@json($pomodoroStats)'>
+        <div x-data="pomodoroTimer()" x-init="init()" class="text-center" 
+             x-pomodoro-session='@json($pomodoroStats["active_session"])'
+             x-pomodoro-stats='@json($pomodoroStats)'
+             @if($pomodoroStats['active_session'])
+                 wire:poll.30s="loadPomodoroStats"
+             @endif>
                         {{-- Timer Display --}}
                         <div class="mb-6">
                             <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2">
@@ -503,26 +506,24 @@ function pomodoroTimer() {
             this.startSmartPolling();
         },
         
-        startSmartPolling() {
-            // Check every 30 seconds if we need to poll
-            this.pollInterval = setInterval(() => {
-                // Check if there's an active session in the database
-                const sessionData = this.$el.getAttribute('x-pomodoro-session');
-                if (sessionData && sessionData !== 'null') {
-                    const session = JSON.parse(sessionData);
-                    if (session.is_active) {
-                        this.$wire.loadPomodoroStats();
-                    }
+            startSmartPolling() {
+                // Only start polling if timer is running
+                if (this.isRunning) {
+                    this.pollInterval = setInterval(() => {
+                        // Only poll if timer is still running
+                        if (this.isRunning) {
+                            this.$wire.loadPomodoroStats();
+                        }
+                    }, 30000);
                 }
-            }, 30000);
-        },
-        
-        stopSmartPolling() {
-            if (this.pollInterval) {
-                clearInterval(this.pollInterval);
-                this.pollInterval = null;
-            }
-        },
+            },
+            
+            stopSmartPolling() {
+                if (this.pollInterval) {
+                    clearInterval(this.pollInterval);
+                    this.pollInterval = null;
+                }
+            },
         
         loadFromServer() {
             // Load from server data
@@ -537,7 +538,10 @@ function pomodoroTimer() {
                 
                 // Start timer if session is active and has time left
                 if (this.isRunning && this.timeLeft > 0) {
-                    this.startTimer();
+                    // Only start if not already running
+                    if (!this.timer) {
+                        this.startTimer();
+                    }
                 } else if (this.isRunning && this.timeLeft <= 0) {
                     // Session expired, complete it
                     this.completeSession();
@@ -565,6 +569,9 @@ function pomodoroTimer() {
                         this.completeSession();
                     }
                 }, 30000); // Update every 30 seconds
+                
+                // Start smart polling
+                this.startSmartPolling();
             },
         
         pauseTimer() {
