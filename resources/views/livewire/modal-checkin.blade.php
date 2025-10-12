@@ -243,7 +243,13 @@
                     <div class="flex items-center gap-3 mb-4">
                         @svg('heroicon-o-clock', 'w-5 h-5 text-[var(--ui-primary)]')
                         <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Pomodoro Timer</h3>
-                        @if($pomodoroStats['active_session'])
+                        @if($this->getRemainingTime() > 0)
+                            <div class="ml-auto flex items-center gap-2">
+                                <div class="text-xs text-[var(--ui-primary)] bg-[var(--ui-primary)]/10 px-3 py-1 rounded-full font-medium">
+                                    🍅 {{ $this->getRemainingTime() }} Min
+                                </div>
+                            </div>
+                        @elseif($pomodoroStats['active_session'])
                             <div class="ml-auto flex items-center gap-2">
                                 <div class="w-8 h-8 rounded-full border-2 border-[var(--ui-primary)] overflow-hidden">
                                     <div 
