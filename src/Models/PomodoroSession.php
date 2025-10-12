@@ -34,7 +34,8 @@ class PomodoroSession extends Model
         }
 
         $elapsed = now()->diffInSeconds($this->started_at);
-        return max(0, $this->duration_seconds - $elapsed);
+        $remaining = $this->duration_seconds - $elapsed;
+        return max(0, $remaining);
     }
 
     public function getIsExpiredAttribute(): bool

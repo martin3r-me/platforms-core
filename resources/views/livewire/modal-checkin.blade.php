@@ -450,6 +450,11 @@ function pomodoroTimer() {
         },
         
         init() {
+            // Store original title
+            if (!this.originalTitle) {
+                this.originalTitle = document.title;
+            }
+            
             // Load from server data
             const sessionData = this.$el.getAttribute('x-pomodoro-session');
             const statsData = this.$el.getAttribute('x-pomodoro-stats');
@@ -495,6 +500,7 @@ function pomodoroTimer() {
                 clearInterval(this.timer);
                 this.timer = null;
             }
+            this.updateDisplay();
         },
         
         resetTimer() {
@@ -539,8 +545,11 @@ function pomodoroTimer() {
             // Update page title with timer
             if (this.isRunning && this.currentMode === 'work') {
                 document.title = `${this.formatTime(this.timeLeft)} - Pomodoro Timer`;
-            } else if (!this.isRunning) {
-                document.title = 'Check-in Modal';
+            } else if (this.isRunning && this.currentMode === 'break') {
+                document.title = `${this.formatTime(this.timeLeft)} - Pause`;
+            } else {
+                // Reset to original title when timer is not running
+                document.title = this.originalTitle || 'Check-in Modal';
             }
         },
         
