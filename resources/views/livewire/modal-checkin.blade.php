@@ -255,7 +255,8 @@
 
                     <div x-data="pomodoroTimer()" x-init="init()" class="text-center" 
                          x-pomodoro-session='@json($pomodoroStats["active_session"])'
-                         x-pomodoro-stats='@json($pomodoroStats)'>
+                         x-pomodoro-stats='@json($pomodoroStats)'
+                         wire:poll.30s="loadPomodoroStats">
                         {{-- Timer Display --}}
                         <div class="mb-6">
                             <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2">
@@ -457,6 +458,15 @@ function pomodoroTimer() {
                 this.originalTitle = document.title;
             }
             
+            this.loadFromServer();
+            
+            // Listen for Livewire updates
+            this.$el.addEventListener('livewire:updated', () => {
+                this.loadFromServer();
+            });
+        },
+        
+        loadFromServer() {
             // Load from server data
             const sessionData = this.$el.getAttribute('x-pomodoro-session');
             const statsData = this.$el.getAttribute('x-pomodoro-stats');

@@ -36,15 +36,6 @@ class PomodoroSession extends Model
         $elapsed = now()->timestamp - $this->started_at->timestamp;
         $remaining = $this->duration_seconds - $elapsed;
         
-        // Debug log
-        \Log::info('Pomodoro Debug', [
-            'started_at' => $this->started_at->toDateTimeString(),
-            'now' => now()->toDateTimeString(),
-            'elapsed' => $elapsed,
-            'duration_seconds' => $this->duration_seconds,
-            'remaining' => $remaining
-        ]);
-        
         return max(0, $remaining);
     }
     
