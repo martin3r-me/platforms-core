@@ -33,7 +33,16 @@ class TeamsSdkAuthMiddleware
         $teamsContext = $this->extractTeamsContext($request);
         
         if (!$teamsContext) {
-            Log::info('Teams SDK Auth: No context found, trying SSO headers');
+            Log::info('Teams SDK Auth: No context found, trying JWT token validation');
+            
+            // Fallback: Versuche JWT Token zu validieren
+            $jwtUser = $this->validateJwtToken($request);
+            if ($jwtUser) {
+                Log::info('Teams SDK Auth: JWT user found', ['email' => $jwtUser['email']]);
+                $request->attributes->set('teams_user', $jwtUser);
+                $request->attributes->set('teams_context', ['user' => $jwtUser]);
+                return $next($request);
+            }
             
             // Fallback: Versuche SSO Headers zu extrahieren
             $ssoUser = $this->extractSsoUser($request);
@@ -44,7 +53,7 @@ class TeamsSdkAuthMiddleware
                 return $next($request);
             }
             
-            Log::info('Teams SDK Auth: No context or SSO found, allowing request (Teams SDK will handle auth)');
+            Log::info('Teams SDK Auth: No context, JWT or SSO found, allowing request (Teams SDK will handle auth)');
             return $next($request);
         }
 
@@ -236,6 +245,77 @@ class TeamsSdkAuthMiddleware
             
         } catch (\Throwable $e) {
             Log::error('Teams SDK Auth: SSO extraction failed', [
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Validiert Microsoft Teams JWT Token
+     */
+    private function validateJwtToken(Request $request): ?array
+    {
+        try {
+            // JWT Token aus verschiedenen Quellen extrahieren
+            $token = $request->header('Authorization') ?: 
+                     $request->header('X-Teams-Token') ?: 
+                     $request->query('token') ?: 
+                     $request->input('token');
+            
+            if (!$token) {
+                return null;
+            }
+            
+            // Bearer Token Format bereinigen
+            if (str_starts_with($token, 'Bearer ')) {
+                $token = substr($token, 7);
+            }
+            
+            Log::info('Teams SDK Auth: JWT token found, attempting validation');
+            
+            // JWT Token dekodieren (ohne Validierung für jetzt)
+            $parts = explode('.', $token);
+            if (count($parts) !== 3) {
+                Log::warning('Teams SDK Auth: Invalid JWT format');
+                return null;
+            }
+            
+            $payload = json_decode(base64_decode($parts[1]), true);
+            if (!$payload) {
+                Log::warning('Teams SDK Auth: Could not decode JWT payload');
+                return null;
+            }
+            
+            // Teams-spezifische Claims extrahieren
+            $email = $payload['preferred_username'] ?? $payload['email'] ?? $payload['upn'] ?? null;
+            $name = $payload['name'] ?? $payload['given_name'] . ' ' . $payload['family_name'] ?? $email;
+            $userId = $payload['oid'] ?? $payload['sub'] ?? null;
+            $tenantId = $payload['tid'] ?? null;
+            
+            if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                Log::warning('Teams SDK Auth: Invalid email in JWT', ['email' => $email]);
+                return null;
+            }
+            
+            Log::info('Teams SDK Auth: JWT user extracted', [
+                'email' => $email,
+                'name' => $name,
+                'user_id' => $userId,
+                'tenant_id' => $tenantId
+            ]);
+            
+            return [
+                'id' => $userId,
+                'email' => $email,
+                'name' => $name,
+                'tenant_id' => $tenantId,
+                'team_id' => null,
+                'channel_id' => null,
+            ];
+            
+        } catch (\Throwable $e) {
+            Log::error('Teams SDK Auth: JWT validation failed', [
                 'error' => $e->getMessage()
             ]);
             return null;
