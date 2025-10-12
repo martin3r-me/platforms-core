@@ -247,6 +247,9 @@ class ModalCheckin extends Component
         ]);
         
         $this->loadPomodoroStats();
+        
+        // Dispatch to sidebar for real-time update
+        $this->dispatch('pomodoro-started');
     }
     
     public function stopPomodoro()
@@ -259,6 +262,9 @@ class ModalCheckin extends Component
             $activeSession->complete();
         }
         $this->loadPomodoroStats();
+        
+        // Dispatch to sidebar for real-time update
+        $this->dispatch('pomodoro-stopped');
     }
     
     public function stopActivePomodoro()
@@ -267,6 +273,9 @@ class ModalCheckin extends Component
             ->where('is_active', true)
             ->update(['is_active' => false, 'completed_at' => now()]);
         $this->loadPomodoroStats();
+        
+        // Dispatch to sidebar for real-time update
+        $this->dispatch('pomodoro-stopped');
     }
     
     public function loadPomodoroStats()

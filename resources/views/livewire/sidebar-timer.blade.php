@@ -2,7 +2,11 @@
      x-pomodoro-session='@json($pomodoroStats["active_session"])'
      x-show="isActive"
      class="px-3 text-xs text-[var(--ui-primary)] font-medium"
-     wire:poll.30s="loadPomodoroStats">
+     @if($pomodoroStats['active_session'])
+         wire:poll.30s="loadPomodoroStats"
+     @endif
+     @pomodoro-started.window="loadFromServer()"
+     @pomodoro-stopped.window="loadFromServer()">
     <span x-text="formatTime(timeLeft)"></span>
 </div>
 

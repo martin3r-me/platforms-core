@@ -256,7 +256,9 @@
         <div x-data="pomodoroTimer()" x-init="init()" class="text-center" 
              x-pomodoro-session='@json($pomodoroStats["active_session"])'
              x-pomodoro-stats='@json($pomodoroStats)'
-             wire:poll.30s="loadPomodoroStats">
+             @if($modalShow)
+                 wire:poll.30s="loadPomodoroStats"
+             @endif>
                         {{-- Timer Display --}}
                         <div class="mb-6">
                             <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2">
