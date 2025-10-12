@@ -291,26 +291,32 @@
                         {{-- Time Selection --}}
                         <div class="flex items-center justify-center gap-2 mb-4">
                             <button 
+                                @click="setTime(5)" 
+                                class="px-4 py-2 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-primary)] hover:text-white transition-all duration-200 font-medium"
+                            >
+                                5 Min
+                            </button>
+                            <button 
                                 @click="setTime(15)" 
-                                class="px-3 py-1 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-muted)]/80 transition-colors"
+                                class="px-4 py-2 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-primary)] hover:text-white transition-all duration-200 font-medium"
                             >
                                 15 Min
                             </button>
                             <button 
                                 @click="setTime(25)" 
-                                class="px-3 py-1 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-muted)]/80 transition-colors"
+                                class="px-4 py-2 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-primary)] hover:text-white transition-all duration-200 font-medium"
                             >
                                 25 Min
                             </button>
                             <button 
                                 @click="setTime(45)" 
-                                class="px-3 py-1 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-muted)]/80 transition-colors"
+                                class="px-4 py-2 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-primary)] hover:text-white transition-all duration-200 font-medium"
                             >
                                 45 Min
                             </button>
                             <button 
                                 @click="setTime(60)" 
-                                class="px-3 py-1 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-muted)]/80 transition-colors"
+                                class="px-4 py-2 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-primary)] hover:text-white transition-all duration-200 font-medium"
                             >
                                 60 Min
                             </button>
@@ -321,7 +327,7 @@
                             <button 
                                 @click="startTimer()" 
                                 x-show="!isRunning"
-                                wire:click="startPomodoro('work')"
+                                :wire:click="`startPomodoro('work', ${Math.ceil(timeLeft / 60)})`"
                                 class="px-6 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-[var(--ui-primary)]/90 transition-colors"
                             >
                                 Start
@@ -330,7 +336,7 @@
                                 @click="pauseTimer()" 
                                 x-show="isRunning"
                                 wire:click="stopPomodoro()"
-                                class="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                                class="px-6 py-2 bg-[var(--ui-secondary)] text-white rounded-lg hover:bg-[var(--ui-secondary)]/90 transition-colors"
                             >
                                 Pause
                             </button>

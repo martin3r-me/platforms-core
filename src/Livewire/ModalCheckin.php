@@ -232,12 +232,12 @@ class ModalCheckin extends Component
     }
 
     // Pomodoro Methods
-    public function startPomodoro($type = 'work')
+    public function startPomodoro($type = 'work', $minutes = 25)
     {
         // Stop any active session first
         $this->stopActivePomodoro();
         
-        $duration = $type === 'work' ? 25 * 60 : 5 * 60; // 25 min work, 5 min break
+        $duration = $minutes * 60; // Convert minutes to seconds
         
         $this->pomodoroSession = PomodoroSession::create([
             'user_id' => auth()->id(),
