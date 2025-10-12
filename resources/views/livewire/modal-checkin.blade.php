@@ -238,6 +238,19 @@
                     <div class="flex items-center gap-3 mb-4">
                         @svg('heroicon-o-clock', 'w-5 h-5 text-[var(--ui-primary)]')
                         <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Pomodoro Timer</h3>
+                        @if($pomodoroStats['active_session'])
+                            <div class="ml-auto flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full border-2 border-[var(--ui-primary)] overflow-hidden">
+                                    <div 
+                                        class="w-full h-full bg-[var(--ui-primary)] transition-all duration-1000"
+                                        style="transform: translateY({{ 100 - $pomodoroStats['active_session']['progress_percentage'] }}%)"
+                                    ></div>
+                                </div>
+                                <span class="text-sm text-[var(--ui-primary)] font-medium">
+                                    {{ round($pomodoroStats['active_session']['progress_percentage']) }}%
+                                </span>
+                            </div>
+                        @endif
                     </div>
 
                     <div x-data="pomodoroTimer()" x-init="init()" class="text-center" 
@@ -448,9 +461,12 @@ function pomodoroTimer() {
                 this.isRunning = session.is_active;
                 this.pomodoroCount = statsData ? JSON.parse(statsData).today_count : 0;
                 
-                // Start timer if session is active
+                // Start timer if session is active and has time left
                 if (this.isRunning && this.timeLeft > 0) {
                     this.startTimer();
+                } else if (this.isRunning && this.timeLeft <= 0) {
+                    // Session expired, complete it
+                    this.completeSession();
                 }
             } else {
                 this.resetTimer();
@@ -508,7 +524,8 @@ function pomodoroTimer() {
                 this.timeLeft = this.workTime;
             }
             
-            this.saveToStorage();
+            // Trigger Livewire to update database
+            this.$wire.stopPomodoro();
             this.updateDisplay();
         },
         
