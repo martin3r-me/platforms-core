@@ -272,6 +272,13 @@ class ModalCheckin extends Component
             ->where('is_active', true)
             ->first();
         
+        // Check if session is expired and auto-complete it
+        if ($activeSession && $activeSession->is_expired) {
+            $activeSession->complete();
+            $this->dispatch('timer-expired');
+            $activeSession = null;
+        }
+        
         $this->pomodoroStats = [
             'today_count' => PomodoroSession::where('user_id', auth()->id())
                 ->where('type', 'work')

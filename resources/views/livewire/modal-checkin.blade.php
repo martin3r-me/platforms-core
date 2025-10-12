@@ -489,6 +489,11 @@ function pomodoroTimer() {
                 this.loadFromServer();
             });
             
+            // Listen for timer expiration
+            this.$el.addEventListener('timer-expired', () => {
+                this.completeSession();
+            });
+            
             // Smart polling - only if timer is running
             this.startSmartPolling();
         },
