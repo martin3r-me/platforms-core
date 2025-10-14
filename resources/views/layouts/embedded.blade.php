@@ -58,5 +58,8 @@
       <livewire:notifications.notices.modal />
   @endif
 
+  {{-- Zusätzliche Scripts von Komponenten --}}
+  @stack('scripts')
+
 </body>
 </html>
