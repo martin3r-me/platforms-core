@@ -47,6 +47,10 @@
 
   @livewireScripts
   <script>
+    // Livewire Navigate im Embedded-Kontext deaktivieren (verhindert weiße Seiten/History-Rewrites)
+    try { window.Livewire?.navigate?.disable?.(); } catch (_) {}
+  </script>
+  <script>
     // Globaler, schlanker Teams-Auth-Bootstrap für alle embedded Seiten
     (function(){
       var MAX_RETRIES = 10;
