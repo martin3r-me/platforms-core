@@ -46,6 +46,37 @@
   </div>
 
   @livewireScripts
+  <script>
+    // Globaler, schlanker Teams-Auth-Bootstrap für alle embedded Seiten
+    (function(){
+      try {
+        if (window.__laravelAuthed === true) return; // bereits eingeloggt
+        if (sessionStorage.getItem('teams-auth-running') === 'true') return; // Guard gegen Doppelläufe
+        if (!(window.microsoftTeams && window.microsoftTeams.app)) return; // nur in Teams
+        sessionStorage.setItem('teams-auth-running', 'true');
+
+        window.microsoftTeams.app.initialize()
+          .then(function(){ return window.microsoftTeams.app.getContext(); })
+          .then(function(ctx){
+            var email = (ctx && ctx.user && ctx.user.userPrincipalName) || '';
+            var name = (ctx && ctx.user && ctx.user.displayName) || '';
+            if (!email) { sessionStorage.removeItem('teams-auth-running'); return; }
+            return fetch('/planner/embedded/teams/auth', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+              },
+              body: JSON.stringify({ email: email, name: name })
+            }).then(function(res){
+              if (res.ok) { setTimeout(function(){ location.reload(); }, 100); }
+              else { sessionStorage.removeItem('teams-auth-running'); }
+            }).catch(function(){ sessionStorage.removeItem('teams-auth-running'); });
+          })
+          .catch(function(){ sessionStorage.removeItem('teams-auth-running'); });
+      } catch (_) { sessionStorage.removeItem('teams-auth-running'); }
+    })();
+  </script>
   
   {{-- Wichtige Livewire-Komponenten für embedded Kontext --}}
   @auth 
