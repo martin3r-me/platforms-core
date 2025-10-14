@@ -49,31 +49,66 @@
   <script>
     // Globaler, schlanker Teams-Auth-Bootstrap für alle embedded Seiten
     (function(){
-      try {
-        if (window.__laravelAuthed === true) return; // bereits eingeloggt
-        if (sessionStorage.getItem('teams-auth-attempted') === 'true') return; // nur einmal pro Session versuchen
-        if (!(window.microsoftTeams && window.microsoftTeams.app)) return; // nur in Teams
-        sessionStorage.setItem('teams-auth-attempted', 'true');
+      var MAX_RETRIES = 10;
+      var RETRY_DELAY_MS = 300;
+      function authOnce() {
+        try {
+          if (window.__laravelAuthed === true) return; // bereits eingeloggt
+          if (sessionStorage.getItem('teams-auth-running') === 'true') return; // Guard gegen Doppelläufe
+          if (sessionStorage.getItem('teams-auth-completed') === 'true') return; // schon erfolgreich in dieser Session
+          if (!(window.microsoftTeams && window.microsoftTeams.app)) return scheduleRetry();
 
-        window.microsoftTeams.app.initialize()
-          .then(function(){ return window.microsoftTeams.app.getContext(); })
-          .then(function(ctx){
-            var email = (ctx && ctx.user && ctx.user.userPrincipalName) || '';
-            var name = (ctx && ctx.user && ctx.user.displayName) || '';
-            if (!email) { return; }
-            return fetch('/planner/embedded/teams/auth', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-              },
-              body: JSON.stringify({ email: email, name: name })
-            }).then(function(res){
-              if (res.ok) { setTimeout(function(){ location.reload(); }, 100); }
-            }).catch(function(){ /* noop: nicht erneut versuchen in dieser Session */ });
-          })
-          .catch(function(){ /* noop */ });
-      } catch (_) { /* noop */ }
+          sessionStorage.setItem('teams-auth-running', 'true');
+
+          window.microsoftTeams.app.initialize()
+            .then(function(){ return window.microsoftTeams.app.getContext(); })
+            .then(function(ctx){
+              var email = (ctx && ctx.user && ctx.user.userPrincipalName) || '';
+              var name = (ctx && ctx.user && ctx.user.displayName) || '';
+              function postAuth(e, n){
+                if (!e) { cleanup(false); return; }
+                fetch('/planner/embedded/teams/auth', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                  },
+                  body: JSON.stringify({ email: e, name: n || '' })
+                }).then(function(res){
+                  if (res.ok) {
+                    sessionStorage.setItem('teams-auth-completed', 'true');
+                    setTimeout(function(){ location.reload(); }, 100);
+                  } else {
+                    cleanup(false);
+                  }
+                }).catch(function(){ cleanup(false); });
+              }
+              if (email) return postAuth(email, name);
+              // Fallback: explizit User anfordern
+              if (window.microsoftTeams.authentication && window.microsoftTeams.authentication.getUser) {
+                return window.microsoftTeams.authentication.getUser()
+                  .then(function(user){ postAuth(user && user.userPrincipalName, user && user.displayName); })
+                  .catch(function(){ cleanup(false); });
+              }
+              cleanup(false);
+            })
+            .catch(function(){ cleanup(false); });
+
+          function cleanup(success){
+            sessionStorage.removeItem('teams-auth-running');
+            if (!success) scheduleRetry();
+          }
+        } catch (_) { scheduleRetry(); }
+      }
+      function scheduleRetry(){
+        var retries = parseInt(sessionStorage.getItem('teams-auth-retries') || '0', 10);
+        if (retries >= MAX_RETRIES) return;
+        retries += 1;
+        sessionStorage.setItem('teams-auth-retries', String(retries));
+        setTimeout(authOnce, RETRY_DELAY_MS);
+      }
+      // Start
+      authOnce();
     })();
   </script>
   
