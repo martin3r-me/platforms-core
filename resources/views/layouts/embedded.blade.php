@@ -133,5 +133,40 @@
   {{-- Zusätzliche Scripts von Komponenten --}}
   @stack('scripts')
 
+  <script>
+    // Globaler Request-Wrapper: sendet Teams-Header + Credentials mit
+    (function(){
+      const nativeFetch = window.fetch;
+      window.fetch = function(input, init){
+        init = init || {};
+        init.credentials = init.credentials || 'include';
+        init.headers = init.headers || {};
+        try {
+          // Teams-User aus sessionStorage an Header hängen (falls vorhanden)
+          const tUser = JSON.parse(sessionStorage.getItem('teams-user') || 'null');
+          if (tUser && tUser.email) {
+            init.headers['X-User-Email'] = tUser.email;
+            if (tUser.name) init.headers['X-User-Name'] = tUser.name;
+          }
+          init.headers['X-Teams-Embedded'] = '1';
+        } catch(_) {}
+        return nativeFetch(input, init);
+      };
+
+      // Versuche Teams-User in sessionStorage zu schreiben, wenn SDK verfügbar
+      try {
+        if (window.microsoftTeams?.app) {
+          window.microsoftTeams.app.initialize().then(function(){
+            return window.microsoftTeams.app.getContext();
+          }).then(function(ctx){
+            const email = ctx?.user?.userPrincipalName || '';
+            const name = ctx?.user?.displayName || '';
+            if (email) sessionStorage.setItem('teams-user', JSON.stringify({ email: email, name: name }));
+          }).catch(function(){});
+        }
+      } catch(_) {}
+    })();
+  </script>
+
 </body>
 </html>
