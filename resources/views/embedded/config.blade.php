@@ -162,26 +162,38 @@
     } catch(e) { alert('Request-Fehler: ' + e.message); }
   });
 
-  // Save in Teams
-  if (window.microsoftTeams?.pages?.config) {
-    window.microsoftTeams.pages.config.setValidityState(false);
-    window.microsoftTeams.pages.config.registerOnSaveHandler(async function (saveEvent) {
-      try {
-        const projectId = projectSelect?.value || '';
-        if (!projectId) { saveEvent.notifyFailure('Bitte Projekt wählen'); return; }
-        let projectName = 'Projekt ' + projectId;
-        const selected = allProjects.find(p => String(p.id) === String(projectId));
-        if (selected) projectName = selected.name;
-        const contentUrl = 'https://office.martin3r.me/planner/embedded/planner/projects/' + encodeURIComponent(projectId) + '?name=' + encodeURIComponent(projectName);
-        await window.microsoftTeams.pages.config.setConfig({
-          contentUrl: contentUrl, websiteUrl: contentUrl, entityId: 'planner-project-' + projectId, suggestedDisplayName: 'PLANNER - ' + projectName
-        });
-        saveEvent.notifySuccess();
-      } catch(e) {
-        saveEvent.notifyFailure('Speichern fehlgeschlagen');
+  // Save in Teams: Initialisierung + Support-Check wie in alter Planner-Config
+  (async function setupTeamsConfig(){
+    try {
+      if (window.microsoftTeams?.app?.initialize) {
+        try { await window.microsoftTeams.app.initialize(); } catch(_) {}
       }
-    });
-  }
+      if (!window.microsoftTeams?.pages?.config || (window.microsoftTeams.pages.config.isSupported && !window.microsoftTeams.pages.config.isSupported())) {
+        return; // Config nicht verfügbar in diesem Kontext
+      }
+      window.microsoftTeams.pages.config.setValidityState(false);
+      window.microsoftTeams.pages.config.registerOnSaveHandler(async function (saveEvent) {
+        try {
+          const projectId = projectSelect?.value || '';
+          if (!projectId) { saveEvent.notifyFailure('Bitte Projekt wählen'); return; }
+          let projectName = 'Projekt ' + projectId;
+          const selected = allProjects.find(p => String(p.id) === String(projectId));
+          if (selected) projectName = selected.name;
+          const contentUrl = 'https://office.martin3r.me/planner/embedded/planner/projects/' + encodeURIComponent(projectId) + '?name=' + encodeURIComponent(projectName);
+          const config = {
+            contentUrl: contentUrl,
+            websiteUrl: contentUrl,
+            entityId: 'planner-project-' + projectId,
+            suggestedDisplayName: 'PLANNER - ' + projectName
+          };
+          await window.microsoftTeams.pages.config.setConfig(config);
+          saveEvent.notifySuccess();
+        } catch(e) {
+          try { saveEvent.notifyFailure('Speichern fehlgeschlagen'); } catch(_) {}
+        }
+      });
+    } catch(_) {}
+  })();
 })();
 </script>
 @endsection
