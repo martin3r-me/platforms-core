@@ -130,7 +130,18 @@
           }).catch(function(){});
       }
       setInterval(pingAuth, 60000);
+      // Extra: kurze Retry-Phase nach Sichtbarkeitswechsel
+      var __authRetryTimer = null;
       document.addEventListener('visibilitychange', function(){ if (!document.hidden) pingAuth(); });
+      window.addEventListener('focus', function(){
+        pingAuth();
+        clearTimeout(__authRetryTimer);
+        var retries = 0;
+        (function retryBurst(){
+          if (retries++ >= 5) return; // ~5 Versuche in ~10s
+          setTimeout(function(){ pingAuth(); retryBurst(); }, 2000);
+        })();
+      });
     })();
   </script>
   
