@@ -22,7 +22,33 @@ Route::post('/logout', function () {
 // (Teams Tab Test-Routen entfernt)
 
 Route::get('/embedded/config', function () {
-    return view('platform::embedded.config');
+    $user = Auth::user();
+    $teamIds = collect();
+    $teams = collect();
+
+    if ($user) {
+        try {
+            if (method_exists($user, 'teams')) {
+                $teams = $user->teams()->select(['teams.id','teams.name'])->orderBy('name')->get();
+                $teamIds = $teams->pluck('id');
+            }
+            if ($user->currentTeam && !$teamIds->contains($user->currentTeam->id)) {
+                $teamIds->push($user->currentTeam->id);
+                $teams = $teams->push($user->currentTeam)->unique('id');
+            }
+        } catch (\Throwable $e) {}
+    }
+
+    // Planner-Projekte nur aus User-Teams
+    $projects = \Platform\Planner\Models\PlannerProject::select(['id','name','team_id'])
+        ->when($teamIds->isNotEmpty(), function($q) use ($teamIds){ $q->whereIn('team_id', $teamIds); }, function($q){ $q->whereRaw('1=0'); })
+        ->orderBy('name')
+        ->get();
+
+    return view('platform::embedded.config', [
+        'teams' => $teams,
+        'plannerProjects' => $projects,
+    ]);
 })->name('embedded.config');
 
 Route::get('/embedded/config/okrs', function () {
