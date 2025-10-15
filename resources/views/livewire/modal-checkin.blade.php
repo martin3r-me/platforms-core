@@ -358,6 +358,13 @@
                                     {{ $todo['title'] }}
                                 </span>
                                 <button
+                                    wire:click="postponeTodo({{ $todo['id'] }})"
+                                    class="opacity-0 group-hover:opacity-100 p-1 hover:bg-[var(--ui-warning)] hover:text-[var(--ui-on-warning)] rounded transition-all duration-200"
+                                    title="Auf morgen verschieben"
+                                >
+                                    @svg('heroicon-o-arrow-right', 'w-4 h-4')
+                                </button>
+                                <button
                                     wire:click="deleteTodo({{ $todo['id'] }})"
                                     class="opacity-0 group-hover:opacity-100 p-1 hover:bg-[var(--ui-danger)] hover:text-[var(--ui-on-danger)] rounded transition-all duration-200"
                                 >

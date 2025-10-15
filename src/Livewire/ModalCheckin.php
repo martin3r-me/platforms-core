@@ -232,6 +232,50 @@ class ModalCheckin extends Component
         // Dispatch Event für Badge-Update
     }
 
+    public function postponeTodo($todoId)
+    {
+        $todo = CheckinTodo::with('checkin')->find($todoId);
+        if (!$todo || !$todo->checkin) {
+            return;
+        }
+
+        // Sicherstellen, dass der Todo dem aktuellen Nutzer gehört
+        if ((int)$todo->checkin->user_id !== (int)auth()->id()) {
+            return;
+        }
+
+        // Nächsten Tag bestimmen basierend auf dem ursprünglichen Check-in Datum
+        $nextDate = Carbon::parse($todo->checkin->date)->addDay()->format('Y-m-d');
+
+        // Ziel-Check-in für den nächsten Tag finden oder anlegen
+        $targetCheckin = Checkin::firstOrCreate(
+            [
+                'user_id' => auth()->id(),
+                'date' => $nextDate,
+            ],
+            [
+                'daily_goal' => '',
+                'mood' => null,
+                'happiness' => null,
+                'needs_support' => false,
+                'hydrated' => false,
+                'exercised' => false,
+                'slept_well' => false,
+                'focused_work' => false,
+                'social_time' => false,
+                'notes' => '',
+            ]
+        );
+
+        // Todo auf den nächsten Tag verschieben
+        $todo->update([
+            'checkin_id' => $targetCheckin->id,
+        ]);
+
+        // Aktuelle Liste neu laden
+        $this->loadCheckinForDate($this->selectedDate);
+    }
+
     public function getMoodOptions()
     {
         return Checkin::getMoodOptions();
