@@ -55,7 +55,7 @@
     (function(){
       var MAX_RETRIES = 10;
       var RETRY_DELAY_MS = 300;
-      function authOnce() {
+      function authOnce(cb) {
         try {
           if (window.__laravelAuthed === true) return; // bereits eingeloggt
           if (sessionStorage.getItem('teams-auth-running') === 'true') return; // Guard gegen Doppelläufe
@@ -81,6 +81,7 @@
                 }).then(function(res){
                   if (res.ok) {
                     sessionStorage.setItem('teams-auth-completed', 'true');
+                    try { if (typeof cb === 'function') cb(); } catch(_) {}
                     setTimeout(function(){ location.reload(); }, 100);
                   } else {
                     cleanup(false);
@@ -104,6 +105,8 @@
           }
         } catch (_) { scheduleRetry(); }
       }
+      // Global verfügbar machen, damit andere Skripte triggern können
+      window.__teamsAuthOnce = authOnce;
       function scheduleRetry(){
         var retries = parseInt(sessionStorage.getItem('teams-auth-retries') || '0', 10);
         if (retries >= MAX_RETRIES) return;
@@ -113,6 +116,21 @@
       }
       // Start
       authOnce();
+
+      // Heartbeat: prüfe regelmäßig Auth-Status und triggere Re-Auth bei Bedarf
+      function pingAuth(){
+        fetch('/planner/embedded/teams/ping', { credentials: 'include' })
+          .then(function(r){ return r.json().catch(function(){ return {}; }); })
+          .then(function(data){
+            var authed = data && data.auth && data.auth.checked;
+            if (!authed) {
+              sessionStorage.removeItem('teams-auth-completed');
+              try { window.__teamsAuthOnce(); } catch(_) {}
+            }
+          }).catch(function(){});
+      }
+      setInterval(pingAuth, 60000);
+      document.addEventListener('visibilitychange', function(){ if (!document.hidden) pingAuth(); });
     })();
   </script>
   
@@ -150,7 +168,20 @@
           }
           init.headers['X-Teams-Embedded'] = '1';
         } catch(_) {}
-        return nativeFetch(input, init);
+        return nativeFetch(input, init).then(function(res){
+          // Bei 401/419 einmalig re-authen und Request wiederholen
+          if ((res.status === 401 || res.status === 419) && !init.__retried) {
+            return new Promise(function(resolve){
+              try {
+                (window.__teamsAuthOnce || function(cb){ cb && cb(); })(function(){
+                  const retryInit = Object.assign({}, init, { __retried: true });
+                  resolve(nativeFetch(input, retryInit));
+                });
+              } catch(_) { resolve(res); }
+            });
+          }
+          return res;
+        });
       };
 
       // Versuche Teams-User in sessionStorage zu schreiben, wenn SDK verfügbar
