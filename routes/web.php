@@ -45,19 +45,25 @@ Route::get('/embedded/config', function () {
         ->orderBy('name')
         ->get();
 
-    return view('platform::embedded.config', [
+    $response = response()->view('platform::embedded.config', [
         'teams' => $teams,
         'plannerProjects' => $projects,
     ]);
+    $response->headers->set('Content-Security-Policy', "frame-ancestors https://*.teams.microsoft.com https://teams.microsoft.com https://*.skype.com");
+    return $response;
 })->name('embedded.config');
 
 Route::get('/embedded/config/okrs', function () {
     // Platzhalterseite – später: OKR-Auswahl (Teams-Tab-Konfiguration)
-    return view('platform::embedded.config-okrs');
+    $response = response()->view('platform::embedded.config-okrs');
+    $response->headers->set('Content-Security-Policy', "frame-ancestors https://*.teams.microsoft.com https://teams.microsoft.com https://*.skype.com");
+    return $response;
 })->name('embedded.config.okrs');
 
 Route::get('/embedded/config/helpdesk', function () {
     // Platzhalterseite – später: Helpdesk-Board-Auswahl
-    return view('platform::embedded.config-helpdesk');
+    $response = response()->view('platform::embedded.config-helpdesk');
+    $response->headers->set('Content-Security-Policy', "frame-ancestors https://*.teams.microsoft.com https://teams.microsoft.com https://*.skype.com");
+    return $response;
 })->name('embedded.config.helpdesk');
 
