@@ -21,3 +21,17 @@ Route::post('/logout', function () {
 
 // (Teams Tab Test-Routen entfernt)
 
+Route::get('/embedded/config', function () {
+    return view('platform::embedded.config');
+})->name('embedded.config');
+
+Route::get('/embedded/config/okrs', function () {
+    // Platzhalterseite – später: OKR-Auswahl (Teams-Tab-Konfiguration)
+    return view('platform::embedded.config-okrs');
+})->name('embedded.config.okrs');
+
+Route::get('/embedded/config/helpdesk', function () {
+    // Platzhalterseite – später: Helpdesk-Board-Auswahl
+    return view('platform::embedded.config-helpdesk');
+})->name('embedded.config.helpdesk');
+
