@@ -1,20 +1,32 @@
-<div x-data="{ tab: 'modules' }" x-init="
-    window.addEventListener('open-modal-modules', (e) => { tab = e?.detail?.tab || 'modules'; });
-">
-<x-ui-modal size="xl" wire:model="modalShow">
+<div x-data="{ tab: 'modules', query: '' }" x-init="window.addEventListener('open-modal-modules', (e) => { tab = e?.detail?.tab || 'modules'; });">
+<x-ui-modal size="xl" model="modalShow">
     <x-slot name="header">
         <div class="flex items-center justify-between w-full">
-            <div class="flex items-center gap-3">
-                <h2 class="text-xl font-semibold text-[var(--ui-secondary)] m-0">Zentrale Steuerung</h2>
+            <div class="flex items-center gap-3 min-w-0">
+                @php $logoSquare = file_exists(public_path('logo_square.png')) ? asset('logo_square.png') : null; @endphp
+                @if($logoSquare)
+                    <img src="{{ $logoSquare }}" alt="Logo" class="w-7 h-7 rounded-md" />
+                @endif
+                <h2 class="text-xl font-semibold text-[var(--ui-secondary)] m-0 truncate">Zentrale Steuerung</h2>
                 <span class="text-xs text-[var(--ui-muted)] bg-[var(--ui-muted-5)] px-2 py-1 rounded-full">⌘K / M</span>
             </div>
+            <div class="flex items-center gap-1">
+                <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2" :class="tab === 'modules' ? 'text-[var(--ui-primary)] border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'text-[var(--ui-muted)] border-transparent hover:text-[var(--ui-secondary)]'" @click="tab = 'modules'">Module</button>
+                @if(auth()->user()?->currentTeam && auth()->user()->currentTeam->user_id === auth()->id())
+                    <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2" :class="tab === 'matrix' ? 'text-[var(--ui-primary)] border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'text-[var(--ui-muted)] border-transparent hover:text-[var(--ui-secondary)]'" @click="tab = 'matrix'">Matrix</button>
+                @endif
+            </div>
         </div>
-        <div class="flex gap-1 mt-4 border-b border-gray-200">
-            <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : tab === 'modules', 'text-gray-500 hover:text-gray-700' : tab !== 'modules' }" @click="tab = 'modules'">Module</button>
-            @if(auth()->user()?->currentTeam && auth()->user()->currentTeam->user_id === auth()->id())
-                <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors ml-auto" :class="{ 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : tab === 'matrix', 'text-gray-500 hover:text-gray-700' : tab !== 'matrix' }" @click="tab = 'matrix'">Matrix</button>
-            @endif
-        </div>
+        <template x-if="tab === 'modules'">
+            <div class="mt-3">
+                <div class="relative">
+                    <input x-model="query" type="text" placeholder="Module suchen..." class="w-full text-sm px-3 py-2 rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] focus:outline-none focus:border-[var(--ui-primary)]/60" />
+                    <div class="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--ui-muted)]">
+                        @svg('heroicon-o-magnifying-glass','w-4 h-4')
+                    </div>
+                </div>
+            </div>
+        </template>
     </x-slot>
         
         {{-- Tabs: Inhalte --}}
@@ -34,7 +46,7 @@
                                 ? route($routeName)
                                 : ($module['url'] ?? '#');
                         @endphp
-                    <a href="{{ $finalUrl }}" class="group flex items-center gap-4 p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-all duration-200">
+                    <a href="{{ $finalUrl }}" class="group flex items-center gap-4 p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-all duration-200" :class="(query && !('{{ Str::lower($title) }}'.includes(query.toLowerCase()))) ? 'hidden' : ''">
                         <div class="flex-shrink-0">
                             @if(!empty($icon))
                                 <x-dynamic-component :component="$icon" class="w-8 h-8 text-[var(--ui-primary)] group-hover:scale-110 transition-transform" />
@@ -58,6 +70,7 @@
         </div>
 
         {{-- Matrix --}}
+        @if(auth()->user()?->currentTeam && auth()->user()->currentTeam->user_id === auth()->id())
         <div class="mt-6" x-show="tab === 'matrix'" x-cloak>
             @if(!empty($matrixUsers) && !empty($matrixModules))
                 <div class="overflow-auto rounded-lg border border-[var(--ui-border)]/60">
@@ -98,15 +111,15 @@
                 <div class="text-sm text-[var(--ui-muted)] p-6 text-center bg-[var(--ui-muted-5)] rounded-lg">Matrix-Daten nicht verfügbar.</div>
             @endif
         </div>
+        @endif
 
 
 
 
     <x-slot name="footer">
-        <div class="flex justify-end">
-            <x-ui-button variant="secondary-outline" @click="modalShow = false">
-                Schließen
-            </x-ui-button>
+        <div class="flex justify-between items-center w-full">
+            <div class="text-xs text-[var(--ui-muted)]">Tipp: Suche nutzt Titelfilter</div>
+            <x-ui-button variant="secondary-outline" @click="modalShow = false">Schließen</x-ui-button>
         </div>
     </x-slot>
 </x-ui-modal>
