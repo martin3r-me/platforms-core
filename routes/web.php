@@ -21,7 +21,7 @@ Route::post('/logout', function () {
 
 // (Teams Tab Test-Routen entfernt)
 
-Route::get('/embedded/config', function () {
+Route::middleware([\Platform\Core\Middleware\EmbeddedHeaderAuth::class])->get('/embedded/config', function () {
     $user = Auth::user();
     $teamIds = collect();
     $teams = collect();
@@ -51,8 +51,7 @@ Route::get('/embedded/config', function () {
     ]);
     $response->headers->set('Content-Security-Policy', "frame-ancestors https://*.teams.microsoft.com https://teams.microsoft.com https://*.skype.com");
     return $response;
-// Temporär ungeschützt testen (ohne FrameGuard, ohne EmbeddedHeaderAuth, ohne auth)
-})->withoutMiddleware([\Illuminate\Http\Middleware\FrameGuard::class, \Platform\Core\Middleware\EmbeddedHeaderAuth::class, \Illuminate\Auth\Middleware\Authenticate::class])->name('embedded.config');
+})->withoutMiddleware([\Illuminate\Http\Middleware\FrameGuard::class])->name('embedded.config');
 
 Route::get('/embedded/config/okrs', function () {
     // Platzhalterseite – später: OKR-Auswahl (Teams-Tab-Konfiguration)
