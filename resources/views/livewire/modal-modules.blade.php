@@ -4,7 +4,6 @@
         <div class="flex items-center justify-between w-full">
             <div class="flex items-center gap-3 min-w-0">
                 <h2 class="text-xl font-semibold text-[var(--ui-secondary)] m-0 truncate">Zentrale Steuerung</h2>
-                <span class="text-xs text-[var(--ui-muted)] bg-[var(--ui-muted-5)] px-2 py-1 rounded-full">⌘K / M</span>
             </div>
             <div class="flex items-center gap-1">
                 <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2" :class="tab === 'modules' ? 'text-[var(--ui-primary)] border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'text-[var(--ui-muted)] border-transparent hover:text-[var(--ui-secondary)]'" @click="tab = 'modules'">Module</button>
