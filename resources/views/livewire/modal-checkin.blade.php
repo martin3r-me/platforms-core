@@ -14,102 +14,9 @@
         </x-slot>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-            {{-- Kalender (1/3) --}}
-            <div class="order-3 lg:order-1 h-full overflow-y-auto">
-                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
-                    <div class="flex items-center gap-3 mb-6">
-                        @svg('heroicon-o-calendar-days', 'w-6 h-6 text-[var(--ui-primary)]')
-                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Kalender</h3>
-                    </div>
-                
-                {{-- Monats-Navigation --}}
-                <div class="flex items-center justify-between mb-6">
-                    <button wire:click="previousMonth" class="group p-2 hover:bg-[var(--ui-primary)]/10 rounded-lg transition-all duration-200 hover:scale-105">
-                        @svg('heroicon-o-chevron-left', 'w-5 h-5 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)]')
-                    </button>
-                    <div class="text-center">
-                        <h4 class="text-lg font-semibold text-[var(--ui-secondary)]">
-                            {{ \Carbon\Carbon::create($currentYear, $currentMonth, 1)->locale('de')->isoFormat('MMMM YYYY') }}
-                        </h4>
-                        <p class="text-xs text-[var(--ui-muted)] mt-1">
-                            {{ count($checkins) }} Check-ins diesen Monat
-                        </p>
-                    </div>
-                    <button wire:click="nextMonth" class="group p-2 hover:bg-[var(--ui-primary)]/10 rounded-lg transition-all duration-200 hover:scale-105">
-                        @svg('heroicon-o-chevron-right', 'w-5 h-5 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)]')
-                    </button>
-                </div>
-
-                {{-- Heute-Button --}}
-                <div class="mb-4">
-                    <x-ui-button 
-                        wire:click="goToToday()" 
-                        variant="secondary-outline" 
-                        size="sm" 
-                        class="w-full"
-                    >
-                        <div class="flex items-center gap-2">
-                            @svg('heroicon-o-calendar-days', 'w-4 h-4')
-                            Heute ({{ now()->format('d.m.') }})
-                        </div>
-                    </x-ui-button>
-                </div>
-
-                {{-- Kalender-Grid --}}
-                <div class="grid grid-cols-7 gap-1 mb-3">
-                    @foreach(['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'] as $day)
-                        <div class="text-center text-xs font-semibold text-[var(--ui-muted)] py-2 uppercase tracking-wide">{{ $day }}</div>
-                    @endforeach
-                </div>
-
-                <div class="grid grid-cols-7 gap-1">
-                    @php
-                        $startOfMonth = \Carbon\Carbon::create($currentYear, $currentMonth, 1);
-                        $endOfMonth = $startOfMonth->copy()->endOfMonth();
-                        $startOfWeek = $startOfMonth->copy()->startOfWeek(\Carbon\Carbon::MONDAY);
-                        $endOfWeek = $endOfMonth->copy()->endOfWeek(\Carbon\Carbon::SUNDAY);
-                        $currentDate = $startOfWeek->copy();
-                    @endphp
-
-                    @while($currentDate->lte($endOfWeek))
-                        @php
-                            $isCurrentMonth = $currentDate->month === $currentMonth;
-                            $isToday = $currentDate->isToday();
-                            $isSelected = $currentDate->format('Y-m-d') === $selectedDate;
-                            $hasCheckin = in_array($currentDate->format('Y-m-d'), $checkins);
-                            $dateString = $currentDate->format('Y-m-d');
-                        @endphp
-
-                            <button
-                                wire:click="selectDate('{{ $dateString }}')"
-                                class="group relative p-2 text-sm rounded-lg transition-colors duration-200
-                                    {{ $isCurrentMonth ? 'text-[var(--ui-secondary)]' : 'text-[var(--ui-muted)]' }}
-                                    {{ $isToday ? 'bg-gradient-to-br from-[var(--ui-primary)] to-[var(--ui-primary)]/80 text-[var(--ui-on-primary)] font-semibold shadow-md' : '' }}
-                                    {{ $isSelected && !$isToday ? 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] font-semibold border border-[var(--ui-primary)]/20' : '' }}
-                                    {{ !$isSelected && !$isToday ? 'hover:bg-[var(--ui-primary)]/5 hover:text-[var(--ui-primary)]' : '' }}
-                                "
-                            >
-                            <span class="relative z-10">{{ $currentDate->day }}</span>
-                            @if($hasCheckin)
-                                <div class="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-[var(--ui-primary)] rounded-full shadow-sm"></div>
-                            @endif
-                            @if($isToday)
-                                <div class="absolute inset-0 bg-gradient-to-br from-[var(--ui-primary)]/20 to-transparent rounded-lg"></div>
-                            @endif
-                        </button>
-
-                        @php $currentDate->addDay(); @endphp
-                    @endwhile
-                </div>
-
-
-            </div>
-        </div>
-
-        {{-- Pomodoro links (1/3) --}}
-        <div class="order-1 lg:order-2">
-            <div class="space-y-4 h-full overflow-y-auto">
-                {{-- Pomodoro Timer (links) --}}
+            {{-- Linke Spalte: Pomodoro + Kalender --}}
+            <div class="order-1 lg:order-1 h-full overflow-y-auto space-y-6">
+                {{-- Pomodoro Timer --}}
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
                     <div class="flex items-center gap-3 mb-4">
                         @svg('heroicon-o-clock', 'w-5 h-5 text-[var(--ui-primary)]')
@@ -120,7 +27,6 @@
                          x-pomodoro-session='@json($pomodoroStats["active_session"])'
                          x-pomodoro-stats='@json($pomodoroStats)'
                          wire:poll.30s="loadPomodoroStats">
-                        {{-- Timer Display --}}
                         <div class="mb-6">
                             <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2">
                                 <span x-text="formatTime(timeLeft)"></span> Min
@@ -128,7 +34,6 @@
                             <div class="text-sm text-[var(--ui-muted)]">Fokuszeit</div>
                         </div>
 
-                        {{-- Schlanke Auswahl --}}
                         <div class="flex items-center justify-center gap-2 mb-4">
                             <x-ui-button size="sm" variant="secondary-outline" @click="setTime(15)">15</x-ui-button>
                             <x-ui-button size="sm" variant="secondary-outline" @click="setTime(25)">25</x-ui-button>
@@ -136,7 +41,6 @@
                             <x-ui-button size="sm" variant="secondary-outline" @click="setTime(60)">60</x-ui-button>
                         </div>
 
-                        {{-- Controls --}}
                         <div class="flex items-center justify-center gap-3 mb-2">
                             <x-ui-button size="sm" variant="primary" @click="startTimer()" x-show="!isRunning">Start</x-ui-button>
                             <x-ui-button size="sm" variant="secondary" @click="pauseTimer()" x-show="isRunning" wire:click="stopPomodoro()">Pause</x-ui-button>
@@ -144,11 +48,95 @@
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        {{-- Check-in Formular (1/3) --}}
-        <div class="order-2 lg:order-3">
+                {{-- Kalender --}}
+                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
+                    <div class="flex items-center gap-3 mb-6">
+                        @svg('heroicon-o-calendar-days', 'w-6 h-6 text-[var(--ui-primary)]')
+                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Kalender</h3>
+                    </div>
+
+                    <div class="flex items-center justify-between mb-6">
+                        <button wire:click="previousMonth" class="group p-2 hover:bg-[var(--ui-primary)]/10 rounded-lg transition-all duration-200 hover:scale-105">
+                            @svg('heroicon-o-chevron-left', 'w-5 h-5 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)]')
+                        </button>
+                        <div class="text-center">
+                            <h4 class="text-lg font-semibold text-[var(--ui-secondary)]">
+                                {{ \Carbon\Carbon::create($currentYear, $currentMonth, 1)->locale('de')->isoFormat('MMMM YYYY') }}
+                            </h4>
+                            <p class="text-xs text-[var(--ui-muted)] mt-1">
+                                {{ count($checkins) }} Check-ins diesen Monat
+                            </p>
+                        </div>
+                        <button wire:click="nextMonth" class="group p-2 hover:bg-[var(--ui-primary)]/10 rounded-lg transition-all duration-200 hover:scale-105">
+                            @svg('heroicon-o-chevron-right', 'w-5 h-5 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)]')
+                        </button>
+                    </div>
+
+                    <div class="mb-4">
+                        <x-ui-button 
+                            wire:click="goToToday()" 
+                            variant="secondary-outline" 
+                            size="sm" 
+                            class="w-full"
+                        >
+                            <div class="flex items-center gap-2">
+                                @svg('heroicon-o-calendar-days', 'w-4 h-4')
+                                Heute ({{ now()->format('d.m.') }})
+                            </div>
+                        </x-ui-button>
+                    </div>
+
+                    <div class="grid grid-cols-7 gap-1 mb-3">
+                        @foreach(['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'] as $day)
+                            <div class="text-center text-xs font-semibold text-[var(--ui-muted)] py-2 uppercase tracking-wide">{{ $day }}</div>
+                        @endforeach
+                    </div>
+
+                    <div class="grid grid-cols-7 gap-1">
+                        @php
+                            $startOfMonth = \Carbon\Carbon::create($currentYear, $currentMonth, 1);
+                            $endOfMonth = $startOfMonth->copy()->endOfMonth();
+                            $startOfWeek = $startOfMonth->copy()->startOfWeek(\Carbon\Carbon::MONDAY);
+                            $endOfWeek = $endOfMonth->copy()->endOfWeek(\Carbon\Carbon::SUNDAY);
+                            $currentDate = $startOfWeek->copy();
+                        @endphp
+
+                        @while($currentDate->lte($endOfWeek))
+                            @php
+                                $isCurrentMonth = $currentDate->month === $currentMonth;
+                                $isToday = $currentDate->isToday();
+                                $isSelected = $currentDate->format('Y-m-d') === $selectedDate;
+                                $hasCheckin = in_array($currentDate->format('Y-m-d'), $checkins);
+                                $dateString = $currentDate->format('Y-m-d');
+                            @endphp
+
+                            <button
+                                wire:click="selectDate('{{ $dateString }}')"
+                                class="group relative p-2 text-sm rounded-lg transition-colors duration-200
+                                    {{ $isCurrentMonth ? 'text-[var(--ui-secondary)]' : 'text-[var(--ui-muted)]' }}
+                                    {{ $isToday ? 'bg-gradient-to-br from-[var(--ui-primary)] to-[var(--ui-primary)]/80 text-[var(--ui-on-primary)] font-semibold shadow-md' : '' }}
+                                    {{ $isSelected && !$isToday ? 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] font-semibold border border-[var(--ui-primary)]/20' : '' }}
+                                    {{ !$isSelected && !$isToday ? 'hover:bg-[var(--ui-primary)]/5 hover:text-[var(--ui-primary)]' : '' }}
+                                "
+                            >
+                                <span class="relative z-10">{{ $currentDate->day }}</span>
+                                @if($hasCheckin)
+                                    <div class="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-[var(--ui-primary)] rounded-full shadow-sm"></div>
+                                @endif
+                                @if($isToday)
+                                    <div class="absolute inset-0 bg-gradient-to-br from-[var(--ui-primary)]/20 to-transparent rounded-lg"></div>
+                                @endif
+                            </button>
+
+                            @php $currentDate->addDay(); @endphp
+                        @endwhile
+                    </div>
+                </div>
+            </div>
+
+        {{-- Mittlere Spalte: Check-in Formular --}}
+        <div class="order-2 lg:order-2">
             <div class="space-y-4 h-full overflow-y-auto">
                 {{-- Datum und Grunddaten --}}
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
@@ -274,12 +262,11 @@
                     </div>
                 </div>
 
-                
             </div>
         </div>
 
-        {{-- Aufgaben (1/3) --}}
-        <div class="order-2 lg:order-3">
+        {{-- Rechte Spalte: Aufgaben & Notizen --}}
+        <div class="order-3 lg:order-3">
             <div class="h-full overflow-y-auto">
                 {{-- To-Do Liste --}}
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
