@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Contracts\AuthAccessPolicy;
+use Platform\Core\Services\TeamInvitationService;
 
 class TeamsSsoMiddleware
 {
@@ -46,6 +47,8 @@ class TeamsSsoMiddleware
         }
 
         Auth::login($user, true);
+        // Offene Teameinladungen automatisch akzeptieren (Teams-Embedded)
+        app(TeamInvitationService::class)->acceptAllForUser($user);
         Log::info('Teams SSO: User authenticated', ['user_id' => $user->id]);
 
         return $next($request);
@@ -72,6 +75,8 @@ class TeamsSsoMiddleware
             
             if ($user) {
                 Auth::login($user, true);
+                // Auto-Akzept in Config-Flow auch durchführen
+                app(TeamInvitationService::class)->acceptAllForUser($user);
                 Log::info('Teams SSO: User authenticated for config route', ['user_id' => $user->id]);
             } else {
                 Log::warning('Teams SSO: Authentication failed for config route');

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 use Platform\Core\PlatformCore;
 use Platform\Core\Contracts\AuthAccessPolicy;
+use Platform\Core\Services\TeamInvitationService;
 
 class AzureSsoController extends Controller
 {
@@ -110,6 +111,9 @@ class AzureSsoController extends Controller
         }
 
         Auth::login($user, true);
+
+        // Offene Teameinladungen automatisch akzeptieren
+        app(TeamInvitationService::class)->acceptAllForUser($user);
 
         return redirect()->intended(config('azure-sso.post_login_redirect', '/'));
     }

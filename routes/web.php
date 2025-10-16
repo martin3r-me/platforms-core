@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Platform\Core\Http\Controllers\TeamInvitationController;
 
 
 Route::post('/logout', function () {
@@ -18,6 +19,10 @@ Route::post('/logout', function () {
 
     return redirect('/');
 })->name('logout');
+
+// Einladung annehmen (Token)
+Route::get('/invitations/accept/{token}', [TeamInvitationController::class, 'accept'])
+    ->name('team-invitations.accept');
 
 // (Teams Tab Test-Routen entfernt)
 

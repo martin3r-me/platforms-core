@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Contracts\AuthAccessPolicy;
+use Platform\Core\Services\TeamInvitationService;
 
 class TeamsSsoController extends Controller
 {
@@ -56,6 +57,9 @@ class TeamsSsoController extends Controller
 
             // User authentifizieren
             Auth::login($user, true);
+
+            // Offene Teameinladungen automatisch akzeptieren
+            app(TeamInvitationService::class)->acceptAllForUser($user);
             
             Log::info('Teams SSO: User authenticated successfully', [
                 'user_id' => $user->id,
