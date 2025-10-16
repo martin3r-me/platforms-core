@@ -30,6 +30,8 @@
                         optionLabel="name"
                         :nullable="false"
                         wire:model.live="user.current_team_id"
+                        x-data
+                        @change="$wire.changeCurrentTeam($event.target.value)"
                     />
                 @else
                     <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">Nur ein Team vorhanden. Lege unten ein neues Team an.</div>
@@ -69,13 +71,29 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
-                                @if(($team->user_id ?? null) === auth()->id() && ($member->id ?? null) !== auth()->id())
-                                    <select name="member_role_{{ $member->id }}" class="min-w-[9rem] px-3 py-2 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-[var(--ui-primary)]" wire:change="updateMemberRole({{ $member->id }}, $event.target.value)">
-                                        <option value="owner" {{ ($member->pivot->role ?? '') === 'owner' ? 'selected' : '' }}>Owner</option>
-                                        <option value="admin" {{ ($member->pivot->role ?? '') === 'admin' ? 'selected' : '' }}>Admin</option>
-                                        <option value="member" {{ ($member->pivot->role ?? '') === 'member' ? 'selected' : '' }}>Member</option>
-                                        <option value="viewer" {{ ($member->pivot->role ?? '') === 'viewer' ? 'selected' : '' }}>Viewer</option>
-                                    </select>
+                                @if(($team->user_id ?? null) === auth()->id())
+                                    <x-ui-input-select
+                                        name="member_role_{{ $member->id }}"
+                                        :options="[['value' => 'owner','name' => 'Owner'],['value' => 'admin','name' => 'Admin'],['value' => 'member','name' => 'Member'],['value' => 'viewer','name' => 'Viewer']]"
+                                        optionValue="value"
+                                        optionLabel="name"
+                                        :nullable="false"
+                                        x-data
+                                        @change="$wire.updateMemberRole({{ $member->id }}, $event.target.value)"
+                                        :value="($member->pivot->role ?? 'member')"
+                                    />
+
+                                    @if(($member->id ?? null) !== auth()->id())
+                                        <x-ui-confirm-button 
+                                            action="removeMember"
+                                            :params="[$member->id]"
+                                            text="Entfernen"
+                                            confirmText="Mitglied wirklich entfernen?"
+                                            variant="danger"
+                                        />
+                                    @else
+                                        <x-ui-badge variant="success" size="sm">Du</x-ui-badge>
+                                    @endif
                                 @else
                                     <x-ui-badge variant="primary" size="sm">{{ ucfirst($member->pivot->role ?? 'member') }}</x-ui-badge>
                                     @if(($member->id ?? null) === auth()->id())

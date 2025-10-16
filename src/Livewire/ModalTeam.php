@@ -110,6 +110,18 @@ class ModalTeam extends Component
         }
     }
 
+    public function changeCurrentTeam($teamId)
+    {
+        $authUser = Auth::user();
+        $authUser->current_team_id = (int) $teamId;
+        $authUser->save();
+
+        $this->user['current_team_id'] = (int) $teamId;
+        $this->team = $authUser->currentTeam;
+        $this->modalShow = false;
+        $this->redirect(route('platform.dashboard'));
+    }
+
     public function inviteToTeam()
     {
         $team = auth()->user()->currentTeam;
@@ -160,6 +172,40 @@ class ModalTeam extends Component
         $team = auth()->user()->currentTeam;
         if (! $team) { return collect(); }
         return $team->invitations()->whereNull('accepted_at')->latest()->get();
+    }
+
+    public function removeMember(int $memberId): void
+    {
+        $team = auth()->user()->currentTeam;
+        if (! $team) { return; }
+
+        // Nur Owner darf Mitglieder entfernen
+        if ($team->user_id !== auth()->id()) {
+            return;
+        }
+
+        // Selbst-Entfernen zulassen, sofern es weitere Owner gibt
+        $member = $team->users()->where('users.id', $memberId)->first();
+        if (! $member) { return; }
+
+        $isMemberOwner = ($member->pivot->role ?? null) === TeamRole::OWNER->value;
+        if ($isMemberOwner) {
+            $ownerCount = $team->users()->wherePivot('role', TeamRole::OWNER->value)->count();
+            if ($ownerCount <= 1) {
+                // Letzten Owner nicht entfernen
+                $this->dispatch('notice', [
+                    'type' => 'error',
+                    'message' => 'Der letzte Team-Owner kann nicht entfernt werden.'
+                ]);
+                return;
+            }
+        }
+
+        $team->users()->detach($memberId);
+        $this->dispatch('member-removed');
+        // Liste neu laden
+        $this->loadTeams();
+        $this->team = auth()->user()->currentTeam;
     }
 
     public function loadBillingData()
