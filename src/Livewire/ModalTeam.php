@@ -96,6 +96,20 @@ class ModalTeam extends Component
         }
     }
 
+    public function updatedUser($property, $value)
+    {
+        if ($property === 'current_team_id') {
+            $authUser = Auth::user();
+            $authUser->current_team_id = $this->user['current_team_id'] ?? $value;
+            $authUser->save();
+
+            // Team aktualisieren, Modal schließen und Dashboard neu laden
+            $this->team = $authUser->currentTeam;
+            $this->modalShow = false;
+            $this->redirect(route('platform.dashboard'));
+        }
+    }
+
     public function inviteToTeam()
     {
         $team = auth()->user()->currentTeam;
