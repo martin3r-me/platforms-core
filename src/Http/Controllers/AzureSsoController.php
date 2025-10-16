@@ -70,10 +70,17 @@ class AzureSsoController extends Controller
 
         $userModelClass = config('azure-sso.user_model') ?: config('auth.providers.users.model');
 
+        // Bestehenden Nutzer anhand azure_id ODER email finden (bevorzugt azure_id)
         $user = $userModelClass::query()
             ->when($azureId, fn($q) => $q->where('azure_id', $azureId))
             ->when(!$azureId && $email, fn($q) => $q->orWhere('email', $email))
             ->first();
+
+        // Wenn kein Nutzer per azure_id gefunden wurde, aber eine Email existiert,
+        // versuche den Nutzer strikt per Email zu finden (Unique-Constraint beachten)
+        if (! $user && $email) {
+            $user = $userModelClass::query()->where('email', $email)->first();
+        }
 
         if (! $user) {
             $user = new $userModelClass();
@@ -81,12 +88,16 @@ class AzureSsoController extends Controller
 
         $isNewUser = ! $user->exists;
 
+        // azure_id immer setzen, um zukünftige Logins stabil zu verknüpfen
         $user->azure_id = $azureId;
         if ($name || ! $user->name) {
             $user->name = $name ?: ($email ?? 'Azure User');
         }
+        // Email nur setzen, wenn leer oder identisch, um Duplicate-Key zu vermeiden
         if ($email) {
-            $user->email = $email;
+            if (! $user->email || $user->email === $email) {
+                $user->email = $email;
+            }
         }
         if ($avatar) {
             $user->avatar = $avatar;

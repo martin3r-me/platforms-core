@@ -129,20 +129,36 @@ class TeamsSsoMiddleware
                 return null;
             }
 
-            // User finden oder erstellen
+            // User finden oder aktualisieren (azure_id bevorzugt, fallback email)
             $userModelClass = config('auth.providers.users.model');
             $user = $userModelClass::query()
-                ->where('email', $userInfo['email'])
-                ->orWhere('azure_id', $userInfo['id'])
+                ->when($userInfo['id'] ?? null, fn($q) => $q->where('azure_id', $userInfo['id']))
+                ->when(!($userInfo['id'] ?? null) && ($userInfo['email'] ?? null), fn($q) => $q->orWhere('email', $userInfo['email']))
                 ->first();
+
+            if (!$user && ($userInfo['email'] ?? null)) {
+                $user = $userModelClass::query()->where('email', $userInfo['email'])->first();
+            }
 
             if (!$user) {
                 $user = new $userModelClass();
-                $user->email = $userInfo['email'];
-                $user->name = $userInfo['name'] ?? $userInfo['email'];
-                $user->azure_id = $userInfo['id'];
-                $user->save();
-                
+            }
+
+            $isNewUser = ! $user->exists;
+
+            $user->azure_id = $userInfo['id'] ?? $user->azure_id;
+            if (($userInfo['name'] ?? null) || ! $user->name) {
+                $user->name = $userInfo['name'] ?? ($userInfo['email'] ?? $user->name);
+            }
+            if ($userInfo['email'] ?? null) {
+                if (! $user->email || $user->email === $userInfo['email']) {
+                    $user->email = $userInfo['email'];
+                }
+            }
+
+            $user->save();
+
+            if ($isNewUser) {
                 // Personal Team erstellen
                 \Platform\Core\PlatformCore::createPersonalTeamFor($user);
             }
