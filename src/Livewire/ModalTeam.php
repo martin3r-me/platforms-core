@@ -19,6 +19,7 @@ class ModalTeam extends Component
     public $inviteEmail = '';
     public $inviteRole = 'member';
     public $team;
+    public $memberRoles = [];
     
     // Billing properties
     public $billing = [
@@ -52,6 +53,7 @@ class ModalTeam extends Component
         $this->user = auth()->user()->toArray();
         $this->team = auth()->user()->currentTeam;
         $this->loadTeams();
+        $this->loadMemberRoles();
         $this->loadBillingData();
         $this->loadBillingTotals();
     }
@@ -59,6 +61,8 @@ class ModalTeam extends Component
     public function openModal()
     {
         $this->modalShow = true;
+        $this->team = auth()->user()->currentTeam;
+        $this->loadMemberRoles();
     }
 
     public function loadTeams()
@@ -92,6 +96,7 @@ class ModalTeam extends Component
         $team = auth()->user()->currentTeam;
         if ($team && $team->user_id === auth()->id()) {
             $team->users()->updateExistingPivot($memberId, ['role' => $role]);
+            $this->memberRoles[$memberId] = $role;
             $this->dispatch('member-role-updated');
         }
     }
@@ -206,6 +211,17 @@ class ModalTeam extends Component
         // Liste neu laden
         $this->loadTeams();
         $this->team = auth()->user()->currentTeam;
+        unset($this->memberRoles[$memberId]);
+    }
+
+    private function loadMemberRoles(): void
+    {
+        $team = auth()->user()->currentTeam;
+        if ($team) {
+            $this->memberRoles = $team->users->pluck('pivot.role', 'id')->toArray();
+        } else {
+            $this->memberRoles = [];
+        }
     }
 
     public function loadBillingData()
