@@ -3,7 +3,11 @@
 namespace Platform\Core\Livewire;
 
 use Livewire\Component;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\Team;
+use Platform\Core\Models\TeamInvitation;
 use Platform\Core\Enums\TeamRole;
 
 class ModalTeam extends Component
@@ -14,6 +18,7 @@ class ModalTeam extends Component
     public $newTeamName = '';
     public $inviteEmail = '';
     public $inviteRole = 'member';
+    public $team;
     
     // Billing properties
     public $billing = [
@@ -45,6 +50,7 @@ class ModalTeam extends Component
     public function mount()
     {
         $this->user = auth()->user()->toArray();
+        $this->team = auth()->user()->currentTeam;
         $this->loadTeams();
         $this->loadBillingData();
         $this->loadBillingTotals();
@@ -92,15 +98,54 @@ class ModalTeam extends Component
 
     public function inviteToTeam()
     {
+        $team = auth()->user()->currentTeam;
+        if (! $team) { return; }
+
         $this->validate([
-            'inviteEmail' => 'required|email',
-            'inviteRole' => 'required|string',
+            'inviteEmail' => [
+                'required',
+                'email',
+                Rule::unique('team_invitations', 'email')->where(fn($q) => $q->where('team_id', $team->id)),
+            ],
+            'inviteRole' => [
+                'required',
+                Rule::in([TeamRole::OWNER->value, TeamRole::ADMIN->value, TeamRole::MEMBER->value, 'viewer']),
+            ],
         ]);
 
-        // Hier würde die Einladungslogik implementiert
+        TeamInvitation::create([
+            'team_id' => $team->id,
+            'email'   => $this->inviteEmail,
+            'token'   => Str::uuid(),
+            'role'    => $this->inviteRole,
+        ]);
+
         $this->inviteEmail = '';
         $this->inviteRole = 'member';
         $this->dispatch('invitation-sent');
+    }
+
+    public function revokeInvitation(int $invitationId): void
+    {
+        $team = auth()->user()->currentTeam;
+        if (! $team) { return; }
+
+        $inv = TeamInvitation::query()
+            ->where('team_id', $team->id)
+            ->whereNull('accepted_at')
+            ->find($invitationId);
+
+        if ($inv) {
+            $inv->delete();
+            $this->dispatch('invitation-revoked');
+        }
+    }
+
+    public function getPendingInvitationsProperty()
+    {
+        $team = auth()->user()->currentTeam;
+        if (! $team) { return collect(); }
+        return $team->invitations()->whereNull('accepted_at')->latest()->get();
     }
 
     public function loadBillingData()

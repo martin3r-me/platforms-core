@@ -20,6 +20,11 @@
                     Willkommen im {{ $currentTeam->name }} Team. 
                     {{ count($teamMembers) }} Mitglieder, {{ count($modules) }} verfügbare Module.
                 </p>
+                <div class="mt-3">
+                    <x-ui-button variant="primary" x-data @click="$dispatch('open-modal-team', { tab: 'team' })">
+                        Team verwalten / Mitglieder einladen
+                    </x-ui-button>
+                </div>
             </div>
         </div>
     @endif

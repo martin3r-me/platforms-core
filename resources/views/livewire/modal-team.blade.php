@@ -99,6 +99,34 @@
                     <x-ui-input-select name="inviteRole" label="Rolle" :options="$roles" optionValue="value" optionLabel="name" :nullable="false" wire:model.live="inviteRole" />
                     <x-ui-button type="submit">Einladung senden</x-ui-button>
                 </form>
+
+                {{-- Offene Einladungen --}}
+                <div class="mt-6">
+                    <h4 class="text-md font-semibold text-[var(--ui-secondary)] mb-3">Offene Einladungen</h4>
+                    @php($pending = $this->pendingInvitations)
+                    @if($pending && count($pending))
+                        <div class="space-y-2">
+                            @foreach($pending as $inv)
+                                <div class="flex items-center justify-between p-3 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                                    <div>
+                                        <div class="font-medium text-[var(--ui-secondary)]">{{ $inv->email }}</div>
+                                        <div class="text-xs text-[var(--ui-muted)]">Rolle: {{ ucfirst($inv->role ?? 'member') }}</div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <x-ui-button variant="secondary-outline" x-data @click="navigator.clipboard.writeText('{{ url('/invitations/accept/'.$inv->token) }}'); $dispatch('notify', { type: 'success', message: 'Einladungslink kopiert' })">
+                                            Link kopieren
+                                        </x-ui-button>
+                                        <x-ui-button variant="danger" wire:click="revokeInvitation({{ $inv->id }})">
+                                            Widerrufen
+                                        </x-ui-button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="text-sm text-[var(--ui-muted)]">Keine offenen Einladungen.</div>
+                    @endif
+                </div>
             </div>
             @endif
         </div>
