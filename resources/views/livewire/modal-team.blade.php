@@ -74,13 +74,11 @@
                                 @if(($team->user_id ?? null) === auth()->id())
                                     <x-ui-input-select
                                         name="member_role_{{ $member->id }}"
-                                        :options="[['value' => 'owner','name' => 'Owner'],['value' => 'admin','name' => 'Admin'],['value' => 'member','name' => 'Member'],['value' => 'viewer','name' => 'Viewer']]"
-                                        optionValue="value"
-                                        optionLabel="name"
+                                        :options="['owner' => 'Owner', 'admin' => 'Admin', 'member' => 'Member', 'viewer' => 'Viewer']"
                                         :nullable="false"
                                         x-data
                                         @change="$wire.updateMemberRole({{ $member->id }}, $event.target.value)"
-                                        :value="($member->pivot->role ?? 'member')"
+                                        wire:model.defer="memberRoles.{{ $member->id }}"
                                     />
 
                                     @if(($member->id ?? null) !== auth()->id())
