@@ -14,41 +14,8 @@
         </x-slot>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-            {{-- Linke Spalte: Pomodoro + Kalender --}}
+            {{-- Linke Spalte: Kalender + Pomodoro --}}
             <div class="order-1 lg:order-1 h-full overflow-y-auto space-y-6">
-                {{-- Pomodoro Timer --}}
-                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
-                    <div class="flex items-center gap-3 mb-4">
-                        @svg('heroicon-o-clock', 'w-5 h-5 text-[var(--ui-primary)]')
-                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Pomodoro Timer</h3>
-                    </div>
-
-                    <div x-data="pomodoroTimer()" x-init="init()" class="text-center" 
-                         x-pomodoro-session='@json($pomodoroStats["active_session"])'
-                         x-pomodoro-stats='@json($pomodoroStats)'
-                         wire:poll.30s="loadPomodoroStats">
-                        <div class="mb-6">
-                            <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2">
-                                <span x-text="formatTime(timeLeft)"></span> Min
-                            </div>
-                            <div class="text-sm text-[var(--ui-muted)]">Fokuszeit</div>
-                        </div>
-
-                        <div class="flex items-center justify-center gap-2 mb-4">
-                            <x-ui-button size="sm" variant="secondary-outline" @click="setTime(15)">15</x-ui-button>
-                            <x-ui-button size="sm" variant="secondary-outline" @click="setTime(25)">25</x-ui-button>
-                            <x-ui-button size="sm" variant="secondary-outline" @click="setTime(45)">45</x-ui-button>
-                            <x-ui-button size="sm" variant="secondary-outline" @click="setTime(60)">60</x-ui-button>
-                        </div>
-
-                        <div class="flex items-center justify-center gap-3 mb-2">
-                            <x-ui-button size="sm" variant="primary" @click="startTimer()" x-show="!isRunning">Start</x-ui-button>
-                            <x-ui-button size="sm" variant="secondary" @click="pauseTimer()" x-show="isRunning" wire:click="stopPomodoro()">Pause</x-ui-button>
-                            <x-ui-button size="sm" variant="secondary-outline" @click="resetTimer()" wire:click="stopActivePomodoro()">Reset</x-ui-button>
-                        </div>
-                    </div>
-                </div>
-
                 {{-- Kalender --}}
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
                     <div class="flex items-center gap-3 mb-6">
@@ -131,6 +98,38 @@
 
                             @php $currentDate->addDay(); @endphp
                         @endwhile
+                    </div>
+                </div>
+                {{-- Pomodoro Timer --}}
+                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
+                    <div class="flex items-center gap-3 mb-4">
+                        @svg('heroicon-o-clock', 'w-5 h-5 text-[var(--ui-primary)]')
+                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Pomodoro Timer</h3>
+                    </div>
+
+                    <div x-data="pomodoroTimer()" x-init="init()" class="text-center" 
+                         x-pomodoro-session='@json($pomodoroStats["active_session"])'
+                         x-pomodoro-stats='@json($pomodoroStats)'
+                         wire:poll.30s="loadPomodoroStats">
+                        <div class="mb-6">
+                            <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2">
+                                <span x-text="formatTime(timeLeft)"></span> Min
+                            </div>
+                            <div class="text-sm text-[var(--ui-muted)]">Fokuszeit</div>
+                        </div>
+
+                        <div class="flex items-center justify-center gap-2 mb-4">
+                            <x-ui-button size="sm" variant="secondary-outline" @click="setTime(15)">15</x-ui-button>
+                            <x-ui-button size="sm" variant="secondary-outline" @click="setTime(25)">25</x-ui-button>
+                            <x-ui-button size="sm" variant="secondary-outline" @click="setTime(45)">45</x-ui-button>
+                            <x-ui-button size="sm" variant="secondary-outline" @click="setTime(60)">60</x-ui-button>
+                        </div>
+
+                        <div class="flex items-center justify-center gap-3 mb-2">
+                            <x-ui-button size="sm" variant="primary" @click="startTimer()" x-show="!isRunning">Start</x-ui-button>
+                            <x-ui-button size="sm" variant="secondary" @click="pauseTimer()" x-show="isRunning" wire:click="stopPomodoro()">Pause</x-ui-button>
+                            <x-ui-button size="sm" variant="secondary-outline" @click="resetTimer()" wire:click="stopActivePomodoro()">Reset</x-ui-button>
+                        </div>
                     </div>
                 </div>
             </div>
