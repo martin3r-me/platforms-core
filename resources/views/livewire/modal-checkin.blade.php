@@ -106,8 +106,49 @@
             </div>
         </div>
 
-        {{-- Check-in Formular (1/3) --}}
+        {{-- Pomodoro links (1/3) --}}
         <div class="order-1 lg:order-2">
+            <div class="space-y-4 h-full overflow-y-auto">
+                {{-- Pomodoro Timer (links) --}}
+                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
+                    <div class="flex items-center gap-3 mb-4">
+                        @svg('heroicon-o-clock', 'w-5 h-5 text-[var(--ui-primary)]')
+                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Pomodoro Timer</h3>
+                    </div>
+
+                    <div x-data="pomodoroTimer()" x-init="init()" class="text-center" 
+                         x-pomodoro-session='@json($pomodoroStats["active_session"])'
+                         x-pomodoro-stats='@json($pomodoroStats)'
+                         wire:poll.30s="loadPomodoroStats">
+                        {{-- Timer Display --}}
+                        <div class="mb-6">
+                            <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2">
+                                <span x-text="formatTime(timeLeft)"></span> Min
+                            </div>
+                            <div class="text-sm text-[var(--ui-muted)]">Fokuszeit</div>
+                        </div>
+
+                        {{-- Schlanke Auswahl --}}
+                        <div class="flex items-center justify-center gap-2 mb-4">
+                            <x-ui-button size="sm" variant="secondary-outline" @click="setTime(15)">15</x-ui-button>
+                            <x-ui-button size="sm" variant="secondary-outline" @click="setTime(25)">25</x-ui-button>
+                            <x-ui-button size="sm" variant="secondary-outline" @click="setTime(45)">45</x-ui-button>
+                            <x-ui-button size="sm" variant="secondary-outline" @click="setTime(60)">60</x-ui-button>
+                        </div>
+
+                        {{-- Controls --}}
+                        <div class="flex items-center justify-center gap-3 mb-2">
+                            <x-ui-button size="sm" variant="primary" @click="startTimer()" x-show="!isRunning">Start</x-ui-button>
+                            <x-ui-button size="sm" variant="secondary" @click="pauseTimer()" x-show="isRunning" wire:click="stopPomodoro()">Pause</x-ui-button>
+                            <x-ui-button size="sm" variant="secondary-outline" @click="resetTimer()" wire:click="stopActivePomodoro()">Reset</x-ui-button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Check-in Formular (1/3) --}}
+        <div class="order-2 lg:order-3">
             <div class="space-y-4 h-full overflow-y-auto">
                 {{-- Datum und Grunddaten --}}
                 <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
@@ -233,87 +274,7 @@
                     </div>
                 </div>
 
-                {{-- Pomodoro Timer --}}
-                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
-                    <div class="flex items-center gap-3 mb-4">
-                        @svg('heroicon-o-clock', 'w-5 h-5 text-[var(--ui-primary)]')
-                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Pomodoro Timer</h3>
-                    </div>
-
-        <div x-data="pomodoroTimer()" x-init="init()" class="text-center" 
-             x-pomodoro-session='@json($pomodoroStats["active_session"])'
-             x-pomodoro-stats='@json($pomodoroStats)'
-             wire:poll.30s="loadPomodoroStats">
-                        {{-- Timer Display --}}
-                        <div class="mb-6">
-                            <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2">
-                                <span x-text="formatTime(timeLeft)"></span> Min
-                            </div>
-                            <div class="text-sm text-[var(--ui-muted)]">Fokuszeit</div>
-                        </div>
-
-                        {{-- Time Selection --}}
-                        <div class="flex items-center justify-center gap-2 mb-4">
-                            <button 
-                                @click="setTime(5)" 
-                                class="px-4 py-2 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-primary)] hover:text-white transition-all duration-200 font-medium"
-                            >
-                                5 Min
-                            </button>
-                            <button 
-                                @click="setTime(15)" 
-                                class="px-4 py-2 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-primary)] hover:text-white transition-all duration-200 font-medium"
-                            >
-                                15 Min
-                            </button>
-                            <button 
-                                @click="setTime(25)" 
-                                class="px-4 py-2 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-primary)] hover:text-white transition-all duration-200 font-medium"
-                            >
-                                25 Min
-                            </button>
-                            <button 
-                                @click="setTime(45)" 
-                                class="px-4 py-2 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-primary)] hover:text-white transition-all duration-200 font-medium"
-                            >
-                                45 Min
-                            </button>
-                            <button 
-                                @click="setTime(60)" 
-                                class="px-4 py-2 text-sm bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-primary)] hover:text-white transition-all duration-200 font-medium"
-                            >
-                                60 Min
-                            </button>
-                        </div>
-
-                        {{-- Controls --}}
-                        <div class="flex items-center justify-center gap-3 mb-4">
-                            <button 
-                                @click="startTimer()" 
-                                x-show="!isRunning"
-                                class="px-6 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-[var(--ui-primary)]/90 transition-colors"
-                            >
-                                Start
-                            </button>
-                            <button 
-                                @click="pauseTimer()" 
-                                x-show="isRunning"
-                                wire:click="stopPomodoro()"
-                                class="px-6 py-2 bg-[var(--ui-secondary)] text-white rounded-lg hover:bg-[var(--ui-secondary)]/90 transition-colors"
-                            >
-                                Pause
-                            </button>
-                            <button 
-                                @click="resetTimer()" 
-                                wire:click="stopActivePomodoro()"
-                                class="px-6 py-2 bg-[var(--ui-muted)] text-[var(--ui-secondary)] rounded-lg hover:bg-[var(--ui-muted)]/80 transition-colors"
-                            >
-                                Reset
-                            </button>
-                        </div>
-
-                    </div>
-                </div>
+                
             </div>
         </div>
 

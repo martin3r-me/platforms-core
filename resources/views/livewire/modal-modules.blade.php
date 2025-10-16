@@ -1,12 +1,8 @@
-<div x-data="{ tab: 'modules', query: '' }" x-init="window.addEventListener('open-modal-modules', (e) => { tab = e?.detail?.tab || 'modules'; });">
+<div x-data="{ tab: 'modules' }" x-init="window.addEventListener('open-modal-modules', (e) => { tab = e?.detail?.tab || 'modules'; });">
 <x-ui-modal size="xl" model="modalShow">
     <x-slot name="header">
         <div class="flex items-center justify-between w-full">
             <div class="flex items-center gap-3 min-w-0">
-                @php $logoSquare = file_exists(public_path('logo_square.png')) ? asset('logo_square.png') : null; @endphp
-                @if($logoSquare)
-                    <img src="{{ $logoSquare }}" alt="Logo" class="w-7 h-7 rounded-md" />
-                @endif
                 <h2 class="text-xl font-semibold text-[var(--ui-secondary)] m-0 truncate">Zentrale Steuerung</h2>
                 <span class="text-xs text-[var(--ui-muted)] bg-[var(--ui-muted-5)] px-2 py-1 rounded-full">⌘K / M</span>
             </div>
@@ -17,16 +13,7 @@
                 @endif
             </div>
         </div>
-        <template x-if="tab === 'modules'">
-            <div class="mt-3">
-                <div class="relative">
-                    <input x-model="query" type="text" placeholder="Module suchen..." class="w-full text-sm px-3 py-2 rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] focus:outline-none focus:border-[var(--ui-primary)]/60" />
-                    <div class="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--ui-muted)]">
-                        @svg('heroicon-o-magnifying-glass','w-4 h-4')
-                    </div>
-                </div>
-            </div>
-        </template>
+        
     </x-slot>
         
         {{-- Tabs: Inhalte --}}
@@ -46,7 +33,7 @@
                                 ? route($routeName)
                                 : ($module['url'] ?? '#');
                         @endphp
-                    <a href="{{ $finalUrl }}" class="group flex items-center gap-4 p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-all duration-200" :class="(query && !('{{ Str::lower($title) }}'.includes(query.toLowerCase()))) ? 'hidden' : ''">
+                    <a href="{{ $finalUrl }}" class="group flex items-center gap-4 p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-all duration-200">
                         <div class="flex-shrink-0">
                             @if(!empty($icon))
                                 <x-dynamic-component :component="$icon" class="w-8 h-8 text-[var(--ui-primary)] group-hover:scale-110 transition-transform" />
@@ -90,14 +77,14 @@
                                     @foreach($matrixModules as $module)
                                         @php
                                             $hasModule = in_array($module->id, $userModuleMap[$user->id] ?? []);
-                                            $variant = $hasModule ? 'success-outline' : 'danger-outline';
+                                            $variant = 'secondary-outline';
                                         @endphp
                                         <td class="py-3 px-4 border-b border-[var(--ui-border)]/60 text-center">
                                             <x-ui-button :variant="$variant" size="sm" wire:click="toggleMatrix({{ $user->id }}, {{ $module->id }})">
                                                 @if($hasModule)
-                                                    @svg('heroicon-o-hand-thumb-up', 'w-4 h-4 text-[var(--ui-success)]')
+                                                    @svg('heroicon-o-check', 'w-4 h-4 text-[var(--ui-secondary)]')
                                                 @else
-                                                    @svg('heroicon-o-hand-thumb-down', 'w-4 h-4 text-[var(--ui-danger)]')
+                                                    @svg('heroicon-o-minus', 'w-4 h-4 text-[var(--ui-muted)]')
                                                 @endif
                                             </x-ui-button>
                                         </td>
@@ -117,8 +104,7 @@
 
 
     <x-slot name="footer">
-        <div class="flex justify-between items-center w-full">
-            <div class="text-xs text-[var(--ui-muted)]">Tipp: Suche nutzt Titelfilter</div>
+        <div class="flex justify-end items-center w-full">
             <x-ui-button variant="secondary-outline" @click="modalShow = false">Schließen</x-ui-button>
         </div>
     </x-slot>
