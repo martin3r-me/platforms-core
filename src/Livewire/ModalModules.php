@@ -86,22 +86,33 @@ class ModalModules extends Component
 
     public function toggleMatrix($userId, $moduleId)
     {
-        // User und Modul holen
-        $user = \Platform\Core\Models\User::findOrFail($userId);
-        $module = \Platform\Core\Models\Module::findOrFail($moduleId);
+        $teamId = auth()->user()->currentTeam?->id;
+        if (!$teamId) { return; }
 
-        // Prüfen, ob dieses Modul dem User bereits zugeordnet ist
-        $alreadyAssigned = $user->modules()->where('module_id', $moduleId)->exists();
+        $user = \Platform\Core\Models\User::findOrFail($userId);
+        \Platform\Core\Models\Module::findOrFail($moduleId); // exists
+
+        // Team-spezifisch prüfen
+        $alreadyAssigned = $user->modules()
+            ->where('module_id', $moduleId)
+            ->wherePivot('team_id', $teamId)
+            ->exists();
 
         if ($alreadyAssigned) {
-            // Entferne das Modul (detach) aus der Pivot-Tabelle
-            $user->modules()->detach($moduleId);
+            // Nur den Pivot im aktuellen Team lösen
+            $user->modules()->newPivotStatement()
+                ->where('modulable_id', $user->id)
+                ->where('modulable_type', \Platform\Core\Models\User::class)
+                ->where('module_id', $moduleId)
+                ->where('team_id', $teamId)
+                ->delete();
         } else {
-            // Hänge das Modul an (attach) – ggf. weitere Pivot-Werte möglich
+            // Team-spezifisch anhängen
             $user->modules()->attach($moduleId, [
                 'role' => null,
                 'enabled' => true,
-                'guard' => 'web', // Optional: Den Guard dynamisch setzen, falls benötigt
+                'guard' => 'web',
+                'team_id' => $teamId,
             ]);
         }
 
@@ -123,10 +134,14 @@ class ModalModules extends Component
 
         $this->matrixModules = \Platform\Core\Models\Module::all();
 
-        // Build map: user_id => [module_id, ...]
+        // Build map team-scoped: user_id => [module_id, ...]
+        $teamId = auth()->user()->currentTeam?->id;
         $this->userModuleMap = [];
         foreach ($this->matrixUsers as $user) {
-            $this->userModuleMap[$user->id] = $user->modules->pluck('id')->toArray();
+            $this->userModuleMap[$user->id] = $user->modules()
+                ->wherePivot('team_id', $teamId)
+                ->pluck('modules.id')
+                ->toArray();
         }
     }
 
@@ -138,8 +153,28 @@ class ModalModules extends Component
         $user->save();
 
         $this->modalShow = false;
-        // Reload aktuelle Seite via navigate, damit Guards/Sidebars/Scopes neu greifen
-        return $this->redirect(request()->fullUrl(), navigate: true);
+
+        // Versuche auf der aktuellen Seite zu bleiben, wenn das neue Team Zugriff auf das Modul hat
+        $currentUrl = request()->fullUrl();
+        $moduleKey = request()->segment(1); // z.B. planner, cms, okr, ...
+
+        if (is_string($moduleKey) && strlen($moduleKey) > 0) {
+            $moduleModel = \Platform\Core\Models\Module::where('key', $moduleKey)->first();
+            if ($moduleModel) {
+                $team = $user->currentTeam; // aktualisiert
+                $teamAllowed = $team
+                    ? $team->modules()->where('module_id', $moduleModel->id)->wherePivot('enabled', true)->exists()
+                    : false;
+
+                if ($teamAllowed) {
+                    // Harte Weiterleitung auf die aktuelle URL (volle Seite), keine navigate-Redirects
+                    return $this->redirect($currentUrl);
+                }
+            }
+        }
+
+        // Fallback: Plattform-Dashboard
+        return $this->redirect(route('platform.dashboard'));
     }
 
     // --- Team/User/Payment Logik (aus ModalTeam) ---
