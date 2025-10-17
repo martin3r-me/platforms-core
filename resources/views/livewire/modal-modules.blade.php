@@ -6,7 +6,7 @@
                 <h2 class="text-xl font-semibold text-[var(--ui-secondary)] m-0 truncate">Zentrale Steuerung</h2>
             </div>
             <div class="flex items-center gap-1">
-                <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2" :class="tab === 'modules' ? 'text-[var(--ui-primary)] border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'text-[var(--ui-muted)] border-transparent hover:text-[var(--ui-secondary)]'" @click="tab = 'modules'">Module</button>
+                <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2" :class="tab === 'modules' ? 'text-[var(--ui-primary)] border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'text-[var(--ui-muted)] border-transparent hover:text-[var(--ui-secondary)]'" @click="tab = 'modules'">Navigation</button>
                 @if(auth()->user()?->currentTeam && auth()->user()->currentTeam->user_id === auth()->id())
                     <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2" :class="tab === 'matrix' ? 'text-[var(--ui-primary)] border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'text-[var(--ui-muted)] border-transparent hover:text-[var(--ui-secondary)]'" @click="tab = 'matrix'">Matrix</button>
                 @endif
@@ -22,7 +22,7 @@
                 $userTeams = auth()->user()?->teams()->get() ?? collect();
             @endphp
             <div class="space-y-6">
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                     @foreach($availableModules as $key => $module)
                         @php
                             $title = $module['title'] ?? $module['label'] ?? ucfirst($key);
@@ -32,21 +32,21 @@
                                 ? route($routeName)
                                 : ($module['url'] ?? '#');
                         @endphp
-                    <a href="{{ $finalUrl }}" class="group flex items-center gap-4 p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-all duration-200">
-                        <div class="flex-shrink-0">
+                    <a href="{{ $finalUrl }}" class="group flex items-start gap-3 p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-all duration-200">
+                        <div class="flex-shrink-0 mt-0.5">
                             @if(!empty($icon))
-                                <x-dynamic-component :component="$icon" class="w-8 h-8 text-[var(--ui-primary)] group-hover:scale-110 transition-transform" />
+                                <x-dynamic-component :component="$icon" class="w-6 h-6 text-[var(--ui-primary)] group-hover:scale-110 transition-transform" />
                             @else
-                                @svg('heroicon-o-cube', 'w-8 h-8 text-[var(--ui-primary)] group-hover:scale-110 transition-transform')
+                                @svg('heroicon-o-cube', 'w-6 h-6 text-[var(--ui-primary)] group-hover:scale-110 transition-transform')
                             @endif
                         </div>
                         <div class="min-w-0 flex-1">
-                            <div class="font-semibold text-[var(--ui-secondary)] truncate">{{ $title }}</div>
-                            <div class="text-xs text-[var(--ui-muted)] truncate">
+                            <div class="font-semibold text-[var(--ui-secondary)] leading-snug">{{ $title }}</div>
+                            <div class="text-[10px] text-[var(--ui-muted)]">
                                 {{ $routeName ? $routeName : ($finalUrl ?? '') }}
                             </div>
                         </div>
-                        <div class="flex-shrink-0">
+                        <div class="flex-shrink-0 mt-1">
                             @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)] transition-colors')
                         </div>
                     </a>
@@ -55,20 +55,20 @@
 
                 {{-- Teams Liste --}}
                 <div class="pt-2 border-t border-[var(--ui-border)]/60">
-                    <h3 class="text-sm font-semibold text-[var(--ui-muted)] mb-3">Teams</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <h3 class="text-sm font-semibold text-[var(--ui-muted)] mb-2">Teams</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                         @foreach($userTeams as $team)
                             <button type="button"
-                                @click="$dispatch('open-modal-team', { preselect: {{ $team->id }} })"
-                                class="group text-left flex items-center gap-4 p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-all duration-200">
-                                <div class="flex-shrink-0">
-                                    @svg('heroicon-o-user-group', 'w-8 h-8 text-[var(--ui-primary)] group-hover:scale-110 transition-transform')
+                                wire:click="switchTeam({{ $team->id }})"
+                                class="group text-left flex items-start gap-3 p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-all duration-200">
+                                <div class="flex-shrink-0 mt-0.5">
+                                    @svg('heroicon-o-user-group', 'w-6 h-6 text-[var(--ui-primary)] group-hover:scale-110 transition-transform')
                                 </div>
                                 <div class="min-w-0 flex-1">
-                                    <div class="font-semibold text-[var(--ui-secondary)] truncate">{{ $team->name }}</div>
-                                    <div class="text-xs text-[var(--ui-muted)] truncate">Team-ID: {{ $team->id }}</div>
+                                    <div class="font-semibold text-[var(--ui-secondary)] leading-snug break-words">{{ $team->name }}</div>
+                                    <div class="text-[10px] text-[var(--ui-muted)]">Team-ID: {{ $team->id }}</div>
                                 </div>
-                                <div class="flex-shrink-0">
+                                <div class="flex-shrink-0 mt-1">
                                     @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)] transition-colors')
                                 </div>
                             </button>

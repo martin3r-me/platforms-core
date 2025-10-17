@@ -130,6 +130,18 @@ class ModalModules extends Component
         }
     }
 
+    public function switchTeam(int $teamId): void
+    {
+        $user = Auth::user();
+        if (!$user) { return; }
+        $user->current_team_id = $teamId;
+        $user->save();
+
+        $this->modalShow = false;
+        // Reload aktuelle Seite, damit Guards/Sidebars/Scopes neu greifen
+        $this->redirect(request()->fullUrl());
+    }
+
     // --- Team/User/Payment Logik (aus ModalTeam) ---
     protected $rules = [
         'team.name' => 'required|string|max:255',
