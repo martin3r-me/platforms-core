@@ -54,16 +54,22 @@ class ModalModules extends Component
 
         $user = $this->user;
         $team = method_exists($user, 'currentTeam') ? $user->currentTeam : null;
+        $teamId = $team?->id;
 
         // Hole alle sichtbaren Module (z. B. nach Guard gefiltert)
         $modules = PlatformCore::getVisibleModules();
 
         // Filtere Module nach Berechtigung
-        $this->modules = collect($modules)->filter(function($module) use ($user, $team) {
+        $this->modules = collect($modules)->filter(function($module) use ($user, $team, $teamId) {
             $moduleModel = \Platform\Core\Models\Module::where('key', $module['key'])->first();
             if (!$moduleModel) return false;
 
-            $userAllowed = $user->modules()->where('module_id', $moduleModel->id)->wherePivot('enabled', true)->exists();
+            // User-Erlaubnis nur im aktuellen Team-Scope
+            $userAllowed = $user->modules()
+                ->where('module_id', $moduleModel->id)
+                ->wherePivot('team_id', $teamId)
+                ->wherePivot('enabled', true)
+                ->exists();
             $teamAllowed = $team
                 ? $team->modules()->where('module_id', $moduleModel->id)->wherePivot('enabled', true)->exists()
                 : false;

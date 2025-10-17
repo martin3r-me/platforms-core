@@ -27,14 +27,15 @@
                     <h3 class="text-sm font-semibold text-[var(--ui-muted)] mb-2">Teams</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                         @foreach($userTeams as $team)
+                            @php $isActiveTeam = auth()->user()?->currentTeam?->id === $team->id; @endphp
                             <button type="button"
                                 wire:click="switchTeam({{ $team->id }})"
-                                class="group text-left flex items-start gap-3 p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-all duration-200">
+                                class="group text-left flex items-start gap-3 p-3 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200 {{ $isActiveTeam ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}">
                                 <div class="flex-shrink-0 mt-0.5">
-                                    @svg('heroicon-o-user-group', 'w-6 h-6 text-[var(--ui-primary)] group-hover:scale-110 transition-transform')
+                                    @svg('heroicon-o-user-group', 'w-6 h-6 ' . ($isActiveTeam ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-primary)]') . ' group-hover:scale-110 transition-transform')
                                 </div>
                                 <div class="min-w-0 flex-1">
-                                    <div class="font-semibold text-[var(--ui-secondary)] leading-snug break-words">{{ $team->name }}</div>
+                                    <div class="font-semibold leading-snug break-words {{ $isActiveTeam ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)]' }}">{{ $team->name }}</div>
                                     <div class="text-[10px] text-[var(--ui-muted)]">Team-ID: {{ $team->id }}</div>
                                 </div>
                                 <div class="flex-shrink-0 mt-1">
@@ -57,17 +58,18 @@
                             $finalUrl = $routeName && \Illuminate\Support\Facades\Route::has($routeName)
                                 ? route($routeName)
                                 : ($module['url'] ?? '#');
+                            $isActiveModule = request()->segment(1) === ($module['key'] ?? $key);
                         @endphp
-                    <a href="{{ $finalUrl }}" class="group flex items-start gap-3 p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-all duration-200">
+                    <a href="{{ $finalUrl }}" class="group flex items-start gap-3 p-3 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200 {{ $isActiveModule ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}">
                         <div class="flex-shrink-0 mt-0.5">
                             @if(!empty($icon))
-                                <x-dynamic-component :component="$icon" class="w-6 h-6 text-[var(--ui-primary)] group-hover:scale-110 transition-transform" />
+                                <x-dynamic-component :component="$icon" class="w-6 h-6 {{ $isActiveModule ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-primary)]' }} group-hover:scale-110 transition-transform" />
                             @else
-                                @svg('heroicon-o-cube', 'w-6 h-6 text-[var(--ui-primary)] group-hover:scale-110 transition-transform')
+                                @svg('heroicon-o-cube', 'w-6 h-6 ' . ($isActiveModule ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-primary)]') . ' group-hover:scale-110 transition-transform')
                             @endif
                         </div>
                         <div class="min-w-0 flex-1">
-                            <div class="font-semibold text-[var(--ui-secondary)] leading-snug">{{ $title }}</div>
+                            <div class="font-semibold leading-snug {{ $isActiveModule ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)]' }}">{{ $title }}</div>
                             <div class="text-[10px] text-[var(--ui-muted)]">
                                 {{ $routeName ? $routeName : ($finalUrl ?? '') }}
                             </div>
