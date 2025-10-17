@@ -73,7 +73,9 @@
                             $finalUrl = $routeName && \Illuminate\Support\Facades\Route::has($routeName)
                                 ? route($routeName)
                                 : ($module['url'] ?? '#');
-                            $isActiveModule = request()->segment(1) === ($module['key'] ?? $key);
+                            $prefix = strtolower($module['routing']['prefix'] ?? ($module['key'] ?? $key));
+                            $currentPrefix = strtolower(request()->segment(1) ?? '');
+                            $isActiveModule = $currentPrefix === $prefix;
                         @endphp
                     <a href="{{ $finalUrl }}" class="group flex items-start gap-3 p-3 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200 {{ $isActiveModule ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}">
                         <div class="flex-shrink-0 mt-0.5">
