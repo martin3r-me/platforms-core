@@ -50,6 +50,21 @@
                 <div class="pt-2 border-t border-[var(--ui-border)]/60">
                     <h3 class="text-sm font-semibold text-[var(--ui-muted)] mb-2">Module</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {{-- Main Dashboard Card --}}
+                    @php $isPlatformActive = request()->routeIs('platform.dashboard'); @endphp
+                    <a href="{{ route('platform.dashboard') }}" class="group flex items-start gap-3 p-3 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200 {{ $isPlatformActive ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}">
+                        <div class="flex-shrink-0 mt-0.5">
+                            @svg('heroicon-o-home', 'w-6 h-6 ' . ($isPlatformActive ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-primary)]') . ' group-hover:scale-110 transition-transform')
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="font-semibold leading-snug {{ $isPlatformActive ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)]' }}">Haupt-Dashboard</div>
+                            <div class="text-[10px] text-[var(--ui-muted)]">platform.dashboard</div>
+                        </div>
+                        <div class="flex-shrink-0 mt-1">
+                            @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)] transition-colors')
+                        </div>
+                    </a>
+
                     @foreach($availableModules as $key => $module)
                         @php
                             $title = $module['title'] ?? $module['label'] ?? ucfirst($key);
