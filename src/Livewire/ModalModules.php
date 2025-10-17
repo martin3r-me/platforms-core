@@ -138,8 +138,8 @@ class ModalModules extends Component
         $user->save();
 
         $this->modalShow = false;
-        // Reload aktuelle Seite, damit Guards/Sidebars/Scopes neu greifen
-        $this->redirect(request()->fullUrl());
+        // Reload aktuelle Seite via navigate, damit Guards/Sidebars/Scopes neu greifen
+        $this->redirect(request()->fullUrl(), navigate: true);
     }
 
     // --- Team/User/Payment Logik (aus ModalTeam) ---
