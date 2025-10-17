@@ -30,13 +30,12 @@
                             @php $isActiveTeam = auth()->user()?->currentTeam?->id === $team->id; @endphp
                             <button type="button"
                                 wire:click="switchTeam({{ $team->id }})"
-                                class="group text-left flex items-start gap-3 p-3 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200 {{ $isActiveTeam ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}">
+                                class="group text-left flex items-start gap-3 px-3 py-2 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200 {{ $isActiveTeam ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}">
                                 <div class="flex-shrink-0 mt-0.5">
                                     @svg('heroicon-o-user-group', 'w-6 h-6 ' . ($isActiveTeam ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-primary)]') . ' group-hover:scale-110 transition-transform')
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <div class="font-semibold leading-snug break-words {{ $isActiveTeam ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)]' }}">{{ $team->name }}</div>
-                                    <div class="text-[10px] text-[var(--ui-muted)]">Team-ID: {{ $team->id }}</div>
                                     @php $memberCount = $team->users()->count(); @endphp
                                     @if($memberCount > 0 && $memberCount <= 10)
                                         <div class="mt-1 text-[9px] text-[var(--ui-muted)] leading-tight">
@@ -60,13 +59,12 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                     {{-- Main Dashboard Card --}}
                     @php $isPlatformActive = request()->routeIs('platform.dashboard'); @endphp
-                    <a href="{{ route('platform.dashboard') }}" class="group flex items-start gap-3 p-3 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200 {{ $isPlatformActive ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}">
+                    <a href="{{ route('platform.dashboard') }}" class="group flex items-start gap-3 px-3 py-2 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200 {{ $isPlatformActive ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}">
                         <div class="flex-shrink-0 mt-0.5">
                             @svg('heroicon-o-home', 'w-6 h-6 ' . ($isPlatformActive ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-primary)]') . ' group-hover:scale-110 transition-transform')
                         </div>
                         <div class="min-w-0 flex-1">
                             <div class="font-semibold leading-snug {{ $isPlatformActive ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)]' }}">Haupt-Dashboard</div>
-                            <div class="text-[10px] text-[var(--ui-muted)]">platform.dashboard</div>
                         </div>
                         <div class="flex-shrink-0 mt-1">
                             @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)] transition-colors')
@@ -84,7 +82,7 @@
                             $prefix = strtolower($module['routing']['prefix'] ?? ($module['key'] ?? $key));
                             $isActiveModule = request()->is($prefix) || request()->is($prefix . '/*');
                         @endphp
-                    <a href="{{ $finalUrl }}" class="group flex items-start gap-3 p-3 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200 {{ $isActiveModule ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}">
+                    <a href="{{ $finalUrl }}" class="group flex items-start gap-3 px-3 py-2 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200 {{ $isActiveModule ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}">
                         <div class="flex-shrink-0 mt-0.5">
                             @if(!empty($icon))
                                 <x-dynamic-component :component="$icon" class="w-6 h-6 {{ $isActiveModule ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-primary)]' }} group-hover:scale-110 transition-transform" />
@@ -94,9 +92,6 @@
                         </div>
                         <div class="min-w-0 flex-1">
                             <div class="font-semibold leading-snug {{ $isActiveModule ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)]' }}">{{ $title }}</div>
-                            <div class="text-[10px] text-[var(--ui-muted)]">
-                                {{ $routeName ? $routeName : ($finalUrl ?? '') }}
-                            </div>
                         </div>
                         <div class="flex-shrink-0 mt-1">
                             @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)] transition-colors')
