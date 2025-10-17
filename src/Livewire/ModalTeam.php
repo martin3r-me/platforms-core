@@ -103,29 +103,10 @@ class ModalTeam extends Component
 
     public function updatedUser($property, $value)
     {
-        if ($property === 'current_team_id') {
-            $authUser = Auth::user();
-            $authUser->current_team_id = $this->user['current_team_id'] ?? $value;
-            $authUser->save();
-
-            // Team aktualisieren, Modal schließen und Dashboard neu laden
-            $this->team = $authUser->currentTeam;
-            $this->modalShow = false;
-            $this->redirect(route('platform.dashboard'));
-        }
+        // Teamwechsel wurde entfernt – keine automatische Umschaltung mehr hier
     }
 
-    public function changeCurrentTeam($teamId)
-    {
-        $authUser = Auth::user();
-        $authUser->current_team_id = (int) $teamId;
-        $authUser->save();
-
-        $this->user['current_team_id'] = (int) $teamId;
-        $this->team = $authUser->currentTeam;
-        $this->modalShow = false;
-        $this->redirect(route('platform.dashboard'));
-    }
+    // changeCurrentTeam entfernt – Wechsel erfolgt zentral über Module-Modal
 
     public function inviteToTeam()
     {

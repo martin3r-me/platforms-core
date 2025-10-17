@@ -58,13 +58,14 @@
                     <h3 class="text-sm font-semibold text-[var(--ui-muted)] mb-2">Module</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                     {{-- Main Dashboard Card --}}
-                    @php $isPlatformActive = request()->routeIs('platform.dashboard'); @endphp
+                    @php $isPlatformActive = request()->routeIs('platform.dashboard'); $currentRouteName = optional(request()->route())->getName(); @endphp
                     <a href="{{ route('platform.dashboard') }}" class="group flex items-start gap-3 px-3 py-2 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200 {{ $isPlatformActive ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}">
                         <div class="flex-shrink-0 mt-0.5">
                             @svg('heroicon-o-home', 'w-6 h-6 ' . ($isPlatformActive ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-primary)]') . ' group-hover:scale-110 transition-transform')
                         </div>
                         <div class="min-w-0 flex-1">
                             <div class="font-semibold leading-snug {{ $isPlatformActive ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)]' }}">Haupt-Dashboard</div>
+                            <div class="text-[10px] text-[var(--ui-muted)]">routeIs(platform.dashboard): {{ $isPlatformActive ? 'yes' : 'no' }}, currentRoute: {{ $currentRouteName }}</div>
                         </div>
                         <div class="flex-shrink-0 mt-1">
                             @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)] transition-colors')
@@ -96,6 +97,10 @@
                         </div>
                         <div class="min-w-0 flex-1">
                             <div class="font-semibold leading-snug {{ $isActiveModule ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)]' }}">{{ $title }}</div>
+                            <div class="text-[10px] text-[var(--ui-muted)]">
+                                key: {{ $module['key'] ?? $key }}, prefix: {{ $prefix }}, routeName: {{ $routeName ?? '-' }}, currentRoute: {{ optional(request()->route())->getName() }},
+                                pathMatch: {{ (request()->is($prefix) || request()->is($prefix.'/*')) ? 'yes' : 'no' }}, routeMatch: {{ ($routeName && request()->routeIs($routeName.'*')) ? 'yes' : 'no' }}, active: {{ $isActiveModule ? 'yes' : 'no' }}
+                            </div>
                         </div>
                         <div class="flex-shrink-0 mt-1">
                             @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)] transition-colors')
