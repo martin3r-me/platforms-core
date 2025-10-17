@@ -15,11 +15,11 @@
         
     </x-slot>
         
-        {{-- Tabs: Inhalte --}}
-        {{-- Module --}}
+        {{-- Inhalte: Module + Teams auf einer Seite --}}
         <div class="mt-6" x-show="tab === 'modules'" x-cloak>
             @php
                 $availableModules = $modules ?? [];
+                $userTeams = auth()->user()?->teams()->get() ?? collect();
             @endphp
             <div class="space-y-6">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -51,6 +51,29 @@
                         </div>
                     </a>
                     @endforeach
+                </div>
+
+                {{-- Teams Liste --}}
+                <div class="pt-2 border-t border-[var(--ui-border)]/60">
+                    <h3 class="text-sm font-semibold text-[var(--ui-muted)] mb-3">Teams</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        @foreach($userTeams as $team)
+                            <button type="button"
+                                @click="$dispatch('open-modal-team', { preselect: {{ $team->id }} })"
+                                class="group text-left flex items-center gap-4 p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-all duration-200">
+                                <div class="flex-shrink-0">
+                                    @svg('heroicon-o-user-group', 'w-8 h-8 text-[var(--ui-primary)] group-hover:scale-110 transition-transform')
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="font-semibold text-[var(--ui-secondary)] truncate">{{ $team->name }}</div>
+                                    <div class="text-xs text-[var(--ui-muted)] truncate">Team-ID: {{ $team->id }}</div>
+                                </div>
+                                <div class="flex-shrink-0">
+                                    @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)] transition-colors')
+                                </div>
+                            </button>
+                        @endforeach
+                    </div>
                 </div>
             </div>
         </div>
