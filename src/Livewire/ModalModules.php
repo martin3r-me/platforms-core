@@ -130,7 +130,7 @@ class ModalModules extends Component
         }
     }
 
-    public function switchTeam(int $teamId): void
+    public function switchTeam(int $teamId)
     {
         $user = Auth::user();
         if (!$user) { return; }
@@ -139,7 +139,7 @@ class ModalModules extends Component
 
         $this->modalShow = false;
         // Reload aktuelle Seite via navigate, damit Guards/Sidebars/Scopes neu greifen
-        $this->redirect(request()->fullUrl(), navigate: true);
+        return $this->redirect(request()->fullUrl(), navigate: true);
     }
 
     // --- Team/User/Payment Logik (aus ModalTeam) ---

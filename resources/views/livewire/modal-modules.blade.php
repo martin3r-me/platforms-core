@@ -22,7 +22,33 @@
                 $userTeams = auth()->user()?->teams()->get() ?? collect();
             @endphp
             <div class="space-y-6">
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {{-- Teams zuerst --}}
+                <div class="pt-0">
+                    <h3 class="text-sm font-semibold text-[var(--ui-muted)] mb-2">Teams</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        @foreach($userTeams as $team)
+                            <button type="button"
+                                wire:click="switchTeam({{ $team->id }})"
+                                class="group text-left flex items-start gap-3 p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-all duration-200">
+                                <div class="flex-shrink-0 mt-0.5">
+                                    @svg('heroicon-o-user-group', 'w-6 h-6 text-[var(--ui-primary)] group-hover:scale-110 transition-transform')
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="font-semibold text-[var(--ui-secondary)] leading-snug break-words">{{ $team->name }}</div>
+                                    <div class="text-[10px] text-[var(--ui-muted)]">Team-ID: {{ $team->id }}</div>
+                                </div>
+                                <div class="flex-shrink-0 mt-1">
+                                    @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)] transition-colors')
+                                </div>
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Module danach --}}
+                <div class="pt-2 border-t border-[var(--ui-border)]/60">
+                    <h3 class="text-sm font-semibold text-[var(--ui-muted)] mb-2">Module</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                     @foreach($availableModules as $key => $module)
                         @php
                             $title = $module['title'] ?? $module['label'] ?? ucfirst($key);
@@ -51,28 +77,6 @@
                         </div>
                     </a>
                     @endforeach
-                </div>
-
-                {{-- Teams Liste --}}
-                <div class="pt-2 border-t border-[var(--ui-border)]/60">
-                    <h3 class="text-sm font-semibold text-[var(--ui-muted)] mb-2">Teams</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                        @foreach($userTeams as $team)
-                            <button type="button"
-                                wire:click="switchTeam({{ $team->id }})"
-                                class="group text-left flex items-start gap-3 p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-all duration-200">
-                                <div class="flex-shrink-0 mt-0.5">
-                                    @svg('heroicon-o-user-group', 'w-6 h-6 text-[var(--ui-primary)] group-hover:scale-110 transition-transform')
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <div class="font-semibold text-[var(--ui-secondary)] leading-snug break-words">{{ $team->name }}</div>
-                                    <div class="text-[10px] text-[var(--ui-muted)]">Team-ID: {{ $team->id }}</div>
-                                </div>
-                                <div class="flex-shrink-0 mt-1">
-                                    @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)] transition-colors')
-                                </div>
-                            </button>
-                        @endforeach
                     </div>
                 </div>
             </div>
