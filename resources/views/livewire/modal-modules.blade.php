@@ -64,7 +64,7 @@
                        :class="(currentPath === prefix || currentPath.startsWith(prefix + '/')) ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]'"
                        class="group flex items-start gap-3 px-3 py-2 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200">
                         <div class="flex-shrink-0 mt-0.5">
-                            @svg('heroicon-o-home', 'w-6 h-6 ' . ($isPlatformActive ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-primary)]') . ' group-hover:scale-110 transition-transform')
+                            @svg('heroicon-o-home', 'w-6 h-6 text-[var(--ui-primary)] group-hover:scale-110 transition-transform')
                         </div>
                         <div class="min-w-0 flex-1">
                             <div class="font-semibold leading-snug text-[var(--ui-secondary)]">Haupt-Dashboard</div>
