@@ -82,8 +82,12 @@
                             $prefix = strtolower($module['routing']['prefix'] ?? ($module['key'] ?? $key));
                             $isActiveModule = request()->is($prefix) || request()->is($prefix . '/*');
                         @endphp
-                    <a href="{{ $finalUrl }}" class="group flex items-start gap-3 px-3 py-2 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200 {{ $isActiveModule ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}">
-                        <div class="flex-shrink-0 mt-0.5">
+                        @php
+                            // Robust: Modul als aktiv markieren, wenn Route-Name matcht oder Pfad-Präfix matcht
+                            $isActiveModule = ($routeName && request()->routeIs($routeName.'*')) || request()->is($prefix) || request()->is($prefix.'/*');
+                        @endphp
+                    <a href="{{ $finalUrl }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200 {{ $isActiveModule ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}">
+                        <div class="flex-shrink-0">
                             @if(!empty($icon))
                                 <x-dynamic-component :component="$icon" class="w-6 h-6 {{ $isActiveModule ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-primary)]' }} group-hover:scale-110 transition-transform" />
                             @else
