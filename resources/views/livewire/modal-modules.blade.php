@@ -37,6 +37,14 @@
                                 <div class="min-w-0 flex-1">
                                     <div class="font-semibold leading-snug break-words {{ $isActiveTeam ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)]' }}">{{ $team->name }}</div>
                                     <div class="text-[10px] text-[var(--ui-muted)]">Team-ID: {{ $team->id }}</div>
+                                    @php $memberCount = $team->users()->count(); @endphp
+                                    @if($memberCount > 0 && $memberCount <= 10)
+                                        <div class="mt-1 text-[9px] text-[var(--ui-muted)] leading-tight">
+                                            @foreach($team->users()->limit(10)->get() as $member)
+                                                <span>{{ $member->name }}</span>@if(!$loop->last), @endif
+                                            @endforeach
+                                        </div>
+                                    @endif
                                 </div>
                                 <div class="flex-shrink-0 mt-1">
                                     @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)] transition-colors')
@@ -74,8 +82,7 @@
                                 ? route($routeName)
                                 : ($module['url'] ?? '#');
                             $prefix = strtolower($module['routing']['prefix'] ?? ($module['key'] ?? $key));
-                            $currentPrefix = strtolower(request()->segment(1) ?? '');
-                            $isActiveModule = $currentPrefix === $prefix;
+                            $isActiveModule = request()->is($prefix) || request()->is($prefix . '/*');
                         @endphp
                     <a href="{{ $finalUrl }}" class="group flex items-start gap-3 p-3 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200 {{ $isActiveModule ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}">
                         <div class="flex-shrink-0 mt-0.5">
