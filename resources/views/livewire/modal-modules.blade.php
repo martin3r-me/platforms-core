@@ -1,4 +1,4 @@
-<div x-data="{ tab: 'modules' }" x-init="window.addEventListener('open-modal-modules', (e) => { tab = e?.detail?.tab || 'modules'; });">
+<div x-data="{ tab: 'modules', currentPath: window.location.pathname.replace(/^\//,'') }" x-init="window.addEventListener('open-modal-modules', (e) => { tab = e?.detail?.tab || 'modules'; currentPath = window.location.pathname.replace(/^\//,'') });">
 <x-ui-modal size="xl" model="modalShow">
     <x-slot name="header">
         <div class="flex items-center justify-between w-full">
@@ -58,14 +58,17 @@
                     <h3 class="text-sm font-semibold text-[var(--ui-muted)] mb-2">Module</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                     {{-- Main Dashboard Card --}}
-                    @php $isPlatformActive = request()->routeIs('platform.dashboard'); $currentRouteName = optional(request()->route())->getName(); @endphp
-                    <a href="{{ route('platform.dashboard') }}" class="group flex items-start gap-3 px-3 py-2 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200 {{ $isPlatformActive ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}">
+                    @php $currentRouteName = optional(request()->route())->getName(); @endphp
+                    <a href="{{ route('platform.dashboard') }}"
+                       x-data="{ prefix: 'dashboard' }"
+                       :class="(currentPath === prefix || currentPath.startsWith(prefix + '/')) ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]'"
+                       class="group flex items-start gap-3 px-3 py-2 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200">
                         <div class="flex-shrink-0 mt-0.5">
                             @svg('heroicon-o-home', 'w-6 h-6 ' . ($isPlatformActive ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-primary)]') . ' group-hover:scale-110 transition-transform')
                         </div>
                         <div class="min-w-0 flex-1">
-                            <div class="font-semibold leading-snug {{ $isPlatformActive ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)]' }}">Haupt-Dashboard</div>
-                            <div class="text-[10px] text-[var(--ui-muted)]">routeIs(platform.dashboard): {{ $isPlatformActive ? 'yes' : 'no' }}, currentRoute: {{ $currentRouteName }}</div>
+                            <div class="font-semibold leading-snug text-[var(--ui-secondary)]">Haupt-Dashboard</div>
+                            <div class="text-[10px] text-[var(--ui-muted)]">currentPath: <span x-text="currentPath"></span>, match: <span x-text="(currentPath === 'dashboard' || currentPath.startsWith('dashboard/')) ? 'yes' : 'no'"></span></div>
                         </div>
                         <div class="flex-shrink-0 mt-1">
                             @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)] transition-colors')
@@ -83,23 +86,21 @@
                             $prefix = strtolower($module['routing']['prefix'] ?? ($module['key'] ?? $key));
                             $isActiveModule = request()->is($prefix) || request()->is($prefix . '/*');
                         @endphp
-                        @php
-                            // Robust: Modul als aktiv markieren, wenn Route-Name matcht oder Pfad-Präfix matcht
-                            $isActiveModule = ($routeName && request()->routeIs($routeName.'*')) || request()->is($prefix) || request()->is($prefix.'/*');
-                        @endphp
-                    <a href="{{ $finalUrl }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200 {{ $isActiveModule ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}">
+                    <a href="{{ $finalUrl }}"
+                       x-data="{ prefix: '{{ $prefix }}' }"
+                       :class="(currentPath === prefix || currentPath.startsWith(prefix + '/')) ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]'"
+                       class="group flex items-center gap-3 px-3 py-2 rounded-lg border bg-[var(--ui-surface)] transition-all duration-200">
                         <div class="flex-shrink-0">
                             @if(!empty($icon))
-                                <x-dynamic-component :component="$icon" class="w-6 h-6 {{ $isActiveModule ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-primary)]' }} group-hover:scale-110 transition-transform" />
+                                <x-dynamic-component :component="$icon" class="w-6 h-6 text-[var(--ui-primary)] group-hover:scale-110 transition-transform" />
                             @else
-                                @svg('heroicon-o-cube', 'w-6 h-6 ' . ($isActiveModule ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-primary)]') . ' group-hover:scale-110 transition-transform')
+                                @svg('heroicon-o-cube', 'w-6 h-6 text-[var(--ui-primary)] group-hover:scale-110 transition-transform')
                             @endif
                         </div>
                         <div class="min-w-0 flex-1">
-                            <div class="font-semibold leading-snug {{ $isActiveModule ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)]' }}">{{ $title }}</div>
+                            <div class="font-semibold leading-snug text-[var(--ui-secondary)]">{{ $title }}</div>
                             <div class="text-[10px] text-[var(--ui-muted)]">
-                                key: {{ $module['key'] ?? $key }}, prefix: {{ $prefix }}, routeName: {{ $routeName ?? '-' }}, currentRoute: {{ optional(request()->route())->getName() }},
-                                pathMatch: {{ (request()->is($prefix) || request()->is($prefix.'/*')) ? 'yes' : 'no' }}, routeMatch: {{ ($routeName && request()->routeIs($routeName.'*')) ? 'yes' : 'no' }}, active: {{ $isActiveModule ? 'yes' : 'no' }}
+                                key: {{ $module['key'] ?? $key }}, prefix: {{ $prefix }}, routeName: {{ $routeName ?? '-' }}, currentPath: <span x-text="currentPath"></span>, active: <span x-text="(currentPath === prefix || currentPath.startsWith(prefix + '/')) ? 'yes' : 'no'"></span>
                             </div>
                         </div>
                         <div class="flex-shrink-0 mt-1">
