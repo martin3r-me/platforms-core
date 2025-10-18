@@ -57,6 +57,40 @@
         </x-ui-page-sidebar>
     </x-slot>
 
+    <x-slot name="activity">
+        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" side="right">
+            <div class="p-6 space-y-6">
+                <div>
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Letzte Aktivitäten</h3>
+                    <div class="space-y-3">
+                        <div class="p-3 bg-[var(--ui-muted-5)] rounded-lg">
+                            <div class="text-sm text-[var(--ui-muted)]">Team gewechselt</div>
+                            <div class="font-semibold text-[var(--ui-secondary)]">{{ $currentTeam?->name ?? 'Kein Team' }}</div>
+                            <div class="text-xs text-[var(--ui-muted)]">vor 2 Minuten</div>
+                        </div>
+                        <div class="p-3 bg-[var(--ui-muted-5)] rounded-lg">
+                            <div class="text-sm text-[var(--ui-muted)]">Dashboard aufgerufen</div>
+                            <div class="font-semibold text-[var(--ui-secondary)]">Platform Dashboard</div>
+                            <div class="text-xs text-[var(--ui-muted)]">vor 5 Minuten</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Schnellzugriff</h3>
+                    <div class="space-y-2">
+                        <x-ui-button variant="secondary" size="sm" x-data @click="$dispatch('open-modal-user')" class="w-full">
+                            Benutzer-Einstellungen
+                        </x-ui-button>
+                        <x-ui-button variant="secondary" size="sm" x-data @click="$dispatch('open-modal-checkin')" class="w-full">
+                            Täglicher Check-in
+                        </x-ui-button>
+                    </div>
+                </div>
+            </div>
+        </x-ui-page-sidebar>
+    </x-slot>
+
     <x-ui-page-container>
         <!-- Platform Stats Section -->
         <div class="bg-[var(--ui-surface)] py-16 sm:py-24 rounded-xl border border-[var(--ui-border)]/60 mb-8">
@@ -65,29 +99,29 @@
                     <h2 class="text-3xl font-semibold tracking-tight text-[var(--ui-secondary)] sm:text-4xl">Wir gestalten die Zukunft der Arbeit</h2>
                     <p class="mt-6 text-lg text-[var(--ui-muted)]">Unsere Plattform verbindet Teams, optimiert Prozesse und schafft neue Möglichkeiten für produktive Zusammenarbeit.</p>
                 </div>
-                <div class="mx-auto mt-16 flex max-w-2xl flex-col gap-8 lg:mx-0 lg:mt-20 lg:max-w-none lg:flex-row lg:items-end">
-                    <div class="flex flex-col-reverse justify-between gap-x-16 gap-y-8 rounded-2xl bg-[var(--ui-muted-5)] p-8 sm:w-3/4 sm:max-w-md sm:flex-row-reverse sm:items-end lg:w-72 lg:max-w-none lg:flex-none lg:flex-col lg:items-start">
-                        <p class="flex-none text-3xl font-bold tracking-tight text-[var(--ui-secondary)]">{{ count($teamMembers) }}k</p>
-                        <div class="sm:w-80 sm:shrink lg:w-auto lg:flex-none">
-                            <p class="text-lg font-semibold tracking-tight text-[var(--ui-secondary)]">Aktive Nutzer</p>
-                            <p class="mt-2 text-base/7 text-[var(--ui-muted)]">Teams arbeiten täglich mit unserer Plattform.</p>
+                    <div class="mx-auto mt-16 flex max-w-2xl flex-col gap-8 lg:mx-0 lg:mt-20 lg:max-w-none lg:flex-row lg:items-end">
+                        <div class="flex flex-col-reverse justify-between gap-x-16 gap-y-8 rounded-2xl bg-[var(--ui-muted-5)] p-8 sm:w-3/4 sm:max-w-md sm:flex-row-reverse sm:items-end lg:w-72 lg:max-w-none lg:flex-none lg:flex-col lg:items-start">
+                            <p class="flex-none text-3xl font-bold tracking-tight text-[var(--ui-secondary)]">{{ count($teamMembers) }}</p>
+                            <div class="sm:w-80 sm:shrink lg:w-auto lg:flex-none">
+                                <p class="text-lg font-semibold tracking-tight text-[var(--ui-secondary)]">Team-Mitglieder</p>
+                                <p class="mt-2 text-base/7 text-[var(--ui-muted)]">Aktive Nutzer in {{ $currentTeam?->name ?? 'Ihrem Team' }}.</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-col-reverse justify-between gap-x-16 gap-y-8 rounded-2xl bg-[var(--ui-primary)] p-8 sm:flex-row-reverse sm:items-end lg:w-full lg:max-w-sm lg:flex-auto lg:flex-col lg:items-start lg:gap-y-44">
+                            <p class="flex-none text-3xl font-bold tracking-tight text-white">€{{ number_format($monthlyTotal, 2) }}</p>
+                            <div class="sm:w-80 sm:shrink lg:w-auto lg:flex-none">
+                                <p class="text-lg font-semibold tracking-tight text-white">Monatliche Kosten</p>
+                                <p class="mt-2 text-base/7 text-[var(--ui-primary-200)]">Aktuelle Ausgaben für Module und Services.</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-col-reverse justify-between gap-x-16 gap-y-8 rounded-2xl bg-[var(--ui-success)] p-8 sm:w-11/12 sm:max-w-xl sm:flex-row-reverse sm:items-end lg:w-full lg:max-w-none lg:flex-auto lg:flex-col lg:items-start lg:gap-y-28">
+                            <p class="flex-none text-3xl font-bold tracking-tight text-white">{{ count($modules) }}</p>
+                            <div class="sm:w-80 sm:shrink lg:w-auto lg:flex-none">
+                                <p class="text-lg font-semibold tracking-tight text-white">Verfügbare Module</p>
+                                <p class="mt-2 text-base/7 text-[var(--ui-success-200)]">Tools und Services für Ihr Team.</p>
+                            </div>
                         </div>
                     </div>
-                    <div class="flex flex-col-reverse justify-between gap-x-16 gap-y-8 rounded-2xl bg-[var(--ui-primary)] p-8 sm:flex-row-reverse sm:items-end lg:w-full lg:max-w-sm lg:flex-auto lg:flex-col lg:items-start lg:gap-y-44">
-                        <p class="flex-none text-3xl font-bold tracking-tight text-white">€{{ number_format($monthlyTotal, 2) }}</p>
-                        <div class="sm:w-80 sm:shrink lg:w-auto lg:flex-none">
-                            <p class="text-lg font-semibold tracking-tight text-white">Monatliche Einsparungen</p>
-                            <p class="mt-2 text-base/7 text-[var(--ui-primary-200)]">Durch intelligente Prozesse und Automatisierung.</p>
-                        </div>
-                    </div>
-                    <div class="flex flex-col-reverse justify-between gap-x-16 gap-y-8 rounded-2xl bg-[var(--ui-success)] p-8 sm:w-11/12 sm:max-w-xl sm:flex-row-reverse sm:items-end lg:w-full lg:max-w-none lg:flex-auto lg:flex-col lg:items-start lg:gap-y-28">
-                        <p class="flex-none text-3xl font-bold tracking-tight text-white">{{ count($modules) * 1000 }}</p>
-                        <div class="sm:w-80 sm:shrink lg:w-auto lg:flex-none">
-                            <p class="text-lg font-semibold tracking-tight text-white">Automatisierte Workflows</p>
-                            <p class="mt-2 text-base/7 text-[var(--ui-success-200)]">Intelligente Automatisierung steigert die Produktivität.</p>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -125,6 +159,50 @@
                             <dd class="text-3xl font-semibold tracking-tight text-[var(--ui-secondary)]">99.9%</dd>
                         </div>
                     </dl>
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Tools Section -->
+        <div class="bg-[var(--ui-surface)] py-16 sm:py-24 rounded-xl border border-[var(--ui-border)]/60 mb-8">
+            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                <div class="mx-auto max-w-2xl lg:mx-0">
+                    <h2 class="text-3xl font-semibold tracking-tight text-[var(--ui-secondary)] sm:text-4xl">Verfügbare Tools</h2>
+                    <p class="mt-6 text-lg text-[var(--ui-muted)]">Alle Module und Services, auf die Sie Zugriff haben, um Ihre Arbeit zu optimieren.</p>
+                </div>
+                <div class="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-8 lg:mx-0 lg:max-w-none lg:grid-cols-2 xl:grid-cols-3">
+                    @foreach($modules as $key => $module)
+                        @php
+                            $title = $module['title'] ?? $module['label'] ?? ucfirst($key);
+                            $description = $module['description'] ?? 'Ein leistungsstarkes Tool für Ihr Team.';
+                            $icon = $module['navigation']['icon'] ?? ($module['icon'] ?? null);
+                            $routeName = $module['navigation']['route'] ?? null;
+                            $finalUrl = $routeName && \Illuminate\Support\Facades\Route::has($routeName)
+                                ? route($routeName)
+                                : ($module['url'] ?? '#');
+                        @endphp
+                        <div class="group relative flex flex-col gap-6 rounded-2xl bg-[var(--ui-muted-5)] p-8 hover:bg-[var(--ui-primary-5)] transition-colors">
+                            <div class="flex items-center gap-4">
+                                <div class="flex-shrink-0">
+                                    @if(!empty($icon))
+                                        <x-dynamic-component :component="$icon" class="w-8 h-8 text-[var(--ui-primary)]" />
+                                    @else
+                                        @svg('heroicon-o-cube', 'w-8 h-8 text-[var(--ui-primary)]')
+                                    @endif
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <h3 class="text-lg font-semibold text-[var(--ui-secondary)] group-hover:text-[var(--ui-primary)] transition-colors">{{ $title }}</h3>
+                                </div>
+                            </div>
+                            <p class="text-[var(--ui-muted)] text-sm leading-relaxed">{{ $description }}</p>
+                            <div class="mt-auto">
+                                <a href="{{ $finalUrl }}" class="inline-flex items-center gap-2 text-sm font-medium text-[var(--ui-primary)] hover:text-[var(--ui-primary)] transition-colors">
+                                    Tool öffnen
+                                    @svg('heroicon-o-arrow-right', 'w-4 h-4')
+                                </a>
+                            </div>
+                        </div>
+                    @endforeach
                 </div>
             </div>
         </div>
