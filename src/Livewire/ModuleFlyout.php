@@ -51,10 +51,23 @@ class ModuleFlyout extends Component
 
             return $userAllowed || $teamAllowed;
         })->take(4)->values();
+    }
 
-        // Aktuelles Modul ermitteln
-        $currentPath = request()->segment(1) ?? 'dashboard';
-        $this->currentModule = $currentPath === 'dashboard' ? 'Dashboard' : ucfirst($currentPath);
+    public function loadCurrentModule()
+    {
+        $currentPath = request()->segment(1);
+        
+        if ($currentPath === 'dashboard' || empty($currentPath)) {
+            $this->currentModule = 'Dashboard';
+        } else {
+            $moduleModel = \Platform\Core\Models\Module::where('key', $currentPath)->first();
+            if ($moduleModel) {
+                $config = is_array($moduleModel->config) ? $moduleModel->config : json_decode($moduleModel->config, true);
+                $this->currentModule = $config['title'] ?? ucfirst($currentPath);
+            } else {
+                $this->currentModule = ucfirst($currentPath);
+            }
+        }
     }
 
     public function openModal()

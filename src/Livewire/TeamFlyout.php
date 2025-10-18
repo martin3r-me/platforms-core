@@ -12,6 +12,7 @@ class TeamFlyout extends Component
     public $show = false;
     public $userTeams = [];
     public $currentTeam;
+    public $currentModule;
 
     #[On('open-team-flyout')]
     public function openFlyout()
@@ -23,6 +24,7 @@ class TeamFlyout extends Component
     public function mount()
     {
         $this->loadTeams();
+        $this->loadCurrentModule();
     }
 
     public function loadTeams()
@@ -30,6 +32,23 @@ class TeamFlyout extends Component
         $user = Auth::user();
         $this->currentTeam = $user?->currentTeam;
         $this->userTeams = $user?->teams()->take(4)->get() ?? collect();
+    }
+
+    public function loadCurrentModule()
+    {
+        $currentPath = request()->segment(1);
+        
+        if ($currentPath === 'dashboard' || empty($currentPath)) {
+            $this->currentModule = 'Dashboard';
+        } else {
+            $moduleModel = \Platform\Core\Models\Module::where('key', $currentPath)->first();
+            if ($moduleModel) {
+                $config = is_array($moduleModel->config) ? $moduleModel->config : json_decode($moduleModel->config, true);
+                $this->currentModule = $config['title'] ?? ucfirst($currentPath);
+            } else {
+                $this->currentModule = ucfirst($currentPath);
+            }
+        }
     }
 
     public function switchTeam($teamId)
