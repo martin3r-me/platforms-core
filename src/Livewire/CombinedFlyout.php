@@ -61,7 +61,8 @@ class CombinedFlyout extends Component
         } else {
             $moduleModel = \Platform\Core\Models\Module::where('key', $currentPath)->first();
             if ($moduleModel) {
-                $config = json_decode($moduleModel->config, true);
+                // config ist bereits ein Array, nicht JSON
+                $config = is_array($moduleModel->config) ? $moduleModel->config : json_decode($moduleModel->config, true);
                 $this->currentModule = $config['title'] ?? ucfirst($currentPath);
             } else {
                 $this->currentModule = ucfirst($currentPath);
