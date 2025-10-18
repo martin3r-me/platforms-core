@@ -1,13 +1,12 @@
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="Platform Dashboard" />
+        <x-ui-page-navbar title="Platform Dashboard" icon="heroicon-o-home" />
     </x-slot>
 
     <x-ui-page-container>
-        <div class="space-y-6">
         <!-- Team-Info Banner -->
         @if($currentTeam)
-            <div class="bg-[var(--ui-primary-5)] border border-[var(--ui-primary)]/60 rounded-lg p-4">
+            <div class="bg-[var(--ui-primary-5)] border border-[var(--ui-primary)]/60 rounded-lg p-4 mb-6">
                 <div class="flex items-center gap-2 mb-2">
                     @svg('heroicon-o-building-office', 'w-5 h-5 text-[var(--ui-primary)]')
                     <h3 class="text-lg font-semibold text-[var(--ui-primary)]">Team-Übersicht</h3>
@@ -24,7 +23,8 @@
             </div>
         @endif
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Main Stats Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <x-ui-dashboard-tile
                 title="Verfügbare Module"
                 :count="count($modules)"
@@ -53,12 +53,12 @@
             />
         </div>
 
-        <!-- Stats Section -->
-        <div class="bg-[var(--ui-surface)] py-24 sm:py-32">
+        <!-- Platform Stats Section -->
+        <div class="bg-[var(--ui-surface)] py-16 sm:py-24 rounded-xl border border-[var(--ui-border)]/60 mb-8">
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <div class="mx-auto max-w-2xl lg:mx-0">
-                    <h2 class="text-4xl font-semibold tracking-tight text-pretty text-[var(--ui-secondary)] sm:text-5xl">Wir gestalten die Zukunft der Arbeit</h2>
-                    <p class="mt-6 text-base/7 text-[var(--ui-muted)]">Unsere Plattform verbindet Teams, optimiert Prozesse und schafft neue Möglichkeiten für produktive Zusammenarbeit. Jeder Tag bringt uns näher an eine bessere Arbeitswelt.</p>
+                    <h2 class="text-3xl font-semibold tracking-tight text-[var(--ui-secondary)] sm:text-4xl">Wir gestalten die Zukunft der Arbeit</h2>
+                    <p class="mt-6 text-lg text-[var(--ui-muted)]">Unsere Plattform verbindet Teams, optimiert Prozesse und schafft neue Möglichkeiten für produktive Zusammenarbeit.</p>
                 </div>
                 <div class="mx-auto mt-16 flex max-w-2xl flex-col gap-8 lg:mx-0 lg:mt-20 lg:max-w-none lg:flex-row lg:items-end">
                     <div class="flex flex-col-reverse justify-between gap-x-16 gap-y-8 rounded-2xl bg-[var(--ui-muted-5)] p-8 sm:w-3/4 sm:max-w-md sm:flex-row-reverse sm:items-end lg:w-72 lg:max-w-none lg:flex-none lg:flex-col lg:items-start">
@@ -71,27 +71,27 @@
                     <div class="flex flex-col-reverse justify-between gap-x-16 gap-y-8 rounded-2xl bg-[var(--ui-primary)] p-8 sm:flex-row-reverse sm:items-end lg:w-full lg:max-w-sm lg:flex-auto lg:flex-col lg:items-start lg:gap-y-44">
                         <p class="flex-none text-3xl font-bold tracking-tight text-white">€{{ number_format($monthlyTotal, 2) }}</p>
                         <div class="sm:w-80 sm:shrink lg:w-auto lg:flex-none">
-                            <p class="text-lg font-semibold tracking-tight text-white">Monatliche Einsparungen durch Optimierung</p>
-                            <p class="mt-2 text-base/7 text-[var(--ui-primary-200)]">Effizienzsteigerung und Kostensenkung durch intelligente Prozesse.</p>
+                            <p class="text-lg font-semibold tracking-tight text-white">Monatliche Einsparungen</p>
+                            <p class="mt-2 text-base/7 text-[var(--ui-primary-200)]">Durch intelligente Prozesse und Automatisierung.</p>
                         </div>
                     </div>
                     <div class="flex flex-col-reverse justify-between gap-x-16 gap-y-8 rounded-2xl bg-[var(--ui-success)] p-8 sm:w-11/12 sm:max-w-xl sm:flex-row-reverse sm:items-end lg:w-full lg:max-w-none lg:flex-auto lg:flex-col lg:items-start lg:gap-y-28">
                         <p class="flex-none text-3xl font-bold tracking-tight text-white">{{ count($modules) * 1000 }}</p>
                         <div class="sm:w-80 sm:shrink lg:w-auto lg:flex-none">
                             <p class="text-lg font-semibold tracking-tight text-white">Automatisierte Workflows</p>
-                            <p class="mt-2 text-base/7 text-[var(--ui-success-200)]">Intelligente Automatisierung reduziert manuelle Arbeit und steigert die Produktivität.</p>
+                            <p class="mt-2 text-base/7 text-[var(--ui-success-200)]">Intelligente Automatisierung steigert die Produktivität.</p>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Features Section -->
-        <div class="bg-[var(--ui-surface)] py-24 sm:py-32">
+        <!-- Platform Features Section -->
+        <div class="bg-[var(--ui-surface)] py-16 sm:py-24 rounded-xl border border-[var(--ui-border)]/60">
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <div class="mx-auto max-w-2xl lg:mx-0 lg:max-w-none">
                     <p class="text-base/7 font-semibold text-[var(--ui-primary)]">Effizienter arbeiten</p>
-                    <h1 class="mt-2 text-4xl font-semibold tracking-tight text-pretty text-[var(--ui-secondary)] sm:text-5xl">Ein besseres Arbeitsumfeld</h1>
+                    <h1 class="mt-2 text-3xl font-semibold tracking-tight text-[var(--ui-secondary)] sm:text-4xl">Ein besseres Arbeitsumfeld</h1>
                     <div class="mt-10 grid max-w-xl grid-cols-1 gap-8 text-base/7 text-[var(--ui-muted)] lg:max-w-none lg:grid-cols-2">
                         <div>
                             <p>Unsere Plattform vereint alle wichtigen Tools an einem Ort. Teams können nahtlos zusammenarbeiten, ohne zwischen verschiedenen Anwendungen wechseln zu müssen. Die intuitive Benutzeroberfläche macht komplexe Prozesse einfach und übersichtlich.</p>
@@ -121,6 +121,35 @@
                         </div>
                     </dl>
                 </div>
+            </div>
+        </div>
+
+        <!-- Team Section -->
+        <div class="bg-[var(--ui-surface)] py-16 sm:py-24 rounded-xl border border-[var(--ui-border)]/60">
+            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                <div class="mx-auto max-w-2xl lg:mx-0">
+                    <h2 class="text-3xl font-semibold tracking-tight text-[var(--ui-secondary)] sm:text-4xl">Unser Team</h2>
+                    <p class="mt-6 text-lg text-[var(--ui-muted)]">Wir sind ein dynamisches Team von Menschen, die leidenschaftlich an dem arbeiten, was wir tun, und bestrebt sind, die besten Ergebnisse für unsere Kunden zu liefern.</p>
+                </div>
+                <ul role="list" class="mx-auto mt-16 grid max-w-2xl grid-cols-2 gap-x-8 gap-y-16 text-center sm:grid-cols-3 md:grid-cols-4 lg:mx-0 lg:max-w-none lg:grid-cols-5 xl:grid-cols-6">
+                    @foreach($teamMembers as $member)
+                        <li>
+                            <div class="mx-auto size-24 rounded-full bg-[var(--ui-primary-5)] flex items-center justify-center outline-1 -outline-offset-1 outline-[var(--ui-border)]">
+                                <span class="text-2xl font-semibold text-[var(--ui-primary)]">
+                                    {{ strtoupper(substr($member->name, 0, 2)) }}
+                                </span>
+                            </div>
+                            <h3 class="mt-6 text-base/7 font-semibold tracking-tight text-[var(--ui-secondary)]">{{ $member->name }}</h3>
+                            <p class="text-sm/6 text-[var(--ui-muted)]">
+                                @if($member->id === $currentTeam?->user_id)
+                                    Team-Leiter
+                                @else
+                                    Team-Mitglied
+                                @endif
+                            </p>
+                        </li>
+                    @endforeach
+                </ul>
             </div>
         </div>
     </x-ui-page-container>
