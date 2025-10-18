@@ -3,56 +3,61 @@
         <x-ui-page-navbar title="Platform Dashboard" icon="heroicon-o-home" />
     </x-slot>
 
-    <x-ui-page-container>
-        <!-- Team-Info Banner -->
-        @if($currentTeam)
-            <div class="bg-[var(--ui-primary-5)] border border-[var(--ui-primary)]/60 rounded-lg p-4 mb-6">
-                <div class="flex items-center gap-2 mb-2">
-                    @svg('heroicon-o-building-office', 'w-5 h-5 text-[var(--ui-primary)]')
-                    <h3 class="text-lg font-semibold text-[var(--ui-primary)]">Team-Übersicht</h3>
+    <x-slot name="sidebar">
+        <x-ui-page-sidebar title="Schnellzugriff" width="w-80" :defaultOpen="true" side="left">
+            <div class="p-6 space-y-6">
+                <div>
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Team-Info</h3>
+                    <div class="space-y-3">
+                        <div class="p-3 bg-[var(--ui-muted-5)] rounded-lg">
+                            <div class="text-sm text-[var(--ui-muted)]">Aktuelles Team</div>
+                            <div class="font-semibold text-[var(--ui-secondary)]">{{ $currentTeam?->name ?? 'Kein Team' }}</div>
+                        </div>
+                        <div class="p-3 bg-[var(--ui-muted-5)] rounded-lg">
+                            <div class="text-sm text-[var(--ui-muted)]">Mitglieder</div>
+                            <div class="font-semibold text-[var(--ui-secondary)]">{{ count($teamMembers) }}</div>
+                        </div>
+                        <div class="p-3 bg-[var(--ui-muted-5)] rounded-lg">
+                            <div class="text-sm text-[var(--ui-muted)]">Module</div>
+                            <div class="font-semibold text-[var(--ui-secondary)]">{{ count($modules) }}</div>
+                        </div>
+                    </div>
                 </div>
-                <p class="text-[var(--ui-secondary)] text-sm">
-                    Willkommen im {{ $currentTeam->name }} Team. 
-                    {{ count($teamMembers) }} Mitglieder, {{ count($modules) }} verfügbare Module.
-                </p>
-                <div class="mt-3">
-                    <x-ui-button variant="primary" x-data @click="$dispatch('open-modal-team', { tab: 'team' })">
-                        Team verwalten / Mitglieder einladen
-                    </x-ui-button>
+
+                <div>
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Aktionen</h3>
+                    <div class="space-y-2">
+                        <x-ui-button variant="primary" size="sm" x-data @click="$dispatch('open-modal-team')" class="w-full">
+                            Team verwalten
+                        </x-ui-button>
+                        <x-ui-button variant="secondary" size="sm" x-data @click="$dispatch('open-modal-modules')" class="w-full">
+                            Module verwalten
+                        </x-ui-button>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Verfügbare Module</h3>
+                    <div class="space-y-2">
+                        @foreach($modules as $key => $module)
+                            @php
+                                $title = $module['title'] ?? $module['label'] ?? ucfirst($key);
+                                $routeName = $module['navigation']['route'] ?? null;
+                                $finalUrl = $routeName && \Illuminate\Support\Facades\Route::has($routeName)
+                                    ? route($routeName)
+                                    : ($module['url'] ?? '#');
+                            @endphp
+                            <a href="{{ $finalUrl }}" class="block p-2 rounded-lg hover:bg-[var(--ui-muted-5)] transition">
+                                <div class="font-medium text-[var(--ui-secondary)] text-sm">{{ $title }}</div>
+                            </a>
+                        @endforeach
+                    </div>
                 </div>
             </div>
-        @endif
+        </x-ui-page-sidebar>
+    </x-slot>
 
-        <!-- Main Stats Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            <x-ui-dashboard-tile
-                title="Verfügbare Module"
-                :count="count($modules)"
-                subtitle="Tools & Services"
-                icon="cube"
-                variant="primary"
-                size="lg"
-            />
-            
-            <x-ui-dashboard-tile
-                title="Monatliche Kosten"
-                :count="$monthlyTotal"
-                subtitle="Aktueller Monat"
-                icon="banknotes"
-                variant="info"
-                size="lg"
-            />
-            
-            <x-ui-dashboard-tile
-                title="Team-Mitglieder"
-                :count="count($teamMembers)"
-                subtitle="Aktive Nutzer"
-                icon="users"
-                variant="success"
-                size="lg"
-            />
-        </div>
-
+    <x-ui-page-container>
         <!-- Platform Stats Section -->
         <div class="bg-[var(--ui-surface)] py-16 sm:py-24 rounded-xl border border-[var(--ui-border)]/60 mb-8">
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
@@ -87,7 +92,7 @@
         </div>
 
         <!-- Platform Features Section -->
-        <div class="bg-[var(--ui-surface)] py-16 sm:py-24 rounded-xl border border-[var(--ui-border)]/60">
+        <div class="bg-[var(--ui-surface)] py-16 sm:py-24 rounded-xl border border-[var(--ui-border)]/60 mb-8">
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <div class="mx-auto max-w-2xl lg:mx-0 lg:max-w-none">
                     <p class="text-base/7 font-semibold text-[var(--ui-primary)]">Effizienter arbeiten</p>
