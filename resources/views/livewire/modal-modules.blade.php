@@ -25,7 +25,7 @@
                 {{-- Teams zuerst --}}
                 <div class="pt-0">
                     <h3 class="text-sm font-semibold text-[var(--ui-muted)] mb-2">Teams</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         @foreach($userTeams as $team)
                             @php $isActiveTeam = auth()->user()?->currentTeam?->id === $team->id; @endphp
                             <button type="button"
