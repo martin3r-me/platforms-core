@@ -58,7 +58,7 @@
     </x-slot>
 
     <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" side="right">
+        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" side="right" storeKey="activityOpen">
             <div class="p-6 space-y-6">
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Letzte Aktivitäten</h3>
