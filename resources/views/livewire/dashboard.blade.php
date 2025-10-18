@@ -1,6 +1,6 @@
 <x-ui-page>
     <x-slot name="navbar">
-        <x-page-navbar title="Platform Dashboard" />
+        <x-ui-page-navbar title="Platform Dashboard" />
     </x-slot>
 
     <div class="p-6 space-y-6">
