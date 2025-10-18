@@ -3,7 +3,8 @@
         <x-ui-page-navbar title="Platform Dashboard" />
     </x-slot>
 
-    <div class="p-6 space-y-6">
+    <x-ui-page-container>
+        <div class="space-y-6">
         <!-- Team-Info Banner -->
         @if($currentTeam)
             <div class="bg-[var(--ui-primary-5)] border border-[var(--ui-primary)]/60 rounded-lg p-4">
@@ -122,5 +123,5 @@
                 </div>
             </div>
         </div>
-    </div>
+    </x-ui-page-container>
 </x-ui-page>
