@@ -7,7 +7,7 @@
         class="inline-flex items-center gap-1 px-2 py-1 h-7 rounded-md border transition text-xs
         text-[var(--ui-primary)] bg-[var(--ui-primary-5)] border-[var(--ui-primary)]/60"
         title="Team wechseln">
-        <span class="truncate max-w-[12rem]">{{ $currentTeam?->name ?? 'Team' }} • {{ $currentModule }}</span>
+        <span class="truncate max-w-[12rem]">{{ $currentTeam?->name ?? 'Team' }}</span>
         <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
             <path d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" fill-rule="evenodd" />
         </svg>

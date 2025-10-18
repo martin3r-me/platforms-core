@@ -23,6 +23,7 @@ class ModuleFlyout extends Component
     public function mount()
     {
         $this->loadModules();
+        $this->loadCurrentModule();
     }
 
     public function loadModules()
