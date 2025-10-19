@@ -4,14 +4,14 @@
         : new \Platform\Core\Services\ConfigAuthAccessPolicy()
 )
 
-<div class="bg-white dark:bg-gray-900 min-h-screen">
+<div class="bg-white dark:bg-gray-900 h-screen flex flex-col">
   <!-- Header -->
-  <header class="absolute inset-x-0 top-0 z-50">
+  <header class="flex-shrink-0">
     <nav aria-label="Global" class="flex items-center justify-between p-6 lg:px-8">
       <div class="flex lg:flex-1">
         <a href="{{ route('landing') }}" class="-m-1.5 p-1.5">
-          <span class="sr-only">Martin3r</span>
-          <img src="/logo.png" alt="Martin3r" class="h-8 w-auto rounded-lg shadow object-contain" />
+          <span class="sr-only">Glowkit</span>
+          <img src="/logo.png" alt="Glowkit" class="h-8 w-auto rounded-lg shadow object-contain" />
         </a>
       </div>
       <div class="hidden lg:flex lg:flex-1 lg:justify-end">
@@ -20,27 +20,14 @@
     </nav>
   </header>
 
-  <main>
-    <!-- Hero section -->
-    <div class="relative isolate pt-14">
-      <svg aria-hidden="true" class="absolute inset-0 -z-10 size-full mask-[radial-gradient(100%_100%_at_top_right,white,transparent)] stroke-gray-200 dark:stroke-white/10">
-        <defs>
-          <pattern id="83fd4e5a-9d52-42fc-97b6-718e5d7ee527" width="200" height="200" x="50%" y="-1" patternUnits="userSpaceOnUse">
-            <path d="M100 200V.5M.5 .5H200" fill="none" />
-          </pattern>
-        </defs>
-        <svg x="50%" y="-1" class="overflow-visible fill-gray-50 dark:fill-gray-800/50">
-          <path d="M-100.5 0h201v201h-201Z M699.5 0h201v201h-201Z M499.5 400h201v201h-201Z M-300.5 600h201v201h-201Z" stroke-width="0" />
-        </svg>
-        <rect width="100%" height="100%" fill="url(#83fd4e5a-9d52-42fc-97b6-718e5d7ee527)" stroke-width="0" />
-      </svg>
-      <div class="mx-auto max-w-7xl px-6 py-24 sm:py-32 lg:flex lg:items-center lg:gap-x-10 lg:px-8 lg:py-40">
-        <div class="mx-auto max-w-2xl lg:mx-0 lg:flex-auto">
-          <h1 class="mt-10 text-5xl font-semibold tracking-tight text-pretty text-gray-900 sm:text-7xl dark:text-white">Willkommen zurück</h1>
-          <p class="mt-8 text-lg font-medium text-pretty text-gray-500 sm:text-xl/8 dark:text-gray-400">Melden Sie sich in Ihrem Martin3r-Konto an, um auf alle Funktionen zuzugreifen.</p>
-        </div>
-        <div class="mt-16 sm:mt-24 lg:mt-0 lg:shrink-0 lg:grow">
-          <div class="bg-white dark:bg-gray-800 py-8 px-6 shadow-xl sm:rounded-2xl sm:px-10 ring-1 ring-gray-900/10 dark:ring-white/10">
+  <main class="flex-1 flex items-center justify-center">
+    <div class="w-full max-w-md mx-auto px-6">
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Willkommen zurück</h1>
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Melden Sie sich in Ihrem Glowkit-Konto an, um auf alle Funktionen zuzugreifen.</p>
+      </div>
+      
+      <div class="bg-white dark:bg-gray-800 py-8 px-6 shadow-xl rounded-2xl ring-1 ring-gray-900/10 dark:ring-white/10">
             @if($policy->isPasswordLoginAllowed())
               <form wire:submit.prevent="login" class="space-y-6">
                 {{-- E-Mail --}}
@@ -116,6 +103,5 @@
           </div>
         </div>
       </div>
-    </div>
-  </main>
-</div>
+    </main>
+  </div>

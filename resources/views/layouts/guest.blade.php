@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ config('app.name', 'platform') }}</title>
+    <title>{{ config('app.name', 'Glowkit') }}</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -18,17 +18,9 @@
     <x-ui-styles/>
 </head>
 
-<body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)] selection:bg-[rgba(var(--ui-primary-rgb),0.2)]">
+<body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-white selection:bg-indigo-100 dark:selection:bg-indigo-900">
 
-    {{-- Fixed Top Navbar --}}
-    <livewire:core.navbar />
-
-    {{-- Auth-Container --}}
-    <div class="pt-16 min-h-screen flex items-center justify-center">
-        <main class="w-full max-w-5xl p-6">
-            {{ $slot }}
-        </main>
-    </div>
+    {{ $slot }}
 
     @auth 
         @livewire('core.modal-team')
