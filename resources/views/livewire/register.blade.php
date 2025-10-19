@@ -4,9 +4,9 @@
         : new \Platform\Core\Services\ConfigAuthAccessPolicy()
 )
 
-<div class="bg-white dark:bg-gray-900 h-screen flex flex-col">
+<div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
   <!-- Header -->
-  <header class="flex-shrink-0">
+  <header class="absolute inset-x-0 top-0 z-50">
     <nav aria-label="Global" class="flex items-center justify-between p-6 lg:px-8">
       <div class="flex lg:flex-1">
         <a href="{{ route('landing') }}" class="-m-1.5 p-1.5">
@@ -15,19 +15,24 @@
         </a>
       </div>
       <div class="hidden lg:flex lg:flex-1 lg:justify-end">
-        <a href="{{ route('landing') }}" class="text-sm/6 font-semibold text-gray-900 dark:text-white">Zurück zur Startseite <span aria-hidden="true">&larr;</span></a>
+        <a href="{{ route('landing') }}" class="text-sm/6 font-semibold text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">Zurück zur Startseite <span aria-hidden="true">&larr;</span></a>
       </div>
     </nav>
   </header>
 
-  <main class="flex-1 flex items-center justify-center">
-    <div class="w-full max-w-md mx-auto px-6">
+  <main class="flex min-h-screen items-center justify-center px-6 py-12 sm:px-6 lg:px-8">
+    <div class="w-full max-w-md">
+      <!-- Logo und Titel -->
       <div class="text-center mb-8">
-        <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Erstellen Sie Ihr Konto</h1>
-        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Starten Sie noch heute mit Glowkit und verwalten Sie Ihre Geschäftsprozesse effizient.</p>
+        <div class="mx-auto h-12 w-12 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 p-2.5 shadow-lg">
+          <img src="/logo.png" alt="Glowkit" class="h-7 w-7 rounded-lg object-contain" />
+        </div>
+        <h1 class="mt-6 text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Erstellen Sie Ihr Konto</h1>
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Starten Sie noch heute mit Glowkit</p>
       </div>
       
-      <div class="bg-white dark:bg-gray-800 py-8 px-6 shadow-xl rounded-2xl ring-1 ring-gray-900/10 dark:ring-white/10">
+      <!-- Formular-Karte -->
+      <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm py-8 px-6 shadow-2xl rounded-2xl ring-1 ring-gray-200/50 dark:ring-gray-700/50 border border-gray-100/50 dark:border-gray-700/50">
             @if(! $policy->isManualRegistrationAllowed())
               <div class="mb-6 rounded-md bg-yellow-50 dark:bg-yellow-900/20 p-4">
                 <div class="flex">
@@ -148,17 +153,17 @@
 
                 <div>
                   <button type="submit"
-                          class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800">
+                          class="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 transform hover:scale-[1.02]">
                     Konto erstellen
                   </button>
                 </div>
               </form>
             @endif
 
-            <div class="mt-6 text-center">
+            <div class="mt-8 text-center">
               <p class="text-sm text-gray-600 dark:text-gray-400">
                 Bereits registriert?
-                <a href="{{ route('login') }}" class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+                <a href="{{ route('login') }}" class="font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
                   Anmelden
                 </a>
               </p>
