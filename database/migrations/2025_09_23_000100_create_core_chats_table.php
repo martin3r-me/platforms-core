@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('core_chats')) {
+            return;
+        }
+
         Schema::create('core_chats', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->nullable()->index();

@@ -7,6 +7,10 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        if (Schema::hasTable('core_chat_threads')) {
+            return;
+        }
+
         Schema::create('core_chat_threads', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('core_chat_id')->index();

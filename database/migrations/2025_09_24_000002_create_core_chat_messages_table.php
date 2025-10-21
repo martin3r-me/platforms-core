@@ -7,6 +7,10 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        if (Schema::hasTable('core_chat_messages')) {
+            return;
+        }
+
         Schema::create('core_chat_messages', function (Blueprint $table) {
             $table->id();
             $table->foreignId('core_chat_id')->constrained('core_chats')->cascadeOnDelete();
