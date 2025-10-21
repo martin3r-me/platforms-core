@@ -1,8 +1,8 @@
 <div
   x-data="chatTerminal({
-    isStreaming: $wire?.entangle('isStreaming') ?? false,
-    isProcessing: $wire?.entangle('isProcessing') ?? false,
-    canCancel:   $wire?.entangle('canCancel')   ?? false,
+    isStreaming:  @entangle('isStreaming'),
+    isProcessing: @entangle('isProcessing'),
+    canCancel:    @entangle('canCancel'),
   })"
   x-init="init()"
   x-on:toggle-terminal.window="toggle(); $nextTick(() => { const c = $refs.body; if(c){ c.scrollTop = c.scrollHeight } })"
@@ -123,7 +123,7 @@
                role="log"
                aria-live="polite"
                aria-atomic="false">
-            <!-- schon finalisierte Zeilen -->
+            <!-- finalisierte Zeilen -->
             <template x-for="line in streamLines" :key="line.id">
               <div
                 class="text-[var(--ui-secondary)] text-xs break-words transition ease-out duration-200"
@@ -131,18 +131,15 @@
                 x-text="line.text">
               </div>
             </template>
-
-            <!-- aktuell wachsende Zeile (optional, ohne Fade) -->
+            <!-- aktuell wachsende Zeile -->
             <div class="text-[var(--ui-secondary)] text-xs break-words"
                  x-show="currentLine.length"
                  x-text="currentLine">
             </div>
-
-            <!-- Spinner solange noch kein Delta kam -->
+            <!-- Spinner solange kein Delta -->
             <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"
                  x-show="!hasDelta"
                  aria-hidden="true"></div>
-
             <!-- Toolchip -->
             <template x-if="$wire.currentTool">
               <div class="text-xs text-[var(--ui-muted)]" x-text="'(Tool: ' + $wire.currentTool + ')'"></div>
@@ -194,22 +191,24 @@
   </div>
 
   <script>
-    // Dev-Logs optional
+    // Dev-Flag (optional)
     window.__DEV__ = window.__DEV__ ?? false;
 
     function chatTerminal(initial = {}){
       return {
-        // Alpine/Livewire entangled Flags (reaktiv)
-        isStreaming:  initial.isStreaming ?? false,
-        isProcessing: initial.isProcessing ?? false,
-        canCancel:    initial.canCancel ?? false,
+        // Livewire-Entangle (reaktiv)
+        isStreaming:  initial.isStreaming,
+        isProcessing: initial.isProcessing,
+        canCancel:    initial.canCancel,
+
+        // lokale Wire-Referenz (vermeidet $wire-Scoping-Probleme)
+        wire: null,
 
         // SSE/Stream State
         es: null,
         hasDelta: false,
-        // Zeilenweiser Stream:
-        streamLines: [],      // [{id,text,visible}]
-        currentLine: '',      // die wachsende Zeile
+        streamLines: [],   // [{id,text,visible}]
+        currentLine: '',
         lineIdSeq: 0,
 
         // Retry/Backoff
@@ -220,14 +219,14 @@
         // Refs
         bodyEl: null,
 
-        // Init
         init(){
+          this.wire = this.$wire || null;                 // <- lokale Referenz
           this.bodyEl = this.$refs.body;
           window.addEventListener('beforeunload', () => this.closeStream());
           this.$nextTick(() => { if(Alpine?.store('page')?.terminalOpen && this.bodyEl){ this.bodyEl.scrollTop = this.bodyEl.scrollHeight; }});
         },
 
-        // Helpers – UI
+        // Helpers
         scrollToEnd(){
           if(this.bodyEl){
             requestAnimationFrame(() => { this.bodyEl.scrollTop = this.bodyEl.scrollHeight; });
@@ -239,10 +238,7 @@
           const id = `line-${++this.lineIdSeq}`;
           const line = { id, text, visible: false };
           this.streamLines.push(line);
-          this.$nextTick(() => {
-            line.visible = true; // Fade-In triggern
-            this.scrollToEnd();
-          });
+          this.$nextTick(() => { line.visible = true; this.scrollToEnd(); });
         },
         appendToCurrent(delta){
           this.currentLine += delta;
@@ -256,17 +252,14 @@
         },
         handleDeltaText(delta){
           if(!delta) return;
-          // Split nach Zeilenumbrüchen
           const parts = String(delta).split(/\r?\n/);
           for(let i=0;i<parts.length;i++){
             const seg = parts[i];
             const isLast = i === parts.length - 1;
             if(!isLast){
-              // Segment + Zeilenumbruch -> aktuelle Zeile abschließen
               this.appendToCurrent(seg);
               this.finalizeCurrentIfAny();
             } else {
-              // letztes Segment: nur anhängen (noch offen)
               if(seg.length) this.appendToCurrent(seg);
             }
           }
@@ -276,13 +269,13 @@
         startStream(url){
           this.closeStream();
 
-          // Flags beim Start (Eingabe sperren)
+          // Flags beim Start
           this.isProcessing = false;
           this.isStreaming  = true;
           this.canCancel    = true;
-          $wire?.set?.('isProcessing', false);
-          $wire?.set?.('isStreaming', true);
-          $wire?.set?.('canCancel', true);
+          this.wire?.set?.('isProcessing', false);
+          this.wire?.set?.('isStreaming', true);
+          this.wire?.set?.('canCancel', true);
 
           // Reset Stream-UI
           this.streamLines = [];
@@ -309,17 +302,15 @@
                 return;
               }
 
-              // Robust JSON parsing
               let data = null;
               try { data = JSON.parse(e.data); } catch(_) {}
 
               if(data && (typeof data.delta === 'string' || typeof data.delta === 'number')){
                 if(!this.hasDelta) this.hasDelta = true;
                 this.handleDeltaText(String(data.delta));
-                if(data.tool && $wire?.set){ $wire.set('currentTool', data.tool); }
+                if(data.tool && this.wire?.set){ this.wire.set('currentTool', data.tool); }
                 window.dispatchEvent(new CustomEvent('ai-stream-delta', { detail: { delta: String(data.delta) } }));
               } else {
-                // Non-JSON oder anderes Format: ignorieren
                 if(window.__DEV__) console.warn('[Terminal SSE] skip non-JSON or missing delta');
               }
             };
@@ -345,27 +336,24 @@
         },
 
         abortStream(){
-          // manuell aus UI
           this.closeStream();
           this.isStreaming = false;
           this.isProcessing = false;
           this.canCancel = false;
-          $wire?.set?.('isStreaming', false);
-          $wire?.set?.('isProcessing', false);
-          $wire?.set?.('canCancel', false);
-          $wire?.set?.('progressText', '');
-          $wire?.set?.('currentTool', null);
+          this.wire?.set?.('isStreaming', false);
+          this.wire?.set?.('isProcessing', false);
+          this.wire?.set?.('canCancel', false);
+          this.wire?.set?.('progressText', '');
+          this.wire?.set?.('currentTool', null);
           window.dispatchEvent(new CustomEvent('ai-stream-error'));
         },
 
-        // Event-Brücken
+        // Events
         onStreamComplete(){
           if(window.__DEV__) console.log('[Terminal SSE] ai-stream-complete');
-          // letzte offene Zeile finalisieren (falls ohne trailing \n beendet)
           this.finalizeCurrentIfAny();
-          this.canCancel = false; $wire?.set?.('canCancel', false);
+          this.canCancel = false; this.wire?.set?.('canCancel', false);
           this.scrollToEnd();
-          // Jetzt drainen: History nachladen, dann Stream-UI leeren
           this.onStreamDrained();
         },
 
@@ -374,27 +362,25 @@
           this.isStreaming = false;
           this.isProcessing = false;
           this.canCancel = false;
-          $wire?.set?.('isStreaming', false);
-          $wire?.set?.('isProcessing', false);
-          $wire?.set?.('canCancel', false);
-          $wire?.set?.('progressText', '');
-          $wire?.set?.('currentTool', null);
+          this.wire?.set?.('isStreaming', false);
+          this.wire?.set?.('isProcessing', false);
+          this.wire?.set?.('canCancel', false);
+          this.wire?.set?.('progressText', '');
+          this.wire?.set?.('currentTool', null);
         },
 
         async onStreamDrained(){
-          // Flags zurücksetzen, dann History reload
           this.isStreaming = false;
           this.canCancel = false;
           this.isProcessing = false;
-          $wire?.set?.('isStreaming', false);
-          $wire?.set?.('canCancel', false);
-          $wire?.set?.('isProcessing', false);
-          try { await $wire?.call?.('loadMessages'); } catch(_) {}
+          this.wire?.set?.('isStreaming', false);
+          this.wire?.set?.('canCancel', false);
+          this.wire?.set?.('isProcessing', false);
+          try { await this.wire?.call?.('loadMessages'); } catch(_) {}
           setTimeout(() => {
-            // Stream-UI leeren NACHDEM die Historie steht
             this.streamLines = [];
             this.currentLine = '';
-            $wire?.set?.('currentTool', null);
+            this.wire?.set?.('currentTool', null);
             this.scrollToEnd();
             window.dispatchEvent(new CustomEvent('terminal-scroll'));
           }, 60);
