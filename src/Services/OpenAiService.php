@@ -11,7 +11,14 @@ class OpenAiService
 
     private function getApiKey(): string
     {
-        return env('OPENAI_API_KEY') ?: 'demo-key';
+        $apiKey = env('OPENAI_API_KEY');
+        
+        // Check if API key is valid (starts with 'sk-' and has reasonable length)
+        if ($apiKey && str_starts_with($apiKey, 'sk-') && strlen($apiKey) > 20) {
+            return $apiKey;
+        }
+        
+        return 'demo-key';
     }
 
     public function chat(array $messages, string $model = 'gpt-3.5-turbo', array $options = []): array
@@ -68,21 +75,71 @@ class OpenAiService
     private function getDemoResponse(array $messages): array
     {
         $lastMessage = end($messages);
-        $userInput = strtolower($lastMessage['content'] ?? '');
+        $userInput = strtolower(trim($lastMessage['content'] ?? ''));
         
+        // Erweiterte Demo-Antworten mit intelligenten Keywords
         $demoResponses = [
+            // Begrüßungen
             'hallo' => 'Hallo! Wie kann ich dir helfen?',
             'moin' => 'Moin! Schön, dass du da bist!',
             'hi' => 'Hi! Was möchtest du wissen?',
-            'test' => 'Test erfolgreich! Das Terminal funktioniert.',
+            'hey' => 'Hey! Bereit zu arbeiten?',
+            'guten tag' => 'Guten Tag! Wie kann ich dir heute helfen?',
+            'guten morgen' => 'Guten Morgen! Ein produktiver Tag beginnt!',
+            'guten abend' => 'Guten Abend! Zeit für eine Zusammenfassung?',
+            
+            // Dank & Feedback
+            'danke' => 'Gerne! Freut mich, dass ich helfen konnte!',
+            'danke freue mich auch' => 'Das freut mich sehr! Zusammen schaffen wir mehr!',
+            'danke schön' => 'Bitte sehr! Immer gerne!',
+            'vielen dank' => 'Sehr gerne! Was können wir als nächstes angehen?',
+            'perfekt' => 'Super! Freut mich, dass es funktioniert!',
+            'toll' => 'Das ist großartig! Weiter so!',
+            'super' => 'Fantastisch! Lass uns weitermachen!',
+            
+            // Test & Status
+            'test' => 'Test erfolgreich! Das Terminal funktioniert einwandfrei.',
             'hall0' => 'Hallo! Das Terminal funktioniert im Demo-Modus.',
+            'funktioniert' => 'Ja, alles läuft perfekt!',
+            'status' => 'Alles im grünen Bereich! System läuft stabil.',
+            
+            // Arbeit & Projekte
             'projekt' => 'Ich kann dir bei Projekten helfen! Möchtest du ein neues Projekt erstellen?',
             'aufgabe' => 'Aufgaben sind wichtig! Soll ich dir zeigen, wie du eine neue Aufgabe anlegst?',
             'okr' => 'OKRs helfen bei der Zielsetzung. Welche Ziele möchtest du definieren?',
+            'arbeit' => 'Arbeit ist wichtig! Lass uns produktiv werden!',
+            'meeting' => 'Meetings sind wichtig für die Zusammenarbeit. Soll ich dir bei der Planung helfen?',
+            
+            // Hilfe & Support
+            'hilfe' => 'Gerne helfe ich dir! Du kannst mich nach Projekten, Aufgaben, OKRs oder anderen Themen fragen.',
+            'help' => 'I can help you with projects, tasks, OKRs, and more. Just ask!',
+            'was kann ich' => 'Du kannst mich nach Projekten, Aufgaben, OKRs, Meetings und vielem mehr fragen!',
+            'befehle' => 'Verfügbare Befehle: Projekte, Aufgaben, OKRs, Meetings, Status, Hilfe',
+            
+            // Allgemeine Gespräche
+            'wie gehts' => 'Mir geht es gut, danke! Und dir?',
+            'wie geht es dir' => 'Sehr gut, danke der Nachfrage! Bereit zu helfen!',
+            'alles klar' => 'Alles klar! Was können wir angehen?',
+            'ok' => 'Perfekt! Lass uns weitermachen!',
         ];
         
-        $response = $demoResponses[$userInput] ?? 
-            "Demo-Antwort: Du hast '$userInput' geschrieben. Das Terminal funktioniert, aber es ist kein echter OpenAI API Key konfiguriert.";
+        // Intelligente Suche nach Keywords
+        $response = $demoResponses[$userInput] ?? null;
+        
+        if (!$response) {
+            // Suche nach Keywords in der Eingabe
+            foreach ($demoResponses as $keyword => $reply) {
+                if (str_contains($userInput, $keyword)) {
+                    $response = $reply;
+                    break;
+                }
+            }
+        }
+        
+        // Fallback für unbekannte Eingaben
+        if (!$response) {
+            $response = "Interessant! Du hast '$userInput' geschrieben. Das Terminal funktioniert im Demo-Modus. Du kannst mich nach Projekten, Aufgaben, OKRs oder anderen Themen fragen!";
+        }
         
         return [
             'content' => $response,
