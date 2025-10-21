@@ -140,8 +140,8 @@
         wire:keydown.enter="sendMessage"
         class="flex-1 bg-transparent outline-none text-sm text-[var(--ui-secondary)] placeholder-[var(--ui-muted)]"
         :placeholder="$wire.isStreaming ? 'Verarbeite…' : 'Nachricht eingeben…'"
-        :disabled="$wire.isStreaming"
-        :aria-disabled="$wire.isStreaming ? 'true' : 'false'"
+        :disabled="$wire.isStreaming || $wire.isProcessing"
+        :aria-disabled="$wire.isStreaming || $wire.isProcessing ? 'true' : 'false'"
         wire:key="terminal-input"
       />
       @if($canCancel)
