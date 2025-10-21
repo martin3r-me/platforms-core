@@ -7,24 +7,17 @@ use Illuminate\Support\Facades\Log;
 
 class OpenAiService
 {
-    private string $apiKey;
     private string $baseUrl = 'https://api.openai.com/v1';
 
-    public function __construct()
+    private function getApiKey(): string
     {
-        $this->apiKey = env('OPENAI_API_KEY');
-        
-        // Check if API key is empty or not set
-        if (empty($this->apiKey) || $this->apiKey === '') {
-            // For demo purposes, we'll use a mock response
-            $this->apiKey = 'demo-key';
-        }
+        return env('OPENAI_API_KEY') ?: 'demo-key';
     }
 
     public function chat(array $messages, string $model = 'gpt-3.5-turbo', array $options = []): array
     {
         // Demo mode - return mock responses
-        if ($this->apiKey === 'demo-key') {
+        if ($this->getApiKey() === 'demo-key') {
             $lastMessage = end($messages);
             $userInput = $lastMessage['content'] ?? '';
             
@@ -48,7 +41,7 @@ class OpenAiService
         
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->apiKey,
+                'Authorization' => 'Bearer ' . $this->getApiKey(),
                 'Content-Type' => 'application/json',
             ])->post($this->baseUrl . '/chat/completions', [
                 'model' => $model,
@@ -89,7 +82,7 @@ class OpenAiService
     {
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->apiKey,
+                'Authorization' => 'Bearer ' . $this->getApiKey(),
             ])->get($this->baseUrl . '/models');
 
             if ($response->failed()) {
