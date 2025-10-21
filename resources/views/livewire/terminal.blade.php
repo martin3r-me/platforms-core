@@ -7,6 +7,8 @@
         queue: '',
         typingTimer: null,
         typingDelay: 18, // ms per char for natürliches Tippen
+        fastTypingDelay: 8,
+        finalizePending: false,
         stopTyping(){ if(this.typingTimer){ clearInterval(this.typingTimer); this.typingTimer = null; } },
         startTyping(){
             if(this.typingTimer) return;
@@ -20,6 +22,13 @@
             if(!delta) return;
             this.queue += delta;
             this.startTyping();
+        },
+        drainUntilEmpty(){
+            if(this.queue.length === 0){
+                window.dispatchEvent(new CustomEvent('ai-stream-drained'));
+                return;
+            }
+            setTimeout(() => this.drainUntilEmpty(), 30);
         },
         startStream(url){
             if(this.es){ this.es.close(); this.es = null; }
@@ -51,8 +60,9 @@
     x-on:toggle-terminal.window="toggle()"
     x-on:ai-stream-start.window="console.log('[Terminal SSE] ai-stream-start', $event.detail?.url); startStream($event.detail.url)"
     x-on:ai-stream-delta.window="console.log('[Terminal SSE] ai-stream-delta event'); pushDelta($event.detail.delta); $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
-    x-on:ai-stream-complete.window="console.log('[Terminal SSE] ai-stream-complete'); stopTyping(); queue=''; streamText=''; $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
+    x-on:ai-stream-complete.window="console.log('[Terminal SSE] ai-stream-complete'); finalizePending=true; typingDelay=fastTypingDelay; startTyping(); drainUntilEmpty()"
     x-on:ai-stream-error.window="console.log('[Terminal SSE] ai-stream-error'); stopTyping(); queue=''; $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
+    x-on:ai-stream-drained.window="console.log('[Terminal SSE] ai-stream-drained'); stopTyping(); finalizePending=false; queue=''; streamText=''; $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
     x-on:ai-stream-error.window="$wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
     class="w-full"
 >
