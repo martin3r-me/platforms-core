@@ -16,40 +16,25 @@ class OpenAiService
 
     public function chat(array $messages, string $model = 'gpt-3.5-turbo', array $options = []): array
     {
-        // Demo mode - return mock responses
+        // Demo mode - return mock responses with streaming simulation
         if ($this->getApiKey() === 'demo-key') {
-            $lastMessage = end($messages);
-            $userInput = $lastMessage['content'] ?? '';
-            
-            $demoResponses = [
-                'hallo' => 'Hallo! Wie kann ich dir helfen?',
-                'moin' => 'Moin! Schön, dass du da bist!',
-                'hi' => 'Hi! Was möchtest du wissen?',
-                'test' => 'Test erfolgreich! Das Terminal funktioniert.',
-                'hall0' => 'Hallo! Das Terminal funktioniert im Demo-Modus.',
-            ];
-            
-            $response = $demoResponses[strtolower($userInput)] ?? 
-                "Demo-Antwort: Du hast '$userInput' geschrieben. Das Terminal funktioniert, aber es ist kein echter OpenAI API Key konfiguriert.";
-            
-            return [
-                'content' => $response,
-                'usage' => ['total_tokens' => 50],
-                'model' => 'demo-model',
-            ];
+            return $this->getDemoResponse($messages);
         }
         
         try {
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->getApiKey(),
-                'Content-Type' => 'application/json',
-            ])->post($this->baseUrl . '/chat/completions', [
-                'model' => $model,
-                'messages' => $messages,
-                'max_tokens' => $options['max_tokens'] ?? 1000,
-                'temperature' => $options['temperature'] ?? 0.7,
-                'stream' => false,
-            ]);
+            $response = Http::timeout(20) // LLM-Timeout: 20s
+                ->withHeaders([
+                    'Authorization' => 'Bearer ' . $this->getApiKey(),
+                    'Content-Type' => 'application/json',
+                ])->post($this->baseUrl . '/chat/completions', [
+                    'model' => $model,
+                    'messages' => $messages,
+                    'max_tokens' => $options['max_tokens'] ?? 1000,
+                    'temperature' => $options['temperature'] ?? 0.7,
+                    'stream' => $options['stream'] ?? false,
+                    'tools' => $options['tools'] ?? null,
+                    'tool_choice' => $options['tool_choice'] ?? 'auto',
+                ]);
 
             if ($response->failed()) {
                 Log::error('OpenAI API Error', [
@@ -66,6 +51,8 @@ class OpenAiService
                 'content' => $data['choices'][0]['message']['content'] ?? '',
                 'usage' => $data['usage'] ?? [],
                 'model' => $data['model'] ?? $model,
+                'tool_calls' => $data['choices'][0]['message']['tool_calls'] ?? null,
+                'finish_reason' => $data['choices'][0]['finish_reason'] ?? null,
             ];
 
         } catch (\Exception $e) {
@@ -76,6 +63,34 @@ class OpenAiService
             
             throw $e;
         }
+    }
+
+    private function getDemoResponse(array $messages): array
+    {
+        $lastMessage = end($messages);
+        $userInput = strtolower($lastMessage['content'] ?? '');
+        
+        $demoResponses = [
+            'hallo' => 'Hallo! Wie kann ich dir helfen?',
+            'moin' => 'Moin! Schön, dass du da bist!',
+            'hi' => 'Hi! Was möchtest du wissen?',
+            'test' => 'Test erfolgreich! Das Terminal funktioniert.',
+            'hall0' => 'Hallo! Das Terminal funktioniert im Demo-Modus.',
+            'projekt' => 'Ich kann dir bei Projekten helfen! Möchtest du ein neues Projekt erstellen?',
+            'aufgabe' => 'Aufgaben sind wichtig! Soll ich dir zeigen, wie du eine neue Aufgabe anlegst?',
+            'okr' => 'OKRs helfen bei der Zielsetzung. Welche Ziele möchtest du definieren?',
+        ];
+        
+        $response = $demoResponses[$userInput] ?? 
+            "Demo-Antwort: Du hast '$userInput' geschrieben. Das Terminal funktioniert, aber es ist kein echter OpenAI API Key konfiguriert.";
+        
+        return [
+            'content' => $response,
+            'usage' => ['total_tokens' => 50],
+            'model' => 'demo-model',
+            'tool_calls' => null,
+            'finish_reason' => 'stop',
+        ];
     }
 
     public function getModels(): array

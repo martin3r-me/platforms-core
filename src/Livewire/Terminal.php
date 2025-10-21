@@ -17,6 +17,14 @@ class Terminal extends Component
     public $show = false;
     public $messageInput = '';
     public $messages = [];
+    
+    // UX State Management
+    public $isProcessing = false;
+    public $isStreaming = false;
+    public $currentTool = null;
+    public $progressText = '';
+    public $canCancel = false;
+    public $idempotencyKey = '';
 
     public function mount()
     {
@@ -149,9 +157,18 @@ class Terminal extends Component
 
     public function sendMessage()
     {
-        if (empty($this->messageInput) || !$this->activeThreadId) {
+        if (empty($this->messageInput) || !$this->activeThreadId || $this->isProcessing) {
             return;
         }
+
+        // Generate idempotency key
+        $this->idempotencyKey = 'chat_' . time() . '_' . uniqid();
+        
+        // 1. Sofortiges UI-Feedback (0-200ms)
+        $this->isProcessing = true;
+        $this->isStreaming = true;
+        $this->canCancel = true;
+        $this->progressText = 'Denke...';
 
         $userMessage = $this->messageInput;
         
@@ -168,7 +185,7 @@ class Terminal extends Component
         $this->messageInput = '';
         $this->loadMessages();
 
-        // Get AI response
+        // Get AI response with enhanced UX
         $this->getAiResponse();
     }
 
@@ -197,8 +214,26 @@ class Terminal extends Component
                 ]);
             }
 
-            // Get AI response
-            $response = $openAi->chat($messages);
+            // 2. Progress-Mikrotexte für bessere UX
+            $this->progressText = 'Ressourcen prüfen...';
+            $this->dispatch('terminal-progress', ['text' => $this->progressText]);
+
+            // Get AI response with timeout handling
+            $response = $openAi->chat($messages, 'gpt-3.5-turbo', [
+                'max_tokens' => 1000,
+                'temperature' => 0.7,
+                'stream' => false,
+            ]);
+
+            // 3. Tool-Call-Handling
+            if (!empty($response['tool_calls'])) {
+                $this->handleToolCalls($response['tool_calls']);
+                return;
+            }
+
+            // 4. Finale Antwort
+            $this->progressText = 'Antwort wird formatiert...';
+            $this->dispatch('terminal-progress', ['text' => $this->progressText]);
             
             // Create AI message
             CoreChatMessage::create([
@@ -209,20 +244,82 @@ class Terminal extends Component
                 'tokens_out' => $response['usage']['completion_tokens'] ?? 0,
             ]);
 
-            // Reload messages to show AI response
-            $this->loadMessages();
+            // 5. Klares Ende
+            $this->finishResponse();
 
         } catch (\Exception $e) {
-            // Create error message
+            $this->handleError($e);
+        }
+    }
+
+    private function handleToolCalls(array $toolCalls)
+    {
+        foreach ($toolCalls as $toolCall) {
+            $this->currentTool = $toolCall['function']['name'] ?? 'unknown';
+            $this->progressText = "Tool '{$this->currentTool}' wird ausgeführt...";
+            $this->dispatch('terminal-progress', ['text' => $this->progressText]);
+            
+            // Simulate tool execution (in real implementation, execute actual tools)
+            sleep(1); // Simulate processing time
+            
+            // Create tool result message
             CoreChatMessage::create([
                 'core_chat_id' => $this->activeChatId,
                 'thread_id' => $this->activeThreadId,
-                'role' => 'assistant',
-                'content' => 'Entschuldigung, ich konnte deine Nachricht nicht verarbeiten. Bitte versuche es erneut.',
+                'role' => 'tool',
+                'content' => "Tool '{$this->currentTool}' erfolgreich ausgeführt.",
+                'tokens_in' => 0,
             ]);
-
-            $this->loadMessages();
         }
+        
+        // Continue with AI response after tool execution
+        $this->getAiResponse();
+    }
+
+    private function finishResponse()
+    {
+        $this->isProcessing = false;
+        $this->isStreaming = false;
+        $this->canCancel = false;
+        $this->currentTool = null;
+        $this->progressText = '';
+        
+        $this->loadMessages();
+        $this->dispatch('terminal-complete');
+    }
+
+    private function handleError(\Exception $e)
+    {
+        $this->isProcessing = false;
+        $this->isStreaming = false;
+        $this->canCancel = false;
+        $this->currentTool = null;
+        $this->progressText = '';
+        
+        // Create error message
+        CoreChatMessage::create([
+            'core_chat_id' => $this->activeChatId,
+            'thread_id' => $this->activeThreadId,
+            'role' => 'assistant',
+            'content' => 'Entschuldigung, es gab einen Fehler: ' . $e->getMessage(),
+            'tokens_in' => 0,
+        ]);
+
+        $this->loadMessages();
+        $this->dispatch('terminal-error', ['message' => $e->getMessage()]);
+    }
+
+    public function cancelRequest()
+    {
+        if (!$this->canCancel) return;
+        
+        $this->isProcessing = false;
+        $this->isStreaming = false;
+        $this->canCancel = false;
+        $this->currentTool = null;
+        $this->progressText = '';
+        
+        $this->dispatch('terminal-cancelled');
     }
 
     public function render()

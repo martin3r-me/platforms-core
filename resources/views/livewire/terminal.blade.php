@@ -79,6 +79,22 @@
                             </span>
                         </div>
                     @endforeach
+                    
+                    <!-- Progress Indicator -->
+                    @if($isProcessing)
+                        <div class="flex items-start gap-2">
+                            <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
+                            <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"></div>
+                                <span class="text-[var(--ui-secondary)] text-xs">{{ $progressText ?: 'Verarbeite...' }}</span>
+                            </div>
+                            @if($currentTool)
+                                <div class="text-xs text-[var(--ui-muted)]">
+                                    (Tool: {{ $currentTool }})
+                                </div>
+                            @endif
+                        </div>
+                    @endif
                 </div>
             @endif
         </div>
@@ -91,14 +107,25 @@
                 wire:model="messageInput"
                 wire:keydown.enter="sendMessage"
                 class="flex-1 bg-transparent outline-none text-sm text-[var(--ui-secondary)] placeholder-[var(--ui-muted)]" 
-                placeholder="Nachricht eingeben…" 
+                placeholder="{{ $isProcessing ? 'Verarbeite...' : 'Nachricht eingeben…' }}"
+                {{ $isProcessing ? 'disabled' : '' }}
             />
-            <button 
-                wire:click="sendMessage"
-                class="inline-flex items-center justify-center h-8 px-3 rounded-md border border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)] transition"
-            >
-                Senden
-            </button>
+            @if($canCancel)
+                <button 
+                    wire:click="cancelRequest"
+                    class="inline-flex items-center justify-center h-8 px-3 rounded-md border border-[var(--ui-danger)]/60 text-[var(--ui-danger)] hover:bg-[var(--ui-danger-5)] transition"
+                >
+                    Abbrechen
+                </button>
+            @else
+                <button 
+                    wire:click="sendMessage"
+                    class="inline-flex items-center justify-center h-8 px-3 rounded-md border border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)] transition"
+                    {{ $isProcessing ? 'disabled' : '' }}
+                >
+                    Senden
+                </button>
+            @endif
         </div>
     </div>
 </div>
