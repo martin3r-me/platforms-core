@@ -49,7 +49,7 @@ class CoreAiStreamController extends Controller
 
         $assistantBuffer = '';
 
-        $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer) {
+        $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread) {
             // Clean buffers to avoid server buffering
             while (ob_get_level() > 0) {
                 @ob_end_flush();
@@ -59,33 +59,32 @@ class CoreAiStreamController extends Controller
             echo "retry: 500\n\n";
             @flush();
 
+            // Stream deltas
             $openAi->streamChat($messages, function (string $delta) use (&$assistantBuffer) {
                 $assistantBuffer .= $delta;
                 echo 'data: ' . json_encode(['delta' => $delta], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
             });
 
+            // Close stream
             echo "data: [DONE]\n\n";
             @flush();
+
+            // Persist final assistant message
+            if ($assistantBuffer !== '') {
+                CoreChatMessage::create([
+                    'core_chat_id' => $thread->core_chat_id,
+                    'thread_id' => $thread->id,
+                    'role' => 'assistant',
+                    'content' => $assistantBuffer,
+                    'tokens_out' => mb_strlen($assistantBuffer),
+                ]);
+            }
         });
 
         $response->headers->set('Content-Type', 'text/event-stream');
         $response->headers->set('Cache-Control', 'no-cache, no-transform');
         $response->headers->set('Connection', 'keep-alive');
-
-        // Persist the streamed assistant message after the response finishes
-        $response->sendHeaders();
-        $response->sendContent();
-
-        if ($assistantBuffer !== '') {
-            CoreChatMessage::create([
-                'core_chat_id' => $thread->core_chat_id,
-                'thread_id' => $thread->id,
-                'role' => 'assistant',
-                'content' => $assistantBuffer,
-                'tokens_out' => mb_strlen($assistantBuffer),
-            ]);
-        }
 
         return $response;
     }
