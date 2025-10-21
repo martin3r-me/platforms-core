@@ -2,11 +2,6 @@
   x-data="chatTerminal()"
   x-init="init()"
   x-on:toggle-terminal.window="toggle(); $nextTick(() => { const c = $refs.body; if(c){ c.scrollTop = c.scrollHeight } })"
-  x-on:ai-stream-start.window="startStream($event.detail?.url)"
-  x-on:ai-stream-delta.window="$nextTick(() => { const c = $refs.body; if(c){ c.scrollTop = c.scrollHeight } })"
-  x-on:ai-stream-complete.window="onStreamComplete()"
-  x-on:ai-stream-error.window="onStreamError()"
-  x-on:ai-stream-drained.window="onStreamDrained()"
   x-on:terminal-scroll.window="$nextTick(() => { const c = $refs.body; if(c){ c.scrollTop = c.scrollHeight } })"
   class="w-full"
   wire:key="terminal-root"
@@ -113,29 +108,16 @@
         @endforeach
 
         <!-- Streaming-Block (zeilenweises Fade-In) -->
-        <div class="flex items-start gap-2" x-show="$wire.isStreaming || streamLines.length > 0" wire:ignore>
+        <div class="flex items-start gap-2" x-show="$wire.isStreaming" wire:ignore>
           <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
           <div class="flex-1 flex flex-col gap-1"
                role="log"
                aria-live="polite"
                aria-atomic="false">
-            <!-- finalisierte Zeilen -->
-            <template x-for="line in streamLines" :key="line.id">
-              <div
-                class="text-[var(--ui-secondary)] text-xs break-words transition ease-out duration-200"
-                :class="line.visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-0.5'"
-                x-text="line.text">
-              </div>
-            </template>
-            <!-- aktuell wachsende Zeile -->
-            <div class="text-[var(--ui-secondary)] text-xs break-words"
-                 x-show="currentLine.length"
-                 x-text="currentLine">
+            <!-- Streaming-Status -->
+            <div class="text-[var(--ui-secondary)] text-xs break-words">
+              Verarbeite Anfrage...
             </div>
-            <!-- Spinner solange kein Delta -->
-            <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"
-                 x-show="!hasDelta"
-                 aria-hidden="true"></div>
             <!-- Toolchip -->
             <template x-if="$wire.currentTool">
               <div class="text-xs text-[var(--ui-muted)]" x-text="'(Tool: ' + $wire.currentTool + ')'"></div>
@@ -187,211 +169,20 @@
   </div>
 
   <script>
-    window.__DEV__ = window.__DEV__ ?? false;
-
     function chatTerminal(){
       return {
-        // Entangled Flags (werden in init() gebunden)
-        // Diese werden jetzt direkt über $wire referenziert
-
-        // lokale Wire-Referenz (vermeidet $wire-Scoping-Probleme)
-        wire: null,
-
-        // SSE/Stream State
-        es: null,
-        hasDelta: false,
-        streamLines: [],   // [{id,text,visible}]
-        currentLine: '',
-        lineIdSeq: 0,
-
-        // Retry/Backoff
-        retryCount: 0,
-        maxRetry: 3,
-        backoffBaseMs: 400,
-
-        // Refs
-        bodyEl: null,
-
-        init(){
-          // *** Wire-Referenz für direkte Zugriffe ***
-          this.wire = this.$wire || null;
-
-          this.bodyEl = this.$refs.body;
-          window.addEventListener('beforeunload', () => this.closeStream());
-          this.$nextTick(() => {
-            if(Alpine?.store('page')?.terminalOpen && this.bodyEl){
-              this.bodyEl.scrollTop = this.bodyEl.scrollHeight;
-            }
-          });
-        },
-
-        // Helpers
+        // Minimal Alpine.js - nur für UI-Interaktionen
         get open(){ return Alpine?.store('page')?.terminalOpen ?? false; },
         toggle(){ if(Alpine?.store('page')) Alpine.store('page').terminalOpen = !Alpine.store('page').terminalOpen; },
-        scrollToEnd(){
-          if(this.bodyEl){
-            requestAnimationFrame(() => { this.bodyEl.scrollTop = this.bodyEl.scrollHeight; });
-          }
+        
+        init(){
+          // Nur grundlegende Initialisierung
+          window.addEventListener('beforeunload', () => this.closeStream());
         },
-
-        // Zeilenlogik
-        pushFinalLine(text){
-          const id = `line-${++this.lineIdSeq}`;
-          const line = { id, text, visible: false };
-          this.streamLines.push(line);
-          this.$nextTick(() => { line.visible = true; this.scrollToEnd(); });
-        },
-        appendToCurrent(delta){
-          this.currentLine += delta;
-          this.scrollToEnd();
-        },
-        finalizeCurrentIfAny(){
-          if(this.currentLine.length){
-            this.pushFinalLine(this.currentLine);
-            this.currentLine = '';
-          }
-        },
-        handleDeltaText(delta){
-          if(!delta) return;
-          const parts = String(delta).split(/\r?\n/);
-          for(let i=0;i<parts.length;i++){
-            const seg = parts[i];
-            const isLast = i === parts.length - 1;
-            if(!isLast){
-              this.appendToCurrent(seg);
-              this.finalizeCurrentIfAny();
-            } else {
-              if(seg.length) this.appendToCurrent(seg);
-            }
-          }
-        },
-
-        // SSE
-        startStream(url){
-          this.closeStream();
-
-          // Flags beim Start
-          if (this.wire?.set) {
-            this.wire.set('isProcessing', false);
-            this.wire.set('isStreaming', true);
-            this.wire.set('canCancel', true);
-          }
-
-          // Reset Stream-UI
-          this.streamLines = [];
-          this.currentLine = '';
-          this.hasDelta = false;
-
-          try {
-            if(window.__DEV__) console.log('[Terminal SSE] startStream →', url);
-            this.es = new EventSource(url);
-
-            this.es.onopen = () => {
-              if(window.__DEV__) console.log('[Terminal SSE] connection open');
-              this.retryCount = 0;
-            };
-
-            this.es.onmessage = (e) => {
-              if(!e.data) return;
-              if(window.__DEV__) console.log('[Terminal SSE] onmessage raw:', e.data);
-
-              if(e.data === '[DONE]'){
-                if(window.__DEV__) console.log('[Terminal SSE] DONE');
-                this.closeStream();
-                window.dispatchEvent(new CustomEvent('ai-stream-complete'));
-                return;
-              }
-
-              let data = null;
-              try { data = JSON.parse(e.data); } catch(_) {}
-
-              if(data && (typeof data.delta === 'string' || typeof data.delta === 'number')){
-                if(!this.hasDelta) this.hasDelta = true;
-                this.handleDeltaText(String(data.delta));
-                if(data.tool && this.wire?.set){ 
-                  this.wire.set('currentTool', data.tool); 
-                }
-                window.dispatchEvent(new CustomEvent('ai-stream-delta', { detail: { delta: String(data.delta) } }));
-              } else {
-                if(window.__DEV__) console.warn('[Terminal SSE] skip non-JSON or missing delta');
-              }
-            };
-
-            this.es.onerror = (err) => {
-              if(window.__DEV__) console.error('[Terminal SSE] error:', err);
-              this.closeStream();
-              if(this.retryCount < this.maxRetry){
-                const delay = Math.min(4000, this.backoffBaseMs * Math.pow(2, this.retryCount++));
-                setTimeout(() => this.startStream(url), delay);
-              } else {
-                window.dispatchEvent(new CustomEvent('ai-stream-error'));
-              }
-            };
-          } catch(e){
-            if(window.__DEV__) console.error('[Terminal SSE] start error', e);
-            this.onStreamError();
-          }
-        },
-
+        
         closeStream(){
-          if(this.es){ try { this.es.close(); } catch(_){} this.es = null; }
-        },
-
-        abortStream(){
-          this.closeStream();
-          if (this.wire?.set) {
-            this.wire.set('isStreaming', false);
-            this.wire.set('isProcessing', false);
-            this.wire.set('canCancel', false);
-            this.wire.set('progressText', '');
-            this.wire.set('currentTool', null);
-          }
-          window.dispatchEvent(new CustomEvent('ai-stream-error'));
-        },
-
-        // Events
-        onStreamComplete(){
-          if(window.__DEV__) console.log('[Terminal SSE] ai-stream-complete');
-          this.finalizeCurrentIfAny();
-          if (this.wire?.set) {
-            this.wire.set('canCancel', false);
-          }
-          this.scrollToEnd();
-          this.onStreamDrained();
-        },
-
-        onStreamError(){
-          if(window.__DEV__) console.log('[Terminal SSE] ai-stream-error');
-          if (this.wire?.set) {
-            this.wire.set('isStreaming', false);
-            this.wire.set('isProcessing', false);
-            this.wire.set('canCancel', false);
-            this.wire.set('progressText', '');
-            this.wire.set('currentTool', null);
-          }
-        },
-
-        async onStreamDrained(){
-          if (this.wire?.set) {
-            this.wire.set('isStreaming', false);
-            this.wire.set('canCancel', false);
-            this.wire.set('isProcessing', false);
-          }
-          try { 
-            if (this.wire?.call) {
-              await this.wire.call('loadMessages'); 
-            }
-          } catch(_) {}
-          setTimeout(() => {
-            this.streamLines = [];
-            this.currentLine = '';
-            if (this.wire?.set) {
-              this.wire.set('currentTool', null);
-            }
-            this.scrollToEnd();
-            window.dispatchEvent(new CustomEvent('terminal-scroll'));
-          }, 60);
-        },
+          // Minimal cleanup
+        }
       };
     }
   </script>
