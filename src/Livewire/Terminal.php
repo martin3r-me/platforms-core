@@ -26,6 +26,16 @@ class Terminal extends Component
     public $canCancel = false;
     public $idempotencyKey = '';
 
+    protected $listeners = [
+        'refresh' => 'refreshComponent',
+    ];
+
+    public function refreshComponent()
+    {
+        $this->loadMessages();
+        $this->dispatch('terminal-scroll');
+    }
+
     public function mount()
     {
         $this->loadChats();
@@ -45,7 +55,6 @@ class Terminal extends Component
             ->get()
             ->toArray();
 
-        // Set first chat as active if none selected
         if (empty($this->activeChatId) && !empty($this->chats)) {
             $this->activeChatId = $this->chats[0]['id'];
             $this->loadActiveThread();
@@ -66,7 +75,6 @@ class Terminal extends Component
             'status' => 'active',
         ]);
 
-        // Create first thread for the chat
         $thread = CoreChatThread::create([
             'core_chat_id' => $chat->id,
             'title' => 'Thread 1',
@@ -83,10 +91,9 @@ class Terminal extends Component
     public function deleteChat($chatId)
     {
         $chat = CoreChat::find($chatId);
-        if ($chat && $chat->user_id === Auth::id()) {
+        if ($chat && $this->isOwner($chat)) {
             $chat->update(['status' => 'archived']);
             $this->loadChats();
-            
             if ($this->activeChatId === $chatId) {
                 $this->activeChatId = !empty($this->chats) ? $this->chats[0]['id'] : null;
                 $this->loadActiveThread();
@@ -94,6 +101,11 @@ class Terminal extends Component
                 $this->dispatch('terminal-scroll');
             }
         }
+    }
+
+    private function isOwner(CoreChat $chat): bool
+    {
+        return $chat->user_id === Auth::id();
     }
 
     public function setActiveChat($chatId)

@@ -57,12 +57,13 @@
             } catch(_) {}
         }
     }"
+    x-init="$nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(Alpine?.store('page')?.terminalOpen && c){ c.scrollTop = c.scrollHeight } })"
     x-on:toggle-terminal.window="toggle(); $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
     x-on:ai-stream-start.window="console.log('[Terminal SSE] ai-stream-start', $event.detail?.url); startStream($event.detail.url)"
     x-on:ai-stream-delta.window="console.log('[Terminal SSE] ai-stream-delta event'); pushDelta($event.detail.delta); $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
-    x-on:ai-stream-complete.window="console.log('[Terminal SSE] ai-stream-complete'); finalizePending=true; $wire.set('canCancel', false); typingDelay=fastTypingDelay; startTyping(); drainUntilEmpty()"
+    x-on:ai-stream-complete.window="console.log('[Terminal SSE] ai-stream-complete'); finalizePending=true; $wire.set('canCancel', false); typingDelay=fastTypingDelay; startTyping(); drainUntilEmpty(); $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
     x-on:ai-stream-error.window="console.log('[Terminal SSE] ai-stream-error'); stopTyping(); queue=''; finalizePending=false; $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', '')"
-    x-on:ai-stream-drained.window="console.log('[Terminal SSE] ai-stream-drained'); stopTyping(); $wire.set('isProcessing', false); $wire.set('isStreaming', false); setTimeout(()=>{ finalizePending=false; $wire.set('progressText',''); }, 20)"
+    x-on:ai-stream-drained.window="console.log('[Terminal SSE] ai-stream-drained'); stopTyping(); $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.call('loadMessages'); setTimeout(()=>{ window.dispatchEvent(new CustomEvent('terminal-scroll')); streamText=''; queue=''; finalizePending=false; $wire.set('progressText',''); }, 80)"
     x-on:terminal-scroll.window="$nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
     class="w-full"
 >
