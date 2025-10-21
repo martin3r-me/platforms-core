@@ -4,11 +4,30 @@
         toggle(){ Alpine?.store('page') && (Alpine.store('page').terminalOpen = !Alpine.store('page').terminalOpen) },
         es: null,
         streamText: '',
+        queue: '',
+        typingTimer: null,
+        typingDelay: 18, // ms per char for natürliches Tippen
+        stopTyping(){ if(this.typingTimer){ clearInterval(this.typingTimer); this.typingTimer = null; } },
+        startTyping(){
+            if(this.typingTimer) return;
+            this.typingTimer = setInterval(() => {
+                if(this.queue.length === 0){ this.stopTyping(); return; }
+                this.streamText += this.queue[0];
+                this.queue = this.queue.slice(1);
+            }, this.typingDelay);
+        },
+        pushDelta(delta){
+            if(!delta) return;
+            this.queue += delta;
+            this.startTyping();
+        },
         startStream(url){
             if(this.es){ this.es.close(); this.es = null; }
             try {
                 console.log('[Terminal SSE] startStream →', url);
                 this.streamText = '';
+                this.queue = '';
+                this.stopTyping();
                 this.es = new EventSource(url);
                 this.es.onopen = () => { console.log('[Terminal SSE] connection open'); };
                 this.es.onmessage = (e) => {
@@ -31,9 +50,9 @@
     }"
     x-on:toggle-terminal.window="toggle()"
     x-on:ai-stream-start.window="console.log('[Terminal SSE] ai-stream-start', $event.detail?.url); startStream($event.detail.url)"
-    x-on:ai-stream-delta.window="console.log('[Terminal SSE] ai-stream-delta event'); streamText += $event.detail.delta; $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
-    x-on:ai-stream-complete.window="console.log('[Terminal SSE] ai-stream-complete'); $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
-    x-on:ai-stream-error.window="console.log('[Terminal SSE] ai-stream-error'); $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
+    x-on:ai-stream-delta.window="console.log('[Terminal SSE] ai-stream-delta event'); pushDelta($event.detail.delta); $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
+    x-on:ai-stream-complete.window="console.log('[Terminal SSE] ai-stream-complete'); stopTyping(); queue=''; streamText=''; $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
+    x-on:ai-stream-error.window="console.log('[Terminal SSE] ai-stream-error'); stopTyping(); queue=''; $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
     x-on:ai-stream-error.window="$wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
     class="w-full"
 >
