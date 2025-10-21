@@ -144,7 +144,7 @@
                 @endif
 
                 @foreach($messages as $message)
-                    <div class="flex items-start gap-2">
+                    <div class="flex items-start gap-2" wire:key="msg-{{ $message['id'] ?? ($message['thread_id'] ?? 't') . '-' . $loop->index }}">
                         <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">
                             {{ $message['role'] === 'user' ? 'User' : 'AI' }}:
                         </span>
@@ -155,7 +155,7 @@
                 @endforeach
 
                 <!-- Einheitlicher Streaming-Block (kein Flicker) -->
-                <div class="flex items-start gap-2" x-show="$wire.isStreaming || streamText.length > 0">
+                <div class="flex items-start gap-2" x-show="$wire.isStreaming || streamText.length > 0" wire:ignore>
                     <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
                     <div class="flex items-center gap-2">
                         <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
