@@ -118,6 +118,7 @@ class CoreServiceProvider extends ServiceProvider
     {
         // Direkte Registrierung wie andere Module
         Livewire::component('core.terminal', \Platform\Core\Livewire\Terminal::class);
+        Livewire::component('core.team-flyout', \Platform\Core\Livewire\TeamFlyout::class);
         Livewire::component('core.modal-team', \Platform\Core\Livewire\ModalTeam::class);
         Livewire::component('core.modal-user', \Platform\Core\Livewire\ModalUser::class);
         Livewire::component('core.modal-checkin', \Platform\Core\Livewire\ModalCheckin::class);
