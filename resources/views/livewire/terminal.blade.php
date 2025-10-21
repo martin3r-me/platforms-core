@@ -341,6 +341,7 @@
           this.finalizePending = false;
           $wire?.set?.('isProcessing', false);
           $wire?.set?.('progressText','');
+          $wire?.set?.('currentTool', null);
           // **Wichtig**: Stream-Text erst NACH History-Reload leeren, um Flicker zu vermeiden
           try {
             await $wire?.call?.('loadMessages');
@@ -348,6 +349,10 @@
           // kleiner Delay, damit DOM die neuen Messages rendert
           setTimeout(() => {
             this.streamText = '';
+            // Zusätzliche Sicherheit: Alle Properties nochmal zurücksetzen
+            $wire?.set?.('isStreaming', false);
+            $wire?.set?.('canCancel', false);
+            $wire?.set?.('isProcessing', false);
             $wire?.set?.('currentTool', null);
             window.dispatchEvent(new CustomEvent('terminal-scroll'));
           }, 60);
