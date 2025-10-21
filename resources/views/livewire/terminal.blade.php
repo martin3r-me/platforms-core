@@ -1,9 +1,5 @@
 <div
-  x-data="chatTerminal({
-    isStreaming:  @entangle('isStreaming'),
-    isProcessing: @entangle('isProcessing'),
-    canCancel:    @entangle('canCancel'),
-  })"
+  x-data="chatTerminal()"
   x-init="init()"
   x-on:toggle-terminal.window="toggle(); $nextTick(() => { const c = $refs.body; if(c){ c.scrollTop = c.scrollHeight } })"
   x-on:ai-stream-start.window="startStream($event.detail?.url)"
@@ -54,7 +50,7 @@
               :class="$wire.activeChatId == {{ $chat['id'] }}
                 ? 'text-[var(--ui-primary)] bg-[var(--ui-surface)]'
                 : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
-              aria-current="{{ $activeChatId == $chat['id'] ? 'true' : 'false' }}"
+              aria-current="{{ $wire.activeChatId == $chat['id'] ? 'true' : 'false' }}"
               wire:key="chat-tab-button-{{ $chat['id'] }}"
             >
               <span class="truncate max-w-20">{{ $chat['title'] ?: 'Chat ' . $chat['id'] }}</span>
@@ -191,15 +187,14 @@
   </div>
 
   <script>
-    // Dev-Flag (optional)
     window.__DEV__ = window.__DEV__ ?? false;
 
-    function chatTerminal(initial = {}){
+    function chatTerminal(){
       return {
-        // Livewire-Entangle (reaktiv)
-        isStreaming:  initial.isStreaming,
-        isProcessing: initial.isProcessing,
-        canCancel:    initial.canCancel,
+        // Entangled Flags (werden in init() gebunden)
+        isStreaming:  false,
+        isProcessing: false,
+        canCancel:    false,
 
         // lokale Wire-Referenz (vermeidet $wire-Scoping-Probleme)
         wire: null,
@@ -220,13 +215,26 @@
         bodyEl: null,
 
         init(){
-          this.wire = this.$wire || null;                 // <- lokale Referenz
+          // *** HIER die Entanglements robust binden ***
+          this.wire = this.$wire || null;
+          if (this.wire?.entangle) {
+            this.isStreaming  = this.wire.entangle('isStreaming').live;
+            this.isProcessing = this.wire.entangle('isProcessing').live;
+            this.canCancel    = this.wire.entangle('canCancel').live;
+          }
+
           this.bodyEl = this.$refs.body;
           window.addEventListener('beforeunload', () => this.closeStream());
-          this.$nextTick(() => { if(Alpine?.store('page')?.terminalOpen && this.bodyEl){ this.bodyEl.scrollTop = this.bodyEl.scrollHeight; }});
+          this.$nextTick(() => {
+            if(Alpine?.store('page')?.terminalOpen && this.bodyEl){
+              this.bodyEl.scrollTop = this.bodyEl.scrollHeight;
+            }
+          });
         },
 
         // Helpers
+        get open(){ return Alpine?.store('page')?.terminalOpen ?? false; },
+        toggle(){ if(Alpine?.store('page')) Alpine.store('page').terminalOpen = !Alpine.store('page').terminalOpen; },
         scrollToEnd(){
           if(this.bodyEl){
             requestAnimationFrame(() => { this.bodyEl.scrollTop = this.bodyEl.scrollHeight; });
