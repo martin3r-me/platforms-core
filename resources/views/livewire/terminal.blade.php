@@ -187,12 +187,11 @@
   </div>
 
   <script>
-    // Optionales Dev-Flag
     window.__DEV__ = window.__DEV__ ?? false;
 
     function chatTerminal(){
       return {
-        // Flags (werden in init() via entangle .live gebunden)
+        // Entangled Flags (NUR LESEN!)
         isStreaming:  false,
         isProcessing: false,
         canCancel:    false,
@@ -216,10 +215,9 @@
         bodyEl: null,
 
         init(){
-          // Livewire erst hier sicher verfügbar
           this.wire = this.$wire || null;
           if (this.wire?.entangle) {
-            // .live = bidirektional, reaktiv
+            // Bidirektional, aber wir SCHREIBEN NICHT lokal drauf!
             this.isStreaming  = this.wire.entangle('isStreaming').live;
             this.isProcessing = this.wire.entangle('isProcessing').live;
             this.canCancel    = this.wire.entangle('canCancel').live;
@@ -234,7 +232,7 @@
           });
         },
 
-        // UI helpers
+        // Hilfen
         get open(){ return Alpine?.store('page')?.terminalOpen ?? false; },
         toggle(){ if(Alpine?.store('page')) Alpine.store('page').terminalOpen = !Alpine.store('page').terminalOpen; },
         scrollToEnd(){
@@ -242,6 +240,10 @@
             requestAnimationFrame(() => { this.bodyEl.scrollTop = this.bodyEl.scrollHeight; });
           }
         },
+
+        // Flags ausschließlich über Wire setzen
+        setFlag(key, val){ this.wire?.set?.(key, val); },
+        setFlags(obj){ for (const k in obj) this.setFlag(k, obj[k]); },
 
         // Zeilenlogik
         pushFinalLine(text){
@@ -279,13 +281,8 @@
         startStream(url){
           this.closeStream();
 
-          // Flags beim Start
-          this.isProcessing = false;
-          this.isStreaming  = true;
-          this.canCancel    = true;
-          this.wire?.set?.('isProcessing', false);
-          this.wire?.set?.('isStreaming', true);
-          this.wire?.set?.('canCancel', true);
+          // Flags per Server setzen (lokal nicht beschreiben!)
+          this.setFlags({ isProcessing: false, isStreaming: true, canCancel: true });
 
           // Reset Stream-UI
           this.streamLines = [];
@@ -347,12 +344,7 @@
 
         abortStream(){
           this.closeStream();
-          this.isStreaming = false;
-          this.isProcessing = false;
-          this.canCancel = false;
-          this.wire?.set?.('isStreaming', false);
-          this.wire?.set?.('isProcessing', false);
-          this.wire?.set?.('canCancel', false);
+          this.setFlags({ isStreaming: false, isProcessing: false, canCancel: false });
           this.wire?.set?.('progressText', '');
           this.wire?.set?.('currentTool', null);
           window.dispatchEvent(new CustomEvent('ai-stream-error'));
@@ -362,30 +354,20 @@
         onStreamComplete(){
           if(window.__DEV__) console.log('[Terminal SSE] ai-stream-complete');
           this.finalizeCurrentIfAny();
-          this.canCancel = false; this.wire?.set?.('canCancel', false);
+          this.setFlag('canCancel', false);
           this.scrollToEnd();
           this.onStreamDrained();
         },
 
         onStreamError(){
           if(window.__DEV__) console.log('[Terminal SSE] ai-stream-error');
-          this.isStreaming = false;
-          this.isProcessing = false;
-          this.canCancel = false;
-          this.wire?.set?.('isStreaming', false);
-          this.wire?.set?.('isProcessing', false);
-          this.wire?.set?.('canCancel', false);
+          this.setFlags({ isStreaming: false, isProcessing: false, canCancel: false });
           this.wire?.set?.('progressText', '');
           this.wire?.set?.('currentTool', null);
         },
 
         async onStreamDrained(){
-          this.isStreaming = false;
-          this.canCancel = false;
-          this.isProcessing = false;
-          this.wire?.set?.('isStreaming', false);
-          this.wire?.set?.('canCancel', false);
-          this.wire?.set?.('isProcessing', false);
+          this.setFlags({ isStreaming: false, canCancel: false, isProcessing: false });
           try { await this.wire?.call?.('loadMessages'); } catch(_) {}
           setTimeout(() => {
             this.streamLines = [];
