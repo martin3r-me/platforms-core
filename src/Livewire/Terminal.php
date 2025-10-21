@@ -187,7 +187,8 @@ class Terminal extends Component
 
         // Start SSE streaming on client
         $streamUrl = route('core.ai.stream', ['thread' => $this->activeThreadId]);
-        $this->dispatch('ai-stream-start', ['url' => $streamUrl]);
+        // Livewire v3: Payload als benannte Argumente dispatchen, damit es in event.detail ankommt
+        $this->dispatch('ai-stream-start', url: $streamUrl);
     }
 
     public function getAiResponse()
