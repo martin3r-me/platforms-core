@@ -9,6 +9,7 @@
         typingDelay: 28, // ms per char für natürlicheres Tippen
         fastTypingDelay: 12,
         finalizePending: false,
+        hasDelta: false,
         stopTyping(){ if(this.typingTimer){ clearInterval(this.typingTimer); this.typingTimer = null; } },
         startTyping(){
             if(this.typingTimer) return;
@@ -39,6 +40,7 @@
                 this.streamText = '';
                 this.queue = '';
                 this.stopTyping();
+                this.hasDelta = false;
                 this.es = new EventSource(url);
                 this.es.onopen = () => { console.log('[Terminal SSE] connection open'); };
                 this.es.onmessage = (e) => {
@@ -49,6 +51,7 @@
                         const data = JSON.parse(e.data);
                         if(data.delta){
                             console.log('[Terminal SSE] delta:', data.delta);
+                            if(!this.hasDelta){ this.hasDelta = true; }
                             window.dispatchEvent(new CustomEvent('ai-stream-delta', { detail: { delta: data.delta } }));
                         }
                     } catch(parseErr) {
@@ -64,8 +67,8 @@
     x-on:ai-stream-start.window="console.log('[Terminal SSE] ai-stream-start', $event.detail?.url); startStream($event.detail.url)"
     x-on:ai-stream-delta.window="console.log('[Terminal SSE] ai-stream-delta event'); pushDelta($event.detail.delta); $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
     x-on:ai-stream-complete.window="console.log('[Terminal SSE] ai-stream-complete'); finalizePending=true; $wire.set('canCancel', false); typingDelay=fastTypingDelay; startTyping(); drainUntilEmpty(); $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
-    x-on:ai-stream-error.window="console.log('[Terminal SSE] ai-stream-error'); stopTyping(); queue=''; finalizePending=false; $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', '')"
-    x-on:ai-stream-drained.window="console.log('[Terminal SSE] ai-stream-drained'); stopTyping(); $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText',''); finalizePending=false; setTimeout(()=>{ window.dispatchEvent(new CustomEvent('terminal-scroll')); }, 60)"
+    x-on:ai-stream-error.window="console.log('[Terminal SSE] ai-stream-error'); stopTyping(); queue=''; finalizePending=false; hasDelta=false; $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', '')"
+    x-on:ai-stream-drained.window="console.log('[Terminal SSE] ai-stream-drained'); stopTyping(); hasDelta=true; $wire.set('isStreaming', false); $wire.set('canCancel', false); setTimeout(()=>{ $wire.set('isProcessing', false); $wire.set('progressText',''); finalizePending=false; window.dispatchEvent(new CustomEvent('terminal-scroll')); }, 80)"
     x-on:terminal-scroll.window="$nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
     class="w-full"
 >
@@ -148,7 +151,7 @@
                     
                     <!-- Progress Indicator -->
                     @if($isProcessing)
-                        <div class="flex items-start gap-2" x-show="!finalizePending">
+                        <div class="flex items-start gap-2" x-show="es !== null && !hasDelta">
                             <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
                             <div class="flex items-center gap-2">
                                 <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"></div>
