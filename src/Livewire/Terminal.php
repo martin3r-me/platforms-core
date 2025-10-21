@@ -175,7 +175,7 @@ class Terminal extends Component
     public function getAiResponse()
     {
         try {
-            $openAi = new OpenAiService();
+            $openAi = app(OpenAiService::class);
             
             // Get conversation history
             $messages = CoreChatMessage::where('thread_id', $this->activeThreadId)
