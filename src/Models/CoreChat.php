@@ -39,6 +39,16 @@ class CoreChat extends Model
         return $this->hasMany(CoreChatMessage::class, 'chat_id');
     }
 
+    public function threads(): HasMany
+    {
+        return $this->hasMany(CoreChatThread::class, 'core_chat_id');
+    }
+
+    public function activeThread(): HasMany
+    {
+        return $this->hasMany(CoreChatThread::class, 'core_chat_id')->where('status', 'open');
+    }
+
     public function isActive(): bool
     {
         return $this->status === 'active';
