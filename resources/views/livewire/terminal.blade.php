@@ -198,9 +198,7 @@
         </div>
     </div>
     <script>
-        window.addEventListener('ai-stream-delta', (e) => {
-            // Optional hook for integrations
-        });
-        // Kein Livewire-Refresh bei COMPLETE – lokale Blase bleibt bestehen
+        window.addEventListener('ai-stream-delta', () => {});
+        // Kein Livewire-Refresh/Reload am Ende – Streaming-Blase bleibt final stehen
     </script>
 </div>
