@@ -12,7 +12,7 @@ class OpenAiService
 
     public function __construct()
     {
-        $this->apiKey = config('services.openai.api_key') ?? env('OPENAI_API_KEY');
+        $this->apiKey = env('OPENAI_API_KEY');
         
         if (!$this->apiKey) {
             throw new \Exception('OpenAI API Key not found. Please set OPENAI_API_KEY in your .env file.');
