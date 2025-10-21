@@ -60,19 +60,45 @@
 
         <!-- Body -->
         <div class="flex-1 min-h-0 overflow-y-auto px-3 py-2 text-xs font-mono text-[var(--ui-secondary)] opacity-100 transition-opacity duration-200" :class="open ? 'opacity-100' : 'opacity-0'">
-            <div class="text-[var(--ui-muted)]">Tippe "help" für verfügbare Befehle…</div>
-            <div class="mt-2 space-y-1">
-                <div>$ help</div>
-                <div>- kpi            Zeigt Team-KPIs</div>
-                <div>- tasks --mine   Eigene Aufgaben</div>
-            </div>
+            @if(empty($messages))
+                <div class="text-[var(--ui-muted)]">Tippe "help" für verfügbare Befehle…</div>
+                <div class="mt-2 space-y-1">
+                    <div>$ help</div>
+                    <div>- kpi            Zeigt Team-KPIs</div>
+                    <div>- tasks --mine   Eigene Aufgaben</div>
+                </div>
+            @else
+                <div class="space-y-2">
+                    @foreach($messages as $message)
+                        <div class="flex items-start gap-2">
+                            <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">
+                                {{ $message['role'] === 'user' ? 'User' : 'AI' }}:
+                            </span>
+                            <span class="text-[var(--ui-secondary)] text-xs break-words">
+                                {{ $message['content'] }}
+                            </span>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
         </div>
 
         <!-- Prompt -->
         <div class="h-10 px-3 flex items-center gap-2 border-t border-[var(--ui-border)]/60 opacity-100 transition-opacity duration-200 flex-shrink-0" :class="open ? 'opacity-100' : 'opacity-0'">
             <span class="text-[var(--ui-muted)] text-xs font-mono">$</span>
-            <input type="text" class="flex-1 bg-transparent outline-none text-sm text-[var(--ui-secondary)] placeholder-[var(--ui-muted)]" placeholder="Befehl eingeben… (nur Demo)" />
-            <button class="inline-flex items-center justify-center h-8 px-3 rounded-md border border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)] transition">Ausführen</button>
+            <input 
+                type="text" 
+                wire:model="messageInput"
+                wire:keydown.enter="sendMessage"
+                class="flex-1 bg-transparent outline-none text-sm text-[var(--ui-secondary)] placeholder-[var(--ui-muted)]" 
+                placeholder="Nachricht eingeben…" 
+            />
+            <button 
+                wire:click="sendMessage"
+                class="inline-flex items-center justify-center h-8 px-3 rounded-md border border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)] transition"
+            >
+                Senden
+            </button>
         </div>
     </div>
 </div>

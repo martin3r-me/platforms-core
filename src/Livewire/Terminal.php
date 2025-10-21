@@ -5,6 +5,8 @@ namespace Platform\Core\Livewire;
 use Livewire\Component;
 use Platform\Core\Models\CoreChat;
 use Platform\Core\Models\CoreChatThread;
+use Platform\Core\Models\CoreChatMessage;
+use Platform\Core\Services\OpenAiService;
 use Illuminate\Support\Facades\Auth;
 
 class Terminal extends Component
@@ -13,6 +15,8 @@ class Terminal extends Component
     public $activeChatId = null;
     public $activeThreadId = null;
     public $show = false;
+    public $messageInput = '';
+    public $messages = [];
 
     public function mount()
     {
@@ -37,6 +41,7 @@ class Terminal extends Component
         if (empty($this->activeChatId) && !empty($this->chats)) {
             $this->activeChatId = $this->chats[0]['id'];
             $this->loadActiveThread();
+            $this->loadMessages();
         }
     }
 
@@ -126,6 +131,98 @@ class Terminal extends Component
     public function setActiveThread($threadId)
     {
         $this->activeThreadId = $threadId;
+        $this->loadMessages();
+    }
+
+    public function loadMessages()
+    {
+        if (!$this->activeThreadId) {
+            $this->messages = [];
+            return;
+        }
+
+        $this->messages = CoreChatMessage::where('thread_id', $this->activeThreadId)
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->toArray();
+    }
+
+    public function sendMessage()
+    {
+        if (empty($this->messageInput) || !$this->activeThreadId) {
+            return;
+        }
+
+        $userMessage = $this->messageInput;
+        
+        // Create user message
+        CoreChatMessage::create([
+            'core_chat_id' => $this->activeChatId,
+            'thread_id' => $this->activeThreadId,
+            'role' => 'user',
+            'content' => $userMessage,
+            'tokens_in' => strlen($userMessage),
+        ]);
+
+        // Clear input
+        $this->messageInput = '';
+        $this->loadMessages();
+
+        // Get AI response
+        $this->getAiResponse();
+    }
+
+    public function getAiResponse()
+    {
+        try {
+            $openAi = new OpenAiService();
+            
+            // Get conversation history
+            $messages = CoreChatMessage::where('thread_id', $this->activeThreadId)
+                ->orderBy('created_at', 'asc')
+                ->get()
+                ->map(function($message) {
+                    return [
+                        'role' => $message->role,
+                        'content' => $message->content,
+                    ];
+                })
+                ->toArray();
+
+            // Add system message if this is the first user message
+            if (count($messages) === 1) {
+                array_unshift($messages, [
+                    'role' => 'system',
+                    'content' => 'Du bist ein hilfreicher AI-Assistent. Antworte kurz und präzise auf Deutsch.',
+                ]);
+            }
+
+            // Get AI response
+            $response = $openAi->chat($messages);
+            
+            // Create AI message
+            CoreChatMessage::create([
+                'core_chat_id' => $this->activeChatId,
+                'thread_id' => $this->activeThreadId,
+                'role' => 'assistant',
+                'content' => $response['content'],
+                'tokens_out' => $response['usage']['completion_tokens'] ?? 0,
+            ]);
+
+            // Reload messages to show AI response
+            $this->loadMessages();
+
+        } catch (\Exception $e) {
+            // Create error message
+            CoreChatMessage::create([
+                'core_chat_id' => $this->activeChatId,
+                'thread_id' => $this->activeThreadId,
+                'role' => 'assistant',
+                'content' => 'Entschuldigung, ich konnte deine Nachricht nicht verarbeiten. Bitte versuche es erneut.',
+            ]);
+
+            $this->loadMessages();
+        }
     }
 
     public function render()
