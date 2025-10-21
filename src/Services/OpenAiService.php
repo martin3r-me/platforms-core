@@ -14,7 +14,21 @@ class OpenAiService
 
     private function getApiKey(): string
     {
-        return env('OPENAI_API_KEY');
+        // Bevorzugt aus Config lesen (kompatibel mit config:cache); unterstütze beide Keys
+        $key = config('services.openai.api_key');
+        if (!is_string($key) || $key === '') {
+            $key = config('services.openai.key') ?? '';
+        }
+        if ($key === '') {
+            $key = env('OPENAI_API_KEY') ?? '';
+        }
+
+        if ($key === '') {
+            // Klare, semantische Fehlermeldung statt TypeError durch null-Return
+            throw new \RuntimeException('AUTHENTICATION_FAILED: OPENAI_API_KEY fehlt oder ist leer.');
+        }
+
+        return $key;
     }
 
     /**
