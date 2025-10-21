@@ -106,15 +106,28 @@ class OpenAiService
         }
 
         $body = $response->toPsrResponse()->getBody();
+        $buffer = '';
         while (!$body->eof()) {
-            $chunk = $body->read(1024);
-            if (!$chunk) { continue; }
-            foreach (preg_split("/(\r\n|\r|\n)/", $chunk) as $line) {
-                $line = trim($line);
-                if ($line === '' || !str_starts_with($line, 'data:')) { continue; }
-                $data = trim(substr($line, 5));
+            $chunk = $body->read(8192);
+            if ($chunk === '' || $chunk === false) { usleep(10000); continue; }
+            $buffer .= $chunk;
+
+            // Normalisiere Zeilenenden auf \n
+            $buffer = str_replace("\r\n", "\n", $buffer);
+            $buffer = str_replace("\r", "\n", $buffer);
+
+            while (($pos = strpos($buffer, "\n")) !== false) {
+                $line = substr($buffer, 0, $pos);
+                $buffer = substr($buffer, $pos + 1);
+
+                if ($line === '') { continue; }
+                // Erwartet 'data:' Präfix je SSE-Zeile
+                if (strncmp($line, 'data:', 5) !== 0) { continue; }
+                $data = ltrim(substr($line, 5));
                 if ($data === '[DONE]') { return; }
+
                 $decoded = json_decode($data, true);
+                if (!is_array($decoded)) { continue; }
                 $delta = $decoded['choices'][0]['delta']['content'] ?? '';
                 if ($delta !== '') { $onDelta($delta); }
             }

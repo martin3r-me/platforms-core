@@ -7,21 +7,33 @@
         startStream(url){
             if(this.es){ this.es.close(); this.es = null; }
             try {
+                console.log('[Terminal SSE] startStream →', url);
                 this.streamText = '';
                 this.es = new EventSource(url);
+                this.es.onopen = () => { console.log('[Terminal SSE] connection open'); };
                 this.es.onmessage = (e) => {
                     if(!e.data) return;
-                    if(e.data === '[DONE]') { this.es.close(); this.es = null; window.dispatchEvent(new CustomEvent('ai-stream-complete')); return; }
-                    try { const data = JSON.parse(e.data); if(data.delta){ window.dispatchEvent(new CustomEvent('ai-stream-delta', { detail: { delta: data.delta } })); } } catch(_) {}
+                    console.log('[Terminal SSE] onmessage raw:', e.data);
+                    if(e.data === '[DONE]') { console.log('[Terminal SSE] DONE'); this.es.close(); this.es = null; window.dispatchEvent(new CustomEvent('ai-stream-complete')); return; }
+                    try {
+                        const data = JSON.parse(e.data);
+                        if(data.delta){
+                            console.log('[Terminal SSE] delta:', data.delta);
+                            window.dispatchEvent(new CustomEvent('ai-stream-delta', { detail: { delta: data.delta } }));
+                        }
+                    } catch(parseErr) {
+                        console.warn('[Terminal SSE] parse error:', parseErr);
+                    }
                 };
-                this.es.onerror = () => { this.es && this.es.close(); this.es = null; window.dispatchEvent(new CustomEvent('ai-stream-error')); };
+                this.es.onerror = (err) => { console.error('[Terminal SSE] error:', err); this.es && this.es.close(); this.es = null; window.dispatchEvent(new CustomEvent('ai-stream-error')); };
             } catch(_) {}
         }
     }"
     x-on:toggle-terminal.window="toggle()"
-    x-on:ai-stream-start.window="startStream($event.detail.url)"
-    x-on:ai-stream-delta.window="streamText += $event.detail.delta; $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
-    x-on:ai-stream-complete.window="$wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
+    x-on:ai-stream-start.window="console.log('[Terminal SSE] ai-stream-start', $event.detail?.url); startStream($event.detail.url)"
+    x-on:ai-stream-delta.window="console.log('[Terminal SSE] ai-stream-delta event'); streamText += $event.detail.delta; $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
+    x-on:ai-stream-complete.window="console.log('[Terminal SSE] ai-stream-complete'); $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
+    x-on:ai-stream-error.window="console.log('[Terminal SSE] ai-stream-error'); $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
     x-on:ai-stream-error.window="$wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
     class="w-full"
 >
