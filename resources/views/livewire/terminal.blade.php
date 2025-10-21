@@ -6,8 +6,8 @@
         streamText: '',
         queue: '',
         typingTimer: null,
-        typingDelay: 18, // ms per char for natürliches Tippen
-        fastTypingDelay: 8,
+        typingDelay: 28, // ms per char für natürlicheres Tippen
+        fastTypingDelay: 12,
         finalizePending: false,
         stopTyping(){ if(this.typingTimer){ clearInterval(this.typingTimer); this.typingTimer = null; } },
         startTyping(){
@@ -63,7 +63,7 @@
     x-on:ai-stream-delta.window="console.log('[Terminal SSE] ai-stream-delta event'); pushDelta($event.detail.delta); $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
     x-on:ai-stream-complete.window="console.log('[Terminal SSE] ai-stream-complete'); finalizePending=true; $wire.set('canCancel', false); typingDelay=fastTypingDelay; startTyping(); drainUntilEmpty(); $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
     x-on:ai-stream-error.window="console.log('[Terminal SSE] ai-stream-error'); stopTyping(); queue=''; finalizePending=false; $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', '')"
-    x-on:ai-stream-drained.window="console.log('[Terminal SSE] ai-stream-drained'); stopTyping(); $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.call('loadMessages'); setTimeout(()=>{ window.dispatchEvent(new CustomEvent('terminal-scroll')); streamText=''; queue=''; finalizePending=false; $wire.set('progressText',''); }, 80)"
+    x-on:ai-stream-drained.window="console.log('[Terminal SSE] ai-stream-drained'); stopTyping(); $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText',''); finalizePending=false; setTimeout(()=>{ window.dispatchEvent(new CustomEvent('terminal-scroll')); }, 60)"
     x-on:terminal-scroll.window="$nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
     class="w-full"
 >
@@ -123,7 +123,7 @@
         </div>
 
         <!-- Body -->
-        <div class="flex-1 min-h-0 overflow-y-auto px-3 py-2 text-xs font-mono text-[var(--ui-secondary)] opacity-100 transition-opacity duration-200" :class="open ? 'opacity-100' : 'opacity-0'" data-terminal-body>
+        <div class="flex-1 min-h-0 overflow-y-auto px-3 py-2 pb-6 text-xs font-mono text-[var(--ui-secondary)] opacity-100 transition-opacity duration-200" :class="open ? 'opacity-100' : 'opacity-0'" data-terminal-body>
             @if(empty($messages))
                 <div class="text-[var(--ui-muted)]">Tippe "help" für verfügbare Befehle…</div>
                 <div class="mt-2 space-y-1">
@@ -158,12 +158,12 @@
                                 </div>
                             @endif
                         </div>
-                        <!-- Live Streaming Bubble -->
-                        <div class="flex items-start gap-2" x-show="streamText.length > 0">
-                            <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
-                            <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
-                        </div>
                     @endif
+                    <!-- Live Streaming Bubble (immer anzeigen, wenn Text existiert) -->
+                    <div class="flex items-start gap-2" x-show="streamText.length > 0">
+                        <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
+                        <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
+                    </div>
                 </div>
             @endif
         </div>
