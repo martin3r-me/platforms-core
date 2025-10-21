@@ -113,7 +113,7 @@
         @endforeach
 
         <!-- Streaming-Block (zeilenweises Fade-In) -->
-        <div class="flex items-start gap-2" x-show="isStreaming || streamLines.length > 0" wire:ignore>
+        <div class="flex items-start gap-2" x-show="$wire.isStreaming || streamLines.length > 0" wire:ignore>
           <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
           <div class="flex-1 flex flex-col gap-1"
                role="log"
@@ -155,12 +155,12 @@
         wire:model="messageInput"
         wire:keydown.enter="sendMessage"
         class="flex-1 bg-transparent outline-none text-sm text-[var(--ui-secondary)] placeholder-[var(--ui-muted)]"
-        :placeholder="isStreaming ? 'Verarbeite…' : 'Nachricht eingeben…'"
-        :disabled="isStreaming || isProcessing"
-        :aria-disabled="(isStreaming || isProcessing) ? 'true' : 'false'"
+        :placeholder="$wire.isStreaming ? 'Verarbeite…' : 'Nachricht eingeben…'"
+        :disabled="$wire.isStreaming || $wire.isProcessing"
+        :aria-disabled="($wire.isStreaming || $wire.isProcessing) ? 'true' : 'false'"
         wire:key="terminal-input"
       />
-      <template x-if="canCancel">
+      <template x-if="$wire.canCancel">
         <button
           type="button"
           wire:click="cancelRequest"
@@ -171,13 +171,13 @@
           Abbrechen
         </button>
       </template>
-      <template x-if="!canCancel">
+      <template x-if="!$wire.canCancel">
         <button
           type="button"
           wire:click="sendMessage"
           class="inline-flex items-center justify-center h-8 px-3 rounded-md border border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)] transition"
-          :disabled="isProcessing"
-          :aria-disabled="isProcessing ? 'true' : 'false'"
+          :disabled="$wire.isProcessing"
+          :aria-disabled="$wire.isProcessing ? 'true' : 'false'"
           wire:key="terminal-send"
         >
           Senden
@@ -192,9 +192,7 @@
     function chatTerminal(){
       return {
         // Entangled Flags (werden in init() gebunden)
-        isStreaming:  false,
-        isProcessing: false,
-        canCancel:    false,
+        // Diese werden jetzt direkt über $wire referenziert
 
         // lokale Wire-Referenz (vermeidet $wire-Scoping-Probleme)
         wire: null,
@@ -215,13 +213,8 @@
         bodyEl: null,
 
         init(){
-          // *** HIER die Entanglements robust binden ***
+          // *** Wire-Referenz für direkte Zugriffe ***
           this.wire = this.$wire || null;
-          if (this.wire?.entangle) {
-            this.isStreaming  = this.wire.entangle('isStreaming').live;
-            this.isProcessing = this.wire.entangle('isProcessing').live;
-            this.canCancel    = this.wire.entangle('canCancel').live;
-          }
 
           this.bodyEl = this.$refs.body;
           window.addEventListener('beforeunload', () => this.closeStream());
@@ -278,12 +271,11 @@
           this.closeStream();
 
           // Flags beim Start
-          this.isProcessing = false;
-          this.isStreaming  = true;
-          this.canCancel    = true;
-          this.wire?.set?.('isProcessing', false);
-          this.wire?.set?.('isStreaming', true);
-          this.wire?.set?.('canCancel', true);
+          if (this.wire?.set) {
+            this.wire.set('isProcessing', false);
+            this.wire.set('isStreaming', true);
+            this.wire.set('canCancel', true);
+          }
 
           // Reset Stream-UI
           this.streamLines = [];
@@ -316,7 +308,9 @@
               if(data && (typeof data.delta === 'string' || typeof data.delta === 'number')){
                 if(!this.hasDelta) this.hasDelta = true;
                 this.handleDeltaText(String(data.delta));
-                if(data.tool && this.wire?.set){ this.wire.set('currentTool', data.tool); }
+                if(data.tool && this.wire?.set){ 
+                  this.wire.set('currentTool', data.tool); 
+                }
                 window.dispatchEvent(new CustomEvent('ai-stream-delta', { detail: { delta: String(data.delta) } }));
               } else {
                 if(window.__DEV__) console.warn('[Terminal SSE] skip non-JSON or missing delta');
@@ -345,14 +339,13 @@
 
         abortStream(){
           this.closeStream();
-          this.isStreaming = false;
-          this.isProcessing = false;
-          this.canCancel = false;
-          this.wire?.set?.('isStreaming', false);
-          this.wire?.set?.('isProcessing', false);
-          this.wire?.set?.('canCancel', false);
-          this.wire?.set?.('progressText', '');
-          this.wire?.set?.('currentTool', null);
+          if (this.wire?.set) {
+            this.wire.set('isStreaming', false);
+            this.wire.set('isProcessing', false);
+            this.wire.set('canCancel', false);
+            this.wire.set('progressText', '');
+            this.wire.set('currentTool', null);
+          }
           window.dispatchEvent(new CustomEvent('ai-stream-error'));
         },
 
@@ -360,35 +353,41 @@
         onStreamComplete(){
           if(window.__DEV__) console.log('[Terminal SSE] ai-stream-complete');
           this.finalizeCurrentIfAny();
-          this.canCancel = false; this.wire?.set?.('canCancel', false);
+          if (this.wire?.set) {
+            this.wire.set('canCancel', false);
+          }
           this.scrollToEnd();
           this.onStreamDrained();
         },
 
         onStreamError(){
           if(window.__DEV__) console.log('[Terminal SSE] ai-stream-error');
-          this.isStreaming = false;
-          this.isProcessing = false;
-          this.canCancel = false;
-          this.wire?.set?.('isStreaming', false);
-          this.wire?.set?.('isProcessing', false);
-          this.wire?.set?.('canCancel', false);
-          this.wire?.set?.('progressText', '');
-          this.wire?.set?.('currentTool', null);
+          if (this.wire?.set) {
+            this.wire.set('isStreaming', false);
+            this.wire.set('isProcessing', false);
+            this.wire.set('canCancel', false);
+            this.wire.set('progressText', '');
+            this.wire.set('currentTool', null);
+          }
         },
 
         async onStreamDrained(){
-          this.isStreaming = false;
-          this.canCancel = false;
-          this.isProcessing = false;
-          this.wire?.set?.('isStreaming', false);
-          this.wire?.set?.('canCancel', false);
-          this.wire?.set?.('isProcessing', false);
-          try { await this.wire?.call?.('loadMessages'); } catch(_) {}
+          if (this.wire?.set) {
+            this.wire.set('isStreaming', false);
+            this.wire.set('canCancel', false);
+            this.wire.set('isProcessing', false);
+          }
+          try { 
+            if (this.wire?.call) {
+              await this.wire.call('loadMessages'); 
+            }
+          } catch(_) {}
           setTimeout(() => {
             this.streamLines = [];
             this.currentLine = '';
-            this.wire?.set?.('currentTool', null);
+            if (this.wire?.set) {
+              this.wire.set('currentTool', null);
+            }
             this.scrollToEnd();
             window.dispatchEvent(new CustomEvent('terminal-scroll'));
           }, 60);
