@@ -145,7 +145,7 @@
                     
                     <!-- Progress Indicator -->
                     @if($isProcessing)
-                        <div class="flex items-start gap-2">
+                        <div class="flex items-start gap-2" x-show="!finalizePending">
                             <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
                             <div class="flex items-center gap-2">
                                 <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"></div>
@@ -158,7 +158,7 @@
                             @endif
                         </div>
                         <!-- Live Streaming Bubble -->
-                        <div class="flex items-start gap-2">
+                        <div class="flex items-start gap-2" x-show="streamText.length > 0">
                             <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
                             <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
                         </div>
