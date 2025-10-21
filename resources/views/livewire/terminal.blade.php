@@ -133,48 +133,48 @@
 
         <!-- Body -->
         <div class="flex-1 min-h-0 overflow-y-auto px-3 py-2 pb-6 text-xs font-mono text-[var(--ui-secondary)] opacity-100 transition-opacity duration-200" :class="open ? 'opacity-100' : 'opacity-0'" data-terminal-body>
-            @if(empty($messages))
-                <div class="text-[var(--ui-muted)]">Tippe "help" für verfügbare Befehle…</div>
-                <div class="mt-2 space-y-1">
-                    <div>$ help</div>
-                    <div>- kpi            Zeigt Team-KPIs</div>
-                    <div>- tasks --mine   Eigene Aufgaben</div>
-                </div>
-            @else
-                <div class="space-y-2">
-                    @foreach($messages as $message)
-                        <div class="flex items-start gap-2">
-                            <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">
-                                {{ $message['role'] === 'user' ? 'User' : 'AI' }}:
-                            </span>
-                            <span class="text-[var(--ui-secondary)] text-xs break-words">
-                                {{ $message['content'] }}
-                            </span>
-                        </div>
-                    @endforeach
-                    
-                    <!-- Progress Indicator -->
-                    @if($isProcessing)
-                        <div class="flex items-start gap-2" x-show="es !== null && !hasDelta">
-                            <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
-                            <div class="flex items-center gap-2">
-                                <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"></div>
-                                <span class="text-[var(--ui-secondary)] text-xs">{{ $progressText ?: 'Verarbeite...' }}</span>
-                            </div>
-                            @if($currentTool)
-                                <div class="text-xs text-[var(--ui-muted)]">
-                                    (Tool: {{ $currentTool }})
-                                </div>
-                            @endif
-                        </div>
-                    @endif
-                    <!-- Live Streaming Bubble (immer anzeigen, wenn Text existiert) -->
-                    <div class="flex items-start gap-2" x-show="streamText.length > 0">
-                        <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
-                        <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
+            <div class="space-y-2">
+                @if(empty($messages))
+                    <div class="text-[var(--ui-muted)]">Tippe "help" für verfügbare Befehle…</div>
+                    <div class="mt-2 space-y-1">
+                        <div>$ help</div>
+                        <div>- kpi            Zeigt Team-KPIs</div>
+                        <div>- tasks --mine   Eigene Aufgaben</div>
                     </div>
+                @endif
+
+                @foreach($messages as $message)
+                    <div class="flex items-start gap-2">
+                        <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">
+                            {{ $message['role'] === 'user' ? 'User' : 'AI' }}:
+                        </span>
+                        <span class="text-[var(--ui-secondary)] text-xs break-words">
+                            {{ $message['content'] }}
+                        </span>
+                    </div>
+                @endforeach
+
+                <!-- Progress Indicator -->
+                @if($isProcessing)
+                    <div class="flex items-start gap-2" x-show="es !== null && !hasDelta">
+                        <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"></div>
+                            <span class="text-[var(--ui-secondary)] text-xs">{{ $progressText ?: 'Verarbeite...' }}</span>
+                        </div>
+                        @if($currentTool)
+                            <div class="text-xs text-[var(--ui-muted)]">
+                                (Tool: {{ $currentTool }})
+                            </div>
+                        @endif
+                    </div>
+                @endif
+                <!-- Live Streaming Bubble (immer anzeigen, wenn Text existiert) -->
+                <div class="flex items-start gap-2" x-show="streamText.length > 0">
+                    <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
+                    <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
                 </div>
-            @endif
+            </div>
         </div>
 
         <!-- Prompt -->
@@ -185,8 +185,8 @@
                 wire:model="messageInput"
                 wire:keydown.enter="sendMessage"
                 class="flex-1 bg-transparent outline-none text-sm text-[var(--ui-secondary)] placeholder-[var(--ui-muted)]" 
-                placeholder="{{ $isProcessing ? 'Verarbeite...' : 'Nachricht eingeben…' }}"
-                {{ $isProcessing ? 'disabled' : '' }}
+                placeholder="{{ $isStreaming ? 'Verarbeite...' : 'Nachricht eingeben…' }}"
+                {{ $isStreaming ? 'disabled' : '' }}
             />
             @if($canCancel)
                 <button 
