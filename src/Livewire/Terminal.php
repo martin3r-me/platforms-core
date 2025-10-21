@@ -71,6 +71,6 @@ class Terminal extends Component
 
     public function render()
     {
-        return view('core::livewire.terminal');
+        return view('platform::livewire.terminal');
     }
 }
