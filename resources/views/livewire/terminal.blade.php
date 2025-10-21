@@ -49,7 +49,7 @@
               :class="$wire.activeChatId == {{ $chat['id'] }}
                 ? 'text-[var(--ui-primary)] bg-[var(--ui-surface)]'
                 : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
-              aria-current="{{ $wire.activeChatId == $chat['id'] ? 'true' : 'false' }}"
+              aria-current="{{ $activeChatId == $chat['id'] ? 'true' : 'false' }}"
             >
               <span class="truncate max-w-20">{{ $chat['title'] ?: 'Chat ' . $chat['id'] }}</span>
             </button>
