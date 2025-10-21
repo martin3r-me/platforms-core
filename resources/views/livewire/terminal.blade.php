@@ -16,6 +16,8 @@
                 if(this.queue.length === 0){ this.stopTyping(); return; }
                 this.streamText += this.queue[0];
                 this.queue = this.queue.slice(1);
+                // Immer mit scrollen, damit nichts hinter der Eingabeleiste verschwindet
+                try { const c = this.$el && this.$el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } } catch(_) {}
             }, this.typingDelay);
         },
         pushDelta(delta){
