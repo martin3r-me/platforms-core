@@ -29,8 +29,7 @@
       <div class="flex items-center gap-1">
         <button type="button" @click="toggle()"
                 class="inline-flex items-center justify-center w-7 h-7 rounded-md text-[var(--ui-muted)] hover:text-[var(--ui-danger)] hover:bg-[var(--ui-danger-5)] transition"
-                aria-label="Terminal schließen"
-                wire:key="terminal-close-btn">
+                aria-label="Terminal schließen">
           @svg('heroicon-o-x-mark','w-4 h-4')
         </button>
       </div>
@@ -47,11 +46,10 @@
               type="button"
               wire:click="setActiveChat({{ $chat['id'] }})"
               class="flex items-center gap-2 px-3 py-2 text-xs transition-colors min-w-0"
-              :class="$wire.activeChatId === {{ $chat['id'] }}
+              :class="$wire.activeChatId == {{ $chat['id'] }}
                 ? 'text-[var(--ui-primary)] bg-[var(--ui-surface)]'
                 : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
-              :aria-current="$wire.activeChatId === {{ $chat['id'] }} ? 'true' : 'false'"
-              wire:key="chat-tab-button-{{ $chat['id'] }}"
+              aria-current="{{ $wire.activeChatId == $chat['id'] ? 'true' : 'false' }}"
             >
               <span class="truncate max-w-20">{{ $chat['title'] ?: 'Chat ' . $chat['id'] }}</span>
             </button>
@@ -112,31 +110,17 @@
           </div>
         @endforeach
 
-        <!-- Streaming-Block (zeilenweises Fade-In) -->
-        <div class="flex items-start gap-2" x-show="isStreaming || streamLines.length > 0" wire:ignore>
+        <!-- Streaming-Block -->
+        <div class="flex items-start gap-2" x-show="$wire.isStreaming || streamText.length > 0" wire:ignore>
           <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
-          <div class="flex-1 flex flex-col gap-1"
+          <div class="flex items-center gap-2"
                role="log"
                aria-live="polite"
                aria-atomic="false">
-            <!-- finalisierte Zeilen -->
-            <template x-for="line in streamLines" :key="line.id">
-              <div
-                class="text-[var(--ui-secondary)] text-xs break-words transition ease-out duration-200"
-                :class="line.visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-0.5'"
-                x-text="line.text">
-              </div>
-            </template>
-            <!-- aktuell wachsende Zeile -->
-            <div class="text-[var(--ui-secondary)] text-xs break-words"
-                 x-show="currentLine.length"
-                 x-text="currentLine">
-            </div>
-            <!-- Spinner solange kein Delta -->
+            <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
             <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"
                  x-show="!hasDelta"
                  aria-hidden="true"></div>
-            <!-- Toolchip -->
             <template x-if="$wire.currentTool">
               <div class="text-xs text-[var(--ui-muted)]" x-text="'(Tool: ' + $wire.currentTool + ')'"></div>
             </template>
@@ -155,12 +139,12 @@
         wire:model="messageInput"
         wire:keydown.enter="sendMessage"
         class="flex-1 bg-transparent outline-none text-sm text-[var(--ui-secondary)] placeholder-[var(--ui-muted)]"
-        :placeholder="isStreaming ? 'Verarbeite…' : 'Nachricht eingeben…'"
-        :disabled="isStreaming || isProcessing"
-        :aria-disabled="(isStreaming || isProcessing) ? 'true' : 'false'"
+        :placeholder="$wire.isStreaming ? 'Verarbeite…' : 'Nachricht eingeben…'"
+        :disabled="$wire.isStreaming"
+        :aria-disabled="$wire.isStreaming ? 'true' : 'false'"
         wire:key="terminal-input"
       />
-      <template x-if="canCancel">
+      @if($canCancel)
         <button
           type="button"
           wire:click="cancelRequest"
@@ -170,161 +154,122 @@
         >
           Abbrechen
         </button>
-      </template>
-      <template x-if="!canCancel">
+      @else
         <button
           type="button"
           wire:click="sendMessage"
           class="inline-flex items-center justify-center h-8 px-3 rounded-md border border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)] transition"
-          :disabled="isProcessing"
-          :aria-disabled="isProcessing ? 'true' : 'false'"
+          :disabled="$wire.isProcessing"
+          :aria-disabled="$wire.isProcessing ? 'true' : 'false'"
           wire:key="terminal-send"
         >
           Senden
         </button>
-      </template>
+      @endif
     </div>
   </div>
 
   <script>
+    // Flag für Dev-Logs
     window.__DEV__ = window.__DEV__ ?? false;
 
     function chatTerminal(){
       return {
-        // Entangled Flags (NUR LESEN!)
-        isStreaming:  false,
-        isProcessing: false,
-        canCancel:    false,
+        // UI open state via Alpine store
+        get open(){ return Alpine?.store('page')?.terminalOpen ?? false; },
+        toggle(){ if(Alpine?.store('page')) Alpine.store('page').terminalOpen = !Alpine.store('page').terminalOpen; },
 
-        // lokale Wire-Referenz
-        wire: null,
-
-        // SSE/Stream State
+        // Streaming state
         es: null,
+        streamText: '',
+        queue: '',
+        typingTimer: null,
+        typingDelay: 28,
+        fastTypingDelay: 12,
+        chunkSize: 16,         // adaptives Chunking
         hasDelta: false,
-        streamLines: [],   // [{id,text,visible}]
-        currentLine: '',
-        lineIdSeq: 0,
+        finalizePending: false,
 
         // Retry/Backoff
         retryCount: 0,
         maxRetry: 3,
         backoffBaseMs: 400,
 
-        // Refs
+        // Cached ref
         bodyEl: null,
 
+        // Livewire bindings (optional safety fallback)
         init(){
-          this.wire = this.$wire || null;
-          if (this.wire?.entangle) {
-            // Bidirektional, aber wir SCHREIBEN NICHT lokal drauf!
-            this.isStreaming  = this.wire.entangle('isStreaming').live;
-            this.isProcessing = this.wire.entangle('isProcessing').live;
-            this.canCancel    = this.wire.entangle('canCancel').live;
-          }
-
           this.bodyEl = this.$refs.body;
+          // Bei Page unload: Stream schließen
           window.addEventListener('beforeunload', () => this.closeStream());
-          this.$nextTick(() => {
-            if(Alpine?.store('page')?.terminalOpen && this.bodyEl){
-              this.bodyEl.scrollTop = this.bodyEl.scrollHeight;
-            }
-          });
+          // Falls Terminal beim Mount schon offen ist: ans Ende scrollen
+          this.$nextTick(() => { if(Alpine?.store('page')?.terminalOpen && this.bodyEl){ this.bodyEl.scrollTop = this.bodyEl.scrollHeight; }});
         },
 
-        // Hilfen
-        get open(){ return Alpine?.store('page')?.terminalOpen ?? false; },
-        toggle(){ if(Alpine?.store('page')) Alpine.store('page').terminalOpen = !Alpine.store('page').terminalOpen; },
-        scrollToEnd(){
-          if(this.bodyEl){
-            requestAnimationFrame(() => { this.bodyEl.scrollTop = this.bodyEl.scrollHeight; });
-          }
+        // Typing helpers
+        stopTyping(){ if(this.typingTimer){ clearInterval(this.typingTimer); this.typingTimer = null; } },
+        startTyping(){
+          if(this.typingTimer) return;
+          this.typingTimer = setInterval(() => {
+            if(this.queue.length === 0){ this.stopTyping(); return; }
+            // adaptives Chunking (größere Queues -> schneller abbauen)
+            const bigQueue = this.queue.length > 2000 ? 32 : (this.queue.length > 800 ? 24 : this.chunkSize);
+            const n = Math.min(bigQueue, this.queue.length);
+            this.streamText += this.queue.slice(0, n);
+            this.queue = this.queue.slice(n);
+            if(this.bodyEl){ requestAnimationFrame(() => { this.bodyEl.scrollTop = this.bodyEl.scrollHeight; }); }
+          }, this.typingDelay);
         },
-
-        // Flags ausschließlich über Wire setzen
-        setFlag(key, val){ this.wire?.set?.(key, val); },
-        setFlags(obj){ for (const k in obj) this.setFlag(k, obj[k]); },
-
-        // Zeilenlogik
-        pushFinalLine(text){
-          const id = `line-${++this.lineIdSeq}`;
-          const line = { id, text, visible: false };
-          this.streamLines.push(line);
-          this.$nextTick(() => { line.visible = true; this.scrollToEnd(); });
-        },
-        appendToCurrent(delta){
-          this.currentLine += delta;
-          this.scrollToEnd();
-        },
-        finalizeCurrentIfAny(){
-          if(this.currentLine.length){
-            this.pushFinalLine(this.currentLine);
-            this.currentLine = '';
-          }
-        },
-        handleDeltaText(delta){
+        pushDelta(delta){
           if(!delta) return;
-          const parts = String(delta).split(/\r?\n/);
-          for(let i=0;i<parts.length;i++){
-            const seg = parts[i];
-            const isLast = i === parts.length - 1;
-            if(!isLast){
-              this.appendToCurrent(seg);
-              this.finalizeCurrentIfAny();
-            } else {
-              if(seg.length) this.appendToCurrent(seg);
-            }
-          }
+          this.queue += delta;
+          this.startTyping();
         },
 
-        // SSE
+        // SSE Steuerung
         startStream(url){
-          this.closeStream();
-
-          // Flags per Server setzen (lokal nicht beschreiben!)
-          this.setFlags({ isProcessing: false, isStreaming: true, canCancel: true });
-
-          // Reset Stream-UI
-          this.streamLines = [];
-          this.currentLine = '';
-          this.hasDelta = false;
-
+          this.closeStream(); // alte Verbindung schließen
           try {
             if(window.__DEV__) console.log('[Terminal SSE] startStream →', url);
+            // Reset UI-States
+            this.streamText = '';
+            this.queue = '';
+            this.stopTyping();
+            this.hasDelta = false;
+            this.finalizePending = false;
+
             this.es = new EventSource(url);
-
-            this.es.onopen = () => {
-              if(window.__DEV__) console.log('[Terminal SSE] connection open');
-              this.retryCount = 0;
-            };
-
+            this.es.onopen = () => { if(window.__DEV__) console.log('[Terminal SSE] connection open'); this.retryCount = 0; };
             this.es.onmessage = (e) => {
               if(!e.data) return;
               if(window.__DEV__) console.log('[Terminal SSE] onmessage raw:', e.data);
-
               if(e.data === '[DONE]'){
                 if(window.__DEV__) console.log('[Terminal SSE] DONE');
                 this.closeStream();
                 window.dispatchEvent(new CustomEvent('ai-stream-complete'));
                 return;
               }
-
-              let data = null;
-              try { data = JSON.parse(e.data); } catch(_) {}
-
-              if(data && (typeof data.delta === 'string' || typeof data.delta === 'number')){
-                if(!this.hasDelta) this.hasDelta = true;
-                this.handleDeltaText(String(data.delta));
-                if(data.tool && this.wire?.set){ this.wire.set('currentTool', data.tool); }
-                window.dispatchEvent(new CustomEvent('ai-stream-delta', { detail: { delta: String(data.delta) } }));
-              } else {
-                if(window.__DEV__) console.warn('[Terminal SSE] skip non-JSON or missing delta');
+              // Robust JSON-Parsing
+              try {
+                const data = JSON.parse(e.data);
+                if(data?.delta){
+                  if(window.__DEV__) console.log('[Terminal SSE] delta:', data.delta);
+                  if(!this.hasDelta) this.hasDelta = true;
+                  this.pushDelta(data.delta);
+                  window.dispatchEvent(new CustomEvent('ai-stream-delta', { detail: { delta: data.delta } }));
+                }
+                // optional: tool name/status über globales Event oder Livewire setzen
+                if(data?.tool){ $wire && $wire.set && $wire.set('currentTool', data.tool); }
+              } catch(parseErr){
+                // Non-JSON Lines ignorieren (Keep-Alive etc.)
+                if(window.__DEV__) console.warn('[Terminal SSE] parse skip (non-JSON line)');
               }
             };
-
             this.es.onerror = (err) => {
               if(window.__DEV__) console.error('[Terminal SSE] error:', err);
               this.closeStream();
+              // Retry mit Backoff (capped)
               if(this.retryCount < this.maxRetry){
                 const delay = Math.min(4000, this.backoffBaseMs * Math.pow(2, this.retryCount++));
                 setTimeout(() => this.startStream(url), delay);
@@ -334,46 +279,76 @@
             };
           } catch(e){
             if(window.__DEV__) console.error('[Terminal SSE] start error', e);
-            this.onStreamError();
           }
         },
-
         closeStream(){
           if(this.es){ try { this.es.close(); } catch(_){} this.es = null; }
         },
-
         abortStream(){
+          // Manueller Abbruch aus UI
           this.closeStream();
-          this.setFlags({ isStreaming: false, isProcessing: false, canCancel: false });
-          this.wire?.set?.('progressText', '');
-          this.wire?.set?.('currentTool', null);
+          this.stopTyping();
+          this.queue = '';
+          this.finalizePending = false;
+          this.hasDelta = false;
+          // Livewire-State aufräumen (falls gebunden)
+          $wire?.set?.('isProcessing', false);
+          $wire?.set?.('isStreaming', false);
+          $wire?.set?.('canCancel', false);
+          $wire?.set?.('progressText', '');
+          $wire?.set?.('currentTool', null);
           window.dispatchEvent(new CustomEvent('ai-stream-error'));
         },
 
-        // Events
+        // Drain → wartet bis die Queue leer ist, dann signalisiert „drained“
+        drainUntilEmpty(){
+          if(this.queue.length === 0){
+            window.dispatchEvent(new CustomEvent('ai-stream-drained'));
+            return;
+          }
+          setTimeout(() => this.drainUntilEmpty(), 30);
+        },
+
+        // Event-Brücken (aus x-on)
         onStreamComplete(){
           if(window.__DEV__) console.log('[Terminal SSE] ai-stream-complete');
-          this.finalizeCurrentIfAny();
-          this.setFlag('canCancel', false);
-          this.scrollToEnd();
-          this.onStreamDrained();
+          this.finalizePending = true;
+          $wire?.set?.('canCancel', false);
+          this.typingDelay = this.fastTypingDelay; // schneller zu Ende tippen
+          this.startTyping();
+          this.drainUntilEmpty();
+          if(this.bodyEl){ requestAnimationFrame(() => { this.bodyEl.scrollTop = this.bodyEl.scrollHeight; }); }
         },
-
         onStreamError(){
           if(window.__DEV__) console.log('[Terminal SSE] ai-stream-error');
-          this.setFlags({ isStreaming: false, isProcessing: false, canCancel: false });
-          this.wire?.set?.('progressText', '');
-          this.wire?.set?.('currentTool', null);
+          this.stopTyping();
+          this.queue = '';
+          this.finalizePending = false;
+          this.hasDelta = false;
+          $wire?.set?.('isProcessing', false);
+          $wire?.set?.('isStreaming', false);
+          $wire?.set?.('canCancel', false);
+          $wire?.set?.('progressText', '');
+          $wire?.set?.('currentTool', null);
         },
-
         async onStreamDrained(){
-          this.setFlags({ isStreaming: false, canCancel: false, isProcessing: false });
-          try { await this.wire?.call?.('loadMessages'); } catch(_) {}
+          if(window.__DEV__) console.log('[Terminal SSE] ai-stream-drained');
+          this.stopTyping();
+          // Livewire: Streaming-Fahnen zurücksetzen
+          $wire?.set?.('isStreaming', false);
+          $wire?.set?.('canCancel', false);
+          this.hasDelta = false;
+          this.finalizePending = false;
+          $wire?.set?.('isProcessing', false);
+          $wire?.set?.('progressText','');
+          // **Wichtig**: Stream-Text erst NACH History-Reload leeren, um Flicker zu vermeiden
+          try {
+            await $wire?.call?.('loadMessages');
+          } catch(_) {}
+          // kleiner Delay, damit DOM die neuen Messages rendert
           setTimeout(() => {
-            this.streamLines = [];
-            this.currentLine = '';
-            this.wire?.set?.('currentTool', null);
-            this.scrollToEnd();
+            this.streamText = '';
+            $wire?.set?.('currentTool', null);
             window.dispatchEvent(new CustomEvent('terminal-scroll'));
           }, 60);
         },
