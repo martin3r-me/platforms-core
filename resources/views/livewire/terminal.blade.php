@@ -60,10 +60,9 @@
     x-on:toggle-terminal.window="toggle()"
     x-on:ai-stream-start.window="console.log('[Terminal SSE] ai-stream-start', $event.detail?.url); startStream($event.detail.url)"
     x-on:ai-stream-delta.window="console.log('[Terminal SSE] ai-stream-delta event'); pushDelta($event.detail.delta); $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
-    x-on:ai-stream-complete.window="console.log('[Terminal SSE] ai-stream-complete'); finalizePending=true; typingDelay=fastTypingDelay; startTyping(); drainUntilEmpty()"
-    x-on:ai-stream-error.window="console.log('[Terminal SSE] ai-stream-error'); stopTyping(); queue=''; $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
-    x-on:ai-stream-drained.window="console.log('[Terminal SSE] ai-stream-drained'); stopTyping(); finalizePending=false; queue=''; streamText=''; $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
-    x-on:ai-stream-error.window="$wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
+    x-on:ai-stream-complete.window="console.log('[Terminal SSE] ai-stream-complete'); finalizePending=true; $wire.set('canCancel', false); $wire.set('progressText', ''); typingDelay=fastTypingDelay; startTyping(); drainUntilEmpty()"
+    x-on:ai-stream-error.window="console.log('[Terminal SSE] ai-stream-error'); stopTyping(); queue=''; finalizePending=false; $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
+    x-on:ai-stream-drained.window="console.log('[Terminal SSE] ai-stream-drained'); stopTyping(); $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.call('loadMessages'); setTimeout(()=>{ streamText=''; queue=''; finalizePending=false; $wire.set('progressText',''); }, 60)"
     class="w-full"
 >
 
