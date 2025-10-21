@@ -78,6 +78,9 @@ class CoreServiceProvider extends ServiceProvider
 
         // Automatische Modell-Registrierung entfernt
         
+        // Views registrieren
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'core');
+        
         // Livewire-Komponenten registrieren
         $this->registerLivewireComponents();
     }
@@ -113,25 +116,15 @@ class CoreServiceProvider extends ServiceProvider
 
     protected function registerLivewireComponents(): void
     {
-        $componentPath = __DIR__.'/Livewire';
-        $namespace = 'Platform\\Core\\Livewire';
-        $prefix = 'core';
-
-        if (!is_dir($componentPath)) {
-            return;
-        }
-
-        foreach (scandir($componentPath) as $file) {
-            if (!str_ends_with($file, '.php')) {
-                continue;
-            }
-
-            $class = $namespace.'\\'.pathinfo($file, PATHINFO_FILENAME);
-            if (class_exists($class)) {
-                $alias = $prefix.'.'.Str::kebab(pathinfo($file, PATHINFO_FILENAME));
-                Livewire::component($alias, $class);
-            }
-        }
+        // Direkte Registrierung wie andere Module
+        Livewire::component('core.terminal', \Platform\Core\Livewire\Terminal::class);
+        Livewire::component('core.modal-team', \Platform\Core\Livewire\ModalTeam::class);
+        Livewire::component('core.modal-user', \Platform\Core\Livewire\ModalUser::class);
+        Livewire::component('core.modal-checkin', \Platform\Core\Livewire\ModalCheckin::class);
+        Livewire::component('core.modal-pricing', \Platform\Core\Livewire\ModalPricing::class);
+        Livewire::component('core.modal-modules', \Platform\Core\Livewire\ModalModules::class);
+        Livewire::component('core.module-flyout', \Platform\Core\Livewire\ModuleFlyout::class);
+        Livewire::component('core.combined-flyout', \Platform\Core\Livewire\CombinedFlyout::class);
     }
 
     protected function loadModuleServiceProviders(): void
