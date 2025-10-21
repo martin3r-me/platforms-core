@@ -44,16 +44,16 @@
         @foreach($chats as $chat)
           <div class="flex items-center border-r border-[var(--ui-border)]/60" wire:key="chat-tab-{{ $chat['id'] }}">
             <button
-                type="button"
-                wire:click="setActiveChat({{ $chat['id'] }})"
-                class="flex items-center gap-2 px-3 py-2 text-xs transition-colors min-w-0"
-                :class="$wire.activeChatId === {{ $chat['id'] }}
-                    ? 'text-[var(--ui-primary)] bg-[var(--ui-surface)]'
-                    : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
-                :aria-current="$wire.activeChatId === {{ $chat['id'] }} ? 'true' : 'false'"
-                wire:key="chat-tab-button-{{ $chat['id'] }}"
-                >
-                <span class="truncate max-w-20">{{ $chat['title'] ?: 'Chat ' . $chat['id'] }}</span>
+              type="button"
+              wire:click="setActiveChat({{ $chat['id'] }})"
+              class="flex items-center gap-2 px-3 py-2 text-xs transition-colors min-w-0"
+              :class="$wire.activeChatId === {{ $chat['id'] }}
+                ? 'text-[var(--ui-primary)] bg-[var(--ui-surface)]'
+                : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
+              :aria-current="$wire.activeChatId === {{ $chat['id'] }} ? 'true' : 'false'"
+              wire:key="chat-tab-button-{{ $chat['id'] }}"
+            >
+              <span class="truncate max-w-20">{{ $chat['title'] ?: 'Chat ' . $chat['id'] }}</span>
             </button>
             <button
               type="button"
@@ -113,7 +113,7 @@
         @endforeach
 
         <!-- Streaming-Block (zeilenweises Fade-In) -->
-        <div class="flex items-start gap-2" x-show="$wire.isStreaming || streamLines.length > 0" wire:ignore>
+        <div class="flex items-start gap-2" x-show="isStreaming || streamLines.length > 0" wire:ignore>
           <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
           <div class="flex-1 flex flex-col gap-1"
                role="log"
@@ -155,12 +155,12 @@
         wire:model="messageInput"
         wire:keydown.enter="sendMessage"
         class="flex-1 bg-transparent outline-none text-sm text-[var(--ui-secondary)] placeholder-[var(--ui-muted)]"
-        :placeholder="$wire.isStreaming ? 'Verarbeite…' : 'Nachricht eingeben…'"
-        :disabled="$wire.isStreaming || $wire.isProcessing"
-        :aria-disabled="($wire.isStreaming || $wire.isProcessing) ? 'true' : 'false'"
+        :placeholder="isStreaming ? 'Verarbeite…' : 'Nachricht eingeben…'"
+        :disabled="isStreaming || isProcessing"
+        :aria-disabled="(isStreaming || isProcessing) ? 'true' : 'false'"
         wire:key="terminal-input"
       />
-      <template x-if="$wire.canCancel">
+      <template x-if="canCancel">
         <button
           type="button"
           wire:click="cancelRequest"
@@ -171,13 +171,13 @@
           Abbrechen
         </button>
       </template>
-      <template x-if="!$wire.canCancel">
+      <template x-if="!canCancel">
         <button
           type="button"
           wire:click="sendMessage"
           class="inline-flex items-center justify-center h-8 px-3 rounded-md border border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)] transition"
-          :disabled="$wire.isProcessing"
-          :aria-disabled="$wire.isProcessing ? 'true' : 'false'"
+          :disabled="isProcessing"
+          :aria-disabled="isProcessing ? 'true' : 'false'"
           wire:key="terminal-send"
         >
           Senden
@@ -187,24 +187,44 @@
   </div>
 
   <script>
+    // Optionales Dev-Flag
+    window.__DEV__ = window.__DEV__ ?? false;
+
     function chatTerminal(){
       return {
-        // Alpine.js für Terminal
-        get open(){ return Alpine?.store('page')?.terminalOpen ?? false; },
-        toggle(){ if(Alpine?.store('page')) Alpine.store('page').terminalOpen = !Alpine.store('page').terminalOpen; },
-        
+        // Flags (werden in init() via entangle .live gebunden)
+        isStreaming:  false,
+        isProcessing: false,
+        canCancel:    false,
+
+        // lokale Wire-Referenz
+        wire: null,
+
         // SSE/Stream State
         es: null,
         hasDelta: false,
-        streamLines: [],
+        streamLines: [],   // [{id,text,visible}]
         currentLine: '',
         lineIdSeq: 0,
+
+        // Retry/Backoff
         retryCount: 0,
         maxRetry: 3,
         backoffBaseMs: 400,
+
+        // Refs
         bodyEl: null,
-        
+
         init(){
+          // Livewire erst hier sicher verfügbar
+          this.wire = this.$wire || null;
+          if (this.wire?.entangle) {
+            // .live = bidirektional, reaktiv
+            this.isStreaming  = this.wire.entangle('isStreaming').live;
+            this.isProcessing = this.wire.entangle('isProcessing').live;
+            this.canCancel    = this.wire.entangle('canCancel').live;
+          }
+
           this.bodyEl = this.$refs.body;
           window.addEventListener('beforeunload', () => this.closeStream());
           this.$nextTick(() => {
@@ -213,13 +233,16 @@
             }
           });
         },
-        
+
+        // UI helpers
+        get open(){ return Alpine?.store('page')?.terminalOpen ?? false; },
+        toggle(){ if(Alpine?.store('page')) Alpine.store('page').terminalOpen = !Alpine.store('page').terminalOpen; },
         scrollToEnd(){
           if(this.bodyEl){
             requestAnimationFrame(() => { this.bodyEl.scrollTop = this.bodyEl.scrollHeight; });
           }
         },
-        
+
         // Zeilenlogik
         pushFinalLine(text){
           const id = `line-${++this.lineIdSeq}`;
@@ -251,33 +274,59 @@
             }
           }
         },
-        
+
         // SSE
         startStream(url){
           this.closeStream();
+
+          // Flags beim Start
+          this.isProcessing = false;
+          this.isStreaming  = true;
+          this.canCancel    = true;
+          this.wire?.set?.('isProcessing', false);
+          this.wire?.set?.('isStreaming', true);
+          this.wire?.set?.('canCancel', true);
+
+          // Reset Stream-UI
           this.streamLines = [];
           this.currentLine = '';
           this.hasDelta = false;
-          
+
           try {
+            if(window.__DEV__) console.log('[Terminal SSE] startStream →', url);
             this.es = new EventSource(url);
-            this.es.onopen = () => { this.retryCount = 0; };
+
+            this.es.onopen = () => {
+              if(window.__DEV__) console.log('[Terminal SSE] connection open');
+              this.retryCount = 0;
+            };
+
             this.es.onmessage = (e) => {
               if(!e.data) return;
+              if(window.__DEV__) console.log('[Terminal SSE] onmessage raw:', e.data);
+
               if(e.data === '[DONE]'){
+                if(window.__DEV__) console.log('[Terminal SSE] DONE');
                 this.closeStream();
                 window.dispatchEvent(new CustomEvent('ai-stream-complete'));
                 return;
               }
+
               let data = null;
               try { data = JSON.parse(e.data); } catch(_) {}
+
               if(data && (typeof data.delta === 'string' || typeof data.delta === 'number')){
                 if(!this.hasDelta) this.hasDelta = true;
                 this.handleDeltaText(String(data.delta));
+                if(data.tool && this.wire?.set){ this.wire.set('currentTool', data.tool); }
                 window.dispatchEvent(new CustomEvent('ai-stream-delta', { detail: { delta: String(data.delta) } }));
+              } else {
+                if(window.__DEV__) console.warn('[Terminal SSE] skip non-JSON or missing delta');
               }
             };
+
             this.es.onerror = (err) => {
+              if(window.__DEV__) console.error('[Terminal SSE] error:', err);
               this.closeStream();
               if(this.retryCount < this.maxRetry){
                 const delay = Math.min(4000, this.backoffBaseMs * Math.pow(2, this.retryCount++));
@@ -287,37 +336,65 @@
               }
             };
           } catch(e){
+            if(window.__DEV__) console.error('[Terminal SSE] start error', e);
             this.onStreamError();
           }
         },
-        
+
         closeStream(){
           if(this.es){ try { this.es.close(); } catch(_){} this.es = null; }
         },
-        
+
         abortStream(){
           this.closeStream();
+          this.isStreaming = false;
+          this.isProcessing = false;
+          this.canCancel = false;
+          this.wire?.set?.('isStreaming', false);
+          this.wire?.set?.('isProcessing', false);
+          this.wire?.set?.('canCancel', false);
+          this.wire?.set?.('progressText', '');
+          this.wire?.set?.('currentTool', null);
           window.dispatchEvent(new CustomEvent('ai-stream-error'));
         },
-        
+
+        // Events
         onStreamComplete(){
+          if(window.__DEV__) console.log('[Terminal SSE] ai-stream-complete');
           this.finalizeCurrentIfAny();
+          this.canCancel = false; this.wire?.set?.('canCancel', false);
           this.scrollToEnd();
           this.onStreamDrained();
         },
-        
+
         onStreamError(){
-          // Error handling
+          if(window.__DEV__) console.log('[Terminal SSE] ai-stream-error');
+          this.isStreaming = false;
+          this.isProcessing = false;
+          this.canCancel = false;
+          this.wire?.set?.('isStreaming', false);
+          this.wire?.set?.('isProcessing', false);
+          this.wire?.set?.('canCancel', false);
+          this.wire?.set?.('progressText', '');
+          this.wire?.set?.('currentTool', null);
         },
-        
+
         async onStreamDrained(){
+          this.isStreaming = false;
+          this.canCancel = false;
+          this.isProcessing = false;
+          this.wire?.set?.('isStreaming', false);
+          this.wire?.set?.('canCancel', false);
+          this.wire?.set?.('isProcessing', false);
+          try { await this.wire?.call?.('loadMessages'); } catch(_) {}
           setTimeout(() => {
             this.streamLines = [];
             this.currentLine = '';
+            this.wire?.set?.('currentTool', null);
             this.scrollToEnd();
             window.dispatchEvent(new CustomEvent('terminal-scroll'));
           }, 60);
-        }
+        },
       };
     }
   </script>
