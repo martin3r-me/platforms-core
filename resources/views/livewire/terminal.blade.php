@@ -208,11 +208,8 @@
     </div>
     <script>
         window.addEventListener('ai-stream-delta', (e) => {
-            // Optional: could push delta into a live placeholder; server already persists final message
+            // Optional hook for integrations
         });
-        window.addEventListener('ai-stream-complete', () => {
-            // Could trigger a Livewire refresh if needed
-            window.Livewire && window.Livewire.dispatch && window.Livewire.dispatch('refresh');
-        });
+        // Kein Livewire-Refresh bei COMPLETE – lokale Blase bleibt bestehen
     </script>
 </div>

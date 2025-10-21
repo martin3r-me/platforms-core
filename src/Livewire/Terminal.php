@@ -188,7 +188,7 @@ class Terminal extends Component
 
         $userMessage = $this->messageInput;
         
-        CoreChatMessage::create([
+        $created = CoreChatMessage::create([
             'core_chat_id' => $this->activeChatId,
             'thread_id' => $this->activeThreadId,
             'role' => 'user',
@@ -196,8 +196,16 @@ class Terminal extends Component
             'tokens_in' => strlen($userMessage),
         ]);
 
+        // Optimistisch in die aktuelle Liste einfügen, statt neu zu laden
+        $this->messages[] = [
+            'id' => $created->id,
+            'role' => 'user',
+            'content' => $userMessage,
+            'thread_id' => $this->activeThreadId,
+            'core_chat_id' => $this->activeChatId,
+        ];
+
         $this->messageInput = '';
-        $this->loadMessages();
         $this->dispatch('terminal-scroll');
 
         $streamUrl = route('core.ai.stream', ['thread' => $this->activeThreadId]);
@@ -285,7 +293,7 @@ class Terminal extends Component
         $this->currentTool = null;
         $this->progressText = '';
         
-        $this->loadMessages();
+        // Keine DB-Neuladung hier – Streaming-Blase bleibt stehen und wird nicht ersetzt
         $this->dispatch('terminal-scroll');
         $this->dispatch('terminal-complete');
     }
