@@ -44,16 +44,16 @@
         @foreach($chats as $chat)
           <div class="flex items-center border-r border-[var(--ui-border)]/60" wire:key="chat-tab-{{ $chat['id'] }}">
             <button
-              type="button"
-              wire:click="setActiveChat({{ $chat['id'] }})"
-              class="flex items-center gap-2 px-3 py-2 text-xs transition-colors min-w-0"
-              :class="$wire.activeChatId == {{ $chat['id'] }}
-                ? 'text-[var(--ui-primary)] bg-[var(--ui-surface)]'
-                : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
-              aria-current="{{ $wire.activeChatId == $chat['id'] ? 'true' : 'false' }}"
-              wire:key="chat-tab-button-{{ $chat['id'] }}"
-            >
-              <span class="truncate max-w-20">{{ $chat['title'] ?: 'Chat ' . $chat['id'] }}</span>
+                type="button"
+                wire:click="setActiveChat({{ $chat['id'] }})"
+                class="flex items-center gap-2 px-3 py-2 text-xs transition-colors min-w-0"
+                :class="$wire.activeChatId === {{ $chat['id'] }}
+                    ? 'text-[var(--ui-primary)] bg-[var(--ui-surface)]'
+                    : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
+                :aria-current="$wire.activeChatId === {{ $chat['id'] }} ? 'true' : 'false'"
+                wire:key="chat-tab-button-{{ $chat['id'] }}"
+                >
+                <span class="truncate max-w-20">{{ $chat['title'] ?: 'Chat ' . $chat['id'] }}</span>
             </button>
             <button
               type="button"
