@@ -332,6 +332,7 @@ class Terminal extends Component
         $this->dispatch('terminal-cancelled');
     }
 
+
     public function render()
     {
         return view('platform::livewire.terminal');

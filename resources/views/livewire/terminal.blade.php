@@ -111,7 +111,7 @@
         @endforeach
 
         <!-- Streaming-Block -->
-        <div class="flex items-start gap-2" x-show="$wire.isStreaming || streamText.length > 0" wire:ignore>
+        <div class="flex items-start gap-2" x-show="$wire.isStreaming || streamText.length > 0">
           <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
           <div class="flex items-center gap-2"
                role="log"
@@ -140,8 +140,8 @@
         wire:keydown.enter="sendMessage"
         class="flex-1 bg-transparent outline-none text-sm text-[var(--ui-secondary)] placeholder-[var(--ui-muted)]"
         :placeholder="$wire.isStreaming ? 'Verarbeite…' : 'Nachricht eingeben…'"
-        :disabled="$wire.isStreaming || $wire.isProcessing"
-        :aria-disabled="$wire.isStreaming || $wire.isProcessing ? 'true' : 'false'"
+        :disabled="$wire.isStreaming"
+        :aria-disabled="$wire.isStreaming ? 'true' : 'false'"
         wire:key="terminal-input"
       />
       @if($canCancel)
@@ -349,11 +349,6 @@
           // kleiner Delay, damit DOM die neuen Messages rendert
           setTimeout(() => {
             this.streamText = '';
-            // Zusätzliche Sicherheit: Alle Properties nochmal zurücksetzen
-            $wire?.set?.('isStreaming', false);
-            $wire?.set?.('canCancel', false);
-            $wire?.set?.('isProcessing', false);
-            $wire?.set?.('currentTool', null);
             window.dispatchEvent(new CustomEvent('terminal-scroll'));
           }, 60);
         },
