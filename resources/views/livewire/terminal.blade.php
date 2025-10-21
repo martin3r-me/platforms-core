@@ -154,25 +154,16 @@
                     </div>
                 @endforeach
 
-                <!-- Progress Indicator -->
-                @if($isProcessing)
-                    <div class="flex items-start gap-2" x-show="es !== null && !hasDelta">
-                        <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
-                        <div class="flex items-center gap-2">
-                            <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"></div>
-                            <span class="text-[var(--ui-secondary)] text-xs">{{ $progressText ?: 'Verarbeite...' }}</span>
-                        </div>
-                        @if($currentTool)
-                            <div class="text-xs text-[var(--ui-muted)]">
-                                (Tool: {{ $currentTool }})
-                            </div>
-                        @endif
-                    </div>
-                @endif
-                <!-- Live Streaming Bubble (immer anzeigen, wenn Text existiert) -->
-                <div class="flex items-start gap-2" x-show="streamText.length > 0">
+                <!-- Einheitlicher Streaming-Block (kein Flicker) -->
+                <div class="flex items-start gap-2" x-show="$wire.isStreaming || streamText.length > 0">
                     <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
-                    <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
+                        <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin" x-show="!hasDelta"></div>
+                        <template x-if="$wire.currentTool">
+                            <div class="text-xs text-[var(--ui-muted)]" x-text="'(Tool: ' + $wire.currentTool + ')'"></div>
+                        </template>
+                    </div>
                 </div>
             </div>
         </div>
