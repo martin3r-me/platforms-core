@@ -40,7 +40,7 @@
       <div class="flex-1 min-h-0 overflow-y-auto">
         {{ $slot }}
       </div>
-      <x-ui-terminal />
+      @livewire('core.terminal')
     </main>
   </div>
 

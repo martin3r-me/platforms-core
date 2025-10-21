@@ -77,6 +77,9 @@ class CoreServiceProvider extends ServiceProvider
         }
 
         // Automatische Modell-Registrierung entfernt
+        
+        // Livewire-Komponenten registrieren
+        $this->registerLivewireComponents();
     }
 
     public function register(): void
