@@ -23,6 +23,41 @@
             </div>
         </div>
 
+        <!-- Tabs -->
+        <div class="flex items-center border-b border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)] opacity-100 transition-opacity duration-200" :class="open ? 'opacity-100' : 'opacity-0'">
+            <div class="flex items-center overflow-x-auto">
+                @foreach($chats as $chat)
+                    <div class="flex items-center border-r border-[var(--ui-border)]/60">
+                        <button 
+                            wire:click="setActiveChat({{ $chat['id'] }})"
+                            class="flex items-center gap-2 px-3 py-2 text-xs transition-colors min-w-0"
+                            :class="$wire.activeChatId == {{ $chat['id'] }} 
+                                ? 'text-[var(--ui-primary)] bg-[var(--ui-surface)]' 
+                                : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
+                        >
+                            <span class="truncate max-w-20">{{ $chat['title'] ?: 'Chat ' . $chat['id'] }}</span>
+                            <button 
+                                wire:click="deleteChat({{ $chat['id'] }})"
+                                class="inline-flex items-center justify-center w-4 h-4 rounded hover:bg-[var(--ui-danger-5)] hover:text-[var(--ui-danger)] transition-colors"
+                                title="Chat löschen"
+                            >
+                                @svg('heroicon-o-x-mark', 'w-3 h-3')
+                            </button>
+                        </button>
+                    </div>
+                @endforeach
+                
+                <!-- New Chat Button -->
+                <button 
+                    wire:click="createNewChat"
+                    class="flex items-center gap-2 px-3 py-2 text-xs text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)] transition-colors"
+                    title="Neuen Chat erstellen"
+                >
+                    @svg('heroicon-o-plus', 'w-4 h-4')
+                </button>
+            </div>
+        </div>
+
         <!-- Body -->
         <div class="flex-1 min-h-0 overflow-y-auto px-3 py-2 text-xs font-mono text-[var(--ui-secondary)] opacity-100 transition-opacity duration-200" :class="open ? 'opacity-100' : 'opacity-0'">
             <div class="text-[var(--ui-muted)]">Tippe "help" für verfügbare Befehle…</div>
