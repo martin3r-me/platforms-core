@@ -334,22 +334,24 @@
         async onStreamDrained(){
           if(window.__DEV__) console.log('[Terminal SSE] ai-stream-drained');
           this.stopTyping();
-          // Livewire: Streaming-Fahnen zurücksetzen
-          $wire?.set?.('isStreaming', false);
-          $wire?.set?.('canCancel', false);
           this.hasDelta = false;
           this.finalizePending = false;
-          $wire?.set?.('isProcessing', false);
-          $wire?.set?.('progressText','');
-          $wire?.set?.('currentTool', null);
           // **Wichtig**: Stream-Text erst NACH History-Reload leeren, um Flicker zu vermeiden
           try {
             await $wire?.call?.('loadMessages');
+            // Explizit alle Properties zurücksetzen
+            $wire?.set?.('isStreaming', false);
+            $wire?.set?.('canCancel', false);
+            $wire?.set?.('isProcessing', false);
+            $wire?.set?.('progressText', '');
+            $wire?.set?.('currentTool', null);
           } catch(_) {}
           // kleiner Delay, damit DOM die neuen Messages rendert
           setTimeout(() => {
             this.streamText = '';
+            // Zusätzliches Event um sicherzustellen, dass UI aktualisiert wird
             window.dispatchEvent(new CustomEvent('terminal-scroll'));
+            window.dispatchEvent(new CustomEvent('terminal-reset'));
           }, 60);
         },
       };
