@@ -77,12 +77,6 @@ class CoreServiceProvider extends ServiceProvider
         }
 
         // Automatische Modell-Registrierung entfernt
-        
-        // Views registrieren
-        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'core');
-        
-        // Livewire-Komponenten registrieren
-        $this->registerLivewireComponents();
     }
 
     public function register(): void
@@ -114,18 +108,43 @@ class CoreServiceProvider extends ServiceProvider
         // CommandRegistry entfernt - Sidebar soll leer sein
     }
 
+
     protected function registerLivewireComponents(): void
     {
-        // Direkte Registrierung wie andere Module
-        Livewire::component('core.terminal', \Platform\Core\Livewire\Terminal::class);
-        Livewire::component('core.team-flyout', \Platform\Core\Livewire\TeamFlyout::class);
-        Livewire::component('core.modal-team', \Platform\Core\Livewire\ModalTeam::class);
-        Livewire::component('core.modal-user', \Platform\Core\Livewire\ModalUser::class);
-        Livewire::component('core.modal-checkin', \Platform\Core\Livewire\ModalCheckin::class);
-        Livewire::component('core.modal-pricing', \Platform\Core\Livewire\ModalPricing::class);
-        Livewire::component('core.modal-modules', \Platform\Core\Livewire\ModalModules::class);
-        Livewire::component('core.module-flyout', \Platform\Core\Livewire\ModuleFlyout::class);
-        Livewire::component('core.combined-flyout', \Platform\Core\Livewire\CombinedFlyout::class);
+        $basePath = __DIR__ . '/Livewire';
+        $baseNamespace = 'Platform\\Core\\Livewire';
+        $prefix = 'core';
+
+        if (!is_dir($basePath)) {
+            return;
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($basePath)
+        );
+
+        foreach ($iterator as $file) {
+            if (!$file->isFile() || $file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $relativePath = str_replace($basePath . DIRECTORY_SEPARATOR, '', $file->getPathname());
+            $classPath = str_replace(['/', '.php'], ['\\', ''], $relativePath);
+            $class = $baseNamespace . '\\' . $classPath;
+
+            if (!class_exists($class)) {
+                continue;
+            }
+
+            // core.dashboard aus core + dashboard.php
+            $aliasPath = str_replace(['\\', '/'], '.', Str::kebab(str_replace('.php', '', $relativePath)));
+            $alias = $prefix . '.' . $aliasPath;
+
+            // Debug: Ausgabe der registrierten Komponente
+            \Log::info("Registering Livewire component: {$alias} -> {$class}");
+
+            Livewire::component($alias, $class);
+        }
     }
 
     protected function loadModuleServiceProviders(): void
