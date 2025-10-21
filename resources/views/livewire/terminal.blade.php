@@ -260,7 +260,7 @@
                   window.dispatchEvent(new CustomEvent('ai-stream-delta', { detail: { delta: data.delta } }));
                 }
                 // optional: tool name/status über globales Event oder Livewire setzen
-                if(data?.tool){ $wire && $wire.set && $wire.set('currentTool', data.tool); }
+                if(data?.tool){ this.$wire && this.$wire.set && this.$wire.set('currentTool', data.tool); }
               } catch(parseErr){
                 // Non-JSON Lines ignorieren (Keep-Alive etc.)
                 if(window.__DEV__) console.warn('[Terminal SSE] parse skip (non-JSON line)');
@@ -292,11 +292,11 @@
           this.finalizePending = false;
           this.hasDelta = false;
           // Livewire-State aufräumen (falls gebunden)
-          $wire?.set?.('isProcessing', false);
-          $wire?.set?.('isStreaming', false);
-          $wire?.set?.('canCancel', false);
-          $wire?.set?.('progressText', '');
-          $wire?.set?.('currentTool', null);
+          this.$wire?.set?.('isProcessing', false);
+          this.$wire?.set?.('isStreaming', false);
+          this.$wire?.set?.('canCancel', false);
+          this.$wire?.set?.('progressText', '');
+          this.$wire?.set?.('currentTool', null);
           window.dispatchEvent(new CustomEvent('ai-stream-error'));
         },
 
@@ -313,7 +313,7 @@
         onStreamComplete(){
           if(window.__DEV__) console.log('[Terminal SSE] ai-stream-complete');
           this.finalizePending = true;
-          $wire?.set?.('canCancel', false);
+          this.$wire?.set?.('canCancel', false);
           this.typingDelay = this.fastTypingDelay; // schneller zu Ende tippen
           this.startTyping();
           this.drainUntilEmpty();
@@ -325,30 +325,30 @@
           this.queue = '';
           this.finalizePending = false;
           this.hasDelta = false;
-          $wire?.set?.('isProcessing', false);
-          $wire?.set?.('isStreaming', false);
-          $wire?.set?.('canCancel', false);
-          $wire?.set?.('progressText', '');
-          $wire?.set?.('currentTool', null);
+          this.$wire?.set?.('isProcessing', false);
+          this.$wire?.set?.('isStreaming', false);
+          this.$wire?.set?.('canCancel', false);
+          this.$wire?.set?.('progressText', '');
+          this.$wire?.set?.('currentTool', null);
         },
         async onStreamDrained(){
           if(window.__DEV__) console.log('[Terminal SSE] ai-stream-drained');
           this.stopTyping();
           // Livewire: Streaming-Fahnen zurücksetzen
-          $wire?.set?.('isStreaming', false);
-          $wire?.set?.('canCancel', false);
+          this.$wire?.set?.('isStreaming', false);
+          this.$wire?.set?.('canCancel', false);
           this.hasDelta = false;
           this.finalizePending = false;
-          $wire?.set?.('isProcessing', false);
-          $wire?.set?.('progressText','');
+          this.$wire?.set?.('isProcessing', false);
+          this.$wire?.set?.('progressText','');
           // **Wichtig**: Stream-Text erst NACH History-Reload leeren, um Flicker zu vermeiden
           try {
-            await $wire?.call?.('loadMessages');
+            await this.$wire?.call?.('loadMessages');
           } catch(_) {}
           // kleiner Delay, damit DOM die neuen Messages rendert
           setTimeout(() => {
             this.streamText = '';
-            $wire?.set?.('currentTool', null);
+            this.$wire?.set?.('currentTool', null);
             window.dispatchEvent(new CustomEvent('terminal-scroll'));
           }, 60);
         },
