@@ -2,6 +2,7 @@
     x-data="{
         get open(){ return Alpine?.store('page')?.terminalOpen ?? false },
         toggle(){ Alpine?.store('page') && (Alpine.store('page').terminalOpen = !Alpine.store('page').terminalOpen) },
+        processing: $wire ? $wire.entangle('isProcessing') : false,
         es: null,
         streamText: '',
         queue: '',
@@ -52,6 +53,9 @@
                         if(data.delta){
                             console.log('[Terminal SSE] delta:', data.delta);
                             if(!this.hasDelta){ this.hasDelta = true; }
+                            // Direkt anhängen, damit keine Race-Conditions mit globalen Events entstehen
+                            this.pushDelta(data.delta);
+                            // Optional zusätzlich global dispatchen (Debug/Integrationen)
                             window.dispatchEvent(new CustomEvent('ai-stream-delta', { detail: { delta: data.delta } }));
                         }
                     } catch(parseErr) {
@@ -68,7 +72,7 @@
     x-on:ai-stream-delta.window="console.log('[Terminal SSE] ai-stream-delta event'); pushDelta($event.detail.delta); $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
     x-on:ai-stream-complete.window="console.log('[Terminal SSE] ai-stream-complete'); finalizePending=true; $wire.set('canCancel', false); typingDelay=fastTypingDelay; startTyping(); drainUntilEmpty(); $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
     x-on:ai-stream-error.window="console.log('[Terminal SSE] ai-stream-error'); stopTyping(); queue=''; finalizePending=false; hasDelta=false; $wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', '')"
-    x-on:ai-stream-drained.window="console.log('[Terminal SSE] ai-stream-drained'); stopTyping(); hasDelta=true; $wire.set('isStreaming', false); $wire.set('canCancel', false); setTimeout(()=>{ $wire.set('isProcessing', false); $wire.set('progressText',''); finalizePending=false; window.dispatchEvent(new CustomEvent('terminal-scroll')); }, 80)"
+    x-on:ai-stream-drained.window="console.log('[Terminal SSE] ai-stream-drained'); stopTyping(); hasDelta=true; $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('isProcessing', false); $wire.set('progressText',''); finalizePending=false; setTimeout(()=>{ window.dispatchEvent(new CustomEvent('terminal-scroll')); }, 60)"
     x-on:terminal-scroll.window="$nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
     class="w-full"
 >

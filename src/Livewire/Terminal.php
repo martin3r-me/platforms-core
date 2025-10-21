@@ -279,9 +279,9 @@ class Terminal extends Component
 
     private function finishResponse()
     {
-        $this->isProcessing = false;
         $this->isStreaming = false;
         $this->canCancel = false;
+        $this->isProcessing = false;
         $this->currentTool = null;
         $this->progressText = '';
         
@@ -292,9 +292,9 @@ class Terminal extends Component
 
     private function handleError(\Exception $e)
     {
-        $this->isProcessing = false;
         $this->isStreaming = false;
         $this->canCancel = false;
+        $this->isProcessing = false;
         $this->currentTool = null;
         $this->progressText = '';
         
@@ -315,9 +315,9 @@ class Terminal extends Component
     {
         if (!$this->canCancel) return;
         
-        $this->isProcessing = false;
         $this->isStreaming = false;
         $this->canCancel = false;
+        $this->isProcessing = false;
         $this->currentTool = null;
         $this->progressText = '';
         
