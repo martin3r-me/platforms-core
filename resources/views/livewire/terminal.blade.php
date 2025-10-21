@@ -21,7 +21,8 @@
     x-on:toggle-terminal.window="toggle()"
     x-on:ai-stream-start.window="startStream($event.detail.url)"
     x-on:ai-stream-delta.window="streamText += $event.detail.delta; $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
-    x-on:ai-stream-complete.window="$wire.set('isProcessing', false); $wire.set('canCancel', false); $wire.call('loadMessages')"
+    x-on:ai-stream-complete.window="$wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
+    x-on:ai-stream-error.window="$wire.set('isProcessing', false); $wire.set('isStreaming', false); $wire.set('canCancel', false); $wire.set('progressText', ''); $wire.call('loadMessages')"
     class="w-full"
 >
 
