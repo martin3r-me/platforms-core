@@ -1,6 +1,27 @@
 <div
-    x-data="{ get open(){ return Alpine?.store('page')?.terminalOpen ?? false }, toggle(){ Alpine?.store('page') && (Alpine.store('page').terminalOpen = !Alpine.store('page').terminalOpen) } }"
+    x-data="{
+        get open(){ return Alpine?.store('page')?.terminalOpen ?? false },
+        toggle(){ Alpine?.store('page') && (Alpine.store('page').terminalOpen = !Alpine.store('page').terminalOpen) },
+        es: null,
+        streamText: '',
+        startStream(url){
+            if(this.es){ this.es.close(); this.es = null; }
+            try {
+                this.streamText = '';
+                this.es = new EventSource(url);
+                this.es.onmessage = (e) => {
+                    if(!e.data) return;
+                    if(e.data === '[DONE]') { this.es.close(); this.es = null; window.dispatchEvent(new CustomEvent('ai-stream-complete')); return; }
+                    try { const data = JSON.parse(e.data); if(data.delta){ window.dispatchEvent(new CustomEvent('ai-stream-delta', { detail: { delta: data.delta } })); } } catch(_) {}
+                };
+                this.es.onerror = () => { this.es && this.es.close(); this.es = null; window.dispatchEvent(new CustomEvent('ai-stream-error')); };
+            } catch(_) {}
+        }
+    }"
     x-on:toggle-terminal.window="toggle()"
+    x-on:ai-stream-start.window="startStream($event.detail.url)"
+    x-on:ai-stream-delta.window="streamText += $event.detail.delta; $nextTick(() => { const c = $el.querySelector('[data-terminal-body]'); if(c){ c.scrollTop = c.scrollHeight } })"
+    x-on:ai-stream-complete.window="$wire.set('isProcessing', false); $wire.set('canCancel', false); $wire.call('loadMessages')"
     class="w-full"
 >
 
@@ -59,7 +80,7 @@
         </div>
 
         <!-- Body -->
-        <div class="flex-1 min-h-0 overflow-y-auto px-3 py-2 text-xs font-mono text-[var(--ui-secondary)] opacity-100 transition-opacity duration-200" :class="open ? 'opacity-100' : 'opacity-0'">
+        <div class="flex-1 min-h-0 overflow-y-auto px-3 py-2 text-xs font-mono text-[var(--ui-secondary)] opacity-100 transition-opacity duration-200" :class="open ? 'opacity-100' : 'opacity-0'" data-terminal-body>
             @if(empty($messages))
                 <div class="text-[var(--ui-muted)]">Tippe "help" für verfügbare Befehle…</div>
                 <div class="mt-2 space-y-1">
@@ -93,6 +114,11 @@
                                     (Tool: {{ $currentTool }})
                                 </div>
                             @endif
+                        </div>
+                        <!-- Live Streaming Bubble -->
+                        <div class="flex items-start gap-2">
+                            <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
+                            <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
                         </div>
                     @endif
                 </div>
@@ -128,4 +154,13 @@
             @endif
         </div>
     </div>
+    <script>
+        window.addEventListener('ai-stream-delta', (e) => {
+            // Optional: could push delta into a live placeholder; server already persists final message
+        });
+        window.addEventListener('ai-stream-complete', () => {
+            // Could trigger a Livewire refresh if needed
+            window.Livewire && window.Livewire.dispatch && window.Livewire.dispatch('refresh');
+        });
+    </script>
 </div>

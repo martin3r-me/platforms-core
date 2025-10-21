@@ -2,54 +2,46 @@
 
 namespace Platform\Core\Services;
 
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class OpenAiService
 {
+    private const DEFAULT_MODEL = 'gpt-3.5-turbo';
     private string $baseUrl = 'https://api.openai.com/v1';
 
     private function getApiKey(): string
     {
-        $apiKey = env('OPENAI_API_KEY');
-        
-        // Check if API key is valid (starts with 'sk-' and has reasonable length)
-        if ($apiKey && str_starts_with($apiKey, 'sk-') && strlen($apiKey) > 20) {
-            return $apiKey;
-        }
-        
-        return 'demo-key';
+        return env('OPENAI_API_KEY');
     }
 
-    public function chat(array $messages, string $model = 'gpt-3.5-turbo', array $options = []): array
+    /**
+     * Perform a non-streaming chat completion request.
+     */
+    public function chat(array $messages, string $model = self::DEFAULT_MODEL, array $options = []): array
     {
-        // Demo mode - return mock responses with streaming simulation
-        if ($this->getApiKey() === 'demo-key') {
-            return $this->getDemoResponse($messages);
-        }
         
         try {
-            $response = Http::timeout(20) // LLM-Timeout: 20s
-                ->withHeaders([
-                    'Authorization' => 'Bearer ' . $this->getApiKey(),
-                    'Content-Type' => 'application/json',
-                ])->post($this->baseUrl . '/chat/completions', [
-                    'model' => $model,
-                    'messages' => $messages,
-                    'max_tokens' => $options['max_tokens'] ?? 1000,
-                    'temperature' => $options['temperature'] ?? 0.7,
-                    'stream' => $options['stream'] ?? false,
-                    'tools' => $options['tools'] ?? null,
-                    'tool_choice' => $options['tool_choice'] ?? 'auto',
-                ]);
+            $payload = [
+                'model' => $model,
+                'messages' => $messages,
+                'max_tokens' => $options['max_tokens'] ?? 1000,
+                'temperature' => $options['temperature'] ?? 0.7,
+                'stream' => false,
+            ];
+
+            if (!empty($options['tools'])) {
+                $payload['tools'] = $options['tools'];
+                $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
+            }
+
+            $response = $this->http()->post($this->baseUrl . '/chat/completions', $payload);
 
             if ($response->failed()) {
-                Log::error('OpenAI API Error', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-                
-                throw new \Exception('OpenAI API request failed: ' . $response->body());
+                $this->logApiError('OpenAI API Error', $response->status(), $response->body());
+                throw new \Exception($this->formatApiErrorMessage($response->status(), $response->body()));
             }
 
             $data = $response->json();
@@ -72,93 +64,99 @@ class OpenAiService
         }
     }
 
-    private function getDemoResponse(array $messages): array
+    /**
+     * Perform a streaming chat completion. Calls $onDelta with each content token chunk.
+     * Note: For true real-time UX, forward chunks via SSE/WebSockets to the client.
+     */
+    public function streamChat(array $messages, callable $onDelta, string $model = self::DEFAULT_MODEL, array $options = []): void
     {
-        $lastMessage = end($messages);
-        $userInput = strtolower(trim($lastMessage['content'] ?? ''));
-        
-        // Erweiterte Demo-Antworten mit intelligenten Keywords
-        $demoResponses = [
-            // Begrüßungen
-            'hallo' => 'Hallo! Wie kann ich dir helfen?',
-            'moin' => 'Moin! Schön, dass du da bist!',
-            'hi' => 'Hi! Was möchtest du wissen?',
-            'hey' => 'Hey! Bereit zu arbeiten?',
-            'guten tag' => 'Guten Tag! Wie kann ich dir heute helfen?',
-            'guten morgen' => 'Guten Morgen! Ein produktiver Tag beginnt!',
-            'guten abend' => 'Guten Abend! Zeit für eine Zusammenfassung?',
-            
-            // Dank & Feedback
-            'danke' => 'Gerne! Freut mich, dass ich helfen konnte!',
-            'danke freue mich auch' => 'Das freut mich sehr! Zusammen schaffen wir mehr!',
-            'danke schön' => 'Bitte sehr! Immer gerne!',
-            'vielen dank' => 'Sehr gerne! Was können wir als nächstes angehen?',
-            'perfekt' => 'Super! Freut mich, dass es funktioniert!',
-            'toll' => 'Das ist großartig! Weiter so!',
-            'super' => 'Fantastisch! Lass uns weitermachen!',
-            
-            // Test & Status
-            'test' => 'Test erfolgreich! Das Terminal funktioniert einwandfrei.',
-            'hall0' => 'Hallo! Das Terminal funktioniert im Demo-Modus.',
-            'funktioniert' => 'Ja, alles läuft perfekt!',
-            'status' => 'Alles im grünen Bereich! System läuft stabil.',
-            
-            // Arbeit & Projekte
-            'projekt' => 'Ich kann dir bei Projekten helfen! Möchtest du ein neues Projekt erstellen?',
-            'aufgabe' => 'Aufgaben sind wichtig! Soll ich dir zeigen, wie du eine neue Aufgabe anlegst?',
-            'okr' => 'OKRs helfen bei der Zielsetzung. Welche Ziele möchtest du definieren?',
-            'arbeit' => 'Arbeit ist wichtig! Lass uns produktiv werden!',
-            'meeting' => 'Meetings sind wichtig für die Zusammenarbeit. Soll ich dir bei der Planung helfen?',
-            
-            // Hilfe & Support
-            'hilfe' => 'Gerne helfe ich dir! Du kannst mich nach Projekten, Aufgaben, OKRs oder anderen Themen fragen.',
-            'help' => 'I can help you with projects, tasks, OKRs, and more. Just ask!',
-            'was kann ich' => 'Du kannst mich nach Projekten, Aufgaben, OKRs, Meetings und vielem mehr fragen!',
-            'befehle' => 'Verfügbare Befehle: Projekte, Aufgaben, OKRs, Meetings, Status, Hilfe',
-            
-            // Allgemeine Gespräche
-            'wie gehts' => 'Mir geht es gut, danke! Und dir?',
-            'wie geht es dir' => 'Sehr gut, danke der Nachfrage! Bereit zu helfen!',
-            'alles klar' => 'Alles klar! Was können wir angehen?',
-            'ok' => 'Perfekt! Lass uns weitermachen!',
+        $payload = [
+            'model' => $model,
+            'messages' => $messages,
+            'max_tokens' => $options['max_tokens'] ?? 1000,
+            'temperature' => $options['temperature'] ?? 0.7,
+            'stream' => true,
         ];
-        
-        // Intelligente Suche nach Keywords
-        $response = $demoResponses[$userInput] ?? null;
-        
-        if (!$response) {
-            // Suche nach Keywords in der Eingabe
-            foreach ($demoResponses as $keyword => $reply) {
-                if (str_contains($userInput, $keyword)) {
-                    $response = $reply;
-                    break;
-                }
+
+        if (!empty($options['tools'])) {
+            $payload['tools'] = $options['tools'];
+            $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
+        }
+
+        $response = $this->http(withStream: true)
+            ->post($this->baseUrl . '/chat/completions', $payload);
+
+        if ($response->failed()) {
+            $this->logApiError('OpenAI API Error (stream)', $response->status(), $response->body());
+            throw new \Exception($this->formatApiErrorMessage($response->status(), $response->body()));
+        }
+
+        $body = $response->toPsrResponse()->getBody();
+        while (!$body->eof()) {
+            $chunk = $body->read(1024);
+            if (!$chunk) { continue; }
+            foreach (preg_split("/(\r\n|\r|\n)/", $chunk) as $line) {
+                $line = trim($line);
+                if ($line === '' || !str_starts_with($line, 'data:')) { continue; }
+                $data = trim(substr($line, 5));
+                if ($data === '[DONE]') { return; }
+                $decoded = json_decode($data, true);
+                $delta = $decoded['choices'][0]['delta']['content'] ?? '';
+                if ($delta !== '') { $onDelta($delta); }
             }
         }
-        
-        // Fallback für unbekannte Eingaben
-        if (!$response) {
-            $response = "Interessant! Du hast '$userInput' geschrieben. Das Terminal funktioniert im Demo-Modus. Du kannst mich nach Projekten, Aufgaben, OKRs oder anderen Themen fragen!";
+    }
+
+    /** Build a robust HTTP client with consistent headers, timeouts, and retry. */
+    private function http(bool $withStream = false): PendingRequest
+    {
+        $request = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->getApiKey(),
+                'Content-Type' => 'application/json',
+                'User-Agent' => 'Glowkit-Core/1.0 (+Laravel)'
+            ])
+            ->timeout(20)
+            ->connectTimeout(5)
+            ->retry(1, random_int(250, 500), function ($exception, $request) {
+                if ($exception instanceof ConnectionException) { return true; }
+                $status = optional($request->response())->status();
+                return in_array($status, [429, 500, 502, 503, 504], true);
+            });
+
+        if ($withStream) {
+            $request = $request->withOptions(['stream' => true]);
         }
-        
-        return [
-            'content' => $response,
-            'usage' => ['total_tokens' => 50],
-            'model' => 'demo-model',
-            'tool_calls' => null,
-            'finish_reason' => 'stop',
-        ];
+
+        return $request;
+    }
+
+    private function logApiError(string $message, int $status, string $body): void
+    {
+        Log::error($message, [ 'status' => $status, 'body' => $body ]);
+    }
+
+    private function formatApiErrorMessage(int $status, string $body): string
+    {
+        $prefix = match (true) {
+            $status === 401 => 'AUTHENTICATION_FAILED',
+            $status === 403 => 'PERMISSION_DENIED',
+            $status === 404 => 'NOT_FOUND',
+            $status === 409 => 'CONFLICT',
+            $status === 422 => 'VALIDATION',
+            $status === 429 => 'RATE_LIMITED',
+            $status >= 500 => 'DEPENDENCY_FAILED',
+            default => 'INTERNAL_ERROR',
+        };
+        return $prefix . ': OpenAI request failed (HTTP ' . $status . ').';
     }
 
     public function getModels(): array
     {
         try {
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->getApiKey(),
-            ])->get($this->baseUrl . '/models');
+            $response = $this->http()->get($this->baseUrl . '/models');
 
             if ($response->failed()) {
-                throw new \Exception('Failed to fetch OpenAI models');
+                throw new \Exception($this->formatApiErrorMessage($response->status(), $response->body()));
             }
 
             return $response->json()['data'] ?? [];

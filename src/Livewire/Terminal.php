@@ -185,8 +185,9 @@ class Terminal extends Component
         $this->messageInput = '';
         $this->loadMessages();
 
-        // Get AI response with enhanced UX
-        $this->getAiResponse();
+        // Start SSE streaming on client
+        $streamUrl = route('core.ai.stream', ['thread' => $this->activeThreadId]);
+        $this->dispatch('ai-stream-start', ['url' => $streamUrl]);
     }
 
     public function getAiResponse()

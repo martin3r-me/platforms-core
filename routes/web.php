@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Platform\Core\Http\Controllers\CoreAiStreamController;
 use Platform\Core\Http\Controllers\TeamInvitationController;
 
 
@@ -71,4 +72,9 @@ Route::get('/embedded/config/helpdesk', function () {
     $response->headers->set('Content-Security-Policy', "frame-ancestors https://*.teams.microsoft.com https://teams.microsoft.com https://*.skype.com");
     return $response;
 })->name('embedded.config.helpdesk');
+
+// AI SSE Streaming (auth required)
+Route::middleware(['web', 'auth'])->group(function () {
+    Route::get('/core/ai/stream', [CoreAiStreamController::class, 'stream'])->name('core.ai.stream');
+});
 
