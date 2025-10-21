@@ -50,6 +50,7 @@ class Terminal extends Component
             $this->activeChatId = $this->chats[0]['id'];
             $this->loadActiveThread();
             $this->loadMessages();
+            $this->dispatch('terminal-scroll');
         }
     }
 
@@ -76,6 +77,7 @@ class Terminal extends Component
         $this->loadChats();
         $this->activeChatId = $chat->id;
         $this->activeThreadId = $thread->id;
+        $this->dispatch('terminal-scroll');
     }
 
     public function deleteChat($chatId)
@@ -85,9 +87,11 @@ class Terminal extends Component
             $chat->update(['status' => 'archived']);
             $this->loadChats();
             
-            // If deleted chat was active, select first available
             if ($this->activeChatId === $chatId) {
                 $this->activeChatId = !empty($this->chats) ? $this->chats[0]['id'] : null;
+                $this->loadActiveThread();
+                $this->loadMessages();
+                $this->dispatch('terminal-scroll');
             }
         }
     }
@@ -96,6 +100,8 @@ class Terminal extends Component
     {
         $this->activeChatId = $chatId;
         $this->loadActiveThread();
+        $this->loadMessages();
+        $this->dispatch('terminal-scroll');
     }
 
     public function loadActiveThread()
@@ -116,7 +122,6 @@ class Terminal extends Component
         $chat = CoreChat::find($this->activeChatId);
         if (!$chat) return;
 
-        // Close current thread if exists
         if ($this->activeThreadId) {
             $currentThread = CoreChatThread::find($this->activeThreadId);
             if ($currentThread) {
@@ -124,7 +129,6 @@ class Terminal extends Component
             }
         }
 
-        // Create new thread
         $thread = CoreChatThread::create([
             'core_chat_id' => $chat->id,
             'title' => 'Thread ' . ($chat->threads()->count() + 1),
@@ -133,13 +137,15 @@ class Terminal extends Component
         ]);
 
         $this->activeThreadId = $thread->id;
-        $this->loadChats(); // Reload to get updated threads
+        $this->loadChats();
+        $this->dispatch('terminal-scroll');
     }
 
     public function setActiveThread($threadId)
     {
         $this->activeThreadId = $threadId;
         $this->loadMessages();
+        $this->dispatch('terminal-scroll');
     }
 
     public function loadMessages()
@@ -161,10 +167,8 @@ class Terminal extends Component
             return;
         }
 
-        // Generate idempotency key
         $this->idempotencyKey = 'chat_' . time() . '_' . uniqid();
         
-        // 1. Sofortiges UI-Feedback (0-200ms)
         $this->isProcessing = true;
         $this->isStreaming = true;
         $this->canCancel = true;
@@ -172,7 +176,6 @@ class Terminal extends Component
 
         $userMessage = $this->messageInput;
         
-        // Create user message
         CoreChatMessage::create([
             'core_chat_id' => $this->activeChatId,
             'thread_id' => $this->activeThreadId,
@@ -181,13 +184,11 @@ class Terminal extends Component
             'tokens_in' => strlen($userMessage),
         ]);
 
-        // Clear input
         $this->messageInput = '';
         $this->loadMessages();
+        $this->dispatch('terminal-scroll');
 
-        // Start SSE streaming on client
         $streamUrl = route('core.ai.stream', ['thread' => $this->activeThreadId]);
-        // Livewire v3: Payload als benannte Argumente dispatchen, damit es in event.detail ankommt
         $this->dispatch('ai-stream-start', url: $streamUrl);
     }
 
@@ -196,7 +197,6 @@ class Terminal extends Component
         try {
             $openAi = app(OpenAiService::class);
             
-            // Get conversation history
             $messages = CoreChatMessage::where('thread_id', $this->activeThreadId)
                 ->orderBy('created_at', 'asc')
                 ->get()
@@ -208,7 +208,6 @@ class Terminal extends Component
                 })
                 ->toArray();
 
-            // Add system message if this is the first user message
             if (count($messages) === 1) {
                 array_unshift($messages, [
                     'role' => 'system',
@@ -216,28 +215,23 @@ class Terminal extends Component
                 ]);
             }
 
-            // 2. Progress-Mikrotexte für bessere UX
             $this->progressText = 'Ressourcen prüfen...';
             $this->dispatch('terminal-progress', ['text' => $this->progressText]);
 
-            // Get AI response with timeout handling
             $response = $openAi->chat($messages, 'gpt-3.5-turbo', [
                 'max_tokens' => 1000,
                 'temperature' => 0.7,
                 'stream' => false,
             ]);
 
-            // 3. Tool-Call-Handling
             if (!empty($response['tool_calls'])) {
                 $this->handleToolCalls($response['tool_calls']);
                 return;
             }
 
-            // 4. Finale Antwort
             $this->progressText = 'Antwort wird formatiert...';
             $this->dispatch('terminal-progress', ['text' => $this->progressText]);
             
-            // Create AI message
             CoreChatMessage::create([
                 'core_chat_id' => $this->activeChatId,
                 'thread_id' => $this->activeThreadId,
@@ -246,7 +240,6 @@ class Terminal extends Component
                 'tokens_out' => $response['usage']['completion_tokens'] ?? 0,
             ]);
 
-            // 5. Klares Ende
             $this->finishResponse();
 
         } catch (\Exception $e) {
@@ -260,11 +253,7 @@ class Terminal extends Component
             $this->currentTool = $toolCall['function']['name'] ?? 'unknown';
             $this->progressText = "Tool '{$this->currentTool}' wird ausgeführt...";
             $this->dispatch('terminal-progress', ['text' => $this->progressText]);
-            
-            // Simulate tool execution (in real implementation, execute actual tools)
-            sleep(1); // Simulate processing time
-            
-            // Create tool result message
+            sleep(1);
             CoreChatMessage::create([
                 'core_chat_id' => $this->activeChatId,
                 'thread_id' => $this->activeThreadId,
@@ -273,8 +262,6 @@ class Terminal extends Component
                 'tokens_in' => 0,
             ]);
         }
-        
-        // Continue with AI response after tool execution
         $this->getAiResponse();
     }
 
@@ -287,6 +274,7 @@ class Terminal extends Component
         $this->progressText = '';
         
         $this->loadMessages();
+        $this->dispatch('terminal-scroll');
         $this->dispatch('terminal-complete');
     }
 
@@ -298,7 +286,6 @@ class Terminal extends Component
         $this->currentTool = null;
         $this->progressText = '';
         
-        // Create error message
         CoreChatMessage::create([
             'core_chat_id' => $this->activeChatId,
             'thread_id' => $this->activeThreadId,
@@ -308,6 +295,7 @@ class Terminal extends Component
         ]);
 
         $this->loadMessages();
+        $this->dispatch('terminal-scroll');
         $this->dispatch('terminal-error', ['message' => $e->getMessage()]);
     }
 
