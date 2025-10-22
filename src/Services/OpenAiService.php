@@ -23,67 +23,35 @@ class OpenAiService
         return $key;
     }
 
-    private function useResponsesApi(): bool
-    {
-        return (bool) (config('services.openai.use_responses', true));
-    }
-
     public function chat(array $messages, string $model = self::DEFAULT_MODEL, array $options = []): array
     {
         $messagesWithContext = $this->buildMessagesWithContext($messages, $options);
         try {
-            if ($this->useResponsesApi()) {
-                $payload = [
-                    'model' => $model,
-                    'input' => $this->buildResponsesInput($messagesWithContext),
-                    'stream' => false,
-                    'max_output_tokens' => $options['max_tokens'] ?? 1000,
-                    'temperature' => $options['temperature'] ?? 0.7,
-                ];
-                if (!isset($options['tools']) || $options['tools'] !== false) {
-                    $tools = $this->getAvailableTools();
-                    $payload['tools'] = $this->normalizeToolsForResponses($tools);
-                    $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
-                }
-                $response = $this->http()->post($this->baseUrl . '/responses', $payload);
-                if ($response->failed()) {
-                    $this->logApiError('OpenAI API Error (responses)', $response->status(), $response->body());
-                    throw new \Exception($this->formatApiErrorMessage($response->status(), $response->body()));
-                }
-                $data = $response->json();
-                $content = $data['output_text'] ?? ($data['content'][0]['text'] ?? '');
-                return [
-                    'content' => $content,
-                    'usage' => $data['usage'] ?? [],
-                    'model' => $data['model'] ?? $model,
-                    'tool_calls' => $data['tool_calls'] ?? null,
-                    'finish_reason' => $data['finish_reason'] ?? null,
-                ];
-            }
-
             $payload = [
                 'model' => $model,
-                'messages' => $messagesWithContext,
-                'max_tokens' => $options['max_tokens'] ?? 1000,
-                'temperature' => $options['temperature'] ?? 0.7,
+                'input' => $this->buildResponsesInput($messagesWithContext),
                 'stream' => false,
+                'max_output_tokens' => $options['max_tokens'] ?? 1000,
+                'temperature' => $options['temperature'] ?? 0.7,
             ];
             if (!isset($options['tools']) || $options['tools'] !== false) {
-                $payload['tools'] = $this->getAvailableTools();
+                $tools = $this->getAvailableTools();
+                $payload['tools'] = $this->normalizeToolsForResponses($tools);
                 $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
             }
-            $response = $this->http()->post($this->baseUrl . '/chat/completions', $payload);
+            $response = $this->http()->post($this->baseUrl . '/responses', $payload);
             if ($response->failed()) {
-                $this->logApiError('OpenAI API Error', $response->status(), $response->body());
+                $this->logApiError('OpenAI API Error (responses)', $response->status(), $response->body());
                 throw new \Exception($this->formatApiErrorMessage($response->status(), $response->body()));
             }
             $data = $response->json();
+            $content = $data['output_text'] ?? ($data['content'][0]['text'] ?? '');
             return [
-                'content' => $data['choices'][0]['message']['content'] ?? '',
+                'content' => $content,
                 'usage' => $data['usage'] ?? [],
                 'model' => $data['model'] ?? $model,
-                'tool_calls' => $data['choices'][0]['message']['tool_calls'] ?? null,
-                'finish_reason' => $data['choices'][0]['finish_reason'] ?? null,
+                'tool_calls' => $data['tool_calls'] ?? null,
+                'finish_reason' => $data['finish_reason'] ?? null,
             ];
         } catch (\Exception $e) {
             Log::error('OpenAI Service Error', [ 'message' => $e->getMessage(), 'trace' => $e->getTraceAsString() ]);
@@ -94,45 +62,24 @@ class OpenAiService
     public function streamChat(array $messages, callable $onDelta, string $model = self::DEFAULT_MODEL, array $options = []): void
     {
         $messagesWithContext = $this->buildMessagesWithContext($messages, $options);
-        if ($this->useResponsesApi()) {
-            $payload = [
-                'model' => $model,
-                'input' => $this->buildResponsesInput($messagesWithContext),
-                'stream' => true,
-                'max_output_tokens' => $options['max_tokens'] ?? 1000,
-                'temperature' => $options['temperature'] ?? 0.7,
-            ];
-            if (!isset($options['tools']) || $options['tools'] !== false) {
-                $tools = $this->getAvailableTools();
-                $payload['tools'] = $this->normalizeToolsForResponses($tools);
-                $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
-            }
-            $response = $this->http(withStream: true)->post($this->baseUrl . '/responses', $payload);
-            if ($response->failed()) {
-                $this->logApiError('OpenAI API Error (responses stream)', $response->status(), $response->body());
-                throw new \Exception($this->formatApiErrorMessage($response->status(), $response->body()));
-            }
-            $this->parseResponsesStream($response->toPsrResponse()->getBody(), $onDelta, $messages, $options);
-            return;
-        }
-
         $payload = [
             'model' => $model,
-            'messages' => $messagesWithContext,
-            'max_tokens' => $options['max_tokens'] ?? 1000,
-            'temperature' => $options['temperature'] ?? 0.7,
+            'input' => $this->buildResponsesInput($messagesWithContext),
             'stream' => true,
+            'max_output_tokens' => $options['max_tokens'] ?? 1000,
+            'temperature' => $options['temperature'] ?? 0.7,
         ];
         if (!isset($options['tools']) || $options['tools'] !== false) {
-            $payload['tools'] = $this->getAvailableTools();
+            $tools = $this->getAvailableTools();
+            $payload['tools'] = $this->normalizeToolsForResponses($tools);
             $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
         }
-        $response = $this->http(withStream: true)->post($this->baseUrl . '/chat/completions', $payload);
+        $response = $this->http(withStream: true)->post($this->baseUrl . '/responses', $payload);
         if ($response->failed()) {
-            $this->logApiError('OpenAI API Error (stream)', $response->status(), $response->body());
+            $this->logApiError('OpenAI API Error (responses stream)', $response->status(), $response->body());
             throw new \Exception($this->formatApiErrorMessage($response->status(), $response->body()));
         }
-        $this->parseCompletionsStream($response->toPsrResponse()->getBody(), $onDelta, $messages, $options);
+        $this->parseResponsesStream($response->toPsrResponse()->getBody(), $onDelta, $messages, $options);
     }
 
     private function normalizeToolsForResponses(array $tools): array
@@ -152,41 +99,6 @@ class OpenAiService
             }
         }
         return $out;
-    }
-
-    private function parseCompletionsStream($body, callable $onDelta, array $messages, array $options): void
-    {
-        $buffer = '';
-        $currentToolCall = null; $toolArguments = '';
-        $onToolStart = $options['on_tool_start'] ?? null; $toolExecutor = $options['tool_executor'] ?? null;
-        Log::info('[OpenAI Stream] Starting stream processing');
-        while (!$body->eof()) {
-            $chunk = $body->read(8192); if ($chunk === '' || $chunk === false) { usleep(10000); continue; }
-            $buffer .= str_replace(["\r\n","\r"], "\n", $chunk);
-            while (($pos = strpos($buffer, "\n")) !== false) {
-                $line = substr($buffer, 0, $pos); $buffer = substr($buffer, $pos + 1);
-                if ($line === '') { continue; }
-                if (strncmp($line, 'data:', 5) !== 0) { continue; }
-                $data = ltrim(substr($line, 5)); if ($data === '[DONE]') { return; }
-                $decoded = json_decode($data, true); if (!is_array($decoded)) { continue; }
-                if (isset($decoded['choices'][0]['delta']['tool_calls'])) {
-                    foreach ($decoded['choices'][0]['delta']['tool_calls'] as $toolCall) {
-                        if (isset($toolCall['function']['name'])) {
-                            $currentToolCall = $toolCall['function']['name']; $toolArguments = '';
-                            if (is_callable($onToolStart)) { try { $onToolStart($currentToolCall); } catch (\Throwable $e) {} }
-                        }
-                        if (isset($toolCall['function']['arguments'])) { $toolArguments .= $toolCall['function']['arguments']; }
-                    }
-                    continue;
-                }
-                if (isset($decoded['choices'][0]['finish_reason']) && $decoded['choices'][0]['finish_reason'] === 'tool_calls') {
-                    $this->executeToolIfReady($currentToolCall, $toolArguments, $toolExecutor, $onDelta, $messages);
-                    $currentToolCall = null; $toolArguments = '';
-                    continue;
-                }
-                $delta = $decoded['choices'][0]['delta']['content'] ?? ''; if ($delta !== '') { $onDelta($delta); }
-            }
-        }
     }
 
     private function parseResponsesStream($body, callable $onDelta, array $messages, array $options): void
@@ -223,7 +135,6 @@ class OpenAiService
                     case 'response.completed':
                         return;
                     default:
-                        // ignore other events
                         break;
                 }
             }
@@ -304,10 +215,7 @@ class OpenAiService
         $input = [];
         foreach ($messages as $m) {
             $text = is_array($m['content'] ?? null) ? json_encode($m['content']) : ($m['content'] ?? '');
-            $input[] = [
-                'role' => $m['role'] ?? 'user',
-                'content' => $text,
-            ];
+            $input[] = [ 'role' => $m['role'] ?? 'user', 'content' => $text ];
         }
         return $input;
     }
