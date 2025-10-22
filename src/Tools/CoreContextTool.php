@@ -21,20 +21,19 @@ class CoreContextTool
             'ok' => true,
             'data' => [
                 'user' => $user ? [
-                    'id' => $user->id, 
+                    'id' => $user->id,
                     'name' => $user->name ?? null,
-                    'email' => $user->email ?? null
                 ] : null,
                 'team' => $team ? [
-                    'id' => $team->id, 
+                    'id' => $team->id,
                     'name' => $team->name ?? null,
-                    'slug' => $team->slug ?? null
                 ] : null,
                 'route' => $routeName,
                 'module' => $module,
                 'url' => $url,
                 'current_time' => now()->format('Y-m-d H:i:s'),
-                'timezone' => config('app.timezone')
+                'timezone' => config('app.timezone'),
+                'system_prompt' => 'Du bist ein Assistent, der den angegebenen Nutzer beim Bedienen der Plattform unterstützt. Beachte stets den aktuellen Scope (Route/Modul). Nutze Kontextwissen nur, wenn es eindeutig passt; andernfalls ignoriere es. Antworte kurz, präzise und auf Deutsch.'
             ],
             'message' => 'Aktueller User und Team Kontext geladen'
         ];

@@ -7,6 +7,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use Platform\Core\Services\OpenAiService;
 use Platform\Core\Models\CoreChatThread;
 use Platform\Core\Models\CoreChatMessage;
+use Platform\Core\Tools\CoreContextTool;
 
 class CoreAiStreamController extends Controller
 {
@@ -40,13 +41,22 @@ class CoreAiStreamController extends Controller
             })
             ->toArray();
 
-        // Optional: add brief system instruction to improve early tokens
-        if (!empty($messages)) {
-            array_unshift($messages, [
-                'role' => 'system',
-                'content' => 'Antworte kurz, präzise und auf Deutsch. Streame Tokens zügig.',
-            ]);
-        }
+        // Add standard system context (prompt + compact context data)
+        $context = app(CoreContextTool::class)->getContext();
+        $prompt = $context['data']['system_prompt'] ?? 'Antworte kurz, präzise und auf Deutsch.';
+        $ctx = [
+            'user' => $context['data']['user'] ?? null,
+            'team' => $context['data']['team'] ?? null,
+            'route' => $context['data']['route'] ?? null,
+            'module' => $context['data']['module'] ?? null,
+            'url' => $context['data']['url'] ?? null,
+            'current_time' => $context['data']['current_time'] ?? null,
+            'timezone' => $context['data']['timezone'] ?? null,
+        ];
+        array_unshift($messages, [
+            'role' => 'system',
+            'content' => $prompt . ' Kontext: ' . json_encode($ctx, JSON_UNESCAPED_UNICODE),
+        ]);
 
         $assistantBuffer = '';
 
