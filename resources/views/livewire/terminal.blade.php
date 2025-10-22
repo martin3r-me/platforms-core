@@ -99,11 +99,8 @@
         @endif
 
         @foreach($messages as $message)
-          @php($__content = trim($message['content'] ?? ''))
-          @if(($message['role'] ?? null) === 'assistant' && $__content === '')
-            @continue
-          @endif
-          <div class="flex items-start gap-2"
+          @php($__emptyAssistant = (($message['role'] ?? null) === 'assistant') && trim($message['content'] ?? '') === '')
+          <div class="flex items-start gap-2 {{ $__emptyAssistant ? 'hidden' : '' }}"
                wire:key="msg-{{ $message['id'] ?? (($message['thread_id'] ?? 't') . '-' . $loop->index) }}">
             <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">
               {{ $message['role'] === 'user' ? 'User' : 'AI' }}:
