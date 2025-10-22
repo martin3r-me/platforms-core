@@ -25,10 +25,10 @@
       <!-- Logo und Titel -->
       <div class="text-center mb-8">
         <div class="mx-auto h-12 w-12 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 p-2.5 shadow-lg">
-          <img src="/logo.png" alt="Glowkit" class="h-7 w-7 rounded-lg object-contain" />
+          <img src="/logo.png" alt="Plattform" class="h-7 w-7 rounded-lg object-contain" />
         </div>
         <h1 class="mt-6 text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Erstellen Sie Ihr Konto</h1>
-        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Starten Sie noch heute mit Glowkit</p>
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Starten Sie noch heute</p>
       </div>
       
       <!-- Formular-Karte -->
