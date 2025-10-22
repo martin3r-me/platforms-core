@@ -41,7 +41,8 @@ class OpenAiService
                     'temperature' => $options['temperature'] ?? 0.7,
                 ];
                 if (!isset($options['tools']) || $options['tools'] !== false) {
-                    $payload['tools'] = $this->getAvailableTools();
+                    $tools = $this->getAvailableTools();
+                    $payload['tools'] = $this->normalizeToolsForResponses($tools);
                     $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
                 }
                 $response = $this->http()->post($this->baseUrl . '/responses', $payload);
@@ -50,7 +51,6 @@ class OpenAiService
                     throw new \Exception($this->formatApiErrorMessage($response->status(), $response->body()));
                 }
                 $data = $response->json();
-                // Best-effort extraction
                 $content = $data['output_text'] ?? ($data['content'][0]['text'] ?? '');
                 return [
                     'content' => $content,
@@ -61,7 +61,6 @@ class OpenAiService
                 ];
             }
 
-            // Fallback to chat/completions
             $payload = [
                 'model' => $model,
                 'messages' => $messagesWithContext,
@@ -104,7 +103,8 @@ class OpenAiService
                 'temperature' => $options['temperature'] ?? 0.7,
             ];
             if (!isset($options['tools']) || $options['tools'] !== false) {
-                $payload['tools'] = $this->getAvailableTools();
+                $tools = $this->getAvailableTools();
+                $payload['tools'] = $this->normalizeToolsForResponses($tools);
                 $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
             }
             $response = $this->http(withStream: true)->post($this->baseUrl . '/responses', $payload);
@@ -116,7 +116,6 @@ class OpenAiService
             return;
         }
 
-        // Fallback to chat/completions
         $payload = [
             'model' => $model,
             'messages' => $messagesWithContext,
@@ -134,6 +133,25 @@ class OpenAiService
             throw new \Exception($this->formatApiErrorMessage($response->status(), $response->body()));
         }
         $this->parseCompletionsStream($response->toPsrResponse()->getBody(), $onDelta, $messages, $options);
+    }
+
+    private function normalizeToolsForResponses(array $tools): array
+    {
+        $out = [];
+        foreach ($tools as $tool) {
+            if (isset($tool['function']) && is_array($tool['function'])) {
+                $fn = $tool['function'];
+                $out[] = [
+                    'type' => 'function',
+                    'name' => $fn['name'] ?? null,
+                    'description' => $fn['description'] ?? ($tool['description'] ?? null),
+                    'parameters' => $fn['parameters'] ?? null,
+                ];
+            } else {
+                $out[] = $tool;
+            }
+        }
+        return $out;
     }
 
     private function parseCompletionsStream($body, callable $onDelta, array $messages, array $options): void
