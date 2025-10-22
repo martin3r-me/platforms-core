@@ -72,7 +72,12 @@ class ToolBroker
                                 'properties' => [
                                     'field' => ['type' => 'string'],
                                     'op' => ['type' => 'string', 'enum' => ['eq', 'ne', 'like', 'in', 'gte', 'lte', 'between', 'is_null']],
-                                    'value' => ['type' => ['string', 'number', 'boolean', 'array']]
+                                    'value' => ['oneOf' => [
+                                        ['type' => 'string'],
+                                        ['type' => 'number'],
+                                        ['type' => 'boolean'],
+                                        ['type' => 'array', 'items' => ['type' => 'string']]
+                                    ]]
                                 ],
                                 'required' => ['field', 'op']
                             ],
