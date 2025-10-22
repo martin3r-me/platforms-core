@@ -151,9 +151,7 @@ class OpenAiService
             ->timeout(20)
             ->connectTimeout(5)
             ->retry(1, random_int(250, 500), function ($exception, $request) {
-                if ($exception instanceof ConnectionException) { return true; }
-                $status = $request->response?->status();
-                return in_array($status, [429, 500, 502, 503, 504], true);
+                return $exception instanceof ConnectionException;
             });
 
         if ($withStream) {
