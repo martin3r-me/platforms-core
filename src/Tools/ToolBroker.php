@@ -82,9 +82,9 @@ class ToolBroker
                         'entity' => [ 'type' => 'string', 'enum' => $entities ],
                         'operation' => [ 'type' => 'string', 'enum' => ['create','update','delete'] ],
                         'id' => [ 'type' => ['integer','null'] ],
-                        'data' => [ 'type' => 'object' ]
+                        'data' => [ 'type' => 'object', 'description' => 'Payload fields; see entity write_schemas for required fields (e.g., title)']
                     ],
-                    'required' => ['entity','operation']
+                    'required' => ['entity','operation','data']
                 ]
             ]
         ];
