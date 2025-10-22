@@ -17,12 +17,20 @@ class CoreContextTool
             $module = strstr($routeName, '.', true);
         }
         
+        $displayName = null;
+        if ($user) {
+            $displayName = trim(($user->name ?? '') . ' ' . ($user->lastname ?? ''));
+            if ($displayName === '') {
+                $displayName = $user->name ?? null;
+            }
+        }
+
         return [
             'ok' => true,
             'data' => [
                 'user' => $user ? [
                     'id' => $user->id,
-                    'name' => $user->name ?? null,
+                    'name' => $displayName,
                 ] : null,
                 'team' => $team ? [
                     'id' => $team->id,

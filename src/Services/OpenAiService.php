@@ -6,6 +6,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Platform\Core\Tools\CoreContextTool;
 
 class OpenAiService
 {
@@ -36,11 +37,11 @@ class OpenAiService
      */
     public function chat(array $messages, string $model = self::DEFAULT_MODEL, array $options = []): array
     {
-        
+        $messagesWithContext = $this->buildMessagesWithContext($messages, $options);
         try {
             $payload = [
                 'model' => $model,
-                'messages' => $messages,
+                'messages' => $messagesWithContext,
                 'max_tokens' => $options['max_tokens'] ?? 1000,
                 'temperature' => $options['temperature'] ?? 0.7,
                 'stream' => false,
@@ -84,9 +85,10 @@ class OpenAiService
      */
     public function streamChat(array $messages, callable $onDelta, string $model = self::DEFAULT_MODEL, array $options = []): void
     {
+        $messagesWithContext = $this->buildMessagesWithContext($messages, $options);
         $payload = [
             'model' => $model,
-            'messages' => $messages,
+            'messages' => $messagesWithContext,
             'max_tokens' => $options['max_tokens'] ?? 1000,
             'temperature' => $options['temperature'] ?? 0.7,
             'stream' => true,
@@ -155,6 +157,43 @@ class OpenAiService
         }
 
         return $request;
+    }
+
+    private function buildMessagesWithContext(array $messages, array $options): array
+    {
+        $withContext = $options['with_context'] ?? true;
+        if (!$withContext) {
+            return $messages;
+        }
+
+        try {
+            $context = app(CoreContextTool::class)->getContext();
+            $prompt = $context['data']['system_prompt'] ?? 'Antworte kurz, präzise und auf Deutsch.';
+            $u = $context['data']['user'] ?? null;
+            $t = $context['data']['team'] ?? null;
+            $module = $context['data']['module'] ?? null;
+            $route = $context['data']['route'] ?? null;
+            $url = $context['data']['url'] ?? null;
+            $time = $context['data']['current_time'] ?? null;
+            $tz = $context['data']['timezone'] ?? null;
+            $naturalCtx = trim(implode(' ', array_filter([
+                $u ? 'Nutzer: ' . ($u['name'] ?? ('#'.$u['id'])) : null,
+                $t ? 'Team: ' . ($t['name'] ?? ('#'.$t['id'])) : null,
+                $module ? 'Modul: ' . $module : null,
+                $route ? 'Route: ' . $route : null,
+                $url ? 'URL: ' . $url : null,
+                ($time && $tz) ? ('Zeit: ' . $time . ' ' . $tz) : null,
+            ])));
+
+            array_unshift($messages, [
+                'role' => 'system',
+                'content' => $prompt . ($naturalCtx !== '' ? (' ' . $naturalCtx) : ''),
+            ]);
+        } catch (\Throwable $e) {
+            // Fallback: ohne Kontext weiter
+        }
+
+        return $messages;
     }
 
     private function logApiError(string $message, int $status, string $body): void
