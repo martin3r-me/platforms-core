@@ -47,6 +47,23 @@ class CoreDataProxy
             return $this->error('VALIDATION_ERROR', $validationError, $traceId);
         }
 
+        // For get: fetch real model with team scope and authorize 'view' on it first
+        if ($operation === 'get') {
+            $id = (int)($options['id'] ?? 0);
+            if ($id <= 0) {
+                return $this->error('VALIDATION_ERROR', 'id is required for get', $traceId);
+            }
+            try {
+                $row = $provider->teamScopedQuery()->where('id', $id)->first();
+                if (!$row) {
+                    return $this->error('ROW_NOT_FOUND', 'Record not found', $traceId);
+                }
+                Gate::authorize('view', $row);
+            } catch (\Throwable $e) {
+                return $this->error('AUTHZ_DENIED', 'Not authorized to view this row', $traceId);
+            }
+        }
+
         // Execute
         $result = match ($operation) {
             'describe' => $this->dataRead->describe($entity),
@@ -56,37 +73,18 @@ class CoreDataProxy
             default => $this->error('VALIDATION_ERROR', 'Unsupported operation', $traceId)
         };
 
-        // For get, enforce row-level view policy if record exists
-        if ($operation === 'get' && ($result['ok'] ?? false) && !empty($result['data']['record'])) {
-            try {
-                $modelClass = $provider->model();
-                // Rehydrate a model instance for Gate check if possible
-                $recordArr = $result['data']['record'];
-                $model = new $modelClass();
-                $model->forceFill($recordArr);
-                $model->exists = true;
-                Gate::authorize('view', $model);
-            } catch (\Throwable $e) {
-                return $this->error('AUTHZ_DENIED', 'Not authorized to view this row', $traceId);
-            }
-        }
-
         // Redact PII fields
         if (($result['ok'] ?? false) === true) {
             $piiFields = method_exists($provider, 'piiFields') ? $provider->piiFields() : [];
             if (!empty($piiFields)) {
                 if (!empty($result['data']['records']) && is_array($result['data']['records'])) {
                     foreach ($result['data']['records'] as &$row) {
-                        foreach ($piiFields as $f) {
-                            if (array_key_exists($f, $row)) { $row[$f] = $this->maskPii($row[$f]); }
-                        }
+                        foreach ($piiFields as $f) { if (array_key_exists($f, $row)) { $row[$f] = $this->maskPii($row[$f]); } }
                     }
                     unset($row);
                 }
                 if (!empty($result['data']['record']) && is_array($result['data']['record'])) {
-                    foreach ($piiFields as $f) {
-                        if (array_key_exists($f, $result['data']['record'])) { $result['data']['record'][$f] = $this->maskPii($result['data']['record'][$f]); }
-                    }
+                    foreach ($piiFields as $f) { if (array_key_exists($f, $result['data']['record'])) { $result['data']['record'][$f] = $this->maskPii($result['data']['record'][$f]); } }
                 }
             }
         }
@@ -171,8 +169,7 @@ class CoreDataProxy
                 if (!in_array($rel, $allowedRels, true)) { return 'Relation not allowed: '.$rel; }
             }
         }
-        // id for get
-        if ($operation === 'get' && empty($options['id'])) { return 'id is required for get'; }
+        // id for get checked separately
         return null;
     }
 
