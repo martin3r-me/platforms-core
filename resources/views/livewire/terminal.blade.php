@@ -99,6 +99,10 @@
         @endif
 
         @foreach($messages as $message)
+          @php($__content = trim($message['content'] ?? ''))
+          @if(($message['role'] ?? null) === 'assistant' && $__content === '')
+            @continue
+          @endif
           <div class="flex items-start gap-2"
                wire:key="msg-{{ $message['id'] ?? (($message['thread_id'] ?? 't') . '-' . $loop->index) }}">
             <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">
