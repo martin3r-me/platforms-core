@@ -49,7 +49,7 @@ class OpenAiService
                 'stream' => false,
             ];
 
-            // Add data.read tool if not disabled
+            // Add data_read tool if not disabled
             if (!isset($options['tools']) || $options['tools'] !== false) {
                 $payload['tools'] = $this->getAvailableTools();
                 $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
@@ -97,7 +97,7 @@ class OpenAiService
             'stream' => true,
         ];
 
-        // Add data.read tool if not disabled
+        // Add data_read tool if not disabled
         if (!isset($options['tools']) || $options['tools'] !== false) {
             $payload['tools'] = $this->getAvailableTools();
             $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
@@ -113,6 +113,8 @@ class OpenAiService
 
         $body = $response->toPsrResponse()->getBody();
         $buffer = '';
+        $toolCalls = [];
+        
         while (!$body->eof()) {
             $chunk = $body->read(8192);
             if ($chunk === '' || $chunk === false) { usleep(10000); continue; }
@@ -134,6 +136,8 @@ class OpenAiService
 
                 $decoded = json_decode($data, true);
                 if (!is_array($decoded)) { continue; }
+                
+                
                 $delta = $decoded['choices'][0]['delta']['content'] ?? '';
                 if ($delta !== '') { $onDelta($delta); }
             }
