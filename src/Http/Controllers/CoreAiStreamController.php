@@ -110,7 +110,7 @@ class CoreAiStreamController extends Controller
                     $pendingSinceLastFlush = 0;
                     $lastFlushAt = $now;
                 }
-            }, model: null, options: [
+            }, options: [
                 'with_context' => true,
                 'source_route' => $sourceRoute,
                 'source_module' => $sourceModule,
