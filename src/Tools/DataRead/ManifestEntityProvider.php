@@ -27,6 +27,24 @@ class ManifestEntityProvider implements EntityReadProvider
 
     public function readableFields(): array { return array_keys($this->fields); }
 
+    public function fillableFields(): array
+    {
+        $out = [];
+        foreach ($this->fields as $name => $meta) {
+            if (!empty($meta['fillable'])) { $out[] = $name; }
+        }
+        return $out;
+    }
+
+    public function readonlyFields(): array
+    {
+        $out = [];
+        foreach ($this->fields as $name => $meta) {
+            if (!empty($meta['readonly'])) { $out[] = $name; }
+        }
+        return $out;
+    }
+
     public function allowedFilters(): array
     {
         $result = [];
@@ -67,7 +85,7 @@ class ManifestEntityProvider implements EntityReadProvider
     public function defaultProjection(): array
     {
         $fields = $this->readableFields();
-        $pref = ['id','title','name','description','due_date','is_done'];
+        $pref = ['id','title','name','description','due_date','is_done','created_at'];
         $out = array_values(array_intersect($pref, $fields));
         if (empty($out)) { $out = array_slice($fields, 0, 6); }
         return $out;

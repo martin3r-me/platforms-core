@@ -381,6 +381,8 @@ class OpenAiService
                 }
             }
         }
+        // add write tool
+        $tools[] = $toolBroker->getWriteToolDefinition();
         
         Log::info('[OpenAI Tools] Final tools array', ['tools' => $tools]);
         return $tools;
