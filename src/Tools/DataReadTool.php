@@ -154,16 +154,15 @@ class DataReadTool
         return [
             'task' => [
                 'module' => 'planner',
-                'model' => 'Platform\Planner\Models\PlannerTask',
+                'model' => 'Platform\\Planner\\Models\\PlannerTask',
                 'readable_fields' => [
-                    'id', 'uuid', 'title', 'description', 'due_date', 'status', 'is_done', 
+                    'id', 'uuid', 'title', 'description', 'due_date', 'is_done', 
                     'is_frog', 'story_points', 'priority', 'order', 'created_at', 'updated_at',
                     'user_id', 'user_in_charge_id', 'team_id', 'project_id', 'task_group_id'
                 ],
                 'allowed_filters' => [
                     'id' => ['eq', 'ne', 'in'],
                     'title' => ['eq', 'ne', 'like'],
-                    'status' => ['eq', 'ne', 'in'],
                     'is_done' => ['eq'],
                     'is_frog' => ['eq'],
                     'due_date' => ['eq', 'ne', 'gte', 'lte', 'between', 'is_null'],
@@ -182,7 +181,7 @@ class DataReadTool
                     'user', 'team', 'project', 'taskGroup', 'userInCharge'
                 ],
                 'search_fields' => ['title', 'description'],
-                'default_projection' => ['id', 'title', 'description', 'due_date', 'status', 'is_done', 'is_frog'],
+                'default_projection' => ['id', 'title', 'description', 'due_date', 'is_done', 'is_frog'],
                 'pii_redaction' => []
             ]
         ];
@@ -201,9 +200,23 @@ class DataReadTool
             $query->where('team_id', $team->id);
         }
 
-        // Filters anwenden
+        // Default-Filter: nur offene Aufgaben
+        $hasIsDoneFilter = collect($options['filters'] ?? [])->contains(fn($f) => ($f['field'] ?? null) === 'is_done');
+        if (!$hasIsDoneFilter) {
+            $query->where('is_done', false);
+        }
+
+        // Filters anwenden (inkl. Mapping für "status")
         if (!empty($options['filters'])) {
             foreach ($options['filters'] as $filter) {
+                // Mappe status->is_done
+                if (($filter['field'] ?? null) === 'status') {
+                    $mapped = $this->mapStatusFilterToIsDone($filter);
+                    if ($mapped) {
+                        $this->applyFilter($query, $mapped, $provider);
+                    }
+                    continue;
+                }
                 $this->applyFilter($query, $filter, $provider);
             }
         }
@@ -227,10 +240,35 @@ class DataReadTool
                 }
             }
         } else {
-            $query->orderBy('created_at', 'desc');
+            // Default: Fälligkeit zuerst, dann erstellt
+            $query->orderBy('due_date', 'asc')->orderBy('created_at', 'desc');
         }
 
         return $query;
+    }
+
+    private function mapStatusFilterToIsDone(array $filter): ?array
+    {
+        $op = $filter['op'] ?? 'eq';
+        $value = $filter['value'] ?? null;
+        if ($value === null) { return null; }
+
+        // einfache Heuristik: 'completed' => is_done=true, sonst is_done=false
+        $completed = is_string($value) ? strtolower($value) === 'completed' : (bool)$value;
+
+        if ($op === 'eq') {
+            return ['field' => 'is_done', 'op' => 'eq', 'value' => $completed];
+        }
+        if ($op === 'ne') {
+            return ['field' => 'is_done', 'op' => 'eq', 'value' => !$completed];
+        }
+        if ($op === 'in' && is_array($value)) {
+            // wenn irgendein Wert 'completed' enthält, dann is_done=true berücksichtigen, sonst false
+            $hasCompleted = collect($value)->contains(fn($v) => strtolower((string)$v) === 'completed');
+            return ['field' => 'is_done', 'op' => 'eq', 'value' => $hasCompleted];
+        }
+
+        return null;
     }
 
     private function applyFilter(\Illuminate\Database\Eloquent\Builder $query, array $filter, array $provider): void
