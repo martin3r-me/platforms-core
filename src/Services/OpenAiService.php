@@ -288,7 +288,7 @@ class OpenAiService
             $text = is_array($m['content'] ?? null) ? json_encode($m['content']) : ($m['content'] ?? '');
             $input[] = [
                 'role' => $m['role'] ?? 'user',
-                'content' => [ [ 'type' => 'input_text', 'text' => $text ] ],
+                'content' => $text,
             ];
         }
         return $input;
