@@ -10,8 +10,8 @@
     <nav aria-label="Global" class="flex items-center justify-between p-6 lg:px-8">
       <div class="flex lg:flex-1">
         <a href="{{ route('landing') }}" class="-m-1.5 p-1.5">
-          <span class="sr-only">Glowkit</span>
-          <img src="/logo.png" alt="Glowkit" class="h-8 w-auto rounded-lg shadow object-contain" />
+          <span class="sr-only">Plattform</span>
+          <img src="/logo.png" alt="Plattform" class="h-8 w-auto rounded-lg shadow object-contain" />
         </a>
       </div>
       <div class="hidden lg:flex lg:flex-1 lg:justify-end">
@@ -25,10 +25,10 @@
       <!-- Logo und Titel -->
       <div class="text-center mb-8">
         <div class="mx-auto h-12 w-12 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 p-2.5 shadow-lg">
-          <img src="/logo.png" alt="Glowkit" class="h-7 w-7 rounded-lg object-contain" />
+          <img src="/logo.png" alt="Plattform" class="h-7 w-7 rounded-lg object-contain" />
         </div>
         <h1 class="mt-6 text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Willkommen zurück</h1>
-        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Melden Sie sich in Ihrem Glowkit-Konto an</p>
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Melden Sie sich in Ihrem Konto an</p>
       </div>
       
       <!-- Formular-Karte -->

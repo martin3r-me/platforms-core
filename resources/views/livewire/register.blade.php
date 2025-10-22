@@ -10,8 +10,8 @@
     <nav aria-label="Global" class="flex items-center justify-between p-6 lg:px-8">
       <div class="flex lg:flex-1">
         <a href="{{ route('landing') }}" class="-m-1.5 p-1.5">
-          <span class="sr-only">Glowkit</span>
-          <img src="/logo.png" alt="Glowkit" class="h-8 w-auto rounded-lg shadow object-contain" />
+          <span class="sr-only">Plattform</span>
+          <img src="/logo.png" alt="Plattform" class="h-8 w-auto rounded-lg shadow object-contain" />
         </a>
       </div>
       <div class="hidden lg:flex lg:flex-1 lg:justify-end">

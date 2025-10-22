@@ -111,6 +111,9 @@ class OpenAiService
             throw new \Exception($this->formatApiErrorMessage($response->status(), $response->body()));
         }
 
+        $onToolStart = $options['on_tool_start'] ?? null; // function(string $toolName): void
+        $toolExecutor = $options['tool_executor'] ?? null; // function(string $toolName, array $args): mixed
+
         $body = $response->toPsrResponse()->getBody();
         $buffer = '';
         $toolCalls = [];
@@ -173,6 +176,9 @@ class OpenAiService
                             $currentToolCall = $toolCall['function']['name'];
                             $toolArguments = '';
                             Log::info('[OpenAI Stream] Starting tool call', ['tool' => $currentToolCall]);
+                            if (is_callable($onToolStart)) {
+                                try { $onToolStart($currentToolCall); } catch (\Throwable $e) { Log::warning('on_tool_start failed: '.$e->getMessage()); }
+                            }
                         }
                         
                         if (isset($toolCall['function']['arguments'])) {
@@ -193,12 +199,12 @@ class OpenAiService
                         
                         try {
                             $arguments = json_decode($toolArguments, true);
-                            if ($arguments && $currentToolCall === 'data_read') {
-                                $dataReadTool = app(\Platform\Core\Tools\CoreDataReadTool::class);
-                                $result = $dataReadTool->handle($arguments);
-                                
-                                Log::info('[OpenAI Stream] Tool result', ['result' => $result]);
-                                
+                            $result = null;
+                            if ($arguments && is_callable($toolExecutor)) {
+                                try { $result = $toolExecutor($currentToolCall, $arguments); } catch (\Throwable $e) { Log::error('tool_executor failed: '.$e->getMessage()); }
+                            }
+
+                            if ($result !== null) {
                                 // Build a concise natural-language summary via a follow-up non-streaming call
                                 $lastUser = '';
                                 foreach (array_reverse($messages) as $m) {
@@ -208,7 +214,7 @@ class OpenAiService
                                     }
                                 }
 
-                                $summarySystem = 'Formuliere eine kurze, präzise, deutschsprachige Antwort für den Nutzer basierend auf dem folgenden Tool-Ergebnis. Gib eine verständliche Zusammenfassung (Anzahl, wichtigste Felder wie Titel/Fälligkeit), vermeide Roh-JSON und halte dich knapp.';
+                                $summarySystem = 'Formuliere eine kurze, präzise, deutschsprachige Antwort für den Nutzer basierend auf dem folgenden Tool-Ergebnis. Gib eine verständliche Zusammenfassung (Anzahl, wichtigste Felder), vermeide Roh-JSON und halte dich knapp.';
                                 $summaryUser = (
                                     ($lastUser !== '' ? ("Frage: " . $lastUser . "\n\n") : '') .
                                     "Tool: " . $currentToolCall . "\nErgebnis (JSON):\n" . json_encode($result, JSON_UNESCAPED_UNICODE)
@@ -231,9 +237,7 @@ class OpenAiService
                                     }
                                 } catch (\Throwable $e) {
                                     Log::error('[OpenAI Stream] Summary generation failed', ['error' => $e->getMessage()]);
-                                    // Fallback: sehr knappe Textausgabe
-                                    $fallback = $result['ok'] ? 'Ergebnis wurde ermittelt.' : ('Fehler: ' . ($result['error']['message'] ?? 'Unbekannt'));
-                                    $onDelta("\n" . $fallback . "\n");
+                                    $onDelta("\nErgebnis wurde ermittelt.\n");
                                 }
                             }
                         } catch (\Exception $e) {

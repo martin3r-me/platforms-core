@@ -116,6 +116,10 @@ class CoreAiStreamController extends Controller
                 'source_route' => $sourceRoute,
                 'source_module' => $sourceModule,
                 'source_url' => $sourceUrl,
+                'on_tool_start' => function(string $tool) {
+                    echo 'data: ' . json_encode(['tool' => $tool], JSON_UNESCAPED_UNICODE) . "\n\n";
+                    @flush();
+                },
                 'tool_executor' => function($toolName, $arguments) use ($dataReadTool) {
                     if ($toolName === 'data_read') {
                         $result = $dataReadTool->handle($arguments);
