@@ -8,6 +8,7 @@ use Platform\Core\Services\OpenAiService;
 use Platform\Core\Models\CoreChatThread;
 use Platform\Core\Models\CoreChatMessage;
 use Platform\Core\Tools\CoreDataReadTool;
+use Platform\Core\Tools\CoreDataProxy;
 
 class CoreAiStreamController extends Controller
 {
@@ -120,9 +121,12 @@ class CoreAiStreamController extends Controller
                     echo 'data: ' . json_encode(['tool' => $tool], JSON_UNESCAPED_UNICODE) . "\n\n";
                     @flush();
                 },
-                'tool_executor' => function($toolName, $arguments) use ($dataReadTool) {
+                'tool_executor' => function($toolName, $arguments) {
                     if ($toolName === 'data_read') {
-                        $result = $dataReadTool->handle($arguments);
+                        $proxy = app(CoreDataProxy::class);
+                        $entity = $arguments['entity'] ?? '';
+                        $operation = $arguments['operation'] ?? '';
+                        $result = $proxy->executeRead($entity, $operation, $arguments, ['trace_id' => bin2hex(random_bytes(8))]);
                         echo 'data: ' . json_encode(['tool' => 'data_read', 'result' => $result], JSON_UNESCAPED_UNICODE) . "\n\n";
                         @flush();
                         return $result;

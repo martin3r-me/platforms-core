@@ -134,6 +134,6 @@ class ToolBroker
 
     private function getAvailableModules($user, $team): array
     {
-        return ['planner','okr'];
+        return array_values(array_unique(array_map(fn($k) => strstr($k, '.', true) ?: $k, array_keys($this->registry->all()))));
     }
 }

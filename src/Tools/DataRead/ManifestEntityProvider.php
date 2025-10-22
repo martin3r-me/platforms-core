@@ -107,4 +107,13 @@ class ManifestEntityProvider implements EntityReadProvider
     {
         return $filter; // No mapping by default
     }
+
+    public function piiFields(): array
+    {
+        $out = [];
+        foreach ($this->fields as $name => $meta) {
+            if (!empty($meta['pii'])) { $out[] = $name; }
+        }
+        return $out;
+    }
 }
