@@ -111,7 +111,7 @@
         @endforeach
 
         <!-- Streaming-Block -->
-        <div class="flex items-start gap-2" x-show="!suppressStream && (isStreamingLocal || streamText.length > 0)" wire:ignore>
+        <div class="flex items-start gap-2" x-cloak x-show="!suppressStream && (isStreamingLocal || streamText.length > 0)" wire:ignore>
           <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
           <div class="flex items-center gap-2"
                role="log"
