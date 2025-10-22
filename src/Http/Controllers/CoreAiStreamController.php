@@ -18,6 +18,7 @@ class CoreAiStreamController extends Controller
         }
 
         $threadId = (int) $request->query('thread');
+        $assistantId = (int) $request->query('assistant');
         if (!$threadId) {
             abort(422, 'thread parameter is required');
         }
@@ -49,7 +50,7 @@ class CoreAiStreamController extends Controller
 
         $assistantBuffer = '';
 
-        $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread) {
+        $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId) {
             // Clean buffers to avoid server buffering
             while (ob_get_level() > 0) {
                 @ob_end_flush();
@@ -59,14 +60,33 @@ class CoreAiStreamController extends Controller
             echo "retry: 500\n\n";
             @flush();
 
-            // Create assistant message early (append-only updates during stream)
-            $assistantMessage = CoreChatMessage::create([
-                'core_chat_id' => $thread->core_chat_id,
-                'thread_id' => $thread->id,
-                'role' => 'assistant',
-                'content' => '',
-                'meta' => ['is_streaming' => true],
-            ]);
+            // Use provided assistant placeholder or create a new one
+            if ($assistantId) {
+                $assistantMessage = CoreChatMessage::find($assistantId);
+                if (!$assistantMessage) {
+                    $assistantMessage = CoreChatMessage::create([
+                        'core_chat_id' => $thread->core_chat_id,
+                        'thread_id' => $thread->id,
+                        'role' => 'assistant',
+                        'content' => '',
+                        'meta' => ['is_streaming' => true],
+                    ]);
+                } else {
+                    $assistantMessage->update([
+                        'content' => '',
+                        'tokens_out' => 0,
+                        'meta' => ['is_streaming' => true],
+                    ]);
+                }
+            } else {
+                $assistantMessage = CoreChatMessage::create([
+                    'core_chat_id' => $thread->core_chat_id,
+                    'thread_id' => $thread->id,
+                    'role' => 'assistant',
+                    'content' => '',
+                    'meta' => ['is_streaming' => true],
+                ]);
+            }
 
             $lastFlushAt = microtime(true);
             $flushInterval = 0.35; // seconds

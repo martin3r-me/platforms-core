@@ -208,7 +208,25 @@ class Terminal extends Component
         $this->messageInput = '';
         $this->dispatch('terminal-scroll');
 
-        $streamUrl = route('core.ai.stream', ['thread' => $this->activeThreadId]);
+        // Assistant-Placeholder in DB anlegen und optimistisch in Liste pushen
+        $assistant = CoreChatMessage::create([
+            'core_chat_id' => $this->activeChatId,
+            'thread_id' => $this->activeThreadId,
+            'role' => 'assistant',
+            'content' => '',
+            'tokens_out' => 0,
+            'meta' => ['is_streaming' => true],
+        ]);
+
+        $this->messages[] = [
+            'id' => $assistant->id,
+            'role' => 'assistant',
+            'content' => '',
+            'thread_id' => $this->activeThreadId,
+            'core_chat_id' => $this->activeChatId,
+        ];
+
+        $streamUrl = route('core.ai.stream', ['thread' => $this->activeThreadId, 'assistant' => $assistant->id]);
         $this->dispatch('ai-stream-start', url: $streamUrl);
     }
 
