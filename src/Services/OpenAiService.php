@@ -199,9 +199,42 @@ class OpenAiService
                                 
                                 Log::info('[OpenAI Stream] Tool result', ['result' => $result]);
                                 
-                                // Send tool result back to user
-                                $onDelta("\n\n**Tool-Ausführung:** `{$currentToolCall}`\n");
-                                $onDelta("```json\n" . json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n```\n");
+                                // Build a concise natural-language summary via a follow-up non-streaming call
+                                $lastUser = '';
+                                foreach (array_reverse($messages) as $m) {
+                                    if (($m['role'] ?? '') === 'user' && is_string($m['content'] ?? null)) {
+                                        $lastUser = $m['content'];
+                                        break;
+                                    }
+                                }
+
+                                $summarySystem = 'Formuliere eine kurze, präzise, deutschsprachige Antwort für den Nutzer basierend auf dem folgenden Tool-Ergebnis. Gib eine verständliche Zusammenfassung (Anzahl, wichtigste Felder wie Titel/Fälligkeit), vermeide Roh-JSON und halte dich knapp.';
+                                $summaryUser = (
+                                    ($lastUser !== '' ? ("Frage: " . $lastUser . "\n\n") : '') .
+                                    "Tool: " . $currentToolCall . "\nErgebnis (JSON):\n" . json_encode($result, JSON_UNESCAPED_UNICODE)
+                                );
+
+                                try {
+                                    $summary = $this->chat([
+                                        ['role' => 'system', 'content' => $summarySystem],
+                                        ['role' => 'user', 'content' => $summaryUser],
+                                    ], model: self::DEFAULT_MODEL, options: [
+                                        'with_context' => false,
+                                        'tools' => false,
+                                        'max_tokens' => 300,
+                                        'temperature' => 0.2,
+                                    ]);
+
+                                    $text = $summary['content'] ?? '';
+                                    if ($text !== '') {
+                                        $onDelta("\n" . $text . "\n");
+                                    }
+                                } catch (\Throwable $e) {
+                                    Log::error('[OpenAI Stream] Summary generation failed', ['error' => $e->getMessage()]);
+                                    // Fallback: sehr knappe Textausgabe
+                                    $fallback = $result['ok'] ? 'Ergebnis wurde ermittelt.' : ('Fehler: ' . ($result['error']['message'] ?? 'Unbekannt'));
+                                    $onDelta("\n" . $fallback . "\n");
+                                }
                             }
                         } catch (\Exception $e) {
                             Log::error('[OpenAI Stream] Tool execution failed', ['error' => $e->getMessage()]);

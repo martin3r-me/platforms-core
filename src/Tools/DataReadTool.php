@@ -55,6 +55,11 @@ class DataReadTool
                 ->map(fn($record) => $this->redactRecord($record, $provider))
                 ->toArray();
 
+            $sortMeta = $options['sort'] ?? [
+                ['field' => 'due_date', 'dir' => 'asc'],
+                ['field' => 'created_at', 'dir' => 'desc'],
+            ];
+
             return [
                 'ok' => true,
                 'data' => [
@@ -69,7 +74,7 @@ class DataReadTool
                         'total' => $total,
                         'page' => $page,
                         'per_page' => $perPage,
-                        'sort' => $options['sort'] ?? [],
+                        'sort' => $sortMeta,
                         'fields' => $options['fields'] ?? $provider['default_projection'],
                         'include' => $options['include'] ?? [],
                         'duration_ms' => 0, // TODO: measure
