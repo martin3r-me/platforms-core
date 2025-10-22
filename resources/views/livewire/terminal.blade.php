@@ -122,8 +122,8 @@
             <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"
                  x-show="isStreamingLocal && !hasDelta"
                  aria-hidden="true"></div>
-            <template x-if="$wire.currentTool">
-              <div class="text-xs text-[var(--ui-muted)]" x-text="'(Tool: ' + $wire.currentTool + ')'"></div>
+            <template x-if="currentTool">
+              <div class="text-xs text-[var(--ui-muted)]" x-text="'(Tool: ' + currentTool + ')'"></div>
             </template>
           </div>
         </div>
@@ -192,6 +192,7 @@
         finalizePending: false,
         suppressStream: false,
         isStreamingLocal: false,
+        currentTool: null,
 
         // Retry/Backoff
         retryCount: 0,
@@ -224,11 +225,7 @@
             if(this.bodyEl){ requestAnimationFrame(() => { this.bodyEl.scrollTop = this.bodyEl.scrollHeight; }); }
           }, this.typingDelay);
         },
-        pushDelta(delta){
-          if(!delta) return;
-          this.queue += delta;
-          this.startTyping();
-        },
+        pushDelta(delta){ if(!delta) return; this.queue += delta; this.startTyping(); },
 
         // SSE Steuerung
         startStream(url){
@@ -243,6 +240,7 @@
             this.finalizePending = false;
             this.suppressStream = false;
             this.isStreamingLocal = true;
+            this.currentTool = null;
 
             this.es = new EventSource(url);
             this.es.onopen = () => { if(window.__DEV__) console.log('[Terminal SSE] connection open'); this.retryCount = 0; };
@@ -264,17 +262,15 @@
                   this.pushDelta(data.delta);
                   window.dispatchEvent(new CustomEvent('ai-stream-delta', { detail: { delta: data.delta } }));
                 }
-                // optional: tool name/status über globales Event oder Livewire setzen
-                if(data?.tool){ this.$wire && this.$wire.set && this.$wire.set('currentTool', data.tool); }
+                // Tool-Indikator lokal setzen
+                if(data?.tool){ this.currentTool = data.tool; this.$wire && this.$wire.set && this.$wire.set('currentTool', data.tool); }
               } catch(parseErr){
-                // Non-JSON Lines ignorieren (Keep-Alive etc.)
                 if(window.__DEV__) console.warn('[Terminal SSE] parse skip (non-JSON line)');
               }
             };
             this.es.onerror = (err) => {
               if(window.__DEV__) console.error('[Terminal SSE] error:', err);
               this.closeStream();
-              // Retry mit Backoff (capped)
               if(this.retryCount < this.maxRetry){
                 const delay = Math.min(4000, this.backoffBaseMs * Math.pow(2, this.retryCount++));
                 setTimeout(() => this.startStream(url), delay);
@@ -282,22 +278,11 @@
                 window.dispatchEvent(new CustomEvent('ai-stream-error'));
               }
             };
-          } catch(e){
-            if(window.__DEV__) console.error('[Terminal SSE] start error', e);
-          }
+          } catch(e){ if(window.__DEV__) console.error('[Terminal SSE] start error', e); }
         },
-        closeStream(){
-          if(this.es){ try { this.es.close(); } catch(_){} this.es = null; }
-        },
+        closeStream(){ if(this.es){ try { this.es.close(); } catch(_){} this.es = null; } },
         abortStream(){
-          // Manueller Abbruch aus UI
-          this.closeStream();
-          this.stopTyping();
-          this.queue = '';
-          this.finalizePending = false;
-          this.hasDelta = false;
-          this.isStreamingLocal = false;
-          // Livewire-State aufräumen (falls gebunden)
+          this.closeStream(); this.stopTyping(); this.queue = ''; this.finalizePending = false; this.hasDelta = false; this.isStreamingLocal = false; this.currentTool = null;
           this.$wire?.set?.('isProcessing', false);
           this.$wire?.set?.('isStreaming', false);
           this.$wire?.set?.('canCancel', false);
@@ -306,32 +291,16 @@
           window.dispatchEvent(new CustomEvent('ai-stream-error'));
         },
 
-        // Drain → wartet bis die Queue leer ist, dann signalisiert „drained“
-        drainUntilEmpty(){
-          if(this.queue.length === 0){
-            window.dispatchEvent(new CustomEvent('ai-stream-drained'));
-            return;
-          }
-          setTimeout(() => this.drainUntilEmpty(), 30);
-        },
+        drainUntilEmpty(){ if(this.queue.length === 0){ window.dispatchEvent(new CustomEvent('ai-stream-drained')); return; } setTimeout(() => this.drainUntilEmpty(), 30); },
 
-        // Event-Brücken (aus x-on)
         onStreamComplete(){
           if(window.__DEV__) console.log('[Terminal SSE] ai-stream-complete');
-          this.finalizePending = true;
-          this.$wire?.set?.('canCancel', false);
-          this.typingDelay = this.fastTypingDelay; // schneller zu Ende tippen
-          this.startTyping();
-          this.drainUntilEmpty();
+          this.finalizePending = true; this.$wire?.set?.('canCancel', false); this.typingDelay = this.fastTypingDelay; this.startTyping(); this.drainUntilEmpty();
           if(this.bodyEl){ requestAnimationFrame(() => { this.bodyEl.scrollTop = this.bodyEl.scrollHeight; }); }
         },
         onStreamError(){
           if(window.__DEV__) console.log('[Terminal SSE] ai-stream-error');
-          this.stopTyping();
-          this.queue = '';
-          this.finalizePending = false;
-          this.hasDelta = false;
-          this.isStreamingLocal = false;
+          this.stopTyping(); this.queue = ''; this.finalizePending = false; this.hasDelta = false; this.isStreamingLocal = false; this.currentTool = null;
           this.$wire?.set?.('isProcessing', false);
           this.$wire?.set?.('isStreaming', false);
           this.$wire?.set?.('canCancel', false);
@@ -340,23 +309,9 @@
         },
         async onStreamDrained(){
           if(window.__DEV__) console.log('[Terminal SSE] ai-stream-drained');
-          this.stopTyping();
-          // Livewire: Streaming-Fahnen zurücksetzen
-          this.$wire?.set?.('isStreaming', false);
-          this.$wire?.set?.('canCancel', false);
-          this.hasDelta = false;
-          this.finalizePending = false;
-          this.$wire?.set?.('isProcessing', false);
-          this.$wire?.set?.('progressText','');
-          // Letzte Assistant-Message gezielt aus DB holen und in Array ersetzen
+          this.stopTyping(); this.$wire?.set?.('isStreaming', false); this.$wire?.set?.('canCancel', false); this.hasDelta = false; this.finalizePending = false; this.$wire?.set?.('isProcessing', false); this.$wire?.set?.('progressText','');
           try { await this.$wire?.call?.('refreshLastAssistant'); } catch(_) {}
-          // kleiner Delay, dann lokale Stream-Reste leeren und Block sauber ausblenden
-          setTimeout(() => {
-            this.streamText = '';
-            this.$wire?.set?.('currentTool', null);
-            this.isStreamingLocal = false;
-            window.dispatchEvent(new CustomEvent('terminal-scroll'));
-          }, 60);
+          setTimeout(() => { this.streamText = ''; this.$wire?.set?.('currentTool', null); this.currentTool = null; this.isStreamingLocal = false; window.dispatchEvent(new CustomEvent('terminal-scroll')); }, 60);
         },
       };
     }
