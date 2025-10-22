@@ -59,27 +59,51 @@ class CoreAiStreamController extends Controller
             echo "retry: 500\n\n";
             @flush();
 
+            // Create assistant message early (append-only updates during stream)
+            $assistantMessage = CoreChatMessage::create([
+                'core_chat_id' => $thread->core_chat_id,
+                'thread_id' => $thread->id,
+                'role' => 'assistant',
+                'content' => '',
+                'meta' => ['is_streaming' => true],
+            ]);
+
+            $lastFlushAt = microtime(true);
+            $flushInterval = 0.35; // seconds
+            $flushThreshold = 800;  // characters
+            $pendingSinceLastFlush = 0;
+
             // Stream deltas
-            $openAi->streamChat($messages, function (string $delta) use (&$assistantBuffer) {
+            $openAi->streamChat($messages, function (string $delta) use (&$assistantBuffer, &$lastFlushAt, $flushInterval, $flushThreshold, &$pendingSinceLastFlush, $assistantMessage) {
                 $assistantBuffer .= $delta;
+                $pendingSinceLastFlush += mb_strlen($delta);
+
                 echo 'data: ' . json_encode(['delta' => $delta], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
+
+                $now = microtime(true);
+                if ($pendingSinceLastFlush >= $flushThreshold || ($now - $lastFlushAt) >= $flushInterval) {
+                    // Batched update to reduce write amplification
+                    $assistantMessage->update([
+                        'content' => $assistantBuffer,
+                        'tokens_out' => mb_strlen($assistantBuffer),
+                        'meta' => ['is_streaming' => true],
+                    ]);
+                    $pendingSinceLastFlush = 0;
+                    $lastFlushAt = $now;
+                }
             });
 
             // Close stream
             echo "data: [DONE]\n\n";
             @flush();
 
-            // Persist final assistant message
-            if ($assistantBuffer !== '') {
-                CoreChatMessage::create([
-                    'core_chat_id' => $thread->core_chat_id,
-                    'thread_id' => $thread->id,
-                    'role' => 'assistant',
-                    'content' => $assistantBuffer,
-                    'tokens_out' => mb_strlen($assistantBuffer),
-                ]);
-            }
+            // Final flush on the same assistant record
+            $assistantMessage->update([
+                'content' => $assistantBuffer,
+                'tokens_out' => mb_strlen($assistantBuffer),
+                'meta' => ['is_streaming' => false],
+            ]);
         });
 
         $response->headers->set('Content-Type', 'text/event-stream');

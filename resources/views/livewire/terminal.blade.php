@@ -111,7 +111,7 @@
         @endforeach
 
         <!-- Streaming-Block -->
-        <div class="flex items-start gap-2" x-show="!suppressStream && ($wire.isStreaming || streamText.length > 0)" wire:ignore>
+        <div class="flex items-start gap-2" x-show="!suppressStream && (isStreamingLocal || streamText.length > 0)" wire:ignore>
           <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
           <div class="flex items-center gap-2"
                role="log"
@@ -190,6 +190,7 @@
         hasDelta: false,
         finalizePending: false,
         suppressStream: false,
+        isStreamingLocal: false,
 
         // Retry/Backoff
         retryCount: 0,
@@ -240,6 +241,7 @@
             this.hasDelta = false;
             this.finalizePending = false;
             this.suppressStream = false;
+            this.isStreamingLocal = true;
 
             this.es = new EventSource(url);
             this.es.onopen = () => { if(window.__DEV__) console.log('[Terminal SSE] connection open'); this.retryCount = 0; };
@@ -293,6 +295,7 @@
           this.queue = '';
           this.finalizePending = false;
           this.hasDelta = false;
+          this.isStreamingLocal = false;
           // Livewire-State aufräumen (falls gebunden)
           this.$wire?.set?.('isProcessing', false);
           this.$wire?.set?.('isStreaming', false);
@@ -327,6 +330,7 @@
           this.queue = '';
           this.finalizePending = false;
           this.hasDelta = false;
+          this.isStreamingLocal = false;
           this.$wire?.set?.('isProcessing', false);
           this.$wire?.set?.('isStreaming', false);
           this.$wire?.set?.('canCancel', false);
@@ -345,6 +349,7 @@
           this.$wire?.set?.('progressText','');
           // Streaming-Block vor History-Reload ausblenden, um "Pop-in" zu verhindern
           this.suppressStream = true;
+          this.isStreamingLocal = false;
           // **Wichtig**: Stream-Text erst NACH History-Reload leeren, um Flicker zu vermeiden
           try {
             await this.$wire?.call?.('loadMessages');
