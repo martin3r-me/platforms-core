@@ -347,14 +347,12 @@
           this.finalizePending = false;
           this.$wire?.set?.('isProcessing', false);
           this.$wire?.set?.('progressText','');
-          // Streaming-Block vor History-Reload ausblenden, um "Pop-in" zu verhindern
-          this.suppressStream = true;
+          // Kein komplettes Reload mehr – nur letzte Assistant-Message frisch laden
+          this.suppressStream = true; // für den Übergang bis DOM aktualisiert
           this.isStreamingLocal = false;
-          // **Wichtig**: Stream-Text erst NACH History-Reload leeren, um Flicker zu vermeiden
-          try {
-            await this.$wire?.call?.('loadMessages');
-          } catch(_) {}
-          // kleiner Delay, damit DOM die neuen Messages rendert
+          // Letzte Assistant-Message gezielt aus DB holen und in Array ersetzen
+          try { await this.$wire?.call?.('refreshLastAssistant'); } catch(_) {}
+          // kleiner Delay, dann lokale Stream-Reste leeren und wieder einblenden
           setTimeout(() => {
             this.streamText = '';
             this.$wire?.set?.('currentTool', null);

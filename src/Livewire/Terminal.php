@@ -25,6 +25,7 @@ class Terminal extends Component
     public $progressText = '';
     public $canCancel = false;
     public $idempotencyKey = '';
+    public $streamUrl = '';
 
     protected $listeners = [
         'refresh' => 'refreshComponent',
@@ -226,8 +227,25 @@ class Terminal extends Component
             'core_chat_id' => $this->activeChatId,
         ];
 
-        $streamUrl = route('core.ai.stream', ['thread' => $this->activeThreadId, 'assistant' => $assistant->id]);
-        $this->dispatch('ai-stream-start', url: $streamUrl);
+        $this->streamUrl = route('core.ai.stream', ['thread' => $this->activeThreadId, 'assistant' => $assistant->id]);
+        $this->dispatch('ai-stream-start', url: $this->streamUrl);
+    }
+
+    public function refreshLastAssistant(): void
+    {
+        if (!$this->activeThreadId) return;
+        $last = CoreChatMessage::where('thread_id', $this->activeThreadId)
+            ->where('role', 'assistant')
+            ->orderBy('created_at', 'desc')
+            ->first();
+        if (!$last) return;
+        // Ersetze die letzte Assistant-Message im lokalen Array gezielt
+        for ($i = count($this->messages) - 1; $i >= 0; $i--) {
+            if (($this->messages[$i]['role'] ?? null) === 'assistant') {
+                $this->messages[$i] = $last->toArray();
+                break;
+            }
+        }
     }
 
     public function getAiResponse()
