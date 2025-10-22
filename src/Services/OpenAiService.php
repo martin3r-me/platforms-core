@@ -10,7 +10,7 @@ use Platform\Core\Tools\CoreContextTool;
 
 class OpenAiService
 {
-    private const DEFAULT_MODEL = 'gpt-3.5-turbo';
+    private const DEFAULT_MODEL = 'gpt-4o-mini';
     private string $baseUrl = 'https://api.openai.com/v1';
 
     private function getApiKey(): string
