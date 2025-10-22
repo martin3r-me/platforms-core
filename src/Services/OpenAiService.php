@@ -168,6 +168,10 @@ class OpenAiService
 
         try {
             $context = app(CoreContextTool::class)->getContext();
+            // Fallback/Override: nutze explizite Route/Modul/URL falls vom Aufrufer mitgegeben
+            if (!empty($options['source_route'])) { $context['data']['route'] = $options['source_route']; }
+            if (!empty($options['source_module'])) { $context['data']['module'] = $options['source_module']; }
+            if (!empty($options['source_url'])) { $context['data']['url'] = $options['source_url']; }
             $prompt = $context['data']['system_prompt'] ?? 'Antworte kurz, präzise und auf Deutsch.';
             $u = $context['data']['user'] ?? null;
             $t = $context['data']['team'] ?? null;

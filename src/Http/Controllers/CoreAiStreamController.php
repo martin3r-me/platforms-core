@@ -19,6 +19,10 @@ class CoreAiStreamController extends Controller
 
         $threadId = (int) $request->query('thread');
         $assistantId = (int) $request->query('assistant');
+        // Optional source hints from client (used by CoreContextTool fallback)
+        $sourceRoute = $request->query('source_route');
+        $sourceModule = $request->query('source_module');
+        $sourceUrl = $request->query('source_url');
         if (!$threadId) {
             abort(422, 'thread parameter is required');
         }
@@ -44,7 +48,7 @@ class CoreAiStreamController extends Controller
 
         $assistantBuffer = '';
 
-        $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId) {
+        $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl) {
             // Clean buffers to avoid server buffering
             while (ob_get_level() > 0) {
                 @ob_end_flush();
@@ -106,7 +110,12 @@ class CoreAiStreamController extends Controller
                     $pendingSinceLastFlush = 0;
                     $lastFlushAt = $now;
                 }
-            });
+            }, model: null, options: [
+                'with_context' => true,
+                'source_route' => $sourceRoute,
+                'source_module' => $sourceModule,
+                'source_url' => $sourceUrl,
+            ]);
 
             // Close stream
             echo "data: [DONE]\n\n";

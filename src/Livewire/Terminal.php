@@ -227,7 +227,18 @@ class Terminal extends Component
             'core_chat_id' => $this->activeChatId,
         ];
 
-        $this->streamUrl = route('core.ai.stream', ['thread' => $this->activeThreadId, 'assistant' => $assistant->id]);
+        $currentRoute = request()->route()?->getName();
+        $sourceModule = null;
+        if (is_string($currentRoute) && str_contains($currentRoute, '.')) {
+            $sourceModule = strstr($currentRoute, '.', true);
+        }
+        $this->streamUrl = route('core.ai.stream', [
+            'thread' => $this->activeThreadId,
+            'assistant' => $assistant->id,
+            'source_route' => $currentRoute,
+            'source_module' => $sourceModule,
+            'source_url' => url()->current(),
+        ]);
         $this->dispatch('ai-stream-start', url: $this->streamUrl);
     }
 
