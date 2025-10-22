@@ -3,9 +3,12 @@
 namespace Platform\Core\Tools;
 
 use Illuminate\Support\Facades\Auth;
+use Platform\Core\Tools\DataRead\ProviderRegistry;
 
 class ToolBroker
 {
+    public function __construct(private ProviderRegistry $registry) {}
+
     public function getAvailableCapabilities(): array
     {
         $user = Auth::user();
@@ -19,9 +22,11 @@ class ToolBroker
             ];
         }
 
+        $entities = array_keys($this->registry->all());
+
         return [
             'available_modules' => $this->getAvailableModules($user, $team),
-            'available_entities' => $this->getAvailableEntities($user, $team),
+            'available_entities' => $entities,
             'available_operations' => ['describe', 'list', 'get', 'search'],
             'user_context' => [
                 'user_id' => $user->id,
@@ -129,13 +134,6 @@ class ToolBroker
 
     private function getAvailableModules($user, $team): array
     {
-        // TODO: Check user/team module permissions
-        return ['planner'];
-    }
-
-    private function getAvailableEntities($user, $team): array
-    {
-        // TODO: Check user/team entity permissions
-        return ['task'];
+        return ['planner','okr'];
     }
 }

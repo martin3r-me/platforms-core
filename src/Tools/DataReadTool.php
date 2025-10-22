@@ -3,32 +3,31 @@
 namespace Platform\Core\Tools;
 
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Platform\Core\Models\User;
-use Platform\Core\Models\Team;
+use Platform\Core\Tools\DataRead\ProviderRegistry;
+use Illuminate\Database\Eloquent\Builder;
 
 class DataReadTool
 {
     private const MAX_PER_PAGE = 200;
     private const DEFAULT_PER_PAGE = 50;
 
+    public function __construct(private ProviderRegistry $registry) {}
+
     public function describe(string $entity): array
     {
-        $provider = $this->getProvider($entity);
-        if (!$provider) {
-            return $this->error('ENTITY_NOT_FOUND', "Entity '{$entity}' not found");
-        }
+        $provider = $this->registry->get($entity);
+        if (!$provider) { return $this->error('ENTITY_NOT_FOUND', "Entity '{$entity}' not found"); }
 
         return [
             'ok' => true,
             'data' => [
                 'entity' => $entity,
-                'readable_fields' => $provider['readable_fields'],
-                'allowed_filters' => $provider['allowed_filters'],
-                'allowed_sorts' => $provider['allowed_sorts'],
-                'relations_whitelist' => $provider['relations_whitelist'],
-                'search_fields' => $provider['search_fields'],
-                'default_projection' => $provider['default_projection'],
+                'readable_fields' => $provider->readableFields(),
+                'allowed_filters' => $provider->allowedFilters(),
+                'allowed_sorts' => $provider->allowedSorts(),
+                'relations_whitelist' => $provider->relationsWhitelist(),
+                'search_fields' => $provider->searchFields(),
+                'default_projection' => $provider->defaultProjection(),
             ],
             'message' => "Schema for {$entity} loaded"
         ];
@@ -36,38 +35,32 @@ class DataReadTool
 
     public function list(string $entity, array $options = []): array
     {
-        $provider = $this->getProvider($entity);
-        if (!$provider) {
-            return $this->error('ENTITY_NOT_FOUND', "Entity '{$entity}' not found");
-        }
+        $provider = $this->registry->get($entity);
+        if (!$provider) { return $this->error('ENTITY_NOT_FOUND', "Entity '{$entity}' not found"); }
 
         try {
-            $query = $this->buildQuery($entity, $options);
+            $query = $this->buildQuery($provider, $options);
             $total = $query->count();
-            
+
             $page = max(1, (int)($options['page'] ?? 1));
             $perPage = min(self::MAX_PER_PAGE, max(1, (int)($options['per_page'] ?? self::DEFAULT_PER_PAGE)));
-            
+
             $records = $query
                 ->skip(($page - 1) * $perPage)
                 ->take($perPage)
                 ->get()
-                ->map(fn($record) => $this->redactRecord($record, $provider))
+                ->map(fn($record) => $record->toArray())
                 ->toArray();
 
-            $sortMeta = $options['sort'] ?? [
-                ['field' => 'due_date', 'dir' => 'asc'],
-                ['field' => 'created_at', 'dir' => 'desc'],
-            ];
+            $sortMeta = $options['sort'] ?? [];
 
             return [
                 'ok' => true,
                 'data' => [
                     'records' => $records,
                     '_source' => [
-                        'module' => $provider['module'],
                         'entity' => $entity,
-                        'model' => $provider['model'],
+                        'model' => $provider->model(),
                         'updated_at' => now()->toISOString(),
                     ],
                     'meta' => [
@@ -75,161 +68,78 @@ class DataReadTool
                         'page' => $page,
                         'per_page' => $perPage,
                         'sort' => $sortMeta,
-                        'fields' => $options['fields'] ?? $provider['default_projection'],
+                        'fields' => $options['fields'] ?? $provider->defaultProjection(),
                         'include' => $options['include'] ?? [],
-                        'duration_ms' => 0, // TODO: measure
+                        'duration_ms' => 0,
                     ]
                 ],
                 'message' => "Listed {$total} {$entity} records"
             ];
-
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return $this->error('INTERNAL_ERROR', $e->getMessage());
         }
     }
 
     public function get(string $entity, int $id): array
     {
-        $provider = $this->getProvider($entity);
-        if (!$provider) {
-            return $this->error('ENTITY_NOT_FOUND', "Entity '{$entity}' not found");
-        }
+        $provider = $this->registry->get($entity);
+        if (!$provider) { return $this->error('ENTITY_NOT_FOUND', "Entity '{$entity}' not found"); }
 
         try {
-            $query = $this->buildQuery($entity, []);
+            $query = $this->buildQuery($provider, []);
             $record = $query->where('id', $id)->first();
-
-            if (!$record) {
-                return $this->error('ROW_NOT_FOUND', "Record with ID {$id} not found");
-            }
+            if (!$record) { return $this->error('ROW_NOT_FOUND', "Record with ID {$id} not found"); }
 
             return [
                 'ok' => true,
                 'data' => [
-                    'record' => $this->redactRecord($record, $provider),
+                    'record' => $record->toArray(),
                     '_source' => [
-                        'module' => $provider['module'],
                         'entity' => $entity,
-                        'model' => $provider['model'],
+                        'model' => $provider->model(),
                         'updated_at' => now()->toISOString(),
                     ]
                 ],
                 'message' => "Retrieved {$entity} #{$id}"
             ];
-
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return $this->error('INTERNAL_ERROR', $e->getMessage());
         }
     }
 
-    public function search(string $entity, string $query, array $options = []): array
+    public function search(string $entity, string $queryText, array $options = []): array
     {
-        $provider = $this->getProvider($entity);
-        if (!$provider) {
-            return $this->error('ENTITY_NOT_FOUND', "Entity '{$entity}' not found");
-        }
-
-        if (empty($provider['search_fields'])) {
-            return $this->error('SEARCH_NOT_SUPPORTED', "Search not supported for {$entity}");
-        }
+        $provider = $this->registry->get($entity);
+        if (!$provider) { return $this->error('ENTITY_NOT_FOUND', "Entity '{$entity}' not found"); }
+        if (empty($provider->searchFields())) { return $this->error('SEARCH_NOT_SUPPORTED', "Search not supported for {$entity}"); }
 
         try {
-            $searchOptions = array_merge($options, ['query' => $query]);
-            $result = $this->list($entity, $searchOptions);
-            
-            if ($result['ok']) {
-                $result['message'] = "Searched {$entity} for '{$query}'";
-            }
-            
-            return $result;
-
-        } catch (\Exception $e) {
+            $options = array_merge($options, ['query' => $queryText]);
+            return $this->list($entity, $options);
+        } catch (\Throwable $e) {
             return $this->error('INTERNAL_ERROR', $e->getMessage());
         }
     }
 
-    private function getProvider(string $entity): ?array
+    private function buildQuery($provider, array $options): Builder
     {
-        $providers = $this->getProviders();
-        return $providers[$entity] ?? null;
-    }
+        $query = $provider->teamScopedQuery();
 
-    private function getProviders(): array
-    {
-        return [
-            'task' => [
-                'module' => 'planner',
-                'model' => 'Platform\\Planner\\Models\\PlannerTask',
-                'readable_fields' => [
-                    'id', 'uuid', 'title', 'description', 'due_date', 'is_done', 
-                    'is_frog', 'story_points', 'priority', 'order', 'created_at', 'updated_at',
-                    'user_id', 'user_in_charge_id', 'team_id', 'project_id', 'task_group_id'
-                ],
-                'allowed_filters' => [
-                    'id' => ['eq', 'ne', 'in'],
-                    'title' => ['eq', 'ne', 'like'],
-                    'is_done' => ['eq'],
-                    'is_frog' => ['eq'],
-                    'due_date' => ['eq', 'ne', 'gte', 'lte', 'between', 'is_null'],
-                    'user_id' => ['eq', 'ne', 'in'],
-                    'user_in_charge_id' => ['eq', 'ne', 'in', 'is_null'],
-                    'team_id' => ['eq', 'ne', 'in'],
-                    'project_id' => ['eq', 'ne', 'in', 'is_null'],
-                    'task_group_id' => ['eq', 'ne', 'in', 'is_null'],
-                    'created_at' => ['gte', 'lte', 'between'],
-                    'updated_at' => ['gte', 'lte', 'between'],
-                ],
-                'allowed_sorts' => [
-                    'id', 'title', 'due_date', 'created_at', 'updated_at', 'order'
-                ],
-                'relations_whitelist' => [
-                    'user', 'team', 'project', 'taskGroup', 'userInCharge'
-                ],
-                'search_fields' => ['title', 'description'],
-                'default_projection' => ['id', 'title', 'description', 'due_date', 'is_done', 'is_frog'],
-                'pii_redaction' => []
-            ]
-        ];
-    }
+        // Domain defaults (e.g., open only, default sort)
+        $provider->applyDomainDefaults($query, $options);
 
-    private function buildQuery(string $entity, array $options): \Illuminate\Database\Eloquent\Builder
-    {
-        $provider = $this->getProvider($entity);
-        $modelClass = $provider['model'];
-        $query = $modelClass::query();
-
-        // Team-Scope erzwingen
-        $user = Auth::user();
-        $team = $user?->currentTeam;
-        if ($team) {
-            $query->where('team_id', $team->id);
-        }
-
-        // Default-Filter: nur offene Aufgaben
-        $hasIsDoneFilter = collect($options['filters'] ?? [])->contains(fn($f) => ($f['field'] ?? null) === 'is_done');
-        if (!$hasIsDoneFilter) {
-            $query->where('is_done', false);
-        }
-
-        // Filters anwenden (inkl. Mapping für "status")
-        if (!empty($options['filters'])) {
-            foreach ($options['filters'] as $filter) {
-                // Mappe status->is_done
-                if (($filter['field'] ?? null) === 'status') {
-                    $mapped = $this->mapStatusFilterToIsDone($filter);
-                    if ($mapped) {
-                        $this->applyFilter($query, $mapped, $provider);
-                    }
-                    continue;
-                }
-                $this->applyFilter($query, $filter, $provider);
-            }
+        // Filters with mapping
+        foreach ($options['filters'] ?? [] as $filter) {
+            $mapped = $provider->mapFilter($filter);
+            if ($mapped === null) { continue; }
+            $this->applyFilter($query, $mapped, $provider);
         }
 
         // Search
-        if (!empty($options['query']) && !empty($provider['search_fields'])) {
-            $query->where(function($q) use ($options, $provider) {
-                foreach ($provider['search_fields'] as $field) {
+        if (!empty($options['query'])) {
+            $fields = $provider->searchFields();
+            $query->where(function($q) use ($fields, $options) {
+                foreach ($fields as $field) {
                     $q->orWhere($field, 'like', '%' . $options['query'] . '%');
                 }
             });
@@ -240,116 +150,43 @@ class DataReadTool
             foreach ($options['sort'] as $sort) {
                 $field = $sort['field'] ?? null;
                 $dir = $sort['dir'] ?? 'asc';
-                if ($field && in_array($field, $provider['allowed_sorts'])) {
+                if ($field && in_array($field, $provider->allowedSorts(), true)) {
                     $query->orderBy($field, $dir);
                 }
             }
-        } else {
-            // Default: Fälligkeit zuerst, dann erstellt
-            $query->orderBy('due_date', 'asc')->orderBy('created_at', 'desc');
         }
 
         return $query;
     }
 
-    private function mapStatusFilterToIsDone(array $filter): ?array
-    {
-        $op = $filter['op'] ?? 'eq';
-        $value = $filter['value'] ?? null;
-        if ($value === null) { return null; }
-
-        // einfache Heuristik: 'completed' => is_done=true, sonst is_done=false
-        $completed = is_string($value) ? strtolower($value) === 'completed' : (bool)$value;
-
-        if ($op === 'eq') {
-            return ['field' => 'is_done', 'op' => 'eq', 'value' => $completed];
-        }
-        if ($op === 'ne') {
-            return ['field' => 'is_done', 'op' => 'eq', 'value' => !$completed];
-        }
-        if ($op === 'in' && is_array($value)) {
-            // wenn irgendein Wert 'completed' enthält, dann is_done=true berücksichtigen, sonst false
-            $hasCompleted = collect($value)->contains(fn($v) => strtolower((string)$v) === 'completed');
-            return ['field' => 'is_done', 'op' => 'eq', 'value' => $hasCompleted];
-        }
-
-        return null;
-    }
-
-    private function applyFilter(\Illuminate\Database\Eloquent\Builder $query, array $filter, array $provider): void
+    private function applyFilter(Builder $query, array $filter, $provider): void
     {
         $field = $filter['field'] ?? null;
         $op = $filter['op'] ?? null;
         $value = $filter['value'] ?? null;
 
-        if (!$field || !$op || !isset($provider['allowed_filters'][$field])) {
-            return;
-        }
+        $allowed = $provider->allowedFilters();
+        if (!$field || !$op || !isset($allowed[$field])) { return; }
+        if (!in_array($op, $allowed[$field], true)) { return; }
 
-        if (!in_array($op, $provider['allowed_filters'][$field])) {
-            return;
-        }
-
-        switch ($op) {
-            case 'eq':
-                $query->where($field, $value);
-                break;
-            case 'ne':
-                $query->where($field, '!=', $value);
-                break;
-            case 'like':
-                $query->where($field, 'like', '%' . $value . '%');
-                break;
-            case 'in':
-                $query->whereIn($field, is_array($value) ? $value : [$value]);
-                break;
-            case 'gte':
-                $query->where($field, '>=', $value);
-                break;
-            case 'lte':
-                $query->where($field, '<=', $value);
-                break;
-            case 'between':
-                if (is_array($value) && count($value) === 2) {
-                    $query->whereBetween($field, $value);
-                }
-                break;
-            case 'is_null':
-                $query->whereNull($field);
-                break;
-        }
-    }
-
-    private function redactRecord($record, array $provider): array
-    {
-        $data = $record->toArray();
-        
-        // PII Redaction
-        foreach ($provider['pii_redaction'] as $field) {
-            if (isset($data[$field])) {
-                $data[$field] = $this->maskPii($data[$field]);
-            }
-        }
-
-        return $data;
-    }
-
-    private function maskPii($value): string
-    {
-        if (is_string($value) && str_contains($value, '@')) {
-            return preg_replace('/(.{2}).*(@.*)/', '$1***$2', $value);
-        }
-        return '***';
+        match ($op) {
+            'eq' => $query->where($field, $value),
+            'ne' => $query->where($field, '!=', $value),
+            'like' => $query->where($field, 'like', '%' . $value . '%'),
+            'in' => $query->whereIn($field, is_array($value) ? $value : [$value]),
+            'gte' => $query->where($field, '>=', $value),
+            'lte' => $query->where($field, '<=', $value),
+            'between' => (is_array($value) && count($value) === 2) ? $query->whereBetween($field, $value) : null,
+            'is_null' => $query->whereNull($field),
+            default => null
+        };
     }
 
     private function error(string $code, string $message): array
     {
         return [
             'ok' => false,
-            'error' => [
-                'code' => $code,
-                'message' => $message
-            ]
+            'error' => [ 'code' => $code, 'message' => $message ]
         ];
     }
 }
