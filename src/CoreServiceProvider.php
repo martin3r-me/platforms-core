@@ -106,6 +106,9 @@ class CoreServiceProvider extends ServiceProvider
         // AI Agent Services entfernt – kommen in separates Modul
 
         // CommandRegistry entfernt - Sidebar soll leer sein
+
+        // Bootstrap DataRead Provider Registry
+        \Platform\Core\Tools\DataRead\Bootstrap::register();
     }
 
 

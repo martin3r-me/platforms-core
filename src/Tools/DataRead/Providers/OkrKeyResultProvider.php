@@ -9,7 +9,7 @@ use Platform\Core\Tools\DataRead\EntityReadProvider;
 class OkrKeyResultProvider implements EntityReadProvider
 {
     public function key(): string { return 'okr.key_result'; }
-    public function model(): string { return 'Platform\\Okr\\Models\\OkrKeyResult'; }
+    public function model(): string { return 'Platform\\Okr\\Models\\KeyResult'; }
 
     public function readableFields(): array { return ['id','uuid','title','progress','owner_id','team_id','due_date','created_at','updated_at']; }
     public function allowedFilters(): array { return ['id'=>['eq','ne','in'],'owner_id'=>['eq','in'],'team_id'=>['eq'],'due_date'=>['gte','lte','between']]; }
