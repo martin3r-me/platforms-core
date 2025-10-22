@@ -109,6 +109,15 @@ class CoreServiceProvider extends ServiceProvider
 
         // Bootstrap DataRead Provider Registry
         \Platform\Core\Tools\DataRead\Bootstrap::register();
+
+        // Load manifest-backed providers if available
+        $this->app->afterResolving(\Platform\Core\Tools\DataRead\ProviderRegistry::class, function ($registry) {
+            try {
+                (new \Platform\Core\Tools\DataRead\ManifestLoader())->loadFromStorage($registry);
+            } catch (\Throwable $e) {
+                \Log::warning('CoreServiceProvider: Manifest loading skipped: '.$e->getMessage());
+            }
+        });
     }
 
 
