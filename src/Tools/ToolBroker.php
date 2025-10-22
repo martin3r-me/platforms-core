@@ -22,10 +22,23 @@ class ToolBroker
             ];
         }
 
-        $entities = array_keys($this->registry->all());
+        // Scope by current route module (context)
+        $contextModule = null;
+        try {
+            $ctx = app(CoreContextTool::class)->getContext();
+            $contextModule = $ctx['data']['module'] ?? null;
+        } catch (\Throwable $e) {}
+
+        $allEntities = array_keys($this->registry->all());
+        $entities = $allEntities;
+        if (is_string($contextModule) && $contextModule !== '') {
+            $entities = array_values(array_filter($allEntities, function ($key) use ($contextModule) {
+                return str_starts_with($key, $contextModule . '.');
+            }));
+        }
 
         return [
-            'available_modules' => $this->getAvailableModules($user, $team),
+            'available_modules' => $contextModule ? [$contextModule] : $this->getAvailableModules($user, $team),
             'available_entities' => $entities,
             'available_operations' => ['describe', 'list', 'get', 'search'],
             'user_context' => [
@@ -70,7 +83,9 @@ class ToolBroker
 
     public function getWriteToolDefinition(): array
     {
-        $entities = array_keys($this->registry->all());
+        // Use same scoping as capabilities
+        $cap = $this->getAvailableCapabilities();
+        $entities = $cap['available_entities'];
         return [
             'type' => 'function',
             'function' => [
