@@ -7,6 +7,8 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Tools\CoreContextTool;
+use Platform\Core\Tools\CoreDataReadTool;
+use Platform\Core\Tools\ToolBroker;
 
 class OpenAiService
 {
@@ -47,8 +49,9 @@ class OpenAiService
                 'stream' => false,
             ];
 
-            if (!empty($options['tools'])) {
-                $payload['tools'] = $options['tools'];
+            // Add data.read tool if not disabled
+            if (!isset($options['tools']) || $options['tools'] !== false) {
+                $payload['tools'] = $this->getAvailableTools();
                 $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
             }
 
@@ -94,8 +97,9 @@ class OpenAiService
             'stream' => true,
         ];
 
-        if (!empty($options['tools'])) {
-            $payload['tools'] = $options['tools'];
+        // Add data.read tool if not disabled
+        if (!isset($options['tools']) || $options['tools'] !== false) {
+            $payload['tools'] = $this->getAvailableTools();
             $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
         }
 
@@ -238,5 +242,23 @@ class OpenAiService
             
             return [];
         }
+    }
+
+    private function getAvailableTools(): array
+    {
+        $toolBroker = app(ToolBroker::class);
+        $capabilities = $toolBroker->getAvailableCapabilities();
+        
+        $tools = [];
+        foreach ($capabilities['available_entities'] as $entity) {
+            foreach ($capabilities['available_operations'] as $operation) {
+                $toolDef = $toolBroker->getToolDefinition($entity, $operation);
+                if ($toolDef) {
+                    $tools[] = $toolDef;
+                }
+            }
+        }
+        
+        return $tools;
     }
 }

@@ -7,10 +7,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use Platform\Core\Services\OpenAiService;
 use Platform\Core\Models\CoreChatThread;
 use Platform\Core\Models\CoreChatMessage;
+use Platform\Core\Tools\CoreDataReadTool;
 
 class CoreAiStreamController extends Controller
 {
-    public function stream(Request $request, OpenAiService $openAi): StreamedResponse
+    public function stream(Request $request, OpenAiService $openAi, CoreDataReadTool $dataReadTool): StreamedResponse
     {
         $user = $request->user();
         if (!$user) {
@@ -48,7 +49,7 @@ class CoreAiStreamController extends Controller
 
         $assistantBuffer = '';
 
-        $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl) {
+        $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl, $dataReadTool) {
             // Clean buffers to avoid server buffering
             while (ob_get_level() > 0) {
                 @ob_end_flush();
@@ -91,7 +92,7 @@ class CoreAiStreamController extends Controller
             $flushThreshold = 800;  // characters
             $pendingSinceLastFlush = 0;
 
-            // Stream deltas
+            // Stream deltas with tool execution
             $openAi->streamChat($messages, function (string $delta) use (&$assistantBuffer, &$lastFlushAt, $flushInterval, $flushThreshold, &$pendingSinceLastFlush, $assistantMessage) {
                 $assistantBuffer .= $delta;
                 $pendingSinceLastFlush += mb_strlen($delta);
@@ -115,6 +116,15 @@ class CoreAiStreamController extends Controller
                 'source_route' => $sourceRoute,
                 'source_module' => $sourceModule,
                 'source_url' => $sourceUrl,
+                'tool_executor' => function($toolName, $arguments) use ($dataReadTool) {
+                    if ($toolName === 'data.read') {
+                        $result = $dataReadTool->handle($arguments);
+                        echo 'data: ' . json_encode(['tool' => 'data.read', 'result' => $result], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+                        return $result;
+                    }
+                    return null;
+                }
             ]);
 
             // Close stream
