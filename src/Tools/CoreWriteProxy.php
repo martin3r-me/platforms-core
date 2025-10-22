@@ -36,9 +36,22 @@ class CoreWriteProxy
         }
     }
 
+    private function ensureRequired($provider, string $op, array $data): ?string
+    {
+        $required = method_exists($provider, 'requiredWriteFields') ? $provider->requiredWriteFields($op) : [];
+        foreach ($required as $f) {
+            if (!array_key_exists($f, $data) || $data[$f] === null || $data[$f] === '') {
+                return "Missing required field: {$f}";
+            }
+        }
+        return null;
+    }
+
     private function create($provider, string $modelClass, array $data, string $traceId): array
     {
         Gate::authorize('create', $modelClass);
+        if ($msg = $this->ensureRequired($provider, 'create', $data)) { return $this->error('VALIDATION_ERROR', $msg, $traceId); }
+
         $fillable = method_exists($provider, 'fillableFields') ? $provider->fillableFields() : [];
         $readonly = method_exists($provider, 'readonlyFields') ? $provider->readonlyFields() : [];
 
@@ -72,7 +85,6 @@ class CoreWriteProxy
         $fillable = method_exists($provider, 'fillableFields') ? $provider->fillableFields() : [];
         $readonly = method_exists($provider, 'readonlyFields') ? $provider->readonlyFields() : [];
         $payload = $this->filterPayload($data, $fillable, $readonly);
-        // prevent scope tampering
         unset($payload['team_id'], $payload['user_id']);
 
         DB::transaction(function () use ($row, $payload) { $row->fill($payload)->save(); });

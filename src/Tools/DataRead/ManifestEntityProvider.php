@@ -12,6 +12,7 @@ class ManifestEntityProvider implements EntityReadProvider
     private array $fields; // [name => ['type'=>..., 'fillable'=>bool, 'readonly'=>bool, 'pii'=>bool]]
     private array $defaults; // ['sort'=>[], 'filters'=>[]]
     private bool $teamScoped;
+    private array $writeSchemas; // ['create'=>schema,'update'=>schema]
 
     public function __construct(array $manifest)
     {
@@ -20,6 +21,7 @@ class ManifestEntityProvider implements EntityReadProvider
         $this->fields = $manifest['fields'] ?? [];
         $this->defaults = $manifest['defaults'] ?? [];
         $this->teamScoped = (bool)($manifest['team_scoped'] ?? false);
+        $this->writeSchemas = $manifest['write_schemas'] ?? [];
     }
 
     public function key(): string { return $this->entityKey; }
@@ -43,6 +45,18 @@ class ManifestEntityProvider implements EntityReadProvider
             if (!empty($meta['readonly'])) { $out[] = $name; }
         }
         return $out;
+    }
+
+    public function getWriteSchema(string $op): array
+    {
+        return $this->writeSchemas[$op] ?? [];
+    }
+
+    public function requiredWriteFields(string $op): array
+    {
+        $schema = $this->getWriteSchema($op);
+        $req = $schema['required'] ?? [];
+        return is_array($req) ? $req : [];
     }
 
     public function allowedFilters(): array
