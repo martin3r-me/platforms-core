@@ -111,7 +111,7 @@
         @endforeach
 
         <!-- Streaming-Block -->
-        <div class="flex items-start gap-2" x-cloak x-show="!suppressStream && (isStreamingLocal || streamText.length > 0)" wire:ignore>
+        <div class="flex items-start gap-2" x-cloak x-show="isStreamingLocal || streamText.length > 0" wire:ignore>
           <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
           <div class="flex items-center gap-2"
                role="log"
@@ -119,7 +119,7 @@
                aria-atomic="false">
             <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
             <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"
-                 x-show="!hasDelta"
+                 x-show="isStreamingLocal && !hasDelta"
                  aria-hidden="true"></div>
             <template x-if="$wire.currentTool">
               <div class="text-xs text-[var(--ui-muted)]" x-text="'(Tool: ' + $wire.currentTool + ')'"></div>
@@ -347,16 +347,13 @@
           this.finalizePending = false;
           this.$wire?.set?.('isProcessing', false);
           this.$wire?.set?.('progressText','');
-          // Kein komplettes Reload mehr – nur letzte Assistant-Message frisch laden
-          this.suppressStream = true; // für den Übergang bis DOM aktualisiert
-          this.isStreamingLocal = false;
           // Letzte Assistant-Message gezielt aus DB holen und in Array ersetzen
           try { await this.$wire?.call?.('refreshLastAssistant'); } catch(_) {}
-          // kleiner Delay, dann lokale Stream-Reste leeren und wieder einblenden
+          // kleiner Delay, dann lokale Stream-Reste leeren und Block sauber ausblenden
           setTimeout(() => {
             this.streamText = '';
             this.$wire?.set?.('currentTool', null);
-            this.suppressStream = false;
+            this.isStreamingLocal = false;
             window.dispatchEvent(new CustomEvent('terminal-scroll'));
           }, 60);
         },
