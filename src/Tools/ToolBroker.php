@@ -46,7 +46,7 @@ class ToolBroker
         return [
             'type' => 'function',
             'function' => [
-                'name' => 'data.read',
+                'name' => 'data_read',
                 'description' => "Read {$entity} data with {$operation} operation",
                 'parameters' => [
                     'type' => 'object',
