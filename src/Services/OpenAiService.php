@@ -114,6 +114,8 @@ class OpenAiService
         $body = $response->toPsrResponse()->getBody();
         $buffer = '';
         $toolCalls = [];
+        $currentToolCall = null;
+        $toolArguments = '';
         
         Log::info('[OpenAI Stream] Starting stream processing');
         
@@ -163,8 +165,52 @@ class OpenAiService
                 
                 // Check for tool calls
                 if (isset($decoded['choices'][0]['delta']['tool_calls'])) {
-                    Log::info('[OpenAI Stream] Tool call detected', ['tool_calls' => $decoded['choices'][0]['delta']['tool_calls']]);
-                    $toolCalls[] = $decoded['choices'][0]['delta']['tool_calls'];
+                    $toolCallDelta = $decoded['choices'][0]['delta']['tool_calls'];
+                    Log::info('[OpenAI Stream] Tool call delta', ['tool_calls' => $toolCallDelta]);
+                    
+                    foreach ($toolCallDelta as $toolCall) {
+                        if (isset($toolCall['function']['name'])) {
+                            $currentToolCall = $toolCall['function']['name'];
+                            $toolArguments = '';
+                            Log::info('[OpenAI Stream] Starting tool call', ['tool' => $currentToolCall]);
+                        }
+                        
+                        if (isset($toolCall['function']['arguments'])) {
+                            $toolArguments .= $toolCall['function']['arguments'];
+                            Log::debug('[OpenAI Stream] Tool arguments chunk', ['chunk' => $toolCall['function']['arguments']]);
+                        }
+                    }
+                    continue;
+                }
+                
+                // Check for tool call completion
+                if (isset($decoded['choices'][0]['finish_reason']) && $decoded['choices'][0]['finish_reason'] === 'tool_calls') {
+                    if ($currentToolCall && $toolArguments) {
+                        Log::info('[OpenAI Stream] Executing tool call', [
+                            'tool' => $currentToolCall, 
+                            'arguments' => $toolArguments
+                        ]);
+                        
+                        try {
+                            $arguments = json_decode($toolArguments, true);
+                            if ($arguments && $currentToolCall === 'data_read') {
+                                $dataReadTool = app(\Platform\Core\Tools\CoreDataReadTool::class);
+                                $result = $dataReadTool->handle($arguments);
+                                
+                                Log::info('[OpenAI Stream] Tool result', ['result' => $result]);
+                                
+                                // Send tool result back to user
+                                $onDelta("\n\n**Tool-Ausführung:** `{$currentToolCall}`\n");
+                                $onDelta("```json\n" . json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n```\n");
+                            }
+                        } catch (\Exception $e) {
+                            Log::error('[OpenAI Stream] Tool execution failed', ['error' => $e->getMessage()]);
+                            $onDelta("\n\n**Tool-Fehler:** " . $e->getMessage() . "\n");
+                        }
+                    }
+                    
+                    $currentToolCall = null;
+                    $toolArguments = '';
                     continue;
                 }
                 
