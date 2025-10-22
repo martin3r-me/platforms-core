@@ -115,9 +115,16 @@ class OpenAiService
         $buffer = '';
         $toolCalls = [];
         
+        Log::info('[OpenAI Stream] Starting stream processing');
+        
         while (!$body->eof()) {
             $chunk = $body->read(8192);
-            if ($chunk === '' || $chunk === false) { usleep(10000); continue; }
+            if ($chunk === '' || $chunk === false) { 
+                usleep(10000); 
+                continue; 
+            }
+            
+            Log::debug('[OpenAI Stream] Received chunk', ['size' => strlen($chunk)]);
             $buffer .= $chunk;
 
             // Normalisiere Zeilenenden auf \n
@@ -129,19 +136,47 @@ class OpenAiService
                 $buffer = substr($buffer, $pos + 1);
 
                 if ($line === '') { continue; }
+                
+                Log::debug('[OpenAI Stream] Processing line', ['line' => $line]);
+                
                 // Erwartet 'data:' Präfix je SSE-Zeile
-                if (strncmp($line, 'data:', 5) !== 0) { continue; }
+                if (strncmp($line, 'data:', 5) !== 0) { 
+                    Log::debug('[OpenAI Stream] Skipping non-data line', ['line' => $line]);
+                    continue; 
+                }
+                
                 $data = ltrim(substr($line, 5));
-                if ($data === '[DONE]') { return; }
+                Log::debug('[OpenAI Stream] Data content', ['data' => $data]);
+                
+                if ($data === '[DONE]') { 
+                    Log::info('[OpenAI Stream] Stream completed');
+                    return; 
+                }
 
                 $decoded = json_decode($data, true);
-                if (!is_array($decoded)) { continue; }
+                if (!is_array($decoded)) { 
+                    Log::debug('[OpenAI Stream] Invalid JSON', ['data' => $data]);
+                    continue; 
+                }
                 
+                Log::debug('[OpenAI Stream] Decoded data', ['decoded' => $decoded]);
+                
+                // Check for tool calls
+                if (isset($decoded['choices'][0]['delta']['tool_calls'])) {
+                    Log::info('[OpenAI Stream] Tool call detected', ['tool_calls' => $decoded['choices'][0]['delta']['tool_calls']]);
+                    $toolCalls[] = $decoded['choices'][0]['delta']['tool_calls'];
+                    continue;
+                }
                 
                 $delta = $decoded['choices'][0]['delta']['content'] ?? '';
-                if ($delta !== '') { $onDelta($delta); }
+                if ($delta !== '') { 
+                    Log::debug('[OpenAI Stream] Content delta', ['delta' => $delta]);
+                    $onDelta($delta); 
+                }
             }
         }
+        
+        Log::info('[OpenAI Stream] Stream ended');
     }
 
     /** Build a robust HTTP client with consistent headers, timeouts, and retry. */
@@ -251,16 +286,20 @@ class OpenAiService
         $toolBroker = app(ToolBroker::class);
         $capabilities = $toolBroker->getAvailableCapabilities();
         
+        Log::info('[OpenAI Tools] Available capabilities', ['capabilities' => $capabilities]);
+        
         $tools = [];
         foreach ($capabilities['available_entities'] as $entity) {
             foreach ($capabilities['available_operations'] as $operation) {
                 $toolDef = $toolBroker->getToolDefinition($entity, $operation);
                 if ($toolDef) {
                     $tools[] = $toolDef;
+                    Log::debug('[OpenAI Tools] Added tool definition', ['entity' => $entity, 'operation' => $operation]);
                 }
             }
         }
         
+        Log::info('[OpenAI Tools] Final tools array', ['tools' => $tools]);
         return $tools;
     }
 }
