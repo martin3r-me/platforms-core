@@ -8,8 +8,7 @@ use Platform\Core\Support\FieldHasher;
 
 trait Encryptable
 {
-    // Beispiel: ['iban' => 'string', 'api_token' => 'string', 'meta' => 'json']
-    protected array $encryptable = [];
+    // Hinweis: Modelle definieren $encryptable selbst
 
     public static function bootEncryptable(): void
     {
@@ -30,6 +29,9 @@ trait Encryptable
     {
         if (!property_exists($this, 'casts')) {
             $this->casts = [];
+        }
+        if (!property_exists($this, 'encryptable') || empty($this->encryptable)) {
+            return;
         }
         foreach ($this->encryptable as $field => $type) {
             if ($type === 'json') {
