@@ -14,8 +14,20 @@
     </x-slot>
 
     <div x-data="{ activeTab: $wire.entangle('activeTab') }">
-        <!-- Tabs -->
-        <div class="flex gap-1 border-b border-[var(--ui-border)]/60 mb-6">
+        @if(!$contextType || !$contextId)
+            <!-- Fallback: Kein Kontext -->
+            <div class="py-12 text-center">
+                <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-muted-5)] flex items-center justify-center">
+                    @svg('heroicon-o-information-circle', 'w-8 h-8 text-[var(--ui-muted)]')
+                </div>
+                <h4 class="text-lg font-semibold text-[var(--ui-secondary)] mb-2">Kein Kontext verfügbar</h4>
+                <p class="text-sm text-[var(--ui-muted)] max-w-md mx-auto">
+                    Die Zeiterfassung ist nur im Kontext einer Aufgabe, eines Projekts oder eines anderen Elements verfügbar. Bitte öffnen Sie eine entsprechende Seite, um Zeiten zu erfassen.
+                </p>
+            </div>
+        @else
+            <!-- Tabs -->
+            <div class="flex gap-1 border-b border-[var(--ui-border)]/60 mb-6">
             <button
                 @click="activeTab = 'entry'"
                 :class="activeTab === 'entry' 
@@ -366,43 +378,50 @@
                 </div>
             </div>
         </div>
+        @endif
     </div>
 
     <x-slot name="footer">
         <div class="flex justify-between items-center">
-            <div class="text-xs text-[var(--ui-muted)]" x-show="activeTab === 'overview'">
-                @if($entries && $entries->count() > 0)
-                    {{ $entries->count() }} Einträge
-                @endif
-            </div>
+            @if($contextType && $contextId)
+                <div class="text-xs text-[var(--ui-muted)]" x-show="activeTab === 'overview'">
+                    @if($entries && $entries->count() > 0)
+                        {{ $entries->count() }} Einträge
+                    @endif
+                </div>
+            @else
+                <div></div>
+            @endif
             <div class="flex justify-end gap-3 ml-auto">
                 <x-ui-button variant="secondary" wire:click="close">
                     Schließen
                 </x-ui-button>
-                <x-ui-button 
-                    variant="primary" 
-                    wire:click="save" 
-                    wire:loading.attr="disabled"
-                    x-show="activeTab === 'entry'"
-                >
-                    <span wire:loading.remove wire:target="save">Zeit erfassen</span>
-                    <span wire:loading wire:target="save" class="inline-flex items-center gap-2">
-                        @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
-                        Speichern…
-                    </span>
-                </x-ui-button>
-                <x-ui-button 
-                    variant="primary" 
-                    wire:click="savePlanned" 
-                    wire:loading.attr="disabled"
-                    x-show="activeTab === 'planned'"
-                >
-                    <span wire:loading.remove wire:target="savePlanned">Soll-Zeit speichern</span>
-                    <span wire:loading wire:target="savePlanned" class="inline-flex items-center gap-2">
-                        @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
-                        Speichern…
-                    </span>
-                </x-ui-button>
+                @if($contextType && $contextId)
+                    <x-ui-button 
+                        variant="primary" 
+                        wire:click="save" 
+                        wire:loading.attr="disabled"
+                        x-show="activeTab === 'entry'"
+                    >
+                        <span wire:loading.remove wire:target="save">Zeit erfassen</span>
+                        <span wire:loading wire:target="save" class="inline-flex items-center gap-2">
+                            @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
+                            Speichern…
+                        </span>
+                    </x-ui-button>
+                    <x-ui-button 
+                        variant="primary" 
+                        wire:click="savePlanned" 
+                        wire:loading.attr="disabled"
+                        x-show="activeTab === 'planned'"
+                    >
+                        <span wire:loading.remove wire:target="savePlanned">Soll-Zeit speichern</span>
+                        <span wire:loading wire:target="savePlanned" class="inline-flex items-center gap-2">
+                            @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
+                            Speichern…
+                        </span>
+                    </x-ui-button>
+                @endif
             </div>
         </div>
     </x-slot>

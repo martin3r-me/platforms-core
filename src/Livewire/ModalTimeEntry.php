@@ -40,7 +40,7 @@ class ModalTimeEntry extends Component
     protected array $minuteOptions = [15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 420, 480];
 
     #[On('time-entry:open')]
-    public function open(array $payload): void
+    public function open(array $payload = []): void
     {
         if (! Auth::check() || ! Auth::user()->currentTeam) {
             return;
@@ -50,19 +50,24 @@ class ModalTimeEntry extends Component
         $this->contextId = isset($payload['context_id']) ? (int) $payload['context_id'] : null;
         $this->linkedContexts = $payload['linked_contexts'] ?? [];
 
+        // Wenn kein Kontext vorhanden, Modal trotzdem öffnen (Fallback-Modus)
         if (! $this->contextType || ! $this->contextId) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Kein Kontext für Zeiterfassung angegeben.',
-            ]);
+            $this->workDate = now()->toDateString();
+            $this->minutes = $payload['minutes'] ?? 60;
+            $this->rate = $payload['rate'] ?? null;
+            $this->note = $payload['note'] ?? null;
+            $this->activeTab = 'entry';
+            $this->open = true;
             return;
         }
 
         if (! class_exists($this->contextType) || ! $this->contextSupportsTimeEntries($this->contextType)) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Dieser Kontext unterstützt keine Zeiterfassung.',
-            ]);
+            $this->workDate = now()->toDateString();
+            $this->minutes = $payload['minutes'] ?? 60;
+            $this->rate = $payload['rate'] ?? null;
+            $this->note = $payload['note'] ?? null;
+            $this->activeTab = 'entry';
+            $this->open = true;
             return;
         }
 
