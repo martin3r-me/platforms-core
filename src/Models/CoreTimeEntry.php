@@ -1,0 +1,95 @@
+<?php
+
+namespace Platform\Core\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
+use Symfony\Component\Uid\UuidV7;
+
+class CoreTimeEntry extends Model
+{
+    use SoftDeletes;
+
+    protected $fillable = [
+        'uuid',
+        'team_id',
+        'user_id',
+        'context_type',
+        'context_id',
+        'work_date',
+        'minutes',
+        'rate_cents',
+        'amount_cents',
+        'is_billed',
+        'metadata',
+        'note',
+    ];
+
+    protected $casts = [
+        'work_date' => 'date',
+        'minutes' => 'integer',
+        'rate_cents' => 'integer',
+        'amount_cents' => 'integer',
+        'is_billed' => 'boolean',
+        'metadata' => 'array',
+    ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $entry): void {
+            do {
+                $uuid = UuidV7::generate();
+            } while (self::where('uuid', $uuid)->exists());
+
+            $entry->uuid = $uuid;
+
+            if (! $entry->team_id && Auth::user()?->currentTeam) {
+                $entry->team_id = Auth::user()->currentTeam->id;
+            }
+        });
+    }
+
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function context(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    public function additionalContexts(): HasMany
+    {
+        return $this->hasMany(CoreTimeEntryContext::class, 'time_entry_id');
+    }
+
+    public function scopeForContext($query, Model $model)
+    {
+        return $query->where('context_type', get_class($model))
+            ->where('context_id', $model->getKey());
+    }
+
+    public function scopeForContextKey($query, string $type, int $id)
+    {
+        return $query->where('context_type', $type)
+            ->where('context_id', $id);
+    }
+
+    public function getHoursAttribute(): float
+    {
+        return round(($this->minutes ?? 0) / 60, 2);
+    }
+}
+
+
