@@ -1,4 +1,3 @@
-@auth
 <x-ui-modal size="md" wire:model="open" :closeButton="true" x-on:close-modal-time-entry.window="$wire.close()">
     <x-slot name="title">
         Zeit erfassen
@@ -33,7 +32,7 @@
                 name="rate"
                 label="Stundensatz (optional)"
                 wire:model.live="rate"
-                placeholder="z. B. 95,00"
+                placeholder="z. B. 95,00"
                 :errorKey="'rate'"
             />
 
@@ -63,5 +62,3 @@
         </div>
     </x-slot>
 </x-ui-modal>
-@endauth
-
