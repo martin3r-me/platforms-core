@@ -8,6 +8,7 @@
         <div class="grid gap-4 sm:grid-cols-2">
             <div>
                 <x-ui-input-date
+                    name="workDate"
                     label="Datum"
                     wire:model.live="workDate"
                     :errorKey="'workDate'"
