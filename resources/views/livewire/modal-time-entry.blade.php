@@ -17,6 +17,7 @@
 
             <div>
                 <x-ui-input-select
+                    name="minutes"
                     label="Dauer"
                     wire:model.live="minutes"
                     :options="collect($this->minuteOptions)->map(fn($value) => ['value' => $value, 'label' => number_format($value / 60, 2, ',', '.') . ' h'])"
