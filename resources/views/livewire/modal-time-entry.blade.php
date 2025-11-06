@@ -30,6 +30,7 @@
 
         <div class="grid gap-4 sm:grid-cols-2">
             <x-ui-input-text
+                name="rate"
                 label="Stundensatz (optional)"
                 wire:model.live="rate"
                 placeholder="z. B. 95,00"
@@ -37,6 +38,7 @@
             />
 
             <x-ui-input-textarea
+                name="note"
                 label="Notiz"
                 wire:model.live="note"
                 rows="2"
