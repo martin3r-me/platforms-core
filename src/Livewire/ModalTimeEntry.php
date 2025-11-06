@@ -10,6 +10,7 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Platform\Core\Models\CoreTimeEntry;
 use Platform\Core\Models\CoreTimeEntryContext;
+use Platform\Core\Models\CoreTimePlanned;
 use Platform\Core\Traits\HasTimeEntries;
 
 class ModalTimeEntry extends Component
@@ -28,9 +29,13 @@ class ModalTimeEntry extends Component
     public ?string $rate = null;
     public ?string $note = null;
 
-    public string $activeTab = 'entry'; // 'entry' or 'overview'
+    public string $activeTab = 'entry'; // 'entry', 'overview', or 'planned'
 
     public $entries = [];
+    public $plannedEntries = [];
+
+    public ?int $plannedMinutes = null;
+    public ?string $plannedNote = null;
 
     protected array $minuteOptions = [15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 420, 480];
 
@@ -68,6 +73,8 @@ class ModalTimeEntry extends Component
         $this->activeTab = 'entry';
 
         $this->loadEntries();
+        $this->loadPlannedEntries();
+        $this->loadCurrentPlanned();
         $this->open = true;
     }
 
@@ -75,7 +82,7 @@ class ModalTimeEntry extends Component
     public function close(): void
     {
         $this->resetValidation();
-        $this->reset('open', 'contextType', 'contextId', 'linkedContexts', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries');
+        $this->reset('open', 'contextType', 'contextId', 'linkedContexts', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote');
     }
 
     #[On('time-entry:saved')]
@@ -191,6 +198,99 @@ class ModalTimeEntry extends Component
         $this->dispatch('notify', [
             'type' => 'success',
             'message' => 'Zeiteintrag gelöscht.',
+        ]);
+    }
+
+    protected function loadPlannedEntries(): void
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            $this->plannedEntries = collect();
+            return;
+        }
+
+        $this->plannedEntries = CoreTimePlanned::query()
+            ->forContextKey($this->contextType, $this->contextId)
+            ->with('user')
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get();
+    }
+
+    protected function loadCurrentPlanned(): void
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            $this->plannedMinutes = null;
+            return;
+        }
+
+        $current = CoreTimePlanned::query()
+            ->forContextKey($this->contextType, $this->contextId)
+            ->active()
+            ->first();
+
+        $this->plannedMinutes = $current?->planned_minutes;
+        $this->plannedNote = $current?->note;
+    }
+
+    public function getCurrentPlannedMinutesProperty(): ?int
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            return null;
+        }
+
+        $current = CoreTimePlanned::query()
+            ->forContextKey($this->contextType, $this->contextId)
+            ->active()
+            ->first();
+
+        return $current?->planned_minutes;
+    }
+
+    public function savePlanned(): void
+    {
+        if (! Auth::check() || ! Auth::user()->currentTeam) {
+            $this->addError('plannedMinutes', 'Kein Team-Kontext vorhanden.');
+            return;
+        }
+
+        $this->validate([
+            'plannedMinutes' => ['required', 'integer', 'min:1'],
+            'plannedNote' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+
+        $contextClass = $this->contextType;
+        $context = $contextClass::find($this->contextId);
+
+        if (! $context) {
+            $this->addError('plannedMinutes', 'Kontext nicht gefunden.');
+            return;
+        }
+
+        if (property_exists($context, 'team_id') && (int) $context->team_id !== $team->id) {
+            $this->addError('plannedMinutes', 'Kontext gehört nicht zu Ihrem Team.');
+            return;
+        }
+
+        CoreTimePlanned::create([
+            'team_id' => $team->id,
+            'user_id' => $user->id,
+            'context_type' => $this->contextType,
+            'context_id' => $this->contextId,
+            'planned_minutes' => (int) $this->plannedMinutes,
+            'note' => $this->plannedNote,
+            'is_active' => true,
+        ]);
+
+        $this->loadPlannedEntries();
+        $this->loadCurrentPlanned();
+        $this->resetValidation();
+
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => 'Soll-Zeit aktualisiert.',
         ]);
     }
 

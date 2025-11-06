@@ -40,6 +40,18 @@
                     Übersicht
                 </span>
             </button>
+            <button
+                @click="activeTab = 'planned'"
+                :class="activeTab === 'planned' 
+                    ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] font-semibold' 
+                    : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]'"
+                class="px-4 py-2 text-sm transition-colors"
+            >
+                <span class="inline-flex items-center gap-2">
+                    @svg('heroicon-o-calendar-days', 'w-4 h-4')
+                    Soll-Zeit
+                </span>
+            </button>
         </div>
 
         <!-- Tab Content: Entry -->
@@ -223,6 +235,137 @@
                 </div>
             </div>
         </div>
+
+        <!-- Tab Content: Planned -->
+        <div x-show="activeTab === 'planned'" x-cloak>
+            <div class="space-y-6">
+                <!-- Current Planned Time -->
+                <div class="p-4 bg-gradient-to-br from-[var(--ui-primary-5)] to-[var(--ui-primary-10)] rounded-lg border border-[var(--ui-primary)]/20">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-[var(--ui-secondary)]">Aktuelle Soll-Zeit</span>
+                        @if($this->currentPlannedMinutes)
+                            <span class="text-2xl font-bold text-[var(--ui-primary)]">{{ number_format($this->currentPlannedMinutes / 60, 2, ',', '.') }} h</span>
+                        @else
+                            <span class="text-lg font-semibold text-[var(--ui-muted)]">Nicht gesetzt</span>
+                        @endif
+                    </div>
+                    @if($this->currentPlannedMinutes && $this->totalMinutes)
+                        @php
+                            $progress = min(100, ($this->totalMinutes / $this->currentPlannedMinutes) * 100);
+                            $isOver = $this->totalMinutes > $this->currentPlannedMinutes;
+                        @endphp
+                        <div class="mt-3">
+                            <div class="flex items-center justify-between text-xs text-[var(--ui-muted)] mb-1">
+                                <span>Erfasst: {{ number_format($this->totalMinutes / 60, 2, ',', '.') }} h</span>
+                                <span class="{{ $isOver ? 'text-[var(--ui-danger)]' : 'text-[var(--ui-success)]' }}">
+                                    {{ $isOver ? '+' : '' }}{{ number_format(($this->totalMinutes - $this->currentPlannedMinutes) / 60, 2, ',', '.') }} h
+                                </span>
+                            </div>
+                            <div class="w-full bg-[var(--ui-muted-5)] rounded-full h-2 overflow-hidden">
+                                <div 
+                                    class="h-2 rounded-full transition-all duration-300 {{ $isOver ? 'bg-[var(--ui-danger)]' : 'bg-[var(--ui-primary)]' }}"
+                                    style="width: {{ min(100, $progress) }}%"
+                                ></div>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                <!-- Update Form -->
+                <div class="rounded-lg border border-[var(--ui-border)]/60 p-4">
+                    <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">Soll-Zeit aktualisieren</h4>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">
+                                Geplante Stunden
+                            </label>
+                            <div class="grid grid-cols-4 gap-2 mb-2">
+                                @foreach([1, 2, 4, 8] as $quickHours)
+                                    <button
+                                        type="button"
+                                        wire:click="$set('plannedMinutes', {{ $quickHours * 60 }})"
+                                        class="px-3 py-2 rounded-lg border-2 font-semibold transition-all duration-200 hover:scale-105 text-sm {{ $plannedMinutes === ($quickHours * 60) ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)]' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/40' }}"
+                                    >
+                                        {{ $quickHours }}h
+                                    </button>
+                                @endforeach
+                            </div>
+                            <input
+                                type="number"
+                                wire:model.live="plannedMinutes"
+                                min="1"
+                                step="15"
+                                placeholder="Minuten eingeben (z. B. 120 für 2 Stunden)"
+                                class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]/20 focus:border-[var(--ui-primary)]"
+                            />
+                            @error('plannedMinutes')
+                                <p class="mt-1 text-xs text-[var(--ui-danger)]">{{ $message }}</p>
+                            @enderror
+                            @if($plannedMinutes)
+                                <p class="mt-1 text-xs text-[var(--ui-muted)]">{{ number_format($plannedMinutes / 60, 2, ',', '.') }} Stunden</p>
+                            @endif
+                        </div>
+
+                        <div>
+                            <x-ui-input-textarea
+                                name="plannedNote"
+                                label="Notiz (optional)"
+                                wire:model.live="plannedNote"
+                                rows="2"
+                                placeholder="Grund für die Änderung der Soll-Zeit"
+                                :errorKey="'plannedNote'"
+                            />
+                        </div>
+
+                        <x-ui-button variant="primary" wire:click="savePlanned" wire:loading.attr="disabled" class="w-full">
+                            <span wire:loading.remove wire:target="savePlanned">Soll-Zeit speichern</span>
+                            <span wire:loading wire:target="savePlanned" class="inline-flex items-center gap-2">
+                                @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
+                                Speichern…
+                            </span>
+                        </x-ui-button>
+                    </div>
+                </div>
+
+                <!-- History -->
+                <div class="rounded-lg border border-[var(--ui-border)]/60 overflow-hidden">
+                    <div class="px-4 py-3 bg-[var(--ui-muted-5)] border-b border-[var(--ui-border)]/60">
+                        <h4 class="text-sm font-semibold text-[var(--ui-secondary)]">Verlauf</h4>
+                    </div>
+                    <div class="divide-y divide-[var(--ui-border)]/40">
+                        @forelse($plannedEntries ?? [] as $planned)
+                            <div class="flex flex-col gap-2 px-4 py-3 hover:bg-[var(--ui-muted-5)]/50 transition-colors sm:flex-row sm:items-center sm:justify-between">
+                                <div class="flex-1 flex flex-col gap-1">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-semibold text-[var(--ui-secondary)]">{{ number_format($planned->planned_minutes / 60, 2, ',', '.') }} h</span>
+                                        @if($planned->is_active)
+                                            <span class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold bg-[var(--ui-success-10)] border-[var(--ui-success)]/40 text-[var(--ui-success)]">
+                                                @svg('heroicon-o-check-circle', 'w-3 h-3')
+                                                Aktuell
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div class="text-xs text-[var(--ui-muted)] flex flex-wrap items-center gap-2">
+                                        <span>{{ $planned->created_at?->format('d.m.Y H:i') }}</span>
+                                        <span>• {{ $planned->user?->name ?? 'Unbekannt' }}</span>
+                                    </div>
+                                    @if($planned->note)
+                                        <div class="text-xs text-[var(--ui-muted)] italic mt-1">{{ $planned->note }}</div>
+                                    @endif
+                                </div>
+                            </div>
+                        @empty
+                            <div class="px-4 py-8 text-center">
+                                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-[var(--ui-muted-5)] flex items-center justify-center">
+                                    @svg('heroicon-o-calendar-days', 'w-6 h-6 text-[var(--ui-muted)]')
+                                </div>
+                                <p class="text-sm text-[var(--ui-muted)]">Noch keine Soll-Zeit gesetzt.</p>
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <x-slot name="footer">
@@ -244,6 +387,18 @@
                 >
                     <span wire:loading.remove wire:target="save">Zeit erfassen</span>
                     <span wire:loading wire:target="save" class="inline-flex items-center gap-2">
+                        @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
+                        Speichern…
+                    </span>
+                </x-ui-button>
+                <x-ui-button 
+                    variant="primary" 
+                    wire:click="savePlanned" 
+                    wire:loading.attr="disabled"
+                    x-show="activeTab === 'planned'"
+                >
+                    <span wire:loading.remove wire:target="savePlanned">Soll-Zeit speichern</span>
+                    <span wire:loading wire:target="savePlanned" class="inline-flex items-center gap-2">
                         @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
                         Speichern…
                     </span>
