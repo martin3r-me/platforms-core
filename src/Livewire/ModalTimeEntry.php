@@ -28,6 +28,10 @@ class ModalTimeEntry extends Component
     public ?string $rate = null;
     public ?string $note = null;
 
+    public string $activeTab = 'entry'; // 'entry' or 'overview'
+
+    public $entries = [];
+
     protected array $minuteOptions = [15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 420, 480];
 
     #[On('time-entry:open')]
@@ -61,7 +65,9 @@ class ModalTimeEntry extends Component
         $this->minutes = $payload['minutes'] ?? 60;
         $this->rate = $payload['rate'] ?? null;
         $this->note = $payload['note'] ?? null;
+        $this->activeTab = 'entry';
 
+        $this->loadEntries();
         $this->open = true;
     }
 
@@ -69,7 +75,123 @@ class ModalTimeEntry extends Component
     public function close(): void
     {
         $this->resetValidation();
-        $this->reset('open', 'contextType', 'contextId', 'linkedContexts', 'workDate', 'minutes', 'rate', 'note');
+        $this->reset('open', 'contextType', 'contextId', 'linkedContexts', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries');
+    }
+
+    #[On('time-entry:saved')]
+    public function reload(): void
+    {
+        $this->loadEntries();
+        $this->activeTab = 'overview';
+        $this->resetValidation();
+        $this->reset('workDate', 'minutes', 'rate', 'note');
+        $this->workDate = now()->toDateString();
+        $this->minutes = 60;
+    }
+
+    protected function loadEntries(): void
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            $this->entries = collect();
+            return;
+        }
+
+        $this->entries = CoreTimeEntry::query()
+            ->forContextKey($this->contextType, $this->contextId)
+            ->with('user')
+            ->orderByDesc('work_date')
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get();
+    }
+
+    public function getTotalMinutesProperty(): int
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            return 0;
+        }
+
+        return (int) CoreTimeEntry::query()->forContextKey($this->contextType, $this->contextId)->sum('minutes');
+    }
+
+    public function getBilledMinutesProperty(): int
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            return 0;
+        }
+
+        return (int) CoreTimeEntry::query()->forContextKey($this->contextType, $this->contextId)->where('is_billed', true)->sum('minutes');
+    }
+
+    public function getUnbilledMinutesProperty(): int
+    {
+        return max(0, $this->totalMinutes - $this->billedMinutes);
+    }
+
+    public function getUnbilledAmountCentsProperty(): int
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            return 0;
+        }
+
+        return (int) CoreTimeEntry::query()
+            ->forContextKey($this->contextType, $this->contextId)
+            ->where('is_billed', false)
+            ->sum('amount_cents');
+    }
+
+    public function toggleBilled(int $entryId): void
+    {
+        $entry = CoreTimeEntry::query()
+            ->forContextKey($this->contextType, $this->contextId)
+            ->findOrFail($entryId);
+
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+
+        if (! $team || $entry->team_id !== $team->id) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Sie haben keine Berechtigung für diesen Eintrag.',
+            ]);
+            return;
+        }
+
+        $entry->is_billed = ! $entry->is_billed;
+        $entry->save();
+
+        $this->loadEntries();
+
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => $entry->is_billed ? 'Eintrag als abgerechnet markiert.' : 'Eintrag wieder auf offen gesetzt.',
+        ]);
+    }
+
+    public function deleteEntry(int $entryId): void
+    {
+        $entry = CoreTimeEntry::query()
+            ->forContextKey($this->contextType, $this->contextId)
+            ->findOrFail($entryId);
+
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+
+        if (! $team || $entry->team_id !== $team->id) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Sie haben keine Berechtigung für diesen Eintrag.',
+            ]);
+            return;
+        }
+
+        $entry->delete();
+        $this->loadEntries();
+
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => 'Zeiteintrag gelöscht.',
+        ]);
     }
 
     public function getMinuteOptionsProperty(): array
@@ -158,8 +280,12 @@ class ModalTimeEntry extends Component
 
         $this->dispatch('time-entry:saved', id: $entry->id);
 
-        $this->reset('open');
+        $this->loadEntries();
+        $this->activeTab = 'overview';
         $this->resetValidation();
+        $this->reset('workDate', 'minutes', 'rate', 'note');
+        $this->workDate = now()->toDateString();
+        $this->minutes = 60;
 
         $this->dispatch('notify', [
             'type' => 'success',
