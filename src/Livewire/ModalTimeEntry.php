@@ -39,6 +39,21 @@ class ModalTimeEntry extends Component
 
     protected array $minuteOptions = [15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 420, 480];
 
+    #[On('time-entry-context:set')]
+    public function setContext(array $payload): void
+    {
+        $this->contextType = $payload['context_type'] ?? null;
+        $this->contextId = isset($payload['context_id']) ? (int) $payload['context_id'] : null;
+        $this->linkedContexts = $payload['linked_contexts'] ?? [];
+
+        // Wenn Modal bereits offen ist, Daten neu laden
+        if ($this->open && $this->contextType && $this->contextId) {
+            $this->loadEntries();
+            $this->loadPlannedEntries();
+            $this->loadCurrentPlanned();
+        }
+    }
+
     #[On('time-entry:open')]
     public function open(array $payload = []): void
     {
@@ -46,10 +61,7 @@ class ModalTimeEntry extends Component
             return;
         }
 
-        $this->contextType = $payload['context_type'] ?? null;
-        $this->contextId = isset($payload['context_id']) ? (int) $payload['context_id'] : null;
-        $this->linkedContexts = $payload['linked_contexts'] ?? [];
-
+        // Kontext wurde bereits durch time-entry-context:set Event gesetzt
         // Wenn kein Kontext vorhanden, Modal trotzdem öffnen (Fallback-Modus)
         if (! $this->contextType || ! $this->contextId) {
             $this->workDate = now()->toDateString();
