@@ -1,5 +1,5 @@
 @auth
-<x-ui-modal size="md" model="open" :closeButton="true" x-on:close-modal-time-entry.window="$wire.close()">
+<x-ui-modal size="md" wire:model="open" :closeButton="true" x-on:close-modal-time-entry.window="$wire.close()">
     <x-slot name="title">
         Zeit erfassen
     </x-slot>
