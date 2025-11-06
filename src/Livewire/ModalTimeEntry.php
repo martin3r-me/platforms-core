@@ -41,7 +41,15 @@ class ModalTimeEntry extends Component
         $this->contextId = isset($payload['context_id']) ? (int) $payload['context_id'] : null;
         $this->linkedContexts = $payload['linked_contexts'] ?? [];
 
-        if (! $this->contextType || ! class_exists($this->contextType) || ! $this->contextSupportsTimeEntries($this->contextType)) {
+        if (! $this->contextType || ! $this->contextId) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Kein Kontext für Zeiterfassung angegeben.',
+            ]);
+            return;
+        }
+
+        if (! class_exists($this->contextType) || ! $this->contextSupportsTimeEntries($this->contextType)) {
             $this->dispatch('notify', [
                 'type' => 'error',
                 'message' => 'Dieser Kontext unterstützt keine Zeiterfassung.',
