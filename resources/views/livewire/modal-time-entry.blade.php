@@ -52,7 +52,7 @@
             <x-ui-button variant="primary" wire:click="save" wire:loading.attr="disabled">
                 <span wire:loading.remove wire:target="save">Speichern</span>
                 <span wire:loading wire:target="save" class="inline-flex items-center gap-2">
-                    <x-ui-icon name="heroicon-o-arrow-path" class="w-4 h-4 animate-spin" />
+                    @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
                     Speichern…
                 </span>
             </x-ui-button>
