@@ -44,9 +44,10 @@ class ModalTimeEntry extends Component
         // Initialisierung
     }
 
-    #[On('timeEntryContextSet')]
+    #[On('time')]
     public function setContext(array $payload = []): void
     {
+        dd('time');
         $this->contextType = $payload['context_type'] ?? null;
         $this->contextId = isset($payload['context_id']) ? (int) $payload['context_id'] : null;
         $this->linkedContexts = $payload['linked_contexts'] ?? [];
