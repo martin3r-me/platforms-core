@@ -48,6 +48,7 @@ class ModalTimeEntry extends Component
     {
         \Log::info('ModalTimeEntry: boot() called', [
             'component_id' => $this->getId(),
+            'component_name' => $this->getName(),
         ]);
     }
 
