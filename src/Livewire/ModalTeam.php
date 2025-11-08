@@ -18,6 +18,7 @@ class ModalTeam extends Component
     public $newTeamName = '';
     public $newParentTeamId = null;
     public $availableParentTeams = [];
+    public $currentParentTeamId = null;
     public $inviteEmail = '';
     public $inviteRole = 'member';
     public $team;
@@ -56,6 +57,7 @@ class ModalTeam extends Component
         $this->team = auth()->user()->currentTeam;
         $this->loadTeams();
         $this->loadAvailableParentTeams();
+        $this->loadCurrentParentTeam();
         $this->loadMemberRoles();
         $this->loadBillingData();
         $this->loadBillingTotals();
@@ -66,6 +68,7 @@ class ModalTeam extends Component
         $this->modalShow = true;
         $this->team = auth()->user()->currentTeam;
         $this->loadAvailableParentTeams();
+        $this->loadCurrentParentTeam();
         $this->loadMemberRoles();
     }
 
@@ -83,19 +86,120 @@ class ModalTeam extends Component
     public function loadAvailableParentTeams()
     {
         $user = auth()->user();
-        $this->availableParentTeams = Team::whereHas('users', function ($query) use ($user) {
+        $currentTeamId = $this->team?->id;
+        $currentParentTeamId = $this->team?->parent_team_id;
+        
+        $query = Team::whereHas('users', function ($query) use ($user) {
             $query->where('user_id', $user->id);
         })
         ->whereNull('parent_team_id') // Nur Root-Teams
-        ->where('id', '!=', $user->currentTeam?->id) // Aktuelles Team ausschließen (kann nicht Parent von sich selbst sein)
-        ->get()
-        ->map(function ($team) {
-            return [
-                'id' => $team->id,
-                'name' => $team->name,
-            ];
-        })
-        ->toArray();
+        ->when($currentTeamId, function ($query) use ($currentTeamId) {
+            $query->where('id', '!=', $currentTeamId); // Aktuelles Team ausschließen
+        });
+        
+        // Wenn bereits ein Parent-Team gesetzt ist, dieses auch in die Liste aufnehmen
+        if ($currentParentTeamId) {
+            $query->orWhere('id', $currentParentTeamId);
+        }
+        
+        $this->availableParentTeams = $query
+            ->get()
+            ->unique('id')
+            ->map(function ($team) {
+                return [
+                    'id' => $team->id,
+                    'name' => $team->name,
+                ];
+            })
+            ->toArray();
+    }
+
+    /**
+     * Lädt das aktuelle Parent-Team des Teams.
+     */
+    public function loadCurrentParentTeam()
+    {
+        $this->currentParentTeamId = $this->team?->parent_team_id;
+    }
+
+    /**
+     * Aktualisiert das Parent-Team (nur für Team-Owner).
+     */
+    public function updateParentTeam($parentTeamId = null)
+    {
+        $team = auth()->user()->currentTeam;
+        if (!$team) {
+            return;
+        }
+
+        // Nur Owner darf Parent-Team ändern
+        if ($team->user_id !== auth()->id()) {
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'Nur der Team-Owner kann das Parent-Team ändern.'
+            ]);
+            return;
+        }
+
+        // Konvertiere leeren String zu null
+        if ($parentTeamId === '' || $parentTeamId === 'null') {
+            $parentTeamId = null;
+        }
+
+        // Validierung (nur wenn ein Parent-Team gesetzt werden soll)
+        if ($parentTeamId) {
+            $parentTeam = Team::find($parentTeamId);
+            
+            if (!$parentTeam) {
+                $this->dispatch('notice', [
+                    'type' => 'error',
+                    'message' => 'Das ausgewählte Parent-Team existiert nicht.'
+                ]);
+                return;
+            }
+
+            // Prüfe ob es ein Root-Team ist
+            if ($parentTeam->parent_team_id !== null) {
+                $this->dispatch('notice', [
+                    'type' => 'error',
+                    'message' => 'Nur Root-Teams können als Parent-Team verwendet werden.'
+                ]);
+                return;
+            }
+
+            // Prüfe ob User Zugriff auf das Parent-Team hat
+            $user = auth()->user();
+            if (!$parentTeam->users()->where('user_id', $user->id)->exists()) {
+                $this->dispatch('notice', [
+                    'type' => 'error',
+                    'message' => 'Du hast keinen Zugriff auf das ausgewählte Parent-Team.'
+                ]);
+                return;
+            }
+
+            // Prüfe auf zirkuläre Referenzen (Team kann nicht Parent von sich selbst oder einem Kind sein)
+            if ($parentTeam->id === $team->id || $parentTeam->isChildOf($team)) {
+                $this->dispatch('notice', [
+                    'type' => 'error',
+                    'message' => 'Zirkuläre Referenz: Ein Team kann nicht Parent von sich selbst oder einem Kind-Team sein.'
+                ]);
+                return;
+            }
+        }
+
+        // Update durchführen
+        $team->parent_team_id = $parentTeamId ?: null;
+        $team->save();
+
+        // Team neu laden, damit Änderungen sichtbar sind
+        $this->team = $team->fresh();
+        $this->currentParentTeamId = $this->team->parent_team_id;
+        $this->loadAvailableParentTeams(); // Neu laden, da sich die Hierarchie geändert haben könnte
+
+        $this->dispatch('notice', [
+            'type' => 'success',
+            'message' => 'Parent-Team erfolgreich aktualisiert.'
+        ]);
     }
 
     public function createTeam()

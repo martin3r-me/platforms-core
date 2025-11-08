@@ -69,8 +69,41 @@
                 </form>
             </div>
 
-            {{-- Team Members --}}
+            {{-- Team Settings (nur für Owner) --}}
             @isset($team)
+            @if(($team->user_id ?? null) === auth()->id())
+            <div>
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Team-Einstellungen</h3>
+                <div class="space-y-4 p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                    @if(!empty($availableParentTeams) && count($availableParentTeams) > 0)
+                        <div>
+                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">
+                                Parent-Team
+                            </label>
+                            <x-ui-input-select
+                                name="currentParentTeamId"
+                                :options="$availableParentTeams"
+                                optionValue="id"
+                                optionLabel="name"
+                                :nullable="true"
+                                wire:model.live="currentParentTeamId"
+                                x-data
+                                @change="$wire.updateParentTeam($event.target.value)"
+                            />
+                            <p class="text-xs text-[var(--ui-muted)] mt-2">
+                                Optional: Wähle ein Root-Team als Parent-Team. Kind-Teams erben Zugriff auf root-scoped Module (z.B. CRM, Organization).
+                            </p>
+                        </div>
+                    @else
+                        <div class="text-sm text-[var(--ui-muted)]">
+                            Keine verfügbaren Parent-Teams. Erstelle zuerst ein Root-Team.
+                        </div>
+                    @endif
+                </div>
+            </div>
+            @endif
+
+            {{-- Team Members --}}
             <div>
                 <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Team-Mitglieder</h3>
                 <div class="space-y-3">
