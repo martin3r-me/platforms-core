@@ -43,18 +43,9 @@ class ModalTimeEntry extends Component
     }
 
     #[On('time-entry')]
-    public function setContext(array $payload = []): void
+    public function setContext(): void
     {
-        $this->contextType = $payload['context_type'] ?? null;
-        $this->contextId = isset($payload['context_id']) ? (int) $payload['context_id'] : null;
-        $this->linkedContexts = $payload['linked_contexts'] ?? [];
-
-        // Wenn Modal bereits offen ist, Daten neu laden
-        if ($this->open && $this->contextType && $this->contextId) {
-            $this->loadEntries();
-            $this->loadPlannedEntries();
-            $this->loadCurrentPlanned();
-        }
+        dd('time-entry event received');
     }
 
     #[On('time-entry:open')]
