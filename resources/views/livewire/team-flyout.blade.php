@@ -5,7 +5,7 @@
     
     <button @click="teamFlyoutOpen = !teamFlyoutOpen" 
         class="inline-flex items-center gap-1 px-2 py-1 h-7 rounded-md border transition text-xs
-        {{ $isParentModule ? 'text-[var(--ui-secondary)] bg-[var(--ui-muted-5)] border-[var(--ui-border)]/60' : 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)] border-[var(--ui-primary)]/60' }}"
+        {{ $isParentModule ? 'text-[var(--ui-on-warning)] bg-[var(--ui-warning)] border-[var(--ui-warning)]/60' : 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)] border-[var(--ui-primary)]/60' }}"
         title="Team wechseln">
         <span class="truncate max-w-[12rem] flex items-center gap-1">
             @if($baseTeam)
