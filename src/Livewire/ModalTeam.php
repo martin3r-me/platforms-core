@@ -137,9 +137,11 @@ class ModalTeam extends Component
             return;
         }
 
-        // Konvertiere leeren String zu null
-        if ($parentTeamId === '' || $parentTeamId === 'null') {
+        // Konvertiere leeren String zu null und String zu Integer
+        if ($parentTeamId === '' || $parentTeamId === 'null' || $parentTeamId === null) {
             $parentTeamId = null;
+        } else {
+            $parentTeamId = (int) $parentTeamId;
         }
 
         // Validierung (nur wenn ein Parent-Team gesetzt werden soll)

@@ -82,7 +82,7 @@
                                 name="currentParentTeamId"
                                 :options="$availableParentTeams"
                                 :nullable="true"
-                                wire:model.live="currentParentTeamId"
+                                :value="$currentParentTeamId"
                                 x-data
                                 @change="$wire.updateParentTeam($event.target.value)"
                             />
