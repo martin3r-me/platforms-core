@@ -102,15 +102,11 @@ class ModalTeam extends Component
             $query->orWhere('id', $currentParentTeamId);
         }
         
+        // Als Key-Value Array für die Select-Komponente: [id => name, ...]
         $this->availableParentTeams = $query
             ->get()
             ->unique('id')
-            ->map(function ($team) {
-                return [
-                    'id' => $team->id,
-                    'name' => $team->name,
-                ];
-            })
+            ->pluck('name', 'id')
             ->toArray();
     }
 

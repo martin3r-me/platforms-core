@@ -55,8 +55,6 @@
                             name="newParentTeamId"
                             label="Parent-Team (optional)"
                             :options="$availableParentTeams"
-                            optionValue="id"
-                            optionLabel="name"
                             :nullable="true"
                             wire:model.live="newParentTeamId"
                             :errorKey="'newParentTeamId'"
@@ -83,8 +81,6 @@
                             <x-ui-input-select
                                 name="currentParentTeamId"
                                 :options="$availableParentTeams"
-                                optionValue="id"
-                                optionLabel="name"
                                 :nullable="true"
                                 wire:model.live="currentParentTeamId"
                                 x-data
