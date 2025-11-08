@@ -34,6 +34,7 @@ class ModalTimeEntry extends Component
 
     public $entries = [];
     public $plannedEntries = [];
+    public $teamEntries = [];
 
     public ?int $plannedMinutes = null;
     public ?string $plannedNote = null;
@@ -139,6 +140,9 @@ class ModalTimeEntry extends Component
                 $this->loadPlannedEntries();
                 $this->loadCurrentPlanned();
             }
+        } else {
+            // Kein Kontext: Team-Übersicht laden
+            $this->loadTeamEntries();
         }
 
         $this->open = true;
@@ -164,6 +168,60 @@ class ModalTimeEntry extends Component
             ->orderByDesc('id')
             ->limit(50)
             ->get();
+    }
+
+    protected function loadTeamEntries(): void
+    {
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+
+        if (! $team) {
+            $this->teamEntries = collect();
+            return;
+        }
+
+        $this->teamEntries = CoreTimeEntry::query()
+            ->where('team_id', $team->id)
+            ->with('user')
+            ->with('additionalContexts')
+            ->orderByDesc('work_date')
+            ->orderByDesc('id')
+            ->limit(100)
+            ->get();
+    }
+
+    public function getTeamTotalMinutesProperty(): int
+    {
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+
+        if (! $team) {
+            return 0;
+        }
+
+        return (int) CoreTimeEntry::query()
+            ->where('team_id', $team->id)
+            ->sum('minutes');
+    }
+
+    public function getTeamBilledMinutesProperty(): int
+    {
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+
+        if (! $team) {
+            return 0;
+        }
+
+        return (int) CoreTimeEntry::query()
+            ->where('team_id', $team->id)
+            ->where('is_billed', true)
+            ->sum('minutes');
+    }
+
+    public function getTeamUnbilledMinutesProperty(): int
+    {
+        return max(0, $this->teamTotalMinutes - $this->teamBilledMinutes);
     }
 
     public function getTotalMinutesProperty(): int

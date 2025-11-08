@@ -32,15 +32,131 @@
 
     <div>
         @if(!$contextType || !$contextId)
-            <!-- Fallback: Kein Kontext -->
-            <div class="py-16 text-center">
-                <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-[var(--ui-muted-5)] to-[var(--ui-muted-10)] flex items-center justify-center shadow-sm">
-                    @svg('heroicon-o-information-circle', 'w-10 h-10 text-[var(--ui-muted)]')
+            <!-- Team-Übersicht: Kein Kontext -->
+            <div class="space-y-6">
+                <!-- Statistics -->
+                <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="p-5 bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 shadow-sm">
+                        <div class="text-xs font-semibold text-[var(--ui-muted)] uppercase tracking-wide mb-2">Gesamt</div>
+                        <div class="text-3xl font-bold text-[var(--ui-secondary)]">{{ number_format($this->teamTotalMinutes / 60, 2, ',', '.') }} <span class="text-lg text-[var(--ui-muted)]">h</span></div>
+                    </div>
+                    <div class="p-5 bg-gradient-to-br from-[var(--ui-success-5)] to-[var(--ui-success-10)] rounded-xl border border-[var(--ui-success)]/30 shadow-sm">
+                        <div class="text-xs font-semibold text-[var(--ui-success)] uppercase tracking-wide mb-2">Abgerechnet</div>
+                        <div class="text-3xl font-bold text-[var(--ui-success)]">{{ number_format($this->teamBilledMinutes / 60, 2, ',', '.') }} <span class="text-lg text-[var(--ui-success)]/70">h</span></div>
+                    </div>
+                    <div class="p-5 bg-gradient-to-br from-[var(--ui-warning-5)] to-[var(--ui-warning-10)] rounded-xl border border-[var(--ui-warning)]/30 shadow-sm">
+                        <div class="text-xs font-semibold text-[var(--ui-warning)] uppercase tracking-wide mb-2">Offen</div>
+                        <div class="text-3xl font-bold text-[var(--ui-warning)]">{{ number_format($this->teamUnbilledMinutes / 60, 2, ',', '.') }} <span class="text-lg text-[var(--ui-warning)]/70">h</span></div>
+                    </div>
                 </div>
-                <h4 class="text-xl font-bold text-[var(--ui-secondary)] mb-3">Kein Kontext verfügbar</h4>
-                <p class="text-sm text-[var(--ui-muted)] max-w-md mx-auto leading-relaxed">
-                    Die Zeiterfassung ist nur im Kontext einer Aufgabe, eines Projekts oder eines anderen Elements verfügbar. Bitte öffnen Sie eine entsprechende Seite, um Zeiten zu erfassen.
-                </p>
+
+                <!-- Team Entries Table -->
+                <div class="flow-root">
+                    <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                        <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+                            <div class="overflow-hidden rounded-xl border border-[var(--ui-border)]/60 shadow-sm">
+                                <table class="min-w-full divide-y divide-[var(--ui-border)]/40">
+                                    <thead class="bg-[var(--ui-muted-5)]">
+                                        <tr>
+                                            <th scope="col" class="py-4 pl-6 pr-3 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                                Datum
+                                            </th>
+                                            <th scope="col" class="px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                                Kontext
+                                            </th>
+                                            <th scope="col" class="px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                                Dauer
+                                            </th>
+                                            <th scope="col" class="px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                                Betrag
+                                            </th>
+                                            <th scope="col" class="px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                                Benutzer
+                                            </th>
+                                            <th scope="col" class="px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                                Status
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-[var(--ui-border)]/40 bg-[var(--ui-surface)]">
+                                        @forelse($teamEntries ?? [] as $entry)
+                                            @php
+                                                $primaryContext = $entry->additionalContexts->where('is_primary', true)->first();
+                                                $contextLabel = $primaryContext?->context_label ?? 'Unbekannt';
+                                                $contextType = $primaryContext ? class_basename($primaryContext->context_type) : '';
+                                            @endphp
+                                            <tr class="hover:bg-[var(--ui-muted-5)]/50 transition-colors">
+                                                <td class="whitespace-nowrap py-5 pl-6 pr-3 text-sm">
+                                                    <div class="font-semibold text-[var(--ui-secondary)]">{{ $entry->work_date?->format('d.m.Y') }}</div>
+                                                    <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ $entry->work_date?->format('l') }}</div>
+                                                </td>
+                                                <td class="whitespace-nowrap px-3 py-5 text-sm">
+                                                    <div class="font-medium text-[var(--ui-secondary)]">{{ $contextLabel }}</div>
+                                                    @if($contextType)
+                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ $contextType }}</div>
+                                                    @endif
+                                                </td>
+                                                <td class="whitespace-nowrap px-3 py-5 text-sm">
+                                                    <div class="font-medium text-[var(--ui-secondary)]">{{ number_format($entry->minutes / 60, 2, ',', '.') }} h</div>
+                                                    @if($entry->rate_cents)
+                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ number_format($entry->rate_cents / 100, 2, ',', '.') }} €/h</div>
+                                                    @endif
+                                                </td>
+                                                <td class="whitespace-nowrap px-3 py-5 text-sm">
+                                                    @if($entry->amount_cents)
+                                                        <div class="font-semibold text-[var(--ui-secondary)]">{{ number_format($entry->amount_cents / 100, 2, ',', '.') }} €</div>
+                                                    @else
+                                                        <span class="text-[var(--ui-muted)]">–</span>
+                                                    @endif
+                                                </td>
+                                                <td class="whitespace-nowrap px-3 py-5 text-sm">
+                                                    <div class="flex items-center">
+                                                        <div class="size-9 shrink-0 rounded-full bg-gradient-to-br from-[var(--ui-primary-10)] to-[var(--ui-primary-5)] flex items-center justify-center border border-[var(--ui-border)]/40">
+                                                            <span class="text-xs font-bold text-[var(--ui-primary)]">
+                                                                {{ strtoupper(substr($entry->user?->name ?? 'U', 0, 1)) }}
+                                                            </span>
+                                                        </div>
+                                                        <div class="ml-3">
+                                                            <div class="font-medium text-[var(--ui-secondary)]">{{ $entry->user?->name ?? 'Unbekannt' }}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="whitespace-nowrap px-3 py-5 text-sm">
+                                                    <span class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset {{ $entry->is_billed ? 'bg-[var(--ui-success-10)] text-[var(--ui-success)] ring-[var(--ui-success)]/20' : 'bg-[var(--ui-warning-10)] text-[var(--ui-warning)] ring-[var(--ui-warning)]/20' }}">
+                                                        @if($entry->is_billed)
+                                                            @svg('heroicon-o-check-circle', 'w-3.5 h-3.5')
+                                                            Abgerechnet
+                                                        @else
+                                                            @svg('heroicon-o-exclamation-circle', 'w-3.5 h-3.5')
+                                                            Offen
+                                                        @endif
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            @if($entry->note)
+                                                <tr>
+                                                    <td colspan="6" class="px-6 py-2 bg-[var(--ui-muted-5)]/30">
+                                                        <div class="text-xs text-[var(--ui-muted)] italic">{{ $entry->note }}</div>
+                                                    </td>
+                                                </tr>
+                                            @endif
+                                        @empty
+                                            <tr>
+                                                <td colspan="6" class="px-6 py-12 text-center">
+                                                    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-muted-5)] flex items-center justify-center">
+                                                        @svg('heroicon-o-clock', 'w-8 h-8 text-[var(--ui-muted)]')
+                                                    </div>
+                                                    <p class="text-sm font-medium text-[var(--ui-secondary)]">Noch keine Zeiten erfasst</p>
+                                                    <p class="text-xs text-[var(--ui-muted)] mt-1">Öffnen Sie eine Aufgabe oder ein Projekt, um Zeiten zu erfassen.</p>
+                                                </td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         @else
             <!-- Tabs -->
@@ -124,9 +240,7 @@
                         <x-ui-input-select
                             name="minutes"
                             label="Dauer"
-                            :options="collect($this->minuteOptions)->map(fn($m) => ['value' => $m, 'label' => number_format($m / 60, 2, ',', '.') . ' h'])->toArray()"
-                            optionValue="value"
-                            optionLabel="label"
+                            :options="collect($this->minuteOptions)->mapWithKeys(fn($m) => [$m => number_format($m / 60, 2, ',', '.') . ' h'])->toArray()"
                             :nullable="false"
                             wire:model.live="minutes"
                             :errorKey="'minutes'"
