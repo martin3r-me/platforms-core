@@ -30,7 +30,8 @@ class ModalTimeEntry extends Component
     public ?string $rate = null;
     public ?string $note = null;
 
-    public string $activeTab = 'entry'; // 'entry', 'overview', or 'planned'
+    public string $activeTab = 'entry'; // 'entry', 'overview', 'planned', or 'team'
+    public string $timeRange = 'current_month'; // 'current_week', 'current_month', 'current_year', 'last_week', 'last_month'
 
     public $entries = [];
     public $plannedEntries = [];
@@ -140,10 +141,10 @@ class ModalTimeEntry extends Component
                 $this->loadPlannedEntries();
                 $this->loadCurrentPlanned();
             }
-        } else {
-            // Kein Kontext: Team-Übersicht laden
-            $this->loadTeamEntries();
         }
+        
+        // Team-Übersicht immer laden
+        $this->loadTeamEntries();
 
         $this->open = true;
     }
@@ -180,14 +181,48 @@ class ModalTimeEntry extends Component
             return;
         }
 
-        $this->teamEntries = CoreTimeEntry::query()
+        $query = CoreTimeEntry::query()
             ->where('team_id', $team->id)
             ->with('user')
-            ->with('additionalContexts')
+            ->with('additionalContexts');
+
+        // Zeitraum-Filter anwenden
+        $query = $this->applyTimeRangeFilter($query);
+
+        $this->teamEntries = $query
             ->orderByDesc('work_date')
             ->orderByDesc('id')
-            ->limit(100)
+            ->limit(200)
             ->get();
+    }
+
+    protected function applyTimeRangeFilter($query)
+    {
+        $now = now();
+        
+        return match($this->timeRange) {
+            'current_week' => $query->whereBetween('work_date', [
+                $now->startOfWeek()->toDateString(),
+                $now->endOfWeek()->toDateString()
+            ]),
+            'current_month' => $query->whereBetween('work_date', [
+                $now->startOfMonth()->toDateString(),
+                $now->endOfMonth()->toDateString()
+            ]),
+            'current_year' => $query->whereBetween('work_date', [
+                $now->startOfYear()->toDateString(),
+                $now->endOfYear()->toDateString()
+            ]),
+            'last_week' => $query->whereBetween('work_date', [
+                $now->copy()->subWeek()->startOfWeek()->toDateString(),
+                $now->copy()->subWeek()->endOfWeek()->toDateString()
+            ]),
+            'last_month' => $query->whereBetween('work_date', [
+                $now->copy()->subMonth()->startOfMonth()->toDateString(),
+                $now->copy()->subMonth()->endOfMonth()->toDateString()
+            ]),
+            default => $query,
+        };
     }
 
     public function getTeamTotalMinutesProperty(): int
@@ -199,9 +234,12 @@ class ModalTimeEntry extends Component
             return 0;
         }
 
-        return (int) CoreTimeEntry::query()
-            ->where('team_id', $team->id)
-            ->sum('minutes');
+        $query = CoreTimeEntry::query()
+            ->where('team_id', $team->id);
+        
+        $query = $this->applyTimeRangeFilter($query);
+
+        return (int) $query->sum('minutes');
     }
 
     public function getTeamBilledMinutesProperty(): int
@@ -213,15 +251,34 @@ class ModalTimeEntry extends Component
             return 0;
         }
 
-        return (int) CoreTimeEntry::query()
+        $query = CoreTimeEntry::query()
             ->where('team_id', $team->id)
-            ->where('is_billed', true)
-            ->sum('minutes');
+            ->where('is_billed', true);
+        
+        $query = $this->applyTimeRangeFilter($query);
+
+        return (int) $query->sum('minutes');
     }
 
     public function getTeamUnbilledMinutesProperty(): int
     {
         return max(0, $this->teamTotalMinutes - $this->teamBilledMinutes);
+    }
+
+    public function getTeamPlannedMinutesProperty(): ?int
+    {
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+
+        if (! $team) {
+            return null;
+        }
+
+        // Summe aller aktiven Soll-Zeiten im Team
+        return (int) CoreTimePlanned::query()
+            ->where('team_id', $team->id)
+            ->where('is_active', true)
+            ->sum('planned_minutes');
     }
 
     public function getTotalMinutesProperty(): int
@@ -429,6 +486,11 @@ class ModalTimeEntry extends Component
     public function updatedMinutes($value): void
     {
         $this->minutes = (int) $value;
+    }
+
+    public function updatedTimeRange(): void
+    {
+        $this->loadTeamEntries();
     }
 
     public function save(): void
