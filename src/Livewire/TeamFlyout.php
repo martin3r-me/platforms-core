@@ -12,6 +12,8 @@ class TeamFlyout extends Component
     public $show = false;
     public $userTeams = [];
     public $currentTeam;
+    public $baseTeam; // Das ursprüngliche Team (Child)
+    public $parentTeam; // Das Parent-Team (falls vorhanden)
     public $currentModule;
 
     #[On('open-team-flyout')]
@@ -30,8 +32,23 @@ class TeamFlyout extends Component
     public function loadTeams()
     {
         $user = Auth::user();
-        $this->currentTeam = $user?->currentTeam;
-        $this->userTeams = $user?->teams()->take(4)->get() ?? collect();
+        if (!$user) {
+            return;
+        }
+
+        // Basis-Team (das ursprünglich ausgewählte Team)
+        $this->baseTeam = $user->currentTeamRelation;
+        
+        // Current Team (kann Root-Team sein, wenn in Parent-Modul)
+        $this->currentTeam = $user->currentTeam;
+        
+        // Parent-Team ermitteln (wenn Basis-Team ein Child ist)
+        $this->parentTeam = null;
+        if ($this->baseTeam && $this->baseTeam->parent_team_id) {
+            $this->parentTeam = $this->baseTeam->parentTeam;
+        }
+        
+        $this->userTeams = $user->teams()->take(4)->get() ?? collect();
     }
 
     public function loadCurrentModule()
