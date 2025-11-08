@@ -11,7 +11,10 @@
             @if($baseTeam)
                 <span>{{ $baseTeam->name }}</span>
                 @if($isParentModule && $parentTeam)
-                    <span class="text-[0.5rem] opacity-50 leading-none">({{ $parentTeam->name }})</span>
+                    <span class="text-[0.5rem] opacity-50 leading-none flex items-center gap-0.5">
+                        @svg('heroicon-o-arrow-up', 'w-2.5 h-2.5')
+                        <span>({{ $parentTeam->name }})</span>
+                    </span>
                 @endif
             @else
                 <span>{{ $currentTeam?->name ?? 'Team' }}</span>
