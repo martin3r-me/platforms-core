@@ -10,8 +10,8 @@
         <span class="truncate max-w-[12rem] flex items-center gap-1">
             @if($baseTeam)
                 <span>{{ $baseTeam->name }}</span>
-                @if($parentTeam)
-                    <span class="text-[0.65rem] opacity-60">({{ $parentTeam->name }})</span>
+                @if($isParentModule && $parentTeam)
+                    <span class="text-[0.5rem] opacity-50 leading-none">({{ $parentTeam->name }})</span>
                 @endif
             @else
                 <span>{{ $currentTeam?->name ?? 'Team' }}</span>

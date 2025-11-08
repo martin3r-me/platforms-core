@@ -15,6 +15,7 @@ class TeamFlyout extends Component
     public $baseTeam; // Das ursprüngliche Team (Child)
     public $parentTeam; // Das Parent-Team (falls vorhanden)
     public $currentModule;
+    public $isParentModule = false; // Ob wir in einem Parent-Modul sind
 
     #[On('open-team-flyout')]
     public function openFlyout()
@@ -57,13 +58,17 @@ class TeamFlyout extends Component
         
         if ($currentPath === 'dashboard' || empty($currentPath)) {
             $this->currentModule = 'Dashboard';
+            $this->isParentModule = false;
         } else {
             $moduleModel = \Platform\Core\Models\Module::where('key', $currentPath)->first();
             if ($moduleModel) {
                 $config = is_array($moduleModel->config) ? $moduleModel->config : json_decode($moduleModel->config, true);
                 $this->currentModule = $config['title'] ?? ucfirst($currentPath);
+                // Prüfe ob es ein Parent-Modul ist
+                $this->isParentModule = $moduleModel->isRootScoped();
             } else {
                 $this->currentModule = ucfirst($currentPath);
+                $this->isParentModule = false;
             }
         }
     }
