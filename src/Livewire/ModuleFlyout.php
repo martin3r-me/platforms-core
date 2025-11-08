@@ -43,7 +43,7 @@ class ModuleFlyout extends Component
         $modules = PlatformCore::getVisibleModules();
 
         // Filtere Module nach Berechtigung
-        $this->modules = collect($modules)->filter(function($module) use ($user, $baseTeam, $baseTeamId, $rootTeamId) {
+        $this->modules = collect($modules)->filter(function($module) use ($user, $baseTeam, $baseTeamId, $rootTeam, $rootTeamId) {
             $moduleModel = \Platform\Core\Models\Module::where('key', $module['key'])->first();
             if (!$moduleModel) return false;
 
