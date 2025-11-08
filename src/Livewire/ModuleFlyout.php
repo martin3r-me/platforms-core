@@ -60,15 +60,15 @@ class ModuleFlyout extends Component
                     ->wherePivot('enabled', true)
                     ->exists();
             } else {
-                $userAllowed = $user->modules()
-                    ->where('module_id', $moduleModel->id)
+            $userAllowed = $user->modules()
+                ->where('module_id', $moduleModel->id)
                     ->wherePivot('team_id', $baseTeamId)
                     ->wherePivot('enabled', true)
                     ->exists();
                 $teamAllowed = $baseTeam->modules()
                     ->where('module_id', $moduleModel->id)
-                    ->wherePivot('enabled', true)
-                    ->exists();
+                ->wherePivot('enabled', true)
+                ->exists();
             }
 
             return $userAllowed || $teamAllowed;

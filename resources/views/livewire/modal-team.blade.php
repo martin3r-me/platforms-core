@@ -108,9 +108,9 @@
                                 @if(!empty($member->avatar))
                                     <img src="{{ $member->avatar }}" alt="{{ $member->fullname ?? $member->name }}" class="w-10 h-10 rounded-full object-cover" />
                                 @else
-                                    <div class="w-10 h-10 bg-[var(--ui-primary)] text-[var(--ui-on-primary)] rounded-full flex items-center justify-center">
-                                        <span class="text-sm font-semibold">{{ strtoupper(mb_substr(($member->fullname ?? $member->name), 0, 2)) }}</span>
-                                    </div>
+                                <div class="w-10 h-10 bg-[var(--ui-primary)] text-[var(--ui-on-primary)] rounded-full flex items-center justify-center">
+                                    <span class="text-sm font-semibold">{{ strtoupper(mb_substr(($member->fullname ?? $member->name), 0, 2)) }}</span>
+                                </div>
                                 @endif
                                 <div>
                                     <div class="font-semibold text-[var(--ui-secondary)]">{{ $member->fullname ?? $member->name }}</div>
