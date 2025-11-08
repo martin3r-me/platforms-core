@@ -5,7 +5,7 @@
     
     <button @click="teamFlyoutOpen = !teamFlyoutOpen" 
         class="inline-flex items-center gap-1 px-2 py-1 h-7 rounded-md border transition text-xs
-        text-[var(--ui-secondary)] bg-[var(--ui-muted-5)] border-[var(--ui-border)]/60 hover:bg-[var(--ui-muted)]"
+        {{ $isParentModule ? 'text-[var(--ui-secondary)] bg-[var(--ui-muted-5)] border-[var(--ui-border)]/60' : 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)] border-[var(--ui-primary)]/60' }}"
         title="Team wechseln">
         <span class="truncate max-w-[12rem] flex items-center gap-1">
             @if($baseTeam)
@@ -14,9 +14,8 @@
                     <span>{{ $baseTeam->name }}</span>
                 </span>
                 @if($isParentModule && $parentTeam)
-                    <span class="text-[0.5rem] opacity-50 leading-none flex items-center gap-0.5">
-                        @svg('heroicon-o-arrow-up', 'w-2.5 h-2.5')
-                        <span>({{ $parentTeam->name }})</span>
+                    <span class="text-[0.5rem] opacity-50 leading-none">
+                        ({{ $parentTeam->name }})
                     </span>
                 @endif
             @else
