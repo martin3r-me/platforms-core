@@ -51,15 +51,24 @@ class PlatformCore
             $scopeType = 'single'; // Fallback auf single bei ungültigem Wert
         }
 
+        // Prüfe ob scope_type Spalte existiert (Migration könnte noch nicht ausgeführt sein)
+        $hasScopeTypeColumn = Schema::hasColumn('modules', 'scope_type');
+
+        $updateData = [
+            'title'       => $moduleConfig['title'] ?? ucfirst($key),
+            'description' => $moduleConfig['description'] ?? null,
+            'url'         => $url,
+            'config'      => $moduleConfig,
+        ];
+
+        // Nur scope_type hinzufügen, wenn Spalte existiert
+        if ($hasScopeTypeColumn) {
+            $updateData['scope_type'] = $scopeType;
+        }
+
         Module::updateOrCreate(
             ['key' => $key],
-            [
-                'title'       => $moduleConfig['title'] ?? ucfirst($key),
-                'description' => $moduleConfig['description'] ?? null,
-                'url'         => $url,
-                'scope_type'  => $scopeType,
-                'config'      => $moduleConfig,
-            ]
+            $updateData
         );
 
         // Navigation-Daten sicher zusammenführen
