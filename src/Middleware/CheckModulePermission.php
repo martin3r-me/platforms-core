@@ -36,29 +36,73 @@ class CheckModulePermission
             abort(403, 'Modul nicht bekannt.');
         }
 
-        $team = method_exists($user, 'currentTeam') ? $user->currentTeam : null;
+        $baseTeam = $user->currentTeamRelation; // Basis-Team (nicht dynamisch)
+        if (!$baseTeam) {
+            abort(403, 'Kein Team zugeordnet.');
+        }
 
-        $hasPermission = $user->modules()->where('module_id', $module->id)->wherePivot('enabled', true)->exists();
+        $rootTeam = $baseTeam->getRootTeam();
+        $rootTeamId = $rootTeam->id;
+        $baseTeamId = $baseTeam->id;
 
-        Log::info('CheckModulePermission: User checked', [
-            'user_id'      => $user?->id,
-            'module_id'    => $module->id,
-            'user_allowed' => $hasPermission,
-        ]);
+        // Für Parent-Module: Rechte aus Root-Team prüfen
+        // Für Single-Module: Rechte aus aktuellem Team prüfen
+        if ($module->isRootScoped()) {
+            $hasPermission = $user->modules()
+                ->where('module_id', $module->id)
+                ->wherePivot('team_id', $rootTeamId)
+                ->wherePivot('enabled', true)
+                ->exists();
 
-        if (!$hasPermission && $team) {
-            $hasPermission = $team->modules()->where('module_id', $module->id)->wherePivot('enabled', true)->exists();
-            Log::info('CheckModulePermission: Team checked', [
-                'team_id'      => $team->id ?? null,
+            Log::info('CheckModulePermission: User checked (Parent-Module)', [
+                'user_id'      => $user?->id,
                 'module_id'    => $module->id,
-                'team_allowed' => $hasPermission,
+                'team_id'      => $rootTeamId,
+                'user_allowed' => $hasPermission,
             ]);
+
+            if (!$hasPermission) {
+                $hasPermission = $rootTeam->modules()
+                    ->where('module_id', $module->id)
+                    ->wherePivot('enabled', true)
+                    ->exists();
+                Log::info('CheckModulePermission: Team checked (Parent-Module)', [
+                    'team_id'      => $rootTeamId,
+                    'module_id'    => $module->id,
+                    'team_allowed' => $hasPermission,
+                ]);
+            }
+        } else {
+            $hasPermission = $user->modules()
+                ->where('module_id', $module->id)
+                ->wherePivot('team_id', $baseTeamId)
+                ->wherePivot('enabled', true)
+                ->exists();
+
+            Log::info('CheckModulePermission: User checked (Single-Module)', [
+                'user_id'      => $user?->id,
+                'module_id'    => $module->id,
+                'team_id'      => $baseTeamId,
+                'user_allowed' => $hasPermission,
+            ]);
+
+            if (!$hasPermission && $baseTeam) {
+                $hasPermission = $baseTeam->modules()
+                    ->where('module_id', $module->id)
+                    ->wherePivot('enabled', true)
+                    ->exists();
+                Log::info('CheckModulePermission: Team checked (Single-Module)', [
+                    'team_id'      => $baseTeamId,
+                    'module_id'    => $module->id,
+                    'team_allowed' => $hasPermission,
+                ]);
+            }
         }
 
         if (!$hasPermission) {
             Log::warning('CheckModulePermission: Zugriff verweigert.', [
                 'user_id'   => $user?->id,
-                'team_id'   => $team->id ?? null,
+                'team_id'   => $baseTeam->id ?? null,
                 'module_id' => $module->id,
             ]);
             abort(403, 'Du hast für dieses Modul keine Berechtigung.');
@@ -66,7 +110,7 @@ class CheckModulePermission
 
         Log::info('CheckModulePermission: Zugriff erlaubt', [
             'user_id'   => $user?->id,
-            'team_id'   => $team->id ?? null,
+            'team_id'   => $baseTeam->id ?? null,
             'module_id' => $module->id,
         ]);
 

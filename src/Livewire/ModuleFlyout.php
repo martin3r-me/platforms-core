@@ -29,26 +29,47 @@ class ModuleFlyout extends Component
     public function loadModules()
     {
         $user = Auth::user();
-        $team = $user?->currentTeam;
-        $teamId = $team?->id;
+        $baseTeam = $user->currentTeamRelation; // Basis-Team (nicht dynamisch)
+        if (!$baseTeam) {
+            $this->modules = collect();
+            return;
+        }
+
+        $rootTeam = $baseTeam->getRootTeam();
+        $rootTeamId = $rootTeam->id;
+        $baseTeamId = $baseTeam->id;
 
         // Hole alle sichtbaren Module
         $modules = PlatformCore::getVisibleModules();
 
         // Filtere Module nach Berechtigung
-        $this->modules = collect($modules)->filter(function($module) use ($user, $team, $teamId) {
+        $this->modules = collect($modules)->filter(function($module) use ($user, $baseTeam, $baseTeamId, $rootTeamId) {
             $moduleModel = \Platform\Core\Models\Module::where('key', $module['key'])->first();
             if (!$moduleModel) return false;
 
-            // User-Erlaubnis nur im aktuellen Team-Scope
-            $userAllowed = $user->modules()
-                ->where('module_id', $moduleModel->id)
-                ->wherePivot('team_id', $teamId)
-                ->wherePivot('enabled', true)
-                ->exists();
-            $teamAllowed = $team
-                ? $team->modules()->where('module_id', $moduleModel->id)->wherePivot('enabled', true)->exists()
-                : false;
+            // Für Parent-Module: Rechte aus Root-Team prüfen
+            // Für Single-Module: Rechte aus aktuellem Team prüfen
+            if ($moduleModel->isRootScoped()) {
+                $userAllowed = $user->modules()
+                    ->where('module_id', $moduleModel->id)
+                    ->wherePivot('team_id', $rootTeamId)
+                    ->wherePivot('enabled', true)
+                    ->exists();
+                $teamAllowed = $rootTeam->modules()
+                    ->where('module_id', $moduleModel->id)
+                    ->wherePivot('enabled', true)
+                    ->exists();
+            } else {
+                $userAllowed = $user->modules()
+                    ->where('module_id', $moduleModel->id)
+                    ->wherePivot('team_id', $baseTeamId)
+                    ->wherePivot('enabled', true)
+                    ->exists();
+                $teamAllowed = $baseTeam->modules()
+                    ->where('module_id', $moduleModel->id)
+                    ->wherePivot('enabled', true)
+                    ->exists();
+            }
 
             return $userAllowed || $teamAllowed;
         })->sortBy(function($module) {

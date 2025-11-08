@@ -56,37 +56,58 @@ class ModalModules extends Component
         $this->mollieKey = env('MOLLIE_KEY');
 
         $user = $this->user;
-        $team = method_exists($user, 'currentTeam') ? $user->currentTeam : null;
-        $teamId = $team?->id;
+        $baseTeam = $user->currentTeamRelation; // Basis-Team (nicht dynamisch)
+        if (!$baseTeam) {
+            $this->modules = collect();
+            $this->matrixUsers = collect();
+            $this->matrixModules = collect();
+            $this->userModuleMap = [];
+            return;
+        }
+        
+        $rootTeam = $baseTeam->getRootTeam();
+        $rootTeamId = $rootTeam->id;
+        $baseTeamId = $baseTeam->id;
 
         // Hole alle sichtbaren Module (z. B. nach Guard gefiltert)
         $modules = PlatformCore::getVisibleModules();
 
         // Filtere Module nach Berechtigung
-        $this->modules = collect($modules)->filter(function($module) use ($user, $team, $teamId) {
+        $this->modules = collect($modules)->filter(function($module) use ($user, $baseTeam, $baseTeamId, $rootTeam, $rootTeamId) {
             $moduleModel = \Platform\Core\Models\Module::where('key', $module['key'])->first();
             if (!$moduleModel) return false;
 
-            // User-Erlaubnis nur im aktuellen Team-Scope
-            $userAllowed = $user->modules()
-                ->where('module_id', $moduleModel->id)
-                ->wherePivot('team_id', $teamId)
-                ->wherePivot('enabled', true)
-                ->exists();
-            $teamAllowed = $team
-                ? $team->modules()->where('module_id', $moduleModel->id)->wherePivot('enabled', true)->exists()
-                : false;
+            // Für Parent-Module: Rechte aus Root-Team prüfen
+            // Für Single-Module: Rechte aus aktuellem Team prüfen
+            if ($moduleModel->isRootScoped()) {
+                $userAllowed = $user->modules()
+                    ->where('module_id', $moduleModel->id)
+                    ->wherePivot('team_id', $rootTeamId)
+                    ->wherePivot('enabled', true)
+                    ->exists();
+                $teamAllowed = $rootTeam->modules()
+                    ->where('module_id', $moduleModel->id)
+                    ->wherePivot('enabled', true)
+                    ->exists();
+            } else {
+                $userAllowed = $user->modules()
+                    ->where('module_id', $moduleModel->id)
+                    ->wherePivot('team_id', $baseTeamId)
+                    ->wherePivot('enabled', true)
+                    ->exists();
+                $teamAllowed = $baseTeam->modules()
+                    ->where('module_id', $moduleModel->id)
+                    ->wherePivot('enabled', true)
+                    ->exists();
+            }
 
             return $userAllowed || $teamAllowed;
         })->values();
 
         // Matrix-Vorbereitung wie gehabt
-        $teamId = $user->currentTeam?->id;
-        $this->matrixUsers = $teamId
-            ? \Platform\Core\Models\User::whereHas('teams', function($q) use ($teamId) {
-                $q->where('teams.id', $teamId);
-            })->get()
-            : collect();
+        $this->matrixUsers = \Platform\Core\Models\User::whereHas('teams', function($q) use ($baseTeamId) {
+            $q->where('teams.id', $baseTeamId);
+        })->get();
 
         $this->matrixModules = \Platform\Core\Models\Module::all();
         $this->refreshMatrix();
@@ -95,29 +116,46 @@ class ModalModules extends Component
 
     public function toggleMatrix($userId, $moduleId)
     {
-        $teamId = auth()->user()->currentTeam?->id;
-        if (!$teamId) { return; }
+        $user = auth()->user();
+        $currentTeam = $user->currentTeamRelation; // Basis-Team (nicht dynamisch)
+        if (!$currentTeam) { return; }
 
-        $user = \Platform\Core\Models\User::findOrFail($userId);
-        \Platform\Core\Models\Module::findOrFail($moduleId); // exists
+        $targetUser = \Platform\Core\Models\User::findOrFail($userId);
+        $module = \Platform\Core\Models\Module::findOrFail($moduleId);
 
-        // Team-spezifisch prüfen
-        $alreadyAssigned = $user->modules()
+        // Für Parent-Module: Nur im Root-Team vergeben
+        if ($module->isRootScoped()) {
+            $rootTeam = $currentTeam->getRootTeam();
+            
+            // Prüfen ob wir im Root-Team sind
+            if ($currentTeam->id !== $rootTeam->id) {
+                // In Kind-Teams können Parent-Module nicht vergeben werden
+                return;
+            }
+
+            $teamId = $rootTeam->id;
+        } else {
+            // Für Single-Module: Im aktuellen Team vergeben
+            $teamId = $currentTeam->id;
+        }
+
+        // Prüfen ob bereits zugewiesen
+        $alreadyAssigned = $targetUser->modules()
             ->where('module_id', $moduleId)
             ->wherePivot('team_id', $teamId)
             ->exists();
 
         if ($alreadyAssigned) {
-            // Nur den Pivot im aktuellen Team lösen
-            $user->modules()->newPivotStatement()
-                ->where('modulable_id', $user->id)
+            // Pivot löschen
+            $targetUser->modules()->newPivotStatement()
+                ->where('modulable_id', $targetUser->id)
                 ->where('modulable_type', \Platform\Core\Models\User::class)
                 ->where('module_id', $moduleId)
                 ->where('team_id', $teamId)
                 ->delete();
         } else {
-            // Team-spezifisch anhängen
-            $user->modules()->attach($moduleId, [
+            // Pivot erstellen
+            $targetUser->modules()->attach($moduleId, [
                 'role' => null,
                 'enabled' => true,
                 'guard' => 'web',
@@ -125,7 +163,7 @@ class ModalModules extends Component
             ]);
         }
 
-        // Optional: Matrix neu laden, damit das UI sofort den Status anzeigt
+        // Matrix neu laden
         $this->refreshMatrix();
     }
 
@@ -134,23 +172,56 @@ class ModalModules extends Component
 
     public function refreshMatrix()
     {
-        $teamId = auth()->user()->currentTeam?->id;
-        $this->matrixUsers = $teamId
-            ? \Platform\Core\Models\User::whereHas('teams', function($q) use ($teamId) {
-                $q->where('teams.id', $teamId);
-            })->get()
-            : collect();
+        $user = auth()->user();
+        $currentTeam = $user->currentTeamRelation; // Basis-Team (nicht dynamisch)
+        if (!$currentTeam) {
+            $this->matrixUsers = collect();
+            $this->matrixModules = collect();
+            $this->userModuleMap = [];
+            return;
+        }
+
+        $teamId = $currentTeam->id;
+        $rootTeam = $currentTeam->getRootTeam();
+        $rootTeamId = $rootTeam->id;
+
+        // User aus dem aktuellen Team laden
+        $this->matrixUsers = \Platform\Core\Models\User::whereHas('teams', function($q) use ($teamId) {
+            $q->where('teams.id', $teamId);
+        })->get();
 
         $this->matrixModules = \Platform\Core\Models\Module::all();
 
-        // Build map team-scoped: user_id => [module_id, ...]
-        $teamId = auth()->user()->currentTeam?->id;
+        // Build map: user_id => [module_id, ...]
+        // Für Parent-Module: Rechte aus Root-Team berücksichtigen
+        // Für Single-Module: Rechte aus aktuellem Team berücksichtigen
         $this->userModuleMap = [];
-        foreach ($this->matrixUsers as $user) {
-            $this->userModuleMap[$user->id] = $user->modules()
-                ->wherePivot('team_id', $teamId)
-                ->pluck('modules.id')
-                ->toArray();
+        foreach ($this->matrixUsers as $targetUser) {
+            $moduleIds = [];
+
+            foreach ($this->matrixModules as $module) {
+                if ($module->isRootScoped()) {
+                    // Parent-Modul: Rechte aus Root-Team prüfen
+                    $hasPermission = $targetUser->modules()
+                        ->where('module_id', $module->id)
+                        ->wherePivot('team_id', $rootTeamId)
+                        ->wherePivot('enabled', true)
+                        ->exists();
+                } else {
+                    // Single-Modul: Rechte aus aktuellem Team prüfen
+                    $hasPermission = $targetUser->modules()
+                        ->where('module_id', $module->id)
+                        ->wherePivot('team_id', $teamId)
+                        ->wherePivot('enabled', true)
+                        ->exists();
+                }
+
+                if ($hasPermission) {
+                    $moduleIds[] = $module->id;
+                }
+            }
+
+            $this->userModuleMap[$targetUser->id] = $moduleIds;
         }
     }
 

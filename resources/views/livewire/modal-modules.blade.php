@@ -135,15 +135,28 @@
                                         @php
                                             $hasModule = in_array($module->id, $userModuleMap[$user->id] ?? []);
                                             $variant = 'secondary-outline';
+                                            $isParentModule = $module->isRootScoped();
+                                            $isRootTeam = auth()->user()->currentTeamRelation?->isRootTeam() ?? false;
+                                            $isReadOnly = $isParentModule && !$isRootTeam;
                                         @endphp
                                         <td class="py-3 px-4 border-b border-[var(--ui-border)]/60 text-center">
-                                            <x-ui-button :variant="$variant" size="sm" wire:click="toggleMatrix({{ $user->id }}, {{ $module->id }})">
-                                                @if($hasModule)
-                                                    @svg('heroicon-o-check', 'w-4 h-4 text-[var(--ui-secondary)]')
-                                                @else
-                                                    @svg('heroicon-o-minus', 'w-4 h-4 text-[var(--ui-muted)]')
-                                                @endif
-                                            </x-ui-button>
+                                            @if($isReadOnly)
+                                                <div class="inline-flex items-center justify-center w-8 h-8 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)] cursor-not-allowed opacity-50" title="Nur im Root-Team veränderbar">
+                                                    @if($hasModule)
+                                                        @svg('heroicon-o-check', 'w-4 h-4 text-[var(--ui-secondary)]')
+                                                    @else
+                                                        @svg('heroicon-o-minus', 'w-4 h-4 text-[var(--ui-muted)]')
+                                                    @endif
+                                                </div>
+                                            @else
+                                                <x-ui-button :variant="$variant" size="sm" wire:click="toggleMatrix({{ $user->id }}, {{ $module->id }})">
+                                                    @if($hasModule)
+                                                        @svg('heroicon-o-check', 'w-4 h-4 text-[var(--ui-secondary)]')
+                                                    @else
+                                                        @svg('heroicon-o-minus', 'w-4 h-4 text-[var(--ui-muted)]')
+                                                    @endif
+                                                </x-ui-button>
+                                            @endif
                                         </td>
                                     @endforeach
                                 </tr>

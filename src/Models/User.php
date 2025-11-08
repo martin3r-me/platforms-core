@@ -100,7 +100,7 @@ class User extends Authenticatable
     public function modules()
     {
         return $this->morphToMany(Module::class, 'modulable')
-            ->withPivot(['role', 'enabled', 'guard'])
+            ->withPivot(['role', 'enabled', 'guard', 'team_id'])
             ->withTimestamps();
     }
 }
