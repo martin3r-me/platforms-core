@@ -54,7 +54,7 @@ class ModalTeam extends Component
     public function mount()
     {
         $this->user = auth()->user()->toArray();
-        $this->team = auth()->user()->currentTeam;
+        $this->team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
         $this->loadTeams();
         $this->loadAvailableParentTeams();
         $this->loadCurrentParentTeam();
@@ -66,7 +66,7 @@ class ModalTeam extends Component
     public function openModal()
     {
         $this->modalShow = true;
-        $this->team = auth()->user()->currentTeam;
+        $this->team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
         $this->loadAvailableParentTeams();
         $this->loadCurrentParentTeam();
         $this->loadMemberRoles();
@@ -124,7 +124,7 @@ class ModalTeam extends Component
      */
     public function updateParentTeam()
     {
-        $team = auth()->user()->currentTeam;
+        $team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
         if (!$team) {
             return;
         }
@@ -258,7 +258,7 @@ class ModalTeam extends Component
 
     public function updateMemberRole($memberId, $role)
     {
-        $team = auth()->user()->currentTeam;
+        $team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
         if ($team && $team->user_id === auth()->id()) {
             $team->users()->updateExistingPivot($memberId, ['role' => $role]);
             $this->memberRoles[$memberId] = $role;
@@ -275,7 +275,7 @@ class ModalTeam extends Component
 
     public function inviteToTeam()
     {
-        $team = auth()->user()->currentTeam;
+        $team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
         if (! $team) { return; }
 
         $this->validate([
@@ -304,7 +304,7 @@ class ModalTeam extends Component
 
     public function revokeInvitation(int $invitationId): void
     {
-        $team = auth()->user()->currentTeam;
+        $team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
         if (! $team) { return; }
 
         $inv = TeamInvitation::query()
@@ -320,14 +320,14 @@ class ModalTeam extends Component
 
     public function getPendingInvitationsProperty()
     {
-        $team = auth()->user()->currentTeam;
+        $team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
         if (! $team) { return collect(); }
         return $team->invitations()->whereNull('accepted_at')->latest()->get();
     }
 
     public function removeMember(int $memberId): void
     {
-        $team = auth()->user()->currentTeam;
+        $team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
         if (! $team) { return; }
 
         // Nur Owner darf Mitglieder entfernen
@@ -356,13 +356,13 @@ class ModalTeam extends Component
         $this->dispatch('member-removed');
         // Liste neu laden
         $this->loadTeams();
-        $this->team = auth()->user()->currentTeam;
+        $this->team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
         unset($this->memberRoles[$memberId]);
     }
 
     private function loadMemberRoles(): void
     {
-        $team = auth()->user()->currentTeam;
+        $team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
         if ($team) {
             $this->memberRoles = $team->users->pluck('pivot.role', 'id')->toArray();
         } else {
@@ -372,7 +372,7 @@ class ModalTeam extends Component
 
     public function loadBillingData()
     {
-        $team = auth()->user()->currentTeam;
+        $team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
         if ($team) {
             $billingData = $team->billing_data ?? [];
             $this->billing = array_merge($this->billing, $billingData);
@@ -381,7 +381,7 @@ class ModalTeam extends Component
     
     public function loadBillingTotals()
     {
-        $team = auth()->user()->currentTeam;
+        $team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
         if (!$team) {
             return;
         }
@@ -422,7 +422,7 @@ class ModalTeam extends Component
             'billing.payment_method' => 'required|in:sepa,invoice,credit_card',
         ]);
         
-        $team = auth()->user()->currentTeam;
+        $team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
         if ($team) {
             $team->update([
                 'billing_data' => $this->billing
