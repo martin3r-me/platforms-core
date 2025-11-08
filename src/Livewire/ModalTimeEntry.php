@@ -2,7 +2,6 @@
 
 namespace Platform\Core\Livewire;
 
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -15,7 +14,6 @@ use Platform\Core\Traits\HasTimeEntries;
 
 class ModalTimeEntry extends Component
 {
-    use AuthorizesRequests;
 
     public bool $open = false;
 
@@ -44,7 +42,7 @@ class ModalTimeEntry extends Component
         // Initialisierung
     }
 
-    #[On('time')]
+    #[On('time-entry')]
     public function setContext(array $payload = []): void
     {
         dd('time');
