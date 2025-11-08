@@ -106,9 +106,13 @@
                     @foreach($team->users ?? [] as $member)
                         <div class="flex items-center justify-between p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                             <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-[var(--ui-primary)] text-[var(--ui-on-primary)] rounded-full flex items-center justify-center">
-                                    <span class="text-sm font-semibold">{{ strtoupper(mb_substr(($member->fullname ?? $member->name), 0, 2)) }}</span>
-                                </div>
+                                @if(!empty($member->avatar))
+                                    <img src="{{ $member->avatar }}" alt="{{ $member->fullname ?? $member->name }}" class="w-10 h-10 rounded-full object-cover" />
+                                @else
+                                    <div class="w-10 h-10 bg-[var(--ui-primary)] text-[var(--ui-on-primary)] rounded-full flex items-center justify-center">
+                                        <span class="text-sm font-semibold">{{ strtoupper(mb_substr(($member->fullname ?? $member->name), 0, 2)) }}</span>
+                                    </div>
+                                @endif
                                 <div>
                                     <div class="font-semibold text-[var(--ui-secondary)]">{{ $member->fullname ?? $member->name }}</div>
                                     <div class="text-sm text-[var(--ui-muted)]">{{ $member->email }}</div>
