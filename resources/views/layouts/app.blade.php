@@ -28,7 +28,7 @@
     @livewire('core.modal-pricing')
     @livewire('comms.comms-modal')
     @livewire('core.modal-modules')
-    @livewire('organization.modal-time-entry')
+    @livewire('organization.modal-organization')
   @endauth
 
   @php

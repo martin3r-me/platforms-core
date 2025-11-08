@@ -72,6 +72,17 @@ class ModalTeam extends Component
         $this->loadMemberRoles();
         $this->loadBillingData();
         $this->loadBillingTotals();
+        
+        // Organization-Kontext setzen - nur Kontext-Management, keine Zeiterfassung
+        if ($this->team) {
+            $this->dispatch('organization', [
+                'context_type' => Team::class,
+                'context_id' => $this->team->id,
+                'allow_time_entry' => false,
+                'allow_context_management' => true,
+                'can_link_to_entity' => true,
+            ]);
+        }
     }
 
     public function loadTeams()
