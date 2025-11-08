@@ -1,8 +1,12 @@
 <div 
     x-data
     x-init="
+        // Browser-Event empfangen und an Livewire weiterleiten
         window.addEventListener('time-entry', (e) => {
             console.log('Browser: time-entry event received', e);
+            if (e.detail && $wire) {
+                $wire.setContext(e.detail);
+            }
         });
         console.log('ModalTimeEntry: Alpine initialized');
     "
