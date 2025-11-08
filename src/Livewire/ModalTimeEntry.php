@@ -10,6 +10,8 @@ use Livewire\Component;
 use Platform\Core\Models\CoreTimeEntry;
 use Platform\Core\Models\CoreTimeEntryContext;
 use Platform\Core\Models\CoreTimePlanned;
+use Platform\Core\Services\StoreTimeEntry;
+use Platform\Core\Services\StorePlannedTime;
 use Platform\Core\Traits\HasTimeEntries;
 
 class ModalTimeEntry extends Component
@@ -41,14 +43,6 @@ class ModalTimeEntry extends Component
     {
         \Log::info('ModalTimeEntry: mount() called', [
             'component_id' => $this->getId(),
-        ]);
-    }
-
-    public function boot(): void
-    {
-        \Log::info('ModalTimeEntry: boot() called', [
-            'component_id' => $this->getId(),
-            'component_name' => $this->getName(),
         ]);
     }
 
@@ -285,7 +279,10 @@ class ModalTimeEntry extends Component
             return;
         }
 
-        CoreTimePlanned::create([
+        // Verwende StorePlannedTime Service für automatische Kontext-Kaskade
+        $storePlannedTime = app(StorePlannedTime::class);
+        
+        $storePlannedTime->store([
             'team_id' => $team->id,
             'user_id' => $user->id,
             'context_type' => $this->contextType,
@@ -363,7 +360,10 @@ class ModalTimeEntry extends Component
             return;
         }
 
-        $entry = CoreTimeEntry::create([
+        // Verwende StoreTimeEntry Service für automatische Kontext-Kaskade
+        $storeTimeEntry = app(StoreTimeEntry::class);
+        
+        $entry = $storeTimeEntry->store([
             'team_id' => $team->id,
             'user_id' => $user->id,
             'context_type' => $this->contextType,
@@ -376,18 +376,6 @@ class ModalTimeEntry extends Component
             'metadata' => null,
             'note' => $this->note,
         ]);
-
-        foreach ($this->linkedContexts as $context) {
-            if (! isset($context['type'], $context['id'])) {
-                continue;
-            }
-
-            CoreTimeEntryContext::create([
-                'time_entry_id' => $entry->id,
-                'context_type' => $context['type'],
-                'context_id' => (int) $context['id'],
-            ]);
-        }
 
         $this->loadEntries();
         $this->activeTab = 'overview';

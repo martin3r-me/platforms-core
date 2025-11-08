@@ -21,6 +21,8 @@ class CoreTimeEntry extends Model
         'user_id',
         'context_type',
         'context_id',
+        'root_context_type',
+        'root_context_id',
         'work_date',
         'minutes',
         'rate_cents',
@@ -84,6 +86,18 @@ class CoreTimeEntry extends Model
     {
         return $query->where('context_type', $type)
             ->where('context_id', $id);
+    }
+
+    /**
+     * Scope für Abfragen über Kontext-Kaskade.
+     * Findet alle Time-Entries, die über ihre Contexts zu einem bestimmten Kontext gehören.
+     */
+    public function scopeForContext($query, string $type, int $id)
+    {
+        return $query->whereHas('additionalContexts', function ($q) use ($type, $id) {
+            $q->where('context_type', $type)
+              ->where('context_id', $id);
+        });
     }
 
     public function getHoursAttribute(): float

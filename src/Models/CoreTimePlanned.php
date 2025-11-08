@@ -4,6 +4,7 @@ namespace Platform\Core\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\Uid\UuidV7;
@@ -68,10 +69,17 @@ class CoreTimePlanned extends Model
         return $this->morphTo();
     }
 
-    public function scopeForContext($query, Model $model)
+    public function additionalContexts(): HasMany
     {
-        return $query->where('context_type', get_class($model))
-            ->where('context_id', $model->getKey());
+        return $this->hasMany(CoreTimePlannedContext::class, 'planned_id');
+    }
+
+    public function scopeForContext($query, string $type, int $id)
+    {
+        return $query->whereHas('additionalContexts', function ($q) use ($type, $id) {
+            $q->where('context_type', $type)
+              ->where('context_id', $id);
+        });
     }
 
     public function scopeForContextKey($query, string $type, int $id)

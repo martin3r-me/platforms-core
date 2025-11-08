@@ -5,10 +5,12 @@ namespace Platform\Core\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class CoreTimeEntryContext extends Model
+class CoreTimePlannedContext extends Model
 {
+    protected $table = 'core_time_planned_contexts';
+
     protected $fillable = [
-        'time_entry_id',
+        'planned_id',
         'context_type',
         'context_id',
         'depth',
@@ -23,10 +25,9 @@ class CoreTimeEntryContext extends Model
         'is_root' => 'boolean',
     ];
 
-    public function timeEntry(): BelongsTo
+    public function planned(): BelongsTo
     {
-        return $this->belongsTo(CoreTimeEntry::class, 'time_entry_id');
+        return $this->belongsTo(CoreTimePlanned::class, 'planned_id');
     }
 }
-
 
