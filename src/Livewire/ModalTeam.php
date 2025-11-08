@@ -70,6 +70,8 @@ class ModalTeam extends Component
         $this->loadAvailableParentTeams();
         $this->loadCurrentParentTeam();
         $this->loadMemberRoles();
+        $this->loadBillingData();
+        $this->loadBillingTotals();
     }
 
     public function loadTeams()
