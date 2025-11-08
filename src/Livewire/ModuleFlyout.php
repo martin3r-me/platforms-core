@@ -51,7 +51,9 @@ class ModuleFlyout extends Component
                 : false;
 
             return $userAllowed || $teamAllowed;
-        })->take(4)->values();
+        })->sortBy(function($module) {
+            return $module['title'] ?? $module['label'] ?? '';
+        })->values();
     }
 
     public function loadCurrentModule()

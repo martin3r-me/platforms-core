@@ -49,7 +49,7 @@ class TeamFlyout extends Component
             $this->parentTeam = $this->baseTeam->parentTeam;
         }
         
-        $this->userTeams = $user->teams()->take(4)->get() ?? collect();
+        $this->userTeams = $user->teams()->orderBy('name')->get() ?? collect();
     }
 
     public function loadCurrentModule()

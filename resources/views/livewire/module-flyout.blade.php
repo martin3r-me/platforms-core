@@ -14,21 +14,19 @@
     </button>
     
     <div x-show="moduleFlyoutOpen" x-cloak x-transition
-        class="absolute top-full right-0 mt-2 w-80 bg-[var(--ui-surface)] rounded-xl border border-[var(--ui-border)]/60 shadow-lg z-50">
-        <div class="p-4">
-            <h3 class="text-sm font-semibold text-[var(--ui-muted)] mb-3">Module</h3>
-            <div class="space-y-2">
+        class="absolute top-full right-0 mt-2 w-64 bg-[var(--ui-surface)] rounded-lg border border-[var(--ui-border)]/60 shadow-lg z-50 max-h-[80vh] overflow-y-auto">
+        <div class="p-2">
+            <h3 class="text-xs font-semibold text-[var(--ui-muted)] mb-2 px-2">Module</h3>
+            <div class="space-y-1">
                 {{-- Dashboard --}}
                 <a href="{{ route('platform.dashboard') }}"
-                    class="w-full group flex items-center gap-3 p-3 rounded-lg transition hover:bg-[var(--ui-muted-5)]">
+                    class="w-full group flex items-center gap-2 px-2 py-1.5 rounded-md transition text-sm hover:bg-[var(--ui-muted-5)]">
                     <div class="flex-shrink-0">
-                        @svg('heroicon-o-home', 'w-5 h-5 text-[var(--ui-primary)]')
+                        @svg('heroicon-o-home', 'w-4 h-4 text-[var(--ui-primary)]')
                     </div>
                     <div class="min-w-0 flex-1 text-left">
-                        <div class="font-medium text-[var(--ui-secondary)]">Haupt-Dashboard</div>
-                        <div class="text-xs text-[var(--ui-muted)]">Übersicht & Start</div>
+                        <div class="font-medium text-[var(--ui-secondary)] text-sm truncate">Haupt-Dashboard</div>
                     </div>
-                    @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)]')
                 </a>
 
                 @foreach($modules as $key => $module)
@@ -41,28 +39,19 @@
                             : ($module['url'] ?? '#');
                     @endphp
                     <a href="{{ $finalUrl }}"
-                        class="w-full group flex items-center gap-3 p-3 rounded-lg transition hover:bg-[var(--ui-muted-5)]">
+                        class="w-full group flex items-center gap-2 px-2 py-1.5 rounded-md transition text-sm hover:bg-[var(--ui-muted-5)]">
                         <div class="flex-shrink-0">
                             @if(!empty($icon))
-                                <x-dynamic-component :component="$icon" class="w-5 h-5 text-[var(--ui-primary)]" />
+                                <x-dynamic-component :component="$icon" class="w-4 h-4 text-[var(--ui-primary)]" />
                             @else
-                                @svg('heroicon-o-cube', 'w-5 h-5 text-[var(--ui-primary)]')
+                                @svg('heroicon-o-cube', 'w-4 h-4 text-[var(--ui-primary)]')
                             @endif
                         </div>
                         <div class="min-w-0 flex-1 text-left">
-                            <div class="font-medium text-[var(--ui-secondary)]">{{ $title }}</div>
-                            <div class="text-xs text-[var(--ui-muted)]">{{ $module['description'] ?? 'Modul' }}</div>
+                            <div class="font-medium text-[var(--ui-secondary)] text-sm truncate">{{ $title }}</div>
                         </div>
-                        @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)]')
                     </a>
                 @endforeach
-            </div>
-            <div class="mt-3 pt-3 border-t border-[var(--ui-border)]/60">
-                <button type="button" wire:click="openModal" 
-                    class="w-full flex items-center justify-center gap-2 p-2 text-sm font-medium text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition">
-                    Alle Module anzeigen
-                    @svg('heroicon-o-arrow-right', 'w-4 h-4')
-                </button>
             </div>
         </div>
     </div>

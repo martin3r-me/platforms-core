@@ -31,38 +31,28 @@
     </button>
     
     <div x-show="teamFlyoutOpen" x-cloak x-transition
-        class="absolute top-full right-0 mt-2 w-80 bg-[var(--ui-surface)] rounded-xl border border-[var(--ui-border)]/60 shadow-lg z-50">
-        <div class="p-4">
-            <h3 class="text-sm font-semibold text-[var(--ui-muted)] mb-3">Teams</h3>
-            <div class="space-y-2">
+        class="absolute top-full right-0 mt-2 w-64 bg-[var(--ui-surface)] rounded-lg border border-[var(--ui-border)]/60 shadow-lg z-50 max-h-[80vh] overflow-y-auto">
+        <div class="p-2">
+            <h3 class="text-xs font-semibold text-[var(--ui-muted)] mb-2 px-2">Teams</h3>
+            <div class="space-y-1">
                 @foreach($userTeams as $team)
                     @php $isActiveTeam = $currentTeam?->id === $team->id; @endphp
                     <button type="button" wire:click="switchTeam({{ $team->id }})"
-                        class="w-full group flex items-center gap-3 p-3 rounded-lg transition
+                        class="w-full group flex items-center gap-2 px-2 py-1.5 rounded-md transition text-sm
                         {{ $isActiveTeam ? 'bg-[var(--ui-primary-5)] border border-[var(--ui-primary)]/60' : 'hover:bg-[var(--ui-muted-5)]' }}">
                         <div class="flex-shrink-0">
-                            @svg('heroicon-o-user-group', 'w-5 h-5 text-[var(--ui-primary)]')
+                            @svg('heroicon-o-user-group', 'w-4 h-4 text-[var(--ui-primary)]')
                         </div>
                         <div class="min-w-0 flex-1 text-left">
-                            <div class="font-medium text-[var(--ui-secondary)] truncate">{{ $team->name }}</div>
-                            @if($team->users()->count() > 0)
-                                <div class="text-xs text-[var(--ui-muted)]">{{ $team->users()->count() }} Mitglieder</div>
-                            @endif
+                            <div class="font-medium text-[var(--ui-secondary)] truncate text-sm">{{ $team->name }}</div>
                         </div>
                         @if($isActiveTeam)
                             <div class="flex-shrink-0">
-                                @svg('heroicon-o-check', 'w-4 h-4 text-[var(--ui-primary)]')
+                                @svg('heroicon-o-check', 'w-3.5 h-3.5 text-[var(--ui-primary)]')
                             </div>
                         @endif
                     </button>
                 @endforeach
-            </div>
-            <div class="mt-3 pt-3 border-t border-[var(--ui-border)]/60">
-                <button type="button" wire:click="openModal" 
-                    class="w-full flex items-center justify-center gap-2 p-2 text-sm font-medium text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition">
-                    Alle Teams anzeigen
-                    @svg('heroicon-o-arrow-right', 'w-4 h-4')
-                </button>
             </div>
         </div>
     </div>
