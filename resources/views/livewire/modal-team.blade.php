@@ -82,9 +82,8 @@
                                 name="currentParentTeamId"
                                 :options="$availableParentTeams"
                                 :nullable="true"
-                                :value="$currentParentTeamId"
-                                x-data
-                                @change="$wire.updateParentTeam($event.target.value)"
+                                wire:model="currentParentTeamId"
+                                wire:change="updateParentTeam"
                             />
                             <p class="text-xs text-[var(--ui-muted)] mt-2">
                                 Optional: Wähle ein Root-Team als Parent-Team. Kind-Teams erben Zugriff auf root-scoped Module (z.B. CRM, Organization).

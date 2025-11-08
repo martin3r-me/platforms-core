@@ -120,17 +120,9 @@ class ModalTeam extends Component
 
     /**
      * Aktualisiert das Parent-Team (nur für Team-Owner).
+     * Wird von wire:change aufgerufen, wenn currentParentTeamId sich ändert.
      */
-    public function updateParentTeam($parentTeamId = null)
-    {
-        $this->currentParentTeamId = $parentTeamId;
-        $this->saveParentTeam();
-    }
-
-    /**
-     * Speichert das Parent-Team (nur für Team-Owner).
-     */
-    public function saveParentTeam()
+    public function updateParentTeam()
     {
         $team = auth()->user()->currentTeam;
         if (!$team) {
@@ -146,60 +138,59 @@ class ModalTeam extends Component
             return;
         }
 
-        // Validierung
-        $this->validate([
-            'currentParentTeamId' => [
-                'nullable',
-                'integer',
-                'exists:teams,id',
-                function ($attribute, $value, $fail) use ($team) {
-                    if ($value) {
-                        $parentTeam = Team::find($value);
-                        
-                        if (!$parentTeam) {
-                            $fail('Das ausgewählte Parent-Team existiert nicht.');
-                            return;
-                        }
-
-                        // Prüfe ob es ein Root-Team ist
-                        if ($parentTeam->parent_team_id !== null) {
-                            $fail('Nur Root-Teams können als Parent-Team verwendet werden.');
-                            return;
-                        }
-
-                        // Prüfe ob User Zugriff auf das Parent-Team hat
-                        $user = auth()->user();
-                        if (!$parentTeam->users()->where('user_id', $user->id)->exists()) {
-                            $fail('Du hast keinen Zugriff auf das ausgewählte Parent-Team.');
-                            return;
-                        }
-
-                        // Prüfe auf zirkuläre Referenzen
-                        if ($parentTeam->id === $team->id || $parentTeam->isChildOf($team)) {
-                            $fail('Zirkuläre Referenz: Ein Team kann nicht Parent von sich selbst oder einem Kind-Team sein.');
-                            return;
-                        }
-                    }
-                },
-            ],
-        ]);
+        // Wert aus Property lesen
+        $parentTeamId = $this->currentParentTeamId;
 
         // Konvertiere leeren String zu null und String zu Integer
-        $parentTeamId = $this->currentParentTeamId;
-        if ($parentTeamId === '' || $parentTeamId === 'null' || $parentTeamId === null) {
+        if ($parentTeamId === '' || $parentTeamId === 'null') {
             $parentTeamId = null;
-        } else {
+        } elseif ($parentTeamId) {
             $parentTeamId = (int) $parentTeamId;
+            
+            // Validierung
+            $parentTeam = Team::find($parentTeamId);
+            if (!$parentTeam) {
+                $this->dispatch('notice', [
+                    'type' => 'error',
+                    'message' => 'Das ausgewählte Parent-Team existiert nicht.'
+                ]);
+                return;
+            }
+
+            if ($parentTeam->parent_team_id !== null) {
+                $this->dispatch('notice', [
+                    'type' => 'error',
+                    'message' => 'Nur Root-Teams können als Parent-Team verwendet werden.'
+                ]);
+                return;
+            }
+
+            $user = auth()->user();
+            if (!$parentTeam->users()->where('user_id', $user->id)->exists()) {
+                $this->dispatch('notice', [
+                    'type' => 'error',
+                    'message' => 'Du hast keinen Zugriff auf das ausgewählte Parent-Team.'
+                ]);
+                return;
+            }
+
+            if ($parentTeam->id === $team->id || $parentTeam->isChildOf($team)) {
+                $this->dispatch('notice', [
+                    'type' => 'error',
+                    'message' => 'Zirkuläre Referenz: Ein Team kann nicht Parent von sich selbst oder einem Kind-Team sein.'
+                ]);
+                return;
+            }
         }
 
-        // Update durchführen
+        // Speichern
         $team->parent_team_id = $parentTeamId;
         $team->save();
 
-        // Team neu laden, damit Änderungen sichtbar sind
+        // Aktualisieren
         $this->team = $team->fresh();
         $this->currentParentTeamId = $this->team->parent_team_id;
-        $this->loadAvailableParentTeams(); // Neu laden, da sich die Hierarchie geändert haben könnte
+        $this->loadAvailableParentTeams();
 
         $this->dispatch('notice', [
             'type' => 'success',
