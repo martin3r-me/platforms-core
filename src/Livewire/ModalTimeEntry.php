@@ -41,7 +41,7 @@ class ModalTimeEntry extends Component
 
     public function mount(): void
     {
-        dd('test');
+        // Initialisierung
     }
 
     #[On('time')]
