@@ -76,12 +76,6 @@ class CoreTimeEntry extends Model
         return $this->hasMany(CoreTimeEntryContext::class, 'time_entry_id');
     }
 
-    public function scopeForContext($query, Model $model)
-    {
-        return $query->where('context_type', get_class($model))
-            ->where('context_id', $model->getKey());
-    }
-
     public function scopeForContextKey($query, string $type, int $id)
     {
         return $query->where('context_type', $type)
@@ -91,6 +85,11 @@ class CoreTimeEntry extends Model
     /**
      * Scope für Abfragen über Kontext-Kaskade.
      * Findet alle Time-Entries, die über ihre Contexts zu einem bestimmten Kontext gehören.
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param string $type Model-Klasse
+     * @param int $id Model-ID
+     * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeForContext($query, string $type, int $id)
     {
