@@ -45,7 +45,6 @@ class ModalTimeEntry extends Component
     #[On('time-entry')]
     public function setContext(array $payload = []): void
     {
-        dd('time');
         $this->contextType = $payload['context_type'] ?? null;
         $this->contextId = isset($payload['context_id']) ? (int) $payload['context_id'] : null;
         $this->linkedContexts = $payload['linked_contexts'] ?? [];
@@ -59,62 +58,35 @@ class ModalTimeEntry extends Component
     }
 
     #[On('time-entry:open')]
-    public function open(array $payload = []): void
+    public function open(): void
     {
         if (! Auth::check() || ! Auth::user()->currentTeam) {
             return;
         }
 
-        // Kontext wurde bereits durch time-entry-context:set Event gesetzt
-        // Wenn kein Kontext vorhanden, Modal trotzdem öffnen (Fallback-Modus)
-        if (! $this->contextType || ! $this->contextId) {
-            $this->workDate = now()->toDateString();
-            $this->minutes = $payload['minutes'] ?? 60;
-            $this->rate = $payload['rate'] ?? null;
-            $this->note = $payload['note'] ?? null;
-            $this->activeTab = 'entry';
-            $this->open = true;
-            return;
-        }
-
-        if (! class_exists($this->contextType) || ! $this->contextSupportsTimeEntries($this->contextType)) {
-            $this->workDate = now()->toDateString();
-            $this->minutes = $payload['minutes'] ?? 60;
-            $this->rate = $payload['rate'] ?? null;
-            $this->note = $payload['note'] ?? null;
-            $this->activeTab = 'entry';
-            $this->open = true;
-            return;
-        }
-
+        // Initialisiere Formular
         $this->workDate = now()->toDateString();
-        $this->minutes = $payload['minutes'] ?? 60;
-        $this->rate = $payload['rate'] ?? null;
-        $this->note = $payload['note'] ?? null;
+        $this->minutes = 60;
+        $this->rate = null;
+        $this->note = null;
         $this->activeTab = 'entry';
 
-        $this->loadEntries();
-        $this->loadPlannedEntries();
-        $this->loadCurrentPlanned();
+        // Wenn Kontext vorhanden, Daten laden
+        if ($this->contextType && $this->contextId) {
+            if (class_exists($this->contextType) && $this->contextSupportsTimeEntries($this->contextType)) {
+                $this->loadEntries();
+                $this->loadPlannedEntries();
+                $this->loadCurrentPlanned();
+            }
+        }
+
         $this->open = true;
     }
 
-    #[On('time-entry:close')]
     public function close(): void
     {
         $this->resetValidation();
-        $this->reset('open', 'contextType', 'contextId', 'linkedContexts', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote');
-    }
-
-    #[On('time-entry:saved')]
-    public function reload(): void
-    {
-        $this->loadEntries();
-        $this->activeTab = 'overview';
-        $this->resetValidation();
-        $this->reset('workDate', 'minutes', 'rate', 'note');
-        $this->workDate = now()->toDateString();
-        $this->minutes = 60;
+        $this->reset('open', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote');
     }
 
     protected function loadEntries(): void
@@ -399,14 +371,14 @@ class ModalTimeEntry extends Component
             ]);
         }
 
-        $this->dispatch('time-entry:saved', id: $entry->id);
-
         $this->loadEntries();
         $this->activeTab = 'overview';
         $this->resetValidation();
         $this->reset('workDate', 'minutes', 'rate', 'note');
         $this->workDate = now()->toDateString();
         $this->minutes = 60;
+
+        $this->dispatch('time-entry:saved', id: $entry->id);
 
         $this->dispatch('notify', [
             'type' => 'success',

@@ -1,4 +1,4 @@
-<x-ui-modal size="lg" wire:model="open" :closeButton="true" x-on:close-modal-time-entry.window="$wire.close()">
+<x-ui-modal size="lg" wire:model="open" :closeButton="true">
     <x-slot name="header">
         <div class="flex items-center gap-3">
             <div class="flex-shrink-0">
