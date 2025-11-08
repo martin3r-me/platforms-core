@@ -12,6 +12,7 @@ use Platform\Core\Models\CoreTimeEntryContext;
 use Platform\Core\Models\CoreTimePlanned;
 use Platform\Core\Services\StoreTimeEntry;
 use Platform\Core\Services\StorePlannedTime;
+use Platform\Core\Services\TimeContextResolver;
 use Platform\Core\Traits\HasTimeEntries;
 
 class ModalTimeEntry extends Component
@@ -38,6 +39,54 @@ class ModalTimeEntry extends Component
     public ?string $plannedNote = null;
 
     protected array $minuteOptions = [15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 420, 480];
+
+    public function getContextLabelProperty(): ?string
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            return null;
+        }
+
+        $resolver = app(TimeContextResolver::class);
+        return $resolver->resolveLabel($this->contextType, $this->contextId);
+    }
+
+    public function getContextBreadcrumbProperty(): array
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            return [];
+        }
+
+        $breadcrumb = [];
+        
+        // Primärkontext
+        $resolver = app(TimeContextResolver::class);
+        $label = $resolver->resolveLabel($this->contextType, $this->contextId);
+        if ($label) {
+            $breadcrumb[] = [
+                'type' => class_basename($this->contextType),
+                'label' => $label,
+            ];
+        }
+
+        // Vorfahren-Kontexte
+        if (class_exists($this->contextType)) {
+            $model = $this->contextType::find($this->contextId);
+            if ($model && $model instanceof \Platform\Core\Contracts\HasTimeAncestors) {
+                $ancestors = $model->timeAncestors();
+                foreach ($ancestors as $ancestor) {
+                    $ancestorLabel = $ancestor['label'] ?? $resolver->resolveLabel($ancestor['type'], $ancestor['id']);
+                    if ($ancestorLabel) {
+                        $breadcrumb[] = [
+                            'type' => class_basename($ancestor['type']),
+                            'label' => $ancestorLabel,
+                        ];
+                    }
+                }
+            }
+        }
+
+        return $breadcrumb;
+    }
 
     public function mount(): void
     {
