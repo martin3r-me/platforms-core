@@ -39,12 +39,25 @@ class ModalTimeEntry extends Component
 
     public function mount(): void
     {
-        // Initialisierung
+        \Log::info('ModalTimeEntry: mount() called', [
+            'component_id' => $this->getId(),
+        ]);
+    }
+
+    public function boot(): void
+    {
+        \Log::info('ModalTimeEntry: boot() called', [
+            'component_id' => $this->getId(),
+        ]);
     }
 
     #[On('time-entry')]
     public function setContext(): void
     {
+        \Log::info('ModalTimeEntry: time-entry event received!', [
+            'component_id' => $this->getId(),
+            'timestamp' => now(),
+        ]);
         dd('time-entry event received');
     }
 

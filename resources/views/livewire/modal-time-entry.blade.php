@@ -1,3 +1,12 @@
+<div 
+    x-data
+    x-init="
+        window.addEventListener('time-entry', (e) => {
+            console.log('Browser: time-entry event received', e);
+        });
+        console.log('ModalTimeEntry: Alpine initialized');
+    "
+>
 <x-ui-modal size="lg" wire:model="open" :closeButton="true">
     <x-slot name="header">
         <div class="flex items-center gap-3">
@@ -426,3 +435,4 @@
         </div>
     </x-slot>
 </x-ui-modal>
+</div>
