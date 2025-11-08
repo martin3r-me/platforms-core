@@ -20,6 +20,17 @@
 
 <body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)] overflow-hidden">
 
+  {{-- Modals früh laden, damit sie Events empfangen können --}}
+  @auth 
+    @livewire('core.modal-team')
+    @livewire('core.modal-user')
+    @livewire('core.modal-checkin')
+    @livewire('core.modal-pricing')
+    @livewire('comms.comms-modal')
+    @livewire('core.modal-modules')
+    @livewire('core.modal-time-entry')
+  @endauth
+
   @php
     $currentModuleKey = explode('.', request()->route()?->getName())[0] ?? null;
     $class = $currentModuleKey 
@@ -43,16 +54,6 @@
       @livewire('core.terminal')
     </main>
   </div>
-
-  @auth 
-    @livewire('core.modal-team')
-    @livewire('core.modal-user')
-    @livewire('core.modal-checkin')
-    @livewire('core.modal-pricing')
-    @livewire('comms.comms-modal')
-    @livewire('core.modal-modules')
-    @livewire('core.modal-time-entry')
-  @endauth
     
   <livewire:notifications.notices.index />
   @if(config('notifications.show_modal'))

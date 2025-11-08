@@ -1,16 +1,4 @@
-<div 
-    x-data
-    x-init="
-        // Browser-Event empfangen und an Livewire weiterleiten
-        window.addEventListener('time-entry', (e) => {
-            console.log('Browser: time-entry event received', e);
-            if (e.detail && $wire) {
-                $wire.setContext(e.detail);
-            }
-        });
-        console.log('ModalTimeEntry: Alpine initialized');
-    "
->
+<div x-data="{ activeTab: $wire.entangle('activeTab') }">
 <x-ui-modal size="lg" wire:model="open" :closeButton="true">
     <x-slot name="header">
         <div class="flex items-center gap-3">
@@ -26,7 +14,7 @@
         </div>
     </x-slot>
 
-    <div x-data="{ activeTab: $wire.entangle('activeTab') }">
+    <div>
         @if(!$contextType || !$contextId)
             <!-- Fallback: Kein Kontext -->
             <div class="py-12 text-center">
