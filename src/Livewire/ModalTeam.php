@@ -16,6 +16,8 @@ class ModalTeam extends Component
     public $allTeams = [];
     public $user = [];
     public $newTeamName = '';
+    public $newParentTeamId = null;
+    public $availableParentTeams = [];
     public $inviteEmail = '';
     public $inviteRole = 'member';
     public $team;
@@ -53,6 +55,7 @@ class ModalTeam extends Component
         $this->user = auth()->user()->toArray();
         $this->team = auth()->user()->currentTeam;
         $this->loadTeams();
+        $this->loadAvailableParentTeams();
         $this->loadMemberRoles();
         $this->loadBillingData();
         $this->loadBillingTotals();
@@ -62,6 +65,7 @@ class ModalTeam extends Component
     {
         $this->modalShow = true;
         $this->team = auth()->user()->currentTeam;
+        $this->loadAvailableParentTeams();
         $this->loadMemberRoles();
     }
 
@@ -72,22 +76,83 @@ class ModalTeam extends Component
         })->get();
     }
 
+    /**
+     * Lädt verfügbare Parent-Teams (Root-Teams, zu denen der User Zugriff hat).
+     * Nur Root-Teams können als Parent-Teams verwendet werden.
+     */
+    public function loadAvailableParentTeams()
+    {
+        $user = auth()->user();
+        $this->availableParentTeams = Team::whereHas('users', function ($query) use ($user) {
+            $query->where('user_id', $user->id);
+        })
+        ->whereNull('parent_team_id') // Nur Root-Teams
+        ->where('id', '!=', $user->currentTeam?->id) // Aktuelles Team ausschließen (kann nicht Parent von sich selbst sein)
+        ->get()
+        ->map(function ($team) {
+            return [
+                'id' => $team->id,
+                'name' => $team->name,
+            ];
+        })
+        ->toArray();
+    }
+
     public function createTeam()
     {
         $this->validate([
             'newTeamName' => 'required|string|max:255',
+            'newParentTeamId' => [
+                'nullable',
+                'integer',
+                'exists:teams,id',
+                function ($attribute, $value, $fail) {
+                    if ($value) {
+                        // Prüfe ob User Zugriff auf das Parent-Team hat
+                        $user = auth()->user();
+                        $parentTeam = Team::find($value);
+                        
+                        if (!$parentTeam) {
+                            $fail('Das ausgewählte Parent-Team existiert nicht.');
+                            return;
+                        }
+
+                        // Prüfe ob es ein Root-Team ist (nur Root-Teams können Parent sein)
+                        if ($parentTeam->parent_team_id !== null) {
+                            $fail('Nur Root-Teams können als Parent-Team verwendet werden.');
+                            return;
+                        }
+
+                        // Prüfe ob User Mitglied des Parent-Teams ist
+                        if (!$parentTeam->users()->where('user_id', $user->id)->exists()) {
+                            $fail('Du hast keinen Zugriff auf das ausgewählte Parent-Team.');
+                            return;
+                        }
+
+                        // Prüfe ob User Owner oder Admin des Parent-Teams ist
+                        $userRole = $parentTeam->users()->where('user_id', $user->id)->first()?->pivot->role;
+                        if (!in_array($userRole, [TeamRole::OWNER->value, TeamRole::ADMIN->value])) {
+                            $fail('Nur Owner oder Admin können Kind-Teams erstellen.');
+                            return;
+                        }
+                    }
+                },
+            ],
         ]);
 
         $team = Team::create([
             'name' => $this->newTeamName,
             'user_id' => auth()->id(),
+            'parent_team_id' => $this->newParentTeamId,
             'personal_team' => false,
         ]);
 
         $team->users()->attach(auth()->id(), ['role' => TeamRole::OWNER->value]);
 
         $this->newTeamName = '';
+        $this->newParentTeamId = null;
         $this->loadTeams();
+        $this->loadAvailableParentTeams();
         $this->dispatch('team-created');
     }
 

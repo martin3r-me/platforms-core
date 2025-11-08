@@ -50,6 +50,21 @@
                         required
                         :errorKey="'newTeamName'"
                     />
+                    @if(!empty($availableParentTeams) && count($availableParentTeams) > 0)
+                        <x-ui-input-select
+                            name="newParentTeamId"
+                            label="Parent-Team (optional)"
+                            :options="$availableParentTeams"
+                            optionValue="id"
+                            optionLabel="name"
+                            :nullable="true"
+                            wire:model.live="newParentTeamId"
+                            :errorKey="'newParentTeamId'"
+                        />
+                        <p class="text-xs text-[var(--ui-muted)]">
+                            Optional: Wähle ein Root-Team als Parent-Team. Kind-Teams erben Zugriff auf root-scoped Module (z.B. CRM, Organization).
+                        </p>
+                    @endif
                     <x-ui-button type="submit">Team erstellen</x-ui-button>
                 </form>
             </div>

@@ -29,6 +29,8 @@ class ModalModules extends Component
     public $user;
     public $allTeams = [];
     public $newTeamName = '';
+    public $newParentTeamId = null;
+    public $availableParentTeams = [];
     public $inviteEmail = '';
     public $inviteRole = TeamRole::MEMBER;
     public $memberRoles = [];
@@ -50,6 +52,7 @@ class ModalModules extends Component
         $this->user = Auth::user();
         $this->allTeams = $this->user?->teams()->get() ?? collect();
         $this->loadTeam();
+        $this->loadAvailableParentTeams();
         $this->mollieKey = env('MOLLIE_KEY');
 
         $user = $this->user;
@@ -200,6 +203,28 @@ class ModalModules extends Component
         }
     }
 
+    /**
+     * Lädt verfügbare Parent-Teams (Root-Teams, zu denen der User Zugriff hat).
+     * Nur Root-Teams können als Parent-Teams verwendet werden.
+     */
+    public function loadAvailableParentTeams(): void
+    {
+        $user = Auth::user();
+        $this->availableParentTeams = Team::whereHas('users', function ($query) use ($user) {
+            $query->where('user_id', $user->id);
+        })
+        ->whereNull('parent_team_id') // Nur Root-Teams
+        ->where('id', '!=', $user->currentTeam?->id) // Aktuelles Team ausschließen
+        ->get()
+        ->map(function ($team) {
+            return [
+                'id' => $team->id,
+                'name' => $team->name,
+            ];
+        })
+        ->toArray();
+    }
+
     public function updatedTeam($property, $value): void
     {
         $this->validateOnly("team.$property");
@@ -247,12 +272,45 @@ class ModalModules extends Component
     public function createTeam(): void
     {
         $this->validate([
-            'newTeamName' => 'required|string|max:255'
+            'newTeamName' => 'required|string|max:255',
+            'newParentTeamId' => [
+                'nullable',
+                'integer',
+                'exists:teams,id',
+                function ($attribute, $value, $fail) {
+                    if ($value) {
+                        $user = Auth::user();
+                        $parentTeam = Team::find($value);
+                        
+                        if (!$parentTeam) {
+                            $fail('Das ausgewählte Parent-Team existiert nicht.');
+                            return;
+                        }
+
+                        if ($parentTeam->parent_team_id !== null) {
+                            $fail('Nur Root-Teams können als Parent-Team verwendet werden.');
+                            return;
+                        }
+
+                        if (!$parentTeam->users()->where('user_id', $user->id)->exists()) {
+                            $fail('Du hast keinen Zugriff auf das ausgewählte Parent-Team.');
+                            return;
+                        }
+
+                        $userRole = $parentTeam->users()->where('user_id', $user->id)->first()?->pivot->role;
+                        if (!in_array($userRole, [TeamRole::OWNER->value, TeamRole::ADMIN->value])) {
+                            $fail('Nur Owner oder Admin können Kind-Teams erstellen.');
+                            return;
+                        }
+                    }
+                },
+            ],
         ]);
 
         $team = Team::create([
             'name' => $this->newTeamName,
             'user_id' => Auth::id(),
+            'parent_team_id' => $this->newParentTeamId,
             'personal_team' => false,
         ]);
 
@@ -264,7 +322,9 @@ class ModalModules extends Component
         }
 
         $this->newTeamName = '';
+        $this->newParentTeamId = null;
         $this->loadTeam();
+        $this->loadAvailableParentTeams();
     }
 
     public function updateMemberRole($userId, $newRole): void
