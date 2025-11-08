@@ -45,6 +45,14 @@ class TimeContextResolver
             return null;
         }
 
+        // Spezialbehandlung für CRM Company
+        if ($type === 'Platform\Crm\Models\CrmCompany' || $type === \Platform\Crm\Models\CrmCompany::class) {
+            if (interface_exists(\Platform\Core\Contracts\CrmCompanyResolverInterface::class)) {
+                $resolver = app(\Platform\Core\Contracts\CrmCompanyResolverInterface::class);
+                return $resolver->displayName($id);
+            }
+        }
+
         $model = $type::find($id);
 
         if (! $model) {
