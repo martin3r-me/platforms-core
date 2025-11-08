@@ -20,15 +20,6 @@ class ModalUser extends Component
     public function openModal()
     {
         $this->modalShow = true;
-        
-        // Organization-Kontext setzen - nur Kontext-Management, keine Zeiterfassung
-        $this->dispatch('organization', [
-            'context_type' => \Platform\Core\Models\User::class,
-            'context_id' => auth()->id(),
-            'allow_time_entry' => false,
-            'allow_context_management' => true,
-            'can_link_to_entity' => true,
-        ]);
     }
 
     public function save()
