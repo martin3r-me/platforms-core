@@ -41,12 +41,23 @@ class PlatformCore
         $moduleConfig['url'] = $url;
 
         // --- 1. Modul einmalig in die DB schreiben ---
+        // Scope-Type: 'single' = team-spezifisch, 'parent' = root-scoped
+        // Kann direkt im $moduleConfig oder in der Config-Datei (z.B. config('crm.scope_type')) gesetzt werden
+        $scopeType = $moduleConfig['scope_type'] 
+            ?? config(strtolower($key) . '.scope_type') 
+            ?? 'single';
+        
+        if (!in_array($scopeType, ['single', 'parent'])) {
+            $scopeType = 'single'; // Fallback auf single bei ungültigem Wert
+        }
+
         Module::updateOrCreate(
             ['key' => $key],
             [
                 'title'       => $moduleConfig['title'] ?? ucfirst($key),
                 'description' => $moduleConfig['description'] ?? null,
                 'url'         => $url,
+                'scope_type'  => $scopeType,
                 'config'      => $moduleConfig,
             ]
         );
