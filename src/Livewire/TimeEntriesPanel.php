@@ -89,7 +89,7 @@ class TimeEntriesPanel extends Component
             ->findOrFail($entryId);
 
         $user = Auth::user();
-        $team = $user?->currentTeam;
+        $team = $user?->currentTeamRelation; // Child-Team (nicht dynamisch)
 
         if (! $team || $entry->team_id !== $team->id) {
             $this->dispatch('notify', [
@@ -117,7 +117,7 @@ class TimeEntriesPanel extends Component
             ->findOrFail($entryId);
 
         $user = Auth::user();
-        $team = $user?->currentTeam;
+        $team = $user?->currentTeamRelation; // Child-Team (nicht dynamisch)
 
         if (! $team || $entry->team_id !== $team->id) {
             $this->dispatch('notify', [

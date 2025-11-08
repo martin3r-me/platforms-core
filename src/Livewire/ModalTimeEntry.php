@@ -123,7 +123,7 @@ class ModalTimeEntry extends Component
     #[On('time-entry:open')]
     public function open(): void
     {
-        if (! Auth::check() || ! Auth::user()->currentTeam) {
+        if (! Auth::check() || ! Auth::user()->currentTeamRelation) {
             return;
         }
 
@@ -174,7 +174,7 @@ class ModalTimeEntry extends Component
     protected function loadTeamEntries(): void
     {
         $user = Auth::user();
-        $team = $user?->currentTeam;
+        $team = $user?->currentTeamRelation; // Child-Team (nicht dynamisch)
 
         if (! $team) {
             $this->teamEntries = collect();
@@ -228,7 +228,7 @@ class ModalTimeEntry extends Component
     public function getTeamTotalMinutesProperty(): int
     {
         $user = Auth::user();
-        $team = $user?->currentTeam;
+        $team = $user?->currentTeamRelation; // Child-Team (nicht dynamisch)
 
         if (! $team) {
             return 0;
@@ -245,7 +245,7 @@ class ModalTimeEntry extends Component
     public function getTeamBilledMinutesProperty(): int
     {
         $user = Auth::user();
-        $team = $user?->currentTeam;
+        $team = $user?->currentTeamRelation; // Child-Team (nicht dynamisch)
 
         if (! $team) {
             return 0;
@@ -268,7 +268,7 @@ class ModalTimeEntry extends Component
     public function getTeamPlannedMinutesProperty(): ?int
     {
         $user = Auth::user();
-        $team = $user?->currentTeam;
+        $team = $user?->currentTeamRelation; // Child-Team (nicht dynamisch)
 
         if (! $team) {
             return null;
@@ -323,7 +323,7 @@ class ModalTimeEntry extends Component
             ->findOrFail($entryId);
 
         $user = Auth::user();
-        $team = $user?->currentTeam;
+        $team = $user?->currentTeamRelation; // Child-Team (nicht dynamisch)
 
         if (! $team || $entry->team_id !== $team->id) {
             $this->dispatch('notify', [
@@ -351,7 +351,7 @@ class ModalTimeEntry extends Component
             ->findOrFail($entryId);
 
         $user = Auth::user();
-        $team = $user?->currentTeam;
+        $team = $user?->currentTeamRelation; // Child-Team (nicht dynamisch)
 
         if (! $team || $entry->team_id !== $team->id) {
             $this->dispatch('notify', [
@@ -417,7 +417,7 @@ class ModalTimeEntry extends Component
 
     public function savePlanned(): void
     {
-        if (! Auth::check() || ! Auth::user()->currentTeam) {
+        if (! Auth::check() || ! Auth::user()->currentTeamRelation) {
             $this->addError('plannedMinutes', 'Kein Team-Kontext vorhanden.');
             return;
         }
@@ -428,7 +428,7 @@ class ModalTimeEntry extends Component
         ]);
 
         $user = Auth::user();
-        $team = $user?->currentTeam;
+        $team = $user?->currentTeamRelation; // Child-Team (nicht dynamisch)
 
         $contextClass = $this->contextType;
         $context = $contextClass::find($this->contextId);
@@ -495,7 +495,7 @@ class ModalTimeEntry extends Component
 
     public function save(): void
     {
-        if (! Auth::check() || ! Auth::user()->currentTeam) {
+        if (! Auth::check() || ! Auth::user()->currentTeamRelation) {
             $this->addError('contextType', 'Kein Team-Kontext vorhanden.');
             return;
         }
@@ -503,7 +503,7 @@ class ModalTimeEntry extends Component
         $this->validate();
 
         $user = Auth::user();
-        $team = $user?->currentTeam;
+        $team = $user?->currentTeamRelation; // Child-Team (nicht dynamisch)
 
         $rateCents = $this->rateToCents($this->rate);
         if ($this->rate && $rateCents === null) {

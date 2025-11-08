@@ -50,8 +50,8 @@ class CoreTimeEntry extends Model
 
             $entry->uuid = $uuid;
 
-            if (! $entry->team_id && Auth::user()?->currentTeam) {
-                $entry->team_id = Auth::user()->currentTeam->id;
+            if (! $entry->team_id && Auth::user()?->currentTeamRelation) {
+                $entry->team_id = Auth::user()->currentTeamRelation->id; // Child-Team (nicht dynamisch)
             }
         });
     }
