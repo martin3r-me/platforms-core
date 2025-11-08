@@ -39,17 +39,14 @@ class ModalTimeEntry extends Component
 
     protected array $minuteOptions = [15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 420, 480];
 
-    #[On('comms')]
-    public function prepareCommsContext(array $payload = []): void
+    public function mount(): void
     {
-        dd('test');
-        $this->applyPayload($payload);
+        // Initialisierung
     }
 
-    #[On('time-entry-context-set')]
-    public function setContext(array $payload): void
+    #[On('timeEntryContextSet')]
+    public function setContext(array $payload = []): void
     {
-        dd('test');
         $this->contextType = $payload['context_type'] ?? null;
         $this->contextId = isset($payload['context_id']) ? (int) $payload['context_id'] : null;
         $this->linkedContexts = $payload['linked_contexts'] ?? [];
