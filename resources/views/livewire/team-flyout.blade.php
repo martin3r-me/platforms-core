@@ -36,7 +36,7 @@
             <h3 class="text-xs font-semibold text-[var(--ui-muted)] mb-2 px-2">Teams</h3>
             <div class="space-y-1">
                 @foreach($userTeams as $team)
-                    @php $isActiveTeam = $currentTeam?->id === $team->id; @endphp
+                    @php $isActiveTeam = $baseTeam?->id === $team->id; @endphp
                     <button type="button" wire:click="switchTeam({{ $team->id }})"
                         class="w-full group flex items-center gap-2 px-2 py-1.5 rounded-md transition text-sm
                         {{ $isActiveTeam ? 'bg-[var(--ui-primary-5)] border border-[var(--ui-primary)]/60' : 'hover:bg-[var(--ui-muted-5)]' }}">
