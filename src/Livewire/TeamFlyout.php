@@ -11,6 +11,7 @@ class TeamFlyout extends Component
 {
     public $show = false;
     public $userTeams = [];
+    public $groupedTeams = []; // Gruppierte Teams: Parent-Teams mit ihren Kindern
     public $currentTeam;
     public $baseTeam; // Das ursprüngliche Team (Child)
     public $parentTeam; // Das Parent-Team (falls vorhanden)
@@ -49,7 +50,28 @@ class TeamFlyout extends Component
             $this->parentTeam = $this->baseTeam->parentTeam;
         }
         
-        $this->userTeams = $user->teams()->orderBy('name')->get() ?? collect();
+        // Alle Teams des Users holen
+        $allTeams = $user->teams()->with('childTeams', 'parentTeam')->orderBy('name')->get() ?? collect();
+        
+        // Teams gruppieren: Parent-Teams mit ihren Kindern
+        $parentTeams = $allTeams->filter(function($team) {
+            return $team->parent_team_id === null; // Nur Root-Teams
+        })->sortBy('name');
+        
+        $this->groupedTeams = $parentTeams->map(function($parentTeam) use ($allTeams) {
+            // Kind-Teams dieses Parent-Teams finden (nur die, die der User hat)
+            $childTeams = $allTeams->filter(function($team) use ($parentTeam) {
+                return $team->parent_team_id === $parentTeam->id;
+            })->sortBy('name');
+            
+            return [
+                'parent' => $parentTeam,
+                'children' => $childTeams->values()
+            ];
+        })->values();
+        
+        // Für Rückwärtskompatibilität behalten wir auch userTeams
+        $this->userTeams = $allTeams;
     }
 
     public function loadCurrentModule()

@@ -14,18 +14,18 @@
     </button>
     
     <div x-show="moduleFlyoutOpen" x-cloak x-transition
-        class="absolute top-full right-0 mt-2 w-64 bg-[var(--ui-surface)] rounded-lg border border-[var(--ui-border)]/60 shadow-lg z-50 max-h-[80vh] overflow-y-auto">
+        class="absolute top-full right-0 mt-2 w-80 bg-[var(--ui-surface)] rounded-lg border border-[var(--ui-border)]/60 shadow-lg z-50 max-h-[80vh] overflow-y-auto">
         <div class="p-2">
-            <h3 class="text-xs font-semibold text-[var(--ui-muted)] mb-2 px-2">Module</h3>
+            <h3 class="text-[0.625rem] font-semibold text-[var(--ui-muted)] mb-2 px-2">Module</h3>
             <div class="space-y-1">
                 {{-- Dashboard --}}
                 <a href="{{ route('platform.dashboard') }}"
-                    class="w-full group flex items-center gap-2 px-2 py-1.5 rounded-md transition text-sm hover:bg-[var(--ui-muted-5)]">
+                    class="w-full group flex items-center gap-2 px-2 py-1.5 rounded-md transition text-xs hover:bg-[var(--ui-muted-5)]">
                     <div class="flex-shrink-0">
                         @svg('heroicon-o-home', 'w-4 h-4 text-[var(--ui-primary)]')
                     </div>
                     <div class="min-w-0 flex-1 text-left">
-                        <div class="font-medium text-[var(--ui-secondary)] text-sm truncate">Haupt-Dashboard</div>
+                        <div class="font-medium text-[var(--ui-secondary)] text-xs truncate">Haupt-Dashboard</div>
                     </div>
                 </a>
 
@@ -39,7 +39,7 @@
                             : ($module['url'] ?? '#');
                     @endphp
                     <a href="{{ $finalUrl }}"
-                        class="w-full group flex items-center gap-2 px-2 py-1.5 rounded-md transition text-sm hover:bg-[var(--ui-muted-5)]">
+                        class="w-full group flex items-center gap-2 px-2 py-1.5 rounded-md transition text-xs hover:bg-[var(--ui-muted-5)]">
                         <div class="flex-shrink-0">
                             @if(!empty($icon))
                                 <x-dynamic-component :component="$icon" class="w-4 h-4 text-[var(--ui-primary)]" />
@@ -48,7 +48,7 @@
                             @endif
                         </div>
                         <div class="min-w-0 flex-1 text-left">
-                            <div class="font-medium text-[var(--ui-secondary)] text-sm truncate">{{ $title }}</div>
+                            <div class="font-medium text-[var(--ui-secondary)] text-xs truncate">{{ $title }}</div>
                         </div>
                     </a>
                 @endforeach
