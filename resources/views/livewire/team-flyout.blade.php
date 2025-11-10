@@ -33,7 +33,7 @@
     <div x-show="teamFlyoutOpen" x-cloak x-transition
         class="absolute top-full right-0 mt-2 w-80 bg-[var(--ui-surface)] rounded-lg border border-[var(--ui-border)]/60 shadow-lg z-50 max-h-[80vh] overflow-y-auto">
         <div class="p-2">
-            <h3 class="text-[0.625rem] font-semibold text-[var(--ui-muted)] mb-2 px-2">Teams</h3>
+            <h3 class="text-[0.625rem] font-semibold text-[var(--ui-muted)] mb-2 px-2">SPACES</h3>
             <div class="space-y-1">
                 @foreach($groupedTeams as $group)
                     @php 
@@ -80,6 +80,33 @@
                     @endforeach
                 @endforeach
             </div>
+            
+            {{-- Persönliche Teams am Ende --}}
+            @if($personalTeams->count() > 0)
+                <div class="mt-4 pt-4 border-t border-[var(--ui-border)]/60">
+                    <h3 class="text-[0.625rem] font-semibold text-[var(--ui-muted)] mb-2 px-2">Persönlich</h3>
+                    <div class="space-y-1">
+                        @foreach($personalTeams as $personalTeam)
+                            @php $isActivePersonalTeam = $baseTeam?->id === $personalTeam->id; @endphp
+                            <button type="button" wire:click="switchTeam({{ $personalTeam->id }})"
+                                class="w-full group flex items-center gap-2 px-2 py-1.5 rounded-md transition text-xs
+                                {{ $isActivePersonalTeam ? 'bg-[var(--ui-primary-5)] border border-[var(--ui-primary)]/60' : 'hover:bg-[var(--ui-muted-5)]' }}">
+                                <div class="flex-shrink-0">
+                                    @svg('heroicon-o-user', 'w-4 h-4 text-[var(--ui-primary)]')
+                                </div>
+                                <div class="min-w-0 flex-1 text-left">
+                                    <div class="font-medium text-[var(--ui-secondary)] truncate text-xs">{{ $personalTeam->name }}</div>
+                                </div>
+                                @if($isActivePersonalTeam)
+                                    <div class="flex-shrink-0">
+                                        @svg('heroicon-o-check', 'w-3.5 h-3.5 text-[var(--ui-primary)]')
+                                    </div>
+                                @endif
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 </div>
