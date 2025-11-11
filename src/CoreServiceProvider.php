@@ -15,6 +15,8 @@ use Platform\Core\Services\NullCrmCompanyResolver;
 use Platform\Core\Services\NullCrmContactResolver;
 use Platform\Core\Contracts\CrmCompanyOptionsProviderInterface;
 use Platform\Core\Services\NullCrmCompanyOptionsProvider;
+use Platform\Core\Contracts\CrmContactOptionsProviderInterface;
+use Platform\Core\Services\NullCrmContactOptionsProvider;
 use Platform\Core\Services\IntelligentAgent;
 use Platform\Core\Services\ToolRegistry;
 use Platform\Core\Services\ToolExecutor;
@@ -101,6 +103,9 @@ class CoreServiceProvider extends ServiceProvider
         });
         $this->app->singleton(CrmCompanyOptionsProviderInterface::class, function () {
             return new NullCrmCompanyOptionsProvider();
+        });
+        $this->app->singleton(CrmContactOptionsProviderInterface::class, function () {
+            return new NullCrmContactOptionsProvider();
         });
 
         // AI Agent Services entfernt – kommen in separates Modul
