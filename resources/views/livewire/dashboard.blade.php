@@ -217,10 +217,14 @@
                 <ul role="list" class="mx-auto mt-16 grid max-w-2xl grid-cols-2 gap-x-8 gap-y-16 text-center sm:grid-cols-3 md:grid-cols-4 lg:mx-0 lg:max-w-none lg:grid-cols-5 xl:grid-cols-6">
                     @foreach($teamMembers as $member)
                         <li>
-                            <div class="mx-auto size-24 rounded-full bg-[var(--ui-primary-5)] flex items-center justify-center outline-1 -outline-offset-1 outline-[var(--ui-border)]">
-                                <span class="text-2xl font-semibold text-[var(--ui-primary)]">
-                                    {{ strtoupper(substr($member->name, 0, 2)) }}
-                                </span>
+                            <div class="mx-auto size-24 rounded-full bg-[var(--ui-primary-5)] flex items-center justify-center outline-1 -outline-offset-1 outline-[var(--ui-border)] overflow-hidden">
+                                @if($member->avatar)
+                                    <img src="{{ $member->avatar }}" alt="{{ $member->name }}" class="w-full h-full object-cover rounded-full">
+                                @else
+                                    <span class="text-2xl font-semibold text-[var(--ui-primary)]">
+                                        {{ strtoupper(substr($member->name, 0, 2)) }}
+                                    </span>
+                                @endif
                             </div>
                             <h3 class="mt-6 text-base/7 font-semibold tracking-tight text-[var(--ui-secondary)]">{{ $member->name }}</h3>
                             <p class="text-sm/6 text-[var(--ui-muted)]">
