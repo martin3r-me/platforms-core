@@ -5,6 +5,8 @@ namespace Platform\Core\Livewire;
 use Livewire\Component;
 use Platform\Core\PlatformCore;
 use Platform\Core\Models\TeamBillableUsage;
+use Platform\Core\Models\TeamUserLastModule;
+use Platform\Core\Models\Module;
 use Illuminate\Support\Facades\Auth;
 
 class Dashboard extends Component
@@ -19,10 +21,30 @@ class Dashboard extends Component
         $this->modules = PlatformCore::getModules();
         
         if (Auth::check()) {
-            $this->currentTeam = Auth::user()->currentTeam;
+            $user = Auth::user();
+            $this->currentTeam = $user->currentTeam;
+            
             if ($this->currentTeam) {
                 $this->teamMembers = $this->currentTeam->users()->get()->all();
                 $this->loadMonthlyCosts();
+                
+                // Prüfe ob es ein zuletzt verwendetes Modul gibt und redirecte dorthin
+                $lastModuleKey = TeamUserLastModule::getLastModule($user->id, $this->currentTeam->id);
+                if ($lastModuleKey && $lastModuleKey !== 'dashboard') {
+                    $moduleModel = Module::where('key', $lastModuleKey)->first();
+                    if ($moduleModel) {
+                        $teamAllowed = $this->currentTeam
+                            ->modules()
+                            ->where('module_id', $moduleModel->id)
+                            ->wherePivot('enabled', true)
+                            ->exists();
+
+                        if ($teamAllowed) {
+                            // Zum zuletzt verwendeten Modul redirecten
+                            return $this->redirect('/' . $lastModuleKey);
+                        }
+                    }
+                }
             }
         }
     }

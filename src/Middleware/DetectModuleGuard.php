@@ -19,57 +19,7 @@ class DetectModuleGuard
         $host = $request->getHost();
         $path = trim($request->getPathInfo(), '/');
 
-        // Prüfe ob wir auf Dashboard/Root sind und zuletzt verwendetes Modul laden
-        // Nur bei normalen GET-Requests (nicht bei AJAX/Livewire)
-        if ((empty($path) || $path === 'dashboard') && $request->isMethod('GET') && !$request->ajax() && !$request->wantsJson()) {
-            $user = Auth::user();
-            if ($user && $user->current_team_id) {
-                $lastModuleKey = TeamUserLastModule::getLastModule($user->id, $user->current_team_id);
-                
-                Log::info('DetectModuleGuard: Prüfe zuletzt verwendetes Modul', [
-                    'user_id' => $user->id,
-                    'team_id' => $user->current_team_id,
-                    'last_module_key' => $lastModuleKey,
-                    'path' => $path,
-                ]);
-                
-                if ($lastModuleKey && $lastModuleKey !== 'dashboard') {
-                    // Prüfe ob es ein echtes Modul ist
-                    $moduleModel = Module::where('key', $lastModuleKey)->first();
-                    if ($moduleModel) {
-                        $team = $user->currentTeam;
-                        $teamAllowed = $team
-                            ? $team->modules()->where('module_id', $moduleModel->id)->wherePivot('enabled', true)->exists()
-                            : false;
-
-                        Log::info('DetectModuleGuard: Modul-Prüfung', [
-                            'module_key' => $lastModuleKey,
-                            'team_allowed' => $teamAllowed,
-                            'team_id' => $team?->id,
-                        ]);
-
-                        if ($teamAllowed) {
-                            // Zum zuletzt verwendeten Modul redirecten
-                            Log::info('DetectModuleGuard: Redirect zum Modul', [
-                                'module_key' => $lastModuleKey,
-                                'redirect_to' => '/' . $lastModuleKey,
-                            ]);
-                            return redirect('/' . $lastModuleKey);
-                        }
-                    } else {
-                        Log::warning('DetectModuleGuard: Modul nicht gefunden', [
-                            'module_key' => $lastModuleKey,
-                        ]);
-                    }
-                } else {
-                    Log::info('DetectModuleGuard: Kein zuletzt verwendetes Modul gefunden oder Dashboard', [
-                        'user_id' => $user->id,
-                        'team_id' => $user->current_team_id,
-                        'last_module_key' => $lastModuleKey,
-                    ]);
-                }
-            }
-        }
+        // Redirect-Logik wird in der Dashboard-Komponente gemacht (sauberer)
 
         // Alle registrierten Module durchgehen
         foreach (PlatformCore::getModules() as $module) {
@@ -120,6 +70,12 @@ class DetectModuleGuard
             Auth::shouldUse($guard);
 
             $moduleKey = $currentModule['key'];
+            
+            // Wenn "core" erkannt wurde und wir auf dashboard sind, dann "dashboard" speichern
+            if ($moduleKey === 'core' && ($path === 'dashboard' || empty($path))) {
+                $moduleKey = 'dashboard';
+            }
+            
             $request->attributes->set('current_module', $moduleKey);
             
             // Auch in Session speichern für Livewire-Requests
@@ -127,7 +83,7 @@ class DetectModuleGuard
 
             // Modul für aktuelles Team speichern (wenn User eingeloggt und Team vorhanden)
             $user = Auth::user();
-            if ($user && $user->current_team_id && $moduleKey !== 'core') {
+            if ($user && $user->current_team_id) {
                 TeamUserLastModule::updateLastModule($user->id, $user->current_team_id, $moduleKey);
             }
 
@@ -143,14 +99,6 @@ class DetectModuleGuard
             // Kein Modul → Standard-Guard, kein Key
             Auth::shouldUse('web');
             $request->attributes->set('current_module', null);
-            
-            // Dashboard/Root: Auch als "Ziel" speichern
-            if (empty($path) || $path === 'dashboard') {
-                $user = Auth::user();
-                if ($user && $user->current_team_id) {
-                    TeamUserLastModule::updateLastModule($user->id, $user->current_team_id, 'dashboard');
-                }
-            }
             
             // Bei Livewire-Requests: Versuche Modul aus Session zu holen
             if (str_starts_with($path, 'livewire/')) {
