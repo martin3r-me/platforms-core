@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\PlatformCore;
+use Platform\Core\Models\TeamUserLastModule;
 
 class DetectModuleGuard
 {
@@ -70,6 +71,12 @@ class DetectModuleGuard
             
             // Auch in Session speichern für Livewire-Requests
             session(['current_module_key' => $moduleKey]);
+
+            // Modul für aktuelles Team speichern (wenn User eingeloggt und Team vorhanden)
+            $user = Auth::user();
+            if ($user && $user->current_team_id && $moduleKey !== 'core') {
+                TeamUserLastModule::updateLastModule($user->id, $user->current_team_id, $moduleKey);
+            }
 
             Log::info('DetectModuleGuard: Modul erkannt', [
                 'module' => $moduleKey,
