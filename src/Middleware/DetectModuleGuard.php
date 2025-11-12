@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\PlatformCore;
 use Platform\Core\Models\TeamUserLastModule;
+use Platform\Core\Models\Module;
 
 class DetectModuleGuard
 {
@@ -17,6 +18,29 @@ class DetectModuleGuard
 
         $host = $request->getHost();
         $path = trim($request->getPathInfo(), '/');
+
+        // Prüfe ob wir auf Dashboard/Root sind und zuletzt verwendetes Modul laden
+        // Nur bei normalen GET-Requests (nicht bei AJAX/Livewire)
+        if ((empty($path) || $path === 'dashboard') && $request->isMethod('GET') && !$request->ajax()) {
+            $user = Auth::user();
+            if ($user && $user->current_team_id) {
+                $lastModuleKey = TeamUserLastModule::getLastModule($user->id, $user->current_team_id);
+                if ($lastModuleKey) {
+                    $moduleModel = Module::where('key', $lastModuleKey)->first();
+                    if ($moduleModel) {
+                        $team = $user->currentTeam;
+                        $teamAllowed = $team
+                            ? $team->modules()->where('module_id', $moduleModel->id)->wherePivot('enabled', true)->exists()
+                            : false;
+
+                        if ($teamAllowed) {
+                            // Zum zuletzt verwendeten Modul redirecten
+                            return redirect('/' . $lastModuleKey);
+                        }
+                    }
+                }
+            }
+        }
 
         // Alle registrierten Module durchgehen
         foreach (PlatformCore::getModules() as $module) {
