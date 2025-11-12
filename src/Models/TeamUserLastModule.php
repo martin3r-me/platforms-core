@@ -57,5 +57,6 @@ class TeamUserLastModule extends Model
 
         return $record?->module_key;
     }
+
 }
 
