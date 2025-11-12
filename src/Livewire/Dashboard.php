@@ -8,6 +8,7 @@ use Platform\Core\Models\TeamBillableUsage;
 use Platform\Core\Models\TeamUserLastModule;
 use Platform\Core\Models\Module;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class Dashboard extends Component
 {
@@ -30,6 +31,13 @@ class Dashboard extends Component
                 
                 // Prüfe ob es ein zuletzt verwendetes Modul gibt und redirecte dorthin
                 $lastModuleKey = TeamUserLastModule::getLastModule($user->id, $this->currentTeam->id);
+                
+                Log::info('Dashboard: Prüfe zuletzt verwendetes Modul', [
+                    'user_id' => $user->id,
+                    'team_id' => $this->currentTeam->id,
+                    'last_module_key' => $lastModuleKey,
+                ]);
+                
                 if ($lastModuleKey && $lastModuleKey !== 'dashboard') {
                     $moduleModel = Module::where('key', $lastModuleKey)->first();
                     if ($moduleModel) {
@@ -39,11 +47,31 @@ class Dashboard extends Component
                             ->wherePivot('enabled', true)
                             ->exists();
 
+                        Log::info('Dashboard: Modul-Prüfung', [
+                            'module_key' => $lastModuleKey,
+                            'team_allowed' => $teamAllowed,
+                            'team_id' => $this->currentTeam->id,
+                        ]);
+
                         if ($teamAllowed) {
                             // Zum zuletzt verwendeten Modul redirecten
-                            return $this->redirect('/' . $lastModuleKey);
+                            Log::info('Dashboard: Redirect zum Modul', [
+                                'module_key' => $lastModuleKey,
+                                'redirect_to' => '/' . $lastModuleKey,
+                            ]);
+                            // Livewire v3: $this->redirect() verwenden
+                            $this->redirect('/' . $lastModuleKey, navigate: false);
+                            return;
                         }
+                    } else {
+                        Log::warning('Dashboard: Modul nicht gefunden', [
+                            'module_key' => $lastModuleKey,
+                        ]);
                     }
+                } else {
+                    Log::info('Dashboard: Kein zuletzt verwendetes Modul oder Dashboard', [
+                        'last_module_key' => $lastModuleKey,
+                    ]);
                 }
             }
         }
