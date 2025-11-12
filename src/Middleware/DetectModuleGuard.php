@@ -33,7 +33,8 @@ class DetectModuleGuard
                     'path' => $path,
                 ]);
                 
-                if ($lastModuleKey) {
+                if ($lastModuleKey && $lastModuleKey !== 'dashboard') {
+                    // Prüfe ob es ein echtes Modul ist
                     $moduleModel = Module::where('key', $lastModuleKey)->first();
                     if ($moduleModel) {
                         $team = $user->currentTeam;
@@ -61,9 +62,10 @@ class DetectModuleGuard
                         ]);
                     }
                 } else {
-                    Log::info('DetectModuleGuard: Kein zuletzt verwendetes Modul gefunden', [
+                    Log::info('DetectModuleGuard: Kein zuletzt verwendetes Modul gefunden oder Dashboard', [
                         'user_id' => $user->id,
                         'team_id' => $user->current_team_id,
+                        'last_module_key' => $lastModuleKey,
                     ]);
                 }
             }
@@ -141,6 +143,14 @@ class DetectModuleGuard
             // Kein Modul → Standard-Guard, kein Key
             Auth::shouldUse('web');
             $request->attributes->set('current_module', null);
+            
+            // Dashboard/Root: Auch als "Ziel" speichern
+            if (empty($path) || $path === 'dashboard') {
+                $user = Auth::user();
+                if ($user && $user->current_team_id) {
+                    TeamUserLastModule::updateLastModule($user->id, $user->current_team_id, 'dashboard');
+                }
+            }
             
             // Bei Livewire-Requests: Versuche Modul aus Session zu holen
             if (str_starts_with($path, 'livewire/')) {
