@@ -120,13 +120,17 @@ class TeamFlyout extends Component
         // Team wechseln
         $user->current_team_id = $teamId;
         $user->save();
+        
+        // Session-Flag setzen, damit Middleware weiß, dass wir gerade ein Team wechseln
+        session(['switching_team' => true]);
 
         $this->show = false;
 
         // Zuletzt verwendetes Modul für das neue Team laden
         $lastModuleKey = TeamUserLastModule::getLastModule($user->id, $teamId);
         
-        if ($lastModuleKey) {
+        // Ignoriere "dashboard" - wenn das das einzige ist, gehen wir zum Dashboard
+        if ($lastModuleKey && $lastModuleKey !== 'dashboard') {
             $moduleModel = \Platform\Core\Models\Module::where('key', $lastModuleKey)->first();
             if ($moduleModel) {
                 $team = $user->currentTeam;
