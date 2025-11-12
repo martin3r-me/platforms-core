@@ -65,10 +65,14 @@ class DetectModuleGuard
             $guard = $currentModule['guard'] ?? 'web';
             Auth::shouldUse($guard);
 
-            $request->attributes->set('current_module', $currentModule['key']);
+            $moduleKey = $currentModule['key'];
+            $request->attributes->set('current_module', $moduleKey);
+            
+            // Auch in Session speichern für Livewire-Requests
+            session(['current_module_key' => $moduleKey]);
 
             Log::info('DetectModuleGuard: Modul erkannt', [
-                'module' => $currentModule['key'],
+                'module' => $moduleKey,
                 'guard'  => $guard,
                 'match'  => $matchedBy,
                 'host'   => $host,
@@ -79,6 +83,14 @@ class DetectModuleGuard
             // Kein Modul → Standard-Guard, kein Key
             Auth::shouldUse('web');
             $request->attributes->set('current_module', null);
+            
+            // Bei Livewire-Requests: Versuche Modul aus Session zu holen
+            if (str_starts_with($path, 'livewire/')) {
+                $moduleKey = session('current_module_key');
+                if ($moduleKey) {
+                    $request->attributes->set('current_module', $moduleKey);
+                }
+            }
 
             Log::info('DetectModuleGuard: Kein Modul erkannt', [
                 'host' => $host,
