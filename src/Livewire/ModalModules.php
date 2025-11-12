@@ -232,18 +232,9 @@ class ModalModules extends Component
         if (!$user) { return; }
         
         // Aktuelles Modul für das alte Team speichern
+        // Nutze das vom Middleware gesetzte current_module (funktioniert auch bei Livewire-Requests)
         $oldTeamId = $user->current_team_id;
-        $currentPath = request()->segment(1);
-        
-        // Prüfe ob es ein gültiges Modul ist (wie in loadCurrentModule)
-        // Ignoriere "livewire" und "dashboard"
-        $currentModuleKey = null;
-        if ($currentPath && $currentPath !== 'dashboard' && $currentPath !== 'livewire') {
-            $moduleModel = \Platform\Core\Models\Module::where('key', $currentPath)->first();
-            if ($moduleModel) {
-                $currentModuleKey = $currentPath;
-            }
-        }
+        $currentModuleKey = request()->attributes->get('current_module');
         
         if ($oldTeamId && $currentModuleKey) {
             TeamUserLastModule::updateLastModule($user->id, $oldTeamId, $currentModuleKey);
