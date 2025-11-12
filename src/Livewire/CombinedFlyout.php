@@ -78,14 +78,28 @@ class CombinedFlyout extends Component
         
         // Aktuelles Modul für das alte Team speichern
         $oldTeamId = $user->current_team_id;
-        $currentPath = request()->segment(1);
-        
-        // Prüfe ob es ein gültiges Modul ist (wie in loadCurrentModule)
         $currentModuleKey = null;
-        if ($currentPath && $currentPath !== 'dashboard' && $currentPath !== 'livewire') {
-            $moduleModel = \Platform\Core\Models\Module::where('key', $currentPath)->first();
+        
+        // Durch URL-Segmente iterieren und ersten gültigen Modul-Key finden
+        // Ignoriere "livewire", "dashboard" und andere Nicht-Modul-Segmente
+        $ignoreSegments = ['livewire', 'dashboard', 'api', 'storage', 'assets'];
+        
+        for ($i = 1; $i <= 5; $i++) {
+            $segment = request()->segment($i);
+            if (empty($segment)) {
+                break;
+            }
+            
+            // Überspringe ignorierte Segmente
+            if (in_array(strtolower($segment), $ignoreSegments)) {
+                continue;
+            }
+            
+            // Prüfe ob es ein gültiges Modul ist
+            $moduleModel = \Platform\Core\Models\Module::where('key', $segment)->first();
             if ($moduleModel) {
-                $currentModuleKey = $currentPath;
+                $currentModuleKey = $segment;
+                break;
             }
         }
         
