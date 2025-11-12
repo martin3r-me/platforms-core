@@ -5,6 +5,7 @@ namespace Platform\Core\Livewire;
 use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\Team;
+use Platform\Core\Models\TeamUserLastModule;
 use Livewire\Attributes\On;
 
 class TeamFlyout extends Component
@@ -114,10 +115,37 @@ class TeamFlyout extends Component
         $user = Auth::user();
         if (!$user) return;
 
+        // Aktuelles Modul für das alte Team speichern
+        $oldTeamId = $user->current_team_id;
+        $currentModuleKey = request()->segment(1);
+        
+        if ($oldTeamId && is_string($currentModuleKey) && strlen($currentModuleKey) > 0 && $currentModuleKey !== 'dashboard') {
+            TeamUserLastModule::updateLastModule($user->id, $oldTeamId, $currentModuleKey);
+        }
+
+        // Team wechseln
         $user->current_team_id = $teamId;
         $user->save();
 
         $this->show = false;
+
+        // Zuletzt verwendetes Modul für das neue Team laden
+        $lastModuleKey = TeamUserLastModule::getLastModule($user->id, $teamId);
+        
+        if ($lastModuleKey) {
+            $moduleModel = \Platform\Core\Models\Module::where('key', $lastModuleKey)->first();
+            if ($moduleModel) {
+                $team = $user->currentTeam;
+                $teamAllowed = $team
+                    ? $team->modules()->where('module_id', $moduleModel->id)->wherePivot('enabled', true)->exists()
+                    : false;
+
+                if ($teamAllowed) {
+                    // Zum zuletzt verwendeten Modul navigieren
+                    return $this->redirect('/' . $lastModuleKey);
+                }
+            }
+        }
 
         // Versuche auf der aktuellen Seite zu bleiben, wenn das neue Team Zugriff auf das Modul hat
         $currentUrl = request()->fullUrl();
