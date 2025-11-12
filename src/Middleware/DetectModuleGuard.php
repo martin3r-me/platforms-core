@@ -21,10 +21,18 @@ class DetectModuleGuard
 
         // Prüfe ob wir auf Dashboard/Root sind und zuletzt verwendetes Modul laden
         // Nur bei normalen GET-Requests (nicht bei AJAX/Livewire)
-        if ((empty($path) || $path === 'dashboard') && $request->isMethod('GET') && !$request->ajax()) {
+        if ((empty($path) || $path === 'dashboard') && $request->isMethod('GET') && !$request->ajax() && !$request->wantsJson()) {
             $user = Auth::user();
             if ($user && $user->current_team_id) {
                 $lastModuleKey = TeamUserLastModule::getLastModule($user->id, $user->current_team_id);
+                
+                Log::info('DetectModuleGuard: Prüfe zuletzt verwendetes Modul', [
+                    'user_id' => $user->id,
+                    'team_id' => $user->current_team_id,
+                    'last_module_key' => $lastModuleKey,
+                    'path' => $path,
+                ]);
+                
                 if ($lastModuleKey) {
                     $moduleModel = Module::where('key', $lastModuleKey)->first();
                     if ($moduleModel) {
@@ -33,11 +41,30 @@ class DetectModuleGuard
                             ? $team->modules()->where('module_id', $moduleModel->id)->wherePivot('enabled', true)->exists()
                             : false;
 
+                        Log::info('DetectModuleGuard: Modul-Prüfung', [
+                            'module_key' => $lastModuleKey,
+                            'team_allowed' => $teamAllowed,
+                            'team_id' => $team?->id,
+                        ]);
+
                         if ($teamAllowed) {
                             // Zum zuletzt verwendeten Modul redirecten
+                            Log::info('DetectModuleGuard: Redirect zum Modul', [
+                                'module_key' => $lastModuleKey,
+                                'redirect_to' => '/' . $lastModuleKey,
+                            ]);
                             return redirect('/' . $lastModuleKey);
                         }
+                    } else {
+                        Log::warning('DetectModuleGuard: Modul nicht gefunden', [
+                            'module_key' => $lastModuleKey,
+                        ]);
                     }
+                } else {
+                    Log::info('DetectModuleGuard: Kein zuletzt verwendetes Modul gefunden', [
+                        'user_id' => $user->id,
+                        'team_id' => $user->current_team_id,
+                    ]);
                 }
             }
         }

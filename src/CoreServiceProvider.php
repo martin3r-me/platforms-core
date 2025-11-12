@@ -62,7 +62,7 @@ class CoreServiceProvider extends ServiceProvider
 
         // Routes registrieren
         Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
-            ->middleware('web')
+            ->middleware(['web', 'detect.module.guard'])
             ->group(__DIR__.'/../routes/guest.php');
 
         Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
