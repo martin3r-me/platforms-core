@@ -41,63 +41,16 @@ class CheckModulePermission
             abort(403, 'Kein Team zugeordnet.');
         }
 
-        $rootTeam = $baseTeam->getRootTeam();
-        $rootTeamId = $rootTeam->id;
-        $baseTeamId = $baseTeam->id;
+        // Zentrale Berechtigungsprüfung verwenden
+        $hasPermission = $module->hasAccess($user, $baseTeam);
 
-        // Für Parent-Module: Rechte aus Root-Team prüfen
-        // Für Single-Module: Rechte aus aktuellem Team prüfen
-        if ($module->isRootScoped()) {
-            $hasPermission = $user->modules()
-                ->where('module_id', $module->id)
-                ->wherePivot('team_id', $rootTeamId)
-                ->wherePivot('enabled', true)
-                ->exists();
-
-            Log::info('CheckModulePermission: User checked (Parent-Module)', [
-                'user_id'      => $user?->id,
-                'module_id'    => $module->id,
-                'team_id'      => $rootTeamId,
-                'user_allowed' => $hasPermission,
-            ]);
-
-            if (!$hasPermission) {
-                $hasPermission = $rootTeam->modules()
-                    ->where('module_id', $module->id)
-                    ->wherePivot('enabled', true)
-                    ->exists();
-                Log::info('CheckModulePermission: Team checked (Parent-Module)', [
-                    'team_id'      => $rootTeamId,
-                    'module_id'    => $module->id,
-                    'team_allowed' => $hasPermission,
-                ]);
-            }
-        } else {
-            $hasPermission = $user->modules()
-                ->where('module_id', $module->id)
-                ->wherePivot('team_id', $baseTeamId)
-                ->wherePivot('enabled', true)
-                ->exists();
-
-            Log::info('CheckModulePermission: User checked (Single-Module)', [
-                'user_id'      => $user?->id,
-                'module_id'    => $module->id,
-                'team_id'      => $baseTeamId,
-                'user_allowed' => $hasPermission,
-            ]);
-
-            if (!$hasPermission && $baseTeam) {
-                $hasPermission = $baseTeam->modules()
-                    ->where('module_id', $module->id)
-                    ->wherePivot('enabled', true)
-                    ->exists();
-                Log::info('CheckModulePermission: Team checked (Single-Module)', [
-                    'team_id'      => $baseTeamId,
-                    'module_id'    => $module->id,
-                    'team_allowed' => $hasPermission,
-                ]);
-            }
-        }
+        Log::info('CheckModulePermission: Berechtigung geprüft', [
+            'user_id'      => $user?->id,
+            'module_id'    => $module->id,
+            'team_id'      => $baseTeam->id,
+            'has_permission' => $hasPermission,
+            'is_root_scoped' => $module->isRootScoped(),
+        ]);
 
         if (!$hasPermission) {
             Log::warning('CheckModulePermission: Zugriff verweigert.', [

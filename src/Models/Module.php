@@ -48,4 +48,55 @@ class Module extends Model
     {
         return $this->scope_type === 'single';
     }
+
+    /**
+     * Prüft ob ein User Zugriff auf dieses Modul hat.
+     * Berücksichtigt Root-Scoped vs. Team-Scoped Module.
+     *
+     * @param User $user Der User, dessen Berechtigung geprüft wird
+     * @param Team $baseTeam Das Basis-Team des Users (currentTeamRelation)
+     * @return bool True wenn der User Zugriff hat, sonst false
+     */
+    public function hasAccess(User $user, Team $baseTeam): bool
+    {
+        $rootTeam = $baseTeam->getRootTeam();
+        $rootTeamId = $rootTeam->id;
+        $baseTeamId = $baseTeam->id;
+
+        // Für Root-Scoped Module: Rechte aus Root-Team prüfen
+        // Für Team-Scoped Module: Rechte aus aktuellem Team prüfen
+        if ($this->isRootScoped()) {
+            // Zuerst User-Berechtigung prüfen
+            $hasPermission = $user->modules()
+                ->where('module_id', $this->id)
+                ->wherePivot('team_id', $rootTeamId)
+                ->wherePivot('enabled', true)
+                ->exists();
+
+            // Falls keine User-Berechtigung, Team-Berechtigung prüfen
+            if (!$hasPermission) {
+                $hasPermission = $rootTeam->modules()
+                    ->where('module_id', $this->id)
+                    ->wherePivot('enabled', true)
+                    ->exists();
+            }
+        } else {
+            // Zuerst User-Berechtigung prüfen
+            $hasPermission = $user->modules()
+                ->where('module_id', $this->id)
+                ->wherePivot('team_id', $baseTeamId)
+                ->wherePivot('enabled', true)
+                ->exists();
+
+            // Falls keine User-Berechtigung, Team-Berechtigung prüfen
+            if (!$hasPermission) {
+                $hasPermission = $baseTeam->modules()
+                    ->where('module_id', $this->id)
+                    ->wherePivot('enabled', true)
+                    ->exists();
+            }
+        }
+
+        return $hasPermission;
+    }
 }

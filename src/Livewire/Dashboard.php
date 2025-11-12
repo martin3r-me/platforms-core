@@ -41,48 +41,15 @@ class Dashboard extends Component
                 if ($lastModuleKey && $lastModuleKey !== 'dashboard') {
                     $moduleModel = Module::where('key', $lastModuleKey)->first();
                     if ($moduleModel) {
-                        // Gleiche Logik wie in CheckModulePermission: User- und Team-Berechtigung prüfen
                         $baseTeam = $user->currentTeamRelation;
-                        $rootTeam = $baseTeam->getRootTeam();
-                        $rootTeamId = $rootTeam->id;
-                        $baseTeamId = $baseTeam->id;
                         
-                        if ($moduleModel->isRootScoped()) {
-                            // Parent-Modul: Rechte aus Root-Team prüfen
-                            $hasPermission = $user->modules()
-                                ->where('module_id', $moduleModel->id)
-                                ->wherePivot('team_id', $rootTeamId)
-                                ->wherePivot('enabled', true)
-                                ->exists();
-                            
-                            if (!$hasPermission) {
-                                $hasPermission = $rootTeam->modules()
-                                    ->where('module_id', $moduleModel->id)
-                                    ->wherePivot('enabled', true)
-                                    ->exists();
-                            }
-                        } else {
-                            // Single-Modul: Rechte aus aktuellem Team prüfen
-                            $hasPermission = $user->modules()
-                                ->where('module_id', $moduleModel->id)
-                                ->wherePivot('team_id', $baseTeamId)
-                                ->wherePivot('enabled', true)
-                                ->exists();
-                            
-                            if (!$hasPermission && $baseTeam) {
-                                $hasPermission = $baseTeam->modules()
-                                    ->where('module_id', $moduleModel->id)
-                                    ->wherePivot('enabled', true)
-                                    ->exists();
-                            }
-                        }
+                        // Zentrale Berechtigungsprüfung verwenden
+                        $hasPermission = $moduleModel->hasAccess($user, $baseTeam);
 
                         Log::info('Dashboard: Modul-Prüfung', [
                             'module_key' => $lastModuleKey,
                             'has_permission' => $hasPermission,
                             'team_id' => $this->currentTeam->id,
-                            'base_team_id' => $baseTeamId,
-                            'root_team_id' => $rootTeamId,
                             'is_root_scoped' => $moduleModel->isRootScoped(),
                         ]);
 

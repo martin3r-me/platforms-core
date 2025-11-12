@@ -82,17 +82,19 @@ class DetectModuleGuard
             session(['current_module_key' => $moduleKey]);
 
             // Modul für aktuelles Team speichern (wenn User eingeloggt und Team vorhanden)
-            // ABER: Nicht speichern, wenn wir gerade vom Team-Wechsel kommen
             $user = Auth::user();
             if ($user && $user->current_team_id) {
                 $isTeamSwitch = session('switching_team', false);
                 
-                // Nur speichern wenn es NICHT ein Team-Wechsel ist ODER wenn es nicht "dashboard" ist
+                // Während eines Team-Wechsels: "dashboard" nicht überschreiben,
+                // da der User nach dem Wechsel zunächst auf /dashboard landet,
+                // aber das zuletzt verwendete Modul des neuen Teams beibehalten soll.
+                // Andere Module werden normal gespeichert.
                 if (!$isTeamSwitch || $moduleKey !== 'dashboard') {
                     TeamUserLastModule::updateLastModule($user->id, $user->current_team_id, $moduleKey);
                 }
                 
-                // Session-Flag entfernen nach dem ersten Request
+                // Session-Flag nach dem ersten Request entfernen
                 if ($isTeamSwitch) {
                     session()->forget('switching_team');
                 }
