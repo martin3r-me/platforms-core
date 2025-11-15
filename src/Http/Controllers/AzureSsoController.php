@@ -115,9 +115,12 @@ class AzureSsoController extends Controller
         // Token aus Socialite Provider holen und speichern
         try {
             $token = $azureUser->token ?? null;
+            $refreshToken = $azureUser->refreshToken ?? null;
+            $expiresIn = $azureUser->expiresIn ?? 3600; // Default: 1 Stunde
+            
             if ($token) {
                 session(['microsoft_access_token_' . $user->id => $token]);
-                $this->saveMicrosoftToken($user, $token);
+                $this->saveMicrosoftToken($user, $token, $refreshToken, $expiresIn);
             }
         } catch (\Throwable $e) {
             \Log::warning('Failed to save Azure SSO token', [
@@ -148,7 +151,7 @@ class AzureSsoController extends Controller
     /**
      * Speichert Microsoft OAuth Token in der Datenbank
      */
-    private function saveMicrosoftToken($user, string $token): void
+    private function saveMicrosoftToken($user, string $token, ?string $refreshToken = null, ?int $expiresIn = null): void
     {
         try {
             // Prüfe ob Token-Tabelle existiert
@@ -160,7 +163,8 @@ class AzureSsoController extends Controller
                 ['user_id' => $user->id],
                 [
                     'access_token' => $token,
-                    'expires_at' => now()->addHour(), // OAuth Token sind typischerweise 1 Stunde gültig
+                    'refresh_token' => $refreshToken,
+                    'expires_at' => $expiresIn ? now()->addSeconds($expiresIn) : now()->addHour(),
                     'scopes' => ['User.Read', 'Calendars.ReadWrite', 'Calendars.ReadWrite.Shared'],
                 ]
             );
