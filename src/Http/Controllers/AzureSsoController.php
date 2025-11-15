@@ -16,7 +16,14 @@ class AzureSsoController extends Controller
     {
         return Socialite::driver('azure-tenant')
             ->stateless()
-            ->scopes(['openid', 'profile', 'email'])
+            ->scopes([
+                'openid', 
+                'profile', 
+                'email',
+                'https://graph.microsoft.com/User.Read',
+                'https://graph.microsoft.com/Calendars.ReadWrite',
+                'https://graph.microsoft.com/Calendars.ReadWrite.Shared',
+            ])
             ->with(['response_mode' => 'query']);
     }
 
@@ -120,7 +127,16 @@ class AzureSsoController extends Controller
             
             if ($token) {
                 session(['microsoft_access_token_' . $user->id => $token]);
-                $this->saveMicrosoftToken($user, $token, $refreshToken, $expiresIn);
+                
+                // Scopes aus dem Token extrahieren (falls verfügbar)
+                // Socialite gibt die Scopes nicht direkt zurück, daher verwenden wir die angeforderten Scopes
+                $scopes = [
+                    'User.Read',
+                    'Calendars.ReadWrite',
+                    'Calendars.ReadWrite.Shared',
+                ];
+                
+                $this->saveMicrosoftToken($user, $token, $refreshToken, $expiresIn, $scopes);
             }
         } catch (\Throwable $e) {
             \Log::warning('Failed to save Azure SSO token', [
@@ -151,7 +167,7 @@ class AzureSsoController extends Controller
     /**
      * Speichert Microsoft OAuth Token in der Datenbank
      */
-    private function saveMicrosoftToken($user, string $token, ?string $refreshToken = null, ?int $expiresIn = null): void
+    private function saveMicrosoftToken($user, string $token, ?string $refreshToken = null, ?int $expiresIn = null, ?array $scopes = null): void
     {
         try {
             // Prüfe ob Token-Tabelle existiert
@@ -159,13 +175,16 @@ class AzureSsoController extends Controller
                 return;
             }
 
+            // Scopes verwenden oder Standard-Scopes
+            $scopesToSave = $scopes ?? ['User.Read', 'Calendars.ReadWrite', 'Calendars.ReadWrite.Shared'];
+
             \Platform\Core\Models\MicrosoftOAuthToken::updateOrCreate(
                 ['user_id' => $user->id],
                 [
                     'access_token' => $token,
                     'refresh_token' => $refreshToken,
                     'expires_at' => $expiresIn ? now()->addSeconds($expiresIn) : now()->addHour(),
-                    'scopes' => ['User.Read', 'Calendars.ReadWrite', 'Calendars.ReadWrite.Shared'],
+                    'scopes' => $scopesToSave,
                 ]
             );
         } catch (\Throwable $e) {
