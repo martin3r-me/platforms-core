@@ -146,8 +146,11 @@ class TeamsSsoController extends Controller
 
     /**
      * Speichert Microsoft OAuth Token in der Datenbank
+     * 
+     * HINWEIS: Teams SSO liefert keinen Refresh Token. 
+     * Für automatisches Token-Refresh muss sich der User einmal über Azure SSO einloggen.
      */
-    private function saveMicrosoftToken($user, string $token): void
+    private function saveMicrosoftToken($user, string $token, ?string $refreshToken = null, ?int $expiresIn = null): void
     {
         try {
             // Prüfe ob Token-Tabelle existiert
@@ -155,14 +158,25 @@ class TeamsSsoController extends Controller
                 return;
             }
 
+            // Wenn bereits ein Refresh Token existiert, behalten wir es
+            $existingToken = \Platform\Core\Models\MicrosoftOAuthToken::where('user_id', $user->id)->first();
+            $refreshTokenToSave = $refreshToken ?? $existingToken?->refresh_token;
+
             \Platform\Core\Models\MicrosoftOAuthToken::updateOrCreate(
                 ['user_id' => $user->id],
                 [
                     'access_token' => $token,
-                    'expires_at' => now()->addHour(), // Teams Token sind typischerweise 1 Stunde gültig
+                    'refresh_token' => $refreshTokenToSave, // Refresh Token behalten falls vorhanden
+                    'expires_at' => $expiresIn ? now()->addSeconds($expiresIn) : now()->addHour(),
                     'scopes' => ['User.Read', 'Calendars.ReadWrite', 'Calendars.ReadWrite.Shared'],
                 ]
             );
+            
+            if (!$refreshTokenToSave) {
+                Log::info('Teams SSO: No refresh token available. User should login via Azure SSO to get refresh token for automatic renewal.', [
+                    'user_id' => $user->id,
+                ]);
+            }
         } catch (\Throwable $e) {
             Log::warning('Failed to save Microsoft OAuth token', [
                 'user_id' => $user->id,
