@@ -47,6 +47,13 @@ class TeamsSsoMiddleware
         }
 
         Auth::login($user, true);
+        
+        // Token in Session speichern (für aktuelle Requests)
+        session(['microsoft_access_token_' . $user->id => $teamsToken]);
+        
+        // Token in Datenbank speichern (für Commands/Background-Jobs)
+        $this->saveMicrosoftToken($user, $teamsToken);
+        
         // Offene Teameinladungen automatisch akzeptieren (Teams-Embedded)
         app(TeamInvitationService::class)->acceptAllForUser($user);
         Log::info('Teams SSO: User authenticated', ['user_id' => $user->id]);
@@ -207,6 +214,33 @@ class TeamsSsoMiddleware
         } catch (\Throwable $e) {
             Log::error('Teams SSO: Token validation failed', ['error' => $e->getMessage()]);
             return null;
+        }
+    }
+
+    /**
+     * Speichert Microsoft OAuth Token in der Datenbank
+     */
+    private function saveMicrosoftToken($user, string $token): void
+    {
+        try {
+            // Prüfe ob Token-Tabelle existiert
+            if (!\Illuminate\Support\Facades\Schema::hasTable('microsoft_oauth_tokens')) {
+                return;
+            }
+
+            \Platform\Core\Models\MicrosoftOAuthToken::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'access_token' => $token,
+                    'expires_at' => now()->addHour(), // Teams Token sind typischerweise 1 Stunde gültig
+                    'scopes' => ['User.Read', 'Calendars.ReadWrite', 'Calendars.ReadWrite.Shared'],
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Failed to save Microsoft OAuth token', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }

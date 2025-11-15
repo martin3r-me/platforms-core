@@ -112,6 +112,20 @@ class AzureSsoController extends Controller
 
         Auth::login($user, true);
 
+        // Token aus Socialite Provider holen und speichern
+        try {
+            $token = $azureUser->token ?? null;
+            if ($token) {
+                session(['microsoft_access_token_' . $user->id => $token]);
+                $this->saveMicrosoftToken($user, $token);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Failed to save Azure SSO token', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         // Offene Teameinladungen automatisch akzeptieren
         app(TeamInvitationService::class)->acceptAllForUser($user);
 
@@ -129,6 +143,33 @@ class AzureSsoController extends Controller
         return $url
             ? redirect()->away($url)
             : redirect(config('azure-sso.post_logout_redirect', '/'));
+    }
+
+    /**
+     * Speichert Microsoft OAuth Token in der Datenbank
+     */
+    private function saveMicrosoftToken($user, string $token): void
+    {
+        try {
+            // Prüfe ob Token-Tabelle existiert
+            if (!\Illuminate\Support\Facades\Schema::hasTable('microsoft_oauth_tokens')) {
+                return;
+            }
+
+            \Platform\Core\Models\MicrosoftOAuthToken::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'access_token' => $token,
+                    'expires_at' => now()->addHour(), // OAuth Token sind typischerweise 1 Stunde gültig
+                    'scopes' => ['User.Read', 'Calendars.ReadWrite', 'Calendars.ReadWrite.Shared'],
+                ]
+            );
+        } catch (\Throwable $e) {
+            \Log::warning('Failed to save Microsoft OAuth token', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }
 
