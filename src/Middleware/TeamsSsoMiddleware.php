@@ -241,7 +241,8 @@ class TeamsSsoMiddleware
                     'access_token' => $token,
                     'refresh_token' => $refreshTokenToSave, // Refresh Token behalten falls vorhanden
                     'expires_at' => $expiresIn ? now()->addSeconds($expiresIn) : now()->addHour(),
-                    'scopes' => ['User.Read', 'Calendars.ReadWrite', 'Calendars.ReadWrite.Shared'],
+                    // TODO: Calendar-Scopes am Montag wieder hinzufügen
+                    'scopes' => ['User.Read'],
                 ]
             );
             

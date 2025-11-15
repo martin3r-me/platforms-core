@@ -20,9 +20,10 @@ class AzureSsoController extends Controller
                 'openid', 
                 'profile', 
                 'email',
-                'https://graph.microsoft.com/User.Read',
-                'https://graph.microsoft.com/Calendars.ReadWrite',
-                'https://graph.microsoft.com/Calendars.ReadWrite.Shared',
+                // TODO: Calendar-Scopes am Montag wieder hinzufügen
+                // 'https://graph.microsoft.com/User.Read',
+                // 'https://graph.microsoft.com/Calendars.ReadWrite',
+                // 'https://graph.microsoft.com/Calendars.ReadWrite.Shared',
             ])
             ->with(['response_mode' => 'query']);
     }
@@ -130,10 +131,11 @@ class AzureSsoController extends Controller
                 
                 // Scopes aus dem Token extrahieren (falls verfügbar)
                 // Socialite gibt die Scopes nicht direkt zurück, daher verwenden wir die angeforderten Scopes
+                // TODO: Calendar-Scopes am Montag wieder hinzufügen
                 $scopes = [
                     'User.Read',
-                    'Calendars.ReadWrite',
-                    'Calendars.ReadWrite.Shared',
+                    // 'Calendars.ReadWrite',
+                    // 'Calendars.ReadWrite.Shared',
                 ];
                 
                 $this->saveMicrosoftToken($user, $token, $refreshToken, $expiresIn, $scopes);
@@ -176,7 +178,8 @@ class AzureSsoController extends Controller
             }
 
             // Scopes verwenden oder Standard-Scopes
-            $scopesToSave = $scopes ?? ['User.Read', 'Calendars.ReadWrite', 'Calendars.ReadWrite.Shared'];
+            // TODO: Calendar-Scopes am Montag wieder hinzufügen
+            $scopesToSave = $scopes ?? ['User.Read'];
 
             \Platform\Core\Models\MicrosoftOAuthToken::updateOrCreate(
                 ['user_id' => $user->id],
