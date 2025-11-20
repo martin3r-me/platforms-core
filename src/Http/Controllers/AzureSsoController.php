@@ -20,6 +20,7 @@ class AzureSsoController extends Controller
                 'openid', 
                 'profile', 
                 'email',
+                'offline_access', // WICHTIG: Benötigt für Refresh Token
                 'https://graph.microsoft.com/User.Read',
                 'https://graph.microsoft.com/Calendars.ReadWrite',
                 'https://graph.microsoft.com/Calendars.ReadWrite.Shared',
@@ -122,7 +123,30 @@ class AzureSsoController extends Controller
         // Token aus Socialite Provider holen und speichern
         try {
             $token = $azureUser->token ?? null;
-            $refreshToken = $azureUser->refreshToken ?? null;
+            
+            // Refresh Token kann auf verschiedene Weise zurückgegeben werden
+            // Socialite gibt den Refresh Token manchmal nicht direkt zurück,
+            // daher versuchen wir mehrere Wege
+            $refreshToken = null;
+            
+            // 1. Direktes Property
+            if (isset($azureUser->refreshToken)) {
+                $refreshToken = $azureUser->refreshToken;
+            }
+            // 2. Alternative Property-Name
+            elseif (isset($azureUser->refresh_token)) {
+                $refreshToken = $azureUser->refresh_token;
+            }
+            // 3. Getter-Methode
+            elseif (method_exists($azureUser, 'getRefreshToken')) {
+                $refreshToken = $azureUser->getRefreshToken();
+            }
+            // 4. Aus Token-Response extrahieren (falls verfügbar)
+            elseif (method_exists($azureUser, 'accessTokenResponse')) {
+                $tokenResponse = $azureUser->accessTokenResponse;
+                $refreshToken = $tokenResponse['refresh_token'] ?? null;
+            }
+            
             $expiresIn = $azureUser->expiresIn ?? 3600; // Default: 1 Stunde
             
             if ($token) {
@@ -136,12 +160,27 @@ class AzureSsoController extends Controller
                     'Calendars.ReadWrite.Shared',
                 ];
                 
+                // Log für Debugging
+                if (!$refreshToken) {
+                    \Log::warning('Azure SSO: No refresh token received. User may need to re-authenticate.', [
+                        'user_id' => $user->id,
+                        'email' => $email,
+                        'has_token' => !empty($token),
+                    ]);
+                } else {
+                    \Log::info('Azure SSO: Refresh token received successfully', [
+                        'user_id' => $user->id,
+                        'email' => $email,
+                    ]);
+                }
+                
                 $this->saveMicrosoftToken($user, $token, $refreshToken, $expiresIn, $scopes);
             }
         } catch (\Throwable $e) {
             \Log::warning('Failed to save Azure SSO token', [
                 'user_id' => $user->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
         }
 
@@ -182,19 +221,34 @@ class AzureSsoController extends Controller
                 'Calendars.ReadWrite.Shared',
             ];
 
+            // Bestehenden Token prüfen, um Refresh Token zu behalten falls vorhanden
+            $existingToken = \Platform\Core\Models\MicrosoftOAuthToken::where('user_id', $user->id)->first();
+            
+            // Refresh Token behalten, falls kein neuer übergeben wurde
+            $refreshTokenToSave = $refreshToken ?? $existingToken?->refresh_token;
+
             \Platform\Core\Models\MicrosoftOAuthToken::updateOrCreate(
                 ['user_id' => $user->id],
                 [
                     'access_token' => $token,
-                    'refresh_token' => $refreshToken,
+                    'refresh_token' => $refreshTokenToSave, // Refresh Token behalten falls vorhanden
                     'expires_at' => $expiresIn ? now()->addSeconds($expiresIn) : now()->addHour(),
                     'scopes' => $scopesToSave,
                 ]
             );
+            
+            // Warnung wenn kein Refresh Token vorhanden
+            if (!$refreshTokenToSave) {
+                \Log::warning('Azure SSO: No refresh token saved. User will need to re-authenticate when token expires.', [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                ]);
+            }
         } catch (\Throwable $e) {
             \Log::warning('Failed to save Microsoft OAuth token', [
                 'user_id' => $user->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
         }
     }
