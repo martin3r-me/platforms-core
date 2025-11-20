@@ -38,6 +38,7 @@
     @livewire('comms.comms-modal')
     @livewire('core.modal-modules')
     @livewire('organization.modal-organization')
+    @livewire('okr.modal-key-result')
   @endauth
 
   @php
