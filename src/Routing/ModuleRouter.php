@@ -55,4 +55,64 @@ class ModuleRouter
             ->prefix($prefix)
             ->group($callback);
     }
+
+    /**
+     * Erstellt eine API-Route-Gruppe für ein Modul
+     * 
+     * @param string $key Modul-Schlüssel
+     * @param Closure $callback Route-Definitionen
+     * @param bool $requireAuth Ob Authentifizierung erforderlich ist
+     * @return \Illuminate\Routing\RouteGroup
+     */
+    public static function apiGroup(string $key, Closure $callback, bool $requireAuth = true)
+    {
+        // Modul-Config laden
+        $module = \Platform\Core\PlatformCore::getModule($key);
+        if (!$module) {
+            throw new \RuntimeException("Module '{$key}' is not registered.");
+        }
+
+        $routing = $module['routing'] ?? [];
+        $mode    = $routing['mode'] ?? 'path';
+        $prefix  = $routing['prefix'] ?? strtolower($key);
+
+        // Basis-Domain aus APP_URL
+        $appUrl = config('app.url');
+        $parsed = parse_url($appUrl);
+        $baseHost = $parsed['host'] ?? 'localhost';
+
+        // API-spezifische Middleware
+        $middlewares = ['api'];
+        
+        if ($requireAuth) {
+            $middlewares[] = 'api.auth';
+        }
+
+        $routeGroup = Route::middleware($middlewares);
+
+        Log::info('ModuleRouter: registering API route group', [
+            'module' => $key,
+            'mode'   => $mode,
+            'host'   => $baseHost,
+            'prefix' => "api/{$prefix}",
+        ]);
+
+        // API-Routen haben immer /api/ Prefix
+        $apiPrefix = "api/{$prefix}";
+
+        if ($mode === 'subdomain') {
+            // Subdomain: prefix als Subdomain setzen
+            $domain = "{$prefix}.{$baseHost}";
+            return $routeGroup
+                ->domain($domain)
+                ->prefix('api')
+                ->group($callback);
+        }
+
+        // Path: Domain bleibt die Basisdomain
+        return $routeGroup
+            ->domain($baseHost)
+            ->prefix($apiPrefix)
+            ->group($callback);
+    }
 }

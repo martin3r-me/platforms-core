@@ -148,4 +148,37 @@ class Team extends Model
     {
         return $team->isChildOf($this);
     }
+
+    /**
+     * Gibt alle Team-IDs zurück (inkl. diesem Team und allen Kind-Teams rekursiv)
+     * 
+     * Nützlich für Datawarehouse-Abfragen, die alle Tasks eines Teams inkl. Kind-Teams benötigen.
+     *
+     * @return array<int>
+     */
+    public function getAllTeamIdsIncludingChildren(): array
+    {
+        $teamIds = [$this->id];
+        $this->collectChildTeamIds($this, $teamIds);
+        return $teamIds;
+    }
+
+    /**
+     * Rekursiv alle Kind-Team-IDs sammeln
+     *
+     * @param Team $team
+     * @param array<int> $teamIds
+     * @return void
+     */
+    protected function collectChildTeamIds(Team $team, array &$teamIds): void
+    {
+        $childTeams = $team->childTeams()->get();
+        
+        foreach ($childTeams as $childTeam) {
+            if (!in_array($childTeam->id, $teamIds)) {
+                $teamIds[] = $childTeam->id;
+                $this->collectChildTeamIds($childTeam, $teamIds);
+            }
+        }
+    }
 }

@@ -51,6 +51,12 @@ class CoreServiceProvider extends ServiceProvider
             \Platform\Core\Middleware\TeamsSdkAuthMiddleware::class
         );
 
+        // API Authentifizierungs-Middleware registrieren
+        $this->app->make(\Illuminate\Routing\Router::class)->aliasMiddleware(
+            'api.auth',
+            \Platform\Core\Http\Middleware\ApiAuthenticate::class
+        );
+
         // Module ServiceProvider automatisch laden
         $this->loadModuleServiceProviders();
 
@@ -69,6 +75,12 @@ class CoreServiceProvider extends ServiceProvider
             ->middleware(['web', 'auth'])
             ->group(__DIR__.'/../routes/web.php');
 
+        // API-Routen registrieren
+        Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
+            ->middleware(['api'])
+            ->prefix('api')
+            ->group(__DIR__.'/../routes/api.php');
+
         // Keine Agent/Schema Logs mehr
 
         // Command registrieren (nur in der Konsole)
@@ -77,6 +89,7 @@ class CoreServiceProvider extends ServiceProvider
                 TrackBillableUsage::class,
                 CreateMonthlyInvoices::class,
                 \Platform\Core\Console\Commands\SecurityHashKeyCommand::class,
+                \Platform\Core\Console\Commands\CreateApiTokenCommand::class,
             ]);
         }
 
