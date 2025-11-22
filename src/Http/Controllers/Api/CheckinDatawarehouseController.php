@@ -187,6 +187,12 @@ class CheckinDatawarehouseController extends ApiController
             $query->whereDate('created_at', '<=', $request->created_to);
         }
 
+        // Updated Since Filter (für inkrementelle Imports)
+        if ($request->has('updated_since')) {
+            $updatedSince = Carbon::parse($request->updated_since);
+            $query->where('updated_at', '>=', $updatedSince);
+        }
+
         // Mood Score Filter
         if ($request->has('mood_score')) {
             $query->where('mood_score', $request->mood_score);
