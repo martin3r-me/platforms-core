@@ -178,64 +178,65 @@
                                     </div>
                                 </x-slot>
                             </x-ui-input-select>
+                            <p class="text-xs text-[var(--ui-muted)] mt-1">
+                                Wähle eine Kategorie, um dein Ziel besser zu kategorisieren und später auswerten zu können.
+                            </p>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-4">
-                            {{-- Stimmung (0-4) --}}
-                            <div>
-                                <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2 flex items-center gap-2">
-                                    @svg('heroicon-o-face-smile', 'w-4 h-4 text-[var(--ui-primary)]')
-                                    Stimmung
-                                </label>
-                                <div class="flex items-center gap-2">
-                                    @foreach([0, 1, 2, 3, 4] as $score)
-                                        <button
-                                            type="button"
-                                            wire:click="$set('checkinData.mood_score', {{ $score }})"
-                                            class="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all duration-200
-                                                {{ isset($checkinData['mood_score']) && $checkinData['mood_score'] == $score 
-                                                    ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] shadow-md' 
-                                                    : 'bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] hover:bg-[var(--ui-primary)]/10 hover:text-[var(--ui-primary)]' }}
-                                            "
-                                        >
-                                            {{ $score }}
-                                        </button>
-                                    @endforeach
-                                </div>
-                                @if(isset($checkinData['mood_score']))
-                                    <p class="text-xs text-[var(--ui-muted)] mt-1">
-                                        {{ \Platform\Core\Models\Checkin::getMoodScoreOptions()[$checkinData['mood_score']] ?? '' }}
-                                    </p>
-                                @endif
+                        {{-- Stimmung (0-4) --}}
+                        <div>
+                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2 flex items-center gap-2">
+                                @svg('heroicon-o-face-smile', 'w-4 h-4 text-[var(--ui-primary)]')
+                                Stimmung
+                            </label>
+                            <div class="flex items-center gap-2">
+                                @foreach([0, 1, 2, 3, 4] as $score)
+                                    <button
+                                        type="button"
+                                        wire:click="$set('checkinData.mood_score', {{ $score }})"
+                                        class="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all duration-200
+                                            {{ isset($checkinData['mood_score']) && $checkinData['mood_score'] == $score 
+                                                ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] shadow-md' 
+                                                : 'bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] hover:bg-[var(--ui-primary)]/10 hover:text-[var(--ui-primary)]' }}
+                                        "
+                                    >
+                                        {{ $score }}
+                                    </button>
+                                @endforeach
                             </div>
+                            @if(isset($checkinData['mood_score']))
+                                <p class="text-xs text-[var(--ui-muted)] mt-1">
+                                    {{ \Platform\Core\Models\Checkin::getMoodScoreOptions()[$checkinData['mood_score']] ?? '' }}
+                                </p>
+                            @endif
+                        </div>
 
-                            {{-- Energie (0-4) --}}
-                            <div>
-                                <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2 flex items-center gap-2">
-                                    @svg('heroicon-o-bolt', 'w-4 h-4 text-[var(--ui-primary)]')
-                                    Energie
-                                </label>
-                                <div class="flex items-center gap-2">
-                                    @foreach([0, 1, 2, 3, 4] as $score)
-                                        <button
-                                            type="button"
-                                            wire:click="$set('checkinData.energy_score', {{ $score }})"
-                                            class="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all duration-200
-                                                {{ isset($checkinData['energy_score']) && $checkinData['energy_score'] == $score 
-                                                    ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] shadow-md' 
-                                                    : 'bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] hover:bg-[var(--ui-primary)]/10 hover:text-[var(--ui-primary)]' }}
-                                            "
-                                        >
-                                            {{ $score }}
-                                        </button>
-                                    @endforeach
-                                </div>
-                                @if(isset($checkinData['energy_score']))
-                                    <p class="text-xs text-[var(--ui-muted)] mt-1">
-                                        {{ \Platform\Core\Models\Checkin::getEnergyScoreOptions()[$checkinData['energy_score']] ?? '' }}
-                                    </p>
-                                @endif
+                        {{-- Energie (0-4) --}}
+                        <div>
+                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2 flex items-center gap-2">
+                                @svg('heroicon-o-bolt', 'w-4 h-4 text-[var(--ui-primary)]')
+                                Energie
+                            </label>
+                            <div class="flex items-center gap-2">
+                                @foreach([0, 1, 2, 3, 4] as $score)
+                                    <button
+                                        type="button"
+                                        wire:click="$set('checkinData.energy_score', {{ $score }})"
+                                        class="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all duration-200
+                                            {{ isset($checkinData['energy_score']) && $checkinData['energy_score'] == $score 
+                                                ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] shadow-md' 
+                                                : 'bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] hover:bg-[var(--ui-primary)]/10 hover:text-[var(--ui-primary)]' }}
+                                        "
+                                    >
+                                        {{ $score }}
+                                    </button>
+                                @endforeach
                             </div>
+                            @if(isset($checkinData['energy_score']))
+                                <p class="text-xs text-[var(--ui-muted)] mt-1">
+                                    {{ \Platform\Core\Models\Checkin::getEnergyScoreOptions()[$checkinData['energy_score']] ?? '' }}
+                                </p>
+                            @endif
                         </div>
                     </div>
                 </div>

@@ -84,7 +84,7 @@ class ModalCheckin extends Component
                 'date' => $date,
                 'daily_goal' => '',
                 'goal_category' => null,
-                'mood' => '',
+                'mood' => null,
                 'happiness' => null,
                 'mood_score' => null,
                 'energy_score' => null,
@@ -147,8 +147,11 @@ class ModalCheckin extends Component
             $checkinData = array_merge($this->checkinData, [
                 'user_id' => auth()->id(),
                 'date' => $this->selectedDate,
-                'mood_score' => isset($this->checkinData['mood_score']) ? (int)$this->checkinData['mood_score'] : null,
-                'energy_score' => isset($this->checkinData['energy_score']) ? (int)$this->checkinData['energy_score'] : null,
+                'mood_score' => isset($this->checkinData['mood_score']) && $this->checkinData['mood_score'] !== '' ? (int)$this->checkinData['mood_score'] : null,
+                'energy_score' => isset($this->checkinData['energy_score']) && $this->checkinData['energy_score'] !== '' ? (int)$this->checkinData['energy_score'] : null,
+                // Alte Felder bereinigen (leere Strings zu null)
+                'mood' => !empty($this->checkinData['mood']) ? (int)$this->checkinData['mood'] : null,
+                'happiness' => !empty($this->checkinData['happiness']) ? (int)$this->checkinData['happiness'] : null,
             ]);
 
         if ($this->checkin) {
@@ -189,8 +192,11 @@ class ModalCheckin extends Component
         $checkinData = array_merge($this->checkinData, [
             'user_id' => auth()->id(),
             'date' => $this->selectedDate,
-            'mood_score' => isset($this->checkinData['mood_score']) ? (int)$this->checkinData['mood_score'] : null,
-            'energy_score' => isset($this->checkinData['energy_score']) ? (int)$this->checkinData['energy_score'] : null,
+            'mood_score' => isset($this->checkinData['mood_score']) && $this->checkinData['mood_score'] !== '' ? (int)$this->checkinData['mood_score'] : null,
+            'energy_score' => isset($this->checkinData['energy_score']) && $this->checkinData['energy_score'] !== '' ? (int)$this->checkinData['energy_score'] : null,
+            // Alte Felder bereinigen (leere Strings zu null)
+            'mood' => !empty($this->checkinData['mood']) ? (int)$this->checkinData['mood'] : null,
+            'happiness' => !empty($this->checkinData['happiness']) ? (int)$this->checkinData['happiness'] : null,
         ]);
 
         if ($this->checkin) {
