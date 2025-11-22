@@ -28,21 +28,38 @@ class UserDatawarehouseController extends ApiController
                 ? ($includeChildrenValue === '1' || $includeChildrenValue === 'true' || $includeChildrenValue === true || $includeChildrenValue === 1)
                 : true; // Default: true (wenn nicht gesetzt)
             
+            \Log::debug('UserDatawarehouseController: Filtering users', [
+                'team_id' => $teamId,
+                'include_child_teams' => $includeChildrenValue,
+                'includeChildren' => $includeChildren,
+            ]);
+            
             if ($includeChildren) {
                 $team = \Platform\Core\Models\Team::find($teamId);
                 if ($team) {
                     $teamIds = $team->getAllTeamIdsIncludingChildren();
+                    \Log::debug('UserDatawarehouseController: Team IDs including children', [
+                        'parent_team_id' => $teamId,
+                        'all_team_ids' => $teamIds,
+                        'count' => count($teamIds),
+                    ]);
+                    
+                    // Verwende distinct() um Duplikate zu vermeiden (falls User in mehreren Teams sind)
                     $query->whereHas('teams', function($q) use ($teamIds) {
                         $q->whereIn('teams.id', $teamIds);
-                    });
+                    })->distinct();
                 } else {
+                    \Log::warning('UserDatawarehouseController: Team not found', ['team_id' => $teamId]);
                     $query->whereRaw('1 = 0'); // Team nicht gefunden
                 }
             } else {
+                \Log::debug('UserDatawarehouseController: Filtering users for single team', ['team_id' => $teamId]);
                 $query->whereHas('teams', function($q) use ($teamId) {
                     $q->where('teams.id', $teamId);
-                });
+                })->distinct();
             }
+        } else {
+            \Log::debug('UserDatawarehouseController: No team_id filter - returning all users');
         }
 
         // Sorting

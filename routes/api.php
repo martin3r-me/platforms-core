@@ -32,9 +32,10 @@ Route::get('/health', function () {
     ]);
 });
 
-// Datawarehouse-Endpunkte für Teams und Users
+// Datawarehouse-Endpunkte für Teams, Users und Check-ins
 Route::middleware('api.auth')->group(function () {
     Route::get('/teams/datawarehouse', [\Platform\Core\Http\Controllers\Api\TeamDatawarehouseController::class, 'index']);
     Route::get('/users/datawarehouse', [\Platform\Core\Http\Controllers\Api\UserDatawarehouseController::class, 'index']);
+    Route::get('/checkins/datawarehouse', [\Platform\Core\Http\Controllers\Api\CheckinDatawarehouseController::class, 'index']);
 });
 

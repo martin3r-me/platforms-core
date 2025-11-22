@@ -6,6 +6,8 @@ use Livewire\Component;
 use Platform\Core\Models\Checkin;
 use Platform\Core\Models\CheckinTodo;
 use Platform\Core\Models\PomodoroSession;
+use Platform\Core\Enums\GoalCategory;
+use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 
 class ModalCheckin extends Component
@@ -81,8 +83,11 @@ class ModalCheckin extends Component
             $this->checkinData = [
                 'date' => $date,
                 'daily_goal' => '',
+                'goal_category' => null,
                 'mood' => '',
                 'happiness' => null,
+                'mood_score' => null,
+                'energy_score' => null,
                 'needs_support' => false,
                 'hydrated' => false,
                 'exercised' => false,
@@ -127,8 +132,9 @@ class ModalCheckin extends Component
     {
             $this->validate([
                 'checkinData.daily_goal' => 'nullable|string|max:1000',
-                'checkinData.mood' => 'nullable|integer|min:1|max:5',
-                'checkinData.happiness' => 'nullable|integer|min:1|max:5',
+                'checkinData.goal_category' => ['nullable', 'string', Rule::in(GoalCategory::values())],
+                'checkinData.mood_score' => 'nullable|integer|min:0|max:4',
+                'checkinData.energy_score' => 'nullable|integer|min:0|max:4',
             'checkinData.hydrated' => 'boolean',
             'checkinData.exercised' => 'boolean',
             'checkinData.slept_well' => 'boolean',
@@ -141,8 +147,8 @@ class ModalCheckin extends Component
             $checkinData = array_merge($this->checkinData, [
                 'user_id' => auth()->id(),
                 'date' => $this->selectedDate,
-                'mood' => $this->checkinData['mood'] ? (int)$this->checkinData['mood'] : null,
-                'happiness' => $this->checkinData['happiness'] ? (int)$this->checkinData['happiness'] : null,
+                'mood_score' => isset($this->checkinData['mood_score']) ? (int)$this->checkinData['mood_score'] : null,
+                'energy_score' => isset($this->checkinData['energy_score']) ? (int)$this->checkinData['energy_score'] : null,
             ]);
 
         if ($this->checkin) {
@@ -168,8 +174,9 @@ class ModalCheckin extends Component
     {
         $this->validate([
             'checkinData.daily_goal' => 'nullable|string|max:1000',
-            'checkinData.mood' => 'nullable|integer|min:1|max:5',
-            'checkinData.happiness' => 'nullable|integer|min:1|max:5',
+            'checkinData.goal_category' => ['nullable', 'string', \Illuminate\Validation\Rule::in(\Platform\Core\Enums\GoalCategory::values())],
+            'checkinData.mood_score' => 'nullable|integer|min:0|max:4',
+            'checkinData.energy_score' => 'nullable|integer|min:0|max:4',
             'checkinData.hydrated' => 'boolean',
             'checkinData.exercised' => 'boolean',
             'checkinData.slept_well' => 'boolean',
@@ -182,8 +189,8 @@ class ModalCheckin extends Component
         $checkinData = array_merge($this->checkinData, [
             'user_id' => auth()->id(),
             'date' => $this->selectedDate,
-            'mood' => $this->checkinData['mood'] ? (int)$this->checkinData['mood'] : null,
-            'happiness' => $this->checkinData['happiness'] ? (int)$this->checkinData['happiness'] : null,
+            'mood_score' => isset($this->checkinData['mood_score']) ? (int)$this->checkinData['mood_score'] : null,
+            'energy_score' => isset($this->checkinData['energy_score']) ? (int)$this->checkinData['energy_score'] : null,
         ]);
 
         if ($this->checkin) {
@@ -255,8 +262,11 @@ class ModalCheckin extends Component
             ],
             [
                 'daily_goal' => '',
+                'goal_category' => null,
                 'mood' => null,
                 'happiness' => null,
+                'mood_score' => null,
+                'energy_score' => null,
                 'needs_support' => false,
                 'hydrated' => false,
                 'exercised' => false,
@@ -284,6 +294,21 @@ class ModalCheckin extends Component
     public function getHappinessOptions()
     {
         return Checkin::getHappinessOptions();
+    }
+
+    public function getMoodScoreOptions()
+    {
+        return Checkin::getMoodScoreOptions();
+    }
+
+    public function getEnergyScoreOptions()
+    {
+        return Checkin::getEnergyScoreOptions();
+    }
+
+    public function getGoalCategoryOptions()
+    {
+        return Checkin::getGoalCategoryOptions();
     }
 
     // Pomodoro Methods

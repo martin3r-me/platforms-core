@@ -5,6 +5,7 @@ namespace Platform\Core\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Platform\Core\Enums\GoalCategory;
 
 class Checkin extends Model
 {
@@ -12,8 +13,11 @@ class Checkin extends Model
         'user_id',
         'date',
         'daily_goal',
+        'goal_category',
         'mood',
         'happiness',
+        'mood_score',
+        'energy_score',
         'needs_support',
         'hydrated',
         'exercised',
@@ -27,6 +31,9 @@ class Checkin extends Model
         'date' => 'date',
         'needs_support' => 'boolean',
         'happiness' => 'integer',
+        'mood_score' => 'integer',
+        'energy_score' => 'integer',
+        'goal_category' => GoalCategory::class,
         'hydrated' => 'boolean',
         'exercised' => 'boolean',
         'slept_well' => 'boolean',
@@ -54,6 +61,33 @@ class Checkin extends Model
                 4 => 'Zufrieden',
                 5 => 'Sehr zufrieden',
             ];
+        }
+
+        public static function getMoodScoreOptions(): array
+        {
+            return [
+                0 => 'Sehr schlecht',
+                1 => 'Schlecht',
+                2 => 'Neutral',
+                3 => 'Gut',
+                4 => 'Ausgezeichnet',
+            ];
+        }
+
+        public static function getEnergyScoreOptions(): array
+        {
+            return [
+                0 => 'Sehr niedrig',
+                1 => 'Niedrig',
+                2 => 'Mittel',
+                3 => 'Hoch',
+                4 => 'Sehr hoch',
+            ];
+        }
+
+        public static function getGoalCategoryOptions(): array
+        {
+            return GoalCategory::options();
         }
 
     public function user(): BelongsTo
