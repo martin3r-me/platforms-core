@@ -77,8 +77,26 @@ class UserDatawarehouseController extends ApiController
         $perPage = min($request->get('per_page', 100), 1000);
         $users = $query->paginate($perPage);
 
+        // User-IDs für Session-Abfrage sammeln
+        $userIds = $users->pluck('id')->toArray();
+        
+        // Last Activity aus Sessions-Tabelle holen
+        $lastActivities = [];
+        if (!empty($userIds)) {
+            $sessions = \Illuminate\Support\Facades\DB::table('sessions')
+                ->whereIn('user_id', $userIds)
+                ->whereNotNull('user_id')
+                ->select('user_id', \Illuminate\Support\Facades\DB::raw('MAX(last_activity) as last_activity'))
+                ->groupBy('user_id')
+                ->get();
+            
+            foreach ($sessions as $session) {
+                $lastActivities[$session->user_id] = \Carbon\Carbon::createFromTimestamp($session->last_activity);
+            }
+        }
+
         // Formatting
-        $formatted = $users->map(function ($user) {
+        $formatted = $users->map(function ($user) use ($lastActivities) {
             return [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -86,6 +104,9 @@ class UserDatawarehouseController extends ApiController
                 'email' => $user->email,
                 'username' => $user->username ?? null,
                 'avatar' => $user->avatar ?? null,
+                'last_active' => isset($lastActivities[$user->id]) 
+                    ? $lastActivities[$user->id]->toIso8601String() 
+                    : null,
                 'created_at' => $user->created_at->toIso8601String(),
                 'updated_at' => $user->updated_at->toIso8601String(),
             ];
@@ -116,6 +137,18 @@ class UserDatawarehouseController extends ApiController
                 ], 'Health Check');
             }
 
+            // Last Activity aus Sessions-Tabelle holen
+            $lastActivity = null;
+            $session = \Illuminate\Support\Facades\DB::table('sessions')
+                ->where('user_id', $example->id)
+                ->whereNotNull('user_id')
+                ->orderBy('last_activity', 'desc')
+                ->first();
+            
+            if ($session) {
+                $lastActivity = \Carbon\Carbon::createFromTimestamp($session->last_activity)->toIso8601String();
+            }
+
             $exampleData = [
                 'id' => $example->id,
                 'name' => $example->name,
@@ -123,6 +156,7 @@ class UserDatawarehouseController extends ApiController
                 'email' => $example->email,
                 'username' => $example->username ?? null,
                 'avatar' => $example->avatar ?? null,
+                'last_active' => $lastActivity,
                 'created_at' => $example->created_at->toIso8601String(),
                 'updated_at' => $example->updated_at->toIso8601String(),
             ];
