@@ -89,5 +89,49 @@ class TeamDatawarehouseController extends ApiController
             'Teams erfolgreich geladen'
         );
     }
+
+    /**
+     * Health Check Endpoint
+     * Gibt einen Beispiel-Datensatz zurück für Tests
+     */
+    public function health(Request $request)
+    {
+        try {
+            $example = Team::with('parentTeam:id,name')
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            if (!$example) {
+                return $this->success([
+                    'status' => 'ok',
+                    'message' => 'API ist erreichbar, aber keine Teams vorhanden',
+                    'example' => null,
+                    'timestamp' => now()->toIso8601String(),
+                ], 'Health Check');
+            }
+
+            $exampleData = [
+                'id' => $example->id,
+                'name' => $example->name,
+                'user_id' => $example->user_id,
+                'parent_team_id' => $example->parent_team_id,
+                'parent_team_name' => $example->parentTeam?->name ?? null,
+                'personal_team' => $example->personal_team,
+                'is_root_team' => $example->isRootTeam(),
+                'created_at' => $example->created_at->toIso8601String(),
+                'updated_at' => $example->updated_at->toIso8601String(),
+            ];
+
+            return $this->success([
+                'status' => 'ok',
+                'message' => 'API ist erreichbar',
+                'example' => $exampleData,
+                'timestamp' => now()->toIso8601String(),
+            ], 'Health Check');
+
+        } catch (\Exception $e) {
+            return $this->error('Health Check fehlgeschlagen: ' . $e->getMessage(), 500);
+        }
+    }
 }
 

@@ -266,5 +266,61 @@ class CheckinDatawarehouseController extends ApiController
             }
         }
     }
+
+    /**
+     * Health Check Endpoint
+     * Gibt einen Beispiel-Datensatz zurück für Tests
+     */
+    public function health(Request $request)
+    {
+        try {
+            $example = Checkin::with('user:id,name,email')
+                ->orderBy('date', 'desc')
+                ->first();
+
+            if (!$example) {
+                return $this->success([
+                    'status' => 'ok',
+                    'message' => 'API ist erreichbar, aber keine Check-ins vorhanden',
+                    'example' => null,
+                    'timestamp' => now()->toIso8601String(),
+                ], 'Health Check');
+            }
+
+            $exampleData = [
+                'id' => $example->id,
+                'user_id' => $example->user_id,
+                'user_name' => $example->user?->name,
+                'user_email' => $example->user?->email,
+                'date' => $example->date->format('Y-m-d'),
+                'daily_goal' => $example->daily_goal,
+                'goal_category' => $example->goal_category?->value,
+                'goal_category_label' => $example->goal_category?->label(),
+                'mood_score' => $example->mood_score,
+                'energy_score' => $example->energy_score,
+                'mood' => $example->mood,
+                'happiness' => $example->happiness,
+                'hydrated' => $example->hydrated,
+                'exercised' => $example->exercised,
+                'slept_well' => $example->slept_well,
+                'focused_work' => $example->focused_work,
+                'social_time' => $example->social_time,
+                'needs_support' => $example->needs_support,
+                'notes' => $example->notes,
+                'created_at' => $example->created_at->toIso8601String(),
+                'updated_at' => $example->updated_at->toIso8601String(),
+            ];
+
+            return $this->success([
+                'status' => 'ok',
+                'message' => 'API ist erreichbar',
+                'example' => $exampleData,
+                'timestamp' => now()->toIso8601String(),
+            ], 'Health Check');
+
+        } catch (\Exception $e) {
+            return $this->error('Health Check fehlgeschlagen: ' . $e->getMessage(), 500);
+        }
+    }
 }
 
