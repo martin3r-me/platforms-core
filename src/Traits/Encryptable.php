@@ -22,17 +22,41 @@ trait Encryptable
             $teamSalt = method_exists($model, 'team') && $model->team ? (string) $model->team->id : null;
             
             foreach ($model->encryptable as $field => $type) {
+                $hashField = $field . '_hash';
+                
                 // Nur Hash aktualisieren, wenn das verschlüsselte Feld geändert wurde
                 // oder wenn es ein neues Model ist (creating)
                 if ($model->exists && !isset($dirtyFields[$field])) {
-                    continue; // Feld nicht geändert, überspringen
+                    continue; // Feld nicht geändert, überspringen - kein Hash-Update nötig
                 }
                 
-                $hashField = $field . '_hash';
-                // Nur getAttribute aufrufen, wenn das Feld wirklich geändert wurde
-                // Das vermeidet unnötige Entschlüsselung
-                $plain = $model->getAttribute($field);
-                $model->setAttribute($hashField, FieldHasher::hmacSha256($plain, $teamSalt));
+                // Wenn das Feld geändert wurde, ist der neue Wert bereits in $dirtyFields
+                // Der Wert ist bereits verschlüsselt (durch den Cast), aber für den Hash
+                // brauchen wir den Plain-Text. Da der Cast bereits angewendet wurde,
+                // müssen wir getAttribute() aufrufen, was entschlüsselt.
+                // ABER: Wir können prüfen, ob der Wert in den Attributes ist (vor Cast)
+                // und dann direkt darauf zugreifen, wenn möglich.
+                
+                // Versuche zuerst, den Plain-Text-Wert aus dem temporären Attribut zu holen
+                // (wurde vom Cast gespeichert, um Entschlüsselung zu vermeiden)
+                $plainKey = '_plain_' . $field;
+                $plain = $model->attributes[$plainKey] ?? null;
+                
+                // Falls nicht vorhanden (z.B. bei bestehenden Records ohne Änderung),
+                // müssen wir entschlüsseln (nur wenn Feld wirklich geändert wurde)
+                if ($plain === null && isset($dirtyFields[$field])) {
+                    // Feld wurde geändert, aber Plain-Text nicht gespeichert
+                    // (kann passieren bei direkten DB-Updates oder anderen Szenarien)
+                    $plain = $model->getAttribute($field);
+                }
+                
+                // Temporäres Attribut entfernen (nicht in DB speichern)
+                unset($model->attributes[$plainKey]);
+                
+                // Hash nur setzen, wenn Plain-Text vorhanden ist
+                if ($plain !== null) {
+                    $model->setAttribute($hashField, FieldHasher::hmacSha256($plain, $teamSalt));
+                }
             }
         });
     }
