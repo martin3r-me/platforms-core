@@ -16,9 +16,21 @@ trait Encryptable
             if (!property_exists($model, 'encryptable') || empty($model->encryptable)) {
                 return;
             }
+            
+            // Nur geänderte Felder verarbeiten (Performance-Optimierung)
+            $dirtyFields = $model->getDirty();
             $teamSalt = method_exists($model, 'team') && $model->team ? (string) $model->team->id : null;
+            
             foreach ($model->encryptable as $field => $type) {
+                // Nur Hash aktualisieren, wenn das verschlüsselte Feld geändert wurde
+                // oder wenn es ein neues Model ist (creating)
+                if ($model->exists && !isset($dirtyFields[$field])) {
+                    continue; // Feld nicht geändert, überspringen
+                }
+                
                 $hashField = $field . '_hash';
+                // Nur getAttribute aufrufen, wenn das Feld wirklich geändert wurde
+                // Das vermeidet unnötige Entschlüsselung
                 $plain = $model->getAttribute($field);
                 $model->setAttribute($hashField, FieldHasher::hmacSha256($plain, $teamSalt));
             }
