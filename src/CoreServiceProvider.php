@@ -90,6 +90,7 @@ class CoreServiceProvider extends ServiceProvider
                 CreateMonthlyInvoices::class,
                 \Platform\Core\Console\Commands\SecurityHashKeyCommand::class,
                 \Platform\Core\Console\Commands\CreateApiTokenCommand::class,
+                \Platform\Core\Console\Commands\CreateEndpointApiTokenCommand::class,
             ]);
         }
 
