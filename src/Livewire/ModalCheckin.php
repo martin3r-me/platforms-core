@@ -9,6 +9,7 @@ use Platform\Core\Models\PomodoroSession;
 use Platform\Core\Enums\GoalCategory;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
+use Platform\Core\Services\Checkins\CheckinReminderService;
 
 class ModalCheckin extends Component
 {
@@ -38,7 +39,7 @@ class ModalCheckin extends Component
         return 0;
     }
 
-    public function mount()
+    public function mount(CheckinReminderService $checkinReminderService)
     {
         $this->selectedDate = now()->format('Y-m-d');
         $this->currentMonth = now()->month;
@@ -46,6 +47,10 @@ class ModalCheckin extends Component
         $this->loadCheckins();
         $this->loadCheckinForDate($this->selectedDate);
         $this->loadPomodoroStats(); // Load pomodoro stats on mount
+
+        if (auth()->check() && $checkinReminderService->shouldForceModal(auth()->user())) {
+            $this->modalShow = true;
+        }
     }
 
     public function goToToday()
