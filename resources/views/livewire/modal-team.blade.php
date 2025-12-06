@@ -131,7 +131,7 @@
                                     @if(($member->id ?? null) !== auth()->id())
                                         <x-ui-confirm-button 
                                             action="removeMember"
-                                            :params="[$member->id]"
+                                            :value="$member->id"
                                             text="Entfernen"
                                             confirmText="Mitglied wirklich entfernen?"
                                             variant="danger"
