@@ -7,7 +7,6 @@ use Platform\Core\PlatformCore;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On; 
 use Platform\Core\Models\Team;
-use Platform\Core\Models\TeamInvitation;
 use Platform\Core\Models\TeamUserLastModule;
 use Platform\Core\Enums\TeamRole;
 use Illuminate\Support\Str;
@@ -15,6 +14,8 @@ use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Http;
 use Platform\Core\Models\TeamBillableUsage;
 use Carbon\Carbon;
+use Platform\Core\Services\TeamInvitationService;
+use Illuminate\Support\Facades\Validator;
 
 class ModalModules extends Component
 {
@@ -341,26 +342,46 @@ class ModalModules extends Component
         $this->redirect(request()->fullUrl());
     }
 
-    public function inviteToTeam(): void
+    public function inviteToTeam(TeamInvitationService $invitationService): void
     {
         $this->authorizeEdit();
 
-        $this->validate([
-            'inviteEmail' => 'required|email|unique:team_invitations,email,NULL,id,team_id,' . ($this->team?->id ?? 0),
-            'inviteRole' => [
-                'required',
-                Rule::in([TeamRole::OWNER->value, TeamRole::ADMIN->value, TeamRole::MEMBER->value]),
-            ],
-        ]);
-
         if (!$this->team) { return; }
 
-        TeamInvitation::create([
-            'team_id' => $this->team->id,
-            'email'   => $this->inviteEmail,
-            'token'   => Str::uuid(),
-            'role'    => $this->inviteRole,
-        ]);
+        $emails = collect(preg_split('/[\s,;]+/', (string) $this->inviteEmail, -1, PREG_SPLIT_NO_EMPTY))
+            ->map(fn ($email) => Str::lower(trim($email)))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($emails->isEmpty()) {
+            $this->addError('inviteEmail', 'Bitte mindestens eine gültige E-Mail-Adresse angeben.');
+            return;
+        }
+
+        Validator::make(
+            ['inviteRole' => $this->inviteRole],
+            ['inviteRole' => ['required', Rule::in([TeamRole::OWNER->value, TeamRole::ADMIN->value, TeamRole::MEMBER->value])]]
+        )->validate();
+
+        $result = $invitationService->createInvitations($this->team, $emails->all(), $this->inviteRole);
+
+        $created = count($result['created']);
+        $skipped = collect($result['skipped']);
+
+        if ($created > 0) {
+            $this->dispatch('notice', [
+                'type' => 'success',
+                'message' => "{$created} Einladung(en) gesendet.",
+            ]);
+        }
+
+        if ($skipped->isNotEmpty()) {
+            $this->dispatch('notice', [
+                'type' => 'warning',
+                'message' => 'Übersprungen: ' . $skipped->pluck('email')->implode(', '),
+            ]);
+        }
 
         $this->inviteEmail = '';
         $this->inviteRole = TeamRole::MEMBER;

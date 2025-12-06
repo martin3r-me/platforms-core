@@ -158,7 +158,15 @@
                 <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Mitglied einladen</h3>
                 @php($roles = \Platform\Core\Enums\TeamRole::cases())
                 <form wire:submit.prevent="inviteToTeam" class="space-y-4">
-                    <x-ui-input-text name="inviteEmail" label="E-Mail" wire:model.live="inviteEmail" placeholder="E-Mail-Adresse" required :errorKey="'inviteEmail'" />
+                    <x-ui-input-text
+                        name="inviteEmails"
+                        label="E-Mail(s)"
+                        wire:model.live="inviteEmails"
+                        placeholder="Mehrere Adressen mit Komma oder Zeilenumbruch trennen"
+                        required
+                        :errorKey="'inviteEmails'"
+                    />
+                    <p class="text-xs text-[var(--ui-muted)]">Beispiel: alice@example.com, bob@example.com</p>
                     <x-ui-input-select name="inviteRole" label="Rolle" :options="$roles" optionValue="value" optionLabel="name" :nullable="false" wire:model.live="inviteRole" />
                     <x-ui-button type="submit">Einladung senden</x-ui-button>
                 </form>

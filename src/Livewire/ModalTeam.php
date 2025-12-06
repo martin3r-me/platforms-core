@@ -6,9 +6,11 @@ use Livewire\Component;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 use Platform\Core\Models\Team;
 use Platform\Core\Models\TeamInvitation;
 use Platform\Core\Enums\TeamRole;
+use Platform\Core\Services\TeamInvitationService;
 
 class ModalTeam extends Component
 {
@@ -19,7 +21,7 @@ class ModalTeam extends Component
     public $newParentTeamId = null;
     public $availableParentTeams = [];
     public $currentParentTeamId = null;
-    public $inviteEmail = '';
+    public $inviteEmails = '';
     public $inviteRole = 'member';
     public $team;
     public $memberRoles = [];
@@ -275,31 +277,49 @@ class ModalTeam extends Component
 
     // changeCurrentTeam entfernt – Wechsel erfolgt zentral über Module-Modal
 
-    public function inviteToTeam()
+    public function inviteToTeam(TeamInvitationService $invitationService)
     {
         $team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
         if (! $team) { return; }
 
-        $this->validate([
-            'inviteEmail' => [
-                'required',
-                'email',
-                Rule::unique('team_invitations', 'email')->where(fn($q) => $q->where('team_id', $team->id)),
-            ],
-            'inviteRole' => [
-                'required',
-                Rule::in([TeamRole::OWNER->value, TeamRole::ADMIN->value, TeamRole::MEMBER->value, 'viewer']),
-            ],
-        ]);
+        $emails = collect(preg_split('/[\s,;]+/', (string) $this->inviteEmails, -1, PREG_SPLIT_NO_EMPTY))
+            ->map(fn ($email) => Str::lower(trim($email)))
+            ->filter()
+            ->unique()
+            ->values();
 
-        TeamInvitation::create([
-            'team_id' => $team->id,
-            'email'   => $this->inviteEmail,
-            'token'   => Str::uuid(),
-            'role'    => $this->inviteRole,
-        ]);
+        if ($emails->isEmpty()) {
+            $this->addError('inviteEmails', 'Bitte mindestens eine E-Mail-Adresse angeben (Komma oder Zeilenumbruch getrennt).');
+            return;
+        }
 
-        $this->inviteEmail = '';
+        // Rolle validieren (das Service validiert erneut, hier nur schnelle Prüfung)
+        Validator::make(
+            ['inviteRole' => $this->inviteRole],
+            ['inviteRole' => ['required', Rule::in([TeamRole::OWNER->value, TeamRole::ADMIN->value, TeamRole::MEMBER->value, 'viewer'])]]
+        )->validate();
+
+        $result = $invitationService->createInvitations($team, $emails->all(), $this->inviteRole);
+
+        $createdCount = count($result['created']);
+        $skipped = collect($result['skipped']);
+
+        if ($createdCount > 0) {
+            $this->dispatch('notice', [
+                'type' => 'success',
+                'message' => "{$createdCount} Einladung(en) gesendet.",
+            ]);
+        }
+
+        if ($skipped->isNotEmpty()) {
+            $skippedList = $skipped->pluck('email')->implode(', ');
+            $this->dispatch('notice', [
+                'type' => 'warning',
+                'message' => "Übersprungen: {$skippedList}",
+            ]);
+        }
+
+        $this->inviteEmails = '';
         $this->inviteRole = 'member';
         $this->dispatch('invitation-sent');
     }
