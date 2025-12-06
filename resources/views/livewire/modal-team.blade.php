@@ -20,7 +20,7 @@
         <div class="space-y-6">
             {{-- Team Switch --}}
             <div>
-                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Aktuelles Team wechseln</h3>
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Aktuelles Team wechseln !</h3>
                 @if(!empty($allTeams) && count($allTeams) > 1)
                     <x-ui-input-select
                         name="user.current_team_id"
