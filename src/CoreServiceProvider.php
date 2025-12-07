@@ -91,6 +91,7 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Console\Commands\SecurityHashKeyCommand::class,
                 \Platform\Core\Console\Commands\CreateApiTokenCommand::class,
                 \Platform\Core\Console\Commands\CreateEndpointApiTokenCommand::class,
+                \Platform\Core\Console\Commands\RefreshMicrosoftTokens::class,
             ]);
         }
 
