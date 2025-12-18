@@ -84,6 +84,44 @@ class ModalTeam extends Component
     }
 
     /**
+     * Wechselt das aktuelle Team des Users.
+     * (Wird im Blade via @change aufgerufen.)
+     */
+    public function changeCurrentTeam($teamId)
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return;
+        }
+
+        $teamId = (int) $teamId;
+        if ($teamId <= 0) {
+            return;
+        }
+
+        // Sicherheitscheck: User muss Mitglied des Ziel-Teams sein
+        $hasAccess = $user->teams()->where('teams.id', $teamId)->exists();
+        if (! $hasAccess) {
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'Du hast keinen Zugriff auf dieses Team.',
+            ]);
+            return;
+        }
+
+        $user->current_team_id = $teamId;
+        $user->save();
+
+        // Session-Flag setzen, damit Middleware (falls vorhanden) Teamwechsel erkennt
+        session(['switching_team' => true]);
+
+        $this->modalShow = false;
+
+        // Harte Weiterleitung, damit Sidebar/Guards sauber neu laden
+        return $this->redirect(request()->fullUrl());
+    }
+
+    /**
      * Lädt verfügbare Parent-Teams (Root-Teams, zu denen der User Zugriff hat).
      * Nur Root-Teams können als Parent-Teams verwendet werden.
      */
@@ -92,23 +130,36 @@ class ModalTeam extends Component
         $user = auth()->user();
         $currentTeamId = $this->team?->id;
         $currentParentTeamId = $this->team?->parent_team_id;
-        
-        $query = Team::whereHas('users', function ($query) use ($user) {
-            $query->where('user_id', $user->id);
-        })
-        ->whereNull('parent_team_id') // Nur Root-Teams
-        ->when($currentTeamId, function ($query) use ($currentTeamId) {
-            $query->where('id', '!=', $currentTeamId); // Aktuelles Team ausschließen
-        });
-        
-        // Wenn bereits ein Parent-Team gesetzt ist, dieses auch in die Liste aufnehmen
-        if ($currentParentTeamId) {
-            $query->orWhere('id', $currentParentTeamId);
+
+        // Root-Teams, zu denen der User Zugriff hat (und nicht das aktuelle Team)
+        $rootTeamsQuery = Team::query()
+            ->whereHas('users', function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->whereNull('parent_team_id');
+
+        if ($currentTeamId) {
+            $rootTeamsQuery->where('id', '!=', $currentTeamId);
         }
-        
-        // Als Key-Value Array für die Select-Komponente: [id => name, ...]
-        $this->availableParentTeams = $query
-            ->get()
+
+        $rootTeams = $rootTeamsQuery->get();
+
+        // Wenn bereits ein Parent-Team gesetzt ist, dieses auch in die Liste aufnehmen,
+        // aber nur, wenn der User Zugriff hat (sonst würden wir fremde Teams anzeigen).
+        if ($currentParentTeamId) {
+            $currentParent = Team::query()
+                ->whereHas('users', function ($query) use ($user) {
+                    $query->where('user_id', $user->id);
+                })
+                ->where('id', $currentParentTeamId)
+                ->first();
+
+            if ($currentParent) {
+                $rootTeams->push($currentParent);
+            }
+        }
+
+        $this->availableParentTeams = $rootTeams
             ->unique('id')
             ->pluck('name', 'id')
             ->toArray();
@@ -204,6 +255,13 @@ class ModalTeam extends Component
 
     public function createTeam()
     {
+        // Normalisieren: Livewire liefert bei nullable Selects oft '' statt null
+        if ($this->newParentTeamId === '' || $this->newParentTeamId === 'null') {
+            $this->newParentTeamId = null;
+        } elseif ($this->newParentTeamId !== null) {
+            $this->newParentTeamId = (int) $this->newParentTeamId;
+        }
+
         $this->validate([
             'newTeamName' => 'required|string|max:255',
             'newParentTeamId' => [

@@ -41,30 +41,19 @@
             {{-- Create Team --}}
             <div>
                 <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Neues Team erstellen</h3>
-                <form wire:submit.prevent="createTeam" class="space-y-4">
-                    <x-ui-input-text
-                        name="newTeamName"
-                        label="Team-Name"
-                        wire:model.live="newTeamName"
-                        placeholder="Team-Name eingeben..."
-                        required
-                        :errorKey="'newTeamName'"
-                    />
-                    @if(!empty($availableParentTeams) && count($availableParentTeams) > 0)
-                        <x-ui-input-select
-                            name="newParentTeamId"
-                            label="Parent-Team (optional)"
-                            :options="$availableParentTeams"
-                            :nullable="true"
-                            wire:model.live="newParentTeamId"
-                            :errorKey="'newParentTeamId'"
-                        />
-                        <p class="text-xs text-[var(--ui-muted)]">
-                            Optional: Wähle ein Root-Team als Parent-Team. Kind-Teams erben Zugriff auf root-scoped Module (z.B. CRM, Organization).
-                        </p>
-                    @endif
-                    <x-ui-button type="submit">Team erstellen</x-ui-button>
-                </form>
+                <div class="space-y-3">
+                    <p class="text-sm text-[var(--ui-muted)]">
+                        Das Anlegen eines Teams erfolgt aus Sicherheits-/Session-Gründen in einem separaten Tab.
+                    </p>
+                    <x-ui-button
+                        type="button"
+                        variant="primary"
+                        x-data
+                        @click="window.open('{{ route('platform.teams.create') }}', '_blank', 'noopener,noreferrer')"
+                    >
+                        Team im neuen Tab anlegen
+                    </x-ui-button>
+                </div>
             </div>
 
             {{-- Team Settings (nur für Owner) --}}
