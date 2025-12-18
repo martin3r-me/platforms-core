@@ -315,7 +315,24 @@ class ModalTeam extends Component
         $this->newParentTeamId = null;
         $this->loadTeams();
         $this->loadAvailableParentTeams();
-        $this->dispatch('team-created');
+
+        // Direkt auf das neue Team wechseln
+        $user = auth()->user();
+        if ($user) {
+            $user->current_team_id = $team->id;
+            $user->save();
+            session(['switching_team' => true]);
+        }
+
+        $this->modalShow = false;
+
+        $this->dispatch('notice', [
+            'type' => 'success',
+            'message' => 'Team erfolgreich erstellt.',
+        ]);
+
+        // Harte Weiterleitung, damit Sidebar/Guards sauber neu laden
+        return $this->redirect(request()->fullUrl());
     }
 
     public function updateMemberRole($memberId, $role)

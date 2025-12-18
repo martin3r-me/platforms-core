@@ -11,6 +11,7 @@
         </div>
         <div class="flex gap-1 mt-4 border-b border-gray-200">
             <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : tab === 'team', 'text-gray-500 hover:text-gray-700' : tab !== 'team' }" @click="tab = 'team'">Team</button>
+            <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : tab === 'create', 'text-gray-500 hover:text-gray-700' : tab !== 'create' }" @click="tab = 'create'">Anlegen</button>
             <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : tab === 'billing', 'text-gray-500 hover:text-gray-700' : tab !== 'billing' }" @click="tab = 'billing'">Abrechnung</button>
         </div>
     </x-slot>
@@ -36,24 +37,6 @@
                 @else
                     <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">Nur ein Team vorhanden. Lege unten ein neues Team an.</div>
                 @endif
-            </div>
-
-            {{-- Create Team --}}
-            <div>
-                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Neues Team erstellen</h3>
-                <div class="space-y-3">
-                    <p class="text-sm text-[var(--ui-muted)]">
-                        Das Anlegen eines Teams erfolgt aus Sicherheits-/Session-Gründen in einem separaten Tab.
-                    </p>
-                    <x-ui-button
-                        type="button"
-                        variant="primary"
-                        x-data
-                        @click="window.open('{{ route('platform.teams.create') }}', '_blank', 'noopener,noreferrer')"
-                    >
-                        Team im neuen Tab anlegen
-                    </x-ui-button>
-                </div>
             </div>
 
             {{-- Team Settings (nur für Owner) --}}
@@ -189,6 +172,39 @@
                 </div>
             </div>
             @endif
+        </div>
+    </div>
+
+    {{-- Create Tab --}}
+    <div class="mt-6" x-show="tab === 'create'" x-cloak>
+        <div class="space-y-6">
+            <div>
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Neues Team erstellen</h3>
+                <form wire:submit.prevent="createTeam" class="space-y-4">
+                    <x-ui-input-text
+                        name="newTeamName"
+                        label="Team-Name"
+                        wire:model.live="newTeamName"
+                        placeholder="Team-Name eingeben..."
+                        required
+                        :errorKey="'newTeamName'"
+                    />
+                    @if(!empty($availableParentTeams) && count($availableParentTeams) > 0)
+                        <x-ui-input-select
+                            name="newParentTeamId"
+                            label="Parent-Team (optional)"
+                            :options="$availableParentTeams"
+                            :nullable="true"
+                            wire:model.live="newParentTeamId"
+                            :errorKey="'newParentTeamId'"
+                        />
+                        <p class="text-xs text-[var(--ui-muted)]">
+                            Optional: Wähle ein Root-Team als Parent-Team. Kind-Teams erben Zugriff auf root-scoped Module (z.B. CRM, Organization).
+                        </p>
+                    @endif
+                    <x-ui-button type="submit">Team erstellen</x-ui-button>
+                </form>
+            </div>
         </div>
     </div>
 

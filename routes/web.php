@@ -5,7 +5,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Http\Controllers\CoreAiStreamController;
 use Platform\Core\Http\Controllers\TeamInvitationController;
-use Platform\Core\Http\Controllers\TeamController;
 
 
 Route::post('/logout', function () {
@@ -21,10 +20,6 @@ Route::post('/logout', function () {
 
     return redirect('/');
 })->name('logout');
-
-// Teams: Create (in neuem Tab / full page)
-Route::get('/teams/create', [TeamController::class, 'create'])->name('platform.teams.create');
-Route::post('/teams', [TeamController::class, 'store'])->name('platform.teams.store');
 
 // Einladung annehmen (Token)
 Route::get('/invitations/accept/{token}', [TeamInvitationController::class, 'accept'])
