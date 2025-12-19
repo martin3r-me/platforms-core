@@ -5,8 +5,9 @@ namespace Platform\Core\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Platform\Core\Contracts\HasDisplayName;
 
-class TeamCounterDefinition extends Model
+class TeamCounterDefinition extends Model implements HasDisplayName
 {
     protected $table = 'team_counter_definitions';
 
@@ -38,6 +39,11 @@ class TeamCounterDefinition extends Model
     public function events(): HasMany
     {
         return $this->hasMany(TeamCounterEvent::class, 'team_counter_definition_id');
+    }
+
+    public function getDisplayName(): ?string
+    {
+        return $this->label ?? null;
     }
 }
 

@@ -249,9 +249,8 @@ class ModalCounters extends Component
             'context_type' => \Platform\Core\Models\TeamCounterDefinition::class,
             'context_id' => $definitionId,
             'push' => true,
+            'open_modal' => true,
         ]);
-
-        $this->dispatch('keyresult:open');
     }
 
     public function render()
