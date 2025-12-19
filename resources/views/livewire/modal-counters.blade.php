@@ -79,7 +79,7 @@
                                 wire:click="increment({{ $id }})"
                                 :disabled="!$isActive"
                             >
-                                +1
+                                +
                             </x-ui-button>
                         </div>
                     </div>
