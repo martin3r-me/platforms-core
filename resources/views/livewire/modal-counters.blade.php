@@ -167,7 +167,12 @@
                                                     variant="secondary-outline"
                                                     size="sm"
                                                     x-data
-                                                    x-on:click="$dispatch('keyresult', { context_type: 'Platform\\\\Core\\\\Models\\\\TeamCounterDefinition', context_id: {{ $id }}, push: true, open_modal: true }); $dispatch('keyresult:open')"
+                                                    x-on:click="
+                                                        window.dispatchEvent(new CustomEvent('keyresult', {
+                                                            detail: { context_type: 'Platform\\\\Core\\\\Models\\\\TeamCounterDefinition', context_id: {{ $id }}, push: true, open_modal: true }
+                                                        }));
+                                                        window.dispatchEvent(new CustomEvent('keyresult:open'));
+                                                    "
                                                 >
                                                     KR verknüpfen
                                                 </x-ui-button>
