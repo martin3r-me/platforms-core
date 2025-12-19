@@ -234,6 +234,26 @@ class ModalCounters extends Component
         $this->loadCounters();
     }
 
+    /**
+     * Öffnet das bestehende OKR-KeyResult-Verknüpfungsmodal mit Counter-Context,
+     * ohne den zuvor gesetzten Kontext dauerhaft zu überschreiben (push=true).
+     */
+    public function openKeyResultLinker(int $definitionId): void
+    {
+        // OKR-Modul optional: wenn nicht installiert, einfach nichts tun
+        if (!class_exists(\Platform\Okr\Models\KeyResultContext::class)) {
+            return;
+        }
+
+        $this->dispatch('keyresult', [
+            'context_type' => \Platform\Core\Models\TeamCounterDefinition::class,
+            'context_id' => $definitionId,
+            'push' => true,
+        ]);
+
+        $this->dispatch('keyresult:open');
+    }
+
     public function render()
     {
         return view('platform::livewire.modal-counters');

@@ -166,8 +166,7 @@
                                                 <x-ui-button
                                                     variant="secondary-outline"
                                                     size="sm"
-                                                    x-data
-                                                    x-on:click="$dispatch('keyresult', {{ \Illuminate\Support\Js::from(['context_type' => \Platform\Core\Models\TeamCounterDefinition::class, 'context_id' => $id, 'push' => true]) }}); $dispatch('keyresult:open')"
+                                                    wire:click="openKeyResultLinker({{ $id }})"
                                                 >
                                                     KR verknüpfen
                                                 </x-ui-button>
