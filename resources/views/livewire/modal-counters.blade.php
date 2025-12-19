@@ -77,7 +77,7 @@
                                 variant="primary"
                                 size="sm"
                                 wire:click="increment({{ $id }})"
-                                @disabled(!$isActive)
+                                :disabled="!$isActive"
                             >
                                 +1
                             </x-ui-button>
