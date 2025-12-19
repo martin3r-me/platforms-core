@@ -166,7 +166,8 @@
                                                 <x-ui-button
                                                     variant="secondary-outline"
                                                     size="sm"
-                                                    wire:click="openKeyResultLinker({{ $id }})"
+                                                    x-data
+                                                    x-on:click="$dispatch('keyresult', { context_type: 'Platform\\\\Core\\\\Models\\\\TeamCounterDefinition', context_id: {{ $id }}, push: true, open_modal: true })"
                                                 >
                                                     KR verknüpfen
                                                 </x-ui-button>
