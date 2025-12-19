@@ -167,7 +167,7 @@
                                                     variant="secondary-outline"
                                                     size="sm"
                                                     x-data
-                                                    @click="$dispatch('keyresult', @js(['context_type' => \Platform\Core\Models\TeamCounterDefinition::class, 'context_id' => $id, 'push' => true])); $dispatch('keyresult:open')"
+                                                    x-on:click="$dispatch('keyresult', {{ \Illuminate\Support\Js::from(['context_type' => \Platform\Core\Models\TeamCounterDefinition::class, 'context_id' => $id, 'push' => true]) }}); $dispatch('keyresult:open')"
                                                 >
                                                     KR verknüpfen
                                                 </x-ui-button>
