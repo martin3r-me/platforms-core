@@ -85,6 +85,9 @@
                         <x-ui-button variant="secondary" size="sm" x-data @click="$dispatch('open-modal-checkin')" class="w-full">
                             Täglicher Check-in
                         </x-ui-button>
+                        <x-ui-button variant="secondary" size="sm" x-data @click="$dispatch('open-modal-counters')" class="w-full">
+                            Counter
+                        </x-ui-button>
                     </div>
                 </div>
             </div>
