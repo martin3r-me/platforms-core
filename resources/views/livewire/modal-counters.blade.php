@@ -162,6 +162,16 @@
                                         </div>
 
                                         <div class="flex flex-col gap-2 shrink-0">
+                                            @if(class_exists(\Platform\Okr\Models\KeyResultContext::class))
+                                                <x-ui-button
+                                                    variant="secondary-outline"
+                                                    size="sm"
+                                                    x-data
+                                                    @click="$dispatch('keyresult', @js(['context_type' => \Platform\Core\Models\TeamCounterDefinition::class, 'context_id' => $id, 'push' => true])); $dispatch('keyresult:open')"
+                                                >
+                                                    KR verknüpfen
+                                                </x-ui-button>
+                                            @endif
                                             <x-ui-button variant="secondary-outline" wire:click="saveCounter({{ $id }})">
                                                 Speichern
                                             </x-ui-button>

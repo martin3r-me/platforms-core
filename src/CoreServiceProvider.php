@@ -23,6 +23,8 @@ use Platform\Core\Services\IntelligentAgent;
 use Platform\Core\Services\ToolRegistry;
 use Platform\Core\Services\ToolExecutor;
 use Platform\Core\Services\AgentOrchestrator;
+use Platform\Core\Contracts\CounterKeyResultSyncer;
+use Platform\Core\Services\NullCounterKeyResultSyncer;
 
 // Command-Klasse importieren!
 use Platform\Core\Commands\TrackBillableUsage;
@@ -92,6 +94,7 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Console\Commands\CreateApiTokenCommand::class,
                 \Platform\Core\Console\Commands\CreateEndpointApiTokenCommand::class,
                 \Platform\Core\Console\Commands\RefreshMicrosoftTokens::class,
+                \Platform\Core\Console\Commands\SyncCounterKeyResultsCommand::class,
             ]);
         }
 
@@ -105,6 +108,11 @@ class CoreServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/security.php', 'security');
         $this->mergeConfigFrom(__DIR__.'/../config/checkins.php', 'checkins');
         // Agent-Config entfernt – Agent ausgelagert
+
+        // Counter→KeyResult Sync (Default: No-Op; OKR-Modul kann überschreiben)
+        $this->app->singleton(CounterKeyResultSyncer::class, function () {
+            return new NullCounterKeyResultSyncer();
+        });
 
         // Auth Policy Config einbinden und Service binden
         $this->mergeConfigFrom(__DIR__.'/../config/auth-policy.php', 'auth-policy');
