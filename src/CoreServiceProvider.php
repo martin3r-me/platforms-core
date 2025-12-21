@@ -20,8 +20,6 @@ use Platform\Core\Services\NullCrmContactOptionsProvider;
 use Platform\Core\Contracts\CrmCompanyContactsProviderInterface;
 use Platform\Core\Services\NullCrmCompanyContactsProvider;
 use Platform\Core\Services\IntelligentAgent;
-use Platform\Core\Services\ToolRegistry;
-use Platform\Core\Services\ToolExecutor;
 use Platform\Core\Services\AgentOrchestrator;
 use Platform\Core\Contracts\CounterKeyResultSyncer;
 use Platform\Core\Services\NullCounterKeyResultSyncer;
@@ -159,14 +157,18 @@ class CoreServiceProvider extends ServiceProvider
 
         // Tools registrieren (nach dem Boot, damit alle Dependencies verfügbar sind)
         $this->app->booted(function () {
-            $registry = $this->app->make(\Platform\Core\Tools\ToolRegistry::class);
-            
-            // Bestehende Tools registrieren
-            $registry->register($this->app->make(\Platform\Core\Tools\DataReadTool::class));
-            $registry->register($this->app->make(\Platform\Core\Tools\DataWriteTool::class));
-            
-            // Test-Tool registrieren (für Entwicklung/Testing)
-            $registry->register($this->app->make(\Platform\Core\Tools\EchoTool::class));
+            try {
+                $registry = $this->app->make(\Platform\Core\Tools\ToolRegistry::class);
+                
+                // Bestehende Tools registrieren
+                $registry->register($this->app->make(\Platform\Core\Tools\DataReadTool::class));
+                $registry->register($this->app->make(\Platform\Core\Tools\DataWriteTool::class));
+                
+                // Test-Tool registrieren (für Entwicklung/Testing)
+                $registry->register($this->app->make(\Platform\Core\Tools\EchoTool::class));
+            } catch (\Throwable $e) {
+                \Log::warning('CoreServiceProvider: Tool registration failed: ' . $e->getMessage());
+            }
         });
     }
 
