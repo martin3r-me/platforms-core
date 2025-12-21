@@ -99,7 +99,7 @@ class Tag extends Model
     /**
      * Scope: Tags für einen User (Team-Tags seines Root-Teams + globale Tags)
      */
-    public function scopeAvailableForUser($query, User $user)
+    public function scopeAvailableForUser($query, \Platform\Core\Models\User $user)
     {
         $baseTeam = $user->currentTeamRelation;
         if (!$baseTeam) {
