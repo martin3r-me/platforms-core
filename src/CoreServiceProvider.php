@@ -155,11 +155,13 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(\Platform\Core\Tools\ToolRegistry::class);
         $this->app->singleton(\Platform\Core\Tools\ToolExecutor::class);
 
-        // Tools registrieren (lazy - erst wenn Registry tatsächlich verwendet wird)
-        $this->app->afterResolving(\Platform\Core\Tools\ToolRegistry::class, function ($registry) {
+        // Tools registrieren (beim Boot - sicherer als afterResolving)
+        $this->app->booted(function () {
             try {
-                // Prüfe ob App gebootet ist (für package:discover)
-                if (!$this->app->isBooted()) {
+                $registry = $this->app->make(\Platform\Core\Tools\ToolRegistry::class);
+                
+                // Prüfe ob Tools bereits registriert sind (verhindert doppelte Registrierung)
+                if (count($registry->all()) > 0) {
                     return;
                 }
                 
@@ -169,10 +171,17 @@ class CoreServiceProvider extends ServiceProvider
                 
                 // Test-Tool registrieren (für Entwicklung/Testing)
                 $registry->register($this->app->make(\Platform\Core\Tools\EchoTool::class));
+                
+                \Log::info('[CoreServiceProvider] Tools registriert', [
+                    'count' => count($registry->all()),
+                    'tools' => $registry->names()
+                ]);
             } catch (\Throwable $e) {
-                // Silent fail - Log nur wenn App gebootet ist
-                if ($this->app->isBooted() && method_exists(\Log::class, 'warning')) {
-                    \Log::warning('CoreServiceProvider: Tool registration failed: ' . $e->getMessage());
+                // Log nur wenn Log verfügbar ist
+                if (method_exists(\Log::class, 'warning')) {
+                    \Log::warning('CoreServiceProvider: Tool registration failed: ' . $e->getMessage(), [
+                        'trace' => $e->getTraceAsString()
+                    ]);
                 }
             }
         });

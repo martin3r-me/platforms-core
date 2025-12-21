@@ -276,11 +276,16 @@ class OpenAiService
         $tools[] = $toolBroker->getWriteToolDefinition();
         
         // 2. Tools aus ToolRegistry hinzufügen
-        foreach ($toolRegistry->all() as $tool) {
+        // Stelle sicher, dass Registry aufgelöst wird (triggert afterResolving)
+        $registryInstance = $toolRegistry;
+        $allTools = $registryInstance->all();
+        Log::info('[OpenAI Tools] Registry tools count', ['count' => count($allTools)]);
+        
+        foreach ($allTools as $tool) {
             $toolDef = $this->convertToolToOpenAiFormat($tool);
             if ($toolDef) {
                 $tools[] = $toolDef;
-                Log::debug('[OpenAI Tools] Added tool from registry', ['tool' => $tool->getName()]);
+                Log::info('[OpenAI Tools] Added tool from registry', ['tool' => $tool->getName()]);
             }
         }
         
