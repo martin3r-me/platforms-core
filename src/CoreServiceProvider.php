@@ -155,11 +155,24 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(\Platform\Core\Tools\ToolRegistry::class);
         $this->app->singleton(\Platform\Core\Tools\ToolExecutor::class);
 
-        // Tools registrieren (beim Boot - sicherer als afterResolving)
-        $this->app->booted(function () {
+        // Tools registrieren (lazy - erst wenn Registry tatsächlich verwendet wird)
+        // Wichtig: Nur wenn App gebootet ist UND nicht beim package:discover
+        $this->app->afterResolving(\Platform\Core\Tools\ToolRegistry::class, function ($registry) {
+            // Prüfe ob wir beim package:discover sind (keine vollständige App)
+            if ($this->app->runningInConsole() && !$this->app->runningUnitTests()) {
+                // Prüfe ob es ein echter Request ist (nicht package:discover)
+                $command = $_SERVER['argv'][1] ?? '';
+                if ($command === 'package:discover' || str_contains($command, 'package:discover')) {
+                    return; // Skip beim package:discover
+                }
+            }
+            
+            // Prüfe ob App gebootet ist
+            if (!$this->app->isBooted()) {
+                return;
+            }
+            
             try {
-                $registry = $this->app->make(\Platform\Core\Tools\ToolRegistry::class);
-                
                 // Prüfe ob Tools bereits registriert sind (verhindert doppelte Registrierung)
                 if (count($registry->all()) > 0) {
                     return;
@@ -172,16 +185,16 @@ class CoreServiceProvider extends ServiceProvider
                 // Test-Tool registrieren (für Entwicklung/Testing)
                 $registry->register($this->app->make(\Platform\Core\Tools\EchoTool::class));
                 
-                \Log::info('[CoreServiceProvider] Tools registriert', [
-                    'count' => count($registry->all()),
-                    'tools' => $registry->names()
-                ]);
-            } catch (\Throwable $e) {
-                // Log nur wenn Log verfügbar ist
-                if (method_exists(\Log::class, 'warning')) {
-                    \Log::warning('CoreServiceProvider: Tool registration failed: ' . $e->getMessage(), [
-                        'trace' => $e->getTraceAsString()
+                if (method_exists(\Log::class, 'info')) {
+                    \Log::info('[CoreServiceProvider] Tools registriert', [
+                        'count' => count($registry->all()),
+                        'tools' => $registry->names()
                     ]);
+                }
+            } catch (\Throwable $e) {
+                // Silent fail - Log nur wenn Log verfügbar ist und App gebootet
+                if ($this->app->isBooted() && method_exists(\Log::class, 'warning')) {
+                    \Log::warning('CoreServiceProvider: Tool registration failed: ' . $e->getMessage());
                 }
             }
         });
