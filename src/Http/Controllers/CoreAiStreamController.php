@@ -7,13 +7,12 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use Platform\Core\Services\OpenAiService;
 use Platform\Core\Models\CoreChatThread;
 use Platform\Core\Models\CoreChatMessage;
-use Platform\Core\Tools\CoreDataReadTool;
-use Platform\Core\Tools\CoreDataProxy;
-use Platform\Core\Tools\CoreWriteProxy;
+use Platform\Core\Tools\ToolExecutor;
+use Platform\Core\Contracts\ToolContext;
 
 class CoreAiStreamController extends Controller
 {
-    public function stream(Request $request, OpenAiService $openAi, CoreDataReadTool $dataReadTool): StreamedResponse
+    public function stream(Request $request, OpenAiService $openAi, ToolExecutor $toolExecutor): StreamedResponse
     {
         $user = $request->user();
         if (!$user) {
@@ -51,7 +50,7 @@ class CoreAiStreamController extends Controller
 
         $assistantBuffer = '';
 
-        $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl, $dataReadTool) {
+            $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl, $toolExecutor) {
             // Clean buffers to avoid server buffering
             while (ob_get_level() > 0) {
                 @ob_end_flush();
@@ -122,26 +121,37 @@ class CoreAiStreamController extends Controller
                     echo 'data: ' . json_encode(['tool' => $tool], JSON_UNESCAPED_UNICODE) . "\n\n";
                     @flush();
                 },
-                'tool_executor' => function($toolName, $arguments) {
-                    if ($toolName === 'data_read') {
-                        $proxy = app(CoreDataProxy::class);
-                        $entity = $arguments['entity'] ?? '';
-                        $operation = $arguments['operation'] ?? '';
-                        $result = $proxy->executeRead($entity, $operation, $arguments, ['trace_id' => bin2hex(random_bytes(8))]);
-                        echo 'data: ' . json_encode(['tool' => 'data_read', 'result' => $result], JSON_UNESCAPED_UNICODE) . "\n\n";
+                'tool_executor' => function($toolName, $arguments) use ($toolExecutor) {
+                    try {
+                        $context = ToolContext::fromAuth();
+                        $result = $toolExecutor->execute($toolName, $arguments, $context);
+                        
+                        // Konvertiere ToolResult zu altem Format für Kompatibilität
+                        $resultArray = $result->toArray();
+                        
+                        echo 'data: ' . json_encode(['tool' => $toolName, 'result' => $resultArray], JSON_UNESCAPED_UNICODE) . "\n\n";
                         @flush();
-                        return $result;
-                    }
-                    if ($toolName === 'data_write') {
-                        $proxy = app(CoreWriteProxy::class);
-                        $entity = $arguments['entity'] ?? '';
-                        $operation = $arguments['operation'] ?? '';
-                        $result = $proxy->executeCommand($entity, $operation, $arguments, ['trace_id' => bin2hex(random_bytes(8))]);
-                        echo 'data: ' . json_encode(['tool' => 'data_write', 'result' => $result], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        
+                        return $resultArray;
+                    } catch (\Throwable $e) {
+                        \Log::error('[CoreAiStreamController] Tool execution error', [
+                            'tool' => $toolName,
+                            'error' => $e->getMessage()
+                        ]);
+                        
+                        $errorResult = [
+                            'ok' => false,
+                            'error' => [
+                                'code' => 'EXECUTION_ERROR',
+                                'message' => $e->getMessage()
+                            ]
+                        ];
+                        
+                        echo 'data: ' . json_encode(['tool' => $toolName, 'result' => $errorResult], JSON_UNESCAPED_UNICODE) . "\n\n";
                         @flush();
-                        return $result;
+                        
+                        return $errorResult;
                     }
-                    return null;
                 }
             ]);
 

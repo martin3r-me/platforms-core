@@ -32,7 +32,7 @@ Route::get('/health', function () {
     ]);
 });
 
-// Datawarehouse-Endpunkte für Teams, Users und Check-ins
+// Datawarehouse-Endpunkte für Teams, Users, Check-ins und Team Counter
 Route::middleware('api.auth')->group(function () {
     Route::get('/teams/datawarehouse', [\Platform\Core\Http\Controllers\Api\TeamDatawarehouseController::class, 'index']);
     Route::get('/teams/datawarehouse/health', [\Platform\Core\Http\Controllers\Api\TeamDatawarehouseController::class, 'health']);
@@ -40,5 +40,9 @@ Route::middleware('api.auth')->group(function () {
     Route::get('/users/datawarehouse/health', [\Platform\Core\Http\Controllers\Api\UserDatawarehouseController::class, 'health']);
     Route::get('/checkins/datawarehouse', [\Platform\Core\Http\Controllers\Api\CheckinDatawarehouseController::class, 'index']);
     Route::get('/checkins/datawarehouse/health', [\Platform\Core\Http\Controllers\Api\CheckinDatawarehouseController::class, 'health']);
+    Route::get('/team-counter-definitions/datawarehouse', [\Platform\Core\Http\Controllers\Api\TeamCounterDatawarehouseController::class, 'index']);
+    Route::get('/team-counter-definitions/datawarehouse/health', [\Platform\Core\Http\Controllers\Api\TeamCounterDatawarehouseController::class, 'health']);
+    Route::get('/team-counter-events/datawarehouse', [\Platform\Core\Http\Controllers\Api\TeamCounterEventDatawarehouseController::class, 'index']);
+    Route::get('/team-counter-events/datawarehouse/health', [\Platform\Core\Http\Controllers\Api\TeamCounterEventDatawarehouseController::class, 'health']);
 });
 

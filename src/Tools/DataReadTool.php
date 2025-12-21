@@ -2,191 +2,125 @@
 
 namespace Platform\Core\Tools;
 
-use Illuminate\Support\Facades\Auth;
-use Platform\Core\Tools\DataRead\ProviderRegistry;
-use Illuminate\Database\Eloquent\Builder;
+use Platform\Core\Contracts\ToolContract;
+use Platform\Core\Contracts\ToolContext;
+use Platform\Core\Contracts\ToolResult;
 
-class DataReadTool
+/**
+ * Tool-Implementierung für data_read
+ * 
+ * Wrapper um CoreDataProxy, der das ToolContract implementiert
+ */
+class DataReadTool implements ToolContract
 {
-    private const MAX_PER_PAGE = 200;
-    private const DEFAULT_PER_PAGE = 50;
+    public function __construct(
+        private CoreDataProxy $proxy
+    ) {}
 
-    public function __construct(private ProviderRegistry $registry) {}
-
-    public function describe(string $entity): array
+    public function getName(): string
     {
-        $provider = $this->registry->get($entity);
-        if (!$provider) { return $this->error('ENTITY_NOT_FOUND', "Entity '{$entity}' not found"); }
+        return 'data_read';
+    }
 
+    public function getDescription(): string
+    {
+        return 'Liest Daten aus verschiedenen Entitäten. Unterstützt die Operationen: describe (Metadaten), list (Liste), get (Einzel-Datensatz), search (Suche).';
+    }
+
+    public function getSchema(): array
+    {
         return [
-            'ok' => true,
-            'data' => [
-                'entity' => $entity,
-                'readable_fields' => $provider->readableFields(),
-                'allowed_filters' => $provider->allowedFilters(),
-                'allowed_sorts' => $provider->allowedSorts(),
-                'relations_whitelist' => $provider->relationsWhitelist(),
-                'search_fields' => $provider->searchFields(),
-                'default_projection' => $provider->defaultProjection(),
+            'type' => 'object',
+            'properties' => [
+                'entity' => [
+                    'type' => 'string',
+                    'description' => 'Name der Entität (z.B. "planner.tasks", "okr.key_results")'
+                ],
+                'operation' => [
+                    'type' => 'string',
+                    'enum' => ['describe', 'list', 'get', 'search'],
+                    'description' => 'Operation: describe (Metadaten), list (Liste), get (Einzel-Datensatz), search (Suche)'
+                ],
+                'id' => [
+                    'type' => 'integer',
+                    'description' => 'ID für get-Operation'
+                ],
+                'filters' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'field' => ['type' => 'string'],
+                            'op' => ['type' => 'string', 'enum' => ['eq', 'ne', 'like', 'in', 'gte', 'lte', 'between', 'is_null']],
+                            'value' => ['oneOf' => [
+                                ['type' => 'string'],
+                                ['type' => 'number'],
+                                ['type' => 'boolean'],
+                                ['type' => 'array', 'items' => ['type' => 'string']]
+                            ]]
+                        ],
+                        'required' => ['field', 'op']
+                    ]
+                ],
+                'sort' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'field' => ['type' => 'string'],
+                            'dir' => ['type' => 'string', 'enum' => ['asc', 'desc']]
+                        ],
+                        'required' => ['field', 'dir']
+                    ]
+                ],
+                'fields' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string']
+                ],
+                'include' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string']
+                ],
+                'page' => [
+                    'type' => 'integer'
+                ],
+                'per_page' => [
+                    'type' => 'integer',
+                    'minimum' => 1,
+                    'maximum' => 200
+                ],
+                'query' => [
+                    'type' => 'string',
+                    'description' => 'Suchbegriff für search-Operation'
+                ]
             ],
-            'message' => "Schema for {$entity} loaded"
+            'required' => ['entity', 'operation']
         ];
     }
 
-    public function list(string $entity, array $options = []): array
+    public function execute(array $arguments, ToolContext $context): ToolResult
     {
-        $provider = $this->registry->get($entity);
-        if (!$provider) { return $this->error('ENTITY_NOT_FOUND', "Entity '{$entity}' not found"); }
+        $entity = $arguments['entity'] ?? '';
+        $operation = $arguments['operation'] ?? '';
+        
+        // Alle anderen Argumente als Options übergeben
+        $options = $arguments;
+        unset($options['entity'], $options['operation']);
 
-        try {
-            $query = $this->buildQuery($provider, $options);
-            $total = $query->count();
+        $result = $this->proxy->executeRead($entity, $operation, $options, [
+            'trace_id' => bin2hex(random_bytes(8))
+        ]);
 
-            $page = max(1, (int)($options['page'] ?? 1));
-            $perPage = min(self::MAX_PER_PAGE, max(1, (int)($options['per_page'] ?? self::DEFAULT_PER_PAGE)));
-
-            $records = $query
-                ->skip(($page - 1) * $perPage)
-                ->take($perPage)
-                ->get()
-                ->map(fn($record) => $record->toArray())
-                ->toArray();
-
-            $sortMeta = $options['sort'] ?? [];
-
-            return [
-                'ok' => true,
-                'data' => [
-                    'records' => $records,
-                    '_source' => [
-                        'entity' => $entity,
-                        'model' => $provider->model(),
-                        'updated_at' => now()->toISOString(),
-                    ],
-                    'meta' => [
-                        'total' => $total,
-                        'page' => $page,
-                        'per_page' => $perPage,
-                        'sort' => $sortMeta,
-                        'fields' => $options['fields'] ?? $provider->defaultProjection(),
-                        'include' => $options['include'] ?? [],
-                        'duration_ms' => 0,
-                    ]
-                ],
-                'message' => "Listed {$total} {$entity} records"
-            ];
-        } catch (\Throwable $e) {
-            return $this->error('INTERNAL_ERROR', $e->getMessage());
-        }
-    }
-
-    public function get(string $entity, int $id): array
-    {
-        $provider = $this->registry->get($entity);
-        if (!$provider) { return $this->error('ENTITY_NOT_FOUND', "Entity '{$entity}' not found"); }
-
-        try {
-            $query = $this->buildQuery($provider, []);
-            $record = $query->where('id', $id)->first();
-            if (!$record) { return $this->error('ROW_NOT_FOUND', "Record with ID {$id} not found"); }
-
-            return [
-                'ok' => true,
-                'data' => [
-                    'record' => $record->toArray(),
-                    '_source' => [
-                        'entity' => $entity,
-                        'model' => $provider->model(),
-                        'updated_at' => now()->toISOString(),
-                    ]
-                ],
-                'message' => "Retrieved {$entity} #{$id}"
-            ];
-        } catch (\Throwable $e) {
-            return $this->error('INTERNAL_ERROR', $e->getMessage());
-        }
-    }
-
-    public function search(string $entity, string $queryText, array $options = []): array
-    {
-        $provider = $this->registry->get($entity);
-        if (!$provider) { return $this->error('ENTITY_NOT_FOUND', "Entity '{$entity}' not found"); }
-        if (empty($provider->searchFields())) { return $this->error('SEARCH_NOT_SUPPORTED', "Search not supported for {$entity}"); }
-
-        try {
-            $options = array_merge($options, ['query' => $queryText]);
-            return $this->list($entity, $options);
-        } catch (\Throwable $e) {
-            return $this->error('INTERNAL_ERROR', $e->getMessage());
-        }
-    }
-
-    private function buildQuery($provider, array $options): Builder
-    {
-        $query = $provider->teamScopedQuery();
-
-        // Domain defaults (e.g., open only, default sort)
-        $provider->applyDomainDefaults($query, $options);
-
-        // Filters with mapping
-        foreach ($options['filters'] ?? [] as $filter) {
-            $mapped = $provider->mapFilter($filter);
-            if ($mapped === null) { continue; }
-            $this->applyFilter($query, $mapped, $provider);
+        // Konvertiere altes Format zu ToolResult
+        if (($result['ok'] ?? false) === true) {
+            return ToolResult::success($result['data'] ?? null, $result['_source'] ?? []);
         }
 
-        // Search
-        if (!empty($options['query'])) {
-            $fields = $provider->searchFields();
-            $query->where(function($q) use ($fields, $options) {
-                foreach ($fields as $field) {
-                    $q->orWhere($field, 'like', '%' . $options['query'] . '%');
-                }
-            });
-        }
-
-        // Sort
-        if (!empty($options['sort'])) {
-            foreach ($options['sort'] as $sort) {
-                $field = $sort['field'] ?? null;
-                $dir = $sort['dir'] ?? 'asc';
-                if ($field && in_array($field, $provider->allowedSorts(), true)) {
-                    $query->orderBy($field, $dir);
-                }
-            }
-        }
-
-        return $query;
-    }
-
-    private function applyFilter(Builder $query, array $filter, $provider): void
-    {
-        $field = $filter['field'] ?? null;
-        $op = $filter['op'] ?? null;
-        $value = $filter['value'] ?? null;
-
-        $allowed = $provider->allowedFilters();
-        if (!$field || !$op || !isset($allowed[$field])) { return; }
-        if (!in_array($op, $allowed[$field], true)) { return; }
-
-        match ($op) {
-            'eq' => $query->where($field, $value),
-            'ne' => $query->where($field, '!=', $value),
-            'like' => $query->where($field, 'like', '%' . $value . '%'),
-            'in' => $query->whereIn($field, is_array($value) ? $value : [$value]),
-            'gte' => $query->where($field, '>=', $value),
-            'lte' => $query->where($field, '<=', $value),
-            'between' => (is_array($value) && count($value) === 2) ? $query->whereBetween($field, $value) : null,
-            'is_null' => $query->whereNull($field),
-            default => null
-        };
-    }
-
-    private function error(string $code, string $message): array
-    {
-        return [
-            'ok' => false,
-            'error' => [ 'code' => $code, 'message' => $message ]
-        ];
+        $error = $result['error'] ?? [];
+        return ToolResult::error(
+            $error['message'] ?? 'Unbekannter Fehler',
+            $error['code'] ?? 'UNKNOWN_ERROR',
+            ['trace_id' => $error['trace_id'] ?? null]
+        );
     }
 }

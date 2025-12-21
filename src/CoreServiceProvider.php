@@ -152,6 +152,22 @@ class CoreServiceProvider extends ServiceProvider
                 \Log::warning('CoreServiceProvider: Manifest loading skipped: '.$e->getMessage());
             }
         });
+
+        // Tool Registry & Executor als Singleton registrieren
+        $this->app->singleton(\Platform\Core\Tools\ToolRegistry::class);
+        $this->app->singleton(\Platform\Core\Tools\ToolExecutor::class);
+
+        // Tools registrieren (nach dem Boot, damit alle Dependencies verfügbar sind)
+        $this->app->booted(function () {
+            $registry = $this->app->make(\Platform\Core\Tools\ToolRegistry::class);
+            
+            // Bestehende Tools registrieren
+            $registry->register($this->app->make(\Platform\Core\Tools\DataReadTool::class));
+            $registry->register($this->app->make(\Platform\Core\Tools\DataWriteTool::class));
+            
+            // Test-Tool registrieren (für Entwicklung/Testing)
+            $registry->register($this->app->make(\Platform\Core\Tools\EchoTool::class));
+        });
     }
 
 

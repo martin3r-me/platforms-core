@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Tools\CoreContextTool;
 use Platform\Core\Tools\ToolBroker;
+use Platform\Core\Tools\ToolRegistry;
 
 class OpenAiService
 {
@@ -255,17 +256,50 @@ class OpenAiService
     private function getAvailableTools(): array
     {
         $toolBroker = app(ToolBroker::class);
+        $toolRegistry = app(ToolRegistry::class);
+        
         $capabilities = $toolBroker->getAvailableCapabilities();
         Log::info('[OpenAI Tools] Available capabilities', ['capabilities' => $capabilities]);
+        
         $tools = [];
+        
+        // 1. Entity-basierte Tools aus ToolBroker (bestehende Logik)
         foreach ($capabilities['available_entities'] as $entity) {
             foreach ($capabilities['available_operations'] as $operation) {
                 $toolDef = $toolBroker->getToolDefinition($entity, $operation);
-                if ($toolDef) { $tools[] = $toolDef; Log::debug('[OpenAI Tools] Added tool definition', ['entity' => $entity, 'operation' => $operation]); }
+                if ($toolDef) { 
+                    $tools[] = $toolDef; 
+                    Log::debug('[OpenAI Tools] Added tool definition', ['entity' => $entity, 'operation' => $operation]); 
+                }
             }
         }
         $tools[] = $toolBroker->getWriteToolDefinition();
-        Log::info('[OpenAI Tools] Final tools array', ['tools' => $tools]);
+        
+        // 2. Tools aus ToolRegistry hinzufügen
+        foreach ($toolRegistry->all() as $tool) {
+            $toolDef = $this->convertToolToOpenAiFormat($tool);
+            if ($toolDef) {
+                $tools[] = $toolDef;
+                Log::debug('[OpenAI Tools] Added tool from registry', ['tool' => $tool->getName()]);
+            }
+        }
+        
+        Log::info('[OpenAI Tools] Final tools array', ['tools' => $tools, 'count' => count($tools)]);
         return $tools;
+    }
+
+    /**
+     * Konvertiert ein ToolContract zu OpenAI Function Format
+     */
+    private function convertToolToOpenAiFormat(\Platform\Core\Contracts\ToolContract $tool): array
+    {
+        return [
+            'type' => 'function',
+            'function' => [
+                'name' => $tool->getName(),
+                'description' => $tool->getDescription(),
+                'parameters' => $tool->getSchema(),
+            ]
+        ];
     }
 }
