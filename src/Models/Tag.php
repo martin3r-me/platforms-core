@@ -97,11 +97,18 @@ class Tag extends Model
     }
 
     /**
-     * Scope: Tags für einen User (Team-Tags seines Teams + globale Tags)
+     * Scope: Tags für einen User (Team-Tags seines Root-Teams + globale Tags)
      */
     public function scopeAvailableForUser($query, User $user)
     {
-        $teamId = $user->currentTeamRelation?->id;
+        $baseTeam = $user->currentTeamRelation;
+        if (!$baseTeam) {
+            return $query->whereNull('team_id');
+        }
+
+        // Verwende Root-Team (Parent-Team), nicht Child-Team
+        $rootTeam = $baseTeam->getRootTeam();
+        $teamId = $rootTeam?->id;
         
         if ($teamId === null) {
             return $query->whereNull('team_id');
