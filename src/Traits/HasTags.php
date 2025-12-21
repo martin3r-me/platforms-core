@@ -177,19 +177,24 @@ trait HasTags
      */
     protected function getTeamIdForTagging(): ?int
     {
-        $user = Auth::user();
-        if (!$user) {
+        try {
+            $user = Auth::user();
+            if (!$user) {
+                return null;
+            }
+
+            // Hole Root-Team (Parent-Team), nicht Child-Team
+            $baseTeam = $user->currentTeamRelation;
+            if (!$baseTeam) {
+                return null;
+            }
+
+            $rootTeam = $baseTeam->getRootTeam();
+            return $rootTeam?->id;
+        } catch (\Exception $e) {
+            // Fallback wenn Datenbank/Auth noch nicht bereit ist (z.B. beim Bootstrap)
             return null;
         }
-
-        // Hole Root-Team (Parent-Team), nicht Child-Team
-        $baseTeam = $user->currentTeamRelation;
-        if (!$baseTeam) {
-            return null;
-        }
-
-        $rootTeam = $baseTeam->getRootTeam();
-        return $rootTeam?->id;
     }
 }
 

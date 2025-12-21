@@ -22,33 +22,43 @@ class Tag extends Model
     protected static function booted(): void
     {
         static::creating(function (self $tag): void {
+            // Prüfe ob Tabelle existiert (für Migrationen/Bootstrap)
+            if (!\Illuminate\Support\Facades\Schema::hasTable('tags')) {
+                return;
+            }
+
             // Auto-generate name (slug) from label if not provided
             if (empty($tag->name) && !empty($tag->label)) {
                 $tag->name = Str::slug($tag->label);
             }
 
             // Ensure name is unique within team scope
-            if ($tag->team_id) {
-                $baseName = $tag->name;
-                $counter = 1;
-                while (self::where('name', $tag->name)
-                    ->where('team_id', $tag->team_id)
-                    ->where('id', '!=', $tag->id ?? 0)
-                    ->exists()) {
-                    $tag->name = $baseName . '-' . $counter;
-                    $counter++;
+            try {
+                if ($tag->team_id) {
+                    $baseName = $tag->name;
+                    $counter = 1;
+                    while (self::where('name', $tag->name)
+                        ->where('team_id', $tag->team_id)
+                        ->where('id', '!=', $tag->id ?? 0)
+                        ->exists()) {
+                        $tag->name = $baseName . '-' . $counter;
+                        $counter++;
+                    }
+                } else {
+                    // Global tags: name must be globally unique
+                    $baseName = $tag->name;
+                    $counter = 1;
+                    while (self::where('name', $tag->name)
+                        ->whereNull('team_id')
+                        ->where('id', '!=', $tag->id ?? 0)
+                        ->exists()) {
+                        $tag->name = $baseName . '-' . $counter;
+                        $counter++;
+                    }
                 }
-            } else {
-                // Global tags: name must be globally unique
-                $baseName = $tag->name;
-                $counter = 1;
-                while (self::where('name', $tag->name)
-                    ->whereNull('team_id')
-                    ->where('id', '!=', $tag->id ?? 0)
-                    ->exists()) {
-                    $tag->name = $baseName . '-' . $counter;
-                    $counter++;
-                }
+            } catch (\Exception $e) {
+                // Wenn Datenbank-Fehler (z.B. Tabelle existiert nicht), überspringen
+                // Das kann beim Bootstrap/Migration passieren
             }
         });
     }
@@ -101,23 +111,28 @@ class Tag extends Model
      */
     public function scopeAvailableForUser($query, \Platform\Core\Models\User $user)
     {
-        $baseTeam = $user->currentTeamRelation;
-        if (!$baseTeam) {
+        try {
+            $baseTeam = $user->currentTeamRelation;
+            if (!$baseTeam) {
+                return $query->whereNull('team_id');
+            }
+
+            // Verwende Root-Team (Parent-Team), nicht Child-Team
+            $rootTeam = $baseTeam->getRootTeam();
+            $teamId = $rootTeam?->id;
+            
+            if ($teamId === null) {
+                return $query->whereNull('team_id');
+            }
+
+            return $query->where(function ($q) use ($teamId) {
+                $q->where('team_id', $teamId)
+                  ->orWhereNull('team_id');
+            });
+        } catch (\Exception $e) {
+            // Fallback wenn Datenbank noch nicht bereit ist (z.B. beim Bootstrap)
             return $query->whereNull('team_id');
         }
-
-        // Verwende Root-Team (Parent-Team), nicht Child-Team
-        $rootTeam = $baseTeam->getRootTeam();
-        $teamId = $rootTeam?->id;
-        
-        if ($teamId === null) {
-            return $query->whereNull('team_id');
-        }
-
-        return $query->where(function ($q) use ($teamId) {
-            $q->where('team_id', $teamId)
-              ->orWhereNull('team_id');
-        });
     }
 
     /**

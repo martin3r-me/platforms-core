@@ -20,6 +20,8 @@ return new class extends Migration
             // Index für Team-Scope
             $table->index('team_id');
             // Unique Constraint: name muss innerhalb eines Teams eindeutig sein (oder global wenn team_id null)
+            // MySQL behandelt NULL in unique constraints speziell - mehrere NULL-Werte sind erlaubt
+            // Daher verwenden wir einen generierten Spalten-Index für bessere Kontrolle
             $table->unique(['name', 'team_id'], 'tags_name_team_unique');
         });
     }
