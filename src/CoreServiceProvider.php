@@ -155,10 +155,13 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(\Platform\Core\Tools\ToolRegistry::class);
         $this->app->singleton(\Platform\Core\Tools\ToolExecutor::class);
 
-        // Tools registrieren (nach dem Boot, damit alle Dependencies verfügbar sind)
-        $this->app->booted(function () {
+        // Tools registrieren (lazy - erst wenn Registry tatsächlich verwendet wird)
+        $this->app->afterResolving(\Platform\Core\Tools\ToolRegistry::class, function ($registry) {
             try {
-                $registry = $this->app->make(\Platform\Core\Tools\ToolRegistry::class);
+                // Prüfe ob App gebootet ist (für package:discover)
+                if (!$this->app->isBooted()) {
+                    return;
+                }
                 
                 // Bestehende Tools registrieren
                 $registry->register($this->app->make(\Platform\Core\Tools\DataReadTool::class));
@@ -167,7 +170,10 @@ class CoreServiceProvider extends ServiceProvider
                 // Test-Tool registrieren (für Entwicklung/Testing)
                 $registry->register($this->app->make(\Platform\Core\Tools\EchoTool::class));
             } catch (\Throwable $e) {
-                \Log::warning('CoreServiceProvider: Tool registration failed: ' . $e->getMessage());
+                // Silent fail - Log nur wenn App gebootet ist
+                if ($this->app->isBooted() && method_exists(\Log::class, 'warning')) {
+                    \Log::warning('CoreServiceProvider: Tool registration failed: ' . $e->getMessage());
+                }
             }
         });
     }
