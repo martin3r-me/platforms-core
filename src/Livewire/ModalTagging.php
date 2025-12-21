@@ -85,13 +85,29 @@ class ModalTagging extends Component
             return;
         }
 
-        $context = $this->contextType::find($this->contextId);
-        if (!$context || !method_exists($context, 'tags')) {
+        // Prüfe ob Datenbank-Tabellen existieren (für Bootstrap/Migration)
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('tags') || 
+                !\Illuminate\Support\Facades\Schema::hasTable('taggables')) {
+                return;
+            }
+        } catch (\Exception $e) {
+            // Wenn Schema nicht verfügbar ist, überspringen
             return;
         }
 
-        $user = Auth::user();
-        $team = $user->currentTeamRelation;
+        try {
+            $context = $this->contextType::find($this->contextId);
+            if (!$context || !method_exists($context, 'tags')) {
+                return;
+            }
+
+            $user = Auth::user();
+            if (!$user) {
+                return;
+            }
+
+            $team = $user->currentTeamRelation;
 
         // Team-Tags laden
         $this->teamTags = $context->teamTags()
@@ -146,6 +162,12 @@ class ModalTagging extends Component
                 ];
             })
             ->toArray();
+        } catch (\Exception $e) {
+            // Wenn Datenbank-Fehler (z.B. beim Bootstrap), überspringen
+            $this->teamTags = [];
+            $this->personalTags = [];
+            $this->availableTags = [];
+        }
     }
 
     public function toggleTag(int $tagId, bool $personal = false): void
