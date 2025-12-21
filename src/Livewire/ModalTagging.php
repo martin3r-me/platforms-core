@@ -3,6 +3,7 @@
 namespace Platform\Core\Livewire;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Platform\Core\Models\Tag;
@@ -15,12 +16,13 @@ class ModalTagging extends Component
     public ?string $contextType = null;
     public ?int $contextId = null;
 
-    public string $activeTab = 'all'; // 'all', 'team', 'personal'
+    public string $activeTab = 'all'; // 'all', 'team', 'personal', 'overview'
     
     // Tag-Management
     public array $teamTags = [];
     public array $personalTags = [];
     public array $availableTags = [];
+    public array $allTags = []; // Für Übersicht-Tab
     
     // Neues Tag erstellen
     public string $newTagLabel = '';
@@ -64,6 +66,9 @@ class ModalTagging extends Component
         if ($this->contextType && $this->contextId) {
             $this->loadTags();
         }
+
+        // Alle Tags für Übersicht laden
+        $this->loadAllTags();
 
         $this->open = true;
     }
@@ -170,6 +175,63 @@ class ModalTagging extends Component
         }
     }
 
+    public function loadAllTags(): void
+    {
+        try {
+            // Prüfe ob Datenbank-Tabellen existieren
+            if (!\Illuminate\Support\Facades\Schema::hasTable('tags') || 
+                !\Illuminate\Support\Facades\Schema::hasTable('taggables')) {
+                $this->allTags = [];
+                return;
+            }
+
+            $user = Auth::user();
+            if (!$user) {
+                $this->allTags = [];
+                return;
+            }
+
+            // Alle verfügbaren Tags laden (Team + Global)
+            $tags = Tag::query()
+                ->availableForUser($user)
+                ->with('createdBy')
+                ->orderBy('label')
+                ->get();
+
+            $this->allTags = $tags->map(function ($tag) {
+                // Zähle Team-Tags und persönliche Tags separat
+                $teamCount = DB::table('taggables')
+                    ->where('tag_id', $tag->id)
+                    ->whereNull('user_id')
+                    ->count();
+
+                $personalCount = DB::table('taggables')
+                    ->where('tag_id', $tag->id)
+                    ->whereNotNull('user_id')
+                    ->count();
+
+                $totalCount = $teamCount + $personalCount;
+
+                return [
+                    'id' => $tag->id,
+                    'name' => $tag->name,
+                    'label' => $tag->label,
+                    'color' => $tag->color,
+                    'is_team_tag' => $tag->isTeamTag(),
+                    'is_global' => $tag->isGlobal(),
+                    'total_count' => $totalCount,
+                    'team_count' => $teamCount,
+                    'personal_count' => $personalCount,
+                    'created_at' => $tag->created_at?->format('d.m.Y'),
+                    'created_by' => $tag->createdBy?->name ?? 'Unbekannt',
+                ];
+            })->toArray();
+        } catch (\Exception $e) {
+            // Wenn Datenbank-Fehler, überspringen
+            $this->allTags = [];
+        }
+    }
+
     public function toggleTag(int $tagId, bool $personal = false): void
     {
         if (!$this->contextType || !$this->contextId) {
@@ -257,6 +319,7 @@ class ModalTagging extends Component
 
         // Tags neu laden
         $this->loadTags();
+        $this->loadAllTags();
 
         $this->dispatch('notify', [
             'type' => 'success',
@@ -300,6 +363,7 @@ class ModalTagging extends Component
         $tag->delete();
 
         $this->loadTags();
+        $this->loadAllTags();
 
         $this->dispatch('notify', [
             'type' => 'success',
@@ -309,7 +373,10 @@ class ModalTagging extends Component
 
     public function updatedSearchQuery(): void
     {
-        $this->loadTags();
+        if ($this->activeTab !== 'overview') {
+            $this->loadTags();
+        }
+        // Bei Übersicht-Tab wird searchQuery nicht verwendet (könnte später hinzugefügt werden)
     }
 
     public function getContextLabelProperty(): ?string

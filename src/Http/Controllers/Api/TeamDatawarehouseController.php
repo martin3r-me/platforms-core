@@ -50,8 +50,16 @@ class TeamDatawarehouseController extends ApiController
             $query->whereNull('parent_team_id');
         }
 
-        if ($request->boolean('personal_team')) {
-            $query->where('personal_team', true);
+        // Filter: Personal Teams
+        // Wenn personal_team explizit gesetzt ist, filtere danach
+        if ($request->has('personal_team')) {
+            $personalTeamValue = $request->input('personal_team');
+            // Unterstütze sowohl Boolean als auch String-Werte
+            $isPersonalTeam = $personalTeamValue === true 
+                || $personalTeamValue === 'true' 
+                || $personalTeamValue === '1' 
+                || $personalTeamValue === 1;
+            $query->where('personal_team', $isPersonalTeam);
         }
 
         // Sorting

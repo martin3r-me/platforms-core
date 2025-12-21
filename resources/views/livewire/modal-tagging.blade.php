@@ -31,12 +31,7 @@
     </x-slot>
 
     <div>
-        @if(!$contextType || !$contextId)
-            <div class="text-center py-12">
-                <p class="text-[var(--ui-muted)]">Kein Kontext ausgewählt.</p>
-            </div>
-        @else
-            <!-- Tabs -->
+        <!-- Tabs -->
             <div class="border-b border-[var(--ui-border)]/60 mb-6">
                 <nav class="-mb-px flex space-x-8" aria-label="Tabs">
                     <button
@@ -63,10 +58,115 @@
                     >
                         Persönlich
                     </button>
+                    <button
+                        @click="activeTab = 'overview'"
+                        :class="activeTab === 'overview' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                        class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium transition-colors"
+                        wire:click="$set('activeTab', 'overview')"
+                    >
+                        Übersicht
+                    </button>
                 </nav>
             </div>
 
-            <!-- Zugeordnete Tags -->
+            @if($activeTab === 'overview')
+                <!-- Übersicht: Alle Tags -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">
+                        Alle Tags
+                    </h4>
+
+                    <div class="overflow-hidden rounded-xl border border-[var(--ui-border)]/60 shadow-sm">
+                        <table class="min-w-full divide-y divide-[var(--ui-border)]/40">
+                            <thead class="bg-[var(--ui-muted-5)]">
+                                <tr>
+                                    <th scope="col" class="py-3 pl-6 pr-3 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                        Tag
+                                    </th>
+                                    <th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                        Typ
+                                    </th>
+                                    <th scope="col" class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                        Gesamt
+                                    </th>
+                                    <th scope="col" class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                        Team
+                                    </th>
+                                    <th scope="col" class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                        Persönlich
+                                    </th>
+                                    <th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                        Erstellt
+                                    </th>
+                                    <th scope="col" class="px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                        Aktionen
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-[var(--ui-border)]/40 bg-[var(--ui-surface)]">
+                                @forelse($allTags as $tag)
+                                    <tr class="hover:bg-[var(--ui-muted-5)]/50 transition-colors">
+                                        <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                                            <div class="flex items-center gap-2">
+                                                @if($tag['color'])
+                                                    <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: {{ $tag['color'] }}"></div>
+                                                @endif
+                                                <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $tag['label'] }}</span>
+                                            </div>
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-4">
+                                            @if($tag['is_team_tag'])
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[var(--ui-primary-10)] text-[var(--ui-primary)] border border-[var(--ui-primary)]/20">
+                                                    Team
+                                                </span>
+                                            @else
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/40">
+                                                    Global
+                                                </span>
+                                            @endif
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-center">
+                                            <span class="text-sm font-semibold text-[var(--ui-secondary)]">{{ $tag['total_count'] }}</span>
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-center">
+                                            <span class="text-sm text-[var(--ui-muted)]">{{ $tag['team_count'] }}</span>
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-center">
+                                            <span class="text-sm text-[var(--ui-muted)]">{{ $tag['personal_count'] }}</span>
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-4">
+                                            <div class="text-xs text-[var(--ui-muted)]">
+                                                <div>{{ $tag['created_at'] }}</div>
+                                                <div class="text-[var(--ui-muted)]/70">{{ $tag['created_by'] }}</div>
+                                            </div>
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-right">
+                                            @if($tag['total_count'] === 0)
+                                                <button
+                                                    wire:click="deleteTag({{ $tag['id'] }})"
+                                                    wire:confirm="Tag wirklich löschen?"
+                                                    class="text-xs px-3 py-1.5 text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 hover:bg-[var(--ui-danger-5)] rounded-md transition-colors"
+                                                >
+                                                    Löschen
+                                                </button>
+                                            @else
+                                                <span class="text-xs text-[var(--ui-muted)]">In Verwendung</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="7" class="py-12 text-center">
+                                            <p class="text-sm text-[var(--ui-muted)]">Noch keine Tags vorhanden.</p>
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @elseif($contextType && $contextId)
+                <!-- Zugeordnete Tags -->
             <div class="mb-6">
                 <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">
                     Zugeordnete Tags
@@ -242,7 +342,12 @@
                     </button>
                 </form>
             </div>
-        @endif
+            @else
+                <div class="text-center py-12">
+                    <p class="text-[var(--ui-muted)]">Kein Kontext ausgewählt.</p>
+                    <p class="text-sm text-[var(--ui-muted)] mt-2">Wählen Sie einen Kontext aus, um Tags zu verwalten.</p>
+                </div>
+            @endif
     </div>
 </x-ui-modal>
 </div>

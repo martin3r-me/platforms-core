@@ -74,6 +74,24 @@ class Tag extends Model
     }
 
     /**
+     * Anzahl der Zuordnungen dieses Tags (über taggables Tabelle)
+     */
+    public function getTaggablesCountAttribute(): int
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('taggables')) {
+            return 0;
+        }
+        
+        try {
+            return \DB::table('taggables')
+                ->where('tag_id', $this->id)
+                ->count();
+        } catch (\Exception $e) {
+            return 0;
+        }
+    }
+
+    /**
      * Scope: Nur Team-Tags (team_id gesetzt)
      */
     public function scopeForTeam($query, ?int $teamId = null)
