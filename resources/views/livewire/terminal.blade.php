@@ -114,35 +114,63 @@
         <!-- Streaming-Block -->
         <div class="flex items-start gap-2" x-cloak x-show="isStreamingLocal || streamText.length > 0" wire:ignore>
           <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
-          <div class="flex flex-col gap-1 flex-1"
+          <div class="flex flex-col gap-2 flex-1"
                role="log"
                aria-live="polite"
                aria-atomic="false">
+            <!-- Tool-Status Badge -->
+            <template x-if="currentTool">
+              <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[var(--ui-primary)]/10 border border-[var(--ui-primary)]/20 text-[10px] text-[var(--ui-primary)]">
+                <div class="w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></div>
+                <span class="font-mono font-semibold" x-text="currentTool"></span>
+                <span class="text-[var(--ui-muted)]">wird ausgeführt...</span>
+              </div>
+            </template>
+            
+            <!-- Status-Updates (kompakt) -->
+            <div class="flex flex-wrap gap-1.5" x-show="statusUpdates.length > 0">
+              <template x-for="(status, idx) in statusUpdates" :key="idx">
+                <div class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono"
+                     :class="{
+                       'bg-green-500/10 text-green-600': status.type === 'success',
+                       'bg-blue-500/10 text-blue-600': status.type === 'info',
+                       'bg-yellow-500/10 text-yellow-600': status.type === 'warning',
+                       'bg-red-500/10 text-red-600': status.type === 'error',
+                       'bg-[var(--ui-muted-5)] text-[var(--ui-muted)]': !status.type
+                     }">
+                  <span x-text="status.icon || '•'"></span>
+                  <span x-text="status.text"></span>
+                </div>
+              </template>
+            </div>
+            
+            <!-- Antwort-Text -->
             <div class="flex items-center gap-2">
               <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
               <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"
                    x-show="isStreamingLocal && !hasDelta"
                    aria-hidden="true"></div>
-              <template x-if="currentTool">
-                <div class="text-xs text-[var(--ui-muted)]" x-text="'(Tool: ' + currentTool + ')'"></div>
-              </template>
             </div>
-            <!-- Debug-Info -->
-            <div class="text-[10px] text-[var(--ui-muted)] space-y-0.5 border-t border-[var(--ui-border)]/30 pt-2 mt-2" x-show="debugInfo.length > 0">
-              <div class="font-bold mb-1 flex items-center justify-between">
-                <span>🔍 Debug-Infos:</span>
+            
+            <!-- Debug-Info (kollabierbar) -->
+            <div class="text-[10px] text-[var(--ui-muted)] border-t border-[var(--ui-border)]/30 pt-2" x-show="debugInfo.length > 0">
+              <button 
+                @click="showDebug = !showDebug"
+                class="flex items-center justify-between w-full text-left hover:text-[var(--ui-primary)] transition-colors"
+              >
+                <span class="font-bold">🔍 Debug-Infos</span>
+                <span class="text-[9px]" x-text="showDebug ? '▼' : '▶'"></span>
+              </button>
+              <div class="max-h-32 overflow-y-auto font-mono space-y-0.5 mt-1" x-show="showDebug">
+                <template x-for="(info, idx) in debugInfo" :key="idx">
+                  <div x-text="info" class="pl-2 break-all text-[9px]"></div>
+                </template>
                 <button 
                   @click="navigator.clipboard?.writeText(debugInfo.join('\\n')) || alert('Debug-Infos:\\n\\n' + debugInfo.join('\\n'))"
-                  class="text-[var(--ui-primary)] hover:underline text-[9px]"
-                  title="Debug-Infos kopieren"
+                  class="mt-1 text-[var(--ui-primary)] hover:underline text-[9px]"
                 >
-                  📋 Kopieren
+                  📋 Alle kopieren
                 </button>
-              </div>
-              <div class="max-h-32 overflow-y-auto font-mono space-y-0.5">
-                <template x-for="(info, idx) in debugInfo" :key="idx">
-                  <div x-text="info" class="pl-2 break-all"></div>
-                </template>
               </div>
             </div>
           </div>
@@ -214,6 +242,8 @@
         isStreamingLocal: false,
         currentTool: null,
         debugInfo: [],
+        statusUpdates: [],
+        showDebug: false,
         eventCount: 0,
         deltaCount: 0,
 
@@ -253,8 +283,30 @@
         // Debug-Helper
         addDebugInfo(msg){
           this.debugInfo.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
-          // Max 10 Debug-Messages behalten
-          if(this.debugInfo.length > 10) this.debugInfo.shift();
+          // Max 20 Debug-Messages behalten
+          if(this.debugInfo.length > 20) this.debugInfo.shift();
+        },
+        
+        // Status-Updates (visuell schöner)
+        addStatusUpdate(text, type = 'info', icon = null){
+          const icons = {
+            success: '✅',
+            info: 'ℹ️',
+            warning: '⚠️',
+            error: '❌',
+            tool: '🔧',
+            chain: '🔗',
+          };
+          
+          this.statusUpdates.push({
+            text: text,
+            type: type,
+            icon: icon || icons[type] || '•',
+            timestamp: new Date().toLocaleTimeString()
+          });
+          
+          // Max 5 Status-Updates behalten
+          if(this.statusUpdates.length > 5) this.statusUpdates.shift();
         },
         
         // SSE Steuerung
@@ -271,6 +323,8 @@
             this.isStreamingLocal = true;
             this.currentTool = null;
             this.debugInfo = [];
+            this.statusUpdates = [];
+            this.showDebug = false;
             this.eventCount = 0;
             this.deltaCount = 0;
             
@@ -280,6 +334,7 @@
             this.es = new EventSource(url);
             this.es.onopen = () => { 
               this.addDebugInfo('✅ SSE-Verbindung geöffnet');
+              this.addStatusUpdate('Verbindung hergestellt', 'success');
               if(window.__DEV__) console.log('[Terminal SSE] connection open'); 
               this.retryCount = 0; 
             };
@@ -299,6 +354,18 @@
               try {
                 const data = JSON.parse(e.data);
                 
+                // Status-Updates vom Server anzeigen
+                if(data?.status) {
+                  this.addStatusUpdate(
+                    data.status.text || data.status,
+                    data.status.type || 'info',
+                    data.status.icon
+                  );
+                  if(data.status.debug) {
+                    this.addDebugInfo(data.status.debug);
+                  }
+                }
+                
                 // Debug-Nachrichten vom Server anzeigen
                 if(data?.debug) {
                   this.addDebugInfo(data.debug);
@@ -307,6 +374,7 @@
                 // Fehler-Nachrichten vom Server anzeigen
                 if(data?.error) {
                   this.addDebugInfo(`❌ Server-Fehler: ${data.error}`);
+                  this.addStatusUpdate(`Fehler: ${data.error}`, 'error');
                   if(data.debug) {
                     this.addDebugInfo(data.debug);
                   }
@@ -338,7 +406,17 @@
                 if(data?.tool){ 
                   this.currentTool = data.tool; 
                   this.addDebugInfo(`🔧 Tool erkannt: ${data.tool}`);
+                  this.addStatusUpdate(`Tool: ${data.tool}`, 'tool');
                   this.$wire && this.$wire.set && this.$wire.set('currentTool', data.tool); 
+                }
+                
+                // Tool-Ergebnis anzeigen
+                if(data?.tool && data?.result){
+                  const success = data.result?.ok !== false;
+                  this.addStatusUpdate(
+                    `${data.tool}: ${success ? 'Erfolg' : 'Fehler'}`,
+                    success ? 'success' : 'error'
+                  );
                 }
               } catch(parseErr){
                 this.addDebugInfo(`❌ Parse-Fehler: ${parseErr.message}`);

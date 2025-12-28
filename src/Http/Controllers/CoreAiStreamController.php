@@ -120,8 +120,13 @@ class CoreAiStreamController extends Controller
             echo "retry: 500\n\n";
             @flush();
             
-            // Debug: Stream gestartet - SOFORT senden, VOR try-catch
+            // Status-Update: Stream gestartet
             echo "data: " . json_encode([
+                'status' => [
+                    'text' => 'Stream initialisiert',
+                    'type' => 'info',
+                    'icon' => '🚀'
+                ],
                 'debug' => '✅ Stream-Callback gestartet',
                 'user_id' => $user->id ?? 'unknown',
                 'thread_id' => $thread->id ?? 'unknown',
@@ -129,15 +134,29 @@ class CoreAiStreamController extends Controller
             ], JSON_UNESCAPED_UNICODE) . "\n\n";
             @flush();
             
-            // Test: Sende sofort eine zweite Nachricht
-            echo "data: " . json_encode([
-                'debug' => '✅ Zweite Debug-Nachricht - Callback funktioniert!'
-            ], JSON_UNESCAPED_UNICODE) . "\n\n";
-            @flush();
-            
             // Einfacher Ansatz: Erstmal ohne Tools, nur Chat
             try {
+                // Status: Lade OpenAI Service
+                echo "data: " . json_encode([
+                    'status' => [
+                        'text' => 'Lade OpenAI Service...',
+                        'type' => 'info',
+                        'icon' => '🔄'
+                    ]
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+                
                 $openAi = app(OpenAiService::class);
+                
+                // Status: Service geladen
+                echo "data: " . json_encode([
+                    'status' => [
+                        'text' => 'OpenAI Service bereit',
+                        'type' => 'success',
+                        'icon' => '✅'
+                    ]
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
                 
                 // Assistant-Message erstellen
                 if ($assistantId) {
@@ -172,6 +191,16 @@ class CoreAiStreamController extends Controller
                 $flushThreshold = 800;
                 $pendingSinceLastFlush = 0;
 
+                // Status: Starte OpenAI Stream
+                echo "data: " . json_encode([
+                    'status' => [
+                        'text' => 'Starte OpenAI Chat...',
+                        'type' => 'info',
+                        'icon' => '🚀'
+                    ]
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+
                 // Stream OHNE Tools - einfach nur Chat
                 $openAi->streamChat($messages, function (string $delta) use (&$assistantBuffer, &$lastFlushAt, $flushInterval, $flushThreshold, &$pendingSinceLastFlush, $assistantMessage) {
                 $assistantBuffer .= $delta;
@@ -199,6 +228,16 @@ class CoreAiStreamController extends Controller
                 'tools' => false, // Tools deaktiviert - erstmal nur Chat
             ]);
 
+                // Status: Stream erfolgreich beendet
+                echo "data: " . json_encode([
+                    'status' => [
+                        'text' => 'Antwort abgeschlossen',
+                        'type' => 'success',
+                        'icon' => '✅'
+                    ]
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+                
                 // Close stream
                 echo "data: [DONE]\n\n";
                 @flush();
@@ -206,11 +245,6 @@ class CoreAiStreamController extends Controller
                 // Debug: Stream beendet
                 $debugInfos[] = '✅ Stream beendet';
                 $debugInfos[] = 'Buffer-Länge: ' . mb_strlen($assistantBuffer);
-                echo "data: " . json_encode([
-                    'debug' => '✅ Stream beendet',
-                    'buffer_length' => mb_strlen($assistantBuffer)
-                ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                @flush();
 
                 // Final flush on the same assistant record
                 $assistantMessage->update([
