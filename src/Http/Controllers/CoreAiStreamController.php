@@ -187,6 +187,12 @@ class CoreAiStreamController extends Controller
                 $flushThreshold = 800;  // characters
                 $pendingSinceLastFlush = 0;
 
+                // Debug: Starte OpenAI Stream
+                echo "data: " . json_encode([
+                    'debug' => '🚀 Starte OpenAI StreamChat...'
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+
             // Stream deltas with tool execution
             $openAi->streamChat($messages, function (string $delta) use (&$assistantBuffer, &$lastFlushAt, $flushInterval, $flushThreshold, &$pendingSinceLastFlush, $assistantMessage) {
                 $assistantBuffer .= $delta;
