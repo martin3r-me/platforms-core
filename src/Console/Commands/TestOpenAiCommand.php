@@ -41,6 +41,7 @@ class TestOpenAiCommand extends Command
             
             // Schritt 2: ToolRegistry laden (wenn Tools aktiviert)
             $toolExecutor = null;
+            $registry = null;
             if ($useTools) {
                 $this->line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
                 $this->line("SCHRITT 2: ToolRegistry & ToolExecutor laden");
@@ -154,9 +155,47 @@ class TestOpenAiCommand extends Command
                 $this->line("     Das ist der kritische Punkt - prüfe ob getAvailableTools() funktioniert...");
                 $this->newLine();
                 
+                // Test: Prüfe Container-Bindung
+                $this->line("5.3: Prüfe Container-Bindung...");
+                if ($useTools && isset($registry)) {
+                    $isBound = app()->bound(ToolRegistry::class);
+                    $this->line("  ToolRegistry gebunden: " . ($isBound ? "Ja" : "Nein"));
+                    
+                    if ($isBound) {
+                        try {
+                            $boundRegistry = app()->make(ToolRegistry::class);
+                            $this->line("  Gebundene Registry-Instanz: " . get_class($boundRegistry));
+                            $this->line("  Ist es die gleiche Instanz? " . ($boundRegistry === $registry ? "Ja ✅" : "Nein ❌"));
+                            
+                            $boundTools = $boundRegistry->all();
+                            $this->line("  Tools in gebundener Registry: " . count($boundTools));
+                            
+                            $originalTools = $registry->all();
+                            $this->line("  Tools in originaler Registry: " . count($originalTools));
+                            
+                            if (count($boundTools) === 0 && count($originalTools) > 0) {
+                                $this->warn("  ⚠️  PROBLEM: Gebundene Registry ist leer, aber originale hat Tools!");
+                                $this->line("  → Lösung: Gebundene Registry mit Tools füllen...");
+                                
+                                // Kopiere Tools in gebundene Registry
+                                foreach ($originalTools as $tool) {
+                                    $boundRegistry->register($tool);
+                                }
+                                $this->line("  ✅ Tools in gebundene Registry kopiert");
+                                
+                                $boundTools = $boundRegistry->all();
+                                $this->line("  Tools in gebundener Registry (nach Kopie): " . count($boundTools));
+                            }
+                        } catch (\Throwable $e) {
+                            $this->error("  ❌ Fehler beim Zugriff auf gebundene Registry: " . $e->getMessage());
+                        }
+                    }
+                }
+                $this->newLine();
+                
                 // Test: Rufe getAvailableTools() manuell auf (wie streamChat es tut)
                 try {
-                    $this->line("5.3: Teste getAvailableTools() manuell...");
+                    $this->line("5.4: Teste getAvailableTools() manuell...");
                     $reflection = new \ReflectionClass($openAi);
                     $method = $reflection->getMethod('getAvailableTools');
                     $method->setAccessible(true);
@@ -166,6 +205,9 @@ class TestOpenAiCommand extends Command
                         $this->line("  Tools: " . implode(', ', array_map(function($t) {
                             return $t['function']['name'] ?? $t['name'] ?? 'unknown';
                         }, $availableTools)));
+                    } else {
+                        $this->warn("  ⚠️  PROBLEM: getAvailableTools() findet keine Tools!");
+                        $this->line("  → Das ist wahrscheinlich das Problem im Stream!");
                     }
                 } catch (\Throwable $toolsError) {
                     $this->error("❌ getAvailableTools() Fehler:");
@@ -178,7 +220,7 @@ class TestOpenAiCommand extends Command
                 $this->newLine();
                 
                 try {
-                    $this->line("5.4: Rufe streamChat auf...");
+                    $this->line("5.5: Rufe streamChat auf...");
                     $openAi->streamChat($messages, function (string $delta) use (&$streamedContent) {
                         $streamedContent .= $delta;
                         echo $delta; // Direkte Ausgabe
