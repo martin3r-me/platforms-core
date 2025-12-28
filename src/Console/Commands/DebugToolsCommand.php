@@ -142,16 +142,11 @@ class DebugToolsCommand extends Command
                 
                 // Teste Ausführung - ohne Auth (spart Memory)
                 $this->line("   Erstelle Test-Context...");
-                $user = new class implements \Illuminate\Contracts\Auth\Authenticatable {
-                    public $id = 999;
-                    public function getAuthIdentifierName() { return 'id'; }
-                    public function getAuthIdentifier() { return $this->id; }
-                    public function getAuthPassword() { return ''; }
-                    public function getAuthPasswordName() { return 'password'; }
-                    public function getRememberToken() { return ''; }
-                    public function setRememberToken($value) {}
-                    public function getRememberTokenName() { return ''; }
-                };
+                // Verwende User-Model direkt (erweitert bereits Authenticatable)
+                $user = new \Platform\Core\Models\User();
+                $user->id = 999;
+                $user->name = 'Test User';
+                $user->exists = false; // Markiere als nicht-persistent
                 $context = new ToolContext($user);
                 
                 $this->line("   Führe EchoTool aus...");
