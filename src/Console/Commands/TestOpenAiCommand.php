@@ -48,13 +48,34 @@ class TestOpenAiCommand extends Command
                 $this->line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
                 
                 try {
-                    $this->line("2.1: Erstelle ToolRegistry (direkt, ohne Container)...");
-                    $registry = new ToolRegistry();
-                    $this->line("✅ ToolRegistry instanziiert: " . get_class($registry));
+                    $this->line("2.1: Versuche gebundene ToolRegistry aus Container zu holen...");
+                    
+                    // WICHTIG: Versuche zuerst die gebundene Instanz zu holen (hat bereits alle Tools)
+                    try {
+                        if (app()->bound(ToolRegistry::class)) {
+                            $registry = app(ToolRegistry::class);
+                            $this->line("✅ Gebundene ToolRegistry aus Container geholt");
+                            $this->line("  Typ: " . get_class($registry));
+                        } else {
+                            throw new \Exception('ToolRegistry nicht im Container gebunden');
+                        }
+                    } catch (\Throwable $e) {
+                        // Fallback: Neue Instanz erstellen
+                        $this->warn("⚠️  Gebundene Registry nicht verfügbar, erstelle neue Instanz: " . $e->getMessage());
+                        $registry = new ToolRegistry();
+                        $this->line("✅ Neue ToolRegistry instanziiert");
+                    }
                     
                     $this->line("2.2: Prüfe vorhandene Tools...");
                     $tools = $registry->all();
                     $this->line("  Vorhandene Tools: " . count($tools));
+                    
+                    if (count($tools) > 0) {
+                        $this->line("  Tools:");
+                        foreach ($tools as $name => $tool) {
+                            $this->line("    - {$name}: " . $tool->getDescription());
+                        }
+                    }
                     
                     if (count($tools) === 0) {
                         $this->line("2.3: Keine Tools - registriere EchoTool...");
@@ -67,14 +88,6 @@ class TestOpenAiCommand extends Command
                     $this->line("2.4: Erstelle ToolExecutor...");
                     $toolExecutor = new ToolExecutor($registry);
                     $this->line("✅ ToolExecutor erstellt: " . get_class($toolExecutor));
-                    
-                    // Optional: Im Container binden
-                    try {
-                        app()->instance(ToolRegistry::class, $registry);
-                        $this->line("✅ ToolRegistry im Container gebunden");
-                    } catch (\Throwable $bindError) {
-                        $this->warn("⚠️  Container-Binding fehlgeschlagen (nicht kritisch): " . $bindError->getMessage());
-                    }
                     
                 } catch (\Throwable $e) {
                     $this->error("❌ Tool-Loading Fehler: " . $e->getMessage());

@@ -464,8 +464,19 @@ class OpenAiService
                 $info .= "\n";
             }
             
+            // Tool-Liste direkt anzeigen (damit AI weiß, welche Tools verfügbar sind)
+            if (count($allTools) > 0) {
+                $info .= "Verfügbare Tools:\n";
+                foreach ($allTools as $tool) {
+                    $toolName = $tool->getName();
+                    $toolDesc = $tool->getDescription();
+                    $info .= "- {$toolName}: {$toolDesc}\n";
+                }
+                $info .= "\n";
+            }
+            
             // Wichtiger Hinweis
-            $info .= "Tipp: Nutze das Tool 'tools.list', um alle verfügbaren Tools und ihre Funktionen zu sehen.\n";
+            $info .= "Tipp: Nutze das Tool 'tools.list', um alle verfügbaren Tools und ihre Funktionen detailliert zu sehen.\n";
             $info .= "Beispiel: 'Welche Tools stehen mir zur Verfügung?' oder 'Zeige mir alle Planner-Tools'.\n";
             
             return $info;

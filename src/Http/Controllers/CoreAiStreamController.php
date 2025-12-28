@@ -179,36 +179,37 @@ class CoreAiStreamController extends Controller
                     
                     try {
                         echo "data: " . json_encode([
-                            'debug' => 'Schritt 1.1: Vor Instanziierung von ToolRegistry...'
+                            'debug' => 'Schritt 1.1: Versuche gebundene ToolRegistry aus Container zu holen...'
                         ], JSON_UNESCAPED_UNICODE) . "\n\n";
                         @flush();
                         
-                        // Direkt instanziieren - KEINE Container-Interaktion
-                        $registry = new \Platform\Core\Tools\ToolRegistry();
-                        
-                        echo "data: " . json_encode([
-                            'debug' => 'Schritt 1.2: ToolRegistry instanziiert, Typ: ' . get_class($registry)
-                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
-                        
-                        echo "data: " . json_encode([
-                            'debug' => 'Schritt 1.3: ToolRegistry erfolgreich erstellt'
-                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
-                        
-                        // Optional: Im Container binden (nur wenn app() verfügbar ist)
+                        // WICHTIG: Versuche zuerst die gebundene Instanz zu holen (hat bereits alle Tools)
                         try {
                             if (function_exists('app') && app() instanceof \Illuminate\Contracts\Container\Container) {
-                                app()->instance(\Platform\Core\Tools\ToolRegistry::class, $registry);
-                                echo "data: " . json_encode([
-                                    'debug' => '✅ ToolRegistry im Container gebunden'
-                                ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                                @flush();
+                                $container = app();
+                                if ($container->bound(\Platform\Core\Tools\ToolRegistry::class)) {
+                                    $registry = $container->make(\Platform\Core\Tools\ToolRegistry::class);
+                                    echo "data: " . json_encode([
+                                        'debug' => '✅ Gebundene ToolRegistry aus Container geholt (hat bereits Tools)'
+                                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                                    @flush();
+                                } else {
+                                    throw new \Exception('ToolRegistry nicht im Container gebunden');
+                                }
+                            } else {
+                                throw new \Exception('app() nicht verfügbar');
                             }
-                        } catch (\Throwable $bindError) {
-                            // Binding fehlgeschlagen - kein Problem, wir verwenden die Instanz direkt
+                        } catch (\Throwable $e) {
+                            // Fallback: Neue Instanz erstellen
                             echo "data: " . json_encode([
-                                'debug' => '⚠️ Container-Binding fehlgeschlagen (nicht kritisch): ' . $bindError->getMessage()
+                                'debug' => '⚠️ Gebundene Registry nicht verfügbar, erstelle neue Instanz: ' . $e->getMessage()
+                            ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                            @flush();
+                            
+                            $registry = new \Platform\Core\Tools\ToolRegistry();
+                            
+                            echo "data: " . json_encode([
+                                'debug' => 'Schritt 1.2: Neue ToolRegistry instanziiert'
                             ], JSON_UNESCAPED_UNICODE) . "\n\n";
                             @flush();
                         }
