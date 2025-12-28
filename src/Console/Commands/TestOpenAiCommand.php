@@ -116,7 +116,7 @@ class TestOpenAiCommand extends Command
                         $this->line("⚙️  Führe Tool aus: {$toolName}");
                         $this->line("  Argumente: " . json_encode($arguments, JSON_UNESCAPED_UNICODE));
                         
-                        $context = \Platform\Core\Tools\ToolContext::fromAuth();
+                        $context = \Platform\Core\Contracts\ToolContext::fromAuth();
                         $result = $toolExecutor->execute($toolName, $arguments, $context);
                         $resultArray = $result->toArray();
                         

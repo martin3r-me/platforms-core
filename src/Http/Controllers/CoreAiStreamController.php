@@ -425,7 +425,7 @@ class CoreAiStreamController extends Controller
                                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
                                 @flush();
                                 
-                                $context = \Platform\Core\Tools\ToolContext::fromAuth();
+                                $context = \Platform\Core\Contracts\ToolContext::fromAuth();
                                 $result = $toolExecutor->execute($toolName, $arguments, $context);
                                 
                                 // Konvertiere ToolResult zu altem Format für Kompatibilität

@@ -5,8 +5,8 @@ namespace Platform\Core\Tools;
 use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Tools\ToolRegistry;
 use Platform\Core\Registry\ModuleRegistry;
-use Platform\Core\Tools\ToolContext;
-use Platform\Core\Tools\ToolResult;
+use Platform\Core\Contracts\ToolContext;
+use Platform\Core\Contracts\ToolResult;
 
 /**
  * Tool zum Auflisten aller verfügbaren Tools
@@ -43,7 +43,7 @@ class ListToolsTool implements ToolContract
         ];
     }
 
-    public function execute(array $arguments, \Platform\Core\Tools\ToolContext $context): \Platform\Core\Tools\ToolResult
+    public function execute(array $arguments, \Platform\Core\Contracts\ToolContext $context): \Platform\Core\Contracts\ToolResult
     {
         $moduleFilter = $arguments['module'] ?? null;
         
@@ -94,7 +94,7 @@ class ListToolsTool implements ToolContract
             ];
         }
         
-        return \Platform\Core\Tools\ToolResult::success($result);
+        return \Platform\Core\Contracts\ToolResult::success($result);
     }
     
     private function extractModuleFromToolName(string $toolName): ?string
