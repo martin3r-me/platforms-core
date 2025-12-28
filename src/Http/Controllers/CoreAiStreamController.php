@@ -96,35 +96,50 @@ class CoreAiStreamController extends Controller
 
         $assistantBuffer = '';
 
-            $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl, $toolExecutor, $user) {
-            try {
-                // Clean buffers to avoid server buffering
-                while (ob_get_level() > 0) {
-                    @ob_end_flush();
-                }
+            $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl, $toolExecutor, $user, $threadId) {
+            // Clean buffers to avoid server buffering - SOFORT am Anfang
+            while (ob_get_level() > 0) {
+                @ob_end_flush();
+            }
 
-                // Initial retry suggestion (client can reconnect faster)
-                echo "retry: 500\n\n";
-                @flush();
-                
-                // Debug: Stream gestartet - SOFORT senden
-                echo "data: " . json_encode([
-                    'debug' => '✅ Stream-Callback gestartet',
-                    'user_id' => $user->id ?? 'unknown',
-                    'thread_id' => $thread->id ?? 'unknown'
-                ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                @flush();
-                
+            // Initial retry suggestion (client can reconnect faster)
+            echo "retry: 500\n\n";
+            @flush();
+            
+            // Debug: Stream gestartet - SOFORT senden, VOR try-catch
+            echo "data: " . json_encode([
+                'debug' => '✅ Stream-Callback gestartet',
+                'user_id' => $user->id ?? 'unknown',
+                'thread_id' => $thread->id ?? 'unknown'
+            ], JSON_UNESCAPED_UNICODE) . "\n\n";
+            @flush();
+            
+            try {
                 // Zusätzliche Debug-Info
                 echo "data: " . json_encode([
                     'debug' => '📋 Messages: ' . count($messages) . ' | Assistant ID: ' . ($assistantId ?: 'neu')
                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
 
-            // Use provided assistant placeholder or create a new one
-            if ($assistantId) {
-                $assistantMessage = CoreChatMessage::find($assistantId);
-                if (!$assistantMessage) {
+                // Use provided assistant placeholder or create a new one
+                if ($assistantId) {
+                    $assistantMessage = CoreChatMessage::find($assistantId);
+                    if (!$assistantMessage) {
+                        $assistantMessage = CoreChatMessage::create([
+                            'core_chat_id' => $thread->core_chat_id,
+                            'thread_id' => $thread->id,
+                            'role' => 'assistant',
+                            'content' => '',
+                            'meta' => ['is_streaming' => true],
+                        ]);
+                    } else {
+                        $assistantMessage->update([
+                            'content' => '',
+                            'tokens_out' => 0,
+                            'meta' => ['is_streaming' => true],
+                        ]);
+                    }
+                } else {
                     $assistantMessage = CoreChatMessage::create([
                         'core_chat_id' => $thread->core_chat_id,
                         'thread_id' => $thread->id,
@@ -132,27 +147,12 @@ class CoreAiStreamController extends Controller
                         'content' => '',
                         'meta' => ['is_streaming' => true],
                     ]);
-                } else {
-                    $assistantMessage->update([
-                        'content' => '',
-                        'tokens_out' => 0,
-                        'meta' => ['is_streaming' => true],
-                    ]);
                 }
-            } else {
-                $assistantMessage = CoreChatMessage::create([
-                    'core_chat_id' => $thread->core_chat_id,
-                    'thread_id' => $thread->id,
-                    'role' => 'assistant',
-                    'content' => '',
-                    'meta' => ['is_streaming' => true],
-                ]);
-            }
 
-            $lastFlushAt = microtime(true);
-            $flushInterval = 0.35; // seconds
-            $flushThreshold = 800;  // characters
-            $pendingSinceLastFlush = 0;
+                $lastFlushAt = microtime(true);
+                $flushInterval = 0.35; // seconds
+                $flushThreshold = 800;  // characters
+                $pendingSinceLastFlush = 0;
 
             // Stream deltas with tool execution
             $openAi->streamChat($messages, function (string $delta) use (&$assistantBuffer, &$lastFlushAt, $flushInterval, $flushThreshold, &$pendingSinceLastFlush, $assistantMessage) {
@@ -227,23 +227,23 @@ class CoreAiStreamController extends Controller
                 }
             ]);
 
-            // Close stream
-            echo "data: [DONE]\n\n";
-            @flush();
-            
-            // Debug: Stream beendet
-            echo "data: " . json_encode([
-                'debug' => '✅ Stream beendet',
-                'buffer_length' => mb_strlen($assistantBuffer)
-            ], JSON_UNESCAPED_UNICODE) . "\n\n";
-            @flush();
+                // Close stream
+                echo "data: [DONE]\n\n";
+                @flush();
+                
+                // Debug: Stream beendet
+                echo "data: " . json_encode([
+                    'debug' => '✅ Stream beendet',
+                    'buffer_length' => mb_strlen($assistantBuffer)
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
 
-            // Final flush on the same assistant record
-            $assistantMessage->update([
-                'content' => $assistantBuffer,
-                'tokens_out' => mb_strlen($assistantBuffer),
-                'meta' => ['is_streaming' => false],
-            ]);
+                // Final flush on the same assistant record
+                $assistantMessage->update([
+                    'content' => $assistantBuffer,
+                    'tokens_out' => mb_strlen($assistantBuffer),
+                    'meta' => ['is_streaming' => false],
+                ]);
             } catch (\Throwable $e) {
                 // Sende Fehler an Client
                 echo 'data: ' . json_encode([
