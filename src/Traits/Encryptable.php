@@ -40,7 +40,22 @@ trait Encryptable
                 // Versuche zuerst, den Plain-Text-Wert aus dem temporären Attribut zu holen
                 // (wurde vom Cast gespeichert, um Entschlüsselung zu vermeiden)
                 $plainKey = '_plain_' . $field;
-                $plain = $model->attributes[$plainKey] ?? null;
+                
+                // Hole Plain-Text-Wert sicher aus attributes
+                $plain = null;
+                if (method_exists($model, 'getAttributes')) {
+                    $allAttributes = $model->getAttributes();
+                    $plain = $allAttributes[$plainKey] ?? null;
+                } else {
+                    // Fallback: Reflection verwenden
+                    $reflection = new \ReflectionClass($model);
+                    if ($reflection->hasProperty('attributes')) {
+                        $attributesProperty = $reflection->getProperty('attributes');
+                        $attributesProperty->setAccessible(true);
+                        $attributes = $attributesProperty->getValue($model);
+                        $plain = $attributes[$plainKey] ?? null;
+                    }
+                }
                 
                 // Falls nicht vorhanden (z.B. bei bestehenden Records ohne Änderung),
                 // müssen wir entschlüsseln (nur wenn Feld wirklich geändert wurde)
@@ -51,7 +66,22 @@ trait Encryptable
                 }
                 
                 // Temporäres Attribut entfernen (nicht in DB speichern)
-                unset($model->attributes[$plainKey]);
+                if (method_exists($model, 'offsetUnset')) {
+                    $model->offsetUnset($plainKey);
+                } elseif (method_exists($model, 'setRawAttribute')) {
+                    // Versuche über setRawAttribute mit null
+                    $model->setRawAttribute($plainKey, null);
+                } else {
+                    // Fallback: Reflection verwenden
+                    $reflection = new \ReflectionClass($model);
+                    if ($reflection->hasProperty('attributes')) {
+                        $attributesProperty = $reflection->getProperty('attributes');
+                        $attributesProperty->setAccessible(true);
+                        $attributes = $attributesProperty->getValue($model);
+                        unset($attributes[$plainKey]);
+                        $attributesProperty->setValue($model, $attributes);
+                    }
+                }
                 
                 // Hash nur setzen, wenn Plain-Text vorhanden ist
                 if ($plain !== null) {

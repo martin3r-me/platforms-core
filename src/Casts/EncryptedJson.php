@@ -42,11 +42,20 @@ class EncryptedJson implements CastsAttributes
         // Speichere Plain-Text-Wert temporär für Hash-Berechnung
         $json = is_string($value) ? $value : json_encode($value);
         $plainKey = '_plain_' . $key;
+        
+        // Verwende setRawAttribute wenn verfügbar, sonst Reflection
         if (method_exists($model, 'setRawAttribute')) {
             $model->setRawAttribute($plainKey, $json);
-        } else {
-            // Fallback: direkt in attributes array
-            $model->attributes[$plainKey] = $json;
+        } elseif (method_exists($model, 'setAttribute')) {
+            // Fallback: Verwende Reflection um direkt auf attributes zuzugreifen
+            $reflection = new \ReflectionClass($model);
+            if ($reflection->hasProperty('attributes')) {
+                $attributesProperty = $reflection->getProperty('attributes');
+                $attributesProperty->setAccessible(true);
+                $currentAttributes = $attributesProperty->getValue($model);
+                $currentAttributes[$plainKey] = $json;
+                $attributesProperty->setValue($model, $currentAttributes);
+            }
         }
         
         return Crypt::encryptString($json);

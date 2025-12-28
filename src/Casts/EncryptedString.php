@@ -40,16 +40,28 @@ class EncryptedString implements CastsAttributes
         
         // Speichere Plain-Text-Wert temporär für Hash-Berechnung
         // (wird in bootEncryptable verwendet und dann entfernt)
-        // Verwende setRawAttribute um es nicht in die DB zu schreiben
         $plainKey = '_plain_' . $key;
+        $plainValue = (string) $value;
+        
+        // Verwende setRawAttribute wenn verfügbar, sonst setAttribute
+        // setAttribute würde den Cast wieder auslösen, daher verwenden wir setRawAttribute
         if (method_exists($model, 'setRawAttribute')) {
-            $model->setRawAttribute($plainKey, (string) $value);
-        } else {
-            // Fallback: direkt in attributes array
-            $model->attributes[$plainKey] = (string) $value;
+            $model->setRawAttribute($plainKey, $plainValue);
+        } elseif (method_exists($model, 'setAttribute')) {
+            // Fallback: Verwende setAttribute, aber mit einem Präfix, das nicht gecastet wird
+            // Da setAttribute den Cast auslöst, müssen wir einen Workaround verwenden
+            // Wir speichern es in einem temporären Array, das nicht gecastet wird
+            $reflection = new \ReflectionClass($model);
+            if ($reflection->hasProperty('attributes')) {
+                $attributesProperty = $reflection->getProperty('attributes');
+                $attributesProperty->setAccessible(true);
+                $currentAttributes = $attributesProperty->getValue($model);
+                $currentAttributes[$plainKey] = $plainValue;
+                $attributesProperty->setValue($model, $currentAttributes);
+            }
         }
         
-        return Crypt::encryptString((string) $value);
+        return Crypt::encryptString($plainValue);
     }
 }
 
