@@ -22,19 +22,37 @@ class ListToolsCommand extends Command
             // Manuell Auto-Discovery auslösen (ohne Container)
             try {
                 $modulesPath = realpath(__DIR__ . '/../../../../modules');
+                $this->line("🔍 Suche Tools in: {$modulesPath}");
+                
                 if ($modulesPath && is_dir($modulesPath)) {
+                    $modules = array_filter(glob($modulesPath . '/*'), 'is_dir');
+                    $this->line("📦 Gefundene Module: " . count($modules));
+                    
+                    foreach ($modules as $moduleDir) {
+                        $moduleKey = basename($moduleDir);
+                        $toolsPath = $moduleDir . '/src/Tools';
+                        $this->line("  → {$moduleKey}: " . (is_dir($toolsPath) ? "✅ Tools-Verzeichnis gefunden" : "❌ Kein Tools-Verzeichnis"));
+                    }
+                    
                     $moduleTools = \Platform\Core\Tools\ToolLoader::loadFromAllModules($modulesPath);
+                    $this->line("🔧 Gefundene Tools: " . count($moduleTools));
+                    
                     foreach ($moduleTools as $tool) {
                         try {
                             $registry->register($tool);
+                            $this->line("  ✅ Registriert: " . $tool->getName());
                         } catch (\Throwable $e) {
-                            // Ignore
+                            $this->warn("  ❌ Fehler beim Registrieren: " . $e->getMessage());
                         }
                     }
+                } else {
+                    $this->warn("⚠️  Modules-Pfad nicht gefunden: {$modulesPath}");
                 }
             } catch (\Throwable $e) {
-                // Ignore
+                $this->error("❌ Auto-Discovery Fehler: " . $e->getMessage());
+                $this->error("  Datei: " . $e->getFile() . ":" . $e->getLine());
             }
+            $this->newLine();
             
             // Core-Tools manuell registrieren
             try {
