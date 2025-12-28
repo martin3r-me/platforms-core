@@ -132,16 +132,26 @@ class CoreAiStreamController extends Controller
             
             // Lazy-load Dependencies im Callback
             try {
+                echo "data: " . json_encode([
+                    'debug' => '🔄 Lade Dependencies...'
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+                
                 $openAi = app(OpenAiService::class);
+                echo "data: " . json_encode([
+                    'debug' => '✅ OpenAiService geladen'
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+                
                 $toolExecutor = app(ToolExecutor::class);
                 echo "data: " . json_encode([
-                    'debug' => '✅ Dependencies geladen'
+                    'debug' => '✅ ToolExecutor geladen'
                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
             } catch (\Throwable $e) {
                 echo "data: " . json_encode([
                     'error' => 'Dependency Error',
-                    'debug' => "❌ Fehler beim Laden der Dependencies: {$e->getMessage()}"
+                    'debug' => "❌ Fehler beim Laden der Dependencies:\nDatei: {$e->getFile()}\nZeile: {$e->getLine()}\nFehler: {$e->getMessage()}"
                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
                 return;
