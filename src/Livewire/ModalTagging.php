@@ -36,6 +36,11 @@ class ModalTagging extends Component
     
     // Filter
     public string $searchQuery = '';
+    
+    // Tag Autocomplete
+    public string $tagInput = '';
+    public array $tagSuggestions = [];
+    public bool $showTagSuggestions = false;
 
     public function mount(): void
     {
@@ -68,6 +73,9 @@ class ModalTagging extends Component
         $this->newTagColor = null;
         $this->newTagIsPersonal = false;
         $this->newContextColor = null;
+        $this->tagInput = '';
+        $this->tagSuggestions = [];
+        $this->showTagSuggestions = false;
         $this->activeTab = $this->contextType && $this->contextId ? 'tags' : 'overview';
         $this->tagFilter = 'all';
 
@@ -87,7 +95,7 @@ class ModalTagging extends Component
     {
         $this->resetValidation();
         $this->open = false;
-        $this->reset('contextType', 'contextId', 'searchQuery', 'newTagLabel', 'newTagColor', 'newTagIsPersonal', 'contextColor', 'newContextColor', 'activeTab', 'tagFilter');
+        $this->reset('contextType', 'contextId', 'searchQuery', 'newTagLabel', 'newTagColor', 'newTagIsPersonal', 'contextColor', 'newContextColor', 'activeTab', 'tagFilter', 'tagInput', 'tagSuggestions', 'showTagSuggestions');
     }
 
     public function loadTags(): void
@@ -510,6 +518,151 @@ class ModalTagging extends Component
         if ($this->activeTab === 'tags') {
             $this->loadTags();
         }
+    }
+
+    public function updatedTagInput(): void
+    {
+        $this->searchTagSuggestions();
+    }
+
+    public function searchTagSuggestions(): void
+    {
+        if (empty($this->tagInput)) {
+            $this->tagSuggestions = [];
+            $this->showTagSuggestions = false;
+            return;
+        }
+
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('tags')) {
+                $this->tagSuggestions = [];
+                return;
+            }
+
+            $user = Auth::user();
+            if (!$user) {
+                $this->tagSuggestions = [];
+                return;
+            }
+
+            // Lade bereits zugeordnete Tag-IDs
+            $assignedTagIds = collect($this->teamTags)->pluck('id')
+                ->merge(collect($this->personalTags)->pluck('id'))
+                ->unique()
+                ->toArray();
+
+            // Suche nach Tags (nicht zugeordnet)
+            $tags = Tag::query()
+                ->availableForUser($user)
+                ->whereNotIn('id', $assignedTagIds)
+                ->where(function ($q) {
+                    $q->where('label', 'like', '%' . $this->tagInput . '%')
+                      ->orWhere('name', 'like', '%' . $this->tagInput . '%');
+                })
+                ->orderBy('label')
+                ->limit(10)
+                ->get()
+                ->map(function ($tag) {
+                    return [
+                        'id' => $tag->id,
+                        'label' => $tag->label,
+                        'name' => $tag->name,
+                        'color' => $tag->color,
+                        'is_team_tag' => $tag->isTeamTag(),
+                    ];
+                })
+                ->toArray();
+
+            $this->tagSuggestions = $tags;
+            $this->showTagSuggestions = count($tags) > 0 || strlen($this->tagInput) >= 2;
+        } catch (\Exception $e) {
+            $this->tagSuggestions = [];
+        }
+    }
+
+    public function addTagFromSuggestion(int $tagId, bool $personal = false): void
+    {
+        $this->toggleTag($tagId, $personal);
+        $this->tagInput = '';
+        $this->tagSuggestions = [];
+        $this->showTagSuggestions = false;
+    }
+
+    public function createAndAddTag(): void
+    {
+        if (empty(trim($this->tagInput))) {
+            return;
+        }
+
+        // Prüfe ob Tag bereits existiert
+        $user = Auth::user();
+        $baseTeam = $user->currentTeamRelation;
+
+        if (!$baseTeam) {
+            $this->addError('tagInput', 'Kein Team-Kontext vorhanden.');
+            return;
+        }
+
+        $rootTeam = $baseTeam->getRootTeam();
+
+        // Prüfe ob Tag mit diesem Label bereits existiert
+        $existingTag = Tag::query()
+            ->where('label', trim($this->tagInput))
+            ->where(function ($q) use ($rootTeam) {
+                if ($this->newTagIsPersonal) {
+                    $q->whereNull('team_id');
+                } else {
+                    $q->where('team_id', $rootTeam->id)->orWhereNull('team_id');
+                }
+            })
+            ->first();
+
+        if ($existingTag) {
+            // Tag existiert bereits, einfach zuordnen
+            $this->toggleTag($existingTag->id, $this->newTagIsPersonal);
+            $this->tagInput = '';
+            $this->tagSuggestions = [];
+            $this->showTagSuggestions = false;
+            return;
+        }
+
+        // Neues Tag erstellen
+        $tagData = [
+            'label' => trim($this->tagInput),
+            'name' => \Illuminate\Support\Str::slug(trim($this->tagInput)),
+            'color' => $this->newTagColor,
+            'created_by_user_id' => $user->id,
+        ];
+
+        if (!$this->newTagIsPersonal) {
+            $tagData['team_id'] = $rootTeam->id;
+        }
+
+        $tag = Tag::create($tagData);
+
+        // Tag direkt zuordnen
+        if ($this->contextType && $this->contextId && class_exists($this->contextType)) {
+            $context = $this->contextType::find($this->contextId);
+            if ($context && method_exists($context, 'tag')) {
+                $context->tag($tag, $this->newTagIsPersonal);
+            }
+        }
+
+        // Tags neu laden
+        $this->loadTags();
+        $this->loadAllTags();
+
+        // Reset
+        $this->tagInput = '';
+        $this->newTagColor = null;
+        $this->newTagIsPersonal = false;
+        $this->tagSuggestions = [];
+        $this->showTagSuggestions = false;
+
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => 'Tag erstellt und zugeordnet.',
+        ]);
     }
 
     public function getContextLabelProperty(): ?string

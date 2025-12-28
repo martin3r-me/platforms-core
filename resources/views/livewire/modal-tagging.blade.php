@@ -220,35 +220,108 @@
 
         @elseif($activeTab === 'tags' && $contextType && $contextId)
             <!-- Tags Tab -->
-            <div class="space-y-6">
-                <!-- Unter-Tabs für Tags -->
-                <div class="border-b border-[var(--ui-border)]/40">
-                    <nav class="-mb-px flex space-x-6">
-                        <button
-                            @click="activeTab = 'tags'; $wire.set('tagFilter', 'all')"
-                            :class="($wire.tagFilter ?? 'all') === 'all' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                            class="whitespace-nowrap border-b-2 py-2 px-1 text-xs font-medium transition-colors"
-                            wire:click="$set('tagFilter', 'all')"
-                        >
-                            Alle
-                        </button>
-                        <button
-                            @click="activeTab = 'tags'; $wire.set('tagFilter', 'team')"
-                            :class="($wire.tagFilter ?? 'all') === 'team' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                            class="whitespace-nowrap border-b-2 py-2 px-1 text-xs font-medium transition-colors"
-                            wire:click="$set('tagFilter', 'team')"
-                        >
-                            Team
-                        </button>
-                        <button
-                            @click="activeTab = 'tags'; $wire.set('tagFilter', 'personal')"
-                            :class="($wire.tagFilter ?? 'all') === 'personal' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                            class="whitespace-nowrap border-b-2 py-2 px-1 text-xs font-medium transition-colors"
-                            wire:click="$set('tagFilter', 'personal')"
-                        >
-                            Persönlich
-                        </button>
-                    </nav>
+            <div class="space-y-6" x-data="{ showSuggestions: @entangle('showTagSuggestions') }">
+                <!-- Tag hinzufügen - Autocomplete -->
+                <div>
+                    <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">
+                        Tag hinzufügen
+                    </h4>
+                    
+                    <div class="relative" x-on:click.away="showSuggestions = false">
+                        <div class="flex items-center gap-2">
+                            <div class="flex-1 relative">
+                                <input
+                                    type="text"
+                                    wire:model.live.debounce.300ms="tagInput"
+                                    @focus="showSuggestions = $wire.showTagSuggestions"
+                                    placeholder="Tag suchen oder neu erstellen..."
+                                    class="w-full px-4 py-2 border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
+                                />
+                                
+                                <!-- Vorschläge Dropdown -->
+                                <div 
+                                    x-show="showSuggestions && ($wire.tagSuggestions.length > 0 || $wire.tagInput.length >= 2)"
+                                    x-transition
+                                    class="absolute z-10 w-full mt-1 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40 shadow-lg max-h-64 overflow-y-auto"
+                                >
+                                    @if(count($tagSuggestions) > 0)
+                                        @foreach($tagSuggestions as $suggestion)
+                                            <button
+                                                type="button"
+                                                wire:click="addTagFromSuggestion({{ $suggestion['id'] }}, false)"
+                                                @click="showSuggestions = false"
+                                                class="w-full flex items-center justify-between p-3 hover:bg-[var(--ui-muted-5)] transition-colors text-left"
+                                            >
+                                                <div class="flex items-center gap-2">
+                                                    @if($suggestion['color'])
+                                                        <div class="w-3 h-3 rounded-full" style="background-color: {{ $suggestion['color'] }}"></div>
+                                                    @endif
+                                                    <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $suggestion['label'] }}</span>
+                                                    @if($suggestion['is_team_tag'])
+                                                        <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-muted-5)]">Team</span>
+                                                    @else
+                                                        <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-muted-5)]">Global</span>
+                                                    @endif
+                                                </div>
+                                                <div class="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        wire:click.stop="addTagFromSuggestion({{ $suggestion['id'] }}, false)"
+                                                        @click="showSuggestions = false"
+                                                        class="text-xs px-2 py-1 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors"
+                                                    >
+                                                        Team
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        wire:click.stop="addTagFromSuggestion({{ $suggestion['id'] }}, true)"
+                                                        @click="showSuggestions = false"
+                                                        class="text-xs px-2 py-1 bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-10)] transition-colors border border-[var(--ui-border)]/40"
+                                                    >
+                                                        Persönlich
+                                                    </button>
+                                                </div>
+                                            </button>
+                                        @endforeach
+                                    @endif
+                                    
+                                    @if(strlen($tagInput) >= 2 && count($tagSuggestions) === 0)
+                                        <div class="p-3 border-t border-[var(--ui-border)]/40">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <span class="text-sm font-medium text-[var(--ui-secondary)]">Neues Tag erstellen:</span>
+                                                <div class="flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        wire:model="newTagIsPersonal"
+                                                        id="newTagIsPersonalInline"
+                                                        class="w-4 h-4 text-[var(--ui-primary)] border-[var(--ui-border)] focus:ring-[var(--ui-primary)]"
+                                                    />
+                                                    <label for="newTagIsPersonalInline" class="text-xs text-[var(--ui-muted)]">
+                                                        Persönlich
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <input
+                                                    type="color"
+                                                    wire:model="newTagColor"
+                                                    class="h-8 w-16 border border-[var(--ui-border)]/40 cursor-pointer"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    wire:click="createAndAddTag"
+                                                    @click="showSuggestions = false"
+                                                    class="flex-1 px-3 py-2 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors text-sm font-medium"
+                                                >
+                                                    "{{ $tagInput }}" erstellen
+                                                </button>
+                                            </div>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Zugeordnete Tags -->
@@ -318,118 +391,36 @@
                     </div>
                 </div>
 
-                <!-- Verfügbare Tags -->
-                <div>
-                    <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">
-                        Verfügbare Tags
-                    </h4>
-
-                    <!-- Suche -->
-                    <div class="mb-3">
-                        <input
-                            type="text"
-                            wire:model.live.debounce.300ms="searchQuery"
-                            placeholder="Tags durchsuchen..."
-                            class="w-full px-4 py-2 border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
-                        />
+                <!-- Unter-Tabs für Filter -->
+                <div class="border-t border-[var(--ui-border)]/40 pt-4">
+                    <div class="border-b border-[var(--ui-border)]/40">
+                        <nav class="-mb-px flex space-x-6">
+                            <button
+                                @click="$wire.set('tagFilter', 'all')"
+                                :class="($wire.tagFilter ?? 'all') === 'all' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                                class="whitespace-nowrap border-b-2 py-2 px-1 text-xs font-medium transition-colors"
+                                wire:click="$set('tagFilter', 'all')"
+                            >
+                                Alle
+                            </button>
+                            <button
+                                @click="$wire.set('tagFilter', 'team')"
+                                :class="($wire.tagFilter ?? 'all') === 'team' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                                class="whitespace-nowrap border-b-2 py-2 px-1 text-xs font-medium transition-colors"
+                                wire:click="$set('tagFilter', 'team')"
+                            >
+                                Team
+                            </button>
+                            <button
+                                @click="$wire.set('tagFilter', 'personal')"
+                                :class="($wire.tagFilter ?? 'all') === 'personal' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                                class="whitespace-nowrap border-b-2 py-2 px-1 text-xs font-medium transition-colors"
+                                wire:click="$set('tagFilter', 'personal')"
+                            >
+                                Persönlich
+                            </button>
+                        </nav>
                     </div>
-
-                    <div class="space-y-2 max-h-64 overflow-y-auto">
-                        @forelse($availableTags as $tag)
-                            <div class="flex items-center justify-between p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40 hover:bg-[var(--ui-muted-5)] transition-colors">
-                                <div class="flex items-center gap-2">
-                                    @if($tag['color'])
-                                        <div class="w-3 h-3 rounded-full" style="background-color: {{ $tag['color'] }}"></div>
-                                    @endif
-                                    <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $tag['label'] }}</span>
-                                    @if($tag['is_team_tag'])
-                                        <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-muted-5)]">Team</span>
-                                    @else
-                                        <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-muted-5)]">Global</span>
-                                    @endif
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <button
-                                        wire:click="toggleTag({{ $tag['id'] }}, false)"
-                                        class="text-xs px-3 py-1.5 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors"
-                                    >
-                                        Als Team
-                                    </button>
-                                    <button
-                                        wire:click="toggleTag({{ $tag['id'] }}, true)"
-                                        class="text-xs px-3 py-1.5 bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-10)] transition-colors border border-[var(--ui-border)]/40"
-                                    >
-                                        Persönlich
-                                    </button>
-                                </div>
-                            </div>
-                        @empty
-                            <p class="text-sm text-[var(--ui-muted)] py-3 text-center">
-                                @if($searchQuery)
-                                    Keine Tags gefunden.
-                                @else
-                                    Keine verfügbaren Tags.
-                                @endif
-                            </p>
-                        @endforelse
-                    </div>
-                </div>
-
-                <!-- Neues Tag erstellen -->
-                <div class="border-t border-[var(--ui-border)]/40 pt-6">
-                    <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">
-                        Neues Tag erstellen
-                    </h4>
-
-                    <form wire:submit.prevent="createTag" class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">
-                                Label
-                            </label>
-                            <input
-                                type="text"
-                                wire:model="newTagLabel"
-                                placeholder="z.B. Wichtig, Dringend, Review"
-                                class="w-full px-4 py-2 border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
-                            />
-                            @error('newTagLabel')
-                                <p class="mt-1 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">
-                                Farbe (optional)
-                            </label>
-                            <input
-                                type="color"
-                                wire:model="newTagColor"
-                                class="w-full h-10 border border-[var(--ui-border)]/40 cursor-pointer"
-                            />
-                            @error('newTagColor')
-                                <p class="mt-1 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        <div class="flex items-center gap-2">
-                            <input
-                                type="checkbox"
-                                wire:model="newTagIsPersonal"
-                                id="newTagIsPersonal"
-                                class="w-4 h-4 text-[var(--ui-primary)] border-[var(--ui-border)] focus:ring-[var(--ui-primary)]"
-                            />
-                            <label for="newTagIsPersonal" class="text-sm text-[var(--ui-secondary)]">
-                                Als persönliches Tag erstellen
-                            </label>
-                        </div>
-
-                        <button
-                            type="submit"
-                            class="w-full px-4 py-2 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors font-medium"
-                        >
-                            Tag erstellen und zuordnen
-                        </button>
-                    </form>
                 </div>
             </div>
 
