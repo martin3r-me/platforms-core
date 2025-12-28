@@ -76,25 +76,56 @@ class OpenAiService
             Log::debug('[OpenAI Chat] Response data', [
                 'has_output_text' => isset($data['output_text']),
                 'has_content' => isset($data['content']),
+                'content_type' => isset($data['content']) ? gettype($data['content']) : 'not set',
                 'has_usage' => isset($data['usage']),
                 'keys' => array_keys($data),
                 'full_response' => $data, // Vollständige Response für Debugging
             ]);
             
+            // Debug: Zeige alle möglichen Text-Felder
+            $possibleTextFields = ['output_text', 'text', 'message', 'output', 'response', 'answer'];
+            foreach ($possibleTextFields as $field) {
+                if (isset($data[$field])) {
+                    Log::debug("[OpenAI Chat] Found field '{$field}'", [
+                        'type' => gettype($data[$field]),
+                        'value_preview' => is_string($data[$field]) ? substr($data[$field], 0, 100) : $data[$field],
+                    ]);
+                }
+            }
+            
             // Versuche verschiedene Response-Formate
             $content = '';
+            
+            // Format 1: output_text (String)
             if (isset($data['output_text']) && is_string($data['output_text'])) {
                 $content = $data['output_text'];
-            } elseif (isset($data['content']) && is_array($data['content'])) {
-                // Array-Format: [{'type': 'text', 'text': '...'}]
+            }
+            // Format 2: content als Array [{'type': 'text', 'text': '...'}]
+            elseif (isset($data['content']) && is_array($data['content']) && isset($data['content'][0])) {
                 if (isset($data['content'][0]['text'])) {
                     $content = $data['content'][0]['text'];
                 } elseif (isset($data['content'][0]['content'])) {
                     $content = $data['content'][0]['content'];
                 }
-            } elseif (isset($data['text'])) {
+            }
+            // Format 3: content als Objekt mit format/verbosity (neues Format)
+            elseif (isset($data['content']) && is_array($data['content']) && isset($data['content']['format'])) {
+                // Content ist ein Objekt, nicht der Text - Text muss woanders sein
+                // Prüfe ob es ein 'text' Feld gibt
+                if (isset($data['content']['text'])) {
+                    $content = $data['content']['text'];
+                } elseif (isset($data['text'])) {
+                    $content = $data['text'];
+                } elseif (isset($data['output'])) {
+                    $content = $data['output'];
+                }
+            }
+            // Format 4: text direkt
+            elseif (isset($data['text']) && is_string($data['text'])) {
                 $content = $data['text'];
-            } elseif (isset($data['message']) && is_string($data['message'])) {
+            }
+            // Format 5: message
+            elseif (isset($data['message']) && is_string($data['message'])) {
                 $content = $data['message'];
             }
             

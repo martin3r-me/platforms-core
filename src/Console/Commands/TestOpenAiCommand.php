@@ -65,7 +65,13 @@ class TestOpenAiCommand extends Command
             }
             
             $this->info("Antwort:");
-            $this->line($response['content'] ?? 'Keine Antwort');
+            $content = $response['content'] ?? 'Keine Antwort';
+            if (is_array($content)) {
+                $this->warn("  ⚠️  Content ist ein Array, nicht ein String!");
+                $this->line("  Content-Struktur: " . json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            } else {
+                $this->line($content);
+            }
             $this->newLine();
             
             if (isset($response['usage'])) {
