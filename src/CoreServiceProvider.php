@@ -93,6 +93,7 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Console\Commands\CreateEndpointApiTokenCommand::class,
                 \Platform\Core\Console\Commands\RefreshMicrosoftTokens::class,
                 \Platform\Core\Console\Commands\SyncCounterKeyResultsCommand::class,
+                \Platform\Core\Console\Commands\EncryptCheckinTodos::class,
             ]);
         }
 
