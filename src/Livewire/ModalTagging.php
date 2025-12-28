@@ -16,7 +16,8 @@ class ModalTagging extends Component
     public ?string $contextType = null;
     public ?int $contextId = null;
 
-    public string $activeTab = 'all'; // 'all', 'team', 'personal', 'overview'
+    public string $activeTab = 'tags'; // 'tags', 'color', 'overview'
+    public string $tagFilter = 'all'; // 'all', 'team', 'personal' (für Tags-Tab)
     
     // Tag-Management
     public array $teamTags = [];
@@ -67,6 +68,8 @@ class ModalTagging extends Component
         $this->newTagColor = null;
         $this->newTagIsPersonal = false;
         $this->newContextColor = null;
+        $this->activeTab = $this->contextType && $this->contextId ? 'tags' : 'overview';
+        $this->tagFilter = 'all';
 
         // Tags und Farbe laden
         if ($this->contextType && $this->contextId) {
@@ -84,7 +87,7 @@ class ModalTagging extends Component
     {
         $this->resetValidation();
         $this->open = false;
-        $this->reset('contextType', 'contextId', 'searchQuery', 'newTagLabel', 'newTagColor', 'newTagIsPersonal', 'contextColor', 'newContextColor');
+        $this->reset('contextType', 'contextId', 'searchQuery', 'newTagLabel', 'newTagColor', 'newTagIsPersonal', 'contextColor', 'newContextColor', 'activeTab', 'tagFilter');
     }
 
     public function loadTags(): void
@@ -504,10 +507,9 @@ class ModalTagging extends Component
 
     public function updatedSearchQuery(): void
     {
-        if ($this->activeTab !== 'overview') {
+        if ($this->activeTab === 'tags') {
             $this->loadTags();
         }
-        // Bei Übersicht-Tab wird searchQuery nicht verwendet (könnte später hinzugefügt werden)
     }
 
     public function getContextLabelProperty(): ?string

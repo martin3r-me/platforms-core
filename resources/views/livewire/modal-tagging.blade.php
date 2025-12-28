@@ -8,7 +8,7 @@
                 </div>
             </div>
             <div class="flex-1 min-w-0">
-                <h3 class="text-xl font-bold text-[var(--ui-secondary)]">Tags verwalten</h3>
+                <h3 class="text-xl font-bold text-[var(--ui-secondary)]">Tags & Farben</h3>
                 @if($contextType && $contextId && $this->contextBreadcrumb)
                     <div class="flex items-center gap-2 mt-1 flex-wrap">
                         @foreach($this->contextBreadcrumb as $index => $crumb)
@@ -24,7 +24,7 @@
                         @endforeach
                     </div>
                 @else
-                    <p class="text-sm text-[var(--ui-muted)] mt-1">Tags zuordnen und verwalten</p>
+                    <p class="text-sm text-[var(--ui-muted)] mt-1">Tags und Farben zuordnen</p>
                 @endif
             </div>
         </div>
@@ -32,361 +32,413 @@
 
     <div>
         <!-- Tabs -->
-            <div class="border-b border-[var(--ui-border)]/60 mb-6">
-                <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+        <div class="border-b border-[var(--ui-border)]/40 mb-6">
+            <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                @if($contextType && $contextId)
                     <button
-                        @click="activeTab = 'all'"
-                        :class="activeTab === 'all' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                        @click="activeTab = 'tags'"
+                        :class="activeTab === 'tags' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
                         class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium transition-colors"
-                        wire:click="$set('activeTab', 'all')"
+                        wire:click="$set('activeTab', 'tags')"
                     >
-                        Alle
+                        Tags
                     </button>
                     <button
-                        @click="activeTab = 'team'"
-                        :class="activeTab === 'team' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                        @click="activeTab = 'color'"
+                        :class="activeTab === 'color' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
                         class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium transition-colors"
-                        wire:click="$set('activeTab', 'team')"
+                        wire:click="$set('activeTab', 'color')"
                     >
-                        Team
+                        Farbe
                     </button>
-                    <button
-                        @click="activeTab = 'personal'"
-                        :class="activeTab === 'personal' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                        class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium transition-colors"
-                        wire:click="$set('activeTab', 'personal')"
-                    >
-                        Persönlich
-                    </button>
-                    <button
-                        @click="activeTab = 'overview'"
-                        :class="activeTab === 'overview' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                        class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium transition-colors"
-                        wire:click="$set('activeTab', 'overview')"
-                    >
-                        Übersicht
-                    </button>
-                </nav>
+                @endif
+                <button
+                    @click="activeTab = 'overview'"
+                    :class="activeTab === 'overview' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                    class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium transition-colors"
+                    wire:click="$set('activeTab', 'overview')"
+                >
+                    Übersicht
+                </button>
+            </nav>
+        </div>
+
+        @if($activeTab === 'overview')
+            <!-- Übersicht: Alle Tags -->
+            <div>
+                <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">
+                    Alle Tags
+                </h4>
+
+                <div class="overflow-hidden border border-[var(--ui-border)]/40">
+                    <table class="min-w-full divide-y divide-[var(--ui-border)]/40">
+                        <thead class="bg-[var(--ui-muted-5)]">
+                            <tr>
+                                <th scope="col" class="py-3 pl-6 pr-3 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                    Tag
+                                </th>
+                                <th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                    Typ
+                                </th>
+                                <th scope="col" class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                    Gesamt
+                                </th>
+                                <th scope="col" class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                    Team
+                                </th>
+                                <th scope="col" class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                    Persönlich
+                                </th>
+                                <th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                    Erstellt
+                                </th>
+                                <th scope="col" class="px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                    Aktionen
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-[var(--ui-border)]/40 bg-[var(--ui-surface)]">
+                            @forelse($allTags as $tag)
+                                <tr class="hover:bg-[var(--ui-muted-5)]/50 transition-colors">
+                                    <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                                        <div class="flex items-center gap-2">
+                                            @if($tag['color'])
+                                                <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: {{ $tag['color'] }}"></div>
+                                            @endif
+                                            <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $tag['label'] }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-4">
+                                        @if($tag['is_team_tag'])
+                                            <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[var(--ui-primary-10)] text-[var(--ui-primary)] border border-[var(--ui-primary)]/20">
+                                                Team
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/40">
+                                                Global
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-4 text-center">
+                                        <span class="text-sm font-semibold text-[var(--ui-secondary)]">{{ $tag['total_count'] }}</span>
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-4 text-center">
+                                        <span class="text-sm text-[var(--ui-muted)]">{{ $tag['team_count'] }}</span>
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-4 text-center">
+                                        <span class="text-sm text-[var(--ui-muted)]">{{ $tag['personal_count'] }}</span>
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-4">
+                                        <div class="text-xs text-[var(--ui-muted)]">
+                                            <div>{{ $tag['created_at'] }}</div>
+                                            <div class="text-[var(--ui-muted)]/70">{{ $tag['created_by'] }}</div>
+                                        </div>
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-4 text-right">
+                                        @if($tag['total_count'] === 0)
+                                            <button
+                                                wire:click="deleteTag({{ $tag['id'] }})"
+                                                wire:confirm="Tag wirklich löschen?"
+                                                class="text-xs px-3 py-1.5 text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 hover:bg-[var(--ui-danger-5)] transition-colors"
+                                            >
+                                                Löschen
+                                            </button>
+                                        @else
+                                            <span class="text-xs text-[var(--ui-muted)]">In Verwendung</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="py-12 text-center">
+                                        <p class="text-sm text-[var(--ui-muted)]">Noch keine Tags vorhanden.</p>
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            @if($activeTab === 'overview')
-                <!-- Übersicht: Alle Tags -->
-                <div class="mb-6">
-                    <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">
-                        Alle Tags
+        @elseif($activeTab === 'color' && $contextType && $contextId)
+            <!-- Farbe Tab -->
+            <div class="space-y-6">
+                <div>
+                    <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">
+                        Farbe zuordnen
                     </h4>
-
-                    <div class="overflow-hidden border border-[var(--ui-border)]/40">
-                        <table class="min-w-full divide-y divide-[var(--ui-border)]/40">
-                            <thead class="bg-[var(--ui-muted-5)]">
-                                <tr>
-                                    <th scope="col" class="py-3 pl-6 pr-3 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                        Tag
-                                    </th>
-                                    <th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                        Typ
-                                    </th>
-                                    <th scope="col" class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                        Gesamt
-                                    </th>
-                                    <th scope="col" class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                        Team
-                                    </th>
-                                    <th scope="col" class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                        Persönlich
-                                    </th>
-                                    <th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                        Erstellt
-                                    </th>
-                                    <th scope="col" class="px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                        Aktionen
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-[var(--ui-border)]/40 bg-[var(--ui-surface)]">
-                                @forelse($allTags as $tag)
-                                    <tr class="hover:bg-[var(--ui-muted-5)]/50 transition-colors">
-                                        <td class="whitespace-nowrap py-4 pl-6 pr-3">
-                                            <div class="flex items-center gap-2">
-                                                @if($tag['color'])
-                                                    <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: {{ $tag['color'] }}"></div>
-                                                @endif
-                                                <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $tag['label'] }}</span>
-                                            </div>
-                                        </td>
-                                        <td class="whitespace-nowrap px-3 py-4">
-                                            @if($tag['is_team_tag'])
-                                                <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[var(--ui-primary-10)] text-[var(--ui-primary)] border border-[var(--ui-primary)]/20">
-                                                    Team
-                                                </span>
-                                            @else
-                                                <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/40">
-                                                    Global
-                                                </span>
-                                            @endif
-                                        </td>
-                                        <td class="whitespace-nowrap px-3 py-4 text-center">
-                                            <span class="text-sm font-semibold text-[var(--ui-secondary)]">{{ $tag['total_count'] }}</span>
-                                        </td>
-                                        <td class="whitespace-nowrap px-3 py-4 text-center">
-                                            <span class="text-sm text-[var(--ui-muted)]">{{ $tag['team_count'] }}</span>
-                                        </td>
-                                        <td class="whitespace-nowrap px-3 py-4 text-center">
-                                            <span class="text-sm text-[var(--ui-muted)]">{{ $tag['personal_count'] }}</span>
-                                        </td>
-                                        <td class="whitespace-nowrap px-3 py-4">
-                                            <div class="text-xs text-[var(--ui-muted)]">
-                                                <div>{{ $tag['created_at'] }}</div>
-                                                <div class="text-[var(--ui-muted)]/70">{{ $tag['created_by'] }}</div>
-                                            </div>
-                                        </td>
-                                        <td class="whitespace-nowrap px-3 py-4 text-right">
-                                            @if($tag['total_count'] === 0)
-                                                <button
-                                                    wire:click="deleteTag({{ $tag['id'] }})"
-                                                    wire:confirm="Tag wirklich löschen?"
-                                                    class="text-xs px-3 py-1.5 text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 hover:bg-[var(--ui-danger-5)] transition-colors"
-                                                >
-                                                    Löschen
-                                                </button>
-                                            @else
-                                                <span class="text-xs text-[var(--ui-muted)]">In Verwendung</span>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="7" class="py-12 text-center">
-                                            <p class="text-sm text-[var(--ui-muted)]">Noch keine Tags vorhanden.</p>
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            @elseif($contextType && $contextId)
-                <!-- Farbe (ohne Tags) -->
-            <div class="mb-6">
-                <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">
-                    Farbe
-                </h4>
-                
-                <div class="flex items-center gap-3">
+                    
                     @if($contextColor)
-                        <div class="flex items-center gap-2 p-3 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
-                            <div class="w-6 h-6 border border-[var(--ui-border)]/40" style="background-color: {{ $contextColor }}"></div>
-                            <span class="text-sm text-[var(--ui-secondary)]">Aktuelle Farbe</span>
+                        <div class="p-4 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 border border-[var(--ui-border)]/40" style="background-color: {{ $contextColor }}"></div>
+                                    <div>
+                                        <div class="text-sm font-medium text-[var(--ui-secondary)]">Aktuelle Farbe</div>
+                                        <div class="text-xs text-[var(--ui-muted)]">{{ $contextColor }}</div>
+                                    </div>
+                                </div>
+                                <button
+                                    wire:click="removeColor"
+                                    class="text-sm px-4 py-2 text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 hover:bg-[var(--ui-danger-5)] transition-colors"
+                                >
+                                    Entfernen
+                                </button>
+                            </div>
                         </div>
-                        <button
-                            wire:click="removeColor"
-                            class="text-xs px-3 py-1.5 text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 hover:bg-[var(--ui-danger-5)] transition-colors"
-                        >
-                            Entfernen
-                        </button>
                     @else
-                        <div class="flex-1">
-                            <input
-                                type="color"
-                                wire:model.live="newContextColor"
-                                class="w-full h-10 border border-[var(--ui-border)]/40 cursor-pointer"
-                            />
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">
+                                    Farbe auswählen
+                                </label>
+                                <input
+                                    type="color"
+                                    wire:model.live="newContextColor"
+                                    class="w-full h-16 border border-[var(--ui-border)]/40 cursor-pointer"
+                                />
+                            </div>
+                            @if($newContextColor)
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 border border-[var(--ui-border)]/40" style="background-color: {{ $newContextColor }}"></div>
+                                    <div class="flex-1">
+                                        <div class="text-sm font-medium text-[var(--ui-secondary)]">Vorschau</div>
+                                        <div class="text-xs text-[var(--ui-muted)]">{{ $newContextColor }}</div>
+                                    </div>
+                                    <button
+                                        wire:click="setColor"
+                                        class="px-4 py-2 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors text-sm font-medium"
+                                    >
+                                        Farbe setzen
+                                    </button>
+                                </div>
+                            @endif
                         </div>
-                        @if($newContextColor)
-                            <button
-                                wire:click="setColor"
-                                class="text-xs px-3 py-1.5 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors"
-                            >
-                                Farbe setzen
-                            </button>
-                        @endif
                     @endif
                 </div>
             </div>
+
+        @elseif($activeTab === 'tags' && $contextType && $contextId)
+            <!-- Tags Tab -->
+            <div class="space-y-6">
+                <!-- Unter-Tabs für Tags -->
+                <div class="border-b border-[var(--ui-border)]/40">
+                    <nav class="-mb-px flex space-x-6">
+                        <button
+                            @click="activeTab = 'tags'; $wire.set('tagFilter', 'all')"
+                            :class="($wire.tagFilter ?? 'all') === 'all' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                            class="whitespace-nowrap border-b-2 py-2 px-1 text-xs font-medium transition-colors"
+                            wire:click="$set('tagFilter', 'all')"
+                        >
+                            Alle
+                        </button>
+                        <button
+                            @click="activeTab = 'tags'; $wire.set('tagFilter', 'team')"
+                            :class="($wire.tagFilter ?? 'all') === 'team' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                            class="whitespace-nowrap border-b-2 py-2 px-1 text-xs font-medium transition-colors"
+                            wire:click="$set('tagFilter', 'team')"
+                        >
+                            Team
+                        </button>
+                        <button
+                            @click="activeTab = 'tags'; $wire.set('tagFilter', 'personal')"
+                            :class="($wire.tagFilter ?? 'all') === 'personal' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                            class="whitespace-nowrap border-b-2 py-2 px-1 text-xs font-medium transition-colors"
+                            wire:click="$set('tagFilter', 'personal')"
+                        >
+                            Persönlich
+                        </button>
+                    </nav>
+                </div>
 
                 <!-- Zugeordnete Tags -->
-            <div class="mb-6">
-                <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">
-                    Zugeordnete Tags
-                </h4>
-                
-                <div class="space-y-2">
-                    <!-- Team Tags -->
-                    @if($activeTab === 'all' || $activeTab === 'team')
-                        @forelse($teamTags as $tag)
-                            <div class="flex items-center justify-between p-3 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
-                                <div class="flex items-center gap-2">
-                                    @if($tag['color'])
-                                        <div class="w-3 h-3 rounded-full" style="background-color: {{ $tag['color'] }}"></div>
-                                    @endif
-                                    <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $tag['label'] }}</span>
-                                    <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-surface)]">Team</span>
+                <div>
+                    <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">
+                        Zugeordnete Tags
+                    </h4>
+                    
+                    <div class="space-y-2">
+                        @php
+                            $tagFilter = $tagFilter ?? 'all';
+                        @endphp
+
+                        <!-- Team Tags -->
+                        @if($tagFilter === 'all' || $tagFilter === 'team')
+                            @forelse($teamTags as $tag)
+                                <div class="flex items-center justify-between p-3 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
+                                    <div class="flex items-center gap-2">
+                                        @if($tag['color'])
+                                            <div class="w-3 h-3 rounded-full" style="background-color: {{ $tag['color'] }}"></div>
+                                        @endif
+                                        <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $tag['label'] }}</span>
+                                        <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-surface)]">Team</span>
+                                    </div>
+                                    <button
+                                        wire:click="toggleTag({{ $tag['id'] }}, false)"
+                                        class="text-sm text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 hover:bg-[var(--ui-danger-5)] px-3 py-1 transition-colors"
+                                    >
+                                        Entfernen
+                                    </button>
                                 </div>
-                                <button
-                                    wire:click="toggleTag({{ $tag['id'] }}, false)"
-                                    class="text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 text-sm font-medium"
-                                >
-                                    Entfernen
-                                </button>
-                            </div>
-                        @empty
-                            @if($activeTab === 'team')
-                                <p class="text-sm text-[var(--ui-muted)] py-2">Keine Team-Tags zugeordnet.</p>
-                            @endif
-                        @endforelse
-                    @endif
+                            @empty
+                                @if($tagFilter === 'team')
+                                    <p class="text-sm text-[var(--ui-muted)] py-3 text-center">Keine Team-Tags zugeordnet.</p>
+                                @endif
+                            @endforelse
+                        @endif
 
-                    <!-- Persönliche Tags -->
-                    @if($activeTab === 'all' || $activeTab === 'personal')
-                        @forelse($personalTags as $tag)
-                            <div class="flex items-center justify-between p-3 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
-                                <div class="flex items-center gap-2">
-                                    @if($tag['color'])
-                                        <div class="w-3 h-3 rounded-full" style="background-color: {{ $tag['color'] }}"></div>
-                                    @endif
-                                    <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $tag['label'] }}</span>
-                                    <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-surface)]">Persönlich</span>
+                        <!-- Persönliche Tags -->
+                        @if($tagFilter === 'all' || $tagFilter === 'personal')
+                            @forelse($personalTags as $tag)
+                                <div class="flex items-center justify-between p-3 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
+                                    <div class="flex items-center gap-2">
+                                        @if($tag['color'])
+                                            <div class="w-3 h-3 rounded-full" style="background-color: {{ $tag['color'] }}"></div>
+                                        @endif
+                                        <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $tag['label'] }}</span>
+                                        <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-surface)]">Persönlich</span>
+                                    </div>
+                                    <button
+                                        wire:click="toggleTag({{ $tag['id'] }}, true)"
+                                        class="text-sm text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 hover:bg-[var(--ui-danger-5)] px-3 py-1 transition-colors"
+                                    >
+                                        Entfernen
+                                    </button>
                                 </div>
-                                <button
-                                    wire:click="toggleTag({{ $tag['id'] }}, true)"
-                                    class="text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 text-sm font-medium"
-                                >
-                                    Entfernen
-                                </button>
-                            </div>
-                        @empty
-                            @if($activeTab === 'personal')
-                                <p class="text-sm text-[var(--ui-muted)] py-2">Keine persönlichen Tags zugeordnet.</p>
-                            @endif
-                        @endforelse
-                    @endif
-
-                    @if(empty($teamTags) && empty($personalTags))
-                        <p class="text-sm text-[var(--ui-muted)] py-2">Noch keine Tags zugeordnet.</p>
-                    @endif
-                </div>
-            </div>
-
-            <!-- Verfügbare Tags -->
-            <div class="mb-6">
-                <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">
-                    Verfügbare Tags
-                </h4>
-
-                <!-- Suche -->
-                <div class="mb-3">
-                    <input
-                        type="text"
-                        wire:model.live.debounce.300ms="searchQuery"
-                        placeholder="Tags durchsuchen..."
-                        class="w-full px-4 py-2 border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
-                    />
-                </div>
-
-                <div class="space-y-2 max-h-48 overflow-y-auto">
-                    @forelse($availableTags as $tag)
-                        <div class="flex items-center justify-between p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40 hover:bg-[var(--ui-muted-5)] transition-colors">
-                            <div class="flex items-center gap-2">
-                                @if($tag['color'])
-                                    <div class="w-3 h-3 rounded-full" style="background-color: {{ $tag['color'] }}"></div>
+                            @empty
+                                @if($tagFilter === 'personal')
+                                    <p class="text-sm text-[var(--ui-muted)] py-3 text-center">Keine persönlichen Tags zugeordnet.</p>
                                 @endif
-                                <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $tag['label'] }}</span>
-                                @if($tag['is_team_tag'])
-                                    <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-muted-5)]">Team</span>
-                                @else
-                                    <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-muted-5)]">Global</span>
-                                @endif
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <button
-                                    wire:click="toggleTag({{ $tag['id'] }}, false)"
-                                    class="text-xs px-3 py-1.5 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors"
-                                >
-                                    Als Team
-                                </button>
-                                <button
-                                    wire:click="toggleTag({{ $tag['id'] }}, true)"
-                                    class="text-xs px-3 py-1.5 bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-10)] transition-colors border border-[var(--ui-border)]/40"
-                                >
-                                    Persönlich
-                                </button>
-                            </div>
-                        </div>
-                    @empty
-                        <p class="text-sm text-[var(--ui-muted)] py-2">
-                            @if($searchQuery)
-                                Keine Tags gefunden.
-                            @else
-                                Keine verfügbaren Tags.
-                            @endif
-                        </p>
-                    @endforelse
+                            @endforelse
+                        @endif
+
+                        @if(empty($teamTags) && empty($personalTags))
+                            <p class="text-sm text-[var(--ui-muted)] py-3 text-center">Noch keine Tags zugeordnet.</p>
+                        @endif
+                    </div>
                 </div>
-            </div>
 
-            <!-- Neues Tag erstellen -->
-            <div class="border-t border-[var(--ui-border)]/60 pt-6">
-                <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">
-                    Neues Tag erstellen
-                </h4>
+                <!-- Verfügbare Tags -->
+                <div>
+                    <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">
+                        Verfügbare Tags
+                    </h4>
 
-                <form wire:submit.prevent="createTag" class="space-y-3">
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">
-                            Label
-                        </label>
+                    <!-- Suche -->
+                    <div class="mb-3">
                         <input
                             type="text"
-                            wire:model="newTagLabel"
-                            placeholder="z.B. Wichtig, Dringend, Review"
-                            class="w-full px-4 py-2 border border-[var(--ui-border)]/60 rounded-lg bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
+                            wire:model.live.debounce.300ms="searchQuery"
+                            placeholder="Tags durchsuchen..."
+                            class="w-full px-4 py-2 border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
                         />
-                        @error('newTagLabel')
-                            <p class="mt-1 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
-                        @enderror
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">
-                            Farbe (optional)
-                        </label>
-                        <input
-                            type="color"
-                            wire:model="newTagColor"
-                            class="w-full h-10 border border-[var(--ui-border)]/40 cursor-pointer"
-                        />
-                        @error('newTagColor')
-                            <p class="mt-1 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
-                        @enderror
+                    <div class="space-y-2 max-h-64 overflow-y-auto">
+                        @forelse($availableTags as $tag)
+                            <div class="flex items-center justify-between p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40 hover:bg-[var(--ui-muted-5)] transition-colors">
+                                <div class="flex items-center gap-2">
+                                    @if($tag['color'])
+                                        <div class="w-3 h-3 rounded-full" style="background-color: {{ $tag['color'] }}"></div>
+                                    @endif
+                                    <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $tag['label'] }}</span>
+                                    @if($tag['is_team_tag'])
+                                        <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-muted-5)]">Team</span>
+                                    @else
+                                        <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-muted-5)]">Global</span>
+                                    @endif
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button
+                                        wire:click="toggleTag({{ $tag['id'] }}, false)"
+                                        class="text-xs px-3 py-1.5 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors"
+                                    >
+                                        Als Team
+                                    </button>
+                                    <button
+                                        wire:click="toggleTag({{ $tag['id'] }}, true)"
+                                        class="text-xs px-3 py-1.5 bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-10)] transition-colors border border-[var(--ui-border)]/40"
+                                    >
+                                        Persönlich
+                                    </button>
+                                </div>
+                            </div>
+                        @empty
+                            <p class="text-sm text-[var(--ui-muted)] py-3 text-center">
+                                @if($searchQuery)
+                                    Keine Tags gefunden.
+                                @else
+                                    Keine verfügbaren Tags.
+                                @endif
+                            </p>
+                        @endforelse
                     </div>
-
-                    <div class="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            wire:model="newTagIsPersonal"
-                            id="newTagIsPersonal"
-                            class="w-4 h-4 text-[var(--ui-primary)] border-[var(--ui-border)] rounded focus:ring-[var(--ui-primary)]"
-                        />
-                        <label for="newTagIsPersonal" class="text-sm text-[var(--ui-secondary)]">
-                            Als persönliches Tag erstellen
-                        </label>
-                    </div>
-
-                    <button
-                        type="submit"
-                        class="w-full px-4 py-2 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors font-medium"
-                    >
-                        Tag erstellen und zuordnen
-                    </button>
-                </form>
-            </div>
-            @else
-                <div class="text-center py-12">
-                    <p class="text-[var(--ui-muted)]">Kein Kontext ausgewählt.</p>
-                    <p class="text-sm text-[var(--ui-muted)] mt-2">Wählen Sie einen Kontext aus, um Tags zu verwalten.</p>
                 </div>
-            @endif
+
+                <!-- Neues Tag erstellen -->
+                <div class="border-t border-[var(--ui-border)]/40 pt-6">
+                    <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">
+                        Neues Tag erstellen
+                    </h4>
+
+                    <form wire:submit.prevent="createTag" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">
+                                Label
+                            </label>
+                            <input
+                                type="text"
+                                wire:model="newTagLabel"
+                                placeholder="z.B. Wichtig, Dringend, Review"
+                                class="w-full px-4 py-2 border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
+                            />
+                            @error('newTagLabel')
+                                <p class="mt-1 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">
+                                Farbe (optional)
+                            </label>
+                            <input
+                                type="color"
+                                wire:model="newTagColor"
+                                class="w-full h-10 border border-[var(--ui-border)]/40 cursor-pointer"
+                            />
+                            @error('newTagColor')
+                                <p class="mt-1 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                wire:model="newTagIsPersonal"
+                                id="newTagIsPersonal"
+                                class="w-4 h-4 text-[var(--ui-primary)] border-[var(--ui-border)] focus:ring-[var(--ui-primary)]"
+                            />
+                            <label for="newTagIsPersonal" class="text-sm text-[var(--ui-secondary)]">
+                                Als persönliches Tag erstellen
+                            </label>
+                        </div>
+
+                        <button
+                            type="submit"
+                            class="w-full px-4 py-2 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors font-medium"
+                        >
+                            Tag erstellen und zuordnen
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+        @elseif(!$contextType || !$contextId)
+            <div class="text-center py-12">
+                <p class="text-[var(--ui-muted)]">Kein Kontext ausgewählt.</p>
+                <p class="text-sm text-[var(--ui-muted)] mt-2">Wählen Sie einen Kontext aus, um Tags und Farben zu verwalten.</p>
+            </div>
+        @endif
     </div>
 </x-ui-modal>
 </div>
-
