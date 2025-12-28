@@ -16,8 +16,43 @@ class ListToolsCommand extends Command
         $this->newLine();
         
         try {
-            // Lade Registry (triggert Auto-Discovery)
-            $registry = app(ToolRegistry::class);
+            // Direkte Instanziierung um Memory zu sparen
+            $registry = new ToolRegistry();
+            
+            // Manuell Auto-Discovery auslösen (ohne Container)
+            try {
+                $modulesPath = realpath(__DIR__ . '/../../../../modules');
+                if ($modulesPath && is_dir($modulesPath)) {
+                    $moduleTools = \Platform\Core\Tools\ToolLoader::loadFromAllModules($modulesPath);
+                    foreach ($moduleTools as $tool) {
+                        try {
+                            $registry->register($tool);
+                        } catch (\Throwable $e) {
+                            // Ignore
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Ignore
+            }
+            
+            // Core-Tools manuell registrieren
+            try {
+                if (!$registry->has('tools.list')) {
+                    $registry->register(new \Platform\Core\Tools\ListToolsTool($registry));
+                }
+            } catch (\Throwable $e) {
+                // Ignore
+            }
+            
+            try {
+                if (!$registry->has('echo')) {
+                    $registry->register(new \Platform\Core\Tools\EchoTool());
+                }
+            } catch (\Throwable $e) {
+                // Ignore
+            }
+            
             $tools = $registry->all();
             
             if (count($tools) === 0) {
