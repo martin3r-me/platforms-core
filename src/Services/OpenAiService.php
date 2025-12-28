@@ -199,7 +199,26 @@ class OpenAiService
                 ]);
             }
             
-            throw new \Exception($this->formatApiErrorMessage($response->status(), $errorBody));
+            // Erweitere Fehlermeldung mit vollständiger Antwort
+            $errorMessage = $this->formatApiErrorMessage($response->status(), $errorBody);
+            try {
+                $errorJson = json_decode($errorBody, true);
+                if ($errorJson && isset($errorJson['error'])) {
+                    $errorDetails = json_encode($errorJson['error'], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+                    $errorMessage .= "\n\nOpenAI Error Details:\n" . $errorDetails;
+                    
+                    // Zeige auch im Log für besseres Debugging
+                    Log::error('[OpenAI Stream] Error details', [
+                        'error' => $errorJson['error'],
+                        'payload_tools' => $payload['tools'] ?? [],
+                    ]);
+                } else {
+                    $errorMessage .= "\n\nOpenAI Response Body: " . substr($errorBody, 0, 1000);
+                }
+            } catch (\Throwable $e) {
+                // Ignore JSON parse errors
+            }
+            throw new \Exception($errorMessage);
         }
         $this->parseResponsesStream($response->toPsrResponse()->getBody(), $onDelta, $messages, $options);
     }
