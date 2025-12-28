@@ -324,31 +324,23 @@ class CoreAiStreamController extends Controller
                 // Stream MIT Tools (wenn verfügbar)
                 // WICHTIG: $toolExecutor muss im use-Closure verfügbar sein
                 try {
-                    $openAi->streamChat($messages, function (string $delta) use (&$assistantBuffer, &$lastFlushAt, $flushInterval, $flushThreshold, &$pendingSinceLastFlush, $assistantMessage) {
-                        $assistantBuffer .= $delta;
-                        $pendingSinceLastFlush += mb_strlen($delta);
-
-                        echo 'data: ' . json_encode(['delta' => $delta], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
-
-                        $now = microtime(true);
-                        if ($pendingSinceLastFlush >= $flushThreshold || ($now - $lastFlushAt) >= $flushInterval) {
-                            // Batched update to reduce write amplification
-                            $assistantMessage->update([
-                                'content' => $assistantBuffer,
-                                'tokens_out' => mb_strlen($assistantBuffer),
-                                'meta' => ['is_streaming' => true],
-                            ]);
-                            $pendingSinceLastFlush = 0;
-                            $lastFlushAt = $now;
-                        }
-                    }, options: [
+                    echo "data: " . json_encode([
+                        'debug' => 'Starte streamChat-Aufruf...'
+                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                    @flush();
+                    
+                    // Options vorbereiten
+                    $streamOptions = [
                         'with_context' => true,
                         'source_route' => $sourceRoute,
                         'source_module' => $sourceModule,
                         'source_url' => $sourceUrl,
-                        'tools' => ($toolExecutor !== null) ? null : false, // Tools aktivieren wenn ToolExecutor verfügbar
-                        'on_tool_start' => function(string $tool) use ($toolExecutor) {
+                    ];
+                    
+                    // Tools aktivieren wenn ToolExecutor verfügbar
+                    if ($toolExecutor !== null) {
+                        $streamOptions['tools'] = null; // null = aktivieren
+                        $streamOptions['on_tool_start'] = function(string $tool) {
                             echo 'data: ' . json_encode([
                                 'tool' => $tool,
                                 'status' => [
@@ -358,8 +350,8 @@ class CoreAiStreamController extends Controller
                                 ]
                             ], JSON_UNESCAPED_UNICODE) . "\n\n";
                             @flush();
-                        },
-                        'tool_executor' => ($toolExecutor !== null) ? function($toolName, $arguments) use ($toolExecutor) {
+                        };
+                        $streamOptions['tool_executor'] = function($toolName, $arguments) use ($toolExecutor) {
                             try {
                                 echo 'data: ' . json_encode([
                                     'status' => [
@@ -411,13 +403,54 @@ class CoreAiStreamController extends Controller
                                 
                                 return $errorResult;
                             }
-                        } : null,
-                    ]);
+                        };
+                    } else {
+                        $streamOptions['tools'] = false; // Tools deaktivieren
+                    }
+                    
+                    echo "data: " . json_encode([
+                        'debug' => 'Rufe streamChat auf mit ' . count($streamOptions) . ' Optionen...'
+                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                    @flush();
+                    
+                    // Delta-Callback
+                    $deltaCallback = function (string $delta) use (&$assistantBuffer, &$lastFlushAt, $flushInterval, $flushThreshold, &$pendingSinceLastFlush, $assistantMessage) {
+                        $assistantBuffer .= $delta;
+                        $pendingSinceLastFlush += mb_strlen($delta);
+
+                        echo 'data: ' . json_encode(['delta' => $delta], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+
+                        $now = microtime(true);
+                        if ($pendingSinceLastFlush >= $flushThreshold || ($now - $lastFlushAt) >= $flushInterval) {
+                            // Batched update to reduce write amplification
+                            $assistantMessage->update([
+                                'content' => $assistantBuffer,
+                                'tokens_out' => mb_strlen($assistantBuffer),
+                                'meta' => ['is_streaming' => true],
+                            ]);
+                            $pendingSinceLastFlush = 0;
+                            $lastFlushAt = $now;
+                        }
+                    };
+                    
+                    echo "data: " . json_encode([
+                        'debug' => 'Delta-Callback erstellt, rufe streamChat auf...'
+                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                    @flush();
+                    
+                    // Jetzt streamChat aufrufen
+                    $openAi->streamChat($messages, $deltaCallback, model: \Platform\Core\Services\OpenAiService::DEFAULT_MODEL, options: $streamOptions);
+                    
+                    echo "data: " . json_encode([
+                        'debug' => 'streamChat-Aufruf abgeschlossen'
+                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                    @flush();
                 } catch (\Throwable $streamError) {
                     // Fehler beim StreamChat
                     echo "data: " . json_encode([
                         'error' => 'StreamChat Fehler',
-                        'debug' => "Fehler beim streamChat: {$streamError->getMessage()} in {$streamError->getFile()}:{$streamError->getLine()}"
+                        'debug' => "Fehler beim streamChat: {$streamError->getMessage()} in {$streamError->getFile()}:{$streamError->getLine()}\nTrace: " . substr($streamError->getTraceAsString(), 0, 1000)
                     ], JSON_UNESCAPED_UNICODE) . "\n\n";
                     @flush();
                     throw $streamError; // Re-throw um in outer catch zu landen
