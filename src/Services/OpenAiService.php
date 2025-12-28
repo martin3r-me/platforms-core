@@ -382,10 +382,11 @@ class OpenAiService
     {
         try {
             // Prüfe ob Registry verfügbar ist
-            if (!$this->app->bound(ToolRegistry::class)) {
+            $container = app();
+            if (!$container->bound(ToolRegistry::class)) {
                 return '';
             }
-            $registry = $this->app->make(ToolRegistry::class);
+            $registry = $container->make(ToolRegistry::class);
             $modules = \Platform\Core\Registry\ModuleRegistry::all();
             $allTools = $registry->all();
             
@@ -460,10 +461,11 @@ class OpenAiService
             $toolRegistry = null;
             
             // Versuche die Registry zu bekommen - sollte bereits geladen sein
-            // ABER: Im Stream-Kontext könnte die Registry noch nicht gebunden sein
+            // WICHTIG: Verwende app() Helper, da $this->app nicht existiert
             try {
-                if (isset($this->app) && $this->app->bound(ToolRegistry::class)) {
-                    $toolRegistry = $this->app->make(ToolRegistry::class);
+                $container = app();
+                if ($container->bound(ToolRegistry::class)) {
+                    $toolRegistry = $container->make(ToolRegistry::class);
                 }
             } catch (\Throwable $e) {
                 // Container-Zugriff fehlgeschlagen - kein Problem, erstelle neue Instanz
@@ -506,11 +508,12 @@ class OpenAiService
         // Diese können später entfernt werden, wenn alle Module auf ToolRegistry umgestellt sind
         try {
             // Prüfe ob ToolBroker verfügbar ist (optional)
-            if (!$this->app->bound(ToolBroker::class)) {
+            $container = app();
+            if (!$container->bound(ToolBroker::class)) {
                 // ToolBroker nicht verfügbar - kein Problem, wir verwenden nur ToolRegistry
                 return $tools;
             }
-            $toolBroker = $this->app->make(ToolBroker::class);
+            $toolBroker = $container->make(ToolBroker::class);
             $capabilities = $toolBroker->getAvailableCapabilities();
             
             // Entity-basierte Tools
