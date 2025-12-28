@@ -49,10 +49,29 @@ class DebugToolsCommand extends Command
             $this->line("   ✅ ToolRegistry Klasse gefunden");
             
             $this->line("   Versuche ToolRegistry aufzulösen...");
-            $registry = app(ToolRegistry::class);
+            
+            try {
+                $registry = app(ToolRegistry::class);
+            } catch (\Throwable $resolveError) {
+                $this->error("   ❌ Fehler beim Auflösen der ToolRegistry!");
+                $this->error("   Fehler: " . $resolveError->getMessage());
+                $this->error("   Datei: " . $resolveError->getFile() . ":" . $resolveError->getLine());
+                $this->line("   Trace:");
+                $this->line(substr($resolveError->getTraceAsString(), 0, 1500));
+                
+                // Versuche direkt zu instanziieren
+                $this->line("   → Versuche direkte Instanziierung...");
+                try {
+                    $registry = new ToolRegistry();
+                    $this->line("   ✅ Direkte Instanziierung erfolgreich");
+                } catch (\Throwable $e2) {
+                    $this->error("   ❌ Auch direkte Instanziierung fehlgeschlagen: " . $e2->getMessage());
+                    return 1;
+                }
+            }
             
             if (!$registry) {
-                $this->error("   ❌ ToolRegistry konnte nicht aufgelöst werden!");
+                $this->error("   ❌ ToolRegistry ist null!");
                 return 1;
             }
             $this->line("   ✅ ToolRegistry aufgelöst");
