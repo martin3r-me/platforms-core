@@ -106,6 +106,11 @@ class CoreAiStreamController extends Controller
         $assistantBuffer = '';
 
         $response = new StreamedResponse(function () use ($messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl, $user, $threadId) {
+            // Debug-Infos sammeln
+            $debugInfos = [];
+            $debugInfos[] = '✅ Stream-Callback gestartet';
+            $debugInfos[] = "User ID: {$user->id} | Thread ID: {$thread->id} | Messages: " . count($messages);
+            
             // Clean buffers to avoid server buffering - SOFORT am Anfang
             while (ob_get_level() > 0) {
                 @ob_end_flush();
@@ -132,59 +137,126 @@ class CoreAiStreamController extends Controller
             
             // Lazy-load Dependencies im Callback
             try {
+                $debugInfos[] = '🔄 Lade Dependencies...';
                 echo "data: " . json_encode([
                     'debug' => '🔄 Lade Dependencies...'
                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
                 
                 $openAi = app(OpenAiService::class);
+                $debugInfos[] = '✅ OpenAiService geladen';
                 echo "data: " . json_encode([
                     'debug' => '✅ OpenAiService geladen'
                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
                 
-                // Versuche ToolExecutor zu laden
+                // Versuche ToolExecutor zu laden - direkt instanziieren, um afterResolving Callbacks zu vermeiden
                 try {
-                    $toolExecutor = app(ToolExecutor::class);
+                    $debugInfos[] = '🔄 Lade ToolRegistry...';
                     echo "data: " . json_encode([
-                        'debug' => '✅ ToolExecutor geladen'
+                        'debug' => '🔄 Lade ToolRegistry...'
+                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                    @flush();
+                    
+                    $registry = app(\Platform\Core\Tools\ToolRegistry::class);
+                    $debugInfos[] = '✅ ToolRegistry geladen';
+                    echo "data: " . json_encode([
+                        'debug' => '✅ ToolRegistry geladen'
+                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                    @flush();
+                    
+                    $debugInfos[] = '🔄 Erstelle ToolExecutor...';
+                    echo "data: " . json_encode([
+                        'debug' => '🔄 Erstelle ToolExecutor...'
+                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                    @flush();
+                    
+                    // Direkt instanziieren statt app() zu verwenden, um afterResolving Callbacks zu vermeiden
+                    $toolExecutor = new \Platform\Core\Tools\ToolExecutor($registry);
+                    $debugInfos[] = '✅ ToolExecutor erstellt';
+                    echo "data: " . json_encode([
+                        'debug' => '✅ ToolExecutor erstellt'
                     ], JSON_UNESCAPED_UNICODE) . "\n\n";
                     @flush();
                 } catch (\Throwable $e2) {
+                    $debugInfos[] = "❌ Fehler beim Laden des ToolExecutor:";
+                    $debugInfos[] = "Datei: {$e2->getFile()}";
+                    $debugInfos[] = "Zeile: {$e2->getLine()}";
+                    $debugInfos[] = "Fehler: {$e2->getMessage()}";
+                    $debugInfos[] = "Trace: " . substr($e2->getTraceAsString(), 0, 1000);
+                    
                     echo "data: " . json_encode([
                         'error' => 'ToolExecutor Error',
                         'debug' => "❌ Fehler beim Laden des ToolExecutor:\nDatei: {$e2->getFile()}\nZeile: {$e2->getLine()}\nFehler: {$e2->getMessage()}\nTrace: " . substr($e2->getTraceAsString(), 0, 500)
                     ], JSON_UNESCAPED_UNICODE) . "\n\n";
                     @flush();
+                    
+                    // Speichere Debug-Infos als Chat-Nachricht
+                    try {
+                        \Platform\Core\Models\CoreChatMessage::create([
+                            'core_chat_id' => $thread->core_chat_id,
+                            'thread_id' => $thread->id,
+                            'role' => 'assistant',
+                            'content' => "❌ Stream-Fehler aufgetreten!\n\n🔍 Debug-Infos:\n" . implode("\n", $debugInfos),
+                            'tokens_in' => 0,
+                        ]);
+                    } catch (\Throwable $saveError) {
+                        // Ignore save errors
+                    }
+                    
                     throw $e2; // Re-throw um in outer catch zu landen
                 }
             } catch (\Throwable $e) {
+                $debugInfos[] = "❌ Fehler beim Laden der Dependencies:";
+                $debugInfos[] = "Datei: {$e->getFile()}";
+                $debugInfos[] = "Zeile: {$e->getLine()}";
+                $debugInfos[] = "Fehler: {$e->getMessage()}";
+                $debugInfos[] = "Trace: " . substr($e->getTraceAsString(), 0, 1000);
+                
                 echo "data: " . json_encode([
                     'error' => 'Dependency Error',
                     'debug' => "❌ Fehler beim Laden der Dependencies:\nDatei: {$e->getFile()}\nZeile: {$e->getLine()}\nFehler: {$e->getMessage()}\nTrace: " . substr($e->getTraceAsString(), 0, 500)
                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
+                
+                // Speichere Debug-Infos als Chat-Nachricht
+                try {
+                    \Platform\Core\Models\CoreChatMessage::create([
+                        'core_chat_id' => $thread->core_chat_id,
+                        'thread_id' => $thread->id,
+                        'role' => 'assistant',
+                        'content' => "❌ Stream-Fehler aufgetreten!\n\n🔍 Debug-Infos:\n" . implode("\n", $debugInfos),
+                        'tokens_in' => 0,
+                    ]);
+                } catch (\Throwable $saveError) {
+                    // Ignore save errors
+                }
+                
                 return;
             }
             
+            $debugInfos[] = '✅ Alle Dependencies geladen, starte Try-Block...';
             echo "data: " . json_encode([
                 'debug' => '✅ Alle Dependencies geladen, starte Try-Block...'
             ], JSON_UNESCAPED_UNICODE) . "\n\n";
             @flush();
             
             try {
+                $debugInfos[] = '✅ Try-Block gestartet';
                 echo "data: " . json_encode([
                     'debug' => '✅ Try-Block gestartet'
                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
                 
                 // Zusätzliche Debug-Info
+                $debugInfos[] = '📋 Messages: ' . count($messages) . ' | Assistant ID: ' . ($assistantId ?: 'neu');
                 echo "data: " . json_encode([
                     'debug' => '📋 Messages: ' . count($messages) . ' | Assistant ID: ' . ($assistantId ?: 'neu')
                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
 
                 // Use provided assistant placeholder or create a new one
+                $debugInfos[] = '📝 Erstelle/Update Assistant-Message...';
                 echo "data: " . json_encode([
                     'debug' => '📝 Erstelle/Update Assistant-Message...'
                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
@@ -306,6 +378,8 @@ class CoreAiStreamController extends Controller
                 @flush();
                 
                 // Debug: Stream beendet
+                $debugInfos[] = '✅ Stream beendet';
+                $debugInfos[] = 'Buffer-Länge: ' . mb_strlen($assistantBuffer);
                 echo "data: " . json_encode([
                     'debug' => '✅ Stream beendet',
                     'buffer_length' => mb_strlen($assistantBuffer)
@@ -318,13 +392,48 @@ class CoreAiStreamController extends Controller
                     'tokens_out' => mb_strlen($assistantBuffer),
                     'meta' => ['is_streaming' => false],
                 ]);
+                
+                // Speichere Debug-Infos als Chat-Nachricht (nur wenn Buffer leer oder viele Debug-Infos)
+                if (mb_strlen($assistantBuffer) === 0 || count($debugInfos) > 5) {
+                    try {
+                        \Platform\Core\Models\CoreChatMessage::create([
+                            'core_chat_id' => $thread->core_chat_id,
+                            'thread_id' => $thread->id,
+                            'role' => 'assistant',
+                            'content' => "🔍 Debug-Infos:\n" . implode("\n", $debugInfos),
+                            'tokens_in' => 0,
+                        ]);
+                    } catch (\Throwable $saveError) {
+                        // Ignore save errors
+                    }
+                }
             } catch (\Throwable $e) {
+                // Debug-Infos sammeln
+                $debugInfos[] = "❌ Fehler im Stream-Callback:";
+                $debugInfos[] = "Datei: {$e->getFile()}";
+                $debugInfos[] = "Zeile: {$e->getLine()}";
+                $debugInfos[] = "Fehler: {$e->getMessage()}";
+                $debugInfos[] = "Trace: " . substr($e->getTraceAsString(), 0, 2000);
+                
                 // Sende Fehler an Client
                 echo 'data: ' . json_encode([
                     'error' => $e->getMessage(),
-                    'debug' => "❌ Fehler im Stream-Callback:\nDatei: {$e->getFile()}\nZeile: {$e->getLine()}\n" . substr($e->getTraceAsString(), 0, 500)
+                    'debug' => "❌ Fehler im Stream-Callback:\nDatei: {$e->getFile()}\nZeile: {$e->getLine()}\nFehler: {$e->getMessage()}\n" . substr($e->getTraceAsString(), 0, 1000)
                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
+                
+                // Speichere Debug-Infos als Chat-Nachricht
+                try {
+                    \Platform\Core\Models\CoreChatMessage::create([
+                        'core_chat_id' => $thread->core_chat_id,
+                        'thread_id' => $thread->id,
+                        'role' => 'assistant',
+                        'content' => "❌ Stream-Fehler aufgetreten!\n\n🔍 Debug-Infos:\n" . implode("\n", $debugInfos),
+                        'tokens_in' => 0,
+                    ]);
+                } catch (\Throwable $saveError) {
+                    // Ignore save errors
+                }
             }
         });
 
