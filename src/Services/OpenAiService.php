@@ -278,14 +278,45 @@ class OpenAiService
                             $onDelta($delta); 
                         }
                         break;
+                    case 'response.output_item.added':
+                        // Responses API: Tool-Aufruf wurde erstellt - extrahiere Tool-Namen
+                        if (isset($decoded['item']['type']) && $decoded['item']['type'] === 'function_call') {
+                            $currentToolCall = $decoded['item']['name'] ?? ($decoded['item']['function_name'] ?? null);
+                            if ($currentToolCall && is_callable($onToolStart)) { 
+                                try { 
+                                    $onToolStart($currentToolCall); 
+                                } catch (\Throwable $e) {} 
+                            }
+                        }
+                        break;
                     case 'response.tool_call.created':
                     case 'tool_call.created':
                         $currentToolCall = $decoded['name'] ?? ($decoded['tool_name'] ?? null);
                         if ($currentToolCall && is_callable($onToolStart)) { try { $onToolStart($currentToolCall); } catch (\Throwable $e) {} }
                         break;
+                    case 'response.function_call_arguments.delta':
+                        // Responses API: Tool-Argumente werden gestreamt
+                        $delta = $decoded['delta'] ?? '';
+                        if (is_string($delta)) {
+                            $toolArguments .= $delta;
+                        }
+                        break;
                     case 'response.tool_call.delta':
                     case 'tool_call.delta':
                         $toolArguments .= $decoded['arguments_delta'] ?? ($decoded['arguments'] ?? '');
+                        break;
+                    case 'response.function_call_arguments.done':
+                        // Responses API: Tool-Argumente sind vollständig
+                        $arguments = $decoded['arguments'] ?? '';
+                        if (is_string($arguments)) {
+                            $toolArguments = $arguments; // Ersetze statt append, da done ist
+                        }
+                        // Führe Tool sofort aus, da Argumente vollständig sind
+                        if ($currentToolCall && $toolArguments !== '') {
+                            $this->executeToolIfReady($currentToolCall, $toolArguments, $toolExecutor, $onDelta, $messages);
+                            $currentToolCall = null; 
+                            $toolArguments = '';
+                        }
                         break;
                     case 'response.tool_call.completed':
                     case 'tool_call.completed':
