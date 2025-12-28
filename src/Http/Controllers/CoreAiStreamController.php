@@ -159,6 +159,7 @@ class CoreAiStreamController extends Controller
                 @flush();
                 
                 // ToolExecutor laden (für Tool-Aufrufe)
+                // WICHTIG: Außerhalb des try-catch definieren, damit es im use-Closure verfügbar ist
                 $toolExecutor = null;
                 try {
                     echo "data: " . json_encode([
@@ -309,100 +310,118 @@ class CoreAiStreamController extends Controller
                         'text' => 'Starte OpenAI Chat...',
                         'type' => 'info',
                         'icon' => '🚀'
-                    ]
+                    ],
+                    'debug' => 'Rufe streamChat auf...'
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+
+                // Debug: Prüfe ob ToolExecutor verfügbar ist
+                echo "data: " . json_encode([
+                    'debug' => 'ToolExecutor Status: ' . ($toolExecutor ? 'verfügbar' : 'nicht verfügbar')
                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
 
                 // Stream MIT Tools (wenn verfügbar)
-                $openAi->streamChat($messages, function (string $delta) use (&$assistantBuffer, &$lastFlushAt, $flushInterval, $flushThreshold, &$pendingSinceLastFlush, $assistantMessage) {
-                $assistantBuffer .= $delta;
-                $pendingSinceLastFlush += mb_strlen($delta);
+                // WICHTIG: $toolExecutor muss im use-Closure verfügbar sein
+                try {
+                    $openAi->streamChat($messages, function (string $delta) use (&$assistantBuffer, &$lastFlushAt, $flushInterval, $flushThreshold, &$pendingSinceLastFlush, $assistantMessage) {
+                        $assistantBuffer .= $delta;
+                        $pendingSinceLastFlush += mb_strlen($delta);
 
-                echo 'data: ' . json_encode(['delta' => $delta], JSON_UNESCAPED_UNICODE) . "\n\n";
-                @flush();
+                        echo 'data: ' . json_encode(['delta' => $delta], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
 
-                $now = microtime(true);
-                if ($pendingSinceLastFlush >= $flushThreshold || ($now - $lastFlushAt) >= $flushInterval) {
-                    // Batched update to reduce write amplification
-                    $assistantMessage->update([
-                        'content' => $assistantBuffer,
-                        'tokens_out' => mb_strlen($assistantBuffer),
-                        'meta' => ['is_streaming' => true],
+                        $now = microtime(true);
+                        if ($pendingSinceLastFlush >= $flushThreshold || ($now - $lastFlushAt) >= $flushInterval) {
+                            // Batched update to reduce write amplification
+                            $assistantMessage->update([
+                                'content' => $assistantBuffer,
+                                'tokens_out' => mb_strlen($assistantBuffer),
+                                'meta' => ['is_streaming' => true],
+                            ]);
+                            $pendingSinceLastFlush = 0;
+                            $lastFlushAt = $now;
+                        }
+                    }, options: [
+                        'with_context' => true,
+                        'source_route' => $sourceRoute,
+                        'source_module' => $sourceModule,
+                        'source_url' => $sourceUrl,
+                        'tools' => ($toolExecutor !== null) ? null : false, // Tools aktivieren wenn ToolExecutor verfügbar
+                        'on_tool_start' => function(string $tool) use ($toolExecutor) {
+                            echo 'data: ' . json_encode([
+                                'tool' => $tool,
+                                'status' => [
+                                    'text' => "Tool: {$tool}",
+                                    'type' => 'tool',
+                                    'icon' => '🔧'
+                                ]
+                            ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                            @flush();
+                        },
+                        'tool_executor' => ($toolExecutor !== null) ? function($toolName, $arguments) use ($toolExecutor) {
+                            try {
+                                echo 'data: ' . json_encode([
+                                    'status' => [
+                                        'text' => "Führe {$toolName} aus...",
+                                        'type' => 'info',
+                                        'icon' => '⚙️'
+                                    ]
+                                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                                @flush();
+                                
+                                $context = \Platform\Core\Tools\ToolContext::fromAuth();
+                                $result = $toolExecutor->execute($toolName, $arguments, $context);
+                                
+                                // Konvertiere ToolResult zu altem Format für Kompatibilität
+                                $resultArray = $result->toArray();
+                                
+                                echo 'data: ' . json_encode([
+                                    'tool' => $toolName, 
+                                    'result' => $resultArray,
+                                    'status' => [
+                                        'text' => "{$toolName}: Erfolg",
+                                        'type' => 'success',
+                                        'icon' => '✅'
+                                    ]
+                                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                                @flush();
+                                
+                                return $resultArray;
+                            } catch (\Throwable $e) {
+                                $errorResult = [
+                                    'ok' => false,
+                                    'error' => [
+                                        'code' => 'EXECUTION_ERROR',
+                                        'message' => $e->getMessage()
+                                    ]
+                                ];
+                                
+                                echo 'data: ' . json_encode([
+                                    'tool' => $toolName, 
+                                    'result' => $errorResult,
+                                    'status' => [
+                                        'text' => "{$toolName}: Fehler",
+                                        'type' => 'error',
+                                        'icon' => '❌'
+                                    ],
+                                    'debug' => "Tool-Fehler: {$e->getMessage()}"
+                                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                                @flush();
+                                
+                                return $errorResult;
+                            }
+                        } : null,
                     ]);
-                    $pendingSinceLastFlush = 0;
-                    $lastFlushAt = $now;
-                }
-            }, options: [
-                'with_context' => true,
-                'source_route' => $sourceRoute,
-                'source_module' => $sourceModule,
-                'source_url' => $sourceUrl,
-                'tools' => isset($toolExecutor) ? null : false, // Tools aktivieren wenn ToolExecutor verfügbar
-                'on_tool_start' => function(string $tool) {
-                    echo 'data: ' . json_encode([
-                        'tool' => $tool,
-                        'status' => [
-                            'text' => "Tool: {$tool}",
-                            'type' => 'tool',
-                            'icon' => '🔧'
-                        ]
+                } catch (\Throwable $streamError) {
+                    // Fehler beim StreamChat
+                    echo "data: " . json_encode([
+                        'error' => 'StreamChat Fehler',
+                        'debug' => "Fehler beim streamChat: {$streamError->getMessage()} in {$streamError->getFile()}:{$streamError->getLine()}"
                     ], JSON_UNESCAPED_UNICODE) . "\n\n";
                     @flush();
-                },
-                'tool_executor' => isset($toolExecutor) ? function($toolName, $arguments) use ($toolExecutor) {
-                    try {
-                        echo 'data: ' . json_encode([
-                            'status' => [
-                                'text' => "Führe {$toolName} aus...",
-                                'type' => 'info',
-                                'icon' => '⚙️'
-                            ]
-                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
-                        
-                        $context = \Platform\Core\Tools\ToolContext::fromAuth();
-                        $result = $toolExecutor->execute($toolName, $arguments, $context);
-                        
-                        // Konvertiere ToolResult zu altem Format für Kompatibilität
-                        $resultArray = $result->toArray();
-                        
-                        echo 'data: ' . json_encode([
-                            'tool' => $toolName, 
-                            'result' => $resultArray,
-                            'status' => [
-                                'text' => "{$toolName}: Erfolg",
-                                'type' => 'success',
-                                'icon' => '✅'
-                            ]
-                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
-                        
-                        return $resultArray;
-                    } catch (\Throwable $e) {
-                        $errorResult = [
-                            'ok' => false,
-                            'error' => [
-                                'code' => 'EXECUTION_ERROR',
-                                'message' => $e->getMessage()
-                            ]
-                        ];
-                        
-                        echo 'data: ' . json_encode([
-                            'tool' => $toolName, 
-                            'result' => $errorResult,
-                            'status' => [
-                                'text' => "{$toolName}: Fehler",
-                                'type' => 'error',
-                                'icon' => '❌'
-                            ],
-                            'debug' => "Tool-Fehler: {$e->getMessage()}"
-                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
-                        
-                        return $errorResult;
-                    }
-                } : null,
-            ]);
+                    throw $streamError; // Re-throw um in outer catch zu landen
+                }
 
                 // Status: Stream erfolgreich beendet
                 echo "data: " . json_encode([
