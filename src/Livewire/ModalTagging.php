@@ -29,6 +29,10 @@ class ModalTagging extends Component
     public ?string $newTagColor = null;
     public bool $newTagIsPersonal = false;
     
+    // Farbe ohne Tags
+    public ?string $contextColor = null;
+    public ?string $newContextColor = null;
+    
     // Filter
     public string $searchQuery = '';
 
@@ -46,6 +50,7 @@ class ModalTagging extends Component
         // Wenn Modal bereits offen ist, Daten neu laden
         if ($this->open && $this->contextType && $this->contextId) {
             $this->loadTags();
+            $this->loadColor();
         }
     }
 
@@ -61,10 +66,12 @@ class ModalTagging extends Component
         $this->newTagLabel = '';
         $this->newTagColor = null;
         $this->newTagIsPersonal = false;
+        $this->newContextColor = null;
 
-        // Tags laden
+        // Tags und Farbe laden
         if ($this->contextType && $this->contextId) {
             $this->loadTags();
+            $this->loadColor();
         }
 
         // Alle Tags für Übersicht laden
@@ -77,7 +84,7 @@ class ModalTagging extends Component
     {
         $this->resetValidation();
         $this->open = false;
-        $this->reset('contextType', 'contextId', 'searchQuery', 'newTagLabel', 'newTagColor', 'newTagIsPersonal');
+        $this->reset('contextType', 'contextId', 'searchQuery', 'newTagLabel', 'newTagColor', 'newTagIsPersonal', 'contextColor', 'newContextColor');
     }
 
     public function loadTags(): void
@@ -270,6 +277,130 @@ class ModalTagging extends Component
             'type' => 'success',
             'message' => $hasTag ? 'Tag entfernt.' : 'Tag zugeordnet.',
         ]);
+    }
+
+    public function loadColor(): void
+    {
+        if (!$this->contextType || !$this->contextId) {
+            $this->contextColor = null;
+            return;
+        }
+
+        if (!class_exists($this->contextType)) {
+            $this->contextColor = null;
+            return;
+        }
+
+        try {
+            $context = $this->contextType::find($this->contextId);
+            if (!$context) {
+                $this->contextColor = null;
+                return;
+            }
+
+            // Prüfe ob Model HasColors Trait verwendet
+            if (!in_array(\Platform\Core\Traits\HasColors::class, class_uses_recursive($context))) {
+                $this->contextColor = null;
+                return;
+            }
+
+            // Verwende das color-Attribut aus dem Trait
+            $this->contextColor = $context->color;
+        } catch (\Exception $e) {
+            $this->contextColor = null;
+        }
+    }
+
+    public function setColor(): void
+    {
+        if (!$this->contextType || !$this->contextId || !$this->newContextColor) {
+            return;
+        }
+
+        if (!class_exists($this->contextType)) {
+            return;
+        }
+
+        // Validiere Farbe
+        if (!preg_match('/^#[0-9A-Fa-f]{6}$/', $this->newContextColor)) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Ungültige Farbangabe.',
+            ]);
+            return;
+        }
+
+        try {
+            $context = $this->contextType::find($this->contextId);
+            if (!$context) {
+                return;
+            }
+
+            // Prüfe ob Model HasColors Trait verwendet
+            if (!in_array(\Platform\Core\Traits\HasColors::class, class_uses_recursive($context))) {
+                $this->dispatch('notify', [
+                    'type' => 'error',
+                    'message' => 'Dieses Model unterstützt keine Farben.',
+                ]);
+                return;
+            }
+
+            // Verwende die setColor-Methode aus dem Trait
+            $context->setColor($this->newContextColor, false); // false = Team-Farbe
+            $this->contextColor = $this->newContextColor;
+            $this->newContextColor = null;
+
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => 'Farbe gesetzt.',
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Fehler beim Setzen der Farbe.',
+            ]);
+        }
+    }
+
+    public function removeColor(): void
+    {
+        if (!$this->contextType || !$this->contextId) {
+            return;
+        }
+
+        if (!class_exists($this->contextType)) {
+            return;
+        }
+
+        try {
+            $context = $this->contextType::find($this->contextId);
+            if (!$context) {
+                return;
+            }
+
+            // Prüfe ob Model HasColors Trait verwendet
+            if (!in_array(\Platform\Core\Traits\HasColors::class, class_uses_recursive($context))) {
+                $this->dispatch('notify', [
+                    'type' => 'error',
+                    'message' => 'Dieses Model unterstützt keine Farben.',
+                ]);
+                return;
+            }
+
+            // Verwende die removeColor-Methode aus dem Trait
+            $context->removeColor(false); // false = Team-Farbe
+            $this->contextColor = null;
+
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => 'Farbe entfernt.',
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Fehler beim Entfernen der Farbe.',
+            ]);
+        }
     }
 
     public function createTag(): void

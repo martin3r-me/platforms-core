@@ -3,8 +3,8 @@
     <x-slot name="header">
         <div class="flex items-center gap-3">
             <div class="flex-shrink-0">
-                <div class="w-12 h-12 bg-gradient-to-br from-[var(--ui-primary-10)] to-[var(--ui-primary-5)] rounded-xl flex items-center justify-center shadow-sm">
-                    @svg('heroicon-o-tag', 'w-6 h-6 text-[var(--ui-primary)]')
+                <div class="w-12 h-12 bg-[var(--ui-primary-5)] flex items-center justify-center">
+                    @svg('heroicon-o-hashtag', 'w-6 h-6 text-[var(--ui-primary)]')
                 </div>
             </div>
             <div class="flex-1 min-w-0">
@@ -16,7 +16,7 @@
                                 @if($index > 0)
                                     @svg('heroicon-o-chevron-right', 'w-3 h-3 text-[var(--ui-muted)]')
                                 @endif
-                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] border border-[var(--ui-border)]/40">
+                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] border border-[var(--ui-border)]/40">
                                     <span class="text-[var(--ui-muted)]">{{ $crumb['type'] }}:</span>
                                     <span class="font-semibold">{{ $crumb['label'] }}</span>
                                 </span>
@@ -76,7 +76,7 @@
                         Alle Tags
                     </h4>
 
-                    <div class="overflow-hidden rounded-xl border border-[var(--ui-border)]/60 shadow-sm">
+                    <div class="overflow-hidden border border-[var(--ui-border)]/40">
                         <table class="min-w-full divide-y divide-[var(--ui-border)]/40">
                             <thead class="bg-[var(--ui-muted-5)]">
                                 <tr>
@@ -116,11 +116,11 @@
                                         </td>
                                         <td class="whitespace-nowrap px-3 py-4">
                                             @if($tag['is_team_tag'])
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[var(--ui-primary-10)] text-[var(--ui-primary)] border border-[var(--ui-primary)]/20">
+                                                <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[var(--ui-primary-10)] text-[var(--ui-primary)] border border-[var(--ui-primary)]/20">
                                                     Team
                                                 </span>
                                             @else
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/40">
+                                                <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/40">
                                                     Global
                                                 </span>
                                             @endif
@@ -145,7 +145,7 @@
                                                 <button
                                                     wire:click="deleteTag({{ $tag['id'] }})"
                                                     wire:confirm="Tag wirklich löschen?"
-                                                    class="text-xs px-3 py-1.5 text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 hover:bg-[var(--ui-danger-5)] rounded-md transition-colors"
+                                                    class="text-xs px-3 py-1.5 text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 hover:bg-[var(--ui-danger-5)] transition-colors"
                                                 >
                                                     Löschen
                                                 </button>
@@ -166,6 +166,44 @@
                     </div>
                 </div>
             @elseif($contextType && $contextId)
+                <!-- Farbe (ohne Tags) -->
+            <div class="mb-6">
+                <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">
+                    Farbe
+                </h4>
+                
+                <div class="flex items-center gap-3">
+                    @if($contextColor)
+                        <div class="flex items-center gap-2 p-3 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
+                            <div class="w-6 h-6 border border-[var(--ui-border)]/40" style="background-color: {{ $contextColor }}"></div>
+                            <span class="text-sm text-[var(--ui-secondary)]">Aktuelle Farbe</span>
+                        </div>
+                        <button
+                            wire:click="removeColor"
+                            class="text-xs px-3 py-1.5 text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 hover:bg-[var(--ui-danger-5)] transition-colors"
+                        >
+                            Entfernen
+                        </button>
+                    @else
+                        <div class="flex-1">
+                            <input
+                                type="color"
+                                wire:model.live="newContextColor"
+                                class="w-full h-10 border border-[var(--ui-border)]/40 cursor-pointer"
+                            />
+                        </div>
+                        @if($newContextColor)
+                            <button
+                                wire:click="setColor"
+                                class="text-xs px-3 py-1.5 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors"
+                            >
+                                Farbe setzen
+                            </button>
+                        @endif
+                    @endif
+                </div>
+            </div>
+
                 <!-- Zugeordnete Tags -->
             <div class="mb-6">
                 <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">
@@ -176,13 +214,13 @@
                     <!-- Team Tags -->
                     @if($activeTab === 'all' || $activeTab === 'team')
                         @forelse($teamTags as $tag)
-                            <div class="flex items-center justify-between p-3 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                            <div class="flex items-center justify-between p-3 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
                                 <div class="flex items-center gap-2">
                                     @if($tag['color'])
                                         <div class="w-3 h-3 rounded-full" style="background-color: {{ $tag['color'] }}"></div>
                                     @endif
                                     <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $tag['label'] }}</span>
-                                    <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-surface)] rounded">Team</span>
+                                    <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-surface)]">Team</span>
                                 </div>
                                 <button
                                     wire:click="toggleTag({{ $tag['id'] }}, false)"
@@ -201,13 +239,13 @@
                     <!-- Persönliche Tags -->
                     @if($activeTab === 'all' || $activeTab === 'personal')
                         @forelse($personalTags as $tag)
-                            <div class="flex items-center justify-between p-3 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                            <div class="flex items-center justify-between p-3 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
                                 <div class="flex items-center gap-2">
                                     @if($tag['color'])
                                         <div class="w-3 h-3 rounded-full" style="background-color: {{ $tag['color'] }}"></div>
                                     @endif
                                     <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $tag['label'] }}</span>
-                                    <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-surface)] rounded">Persönlich</span>
+                                    <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-surface)]">Persönlich</span>
                                 </div>
                                 <button
                                     wire:click="toggleTag({{ $tag['id'] }}, true)"
@@ -241,34 +279,34 @@
                         type="text"
                         wire:model.live.debounce.300ms="searchQuery"
                         placeholder="Tags durchsuchen..."
-                        class="w-full px-4 py-2 border border-[var(--ui-border)]/60 rounded-lg bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
+                        class="w-full px-4 py-2 border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
                     />
                 </div>
 
                 <div class="space-y-2 max-h-48 overflow-y-auto">
                     @forelse($availableTags as $tag)
-                        <div class="flex items-center justify-between p-3 bg-[var(--ui-surface)] rounded-lg border border-[var(--ui-border)]/40 hover:bg-[var(--ui-muted-5)] transition-colors">
+                        <div class="flex items-center justify-between p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40 hover:bg-[var(--ui-muted-5)] transition-colors">
                             <div class="flex items-center gap-2">
                                 @if($tag['color'])
                                     <div class="w-3 h-3 rounded-full" style="background-color: {{ $tag['color'] }}"></div>
                                 @endif
                                 <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $tag['label'] }}</span>
                                 @if($tag['is_team_tag'])
-                                    <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-muted-5)] rounded">Team</span>
+                                    <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-muted-5)]">Team</span>
                                 @else
-                                    <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-muted-5)] rounded">Global</span>
+                                    <span class="text-xs text-[var(--ui-muted)] px-2 py-0.5 bg-[var(--ui-muted-5)]">Global</span>
                                 @endif
                             </div>
                             <div class="flex items-center gap-2">
                                 <button
                                     wire:click="toggleTag({{ $tag['id'] }}, false)"
-                                    class="text-xs px-3 py-1.5 bg-[var(--ui-primary)] text-white rounded-md hover:bg-[var(--ui-primary)]/90 transition-colors"
+                                    class="text-xs px-3 py-1.5 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors"
                                 >
                                     Als Team
                                 </button>
                                 <button
                                     wire:click="toggleTag({{ $tag['id'] }}, true)"
-                                    class="text-xs px-3 py-1.5 bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] rounded-md hover:bg-[var(--ui-muted-10)] transition-colors border border-[var(--ui-border)]/40"
+                                    class="text-xs px-3 py-1.5 bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-10)] transition-colors border border-[var(--ui-border)]/40"
                                 >
                                     Persönlich
                                 </button>
@@ -315,7 +353,7 @@
                         <input
                             type="color"
                             wire:model="newTagColor"
-                            class="w-full h-10 border border-[var(--ui-border)]/60 rounded-lg cursor-pointer"
+                            class="w-full h-10 border border-[var(--ui-border)]/40 cursor-pointer"
                         />
                         @error('newTagColor')
                             <p class="mt-1 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
@@ -336,7 +374,7 @@
 
                     <button
                         type="submit"
-                        class="w-full px-4 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-[var(--ui-primary)]/90 transition-colors font-medium"
+                        class="w-full px-4 py-2 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors font-medium"
                     >
                         Tag erstellen und zuordnen
                     </button>
