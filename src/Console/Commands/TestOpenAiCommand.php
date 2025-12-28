@@ -116,7 +116,20 @@ class TestOpenAiCommand extends Command
                         $this->line("⚙️  Führe Tool aus: {$toolName}");
                         $this->line("  Argumente: " . json_encode($arguments, JSON_UNESCAPED_UNICODE));
                         
-                        $context = \Platform\Core\Contracts\ToolContext::fromAuth();
+                        // Erstelle Mock-User für Command-Kontext
+                        try {
+                            $context = \Platform\Core\Contracts\ToolContext::fromAuth();
+                        } catch (\RuntimeException $e) {
+                            // Kein authentifizierter User - erstelle Mock-User für Tests
+                            $this->line("  ⚠️  Kein authentifizierter User - verwende Mock-User für Tests");
+                            $mockUser = new \Platform\Core\Models\User([
+                                'id' => 999,
+                                'name' => 'Test User',
+                                'email' => 'test@example.com',
+                            ]);
+                            $context = new \Platform\Core\Contracts\ToolContext($mockUser);
+                        }
+                        
                         $result = $toolExecutor->execute($toolName, $arguments, $context);
                         $resultArray = $result->toArray();
                         
@@ -124,6 +137,7 @@ class TestOpenAiCommand extends Command
                         return $resultArray;
                     } catch (\Throwable $e) {
                         $this->error("❌ Tool Fehler: " . $e->getMessage());
+                        $this->error("  Datei: " . $e->getFile() . ":" . $e->getLine());
                         return [
                             'ok' => false,
                             'error' => ['code' => 'EXECUTION_ERROR', 'message' => $e->getMessage()]
