@@ -16,8 +16,8 @@ class CoreAiStreamController extends Controller
     {
         // Lazy-load Dependencies im Stream-Callback, um Fehler früher zu erkennen
         try {
-            $user = $request->user();
-            if (!$user) {
+        $user = $request->user();
+        if (!$user) {
                 // Sende SSE-kompatiblen Fehler
                 return new StreamedResponse(function() {
                     echo "data: " . json_encode([
@@ -29,15 +29,15 @@ class CoreAiStreamController extends Controller
                     'Content-Type' => 'text/event-stream',
                     'Cache-Control' => 'no-cache',
                 ]);
-            }
+        }
 
-            $threadId = (int) $request->query('thread');
-            $assistantId = (int) $request->query('assistant');
-            // Optional source hints from client (used by CoreContextTool fallback)
-            $sourceRoute = $request->query('source_route');
-            $sourceModule = $request->query('source_module');
-            $sourceUrl = $request->query('source_url');
-            if (!$threadId) {
+        $threadId = (int) $request->query('thread');
+        $assistantId = (int) $request->query('assistant');
+        // Optional source hints from client (used by CoreContextTool fallback)
+        $sourceRoute = $request->query('source_route');
+        $sourceModule = $request->query('source_module');
+        $sourceUrl = $request->query('source_url');
+        if (!$threadId) {
                 return new StreamedResponse(function() {
                     echo "data: " . json_encode([
                         'error' => 'thread parameter is required',
@@ -48,10 +48,10 @@ class CoreAiStreamController extends Controller
                     'Content-Type' => 'text/event-stream',
                     'Cache-Control' => 'no-cache',
                 ]);
-            }
+        }
 
-            $thread = CoreChatThread::find($threadId);
-            if (!$thread) {
+        $thread = CoreChatThread::find($threadId);
+        if (!$thread) {
                 return new StreamedResponse(function() use ($threadId) {
                     echo "data: " . json_encode([
                         'error' => 'Thread not found',
@@ -79,16 +79,16 @@ class CoreAiStreamController extends Controller
 
         // Build messages context - mit Fehlerbehandlung
         try {
-            $messages = CoreChatMessage::where('thread_id', $threadId)
-                ->orderBy('created_at', 'asc')
-                ->get()
-                ->map(function ($m) {
-                    return [
-                        'role' => $m->role,
-                        'content' => $m->content,
-                    ];
-                })
-                ->toArray();
+        $messages = CoreChatMessage::where('thread_id', $threadId)
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->map(function ($m) {
+                return [
+                    'role' => $m->role,
+                    'content' => $m->content,
+                ];
+            })
+            ->toArray();
         } catch (\Throwable $e) {
             return new StreamedResponse(function() use ($e) {
                 echo "data: " . json_encode([
@@ -119,7 +119,7 @@ class CoreAiStreamController extends Controller
             // Initial retry suggestion (client can reconnect faster)
             echo "retry: 500\n\n";
             @flush();
-            
+
             // Status-Update: Stream gestartet
             echo "data: " . json_encode([
                 'status' => [
@@ -219,6 +219,7 @@ class CoreAiStreamController extends Controller
                     }
                     
                     // Schritt 2: Prüfe vorhandene Tools (nur wenn Registry verfügbar)
+                    $tools = []; // Initialisiere als leeres Array
                     if ($registry === null) {
                         echo "data: " . json_encode([
                             'status' => [
@@ -233,27 +234,27 @@ class CoreAiStreamController extends Controller
                     } else {
                         try {
                             $tools = $registry->all();
-                        echo "data: " . json_encode([
-                            'debug' => 'Vorhandene Tools: ' . count($tools)
-                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
-                        
-                        if (count($tools) === 0) {
                             echo "data: " . json_encode([
-                                'debug' => 'Keine Tools - registriere EchoTool...'
+                                'debug' => 'Vorhandene Tools: ' . count($tools)
                             ], JSON_UNESCAPED_UNICODE) . "\n\n";
                             @flush();
                             
-                            // Manuell EchoTool registrieren (keine Dependencies)
-                            $echoTool = new \Platform\Core\Tools\EchoTool();
-                            $registry->register($echoTool);
-                            $tools = $registry->all();
-                            
-                            echo "data: " . json_encode([
-                                'debug' => 'EchoTool registriert - Tools: ' . count($tools)
-                            ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                            @flush();
-                        }
+                            if (count($tools) === 0) {
+                                echo "data: " . json_encode([
+                                    'debug' => 'Keine Tools - registriere EchoTool...'
+                                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                                @flush();
+                                
+                                // Manuell EchoTool registrieren (keine Dependencies)
+                                $echoTool = new \Platform\Core\Tools\EchoTool();
+                                $registry->register($echoTool);
+                                $tools = $registry->all();
+                                
+                                echo "data: " . json_encode([
+                                    'debug' => 'EchoTool registriert - Tools: ' . count($tools)
+                                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                                @flush();
+                            }
                         } catch (\Throwable $e2) {
                             echo "data: " . json_encode([
                                 'error' => 'Tool-Registrierung Fehler',
@@ -261,11 +262,12 @@ class CoreAiStreamController extends Controller
                             ], JSON_UNESCAPED_UNICODE) . "\n\n";
                             @flush();
                             // Nicht werfen - ohne Tools weiter machen
+                            $tools = [];
                             $toolExecutor = null;
                         }
                         
                         // Schritt 3: ToolExecutor erstellen (nur wenn Registry verfügbar)
-                        if ($registry !== null) {
+                        if ($registry !== null && count($tools) > 0) {
                             try {
                                 echo "data: " . json_encode([
                                     'debug' => 'Erstelle ToolExecutor...'
@@ -298,41 +300,11 @@ class CoreAiStreamController extends Controller
                                 // Nicht werfen - ohne Tools weiter machen
                                 $toolExecutor = null;
                             }
+                        } else {
+                            // Registry vorhanden, aber keine Tools
+                            $toolExecutor = null;
                         }
                     }
-                    
-                    // Schritt 3: ToolExecutor erstellen
-                    try {
-                        echo "data: " . json_encode([
-                            'debug' => 'Erstelle ToolExecutor...'
-                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
-                        
-                        $toolExecutor = new \Platform\Core\Tools\ToolExecutor($registry);
-                        
-                        echo "data: " . json_encode([
-                            'debug' => 'ToolExecutor erstellt: ' . get_class($toolExecutor)
-                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
-                    } catch (\Throwable $e3) {
-                        echo "data: " . json_encode([
-                            'debug' => 'ToolExecutor Fehler: ' . $e3->getMessage() . ' in ' . $e3->getFile() . ':' . $e3->getLine()
-                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
-                        // Nicht werfen - ohne Tools weiter machen
-                        $toolExecutor = null;
-                    }
-                    
-                    // Erfolg
-                    echo "data: " . json_encode([
-                        'status' => [
-                            'text' => count($tools) . ' Tool(s) verfügbar',
-                            'type' => 'success',
-                            'icon' => '✅'
-                        ],
-                        'debug' => 'Tools erfolgreich geladen'
-                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                    @flush();
                 } catch (\Throwable $e) {
                     // Falls ToolExecutor nicht geladen werden kann, ohne Tools weiter
                     $toolExecutor = null;
@@ -348,24 +320,9 @@ class CoreAiStreamController extends Controller
                 }
                 
                 // Assistant-Message erstellen
-                if ($assistantId) {
-                    $assistantMessage = CoreChatMessage::find($assistantId);
-                    if (!$assistantMessage) {
-                        $assistantMessage = CoreChatMessage::create([
-                            'core_chat_id' => $thread->core_chat_id,
-                            'thread_id' => $thread->id,
-                            'role' => 'assistant',
-                            'content' => '',
-                            'meta' => ['is_streaming' => true],
-                        ]);
-                    } else {
-                        $assistantMessage->update([
-                            'content' => '',
-                            'tokens_out' => 0,
-                            'meta' => ['is_streaming' => true],
-                        ]);
-                    }
-                } else {
+            if ($assistantId) {
+                $assistantMessage = CoreChatMessage::find($assistantId);
+                if (!$assistantMessage) {
                     $assistantMessage = CoreChatMessage::create([
                         'core_chat_id' => $thread->core_chat_id,
                         'thread_id' => $thread->id,
@@ -373,12 +330,27 @@ class CoreAiStreamController extends Controller
                         'content' => '',
                         'meta' => ['is_streaming' => true],
                     ]);
+                } else {
+                    $assistantMessage->update([
+                        'content' => '',
+                        'tokens_out' => 0,
+                        'meta' => ['is_streaming' => true],
+                    ]);
                 }
+            } else {
+                $assistantMessage = CoreChatMessage::create([
+                    'core_chat_id' => $thread->core_chat_id,
+                    'thread_id' => $thread->id,
+                    'role' => 'assistant',
+                    'content' => '',
+                    'meta' => ['is_streaming' => true],
+                ]);
+            }
 
-                $lastFlushAt = microtime(true);
+            $lastFlushAt = microtime(true);
                 $flushInterval = 0.35;
                 $flushThreshold = 800;
-                $pendingSinceLastFlush = 0;
+            $pendingSinceLastFlush = 0;
 
                 // Status: Starte OpenAI Stream
                 echo "data: " . json_encode([
@@ -494,23 +466,23 @@ class CoreAiStreamController extends Controller
                     
                     // Delta-Callback
                     $deltaCallback = function (string $delta) use (&$assistantBuffer, &$lastFlushAt, $flushInterval, $flushThreshold, &$pendingSinceLastFlush, $assistantMessage) {
-                        $assistantBuffer .= $delta;
-                        $pendingSinceLastFlush += mb_strlen($delta);
+                $assistantBuffer .= $delta;
+                $pendingSinceLastFlush += mb_strlen($delta);
 
-                        echo 'data: ' . json_encode(['delta' => $delta], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
+                echo 'data: ' . json_encode(['delta' => $delta], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
 
-                        $now = microtime(true);
-                        if ($pendingSinceLastFlush >= $flushThreshold || ($now - $lastFlushAt) >= $flushInterval) {
-                            // Batched update to reduce write amplification
-                            $assistantMessage->update([
-                                'content' => $assistantBuffer,
-                                'tokens_out' => mb_strlen($assistantBuffer),
-                                'meta' => ['is_streaming' => true],
-                            ]);
-                            $pendingSinceLastFlush = 0;
-                            $lastFlushAt = $now;
-                        }
+                $now = microtime(true);
+                if ($pendingSinceLastFlush >= $flushThreshold || ($now - $lastFlushAt) >= $flushInterval) {
+                    // Batched update to reduce write amplification
+                    $assistantMessage->update([
+                        'content' => $assistantBuffer,
+                        'tokens_out' => mb_strlen($assistantBuffer),
+                        'meta' => ['is_streaming' => true],
+                    ]);
+                    $pendingSinceLastFlush = 0;
+                    $lastFlushAt = $now;
+                }
                     };
                     
                     echo "data: " . json_encode([
@@ -562,21 +534,21 @@ class CoreAiStreamController extends Controller
                     ]
                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
-                
-                // Close stream
-                echo "data: [DONE]\n\n";
-                @flush();
+
+            // Close stream
+            echo "data: [DONE]\n\n";
+            @flush();
                 
                 // Debug: Stream beendet
                 $debugInfos[] = '✅ Stream beendet';
                 $debugInfos[] = 'Buffer-Länge: ' . mb_strlen($assistantBuffer);
 
-                // Final flush on the same assistant record
-                $assistantMessage->update([
-                    'content' => $assistantBuffer,
-                    'tokens_out' => mb_strlen($assistantBuffer),
-                    'meta' => ['is_streaming' => false],
-                ]);
+            // Final flush on the same assistant record
+            $assistantMessage->update([
+                'content' => $assistantBuffer,
+                'tokens_out' => mb_strlen($assistantBuffer),
+                'meta' => ['is_streaming' => false],
+            ]);
                 
                 // Speichere Debug-Infos als Chat-Nachricht (nur wenn Buffer leer oder viele Debug-Infos)
                 if (mb_strlen($assistantBuffer) === 0 || count($debugInfos) > 5) {

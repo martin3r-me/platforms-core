@@ -29,7 +29,7 @@ class DataReadTool implements ToolContract
 
     public function getSchema(): array
     {
-        return [
+            return [
             'type' => 'object',
             'properties' => [
                 'entity' => [
@@ -114,7 +114,7 @@ class DataReadTool implements ToolContract
         // Konvertiere altes Format zu ToolResult
         if (($result['ok'] ?? false) === true) {
             return ToolResult::success($result['data'] ?? null, $result['_source'] ?? []);
-        }
+    }
 
         $error = $result['error'] ?? [];
         return ToolResult::error(

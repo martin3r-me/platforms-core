@@ -273,7 +273,7 @@ class CoreServiceProvider extends ServiceProvider
             \Log::info("Registering Livewire component: {$alias} -> {$class}");
 
             try {
-                Livewire::component($alias, $class);
+            Livewire::component($alias, $class);
             } catch (\Throwable $e) {
                 // Fehler beim Registrieren der Komponente loggen, aber nicht abbrechen
                 \Log::warning("Failed to register Livewire component {$alias}: " . $e->getMessage());

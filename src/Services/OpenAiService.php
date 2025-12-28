@@ -507,7 +507,7 @@ class OpenAiService
             foreach ($capabilities['available_entities'] ?? [] as $entity) {
                 foreach ($capabilities['available_operations'] ?? [] as $operation) {
                     try {
-                        $toolDef = $toolBroker->getToolDefinition($entity, $operation);
+                $toolDef = $toolBroker->getToolDefinition($entity, $operation);
                         if ($toolDef) { 
                             $tools[] = $toolDef; 
                             Log::debug('[OpenAI Tools] Added legacy tool', ['entity' => $entity, 'operation' => $operation]); 
@@ -519,8 +519,8 @@ class OpenAiService
                             'error' => $e->getMessage()
                         ]);
                     }
-                }
             }
+        }
             
             // Write Tool
             try {

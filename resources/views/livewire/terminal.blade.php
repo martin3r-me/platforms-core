@@ -146,10 +146,10 @@
             
             <!-- Antwort-Text -->
             <div class="flex items-center gap-2">
-              <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
-              <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"
-                   x-show="isStreamingLocal && !hasDelta"
-                   aria-hidden="true"></div>
+            <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
+            <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"
+                 x-show="isStreamingLocal && !hasDelta"
+                 aria-hidden="true"></div>
             </div>
             
             <!-- Debug-Info (kollabierbar) -->
@@ -164,7 +164,7 @@
               <div class="max-h-32 overflow-y-auto font-mono space-y-0.5 mt-1" x-show="showDebug">
                 <template x-for="(info, idx) in debugInfo" :key="idx">
                   <div x-text="info" class="pl-2 break-all text-[9px]"></div>
-                </template>
+            </template>
                 <button 
                   @click="navigator.clipboard?.writeText(debugInfo.join('\\n')) || alert('Debug-Infos:\\n\\n' + debugInfo.join('\\n'))"
                   class="mt-1 text-[var(--ui-primary)] hover:underline text-[9px]"
@@ -308,7 +308,7 @@
           // Max 5 Status-Updates behalten
           if(this.statusUpdates.length > 5) this.statusUpdates.shift();
         },
-        
+
         // SSE Steuerung
         startStream(url){
           this.closeStream(); // alte Verbindung schließen
