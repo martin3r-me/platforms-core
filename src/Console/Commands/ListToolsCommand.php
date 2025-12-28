@@ -21,8 +21,14 @@ class ListToolsCommand extends Command
             
             // Manuell Auto-Discovery auslösen (ohne Container)
             try {
-                $modulesPath = realpath(__DIR__ . '/../../../../modules');
-                $this->line("🔍 Suche Tools in: {$modulesPath}");
+                // Gleicher Pfad wie im CoreServiceProvider: Von core/src/ aus
+                $coreSrcPath = realpath(__DIR__ . '/../..'); // platform/core/src/
+                $modulesPath = $coreSrcPath ? realpath($coreSrcPath . '/../../modules') : null;
+                
+                $this->line("🔍 Suche Tools in: " . ($modulesPath ?: 'NICHT GEFUNDEN'));
+                if ($modulesPath) {
+                    $this->line("   (von: " . __DIR__ . ")");
+                }
                 
                 if ($modulesPath && is_dir($modulesPath)) {
                     $modules = array_filter(glob($modulesPath . '/*'), 'is_dir');
