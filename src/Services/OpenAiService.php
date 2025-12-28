@@ -381,7 +381,11 @@ class OpenAiService
     private function buildToolsInfo(): string
     {
         try {
-            $registry = resolve(ToolRegistry::class);
+            // Prüfe ob Registry verfügbar ist
+            if (!$this->app->bound(ToolRegistry::class)) {
+                return '';
+            }
+            $registry = $this->app->make(ToolRegistry::class);
             $modules = \Platform\Core\Registry\ModuleRegistry::all();
             $allTools = $registry->all();
             
@@ -452,8 +456,18 @@ class OpenAiService
         
         // 1. Tools aus ToolRegistry (loose gekoppelt - Module registrieren ihre Tools hier)
         // WICHTIG: Verwende resolve() statt app() - das triggert afterResolving nur einmal
+        // ABER: resolve() kann auch blockieren - verwende direkte Instanz wenn möglich
         try {
-            $toolRegistry = resolve(ToolRegistry::class);
+            // Versuche die Registry zu bekommen - sollte bereits geladen sein
+            // Falls nicht, erstelle eine neue Instanz (ohne afterResolving zu triggern)
+            if ($this->app->bound(ToolRegistry::class)) {
+                $toolRegistry = $this->app->make(ToolRegistry::class);
+            } else {
+                // Registry nicht gebunden - erstelle neue Instanz (ohne Callbacks)
+                // Das passiert nur, wenn Registry noch nicht initialisiert wurde
+                $toolRegistry = new ToolRegistry();
+            }
+            
             $allTools = $toolRegistry->all();
             
             Log::info('[OpenAI Tools] Registry tools', ['count' => count($allTools)]);
@@ -475,12 +489,18 @@ class OpenAiService
             }
         } catch (\Throwable $e) {
             Log::error('[OpenAI Tools] Registry access failed', ['error' => $e->getMessage()]);
+            // Return empty array - Chat funktioniert auch ohne Tools
         }
         
         // 2. Legacy: Entity-basierte Tools aus ToolBroker (optional, falls verfügbar)
         // Diese können später entfernt werden, wenn alle Module auf ToolRegistry umgestellt sind
         try {
-            $toolBroker = resolve(ToolBroker::class);
+            // Prüfe ob ToolBroker verfügbar ist (optional)
+            if (!$this->app->bound(ToolBroker::class)) {
+                // ToolBroker nicht verfügbar - kein Problem, wir verwenden nur ToolRegistry
+                return $tools;
+            }
+            $toolBroker = $this->app->make(ToolBroker::class);
             $capabilities = $toolBroker->getAvailableCapabilities();
             
             // Entity-basierte Tools

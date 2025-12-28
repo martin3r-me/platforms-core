@@ -179,13 +179,22 @@ class CoreAiStreamController extends Controller
                         ], JSON_UNESCAPED_UNICODE) . "\n\n";
                         @flush();
                         
-                        // Direkt instanziieren statt app() - vermeidet afterResolving Callbacks
-                        $registry = new \Platform\Core\Tools\ToolRegistry();
-                        
-                        echo "data: " . json_encode([
-                            'debug' => 'ToolRegistry direkt instanziiert: ' . get_class($registry)
-                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
+                        // Versuche zuerst die gebundene Instanz zu verwenden
+                        if (app()->bound(\Platform\Core\Tools\ToolRegistry::class)) {
+                            $registry = app(\Platform\Core\Tools\ToolRegistry::class);
+                            echo "data: " . json_encode([
+                                'debug' => 'ToolRegistry aus Container geladen'
+                            ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                            @flush();
+                        } else {
+                            // Direkt instanziieren und binden - vermeidet afterResolving Callbacks
+                            $registry = new \Platform\Core\Tools\ToolRegistry();
+                            app()->instance(\Platform\Core\Tools\ToolRegistry::class, $registry);
+                            echo "data: " . json_encode([
+                                'debug' => 'ToolRegistry direkt instanziiert und gebunden'
+                            ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                            @flush();
+                        }
                     } catch (\Throwable $e1) {
                         echo "data: " . json_encode([
                             'debug' => 'ToolRegistry Fehler: ' . $e1->getMessage() . ' in ' . $e1->getFile() . ':' . $e1->getLine()
