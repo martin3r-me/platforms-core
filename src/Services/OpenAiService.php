@@ -54,10 +54,12 @@ class OpenAiService
             $response = $this->http()->post($this->baseUrl . '/responses', $payload);
             
             // Debug: Log Response
+            $rawBody = $response->body();
             Log::debug('[OpenAI Chat] Response received', [
                 'status' => $response->status(),
                 'success' => $response->successful(),
-                'body_length' => strlen($response->body()),
+                'body_length' => strlen($rawBody),
+                'body_preview' => substr($rawBody, 0, 500),
             ]);
             
             if ($response->failed()) {
@@ -70,14 +72,38 @@ class OpenAiService
             }
             $data = $response->json();
             
-            // Debug: Log Response Data
+            // Debug: Log Response Data - zeige vollständige Response
             Log::debug('[OpenAI Chat] Response data', [
                 'has_output_text' => isset($data['output_text']),
                 'has_content' => isset($data['content']),
                 'has_usage' => isset($data['usage']),
                 'keys' => array_keys($data),
+                'full_response' => $data, // Vollständige Response für Debugging
             ]);
-            $content = $data['output_text'] ?? ($data['content'][0]['text'] ?? '');
+            
+            // Versuche verschiedene Response-Formate
+            $content = '';
+            if (isset($data['output_text']) && is_string($data['output_text'])) {
+                $content = $data['output_text'];
+            } elseif (isset($data['content']) && is_array($data['content'])) {
+                // Array-Format: [{'type': 'text', 'text': '...'}]
+                if (isset($data['content'][0]['text'])) {
+                    $content = $data['content'][0]['text'];
+                } elseif (isset($data['content'][0]['content'])) {
+                    $content = $data['content'][0]['content'];
+                }
+            } elseif (isset($data['text'])) {
+                $content = $data['text'];
+            } elseif (isset($data['message']) && is_string($data['message'])) {
+                $content = $data['message'];
+            }
+            
+            // Fallback: Wenn content leer, aber output_tokens > 0, dann ist was schiefgelaufen
+            if ($content === '' && isset($data['usage']['output_tokens']) && $data['usage']['output_tokens'] > 0) {
+                Log::warning('[OpenAI Chat] Content ist leer, aber output_tokens > 0', [
+                    'data' => $data,
+                ]);
+            }
             return [
                 'content' => $content,
                 'usage' => $data['usage'] ?? [],

@@ -70,8 +70,18 @@ class TestOpenAiCommand extends Command
             
             if (isset($response['usage'])) {
                 $this->line("Token-Usage:");
-                $this->line("  Input: " . ($response['usage']['prompt_tokens'] ?? 0));
-                $this->line("  Output: " . ($response['usage']['completion_tokens'] ?? 0));
+                $this->line("  Input: " . ($response['usage']['input_tokens'] ?? $response['usage']['prompt_tokens'] ?? 0));
+                $this->line("  Output: " . ($response['usage']['output_tokens'] ?? $response['usage']['completion_tokens'] ?? 0));
+                $this->line("  Total: " . ($response['usage']['total_tokens'] ?? 0));
+            }
+            
+            // Zeige auch die rohe Response-Struktur
+            $this->newLine();
+            $this->line("Response-Struktur:");
+            $this->line("  Keys: " . implode(', ', array_keys($response)));
+            if (isset($response['usage']['output_tokens']) && $response['usage']['output_tokens'] > 0 && empty($response['content'])) {
+                $this->warn("  ⚠️  Output-Tokens vorhanden, aber Content leer!");
+                $this->line("  → Möglicherweise falsches Response-Format");
             }
             
             return 0;
