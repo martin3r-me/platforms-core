@@ -14,10 +14,7 @@ class CoreAiStreamController extends Controller
 {
     public function stream(Request $request, OpenAiService $openAi, ToolExecutor $toolExecutor): StreamedResponse
     {
-        // Debug: Prüfe ob Route erreicht wird - sende sofort eine Test-Nachricht
-        // Aber das funktioniert nicht, weil StreamedResponse erst später ausgeführt wird
-        // Stattdessen: Prüfe alles VOR dem StreamedResponse
-        
+        // Lazy-load Dependencies im Stream-Callback, um Fehler früher zu erkennen
         try {
             $user = $request->user();
             if (!$user) {
@@ -96,7 +93,25 @@ class CoreAiStreamController extends Controller
 
         $assistantBuffer = '';
 
-            $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl, $toolExecutor, $user, $threadId) {
+        // Debug: Prüfe ob Dependencies verfügbar sind
+        try {
+            $openAiCheck = $openAi !== null ? 'OK' : 'NULL';
+            $toolExecutorCheck = $toolExecutor !== null ? 'OK' : 'NULL';
+        } catch (\Throwable $e) {
+            // Dependencies können nicht geprüft werden - Fehler zurückgeben
+            return new StreamedResponse(function() use ($e) {
+                echo "data: " . json_encode([
+                    'error' => 'Dependency Error',
+                    'debug' => "❌ Fehler beim Prüfen der Dependencies: {$e->getMessage()}"
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+            }, 500, [
+                'Content-Type' => 'text/event-stream',
+                'Cache-Control' => 'no-cache',
+            ]);
+        }
+
+        $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl, $toolExecutor, $user, $threadId) {
             // Clean buffers to avoid server buffering - SOFORT am Anfang
             while (ob_get_level() > 0) {
                 @ob_end_flush();

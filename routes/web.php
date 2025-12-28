@@ -76,6 +76,34 @@ Route::get('/embedded/config/helpdesk', function () {
 
 // AI SSE Streaming (auth required)
 Route::middleware(['web', 'auth'])->group(function () {
+    // Minimaler Test-Endpoint direkt im Controller
+    Route::get('/core/ai/stream/minimal', function (Request $request) {
+        $user = $request->user();
+        if (!$user) {
+            return response('Unauthorized', 401);
+        }
+        
+        return new \Symfony\Component\HttpFoundation\StreamedResponse(function() use ($user) {
+            while (ob_get_level() > 0) {
+                @ob_end_flush();
+            }
+            echo "retry: 500\n\n";
+            @flush();
+            echo "data: " . json_encode([
+                'debug' => '✅ Minimaler Stream funktioniert',
+                'user_id' => $user->id
+            ], JSON_UNESCAPED_UNICODE) . "\n\n";
+            @flush();
+            sleep(2);
+            echo "data: [DONE]\n\n";
+            @flush();
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    })->name('core.ai.stream.minimal');
+    
     Route::get('/core/ai/stream', [CoreAiStreamController::class, 'stream'])->name('core.ai.stream');
     
     // Test-Endpoint für Debugging
