@@ -229,9 +229,16 @@ class OpenAiService
         foreach ($tools as $tool) {
             if (isset($tool['function']) && is_array($tool['function'])) {
                 $fn = $tool['function'];
+                
+                // WICHTIG: Responses API erlaubt keine Punkte im Tool-Namen
+                // Erlaubt nur: [a-zA-Z0-9_-]+
+                // Mapping: "planner.projects.create" -> "planner_projects_create"
+                $originalName = $fn['name'] ?? null;
+                $openAiName = $this->normalizeToolNameForOpenAi($originalName);
+                
                 $out[] = [
                     'type' => 'function',
-                    'name' => $fn['name'] ?? null,
+                    'name' => $openAiName,
                     'description' => $fn['description'] ?? ($tool['description'] ?? null),
                     'parameters' => $fn['parameters'] ?? null,
                 ];
@@ -240,6 +247,55 @@ class OpenAiService
             }
         }
         return $out;
+    }
+    
+    /**
+     * Normalisiert Tool-Namen für OpenAI Responses API
+     * 
+     * Responses API erlaubt nur: [a-zA-Z0-9_-]+
+     * Mapping: "planner.projects.create" -> "planner_projects_create"
+     */
+    private function normalizeToolNameForOpenAi(string $name): string
+    {
+        // Ersetze Punkte durch Unterstriche
+        return str_replace('.', '_', $name);
+    }
+    
+    /**
+     * Denormalisiert Tool-Namen von OpenAI Responses API zurück zu internem Format
+     * 
+     * Mapping: "planner_projects_create" -> "planner.projects.create"
+     * 
+     * WICHTIG: Wir müssen prüfen, welcher interne Name passt, da mehrere Tools
+     * den gleichen normalisierten Namen haben könnten (z.B. "a.b" und "a_b" beide -> "a_b")
+     */
+    private function denormalizeToolNameFromOpenAi(string $openAiName): string
+    {
+        // Versuche zuerst, ob es ein Tool mit genau diesem Namen gibt (für Backwards-Kompatibilität)
+        try {
+            $registry = app(ToolRegistry::class);
+            if ($registry->has($openAiName)) {
+                return $openAiName; // Tool existiert bereits mit diesem Namen
+            }
+        } catch (\Throwable $e) {
+            // Registry nicht verfügbar - weiter mit Mapping
+        }
+        
+        // Standard-Mapping: Unterstriche zurück zu Punkten
+        // ABER: Wir müssen prüfen, ob dieser Name existiert
+        $candidateName = str_replace('_', '.', $openAiName);
+        
+        try {
+            $registry = app(ToolRegistry::class);
+            if ($registry->has($candidateName)) {
+                return $candidateName;
+            }
+        } catch (\Throwable $e) {
+            // Registry nicht verfügbar - verwende Kandidat
+        }
+        
+        // Fallback: Verwende den Kandidat-Namen (auch wenn nicht gefunden)
+        return $candidateName;
     }
 
     private function parseResponsesStream($body, callable $onDelta, array $messages, array $options): void
@@ -376,9 +432,13 @@ class OpenAiService
     {
         if (!$toolName || $toolArguments === '') { return; }
         try {
+            // WICHTIG: Tool-Name zurückmappen (von OpenAI-Format zu internem Format)
+            // OpenAI: "planner_projects_create" -> Intern: "planner.projects.create"
+            $internalToolName = $this->denormalizeToolNameFromOpenAi($toolName);
+            
             $arguments = json_decode($toolArguments, true);
             $result = null;
-            if ($arguments && is_callable($toolExecutor)) { try { $result = $toolExecutor($toolName, $arguments); } catch (\Throwable $e) { Log::error('tool_executor failed: '.$e->getMessage()); } }
+            if ($arguments && is_callable($toolExecutor)) { try { $result = $toolExecutor($internalToolName, $arguments); } catch (\Throwable $e) { Log::error('tool_executor failed: '.$e->getMessage()); } }
             if ($result !== null) {
                 $lastUser = '';
                 foreach (array_reverse($messages) as $m) { if (($m['role'] ?? '') === 'user' && is_string($m['content'] ?? null)) { $lastUser = $m['content']; break; } }
