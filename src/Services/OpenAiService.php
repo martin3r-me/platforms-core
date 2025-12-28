@@ -279,7 +279,23 @@ class OpenAiService
         // Stelle sicher, dass Registry aufgelöst wird (triggert afterResolving)
         $registryInstance = $toolRegistry;
         $allTools = $registryInstance->all();
-        Log::info('[OpenAI Tools] Registry tools count', ['count' => count($allTools)]);
+        Log::info('[OpenAI Tools] Registry tools count BEFORE', ['count' => count($allTools)]);
+        
+        // Falls keine Tools registriert sind, versuche manuell zu registrieren
+        if (count($allTools) === 0) {
+            Log::warning('[OpenAI Tools] Keine Tools in Registry - versuche manuelle Registrierung');
+            try {
+                // EchoTool direkt registrieren (keine Dependencies)
+                $echoTool = new \Platform\Core\Tools\EchoTool();
+                $registryInstance->register($echoTool);
+                Log::info('[OpenAI Tools] EchoTool manuell registriert');
+                $allTools = $registryInstance->all();
+            } catch (\Throwable $e) {
+                Log::error('[OpenAI Tools] Manuelle Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
+            }
+        }
+        
+        Log::info('[OpenAI Tools] Registry tools count AFTER', ['count' => count($allTools)]);
         
         foreach ($allTools as $tool) {
             $toolDef = $this->convertToolToOpenAiFormat($tool);
