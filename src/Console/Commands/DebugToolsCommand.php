@@ -16,24 +16,58 @@ class DebugToolsCommand extends Command
     {
         $this->info('=== Tool Debug ===');
         $this->newLine();
+        
+        // Stelle sicher, dass App gebootet ist
+        if (!$this->laravel->isBooted()) {
+            $this->warn('App ist noch nicht gebootet - boote jetzt...');
+            $this->laravel->boot();
+        }
 
         // 1. Prüfe Registry
         $this->info('1. Tool Registry:');
         try {
+            // Prüfe ob Klasse existiert
+            if (!class_exists(ToolRegistry::class)) {
+                $this->error("   ❌ ToolRegistry Klasse nicht gefunden!");
+                return 1;
+            }
+            
             $registry = app(ToolRegistry::class);
+            
+            if (!$registry) {
+                $this->error("   ❌ ToolRegistry konnte nicht aufgelöst werden!");
+                return 1;
+            }
+            
+            $this->line("   ✅ ToolRegistry aufgelöst");
+            
             $tools = $registry->all();
             $this->line("   Registrierte Tools: " . count($tools));
             
             if (count($tools) === 0) {
                 $this->warn('   ⚠️  Keine Tools registriert!');
-            } else {
+                $this->line("   → Versuche Tools manuell zu registrieren...");
+                
+                // Versuche Tools manuell zu registrieren
+                try {
+                    $registry->register(app(\Platform\Core\Tools\EchoTool::class));
+                    $this->line("   ✅ EchoTool manuell registriert");
+                    $tools = $registry->all();
+                } catch (\Throwable $e2) {
+                    $this->error("   ❌ Manuelle Registrierung fehlgeschlagen: " . $e2->getMessage());
+                }
+            }
+            
+            if (count($tools) > 0) {
                 foreach ($tools as $name => $tool) {
                     $this->line("   - {$name}: " . $tool->getDescription());
                 }
             }
         } catch (\Throwable $e) {
             $this->error("   ❌ Fehler: " . $e->getMessage());
-            $this->line("   Trace: " . $e->getTraceAsString());
+            $this->line("   Datei: " . $e->getFile() . ":" . $e->getLine());
+            $this->line("   Trace: " . substr($e->getTraceAsString(), 0, 500));
+            return 1;
         }
         $this->newLine();
 
