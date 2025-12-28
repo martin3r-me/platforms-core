@@ -96,28 +96,28 @@ class OpenAiService
             // Versuche verschiedene Response-Formate
             $content = '';
             
-            // Format 1: output_text (String)
-            if (isset($data['output_text']) && is_string($data['output_text'])) {
+            // Format 1: output[0].content[0].text (Responses API Format)
+            if (isset($data['output']) && is_array($data['output']) && isset($data['output'][0])) {
+                $outputItem = $data['output'][0];
+                if (isset($outputItem['content']) && is_array($outputItem['content']) && isset($outputItem['content'][0])) {
+                    $contentItem = $outputItem['content'][0];
+                    if (isset($contentItem['text']) && is_string($contentItem['text'])) {
+                        $content = $contentItem['text'];
+                    } elseif (isset($contentItem['type']) && $contentItem['type'] === 'output_text' && isset($contentItem['text'])) {
+                        $content = $contentItem['text'];
+                    }
+                }
+            }
+            // Format 2: output_text (String) - Legacy
+            elseif (isset($data['output_text']) && is_string($data['output_text'])) {
                 $content = $data['output_text'];
             }
-            // Format 2: content als Array [{'type': 'text', 'text': '...'}]
+            // Format 3: content als Array [{'type': 'text', 'text': '...'}]
             elseif (isset($data['content']) && is_array($data['content']) && isset($data['content'][0])) {
                 if (isset($data['content'][0]['text'])) {
                     $content = $data['content'][0]['text'];
                 } elseif (isset($data['content'][0]['content'])) {
                     $content = $data['content'][0]['content'];
-                }
-            }
-            // Format 3: content als Objekt mit format/verbosity (neues Format)
-            elseif (isset($data['content']) && is_array($data['content']) && isset($data['content']['format'])) {
-                // Content ist ein Objekt, nicht der Text - Text muss woanders sein
-                // Prüfe ob es ein 'text' Feld gibt
-                if (isset($data['content']['text'])) {
-                    $content = $data['content']['text'];
-                } elseif (isset($data['text'])) {
-                    $content = $data['text'];
-                } elseif (isset($data['output'])) {
-                    $content = $data['output'];
                 }
             }
             // Format 4: text direkt
@@ -199,34 +199,106 @@ class OpenAiService
         $currentEvent = null; $currentToolCall = null; $toolArguments = '';
         $onToolStart = $options['on_tool_start'] ?? null; $toolExecutor = $options['tool_executor'] ?? null;
         Log::info('[OpenAI Responses Stream] Starting');
+        $eventCount = 0;
+        $deltaCount = 0;
         while (!$body->eof()) {
             $chunk = $body->read(8192); if ($chunk === '' || $chunk === false) { usleep(10000); continue; }
             $buffer .= str_replace(["\r\n","\r"], "\n", $chunk);
             while (($pos = strpos($buffer, "\n")) !== false) {
                 $line = substr($buffer, 0, $pos); $buffer = substr($buffer, $pos + 1);
                 if ($line === '') { continue; }
-                if (strncmp($line, 'event:', 6) === 0) { $currentEvent = trim(substr($line, 6)); continue; }
+                
+                // SSE Format: event: <name> oder data: <json>
+                if (strncmp($line, 'event:', 6) === 0) { 
+                    $currentEvent = trim(substr($line, 6)); 
+                    Log::debug('[OpenAI Stream] Event received', ['event' => $currentEvent]);
+                    continue; 
+                }
                 if (strncmp($line, 'data:', 5) !== 0) { continue; }
-                $data = ltrim(substr($line, 5)); if ($data === '[DONE]') { return; }
-                $decoded = json_decode($data, true); if (!is_array($decoded)) { continue; }
+                $data = ltrim(substr($line, 5)); 
+                if ($data === '[DONE]') { 
+                    Log::info('[OpenAI Stream] Stream completed', ['delta_count' => $deltaCount]);
+                    return; 
+                }
+                $decoded = json_decode($data, true); 
+                if (!is_array($decoded)) { 
+                    Log::debug('[OpenAI Stream] Non-array data', ['data' => substr($data, 0, 100)]);
+                    continue; 
+                }
+                
+                // Debug: Log alle Events für die ersten 20 Events
+                if ($eventCount < 20) {
+                    Log::debug('[OpenAI Stream] Event data', [
+                        'event' => $currentEvent,
+                        'data_keys' => array_keys($decoded),
+                        'data_preview' => json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
+                    ]);
+                    $eventCount++;
+                }
+                
                 switch ($currentEvent) {
                     case 'response.output_text.delta':
-                        $delta = $decoded['delta'] ?? ($decoded['text'] ?? ''); if ($delta !== '') { $onDelta($delta); }
+                    case 'response.output.delta':
+                    case 'output_text.delta':
+                    case 'output.delta':
+                        // Responses API: delta kann direkt im decoded sein, oder in einem nested object
+                        $delta = '';
+                        if (isset($decoded['delta']) && is_string($decoded['delta'])) {
+                            $delta = $decoded['delta'];
+                        } elseif (isset($decoded['text']) && is_string($decoded['text'])) {
+                            $delta = $decoded['text'];
+                        } elseif (isset($decoded['content']) && is_string($decoded['content'])) {
+                            $delta = $decoded['content'];
+                        } elseif (isset($decoded['output_text']) && is_string($decoded['output_text'])) {
+                            $delta = $decoded['output_text'];
+                        } elseif (isset($decoded['delta']['text'])) {
+                            $delta = $decoded['delta']['text'];
+                        }
+                        
+                        if ($delta !== '') { 
+                            $deltaCount++;
+                            if ($deltaCount <= 5 || $deltaCount % 10 === 0) {
+                                Log::debug('[OpenAI Stream] Delta', [
+                                    'event' => $currentEvent, 
+                                    'delta' => $delta, 
+                                    'length' => strlen($delta),
+                                    'count' => $deltaCount
+                                ]);
+                            }
+                            $onDelta($delta); 
+                        } else {
+                            // Delta ist leer - loggen für Debugging
+                            if ($eventCount <= 10) {
+                                Log::warning('[OpenAI Stream] Empty delta', [
+                                    'event' => $currentEvent,
+                                    'decoded' => $decoded
+                                ]);
+                            }
+                        }
                         break;
                     case 'response.tool_call.created':
+                    case 'tool_call.created':
                         $currentToolCall = $decoded['name'] ?? ($decoded['tool_name'] ?? null);
                         if ($currentToolCall && is_callable($onToolStart)) { try { $onToolStart($currentToolCall); } catch (\Throwable $e) {} }
                         break;
                     case 'response.tool_call.delta':
+                    case 'tool_call.delta':
                         $toolArguments .= $decoded['arguments_delta'] ?? ($decoded['arguments'] ?? '');
                         break;
                     case 'response.tool_call.completed':
+                    case 'tool_call.completed':
                         $this->executeToolIfReady($currentToolCall, $toolArguments, $toolExecutor, $onDelta, $messages);
                         $currentToolCall = null; $toolArguments = '';
                         break;
                     case 'response.completed':
+                    case 'completed':
+                        Log::info('[OpenAI Stream] Response completed');
                         return;
                     default:
+                        // Unbekanntes Event - loggen für Debugging
+                        if ($eventCount <= 10) {
+                            Log::debug('[OpenAI Stream] Unknown event', ['event' => $currentEvent, 'data_keys' => array_keys($decoded)]);
+                        }
                         break;
                 }
             }
