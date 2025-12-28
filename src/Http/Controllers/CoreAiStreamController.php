@@ -14,24 +14,46 @@ class CoreAiStreamController extends Controller
 {
     public function stream(Request $request, OpenAiService $openAi, ToolExecutor $toolExecutor): StreamedResponse
     {
-        $user = $request->user();
-        if (!$user) {
-            abort(401);
-        }
+        \Log::info('[CoreAiStreamController] Stream request received', [
+            'user_id' => $request->user()?->id,
+            'thread' => $request->query('thread'),
+            'assistant' => $request->query('assistant'),
+        ]);
+        
+        try {
+            $user = $request->user();
+            if (!$user) {
+                \Log::warning('[CoreAiStreamController] No authenticated user');
+                abort(401);
+            }
 
-        $threadId = (int) $request->query('thread');
-        $assistantId = (int) $request->query('assistant');
-        // Optional source hints from client (used by CoreContextTool fallback)
-        $sourceRoute = $request->query('source_route');
-        $sourceModule = $request->query('source_module');
-        $sourceUrl = $request->query('source_url');
-        if (!$threadId) {
-            abort(422, 'thread parameter is required');
-        }
+            $threadId = (int) $request->query('thread');
+            $assistantId = (int) $request->query('assistant');
+            // Optional source hints from client (used by CoreContextTool fallback)
+            $sourceRoute = $request->query('source_route');
+            $sourceModule = $request->query('source_module');
+            $sourceUrl = $request->query('source_url');
+            if (!$threadId) {
+                \Log::warning('[CoreAiStreamController] Missing thread parameter');
+                abort(422, 'thread parameter is required');
+            }
 
-        $thread = CoreChatThread::find($threadId);
-        if (!$thread) {
-            abort(404, 'Thread not found');
+            $thread = CoreChatThread::find($threadId);
+            if (!$thread) {
+                \Log::warning('[CoreAiStreamController] Thread not found', ['thread_id' => $threadId]);
+                abort(404, 'Thread not found');
+            }
+            
+            \Log::info('[CoreAiStreamController] Starting stream', [
+                'thread_id' => $threadId,
+                'assistant_id' => $assistantId,
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('[CoreAiStreamController] Error before stream start', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
         }
 
         // Build messages context
@@ -51,14 +73,19 @@ class CoreAiStreamController extends Controller
         $assistantBuffer = '';
 
             $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl, $toolExecutor) {
-            // Clean buffers to avoid server buffering
-            while (ob_get_level() > 0) {
-                @ob_end_flush();
-            }
+            try {
+                \Log::info('[CoreAiStreamController] Stream callback started');
+                
+                // Clean buffers to avoid server buffering
+                while (ob_get_level() > 0) {
+                    @ob_end_flush();
+                }
 
-            // Initial retry suggestion (client can reconnect faster)
-            echo "retry: 500\n\n";
-            @flush();
+                // Initial retry suggestion (client can reconnect faster)
+                echo "retry: 500\n\n";
+                @flush();
+                
+                \Log::debug('[CoreAiStreamController] SSE headers sent');
 
             // Use provided assistant placeholder or create a new one
             if ($assistantId) {
@@ -158,6 +185,10 @@ class CoreAiStreamController extends Controller
             // Close stream
             echo "data: [DONE]\n\n";
             @flush();
+            
+            \Log::info('[CoreAiStreamController] Stream completed', [
+                'buffer_length' => mb_strlen($assistantBuffer),
+            ]);
 
             // Final flush on the same assistant record
             $assistantMessage->update([
@@ -165,6 +196,15 @@ class CoreAiStreamController extends Controller
                 'tokens_out' => mb_strlen($assistantBuffer),
                 'meta' => ['is_streaming' => false],
             ]);
+            } catch (\Throwable $e) {
+                \Log::error('[CoreAiStreamController] Error in stream callback', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+                // Sende Fehler an Client
+                echo 'data: ' . json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+            }
         });
 
         $response->headers->set('Content-Type', 'text/event-stream');

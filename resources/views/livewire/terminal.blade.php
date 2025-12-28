@@ -322,8 +322,21 @@
               }
             };
             this.es.onerror = (err) => {
-              this.addDebugInfo(`❌ SSE-Fehler: ${err.message || 'Unbekannter Fehler'}`);
-              if(window.__DEV__) console.error('[Terminal SSE] error:', err);
+              // EventSource gibt nicht immer detaillierte Fehler
+              // Prüfe den readyState: 0=CONNECTING, 1=OPEN, 2=CLOSED
+              const state = this.es?.readyState ?? -1;
+              let errorMsg = 'Unbekannter Fehler';
+              
+              if(state === 2) {
+                errorMsg = 'Verbindung geschlossen (möglicherweise Server-Fehler oder Auth-Problem)';
+              } else if(state === 0) {
+                errorMsg = 'Verbindung konnte nicht hergestellt werden';
+              }
+              
+              this.addDebugInfo(`❌ SSE-Fehler (State: ${state}): ${errorMsg}`);
+              this.addDebugInfo(`🔍 URL: ${url}`);
+              if(window.__DEV__) console.error('[Terminal SSE] error:', err, 'readyState:', state);
+              
               this.closeStream();
               if(this.retryCount < this.maxRetry){
                 const delay = Math.min(4000, this.backoffBaseMs * Math.pow(2, this.retryCount++));
@@ -331,6 +344,7 @@
                 setTimeout(() => this.startStream(url), delay);
               } else {
                 this.addDebugInfo('❌ Max Retries erreicht - Stream abgebrochen');
+                this.addDebugInfo('💡 Tipp: Prüfe die Browser-Konsole und Server-Logs');
                 window.dispatchEvent(new CustomEvent('ai-stream-error'));
               }
             };
