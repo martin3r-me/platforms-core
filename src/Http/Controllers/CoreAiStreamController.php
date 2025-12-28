@@ -159,34 +159,100 @@ class CoreAiStreamController extends Controller
                 @flush();
                 
                 // ToolExecutor laden (für Tool-Aufrufe)
+                $toolExecutor = null;
                 try {
                     echo "data: " . json_encode([
                         'status' => [
                             'text' => 'Lade Tools...',
                             'type' => 'info',
                             'icon' => '🔧'
-                        ]
+                        ],
+                        'debug' => 'Starte Tool-Loading...'
                     ], JSON_UNESCAPED_UNICODE) . "\n\n";
                     @flush();
                     
-                    $registry = app(\Platform\Core\Tools\ToolRegistry::class);
-                    $toolExecutor = new \Platform\Core\Tools\ToolExecutor($registry);
-                    
-                    // Prüfe ob Tools verfügbar sind
-                    $tools = $registry->all();
-                    if (count($tools) === 0) {
-                        // Manuell EchoTool registrieren (keine Dependencies)
-                        $echoTool = new \Platform\Core\Tools\EchoTool();
-                        $registry->register($echoTool);
-                        $tools = $registry->all();
+                    // Schritt 1: ToolRegistry laden
+                    try {
+                        echo "data: " . json_encode([
+                            'debug' => 'Lade ToolRegistry...'
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+                        
+                        $registry = app(\Platform\Core\Tools\ToolRegistry::class);
+                        
+                        echo "data: " . json_encode([
+                            'debug' => 'ToolRegistry geladen: ' . get_class($registry)
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+                    } catch (\Throwable $e1) {
+                        echo "data: " . json_encode([
+                            'debug' => 'ToolRegistry Fehler: ' . $e1->getMessage() . ' in ' . $e1->getFile() . ':' . $e1->getLine()
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+                        throw $e1;
                     }
                     
+                    // Schritt 2: Prüfe vorhandene Tools
+                    try {
+                        $tools = $registry->all();
+                        echo "data: " . json_encode([
+                            'debug' => 'Vorhandene Tools: ' . count($tools)
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+                        
+                        if (count($tools) === 0) {
+                            echo "data: " . json_encode([
+                                'debug' => 'Keine Tools - registriere EchoTool...'
+                            ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                            @flush();
+                            
+                            // Manuell EchoTool registrieren (keine Dependencies)
+                            $echoTool = new \Platform\Core\Tools\EchoTool();
+                            $registry->register($echoTool);
+                            $tools = $registry->all();
+                            
+                            echo "data: " . json_encode([
+                                'debug' => 'EchoTool registriert - Tools: ' . count($tools)
+                            ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                            @flush();
+                        }
+                    } catch (\Throwable $e2) {
+                        echo "data: " . json_encode([
+                            'debug' => 'Tool-Registrierung Fehler: ' . $e2->getMessage() . ' in ' . $e2->getFile() . ':' . $e2->getLine()
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+                        throw $e2;
+                    }
+                    
+                    // Schritt 3: ToolExecutor erstellen
+                    try {
+                        echo "data: " . json_encode([
+                            'debug' => 'Erstelle ToolExecutor...'
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+                        
+                        $toolExecutor = new \Platform\Core\Tools\ToolExecutor($registry);
+                        
+                        echo "data: " . json_encode([
+                            'debug' => 'ToolExecutor erstellt: ' . get_class($toolExecutor)
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+                    } catch (\Throwable $e3) {
+                        echo "data: " . json_encode([
+                            'debug' => 'ToolExecutor Fehler: ' . $e3->getMessage() . ' in ' . $e3->getFile() . ':' . $e3->getLine()
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+                        throw $e3;
+                    }
+                    
+                    // Erfolg
                     echo "data: " . json_encode([
                         'status' => [
                             'text' => count($tools) . ' Tool(s) verfügbar',
                             'type' => 'success',
                             'icon' => '✅'
-                        ]
+                        ],
+                        'debug' => 'Tools erfolgreich geladen'
                     ], JSON_UNESCAPED_UNICODE) . "\n\n";
                     @flush();
                 } catch (\Throwable $e) {
@@ -198,7 +264,7 @@ class CoreAiStreamController extends Controller
                             'type' => 'warning',
                             'icon' => '⚠️'
                         ],
-                        'debug' => 'ToolExecutor Fehler: ' . $e->getMessage()
+                        'debug' => 'ToolExecutor Fehler: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() . ' | Trace: ' . substr($e->getTraceAsString(), 0, 500)
                     ], JSON_UNESCAPED_UNICODE) . "\n\n";
                     @flush();
                 }
