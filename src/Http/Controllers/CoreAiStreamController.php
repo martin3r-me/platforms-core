@@ -180,32 +180,57 @@ class CoreAiStreamController extends Controller
                         @flush();
                         
                         // Versuche zuerst die gebundene Instanz zu verwenden
-                        if (app()->bound(\Platform\Core\Tools\ToolRegistry::class)) {
-                            $registry = app(\Platform\Core\Tools\ToolRegistry::class);
-                            echo "data: " . json_encode([
-                                'debug' => 'ToolRegistry aus Container geladen'
-                            ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                            @flush();
-                        } else {
-                            // Direkt instanziieren und binden - vermeidet afterResolving Callbacks
+                        try {
+                            if (app()->bound(\Platform\Core\Tools\ToolRegistry::class)) {
+                                $registry = app(\Platform\Core\Tools\ToolRegistry::class);
+                                echo "data: " . json_encode([
+                                    'debug' => 'ToolRegistry aus Container geladen'
+                                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                                @flush();
+                            } else {
+                                // Direkt instanziieren und binden - vermeidet afterResolving Callbacks
+                                $registry = new \Platform\Core\Tools\ToolRegistry();
+                                app()->instance(\Platform\Core\Tools\ToolRegistry::class, $registry);
+                                echo "data: " . json_encode([
+                                    'debug' => 'ToolRegistry direkt instanziiert und gebunden'
+                                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                                @flush();
+                            }
+                        } catch (\Throwable $registryError) {
+                            // Fallback: Neue Instanz ohne Binding
                             $registry = new \Platform\Core\Tools\ToolRegistry();
-                            app()->instance(\Platform\Core\Tools\ToolRegistry::class, $registry);
                             echo "data: " . json_encode([
-                                'debug' => 'ToolRegistry direkt instanziiert und gebunden'
+                                'debug' => 'ToolRegistry Fallback: Neue Instanz erstellt (ohne Binding)',
+                                'error' => $registryError->getMessage()
                             ], JSON_UNESCAPED_UNICODE) . "\n\n";
                             @flush();
                         }
                     } catch (\Throwable $e1) {
                         echo "data: " . json_encode([
-                            'debug' => 'ToolRegistry Fehler: ' . $e1->getMessage() . ' in ' . $e1->getFile() . ':' . $e1->getLine()
+                            'error' => 'ToolRegistry Fehler',
+                            'debug' => 'ToolRegistry Fehler: ' . $e1->getMessage() . ' in ' . $e1->getFile() . ':' . $e1->getLine() . "\nTrace: " . substr($e1->getTraceAsString(), 0, 500)
                         ], JSON_UNESCAPED_UNICODE) . "\n\n";
                         @flush();
-                        throw $e1;
+                        // Nicht werfen - ohne Tools weiter machen
+                        $registry = null;
+                        $toolExecutor = null;
                     }
                     
-                    // Schritt 2: Prüfe vorhandene Tools
-                    try {
-                        $tools = $registry->all();
+                    // Schritt 2: Prüfe vorhandene Tools (nur wenn Registry verfügbar)
+                    if ($registry === null) {
+                        echo "data: " . json_encode([
+                            'status' => [
+                                'text' => 'Tools nicht verfügbar - nur Chat',
+                                'type' => 'warning',
+                                'icon' => '⚠️'
+                            ],
+                            'debug' => 'ToolRegistry nicht verfügbar - Chat ohne Tools'
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+                        $toolExecutor = null;
+                    } else {
+                        try {
+                            $tools = $registry->all();
                         echo "data: " . json_encode([
                             'debug' => 'Vorhandene Tools: ' . count($tools)
                         ], JSON_UNESCAPED_UNICODE) . "\n\n";
@@ -227,12 +252,51 @@ class CoreAiStreamController extends Controller
                             ], JSON_UNESCAPED_UNICODE) . "\n\n";
                             @flush();
                         }
-                    } catch (\Throwable $e2) {
-                        echo "data: " . json_encode([
-                            'debug' => 'Tool-Registrierung Fehler: ' . $e2->getMessage() . ' in ' . $e2->getFile() . ':' . $e2->getLine()
-                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
-                        throw $e2;
+                        } catch (\Throwable $e2) {
+                            echo "data: " . json_encode([
+                                'error' => 'Tool-Registrierung Fehler',
+                                'debug' => 'Tool-Registrierung Fehler: ' . $e2->getMessage() . ' in ' . $e2->getFile() . ':' . $e2->getLine()
+                            ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                            @flush();
+                            // Nicht werfen - ohne Tools weiter machen
+                            $toolExecutor = null;
+                        }
+                        
+                        // Schritt 3: ToolExecutor erstellen (nur wenn Registry verfügbar)
+                        if ($registry !== null) {
+                            try {
+                                echo "data: " . json_encode([
+                                    'debug' => 'Erstelle ToolExecutor...'
+                                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                                @flush();
+                                
+                                $toolExecutor = new \Platform\Core\Tools\ToolExecutor($registry);
+                                
+                                echo "data: " . json_encode([
+                                    'debug' => 'ToolExecutor erstellt: ' . get_class($toolExecutor)
+                                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                                @flush();
+                                
+                                // Erfolg
+                                echo "data: " . json_encode([
+                                    'status' => [
+                                        'text' => count($tools) . ' Tool(s) verfügbar',
+                                        'type' => 'success',
+                                        'icon' => '✅'
+                                    ],
+                                    'debug' => 'Tools erfolgreich geladen'
+                                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                                @flush();
+                            } catch (\Throwable $e3) {
+                                echo "data: " . json_encode([
+                                    'error' => 'ToolExecutor Fehler',
+                                    'debug' => 'ToolExecutor Fehler: ' . $e3->getMessage() . ' in ' . $e3->getFile() . ':' . $e3->getLine()
+                                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                                @flush();
+                                // Nicht werfen - ohne Tools weiter machen
+                                $toolExecutor = null;
+                            }
+                        }
                     }
                     
                     // Schritt 3: ToolExecutor erstellen
@@ -253,7 +317,8 @@ class CoreAiStreamController extends Controller
                             'debug' => 'ToolExecutor Fehler: ' . $e3->getMessage() . ' in ' . $e3->getFile() . ':' . $e3->getLine()
                         ], JSON_UNESCAPED_UNICODE) . "\n\n";
                         @flush();
-                        throw $e3;
+                        // Nicht werfen - ohne Tools weiter machen
+                        $toolExecutor = null;
                     }
                     
                     // Erfolg
