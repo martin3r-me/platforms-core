@@ -105,7 +105,7 @@ class CoreAiStreamController extends Controller
         // Kontext wird zentral im OpenAiService prependet
         $assistantBuffer = '';
 
-        $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl, $toolExecutor, $user, $threadId) {
+        $response = new StreamedResponse(function () use ($messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl, $user, $threadId) {
             // Clean buffers to avoid server buffering - SOFORT am Anfang
             while (ob_get_level() > 0) {
                 @ob_end_flush();
@@ -129,6 +129,23 @@ class CoreAiStreamController extends Controller
                 'debug' => '✅ Zweite Debug-Nachricht - Callback funktioniert!'
             ], JSON_UNESCAPED_UNICODE) . "\n\n";
             @flush();
+            
+            // Lazy-load Dependencies im Callback
+            try {
+                $openAi = app(OpenAiService::class);
+                $toolExecutor = app(ToolExecutor::class);
+                echo "data: " . json_encode([
+                    'debug' => '✅ Dependencies geladen'
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+            } catch (\Throwable $e) {
+                echo "data: " . json_encode([
+                    'error' => 'Dependency Error',
+                    'debug' => "❌ Fehler beim Laden der Dependencies: {$e->getMessage()}"
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+                return;
+            }
             
             try {
                 // Zusätzliche Debug-Info
