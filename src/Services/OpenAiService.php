@@ -346,7 +346,19 @@ class OpenAiService
                 $url ? 'URL: ' . $url : null,
                 ($time && $tz) ? ('Zeit: ' . $time . ' ' . $tz) : null,
             ])));
-            array_unshift($messages, [ 'role' => 'system', 'content' => $prompt . ($naturalCtx !== '' ? (' ' . $naturalCtx) : '') ]);
+            
+            // Tool-Informationen zum System-Prompt hinzufügen
+            $toolsInfo = $this->buildToolsInfo();
+            
+            $systemMessage = $prompt;
+            if ($naturalCtx !== '') {
+                $systemMessage .= ' ' . $naturalCtx;
+            }
+            if ($toolsInfo !== '') {
+                $systemMessage .= "\n\n" . $toolsInfo;
+            }
+            
+            array_unshift($messages, [ 'role' => 'system', 'content' => $systemMessage ]);
         } catch (\Throwable $e) { }
         return $messages;
     }
@@ -364,6 +376,47 @@ class OpenAiService
     private function logApiError(string $message, int $status, string $body): void
     {
         Log::error($message, [ 'status' => $status, 'body' => $body ]);
+    }
+
+    private function buildToolsInfo(): string
+    {
+        try {
+            $registry = resolve(ToolRegistry::class);
+            $modules = \Platform\Core\Registry\ModuleRegistry::all();
+            $allTools = $registry->all();
+            
+            if (count($allTools) === 0 && count($modules) === 0) {
+                return '';
+            }
+            
+            $info = "Verfügbare Funktionen:\n\n";
+            
+            // Module-Übersicht
+            if (count($modules) > 0) {
+                $info .= "Module:\n";
+                foreach ($modules as $moduleKey => $moduleConfig) {
+                    $moduleTools = array_filter($allTools, function($tool) use ($moduleKey) {
+                        return str_starts_with($tool->getName(), $moduleKey . '.');
+                    });
+                    
+                    $info .= "- " . ($moduleConfig['title'] ?? ucfirst($moduleKey));
+                    if (count($moduleTools) > 0) {
+                        $info .= " (" . count($moduleTools) . " Tools)";
+                    }
+                    $info .= "\n";
+                }
+                $info .= "\n";
+            }
+            
+            // Wichtiger Hinweis
+            $info .= "Tipp: Nutze das Tool 'tools.list', um alle verfügbaren Tools und ihre Funktionen zu sehen.\n";
+            $info .= "Beispiel: 'Welche Tools stehen mir zur Verfügung?' oder 'Zeige mir alle Planner-Tools'.\n";
+            
+            return $info;
+        } catch (\Throwable $e) {
+            // Silent fail - keine Tool-Info
+            return '';
+        }
     }
 
     private function formatApiErrorMessage(int $status, string $body): string
@@ -395,57 +448,75 @@ class OpenAiService
 
     private function getAvailableTools(): array
     {
-        $toolBroker = app(ToolBroker::class);
-        $toolRegistry = app(ToolRegistry::class);
-        
-        $capabilities = $toolBroker->getAvailableCapabilities();
-        Log::info('[OpenAI Tools] Available capabilities', ['capabilities' => $capabilities]);
-        
         $tools = [];
         
-        // 1. Entity-basierte Tools aus ToolBroker (bestehende Logik)
-        foreach ($capabilities['available_entities'] as $entity) {
-            foreach ($capabilities['available_operations'] as $operation) {
-                $toolDef = $toolBroker->getToolDefinition($entity, $operation);
-                if ($toolDef) { 
-                    $tools[] = $toolDef; 
-                    Log::debug('[OpenAI Tools] Added tool definition', ['entity' => $entity, 'operation' => $operation]); 
+        // 1. Tools aus ToolRegistry (loose gekoppelt - Module registrieren ihre Tools hier)
+        // WICHTIG: Verwende resolve() statt app() - das triggert afterResolving nur einmal
+        try {
+            $toolRegistry = resolve(ToolRegistry::class);
+            $allTools = $toolRegistry->all();
+            
+            Log::info('[OpenAI Tools] Registry tools', ['count' => count($allTools)]);
+            
+            // Konvertiere alle registrierten Tools zu OpenAI-Format
+            foreach ($allTools as $tool) {
+                try {
+                    $toolDef = $this->convertToolToOpenAiFormat($tool);
+                    if ($toolDef) {
+                        $tools[] = $toolDef;
+                        Log::debug('[OpenAI Tools] Added tool from registry', ['tool' => $tool->getName()]);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('[OpenAI Tools] Tool conversion failed', [
+                        'tool' => $tool->getName(),
+                        'error' => $e->getMessage()
+                    ]);
                 }
             }
+        } catch (\Throwable $e) {
+            Log::error('[OpenAI Tools] Registry access failed', ['error' => $e->getMessage()]);
         }
-        $tools[] = $toolBroker->getWriteToolDefinition();
         
-        // 2. Tools aus ToolRegistry hinzufügen
-        // Stelle sicher, dass Registry aufgelöst wird (triggert afterResolving)
-        $registryInstance = $toolRegistry;
-        $allTools = $registryInstance->all();
-        Log::info('[OpenAI Tools] Registry tools count BEFORE', ['count' => count($allTools)]);
-        
-        // Falls keine Tools registriert sind, versuche manuell zu registrieren
-        if (count($allTools) === 0) {
-            Log::warning('[OpenAI Tools] Keine Tools in Registry - versuche manuelle Registrierung');
+        // 2. Legacy: Entity-basierte Tools aus ToolBroker (optional, falls verfügbar)
+        // Diese können später entfernt werden, wenn alle Module auf ToolRegistry umgestellt sind
+        try {
+            $toolBroker = resolve(ToolBroker::class);
+            $capabilities = $toolBroker->getAvailableCapabilities();
+            
+            // Entity-basierte Tools
+            foreach ($capabilities['available_entities'] ?? [] as $entity) {
+                foreach ($capabilities['available_operations'] ?? [] as $operation) {
+                    try {
+                        $toolDef = $toolBroker->getToolDefinition($entity, $operation);
+                        if ($toolDef) { 
+                            $tools[] = $toolDef; 
+                            Log::debug('[OpenAI Tools] Added legacy tool', ['entity' => $entity, 'operation' => $operation]); 
+                        }
+                    } catch (\Throwable $e) {
+                        Log::warning('[OpenAI Tools] Legacy tool failed', [
+                            'entity' => $entity,
+                            'operation' => $operation,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
+            }
+            
+            // Write Tool
             try {
-                // EchoTool direkt registrieren (keine Dependencies)
-                $echoTool = new \Platform\Core\Tools\EchoTool();
-                $registryInstance->register($echoTool);
-                Log::info('[OpenAI Tools] EchoTool manuell registriert');
-                $allTools = $registryInstance->all();
+                $writeTool = $toolBroker->getWriteToolDefinition();
+                if ($writeTool) {
+                    $tools[] = $writeTool;
+                }
             } catch (\Throwable $e) {
-                Log::error('[OpenAI Tools] Manuelle Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
+                Log::warning('[OpenAI Tools] Write tool failed', ['error' => $e->getMessage()]);
             }
+        } catch (\Throwable $e) {
+            // ToolBroker nicht verfügbar - kein Problem, wir verwenden nur ToolRegistry
+            Log::debug('[OpenAI Tools] ToolBroker not available', ['error' => $e->getMessage()]);
         }
         
-        Log::info('[OpenAI Tools] Registry tools count AFTER', ['count' => count($allTools)]);
-        
-        foreach ($allTools as $tool) {
-            $toolDef = $this->convertToolToOpenAiFormat($tool);
-            if ($toolDef) {
-                $tools[] = $toolDef;
-                Log::info('[OpenAI Tools] Added tool from registry', ['tool' => $tool->getName()]);
-            }
-        }
-        
-        Log::info('[OpenAI Tools] Final tools array', ['tools' => $tools, 'count' => count($tools)]);
+        Log::info('[OpenAI Tools] Final tools', ['count' => count($tools)]);
         return $tools;
     }
 

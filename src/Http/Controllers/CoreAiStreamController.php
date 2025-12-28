@@ -338,8 +338,11 @@ class CoreAiStreamController extends Controller
                     ];
                     
                     // Tools aktivieren wenn ToolExecutor verfügbar
+                    // WICHTIG: null = Tools aktivieren (OpenAiService lädt sie dann)
+                    // false = Tools deaktivieren
                     if ($toolExecutor !== null) {
-                        $streamOptions['tools'] = null; // null = aktivieren
+                        // null bedeutet: Tools aktivieren (OpenAiService ruft getAvailableTools() auf)
+                        $streamOptions['tools'] = null;
                         $streamOptions['on_tool_start'] = function(string $tool) {
                             echo 'data: ' . json_encode([
                                 'tool' => $tool,
@@ -439,13 +442,31 @@ class CoreAiStreamController extends Controller
                     ], JSON_UNESCAPED_UNICODE) . "\n\n";
                     @flush();
                     
-                    // Jetzt streamChat aufrufen
-                    $openAi->streamChat($messages, $deltaCallback, model: 'gpt-4o-mini', options: $streamOptions);
-                    
-                    echo "data: " . json_encode([
-                        'debug' => 'streamChat-Aufruf abgeschlossen'
-                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                    @flush();
+                    // WICHTIG: streamChat blockiert - der Stream läuft synchron
+                    // Deshalb müssen wir sicherstellen, dass der Output-Buffer nicht geschlossen wird
+                    // Jetzt streamChat aufrufen - mit expliziter Fehlerbehandlung
+                    try {
+                        echo "data: " . json_encode([
+                            'debug' => 'Starte streamChat (blockiert bis Stream beendet)...'
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+                        
+                        $openAi->streamChat($messages, $deltaCallback, model: 'gpt-4o-mini', options: $streamOptions);
+                        
+                        // Diese Zeile wird nur erreicht, wenn streamChat erfolgreich beendet wurde
+                        echo "data: " . json_encode([
+                            'debug' => 'streamChat-Aufruf abgeschlossen'
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+                    } catch (\Throwable $streamChatError) {
+                        // Fehler direkt beim streamChat-Aufruf
+                        echo "data: " . json_encode([
+                            'error' => 'streamChat Fehler',
+                            'debug' => "Fehler beim streamChat-Aufruf: {$streamChatError->getMessage()} in {$streamChatError->getFile()}:{$streamChatError->getLine()}\nTrace: " . substr($streamChatError->getTraceAsString(), 0, 1000)
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+                        throw $streamChatError; // Re-throw um in outer catch zu landen
+                    }
                 } catch (\Throwable $streamError) {
                     // Fehler beim StreamChat
                     echo "data: " . json_encode([

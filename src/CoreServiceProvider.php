@@ -158,8 +158,8 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(\Platform\Core\Tools\ToolRegistry::class);
         $this->app->singleton(\Platform\Core\Tools\ToolExecutor::class);
 
-        // Tools registrieren (lazy - erst wenn Registry tatsächlich verwendet wird)
-        // Wichtig: Nur wenn App gebootet ist UND nicht beim package:discover
+        // Tool Auto-Discovery & Registrierung (lazy - erst wenn Registry tatsächlich verwendet wird)
+        // INNOVATIV: Auto-Discovery + manuelle Registrierung - Module entscheiden selbst
         $this->app->afterResolving(\Platform\Core\Tools\ToolRegistry::class, function ($registry) {
             // Prüfe ob wir beim package:discover sind (keine vollständige App)
             if ($this->app->runningInConsole() && !$this->app->runningUnitTests()) {
@@ -174,30 +174,65 @@ class CoreServiceProvider extends ServiceProvider
                 return;
             }
             
-            // Prüfe ob Tools bereits registriert sind (verhindert doppelte Registrierung)
+            // Prüfe ob Tools bereits geladen wurden (verhindert doppelte Registrierung)
             if (count($registry->all()) > 0) {
                 return;
             }
             
-            // Tools registrieren - mit try-catch für jeden einzelnen
-            // EchoTool zuerst (keine Dependencies)
+            // 1. Auto-Discovery: Lade Tools automatisch aus Verzeichnissen
             try {
-                $registry->register(new \Platform\Core\Tools\EchoTool());
+                $modulesPath = realpath(__DIR__ . '/../../modules');
+                if ($modulesPath && is_dir($modulesPath)) {
+                    $moduleTools = \Platform\Core\Tools\ToolLoader::loadFromAllModules($modulesPath);
+                    foreach ($moduleTools as $tool) {
+                        try {
+                            $registry->register($tool);
+                        } catch (\Throwable $e) {
+                            \Log::warning("[ToolRegistry] Auto-Discovery Tool konnte nicht registriert werden", [
+                                'tool' => get_class($tool),
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
+                }
             } catch (\Throwable $e) {
-                // Silent fail
+                \Log::warning("[ToolRegistry] Auto-Discovery fehlgeschlagen", ['error' => $e->getMessage()]);
+            }
+            
+            // 2. Core-Tools manuell registrieren (wenn nicht bereits durch Auto-Discovery geladen)
+            // ListToolsTool zuerst (wichtig für AI - zeigt verfügbare Tools)
+            if (!$registry->has('tools.list')) {
+                try {
+                    $registry->register($this->app->make(\Platform\Core\Tools\ListToolsTool::class));
+                } catch (\Throwable $e) {
+                    // Silent fail
+                }
+            }
+            
+            // EchoTool
+            if (!$registry->has('echo')) {
+                try {
+                    $registry->register(new \Platform\Core\Tools\EchoTool());
+                } catch (\Throwable $e) {
+                    // Silent fail
+                }
             }
             
             // DataReadTool und DataWriteTool nur wenn Dependencies verfügbar sind
-            try {
-                $registry->register($this->app->make(\Platform\Core\Tools\DataReadTool::class));
-            } catch (\Throwable $e) {
-                // Silent fail - Dependencies möglicherweise nicht verfügbar
+            if (!$registry->has('data.read')) {
+                try {
+                    $registry->register($this->app->make(\Platform\Core\Tools\DataReadTool::class));
+                } catch (\Throwable $e) {
+                    // Silent fail - Dependencies möglicherweise nicht verfügbar
+                }
             }
             
-            try {
-                $registry->register($this->app->make(\Platform\Core\Tools\DataWriteTool::class));
-            } catch (\Throwable $e) {
-                // Silent fail - Dependencies möglicherweise nicht verfügbar
+            if (!$registry->has('data.write')) {
+                try {
+                    $registry->register($this->app->make(\Platform\Core\Tools\DataWriteTool::class));
+                } catch (\Throwable $e) {
+                    // Silent fail - Dependencies möglicherweise nicht verfügbar
+                }
             }
         });
     }
