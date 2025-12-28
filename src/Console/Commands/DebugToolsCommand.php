@@ -142,8 +142,14 @@ class DebugToolsCommand extends Command
                 
                 // Teste Ausführung - ohne Auth (spart Memory)
                 $this->line("   Erstelle Test-Context...");
-                $user = new class {
+                $user = new class implements \Illuminate\Contracts\Auth\Authenticatable {
                     public $id = 999;
+                    public function getAuthIdentifierName() { return 'id'; }
+                    public function getAuthIdentifier() { return $this->id; }
+                    public function getAuthPassword() { return ''; }
+                    public function getRememberToken() { return ''; }
+                    public function setRememberToken($value) {}
+                    public function getRememberTokenName() { return ''; }
                 };
                 $context = new ToolContext($user);
                 
