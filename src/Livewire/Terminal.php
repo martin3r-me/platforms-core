@@ -353,11 +353,19 @@ class Terminal extends Component
         $this->currentTool = null;
         $this->progressText = '';
         
+        $errorMessage = '❌ Fehler: ' . $e->getMessage() . "\n\n";
+        $errorMessage .= "📋 Details:\n";
+        $errorMessage .= "Datei: " . $e->getFile() . "\n";
+        $errorMessage .= "Zeile: " . $e->getLine() . "\n";
+        if ($e->getTraceAsString()) {
+            $errorMessage .= "\n🔍 Stack Trace:\n" . substr($e->getTraceAsString(), 0, 1000);
+        }
+        
         CoreChatMessage::create([
             'core_chat_id' => $this->activeChatId,
             'thread_id' => $this->activeThreadId,
             'role' => 'assistant',
-            'content' => 'Entschuldigung, es gab einen Fehler: ' . $e->getMessage(),
+            'content' => $errorMessage,
             'tokens_in' => 0,
         ]);
 
@@ -377,6 +385,22 @@ class Terminal extends Component
         $this->progressText = '';
         
         $this->dispatch('terminal-cancelled');
+    }
+
+    public function addErrorMessage($message)
+    {
+        if (!$this->activeThreadId) return;
+        
+        CoreChatMessage::create([
+            'core_chat_id' => $this->activeChatId,
+            'thread_id' => $this->activeThreadId,
+            'role' => 'assistant',
+            'content' => $message,
+            'tokens_in' => 0,
+        ]);
+        
+        $this->loadMessages();
+        $this->dispatch('terminal-scroll');
     }
 
 

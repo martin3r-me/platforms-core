@@ -128,11 +128,22 @@
               </template>
             </div>
             <!-- Debug-Info -->
-            <div class="text-[10px] text-[var(--ui-muted)] space-y-0.5" x-show="debugInfo.length > 0">
-              <div class="font-bold">🔍 Debug:</div>
-              <template x-for="(info, idx) in debugInfo" :key="idx">
-                <div x-text="info" class="pl-2"></div>
-              </template>
+            <div class="text-[10px] text-[var(--ui-muted)] space-y-0.5 border-t border-[var(--ui-border)]/30 pt-2 mt-2" x-show="debugInfo.length > 0">
+              <div class="font-bold mb-1 flex items-center justify-between">
+                <span>🔍 Debug-Infos:</span>
+                <button 
+                  @click="navigator.clipboard?.writeText(debugInfo.join('\\n')) || alert('Debug-Infos:\\n\\n' + debugInfo.join('\\n'))"
+                  class="text-[var(--ui-primary)] hover:underline text-[9px]"
+                  title="Debug-Infos kopieren"
+                >
+                  📋 Kopieren
+                </button>
+              </div>
+              <div class="max-h-32 overflow-y-auto font-mono space-y-0.5">
+                <template x-for="(info, idx) in debugInfo" :key="idx">
+                  <div x-text="info" class="pl-2 break-all"></div>
+                </template>
+              </div>
             </div>
           </div>
         </div>
@@ -370,6 +381,20 @@
         },
         onStreamError(){
           if(window.__DEV__) console.log('[Terminal SSE] ai-stream-error');
+          
+          // Fehler als Nachricht im Chat anzeigen
+          const errorMsg = '❌ Stream-Fehler aufgetreten!\n\n' +
+            '🔍 Debug-Infos:\n' +
+            this.debugInfo.join('\n') + '\n\n' +
+            '💡 Bitte die Debug-Infos oben kopieren und dem Entwickler geben.';
+          
+          // Versuche Fehler als Assistant-Message zu speichern
+          try {
+            this.$wire?.call?.('addErrorMessage', errorMsg);
+          } catch(e) {
+            console.error('Could not save error message:', e);
+          }
+          
           this.stopTyping(); this.queue = ''; this.finalizePending = false; this.hasDelta = false; this.isStreamingLocal = false; this.currentTool = null;
           this.$wire?.set?.('isProcessing', false);
           this.$wire?.set?.('isStreaming', false);
