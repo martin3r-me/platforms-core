@@ -329,6 +329,36 @@ class TestOpenAiCommand extends Command
                     $this->line("5.6: Stream-Debugging aktiviert - alle Events werden geloggt");
                     $this->newLine();
                     
+                    // Debug: Zeige Payload, der an OpenAI gesendet wird
+                    try {
+                        $this->line("5.7: Prüfe Payload, der an OpenAI gesendet wird...");
+                        $reflection = new \ReflectionClass($openAi);
+                        
+                        // Rufe getAvailableTools auf, um zu sehen, was normalisiert wird
+                        $getToolsMethod = $reflection->getMethod('getAvailableTools');
+                        $getToolsMethod->setAccessible(true);
+                        $availableTools = $getToolsMethod->invoke($openAi);
+                        
+                        $normalizeMethod = $reflection->getMethod('normalizeToolsForResponses');
+                        $normalizeMethod->setAccessible(true);
+                        $normalizedTools = $normalizeMethod->invoke($openAi, $availableTools);
+                        
+                        $this->line("  Tools (vor Normalisierung): " . count($availableTools));
+                        $this->line("  Tools (nach Normalisierung): " . count($normalizedTools));
+                        
+                        if (count($normalizedTools) > 0) {
+                            $this->line("  Normalisierte Tools:");
+                            foreach ($normalizedTools as $idx => $tool) {
+                                $this->line("    Tool #" . ($idx + 1) . ":");
+                                $this->line("      " . json_encode($tool, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+                            }
+                        }
+                        $this->newLine();
+                    } catch (\Throwable $e) {
+                        $this->warn("  ⚠️  Fehler beim Prüfen des Payloads: " . $e->getMessage());
+                        $this->newLine();
+                    }
+                    
                     $eventCount = 0;
                     $deltaCount = 0;
                     $toolCallCount = 0;
@@ -397,6 +427,19 @@ class TestOpenAiCommand extends Command
                     $this->error("❌ Stream-Fehler nach {$duration}ms:");
                     $this->error("  " . $streamError->getMessage());
                     $this->error("  Datei: " . $streamError->getFile() . ":" . $streamError->getLine());
+                    
+                    // Versuche die vollständige Fehlerantwort von OpenAI zu zeigen
+                    if (str_contains($streamError->getMessage(), 'HTTP 400')) {
+                        $this->newLine();
+                        $this->warn("⚠️  HTTP 400 Fehler - mögliche Ursachen:");
+                        $this->line("  1. Tool-Schema ist nicht korrekt");
+                        $this->line("  2. Payload-Format ist nicht korrekt");
+                        $this->line("  3. Tool-Parameter sind nicht valide");
+                        $this->newLine();
+                        $this->line("💡 Prüfe die Laravel-Logs für Details:");
+                        $this->line("   tail -n 50 storage/logs/laravel.log | grep -i 'openai\|tool'");
+                    }
+                    
                     $this->line("  Trace: " . substr($streamError->getTraceAsString(), 0, 1000));
                     throw $streamError;
                 }

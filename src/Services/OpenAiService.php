@@ -176,10 +176,30 @@ class OpenAiService
                 ]);
             }
         }
+        // Debug: Log Payload (nur wenn Debug aktiviert)
+        if (config('app.debug', false)) {
+            Log::debug('[OpenAI Stream] Sending payload', [
+                'payload_keys' => array_keys($payload),
+                'tools_count' => count($payload['tools'] ?? []),
+                'tools' => $payload['tools'] ?? [],
+            ]);
+        }
+        
         $response = $this->http(withStream: true)->post($this->baseUrl . '/responses', $payload);
         if ($response->failed()) {
-            $this->logApiError('OpenAI API Error (responses stream)', $response->status(), $response->body());
-            throw new \Exception($this->formatApiErrorMessage($response->status(), $response->body()));
+            $errorBody = $response->body();
+            $this->logApiError('OpenAI API Error (responses stream)', $response->status(), $errorBody);
+            
+            // Debug: Zeige vollständige Fehlerantwort
+            if (config('app.debug', false)) {
+                Log::error('[OpenAI Stream] Full error response', [
+                    'status' => $response->status(),
+                    'body' => $errorBody,
+                    'payload' => $payload,
+                ]);
+            }
+            
+            throw new \Exception($this->formatApiErrorMessage($response->status(), $errorBody));
         }
         $this->parseResponsesStream($response->toPsrResponse()->getBody(), $onDelta, $messages, $options);
     }
