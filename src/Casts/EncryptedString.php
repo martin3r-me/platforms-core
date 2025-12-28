@@ -38,10 +38,39 @@ class EncryptedString implements CastsAttributes
             return $value;
         }
         
+        $plainValue = (string) $value;
+        
+        // Prüfe ob der Wert bereits verschlüsselt ist
+        // (kann passieren wenn Livewire den verschlüsselten Wert direkt aus der DB sendet)
+        if ($this->isEncrypted($plainValue)) {
+            // Wert ist bereits verschlüsselt, gib ihn direkt zurück
+            // Aber speichere den Plain-Text für Hash-Berechnung (müssen entschlüsseln)
+            try {
+                $decrypted = Crypt::decryptString($plainValue);
+                $plainKey = '_plain_' . $key;
+                if (method_exists($model, 'setRawAttribute')) {
+                    $model->setRawAttribute($plainKey, $decrypted);
+                } else {
+                    $reflection = new \ReflectionClass($model);
+                    if ($reflection->hasProperty('attributes')) {
+                        $attributesProperty = $reflection->getProperty('attributes');
+                        $attributesProperty->setAccessible(true);
+                        $currentAttributes = $attributesProperty->getValue($model);
+                        $currentAttributes[$plainKey] = $decrypted;
+                        $attributesProperty->setValue($model, $currentAttributes);
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Entschlüsselung fehlgeschlagen, behandle als Plain-Text
+            }
+            
+            // Gib den bereits verschlüsselten Wert zurück
+            return $plainValue;
+        }
+        
         // Speichere Plain-Text-Wert temporär für Hash-Berechnung
         // (wird in bootEncryptable verwendet und dann entfernt)
         $plainKey = '_plain_' . $key;
-        $plainValue = (string) $value;
         
         // Verwende setRawAttribute wenn verfügbar, sonst setAttribute
         // setAttribute würde den Cast wieder auslösen, daher verwenden wir setRawAttribute
@@ -62,6 +91,27 @@ class EncryptedString implements CastsAttributes
         }
         
         return Crypt::encryptString($plainValue);
+    }
+    
+    /**
+     * Prüft ob ein Wert bereits verschlüsselt ist
+     */
+    private function isEncrypted(string $value): bool
+    {
+        if (empty($value)) {
+            return false;
+        }
+
+        // Laravel Crypt erzeugt base64-kodierte Strings
+        // Verschlüsselte Werte sind typischerweise länger und haben base64-Format
+        $decoded = base64_decode($value, true);
+        if ($decoded === false) {
+            return false;
+        }
+
+        // Verschlüsselte Werte haben typischerweise eine Mindestlänge
+        // und enthalten nicht-printable Zeichen nach Decodierung
+        return strlen($decoded) > 16 && !ctype_print($decoded);
     }
 }
 
