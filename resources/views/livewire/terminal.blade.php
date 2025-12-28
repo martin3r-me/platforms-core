@@ -114,17 +114,26 @@
         <!-- Streaming-Block -->
         <div class="flex items-start gap-2" x-cloak x-show="isStreamingLocal || streamText.length > 0" wire:ignore>
           <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
-          <div class="flex items-center gap-2"
+          <div class="flex flex-col gap-1 flex-1"
                role="log"
                aria-live="polite"
                aria-atomic="false">
-            <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
-            <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"
-                 x-show="isStreamingLocal && !hasDelta"
-                 aria-hidden="true"></div>
-            <template x-if="currentTool">
-              <div class="text-xs text-[var(--ui-muted)]" x-text="'(Tool: ' + currentTool + ')'"></div>
-            </template>
+            <div class="flex items-center gap-2">
+              <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
+              <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"
+                   x-show="isStreamingLocal && !hasDelta"
+                   aria-hidden="true"></div>
+              <template x-if="currentTool">
+                <div class="text-xs text-[var(--ui-muted)]" x-text="'(Tool: ' + currentTool + ')'"></div>
+              </template>
+            </div>
+            <!-- Debug-Info -->
+            <div class="text-[10px] text-[var(--ui-muted)] space-y-0.5" x-show="debugInfo.length > 0">
+              <div class="font-bold">🔍 Debug:</div>
+              <template x-for="(info, idx) in debugInfo" :key="idx">
+                <div x-text="info" class="pl-2"></div>
+              </template>
+            </div>
           </div>
         </div>
       </div>
@@ -193,6 +202,9 @@
         suppressStream: false,
         isStreamingLocal: false,
         currentTool: null,
+        debugInfo: [],
+        eventCount: 0,
+        deltaCount: 0,
 
         // Retry/Backoff
         retryCount: 0,
@@ -227,11 +239,17 @@
         },
         pushDelta(delta){ if(!delta) return; this.queue += delta; this.startTyping(); },
 
+        // Debug-Helper
+        addDebugInfo(msg){
+          this.debugInfo.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
+          // Max 10 Debug-Messages behalten
+          if(this.debugInfo.length > 10) this.debugInfo.shift();
+        },
+        
         // SSE Steuerung
         startStream(url){
           this.closeStream(); // alte Verbindung schließen
           try {
-            if(window.__DEV__) console.log('[Terminal SSE] startStream →', url);
             // Reset UI-States
             this.streamText = '';
             this.queue = '';
@@ -241,40 +259,78 @@
             this.suppressStream = false;
             this.isStreamingLocal = true;
             this.currentTool = null;
+            this.debugInfo = [];
+            this.eventCount = 0;
+            this.deltaCount = 0;
+            
+            this.addDebugInfo(`🚀 Stream gestartet: ${url}`);
+            if(window.__DEV__) console.log('[Terminal SSE] startStream →', url);
 
             this.es = new EventSource(url);
-            this.es.onopen = () => { if(window.__DEV__) console.log('[Terminal SSE] connection open'); this.retryCount = 0; };
+            this.es.onopen = () => { 
+              this.addDebugInfo('✅ SSE-Verbindung geöffnet');
+              if(window.__DEV__) console.log('[Terminal SSE] connection open'); 
+              this.retryCount = 0; 
+            };
             this.es.onmessage = (e) => {
               if(!e.data) return;
-              if(window.__DEV__) console.log('[Terminal SSE] onmessage raw:', e.data);
+              this.eventCount++;
+              
               if(e.data === '[DONE]'){
+                this.addDebugInfo(`✅ Stream beendet (${this.eventCount} Events, ${this.deltaCount} Deltas)`);
                 if(window.__DEV__) console.log('[Terminal SSE] DONE');
                 this.closeStream();
                 window.dispatchEvent(new CustomEvent('ai-stream-complete'));
                 return;
               }
+              
               // Robust JSON-Parsing
               try {
                 const data = JSON.parse(e.data);
+                
+                // Debug: Erste 5 Events loggen
+                if(this.eventCount <= 5) {
+                  this.addDebugInfo(`📦 Event #${this.eventCount}: ${JSON.stringify(data).substring(0, 100)}`);
+                }
+                
                 if(data?.delta){
+                  this.deltaCount++;
+                  if(this.deltaCount <= 3) {
+                    this.addDebugInfo(`📝 Delta #${this.deltaCount}: "${data.delta.substring(0, 50)}${data.delta.length > 50 ? '...' : ''}"`);
+                  }
                   if(window.__DEV__) console.log('[Terminal SSE] delta:', data.delta);
-                  if(!this.hasDelta) this.hasDelta = true;
+                  if(!this.hasDelta) {
+                    this.hasDelta = true;
+                    this.addDebugInfo('✨ Erster Delta empfangen');
+                  }
                   this.pushDelta(data.delta);
                   window.dispatchEvent(new CustomEvent('ai-stream-delta', { detail: { delta: data.delta } }));
+                } else if(this.eventCount <= 5) {
+                  // Event ohne Delta - nur für erste Events loggen
+                  this.addDebugInfo(`⚠️ Event ohne Delta: ${Object.keys(data).join(', ')}`);
                 }
+                
                 // Tool-Indikator lokal setzen
-                if(data?.tool){ this.currentTool = data.tool; this.$wire && this.$wire.set && this.$wire.set('currentTool', data.tool); }
+                if(data?.tool){ 
+                  this.currentTool = data.tool; 
+                  this.addDebugInfo(`🔧 Tool erkannt: ${data.tool}`);
+                  this.$wire && this.$wire.set && this.$wire.set('currentTool', data.tool); 
+                }
               } catch(parseErr){
-                if(window.__DEV__) console.warn('[Terminal SSE] parse skip (non-JSON line)');
+                this.addDebugInfo(`❌ Parse-Fehler: ${parseErr.message}`);
+                if(window.__DEV__) console.warn('[Terminal SSE] parse skip (non-JSON line)', e.data);
               }
             };
             this.es.onerror = (err) => {
+              this.addDebugInfo(`❌ SSE-Fehler: ${err.message || 'Unbekannter Fehler'}`);
               if(window.__DEV__) console.error('[Terminal SSE] error:', err);
               this.closeStream();
               if(this.retryCount < this.maxRetry){
                 const delay = Math.min(4000, this.backoffBaseMs * Math.pow(2, this.retryCount++));
+                this.addDebugInfo(`🔄 Retry in ${delay}ms (${this.retryCount}/${this.maxRetry})`);
                 setTimeout(() => this.startStream(url), delay);
               } else {
+                this.addDebugInfo('❌ Max Retries erreicht - Stream abgebrochen');
                 window.dispatchEvent(new CustomEvent('ai-stream-error'));
               }
             };
