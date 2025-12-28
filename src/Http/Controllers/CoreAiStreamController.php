@@ -440,7 +440,7 @@ class CoreAiStreamController extends Controller
                     @flush();
                     
                     // Jetzt streamChat aufrufen
-                    $openAi->streamChat($messages, $deltaCallback, model: \Platform\Core\Services\OpenAiService::DEFAULT_MODEL, options: $streamOptions);
+                    $openAi->streamChat($messages, $deltaCallback, model: 'gpt-4o-mini', options: $streamOptions);
                     
                     echo "data: " . json_encode([
                         'debug' => 'streamChat-Aufruf abgeschlossen'
