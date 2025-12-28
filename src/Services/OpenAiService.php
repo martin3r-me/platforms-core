@@ -165,6 +165,16 @@ class OpenAiService
             $tools = $this->getAvailableTools();
             $payload['tools'] = $this->normalizeToolsForResponses($tools);
             $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
+            
+            // Debug: Log Tools (nur wenn Logging aktiviert ist)
+            if (config('app.debug', false)) {
+                Log::debug('[OpenAI Stream] Tools aktiviert', [
+                    'tool_count' => count($tools),
+                    'tool_names' => array_map(function($t) {
+                        return $t['function']['name'] ?? $t['name'] ?? 'unknown';
+                    }, $tools),
+                ]);
+            }
         }
         $response = $this->http(withStream: true)->post($this->baseUrl . '/responses', $payload);
         if ($response->failed()) {

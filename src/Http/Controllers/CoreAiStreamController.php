@@ -497,6 +497,25 @@ class CoreAiStreamController extends Controller
                 }
                     };
                     
+                    // Debug: Zeige Tools, die an OpenAI gesendet werden
+                    if (isset($streamOptions['tools']) && $streamOptions['tools'] !== false) {
+                        try {
+                            $reflection = new \ReflectionClass($openAi);
+                            $method = $reflection->getMethod('getAvailableTools');
+                            $method->setAccessible(true);
+                            $availableTools = $method->invoke($openAi);
+                            echo "data: " . json_encode([
+                                'debug' => 'Tools an OpenAI: ' . count($availableTools) . ' Tool(s)',
+                                'tool_names' => array_map(function($t) {
+                                    return $t['function']['name'] ?? $t['name'] ?? 'unknown';
+                                }, $availableTools)
+                            ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                            @flush();
+                        } catch (\Throwable $e) {
+                            // Ignore
+                        }
+                    }
+                    
                     echo "data: " . json_encode([
                         'debug' => 'Delta-Callback erstellt, rufe streamChat auf...'
                     ], JSON_UNESCAPED_UNICODE) . "\n\n";
