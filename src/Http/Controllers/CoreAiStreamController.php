@@ -14,6 +14,10 @@ class CoreAiStreamController extends Controller
 {
     public function stream(Request $request, OpenAiService $openAi, ToolExecutor $toolExecutor): StreamedResponse
     {
+        // Debug: Prüfe ob Route erreicht wird - sende sofort eine Test-Nachricht
+        // Aber das funktioniert nicht, weil StreamedResponse erst später ausgeführt wird
+        // Stattdessen: Prüfe alles VOR dem StreamedResponse
+        
         try {
             $user = $request->user();
             if (!$user) {
@@ -92,7 +96,7 @@ class CoreAiStreamController extends Controller
 
         $assistantBuffer = '';
 
-            $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl, $toolExecutor) {
+            $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl, $toolExecutor, $user) {
             try {
                 // Clean buffers to avoid server buffering
                 while (ob_get_level() > 0) {
@@ -103,8 +107,18 @@ class CoreAiStreamController extends Controller
                 echo "retry: 500\n\n";
                 @flush();
                 
-                // Debug: Stream gestartet
-                echo "data: " . json_encode(['debug' => '✅ Stream-Callback gestartet'], JSON_UNESCAPED_UNICODE) . "\n\n";
+                // Debug: Stream gestartet - SOFORT senden
+                echo "data: " . json_encode([
+                    'debug' => '✅ Stream-Callback gestartet',
+                    'user_id' => $user->id ?? 'unknown',
+                    'thread_id' => $thread->id ?? 'unknown'
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+                
+                // Zusätzliche Debug-Info
+                echo "data: " . json_encode([
+                    'debug' => '📋 Messages: ' . count($messages) . ' | Assistant ID: ' . ($assistantId ?: 'neu')
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
 
             // Use provided assistant placeholder or create a new one
@@ -165,27 +179,34 @@ class CoreAiStreamController extends Controller
                 'source_module' => $sourceModule,
                 'source_url' => $sourceUrl,
                 'on_tool_start' => function(string $tool) {
-                    echo 'data: ' . json_encode(['tool' => $tool], JSON_UNESCAPED_UNICODE) . "\n\n";
+                    echo 'data: ' . json_encode([
+                        'tool' => $tool,
+                        'debug' => "🔧 Tool gestartet: {$tool}"
+                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
                     @flush();
                 },
                 'tool_executor' => function($toolName, $arguments) use ($toolExecutor) {
                     try {
+                        echo 'data: ' . json_encode([
+                            'debug' => "⚙️ Führe Tool aus: {$toolName}"
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+                        
                         $context = ToolContext::fromAuth();
                         $result = $toolExecutor->execute($toolName, $arguments, $context);
                         
                         // Konvertiere ToolResult zu altem Format für Kompatibilität
                         $resultArray = $result->toArray();
                         
-                        echo 'data: ' . json_encode(['tool' => $toolName, 'result' => $resultArray], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        echo 'data: ' . json_encode([
+                            'tool' => $toolName, 
+                            'result' => $resultArray,
+                            'debug' => "✅ Tool {$toolName} erfolgreich ausgeführt"
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
                         @flush();
                         
                         return $resultArray;
                     } catch (\Throwable $e) {
-                        \Log::error('[CoreAiStreamController] Tool execution error', [
-                            'tool' => $toolName,
-                            'error' => $e->getMessage()
-                        ]);
-                        
                         $errorResult = [
                             'ok' => false,
                             'error' => [
@@ -194,7 +215,11 @@ class CoreAiStreamController extends Controller
                             ]
                         ];
                         
-                        echo 'data: ' . json_encode(['tool' => $toolName, 'result' => $errorResult], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        echo 'data: ' . json_encode([
+                            'tool' => $toolName, 
+                            'result' => $errorResult,
+                            'debug' => "❌ Tool {$toolName} Fehler: {$e->getMessage()}"
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
                         @flush();
                         
                         return $errorResult;

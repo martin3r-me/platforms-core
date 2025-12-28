@@ -80,23 +80,52 @@ Route::middleware(['web', 'auth'])->group(function () {
     
     // Test-Endpoint für Debugging
     Route::get('/core/ai/stream/test', function (Request $request) {
-        \Log::info('[CoreAiStreamTest] Test endpoint called', [
-            'user_id' => $request->user()?->id,
-            'authenticated' => auth()->check(),
-        ]);
+        $user = $request->user();
+        if (!$user) {
+            return new \Symfony\Component\HttpFoundation\StreamedResponse(function() {
+                echo "data: " . json_encode([
+                    'error' => 'Unauthorized',
+                    'debug' => 'Kein authentifizierter User'
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+            }, 401, [
+                'Content-Type' => 'text/event-stream',
+                'Cache-Control' => 'no-cache',
+            ]);
+        }
         
-        return new \Symfony\Component\HttpFoundation\StreamedResponse(function() {
+        return new \Symfony\Component\HttpFoundation\StreamedResponse(function() use ($user) {
+            // Clean buffers
+            while (ob_get_level() > 0) {
+                @ob_end_flush();
+            }
+            
             echo "retry: 500\n\n";
             @flush();
-            echo "data: " . json_encode(['message' => 'Test erfolgreich - Verbindung funktioniert'], JSON_UNESCAPED_UNICODE) . "\n\n";
+            
+            echo "data: " . json_encode([
+                'debug' => '✅ Test-Endpoint erreicht',
+                'user_id' => $user->id,
+                'message' => 'SSE-Verbindung funktioniert!'
+            ], JSON_UNESCAPED_UNICODE) . "\n\n";
             @flush();
+            
             sleep(1);
+            
+            echo "data: " . json_encode([
+                'debug' => '✅ Zweite Nachricht gesendet'
+            ], JSON_UNESCAPED_UNICODE) . "\n\n";
+            @flush();
+            
+            sleep(1);
+            
             echo "data: [DONE]\n\n";
             @flush();
         }, 200, [
             'Content-Type' => 'text/event-stream',
             'Cache-Control' => 'no-cache, no-transform',
             'Connection' => 'keep-alive',
+            'X-Accel-Buffering' => 'no', // Nginx buffering deaktivieren
         ]);
     })->name('core.ai.stream.test');
 });
