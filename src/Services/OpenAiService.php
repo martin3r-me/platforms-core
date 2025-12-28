@@ -208,6 +208,7 @@ class OpenAiService
         $buffer = '';
         $currentEvent = null; $currentToolCall = null; $toolArguments = '';
         $onToolStart = $options['on_tool_start'] ?? null; $toolExecutor = $options['tool_executor'] ?? null;
+        $onDebug = $options['on_debug'] ?? null; // Optional: Debug-Callback für detailliertes Logging
         $eventCount = 0;
         $deltaCount = 0;
         while (!$body->eof()) {
@@ -242,6 +243,15 @@ class OpenAiService
                         'data_preview' => json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
                     ]);
                     $eventCount++;
+                }
+                
+                // Optional: Debug-Callback für detailliertes Logging (z.B. im TestCommand)
+                if (is_callable($onDebug)) {
+                    try {
+                        $onDebug($currentEvent, $decoded);
+                    } catch (\Throwable $e) {
+                        // Ignore debug callback errors
+                    }
                 }
                 
                 switch ($currentEvent) {

@@ -299,8 +299,37 @@ class TestOpenAiCommand extends Command
                 
                 try {
                     $this->line("5.5: Rufe streamChat auf...");
-                    $openAi->streamChat($messages, function (string $delta) use (&$streamedContent) {
+                    $this->line("5.6: Stream-Debugging aktiviert - alle Events werden geloggt");
+                    $this->newLine();
+                    
+                    $eventCount = 0;
+                    $deltaCount = 0;
+                    $toolCallCount = 0;
+                    $lastEvent = null;
+                    $events = [];
+                    
+                    // Debug-Callback für alle Events
+                    $options['on_debug'] = function($event, $data) use (&$eventCount, &$events, &$toolCallCount) {
+                        $eventCount++;
+                        $events[] = [
+                            'event' => $event,
+                            'keys' => array_keys($data),
+                            'has_tool_call' => isset($data['name']) || isset($data['tool_name']),
+                        ];
+                        
+                        if (isset($data['name']) || isset($data['tool_name'])) {
+                            $toolCallCount++;
+                        }
+                        
+                        // Zeige die ersten 10 Events direkt an
+                        if ($eventCount <= 10) {
+                            echo "\n[Event #{$eventCount}] {$event}: " . json_encode(array_keys($data), JSON_UNESCAPED_UNICODE) . "\n";
+                        }
+                    };
+                    
+                    $openAi->streamChat($messages, function (string $delta) use (&$streamedContent, &$deltaCount) {
                         $streamedContent .= $delta;
+                        $deltaCount++;
                         echo $delta; // Direkte Ausgabe
                     }, model: 'gpt-4o-mini', options: $options);
                     
@@ -308,10 +337,33 @@ class TestOpenAiCommand extends Command
                     $this->newLine();
                     $this->line("✅ Stream abgeschlossen (Dauer: {$duration}ms)");
                     $this->line("Streamed Content Länge: " . mb_strlen($streamedContent));
+                    $this->line("Delta-Count: {$deltaCount}");
+                    $this->line("Event-Count: {$eventCount}");
+                    $this->line("Tool-Call-Count: {$toolCallCount}");
                     $this->newLine();
                     
-                    $this->info("Antwort (aus Stream):");
-                    $this->line($streamedContent);
+                    // Zeige Event-Übersicht
+                    if (count($events) > 0) {
+                        $this->line("Event-Übersicht (erste 20):");
+                        foreach (array_slice($events, 0, 20) as $idx => $event) {
+                            $this->line("  " . ($idx + 1) . ". {$event['event']}: " . implode(', ', $event['keys']));
+                        }
+                        if (count($events) > 20) {
+                            $this->line("  ... und " . (count($events) - 20) . " weitere Events");
+                        }
+                        $this->newLine();
+                    }
+                    
+                    if (mb_strlen($streamedContent) === 0) {
+                        $this->warn("⚠️  PROBLEM: Stream-Content ist leer!");
+                        $this->line("  → Mögliche Ursachen:");
+                        $this->line("     1. OpenAI sendet keine Antwort");
+                        $this->line("     2. Stream wird nicht korrekt geparst");
+                        $this->line("     3. Tool-Aufrufe werden nicht verarbeitet");
+                    } else {
+                        $this->info("Antwort (aus Stream):");
+                        $this->line($streamedContent);
+                    }
                     
                 } catch (\Throwable $streamError) {
                     $duration = round((microtime(true) - $startTime) * 1000);
