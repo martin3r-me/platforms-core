@@ -172,43 +172,45 @@ class CoreAiStreamController extends Controller
                     ], JSON_UNESCAPED_UNICODE) . "\n\n";
                     @flush();
                     
-                    // Schritt 1: ToolRegistry laden (direkt instanziieren, um afterResolving zu vermeiden)
+                    // Schritt 1: ToolRegistry laden (KOMPLETT ohne Container-Interaktion)
+                    // INNOVATIV: Direkte Instanz, keine Container-Bindung - maximale Isolation
+                    $registry = null;
+                    $toolExecutor = null;
+                    
                     try {
                         echo "data: " . json_encode([
-                            'debug' => 'Lade ToolRegistry (direkt)...'
+                            'debug' => 'Schritt 1: Erstelle ToolRegistry (ohne Container)...'
                         ], JSON_UNESCAPED_UNICODE) . "\n\n";
                         @flush();
                         
-                        // Versuche zuerst die gebundene Instanz zu verwenden
+                        // Direkt instanziieren - KEINE Container-Interaktion
+                        $registry = new \Platform\Core\Tools\ToolRegistry();
+                        
+                        echo "data: " . json_encode([
+                            'debug' => '✅ ToolRegistry instanziiert: ' . get_class($registry)
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+                        
+                        // Optional: Im Container binden (nur wenn app() verfügbar ist)
                         try {
-                            if (app()->bound(\Platform\Core\Tools\ToolRegistry::class)) {
-                                $registry = app(\Platform\Core\Tools\ToolRegistry::class);
-                                echo "data: " . json_encode([
-                                    'debug' => 'ToolRegistry aus Container geladen'
-                                ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                                @flush();
-                            } else {
-                                // Direkt instanziieren und binden - vermeidet afterResolving Callbacks
-                                $registry = new \Platform\Core\Tools\ToolRegistry();
+                            if (function_exists('app') && app() instanceof \Illuminate\Contracts\Container\Container) {
                                 app()->instance(\Platform\Core\Tools\ToolRegistry::class, $registry);
                                 echo "data: " . json_encode([
-                                    'debug' => 'ToolRegistry direkt instanziiert und gebunden'
+                                    'debug' => '✅ ToolRegistry im Container gebunden'
                                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
                                 @flush();
                             }
-                        } catch (\Throwable $registryError) {
-                            // Fallback: Neue Instanz ohne Binding
-                            $registry = new \Platform\Core\Tools\ToolRegistry();
+                        } catch (\Throwable $bindError) {
+                            // Binding fehlgeschlagen - kein Problem, wir verwenden die Instanz direkt
                             echo "data: " . json_encode([
-                                'debug' => 'ToolRegistry Fallback: Neue Instanz erstellt (ohne Binding)',
-                                'error' => $registryError->getMessage()
+                                'debug' => '⚠️ Container-Binding fehlgeschlagen (nicht kritisch): ' . $bindError->getMessage()
                             ], JSON_UNESCAPED_UNICODE) . "\n\n";
                             @flush();
                         }
                     } catch (\Throwable $e1) {
                         echo "data: " . json_encode([
                             'error' => 'ToolRegistry Fehler',
-                            'debug' => 'ToolRegistry Fehler: ' . $e1->getMessage() . ' in ' . $e1->getFile() . ':' . $e1->getLine() . "\nTrace: " . substr($e1->getTraceAsString(), 0, 500)
+                            'debug' => '❌ ToolRegistry Fehler: ' . $e1->getMessage() . ' in ' . $e1->getFile() . ':' . $e1->getLine() . "\nTrace: " . substr($e1->getTraceAsString(), 0, 500)
                         ], JSON_UNESCAPED_UNICODE) . "\n\n";
                         @flush();
                         // Nicht werfen - ohne Tools weiter machen

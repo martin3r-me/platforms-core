@@ -4,98 +4,224 @@ namespace Platform\Core\Console\Commands;
 
 use Illuminate\Console\Command;
 use Platform\Core\Services\OpenAiService;
+use Platform\Core\Tools\ToolRegistry;
+use Platform\Core\Tools\ToolExecutor;
 
 class TestOpenAiCommand extends Command
 {
-    protected $signature = 'core:test-openai {message=Hallo Welt}';
-    protected $description = 'Test OpenAI Service - Sendet eine Nachricht und zeigt die Antwort';
+    protected $signature = 'core:test-openai {message=Hallo Welt} {--stream : Teste Stream statt Chat} {--tools : Aktiviere Tools}';
+    protected $description = 'Test OpenAI Service - Sendet eine Nachricht und zeigt die Antwort (mit ausführlichem Debugging)';
 
     public function handle()
     {
         $message = $this->argument('message');
+        $useStream = $this->option('stream');
+        $useTools = $this->option('tools');
         
-        $this->info("=== OpenAI Test ===");
+        $this->info("=== OpenAI Test (mit Debugging) ===");
         $this->line("Nachricht: {$message}");
+        $this->line("Modus: " . ($useStream ? "Stream" : "Chat"));
+        $this->line("Tools: " . ($useTools ? "Aktiviert" : "Deaktiviert"));
         $this->newLine();
         
         try {
-            $this->line("Initialisiere OpenAiService...");
-            $openAi = app(OpenAiService::class);
-            $this->line("✅ OpenAiService initialisiert");
+            // Schritt 1: OpenAiService laden
+            $this->line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            $this->line("SCHRITT 1: OpenAiService laden");
+            $this->line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            try {
+                $openAi = app(OpenAiService::class);
+                $this->line("✅ OpenAiService geladen: " . get_class($openAi));
+            } catch (\Throwable $e) {
+                $this->error("❌ OpenAiService Fehler: " . $e->getMessage());
+                $this->line("  Datei: " . $e->getFile() . ":" . $e->getLine());
+                throw $e;
+            }
             $this->newLine();
             
-            $this->line("Sende Nachricht an OpenAI...");
+            // Schritt 2: ToolRegistry laden (wenn Tools aktiviert)
+            $toolExecutor = null;
+            if ($useTools) {
+                $this->line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                $this->line("SCHRITT 2: ToolRegistry & ToolExecutor laden");
+                $this->line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                
+                try {
+                    $this->line("2.1: Erstelle ToolRegistry (direkt, ohne Container)...");
+                    $registry = new ToolRegistry();
+                    $this->line("✅ ToolRegistry instanziiert: " . get_class($registry));
+                    
+                    $this->line("2.2: Prüfe vorhandene Tools...");
+                    $tools = $registry->all();
+                    $this->line("  Vorhandene Tools: " . count($tools));
+                    
+                    if (count($tools) === 0) {
+                        $this->line("2.3: Keine Tools - registriere EchoTool...");
+                        $echoTool = new \Platform\Core\Tools\EchoTool();
+                        $registry->register($echoTool);
+                        $tools = $registry->all();
+                        $this->line("✅ EchoTool registriert - Tools: " . count($tools));
+                    }
+                    
+                    $this->line("2.4: Erstelle ToolExecutor...");
+                    $toolExecutor = new ToolExecutor($registry);
+                    $this->line("✅ ToolExecutor erstellt: " . get_class($toolExecutor));
+                    
+                    // Optional: Im Container binden
+                    try {
+                        app()->instance(ToolRegistry::class, $registry);
+                        $this->line("✅ ToolRegistry im Container gebunden");
+                    } catch (\Throwable $bindError) {
+                        $this->warn("⚠️  Container-Binding fehlgeschlagen (nicht kritisch): " . $bindError->getMessage());
+                    }
+                    
+                } catch (\Throwable $e) {
+                    $this->error("❌ Tool-Loading Fehler: " . $e->getMessage());
+                    $this->line("  Datei: " . $e->getFile() . ":" . $e->getLine());
+                    $this->line("  Trace: " . substr($e->getTraceAsString(), 0, 500));
+                    $this->warn("⚠️  Weiter ohne Tools...");
+                    $toolExecutor = null;
+                }
+                $this->newLine();
+            }
+            
+            // Schritt 3: Messages vorbereiten
+            $this->line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            $this->line("SCHRITT 3: Messages vorbereiten");
+            $this->line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             $messages = [
                 ['role' => 'user', 'content' => $message]
             ];
+            $this->line("Messages: " . json_encode($messages, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+            $this->newLine();
             
-            $this->line("  Messages: " . json_encode($messages, JSON_UNESCAPED_UNICODE));
-            $this->line("  Model: gpt-4o-mini");
-            $this->line("  Options: tools=false, max_tokens=100");
+            // Schritt 4: Options vorbereiten
+            $this->line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            $this->line("SCHRITT 4: Options vorbereiten");
+            $this->line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            $options = [
+                'max_tokens' => 100,
+                'temperature' => 0.7,
+                'with_context' => true,
+            ];
+            
+            if ($useTools && $toolExecutor !== null) {
+                $options['tools'] = null; // null = aktivieren
+                $options['on_tool_start'] = function(string $tool) {
+                    $this->line("🔧 Tool gestartet: {$tool}");
+                };
+                $options['tool_executor'] = function($toolName, $arguments) use ($toolExecutor) {
+                    try {
+                        $this->line("⚙️  Führe Tool aus: {$toolName}");
+                        $this->line("  Argumente: " . json_encode($arguments, JSON_UNESCAPED_UNICODE));
+                        
+                        $context = \Platform\Core\Tools\ToolContext::fromAuth();
+                        $result = $toolExecutor->execute($toolName, $arguments, $context);
+                        $resultArray = $result->toArray();
+                        
+                        $this->line("✅ Tool erfolgreich: " . json_encode($resultArray, JSON_UNESCAPED_UNICODE));
+                        return $resultArray;
+                    } catch (\Throwable $e) {
+                        $this->error("❌ Tool Fehler: " . $e->getMessage());
+                        return [
+                            'ok' => false,
+                            'error' => ['code' => 'EXECUTION_ERROR', 'message' => $e->getMessage()]
+                        ];
+                    }
+                };
+                $this->line("✅ Tools aktiviert");
+            } else {
+                $options['tools'] = false;
+                $this->line("✅ Tools deaktiviert");
+            }
+            $this->newLine();
+            
+            // Schritt 5: OpenAI aufrufen
+            $this->line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            $this->line("SCHRITT 5: OpenAI aufrufen");
+            $this->line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            $this->line("Model: gpt-4o-mini");
+            $this->line("Options: " . json_encode($options, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
             $this->newLine();
             
             $startTime = microtime(true);
-            $this->line("  Warte auf Antwort...");
-            $this->line("  (Timeout: 20 Sekunden)");
-            $this->newLine();
+            $response = null;
+            $streamedContent = '';
             
-            try {
-                $response = $openAi->chat($messages, 'gpt-4o-mini', [
-                    'max_tokens' => 100,
-                    'temperature' => 0.7,
-                    'tools' => false, // Erstmal ohne Tools testen
-                ]);
-                
-                $duration = round((microtime(true) - $startTime) * 1000);
-                $this->line("✅ Antwort erhalten (Dauer: {$duration}ms)");
-                $this->newLine();
-                
-                // Zeige vollständige Response
-                $this->line("Vollständige Response:");
-                $this->line(json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-                $this->newLine();
-                
-            } catch (\Throwable $chatError) {
-                $duration = round((microtime(true) - $startTime) * 1000);
-                $this->error("❌ Fehler nach {$duration}ms:");
-                $this->error("  " . $chatError->getMessage());
-                $this->error("  Datei: " . $chatError->getFile() . ":" . $chatError->getLine());
-                $this->line("  Trace: " . substr($chatError->getTraceAsString(), 0, 800));
-                throw $chatError;
-            }
-            
-            $this->info("Antwort:");
-            $content = $response['content'] ?? 'Keine Antwort';
-            if (is_array($content)) {
-                $this->warn("  ⚠️  Content ist ein Array, nicht ein String!");
-                $this->line("  Content-Struktur: " . json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            if ($useStream) {
+                $this->line("5.1: Starte streamChat...");
+                try {
+                    $openAi->streamChat($messages, function (string $delta) use (&$streamedContent) {
+                        $streamedContent .= $delta;
+                        echo $delta; // Direkte Ausgabe
+                    }, model: 'gpt-4o-mini', options: $options);
+                    
+                    $duration = round((microtime(true) - $startTime) * 1000);
+                    $this->newLine();
+                    $this->line("✅ Stream abgeschlossen (Dauer: {$duration}ms)");
+                    $this->line("Streamed Content Länge: " . mb_strlen($streamedContent));
+                    $this->newLine();
+                    
+                    $this->info("Antwort (aus Stream):");
+                    $this->line($streamedContent);
+                    
+                } catch (\Throwable $streamError) {
+                    $duration = round((microtime(true) - $startTime) * 1000);
+                    $this->error("❌ Stream-Fehler nach {$duration}ms:");
+                    $this->error("  " . $streamError->getMessage());
+                    $this->error("  Datei: " . $streamError->getFile() . ":" . $streamError->getLine());
+                    $this->line("  Trace: " . substr($streamError->getTraceAsString(), 0, 1000));
+                    throw $streamError;
+                }
             } else {
-                $this->line($content);
+                $this->line("5.1: Starte chat...");
+                try {
+                    $response = $openAi->chat($messages, 'gpt-4o-mini', $options);
+                    
+                    $duration = round((microtime(true) - $startTime) * 1000);
+                    $this->line("✅ Antwort erhalten (Dauer: {$duration}ms)");
+                    $this->newLine();
+                    
+                    $this->info("Antwort:");
+                    $content = $response['content'] ?? 'Keine Antwort';
+                    if (is_array($content)) {
+                        $this->warn("  ⚠️  Content ist ein Array!");
+                        $this->line("  Content: " . json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                    } else {
+                        $this->line($content);
+                    }
+                    $this->newLine();
+                    
+                    if (isset($response['usage'])) {
+                        $this->line("Token-Usage:");
+                        $this->line("  Input: " . ($response['usage']['input_tokens'] ?? $response['usage']['prompt_tokens'] ?? 0));
+                        $this->line("  Output: " . ($response['usage']['output_tokens'] ?? $response['usage']['completion_tokens'] ?? 0));
+                        $this->line("  Total: " . ($response['usage']['total_tokens'] ?? 0));
+                    }
+                    
+                } catch (\Throwable $chatError) {
+                    $duration = round((microtime(true) - $startTime) * 1000);
+                    $this->error("❌ Chat-Fehler nach {$duration}ms:");
+                    $this->error("  " . $chatError->getMessage());
+                    $this->error("  Datei: " . $chatError->getFile() . ":" . $chatError->getLine());
+                    $this->line("  Trace: " . substr($chatError->getTraceAsString(), 0, 1000));
+                    throw $chatError;
+                }
             }
+            
             $this->newLine();
-            
-            if (isset($response['usage'])) {
-                $this->line("Token-Usage:");
-                $this->line("  Input: " . ($response['usage']['input_tokens'] ?? $response['usage']['prompt_tokens'] ?? 0));
-                $this->line("  Output: " . ($response['usage']['output_tokens'] ?? $response['usage']['completion_tokens'] ?? 0));
-                $this->line("  Total: " . ($response['usage']['total_tokens'] ?? 0));
-            }
-            
-            // Zeige auch die rohe Response-Struktur
-            $this->newLine();
-            $this->line("Response-Struktur:");
-            $this->line("  Keys: " . implode(', ', array_keys($response)));
-            if (isset($response['usage']['output_tokens']) && $response['usage']['output_tokens'] > 0 && empty($response['content'])) {
-                $this->warn("  ⚠️  Output-Tokens vorhanden, aber Content leer!");
-                $this->line("  → Möglicherweise falsches Response-Format");
-            }
-            
+            $this->info("✅ Test erfolgreich abgeschlossen!");
             return 0;
             
         } catch (\Throwable $e) {
-            $this->error("❌ Fehler: " . $e->getMessage());
-            $this->line("Datei: " . $e->getFile() . ":" . $e->getLine());
-            $this->line("Trace: " . substr($e->getTraceAsString(), 0, 500));
+            $this->newLine();
+            $this->error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            $this->error("❌ FEHLER:");
+            $this->error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            $this->error("Message: " . $e->getMessage());
+            $this->error("Datei: " . $e->getFile() . ":" . $e->getLine());
+            $this->line("Trace:");
+            $this->line($e->getTraceAsString());
             return 1;
         }
     }
