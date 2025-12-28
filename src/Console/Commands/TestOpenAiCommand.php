@@ -129,18 +129,25 @@ class TestOpenAiCommand extends Command
                         $this->line("⚙️  Führe Tool aus: {$toolName}");
                         $this->line("  Argumente: " . json_encode($arguments, JSON_UNESCAPED_UNICODE));
                         
-                        // Erstelle Mock-User für Command-Kontext
+                        // Erstelle Mock-User und Mock-Team für Command-Kontext
                         try {
                             $context = \Platform\Core\Contracts\ToolContext::fromAuth();
                         } catch (\RuntimeException $e) {
-                            // Kein authentifizierter User - erstelle Mock-User für Tests
+                            // Kein authentifizierter User - erstelle Mock-User und Mock-Team für Tests
                             $this->line("  ⚠️  Kein authentifizierter User - verwende Mock-User für Tests");
                             $mockUser = new \Platform\Core\Models\User([
                                 'id' => 999,
                                 'name' => 'Test User',
                                 'email' => 'test@example.com',
                             ]);
-                            $context = new \Platform\Core\Contracts\ToolContext($mockUser);
+                            
+                            // Erstelle Mock-Team für Tests
+                            $mockTeam = new \Platform\Core\Models\Team([
+                                'id' => 999,
+                                'name' => 'Test Team',
+                            ]);
+                            
+                            $context = new \Platform\Core\Contracts\ToolContext($mockUser, $mockTeam);
                         }
                         
                         $result = $toolExecutor->execute($toolName, $arguments, $context);

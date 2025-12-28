@@ -210,6 +210,15 @@ class CoreServiceProvider extends ServiceProvider
                 }
             }
             
+            // ListTeamsTool (wichtig für AI - zeigt verfügbare Teams)
+            if (!$registry->has('core.teams.list')) {
+                try {
+                    $registry->register($this->app->make(\Platform\Core\Tools\ListTeamsTool::class));
+                } catch (\Throwable $e) {
+                    // Silent fail
+                }
+            }
+            
             // EchoTool
             if (!$registry->has('echo')) {
                 try {
