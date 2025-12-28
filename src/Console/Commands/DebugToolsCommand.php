@@ -102,10 +102,12 @@ class DebugToolsCommand extends Command
         try {
             $user = auth()->user();
             if ($user) {
-                $this->line("   ✅ User: {$user->id} ({$user->name ?? 'no name'})");
+                $userName = $user->name ?? 'no name';
+                $this->line("   ✅ User: {$user->id} ({$userName})");
                 if (method_exists($user, 'currentTeam')) {
                     $team = $user->currentTeam;
-                    $this->line("   Team: " . ($team ? "{$team->id} ({$team->name})" : "kein Team"));
+                    $teamInfo = $team ? "{$team->id} ({$team->name})" : "kein Team";
+                    $this->line("   Team: {$teamInfo}");
                 }
             } else {
                 $this->warn('   ⚠️  Kein User authentifiziert');
