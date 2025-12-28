@@ -147,6 +147,7 @@ class DebugToolsCommand extends Command
                     public function getAuthIdentifierName() { return 'id'; }
                     public function getAuthIdentifier() { return $this->id; }
                     public function getAuthPassword() { return ''; }
+                    public function getAuthPasswordName() { return 'password'; }
                     public function getRememberToken() { return ''; }
                     public function setRememberToken($value) {}
                     public function getRememberTokenName() { return ''; }
