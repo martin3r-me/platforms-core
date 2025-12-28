@@ -455,41 +455,51 @@ class OpenAiService
         $tools = [];
         
         // 1. Tools aus ToolRegistry (loose gekoppelt - Module registrieren ihre Tools hier)
-        // WICHTIG: Verwende resolve() statt app() - das triggert afterResolving nur einmal
-        // ABER: resolve() kann auch blockieren - verwende direkte Instanz wenn möglich
+        // WICHTIG: Robuste Fehlerbehandlung - Chat funktioniert auch ohne Tools
         try {
+            $toolRegistry = null;
+            
             // Versuche die Registry zu bekommen - sollte bereits geladen sein
-            // Falls nicht, erstelle eine neue Instanz (ohne afterResolving zu triggern)
-            if ($this->app->bound(ToolRegistry::class)) {
-                $toolRegistry = $this->app->make(ToolRegistry::class);
-            } else {
-                // Registry nicht gebunden - erstelle neue Instanz (ohne Callbacks)
-                // Das passiert nur, wenn Registry noch nicht initialisiert wurde
-                $toolRegistry = new ToolRegistry();
+            // ABER: Im Stream-Kontext könnte die Registry noch nicht gebunden sein
+            try {
+                if (isset($this->app) && $this->app->bound(ToolRegistry::class)) {
+                    $toolRegistry = $this->app->make(ToolRegistry::class);
+                }
+            } catch (\Throwable $e) {
+                // Container-Zugriff fehlgeschlagen - kein Problem, erstelle neue Instanz
             }
             
-            $allTools = $toolRegistry->all();
-            
-            Log::info('[OpenAI Tools] Registry tools', ['count' => count($allTools)]);
-            
-            // Konvertiere alle registrierten Tools zu OpenAI-Format
-            foreach ($allTools as $tool) {
+            // Falls Registry nicht gebunden, erstelle neue Instanz (ohne Callbacks)
+            if ($toolRegistry === null) {
                 try {
-                    $toolDef = $this->convertToolToOpenAiFormat($tool);
-                    if ($toolDef) {
-                        $tools[] = $toolDef;
-                        Log::debug('[OpenAI Tools] Added tool from registry', ['tool' => $tool->getName()]);
-                    }
+                    $toolRegistry = new ToolRegistry();
                 } catch (\Throwable $e) {
-                    Log::warning('[OpenAI Tools] Tool conversion failed', [
-                        'tool' => $tool->getName(),
-                        'error' => $e->getMessage()
-                    ]);
+                    // Auch direkte Instanziierung fehlgeschlagen - ohne Tools weiter
+                    return $tools; // Leeres Array zurückgeben
                 }
             }
+            
+            // Tools aus Registry holen
+            try {
+                $allTools = $toolRegistry->all();
+                
+                // Konvertiere alle registrierten Tools zu OpenAI-Format
+                foreach ($allTools as $tool) {
+                    try {
+                        $toolDef = $this->convertToolToOpenAiFormat($tool);
+                        if ($toolDef) {
+                            $tools[] = $toolDef;
+                        }
+                    } catch (\Throwable $e) {
+                        // Einzelnes Tool-Fehler - überspringen
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Registry-Zugriff fehlgeschlagen - ohne Tools weiter
+            }
         } catch (\Throwable $e) {
-            Log::error('[OpenAI Tools] Registry access failed', ['error' => $e->getMessage()]);
-            // Return empty array - Chat funktioniert auch ohne Tools
+            // Kompletter Registry-Zugriff fehlgeschlagen - ohne Tools weiter
+            // Chat funktioniert auch ohne Tools
         }
         
         // 2. Legacy: Entity-basierte Tools aus ToolBroker (optional, falls verfügbar)

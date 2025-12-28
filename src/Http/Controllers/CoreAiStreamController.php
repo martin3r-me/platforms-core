@@ -179,7 +179,7 @@ class CoreAiStreamController extends Controller
                     
                     try {
                         echo "data: " . json_encode([
-                            'debug' => 'Schritt 1: Erstelle ToolRegistry (ohne Container)...'
+                            'debug' => 'Schritt 1.1: Vor Instanziierung von ToolRegistry...'
                         ], JSON_UNESCAPED_UNICODE) . "\n\n";
                         @flush();
                         
@@ -187,7 +187,12 @@ class CoreAiStreamController extends Controller
                         $registry = new \Platform\Core\Tools\ToolRegistry();
                         
                         echo "data: " . json_encode([
-                            'debug' => '✅ ToolRegistry instanziiert: ' . get_class($registry)
+                            'debug' => 'Schritt 1.2: ToolRegistry instanziiert, Typ: ' . get_class($registry)
+                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                        @flush();
+                        
+                        echo "data: " . json_encode([
+                            'debug' => 'Schritt 1.3: ToolRegistry erfolgreich erstellt'
                         ], JSON_UNESCAPED_UNICODE) . "\n\n";
                         @flush();
                         
@@ -208,11 +213,18 @@ class CoreAiStreamController extends Controller
                             @flush();
                         }
                     } catch (\Throwable $e1) {
-                        echo "data: " . json_encode([
-                            'error' => 'ToolRegistry Fehler',
-                            'debug' => '❌ ToolRegistry Fehler: ' . $e1->getMessage() . ' in ' . $e1->getFile() . ':' . $e1->getLine() . "\nTrace: " . substr($e1->getTraceAsString(), 0, 500)
-                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
+                        try {
+                            echo "data: " . json_encode([
+                                'error' => 'ToolRegistry Fehler',
+                                'debug' => '❌ ToolRegistry Fehler: ' . $e1->getMessage() . ' in ' . $e1->getFile() . ':' . $e1->getLine() . "\nTrace: " . substr($e1->getTraceAsString(), 0, 500)
+                            ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                            @flush();
+                        } catch (\Throwable $e) {
+                            // Selbst der Error-Output schlägt fehl - kritisch
+                            // Versuche es nochmal ohne JSON
+                            echo "data: {\"error\":\"ToolRegistry Fehler\",\"debug\":\"Kritischer Fehler beim Error-Handling\"}\n\n";
+                            @flush();
+                        }
                         // Nicht werfen - ohne Tools weiter machen
                         $registry = null;
                         $toolExecutor = null;
