@@ -171,17 +171,18 @@ class CoreAiStreamController extends Controller
                     ], JSON_UNESCAPED_UNICODE) . "\n\n";
                     @flush();
                     
-                    // Schritt 1: ToolRegistry laden
+                    // Schritt 1: ToolRegistry laden (direkt instanziieren, um afterResolving zu vermeiden)
                     try {
                         echo "data: " . json_encode([
-                            'debug' => 'Lade ToolRegistry...'
+                            'debug' => 'Lade ToolRegistry (direkt)...'
                         ], JSON_UNESCAPED_UNICODE) . "\n\n";
                         @flush();
                         
-                        $registry = app(\Platform\Core\Tools\ToolRegistry::class);
+                        // Direkt instanziieren statt app() - vermeidet afterResolving Callbacks
+                        $registry = new \Platform\Core\Tools\ToolRegistry();
                         
                         echo "data: " . json_encode([
-                            'debug' => 'ToolRegistry geladen: ' . get_class($registry)
+                            'debug' => 'ToolRegistry direkt instanziiert: ' . get_class($registry)
                         ], JSON_UNESCAPED_UNICODE) . "\n\n";
                         @flush();
                     } catch (\Throwable $e1) {
