@@ -135,133 +135,11 @@ class CoreAiStreamController extends Controller
             ], JSON_UNESCAPED_UNICODE) . "\n\n";
             @flush();
             
-            // Lazy-load Dependencies im Callback
+            // Einfacher Ansatz: Erstmal ohne Tools, nur Chat
             try {
-                $debugInfos[] = '🔄 Lade Dependencies...';
-                echo "data: " . json_encode([
-                    'debug' => '🔄 Lade Dependencies...'
-                ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                @flush();
-                
                 $openAi = app(OpenAiService::class);
-                $debugInfos[] = '✅ OpenAiService geladen';
-                echo "data: " . json_encode([
-                    'debug' => '✅ OpenAiService geladen'
-                ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                @flush();
                 
-                // Versuche ToolExecutor zu laden - direkt instanziieren, um afterResolving Callbacks zu vermeiden
-                try {
-                    $debugInfos[] = '🔄 Lade ToolRegistry...';
-                    echo "data: " . json_encode([
-                        'debug' => '🔄 Lade ToolRegistry...'
-                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                    @flush();
-                    
-                    $registry = app(\Platform\Core\Tools\ToolRegistry::class);
-                    $debugInfos[] = '✅ ToolRegistry geladen';
-                    echo "data: " . json_encode([
-                        'debug' => '✅ ToolRegistry geladen'
-                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                    @flush();
-                    
-                    $debugInfos[] = '🔄 Erstelle ToolExecutor...';
-                    echo "data: " . json_encode([
-                        'debug' => '🔄 Erstelle ToolExecutor...'
-                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                    @flush();
-                    
-                    // Direkt instanziieren statt app() zu verwenden, um afterResolving Callbacks zu vermeiden
-                    $toolExecutor = new \Platform\Core\Tools\ToolExecutor($registry);
-                    $debugInfos[] = '✅ ToolExecutor erstellt';
-                    echo "data: " . json_encode([
-                        'debug' => '✅ ToolExecutor erstellt'
-                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                    @flush();
-                } catch (\Throwable $e2) {
-                    $debugInfos[] = "❌ Fehler beim Laden des ToolExecutor:";
-                    $debugInfos[] = "Datei: {$e2->getFile()}";
-                    $debugInfos[] = "Zeile: {$e2->getLine()}";
-                    $debugInfos[] = "Fehler: {$e2->getMessage()}";
-                    $debugInfos[] = "Trace: " . substr($e2->getTraceAsString(), 0, 1000);
-                    
-                    echo "data: " . json_encode([
-                        'error' => 'ToolExecutor Error',
-                        'debug' => "❌ Fehler beim Laden des ToolExecutor:\nDatei: {$e2->getFile()}\nZeile: {$e2->getLine()}\nFehler: {$e2->getMessage()}\nTrace: " . substr($e2->getTraceAsString(), 0, 500)
-                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                    @flush();
-                    
-                    // Speichere Debug-Infos als Chat-Nachricht
-                    try {
-                        \Platform\Core\Models\CoreChatMessage::create([
-                            'core_chat_id' => $thread->core_chat_id,
-                            'thread_id' => $thread->id,
-                            'role' => 'assistant',
-                            'content' => "❌ Stream-Fehler aufgetreten!\n\n🔍 Debug-Infos:\n" . implode("\n", $debugInfos),
-                            'tokens_in' => 0,
-                        ]);
-                    } catch (\Throwable $saveError) {
-                        // Ignore save errors
-                    }
-                    
-                    throw $e2; // Re-throw um in outer catch zu landen
-                }
-            } catch (\Throwable $e) {
-                $debugInfos[] = "❌ Fehler beim Laden der Dependencies:";
-                $debugInfos[] = "Datei: {$e->getFile()}";
-                $debugInfos[] = "Zeile: {$e->getLine()}";
-                $debugInfos[] = "Fehler: {$e->getMessage()}";
-                $debugInfos[] = "Trace: " . substr($e->getTraceAsString(), 0, 1000);
-                
-                echo "data: " . json_encode([
-                    'error' => 'Dependency Error',
-                    'debug' => "❌ Fehler beim Laden der Dependencies:\nDatei: {$e->getFile()}\nZeile: {$e->getLine()}\nFehler: {$e->getMessage()}\nTrace: " . substr($e->getTraceAsString(), 0, 500)
-                ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                @flush();
-                
-                // Speichere Debug-Infos als Chat-Nachricht
-                try {
-                    \Platform\Core\Models\CoreChatMessage::create([
-                        'core_chat_id' => $thread->core_chat_id,
-                        'thread_id' => $thread->id,
-                        'role' => 'assistant',
-                        'content' => "❌ Stream-Fehler aufgetreten!\n\n🔍 Debug-Infos:\n" . implode("\n", $debugInfos),
-                        'tokens_in' => 0,
-                    ]);
-                } catch (\Throwable $saveError) {
-                    // Ignore save errors
-                }
-                
-                return;
-            }
-            
-            $debugInfos[] = '✅ Alle Dependencies geladen, starte Try-Block...';
-            echo "data: " . json_encode([
-                'debug' => '✅ Alle Dependencies geladen, starte Try-Block...'
-            ], JSON_UNESCAPED_UNICODE) . "\n\n";
-            @flush();
-            
-            try {
-                $debugInfos[] = '✅ Try-Block gestartet';
-                echo "data: " . json_encode([
-                    'debug' => '✅ Try-Block gestartet'
-                ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                @flush();
-                
-                // Zusätzliche Debug-Info
-                $debugInfos[] = '📋 Messages: ' . count($messages) . ' | Assistant ID: ' . ($assistantId ?: 'neu');
-                echo "data: " . json_encode([
-                    'debug' => '📋 Messages: ' . count($messages) . ' | Assistant ID: ' . ($assistantId ?: 'neu')
-                ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                @flush();
-
-                // Use provided assistant placeholder or create a new one
-                $debugInfos[] = '📝 Erstelle/Update Assistant-Message...';
-                echo "data: " . json_encode([
-                    'debug' => '📝 Erstelle/Update Assistant-Message...'
-                ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                @flush();
-                
+                // Assistant-Message erstellen
                 if ($assistantId) {
                     $assistantMessage = CoreChatMessage::find($assistantId);
                     if (!$assistantMessage) {
@@ -290,18 +168,12 @@ class CoreAiStreamController extends Controller
                 }
 
                 $lastFlushAt = microtime(true);
-                $flushInterval = 0.35; // seconds
-                $flushThreshold = 800;  // characters
+                $flushInterval = 0.35;
+                $flushThreshold = 800;
                 $pendingSinceLastFlush = 0;
 
-                // Debug: Starte OpenAI Stream
-                echo "data: " . json_encode([
-                    'debug' => '🚀 Starte OpenAI StreamChat...'
-                ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                @flush();
-
-            // Stream deltas with tool execution
-            $openAi->streamChat($messages, function (string $delta) use (&$assistantBuffer, &$lastFlushAt, $flushInterval, $flushThreshold, &$pendingSinceLastFlush, $assistantMessage) {
+                // Stream OHNE Tools - einfach nur Chat
+                $openAi->streamChat($messages, function (string $delta) use (&$assistantBuffer, &$lastFlushAt, $flushInterval, $flushThreshold, &$pendingSinceLastFlush, $assistantMessage) {
                 $assistantBuffer .= $delta;
                 $pendingSinceLastFlush += mb_strlen($delta);
 
@@ -324,53 +196,7 @@ class CoreAiStreamController extends Controller
                 'source_route' => $sourceRoute,
                 'source_module' => $sourceModule,
                 'source_url' => $sourceUrl,
-                'on_tool_start' => function(string $tool) {
-                    echo 'data: ' . json_encode([
-                        'tool' => $tool,
-                        'debug' => "🔧 Tool gestartet: {$tool}"
-                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                    @flush();
-                },
-                'tool_executor' => function($toolName, $arguments) use ($toolExecutor) {
-                    try {
-                        echo 'data: ' . json_encode([
-                            'debug' => "⚙️ Führe Tool aus: {$toolName}"
-                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
-                        
-                        $context = ToolContext::fromAuth();
-                        $result = $toolExecutor->execute($toolName, $arguments, $context);
-                        
-                        // Konvertiere ToolResult zu altem Format für Kompatibilität
-                        $resultArray = $result->toArray();
-                        
-                        echo 'data: ' . json_encode([
-                            'tool' => $toolName, 
-                            'result' => $resultArray,
-                            'debug' => "✅ Tool {$toolName} erfolgreich ausgeführt"
-                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
-                        
-                        return $resultArray;
-                    } catch (\Throwable $e) {
-                        $errorResult = [
-                            'ok' => false,
-                            'error' => [
-                                'code' => 'EXECUTION_ERROR',
-                                'message' => $e->getMessage()
-                            ]
-                        ];
-                        
-                        echo 'data: ' . json_encode([
-                            'tool' => $toolName, 
-                            'result' => $errorResult,
-                            'debug' => "❌ Tool {$toolName} Fehler: {$e->getMessage()}"
-                        ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                        @flush();
-                        
-                        return $errorResult;
-                    }
-                }
+                'tools' => false, // Tools deaktiviert - erstmal nur Chat
             ]);
 
                 // Close stream
