@@ -35,7 +35,10 @@ class OpenAiService
                 'max_output_tokens' => $options['max_tokens'] ?? 1000,
                 'temperature' => $options['temperature'] ?? 0.7,
             ];
-            if (!isset($options['tools']) || $options['tools'] !== false) {
+            if (isset($options['tools']) && $options['tools'] === false) {
+                // Tools explizit deaktiviert - nichts hinzufügen
+            } else {
+                // Tools aktivieren (Standard)
                 $tools = $this->getAvailableTools();
                 $payload['tools'] = $this->normalizeToolsForResponses($tools);
                 $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
@@ -70,7 +73,10 @@ class OpenAiService
             'max_output_tokens' => $options['max_tokens'] ?? 1000,
             'temperature' => $options['temperature'] ?? 0.7,
         ];
-        if (!isset($options['tools']) || $options['tools'] !== false) {
+        if (isset($options['tools']) && $options['tools'] === false) {
+            // Tools explizit deaktiviert - nichts hinzufügen
+        } else {
+            // Tools aktivieren (Standard)
             $tools = $this->getAvailableTools();
             $payload['tools'] = $this->normalizeToolsForResponses($tools);
             $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
