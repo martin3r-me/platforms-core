@@ -14,17 +14,20 @@ class CoreAiStreamController extends Controller
 {
     public function stream(Request $request, OpenAiService $openAi, ToolExecutor $toolExecutor): StreamedResponse
     {
-        \Log::info('[CoreAiStreamController] Stream request received', [
-            'user_id' => $request->user()?->id,
-            'thread' => $request->query('thread'),
-            'assistant' => $request->query('assistant'),
-        ]);
-        
         try {
             $user = $request->user();
             if (!$user) {
-                \Log::warning('[CoreAiStreamController] No authenticated user');
-                abort(401);
+                // Sende SSE-kompatiblen Fehler
+                return new StreamedResponse(function() {
+                    echo "data: " . json_encode([
+                        'error' => 'Unauthorized - Please log in',
+                        'debug' => 'Kein authentifizierter User gefunden'
+                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                    @flush();
+                }, 401, [
+                    'Content-Type' => 'text/event-stream',
+                    'Cache-Control' => 'no-cache',
+                ]);
             }
 
             $threadId = (int) $request->query('thread');
@@ -34,26 +37,43 @@ class CoreAiStreamController extends Controller
             $sourceModule = $request->query('source_module');
             $sourceUrl = $request->query('source_url');
             if (!$threadId) {
-                \Log::warning('[CoreAiStreamController] Missing thread parameter');
-                abort(422, 'thread parameter is required');
+                return new StreamedResponse(function() {
+                    echo "data: " . json_encode([
+                        'error' => 'thread parameter is required',
+                        'debug' => 'Thread-ID fehlt in der Anfrage'
+                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                    @flush();
+                }, 422, [
+                    'Content-Type' => 'text/event-stream',
+                    'Cache-Control' => 'no-cache',
+                ]);
             }
 
             $thread = CoreChatThread::find($threadId);
             if (!$thread) {
-                \Log::warning('[CoreAiStreamController] Thread not found', ['thread_id' => $threadId]);
-                abort(404, 'Thread not found');
+                return new StreamedResponse(function() use ($threadId) {
+                    echo "data: " . json_encode([
+                        'error' => 'Thread not found',
+                        'debug' => "Thread mit ID {$threadId} wurde nicht gefunden"
+                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                    @flush();
+                }, 404, [
+                    'Content-Type' => 'text/event-stream',
+                    'Cache-Control' => 'no-cache',
+                ]);
             }
-            
-            \Log::info('[CoreAiStreamController] Starting stream', [
-                'thread_id' => $threadId,
-                'assistant_id' => $assistantId,
-            ]);
         } catch (\Throwable $e) {
-            \Log::error('[CoreAiStreamController] Error before stream start', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+            // Sende Fehler als SSE
+            return new StreamedResponse(function() use ($e) {
+                echo "data: " . json_encode([
+                    'error' => $e->getMessage(),
+                    'debug' => "❌ Fehler vor Stream-Start:\nDatei: {$e->getFile()}\nZeile: {$e->getLine()}\n" . substr($e->getTraceAsString(), 0, 500)
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+            }, 500, [
+                'Content-Type' => 'text/event-stream',
+                'Cache-Control' => 'no-cache',
             ]);
-            throw $e;
         }
 
         // Build messages context
@@ -74,8 +94,6 @@ class CoreAiStreamController extends Controller
 
             $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl, $toolExecutor) {
             try {
-                \Log::info('[CoreAiStreamController] Stream callback started');
-                
                 // Clean buffers to avoid server buffering
                 while (ob_get_level() > 0) {
                     @ob_end_flush();
@@ -85,7 +103,9 @@ class CoreAiStreamController extends Controller
                 echo "retry: 500\n\n";
                 @flush();
                 
-                \Log::debug('[CoreAiStreamController] SSE headers sent');
+                // Debug: Stream gestartet
+                echo "data: " . json_encode(['debug' => '✅ Stream-Callback gestartet'], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
 
             // Use provided assistant placeholder or create a new one
             if ($assistantId) {
@@ -186,9 +206,12 @@ class CoreAiStreamController extends Controller
             echo "data: [DONE]\n\n";
             @flush();
             
-            \Log::info('[CoreAiStreamController] Stream completed', [
-                'buffer_length' => mb_strlen($assistantBuffer),
-            ]);
+            // Debug: Stream beendet
+            echo "data: " . json_encode([
+                'debug' => '✅ Stream beendet',
+                'buffer_length' => mb_strlen($assistantBuffer)
+            ], JSON_UNESCAPED_UNICODE) . "\n\n";
+            @flush();
 
             // Final flush on the same assistant record
             $assistantMessage->update([
@@ -197,12 +220,11 @@ class CoreAiStreamController extends Controller
                 'meta' => ['is_streaming' => false],
             ]);
             } catch (\Throwable $e) {
-                \Log::error('[CoreAiStreamController] Error in stream callback', [
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                ]);
                 // Sende Fehler an Client
-                echo 'data: ' . json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE) . "\n\n";
+                echo 'data: ' . json_encode([
+                    'error' => $e->getMessage(),
+                    'debug' => "❌ Fehler im Stream-Callback:\nDatei: {$e->getFile()}\nZeile: {$e->getLine()}\n" . substr($e->getTraceAsString(), 0, 500)
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
             }
         });

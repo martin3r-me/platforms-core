@@ -299,6 +299,19 @@
               try {
                 const data = JSON.parse(e.data);
                 
+                // Debug-Nachrichten vom Server anzeigen
+                if(data?.debug) {
+                  this.addDebugInfo(data.debug);
+                }
+                
+                // Fehler-Nachrichten vom Server anzeigen
+                if(data?.error) {
+                  this.addDebugInfo(`❌ Server-Fehler: ${data.error}`);
+                  if(data.debug) {
+                    this.addDebugInfo(data.debug);
+                  }
+                }
+                
                 // Debug: Erste 5 Events loggen
                 if(this.eventCount <= 5) {
                   this.addDebugInfo(`📦 Event #${this.eventCount}: ${JSON.stringify(data).substring(0, 100)}`);

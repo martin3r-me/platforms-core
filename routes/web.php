@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Request;
 use Platform\Core\Http\Controllers\CoreAiStreamController;
 use Platform\Core\Http\Controllers\TeamInvitationController;
 
@@ -76,5 +77,27 @@ Route::get('/embedded/config/helpdesk', function () {
 // AI SSE Streaming (auth required)
 Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/core/ai/stream', [CoreAiStreamController::class, 'stream'])->name('core.ai.stream');
+    
+    // Test-Endpoint für Debugging
+    Route::get('/core/ai/stream/test', function (Request $request) {
+        \Log::info('[CoreAiStreamTest] Test endpoint called', [
+            'user_id' => $request->user()?->id,
+            'authenticated' => auth()->check(),
+        ]);
+        
+        return new \Symfony\Component\HttpFoundation\StreamedResponse(function() {
+            echo "retry: 500\n\n";
+            @flush();
+            echo "data: " . json_encode(['message' => 'Test erfolgreich - Verbindung funktioniert'], JSON_UNESCAPED_UNICODE) . "\n\n";
+            @flush();
+            sleep(1);
+            echo "data: [DONE]\n\n";
+            @flush();
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache, no-transform',
+            'Connection' => 'keep-alive',
+        ]);
+    })->name('core.ai.stream.test');
 });
 

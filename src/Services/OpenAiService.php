@@ -198,7 +198,6 @@ class OpenAiService
         $buffer = '';
         $currentEvent = null; $currentToolCall = null; $toolArguments = '';
         $onToolStart = $options['on_tool_start'] ?? null; $toolExecutor = $options['tool_executor'] ?? null;
-        Log::info('[OpenAI Responses Stream] Starting');
         $eventCount = 0;
         $deltaCount = 0;
         while (!$body->eof()) {
@@ -211,7 +210,6 @@ class OpenAiService
                 // SSE Format: event: <name> oder data: <json>
                 if (strncmp($line, 'event:', 6) === 0) { 
                     $currentEvent = trim(substr($line, 6)); 
-                    Log::debug('[OpenAI Stream] Event received', ['event' => $currentEvent]);
                     continue; 
                 }
                 if (strncmp($line, 'data:', 5) !== 0) { continue; }
@@ -257,23 +255,7 @@ class OpenAiService
                         
                         if ($delta !== '') { 
                             $deltaCount++;
-                            if ($deltaCount <= 5 || $deltaCount % 10 === 0) {
-                                Log::debug('[OpenAI Stream] Delta', [
-                                    'event' => $currentEvent, 
-                                    'delta' => $delta, 
-                                    'length' => strlen($delta),
-                                    'count' => $deltaCount
-                                ]);
-                            }
                             $onDelta($delta); 
-                        } else {
-                            // Delta ist leer - loggen für Debugging
-                            if ($eventCount <= 10) {
-                                Log::warning('[OpenAI Stream] Empty delta', [
-                                    'event' => $currentEvent,
-                                    'decoded' => $decoded
-                                ]);
-                            }
                         }
                         break;
                     case 'response.tool_call.created':
@@ -292,13 +274,8 @@ class OpenAiService
                         break;
                     case 'response.completed':
                     case 'completed':
-                        Log::info('[OpenAI Stream] Response completed');
                         return;
                     default:
-                        // Unbekanntes Event - loggen für Debugging
-                        if ($eventCount <= 10) {
-                            Log::debug('[OpenAI Stream] Unknown event', ['event' => $currentEvent, 'data_keys' => array_keys($decoded)]);
-                        }
                         break;
                 }
             }
