@@ -77,32 +77,23 @@ class CoreAiStreamController extends Controller
             ]);
         }
 
-        // Build messages context
-        $messages = CoreChatMessage::where('thread_id', $threadId)
-            ->orderBy('created_at', 'asc')
-            ->get()
-            ->map(function ($m) {
-                return [
-                    'role' => $m->role,
-                    'content' => $m->content,
-                ];
-            })
-            ->toArray();
-
-        // Kontext wird zentral im OpenAiService prependet
-
-        $assistantBuffer = '';
-
-        // Debug: Prüfe ob Dependencies verfügbar sind
+        // Build messages context - mit Fehlerbehandlung
         try {
-            $openAiCheck = $openAi !== null ? 'OK' : 'NULL';
-            $toolExecutorCheck = $toolExecutor !== null ? 'OK' : 'NULL';
+            $messages = CoreChatMessage::where('thread_id', $threadId)
+                ->orderBy('created_at', 'asc')
+                ->get()
+                ->map(function ($m) {
+                    return [
+                        'role' => $m->role,
+                        'content' => $m->content,
+                    ];
+                })
+                ->toArray();
         } catch (\Throwable $e) {
-            // Dependencies können nicht geprüft werden - Fehler zurückgeben
             return new StreamedResponse(function() use ($e) {
                 echo "data: " . json_encode([
-                    'error' => 'Dependency Error',
-                    'debug' => "❌ Fehler beim Prüfen der Dependencies: {$e->getMessage()}"
+                    'error' => 'Messages Error',
+                    'debug' => "❌ Fehler beim Laden der Messages: {$e->getMessage()}"
                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
             }, 500, [
@@ -110,6 +101,9 @@ class CoreAiStreamController extends Controller
                 'Cache-Control' => 'no-cache',
             ]);
         }
+
+        // Kontext wird zentral im OpenAiService prependet
+        $assistantBuffer = '';
 
         $response = new StreamedResponse(function () use ($openAi, $messages, &$assistantBuffer, $thread, $assistantId, $sourceRoute, $sourceModule, $sourceUrl, $toolExecutor, $user, $threadId) {
             // Clean buffers to avoid server buffering - SOFORT am Anfang
@@ -272,6 +266,7 @@ class CoreAiStreamController extends Controller
         $response->headers->set('Content-Type', 'text/event-stream');
         $response->headers->set('Cache-Control', 'no-cache, no-transform');
         $response->headers->set('Connection', 'keep-alive');
+        $response->headers->set('X-Accel-Buffering', 'no'); // Nginx buffering deaktivieren
 
         return $response;
     }
