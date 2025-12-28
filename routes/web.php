@@ -104,6 +104,57 @@ Route::middleware(['web', 'auth'])->group(function () {
         ]);
     })->name('core.ai.stream.minimal');
     
+    // Test: Vereinfachte Version des Streams direkt in der Route
+    Route::get('/core/ai/stream/simple', function (Request $request) {
+        $user = $request->user();
+        if (!$user) {
+            return response('Unauthorized', 401);
+        }
+        
+        $threadId = (int) $request->query('thread');
+        if (!$threadId) {
+            return new \Symfony\Component\HttpFoundation\StreamedResponse(function() {
+                echo "data: " . json_encode(['error' => 'thread parameter required'], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+            }, 422, [
+                'Content-Type' => 'text/event-stream',
+                'Cache-Control' => 'no-cache',
+            ]);
+        }
+        
+        $thread = \Platform\Core\Models\CoreChatThread::find($threadId);
+        if (!$thread) {
+            return new \Symfony\Component\HttpFoundation\StreamedResponse(function() {
+                echo "data: " . json_encode(['error' => 'Thread not found'], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+            }, 404, [
+                'Content-Type' => 'text/event-stream',
+                'Cache-Control' => 'no-cache',
+            ]);
+        }
+        
+        return new \Symfony\Component\HttpFoundation\StreamedResponse(function() use ($user, $thread) {
+            while (ob_get_level() > 0) {
+                @ob_end_flush();
+            }
+            echo "retry: 500\n\n";
+            @flush();
+            echo "data: " . json_encode([
+                'debug' => '✅ Vereinfachter Stream funktioniert',
+                'user_id' => $user->id,
+                'thread_id' => $thread->id
+            ], JSON_UNESCAPED_UNICODE) . "\n\n";
+            @flush();
+            sleep(2);
+            echo "data: [DONE]\n\n";
+            @flush();
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    })->name('core.ai.stream.simple');
+    
     Route::get('/core/ai/stream', [CoreAiStreamController::class, 'stream'])->name('core.ai.stream');
     
     // Test-Endpoint für Debugging

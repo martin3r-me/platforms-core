@@ -12,7 +12,7 @@ use Platform\Core\Contracts\ToolContext;
 
 class CoreAiStreamController extends Controller
 {
-    public function stream(Request $request, OpenAiService $openAi, ToolExecutor $toolExecutor): StreamedResponse
+    public function stream(Request $request): StreamedResponse
     {
         // Lazy-load Dependencies im Stream-Callback, um Fehler früher zu erkennen
         try {
@@ -119,7 +119,14 @@ class CoreAiStreamController extends Controller
             echo "data: " . json_encode([
                 'debug' => '✅ Stream-Callback gestartet',
                 'user_id' => $user->id ?? 'unknown',
-                'thread_id' => $thread->id ?? 'unknown'
+                'thread_id' => $thread->id ?? 'unknown',
+                'messages_count' => count($messages)
+            ], JSON_UNESCAPED_UNICODE) . "\n\n";
+            @flush();
+            
+            // Test: Sende sofort eine zweite Nachricht
+            echo "data: " . json_encode([
+                'debug' => '✅ Zweite Debug-Nachricht - Callback funktioniert!'
             ], JSON_UNESCAPED_UNICODE) . "\n\n";
             @flush();
             
