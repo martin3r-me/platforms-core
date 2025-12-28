@@ -120,17 +120,19 @@ class DebugToolsCommand extends Command
         // 2. Prüfe Executor
         $this->info('2. Tool Executor:');
         try {
-            $executor = app(ToolExecutor::class);
-            $this->line("   ✅ Executor verfügbar");
+            $this->line("   Versuche ToolExecutor direkt zu instanziieren...");
+            // Direkte Instanziierung mit der bereits erstellten Registry
+            $executor = new ToolExecutor($registry);
+            $this->line("   ✅ Executor direkt instanziiert");
         } catch (\Throwable $e) {
             $this->error("   ❌ Fehler: " . $e->getMessage());
+            $this->line("   Datei: " . $e->getFile() . ":" . $e->getLine());
         }
         $this->newLine();
 
         // 3. Teste EchoTool
         $this->info('3. Teste EchoTool:');
         try {
-            $registry = app(ToolRegistry::class);
             $echoTool = $registry->get('echo');
             
             if (!$echoTool) {
@@ -138,8 +140,14 @@ class DebugToolsCommand extends Command
             } else {
                 $this->line("   ✅ EchoTool gefunden");
                 
-                // Teste Ausführung
-                $context = ToolContext::fromAuth();
+                // Teste Ausführung - ohne Auth (spart Memory)
+                $this->line("   Erstelle Test-Context...");
+                $user = new class {
+                    public $id = 999;
+                };
+                $context = new ToolContext($user);
+                
+                $this->line("   Führe EchoTool aus...");
                 $result = $echoTool->execute([
                     'message' => 'Test Message',
                     'number' => 42
@@ -154,7 +162,7 @@ class DebugToolsCommand extends Command
             }
         } catch (\Throwable $e) {
             $this->error("   ❌ Fehler: " . $e->getMessage());
-            $this->line("   Trace: " . $e->getTraceAsString());
+            $this->line("   Datei: " . $e->getFile() . ":" . $e->getLine());
         }
         $this->newLine();
 
@@ -177,24 +185,10 @@ class DebugToolsCommand extends Command
         }
         $this->newLine();
 
-        // 5. Prüfe ob User authentifiziert ist
+        // 5. Prüfe ob User authentifiziert ist (überspringen - spart Memory)
         $this->info('5. Auth Status:');
-        try {
-            $user = auth()->user();
-            if ($user) {
-                $userName = $user->name ?? 'no name';
-                $this->line("   ✅ User: {$user->id} ({$userName})");
-                if (method_exists($user, 'currentTeam')) {
-                    $team = $user->currentTeam;
-                    $teamInfo = $team ? "{$team->id} ({$team->name})" : "kein Team";
-                    $this->line("   Team: {$teamInfo}");
-                }
-            } else {
-                $this->warn('   ⚠️  Kein User authentifiziert');
-            }
-        } catch (\Throwable $e) {
-            $this->error("   ❌ Fehler: " . $e->getMessage());
-        }
+        $this->warn('   ⚠️  Übersprungen (spart Memory)');
+        $this->line("   → Auth-Check würde DB-Queries auslösen");
         $this->newLine();
 
         $this->info('=== Debug abgeschlossen ===');
