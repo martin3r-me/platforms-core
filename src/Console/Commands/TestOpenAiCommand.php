@@ -150,7 +150,35 @@ class TestOpenAiCommand extends Command
             
             if ($useStream) {
                 $this->line("5.1: Starte streamChat...");
+                $this->line("5.2: WICHTIG - streamChat ruft getAvailableTools() auf, BEVOR der Stream startet!");
+                $this->line("     Das ist der kritische Punkt - prüfe ob getAvailableTools() funktioniert...");
+                $this->newLine();
+                
+                // Test: Rufe getAvailableTools() manuell auf (wie streamChat es tut)
                 try {
+                    $this->line("5.3: Teste getAvailableTools() manuell...");
+                    $reflection = new \ReflectionClass($openAi);
+                    $method = $reflection->getMethod('getAvailableTools');
+                    $method->setAccessible(true);
+                    $availableTools = $method->invoke($openAi);
+                    $this->line("✅ getAvailableTools() erfolgreich - " . count($availableTools) . " Tools gefunden");
+                    if (count($availableTools) > 0) {
+                        $this->line("  Tools: " . implode(', ', array_map(function($t) {
+                            return $t['function']['name'] ?? $t['name'] ?? 'unknown';
+                        }, $availableTools)));
+                    }
+                } catch (\Throwable $toolsError) {
+                    $this->error("❌ getAvailableTools() Fehler:");
+                    $this->error("  " . $toolsError->getMessage());
+                    $this->error("  Datei: " . $toolsError->getFile() . ":" . $toolsError->getLine());
+                    $this->line("  Trace: " . substr($toolsError->getTraceAsString(), 0, 1000));
+                    $this->warn("⚠️  streamChat wird wahrscheinlich auch fehlschlagen!");
+                    $this->newLine();
+                }
+                $this->newLine();
+                
+                try {
+                    $this->line("5.4: Rufe streamChat auf...");
                     $openAi->streamChat($messages, function (string $delta) use (&$streamedContent) {
                         $streamedContent .= $delta;
                         echo $delta; // Direkte Ausgabe
