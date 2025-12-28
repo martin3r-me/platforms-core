@@ -195,19 +195,97 @@ class TestOpenAiCommand extends Command
                 
                 // Test: Rufe getAvailableTools() manuell auf (wie streamChat es tut)
                 try {
-                    $this->line("5.4: Teste getAvailableTools() manuell...");
+                    $this->line("5.4: Teste getAvailableTools() manuell (Schritt für Schritt)...");
+                    $this->newLine();
+                    
+                    // Schritt 1: Prüfe ob $this->app existiert
+                    $this->line("  5.4.1: Prüfe OpenAiService->app...");
                     $reflection = new \ReflectionClass($openAi);
+                    $app = null;
+                    try {
+                        $appProperty = $reflection->getProperty('app');
+                        $appProperty->setAccessible(true);
+                        $app = $appProperty->getValue($openAi);
+                        $this->line("    ✅ app Property gefunden: " . get_class($app));
+                        $this->line("    app ist Container: " . ($app instanceof \Illuminate\Contracts\Container\Container ? "Ja" : "Nein"));
+                    } catch (\Throwable $e) {
+                        $this->error("    ❌ app Property nicht gefunden: " . $e->getMessage());
+                        $this->line("    → Verwende app() Helper stattdessen...");
+                        $app = app();
+                    }
+                    $this->newLine();
+                    
+                    // Schritt 2: Prüfe Container-Bindung
+                    $this->line("  5.4.2: Prüfe Container-Bindung...");
+                    try {
+                        if ($app === null) {
+                            $this->warn("    ⚠️  app ist null - verwende app() Helper");
+                            $app = app();
+                        }
+                        $isBound = $app->bound(ToolRegistry::class);
+                        $this->line("    ToolRegistry gebunden: " . ($isBound ? "Ja" : "Nein"));
+                        
+                        if ($isBound) {
+                            $toolRegistryFromApp = $app->make(ToolRegistry::class);
+                            $this->line("    ✅ ToolRegistry aus Container geholt: " . get_class($toolRegistryFromApp));
+                            $this->line("    Ist es die gleiche Instanz wie unsere? " . ($toolRegistryFromApp === $registry ? "Ja ✅" : "Nein ❌"));
+                            
+                            $toolsFromApp = $toolRegistryFromApp->all();
+                            $this->line("    Tools in Registry aus Container: " . count($toolsFromApp));
+                            
+                            if (count($toolsFromApp) > 0) {
+                                foreach ($toolsFromApp as $tool) {
+                                    $this->line("      - " . $tool->getName() . ": " . $tool->getDescription());
+                                }
+                            }
+                        } else {
+                            $this->warn("    ⚠️  ToolRegistry NICHT gebunden - getAvailableTools() wird neue Instanz erstellen!");
+                        }
+                    } catch (\Throwable $e) {
+                        $this->error("    ❌ Fehler beim Container-Zugriff: " . $e->getMessage());
+                    }
+                    $this->newLine();
+                    
+                    // Schritt 3: Rufe getAvailableTools() auf
+                    $this->line("  5.4.3: Rufe getAvailableTools() auf...");
                     $method = $reflection->getMethod('getAvailableTools');
                     $method->setAccessible(true);
+                    
+                    // Hook: Ersetze convertToolToOpenAiFormat temporär mit Debug-Version
+                    $convertMethod = $reflection->getMethod('convertToolToOpenAiFormat');
+                    $convertMethod->setAccessible(true);
+                    
                     $availableTools = $method->invoke($openAi);
-                    $this->line("✅ getAvailableTools() erfolgreich - " . count($availableTools) . " Tools gefunden");
+                    $this->line("    ✅ getAvailableTools() erfolgreich - " . count($availableTools) . " Tools gefunden");
+                    
                     if (count($availableTools) > 0) {
-                        $this->line("  Tools: " . implode(', ', array_map(function($t) {
-                            return $t['function']['name'] ?? $t['name'] ?? 'unknown';
-                        }, $availableTools)));
+                        $this->line("    Tools:");
+                        foreach ($availableTools as $toolDef) {
+                            $name = $toolDef['function']['name'] ?? $toolDef['name'] ?? 'unknown';
+                            $desc = $toolDef['function']['description'] ?? $toolDef['description'] ?? 'no description';
+                            $this->line("      - {$name}: {$desc}");
+                        }
                     } else {
-                        $this->warn("  ⚠️  PROBLEM: getAvailableTools() findet keine Tools!");
-                        $this->line("  → Das ist wahrscheinlich das Problem im Stream!");
+                        $this->warn("    ⚠️  PROBLEM: getAvailableTools() findet keine Tools!");
+                        $this->line("    → Mögliche Ursachen:");
+                        $this->line("      1. ToolRegistry ist leer (aber wir haben 1 Tool registriert!)");
+                        $this->line("      2. convertToolToOpenAiFormat() schlägt fehl (wird still abgefangen)");
+                        $this->line("      3. Tool-Format ist falsch");
+                        
+                        // Debug: Teste convertToolToOpenAiFormat manuell
+                        if ($useTools && isset($registry)) {
+                            $this->line("    → Teste convertToolToOpenAiFormat() manuell...");
+                            $allTools = $registry->all();
+                            foreach ($allTools as $tool) {
+                                try {
+                                    $toolDef = $convertMethod->invoke($openAi, $tool);
+                                    $this->line("      ✅ Tool '{$tool->getName()}' konvertiert: " . json_encode($toolDef, JSON_UNESCAPED_UNICODE));
+                                } catch (\Throwable $e) {
+                                    $this->error("      ❌ Tool '{$tool->getName()}' Konvertierung fehlgeschlagen: " . $e->getMessage());
+                                    $this->line("         Datei: " . $e->getFile() . ":" . $e->getLine());
+                                }
+                            }
+                        }
                     }
                 } catch (\Throwable $toolsError) {
                     $this->error("❌ getAvailableTools() Fehler:");
