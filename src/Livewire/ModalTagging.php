@@ -24,6 +24,7 @@ class ModalTagging extends Component
     public array $personalTags = [];
     public array $availableTags = [];
     public array $allTags = []; // Für Übersicht-Tab
+    public array $allColors = []; // Für Übersicht-Tab
     
     // Neues Tag erstellen
     public string $newTagLabel = '';
@@ -85,8 +86,9 @@ class ModalTagging extends Component
             $this->loadColor();
         }
 
-        // Alle Tags für Übersicht laden
+        // Alle Tags und Farben für Übersicht laden
         $this->loadAllTags();
+        $this->loadAllColors();
 
         $this->open = true;
     }
@@ -247,6 +249,53 @@ class ModalTagging extends Component
         } catch (\Exception $e) {
             // Wenn Datenbank-Fehler, überspringen
             $this->allTags = [];
+        }
+    }
+
+    public function loadAllColors(): void
+    {
+        try {
+            // Prüfe ob Datenbank-Tabellen existieren
+            if (!\Illuminate\Support\Facades\Schema::hasTable('colorables')) {
+                $this->allColors = [];
+                return;
+            }
+
+            $user = Auth::user();
+            if (!$user) {
+                $this->allColors = [];
+                return;
+            }
+
+            // Alle verwendeten Farben aus colorables laden
+            $colors = DB::table('colorables')
+                ->select('color', DB::raw('COUNT(*) as total_count'))
+                ->groupBy('color')
+                ->orderBy('total_count', 'desc')
+                ->get();
+
+            $this->allColors = $colors->map(function ($color) {
+                // Zähle Team-Farben und persönliche Farben separat
+                $teamCount = DB::table('colorables')
+                    ->where('color', $color->color)
+                    ->whereNull('user_id')
+                    ->count();
+
+                $personalCount = DB::table('colorables')
+                    ->where('color', $color->color)
+                    ->whereNotNull('user_id')
+                    ->count();
+
+                return [
+                    'color' => $color->color,
+                    'total_count' => $color->total_count,
+                    'team_count' => $teamCount,
+                    'personal_count' => $personalCount,
+                ];
+            })->toArray();
+        } catch (\Exception $e) {
+            // Wenn Datenbank-Fehler, überspringen
+            $this->allColors = [];
         }
     }
 
