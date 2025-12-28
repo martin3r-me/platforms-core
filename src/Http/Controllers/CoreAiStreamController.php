@@ -143,11 +143,21 @@ class CoreAiStreamController extends Controller
                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
                 
-                $toolExecutor = app(ToolExecutor::class);
-                echo "data: " . json_encode([
-                    'debug' => '✅ ToolExecutor geladen'
-                ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                @flush();
+                // Versuche ToolExecutor zu laden
+                try {
+                    $toolExecutor = app(ToolExecutor::class);
+                    echo "data: " . json_encode([
+                        'debug' => '✅ ToolExecutor geladen'
+                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                    @flush();
+                } catch (\Throwable $e2) {
+                    echo "data: " . json_encode([
+                        'error' => 'ToolExecutor Error',
+                        'debug' => "❌ Fehler beim Laden des ToolExecutor:\nDatei: {$e2->getFile()}\nZeile: {$e2->getLine()}\nFehler: {$e2->getMessage()}\nTrace: " . substr($e2->getTraceAsString(), 0, 500)
+                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                    @flush();
+                    throw $e2; // Re-throw um in outer catch zu landen
+                }
             } catch (\Throwable $e) {
                 echo "data: " . json_encode([
                     'error' => 'Dependency Error',
