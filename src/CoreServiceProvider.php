@@ -162,7 +162,6 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->afterResolving(\Platform\Core\Tools\ToolRegistry::class, function ($registry) {
             // Prüfe ob wir beim package:discover sind (keine vollständige App)
             if ($this->app->runningInConsole() && !$this->app->runningUnitTests()) {
-                // Prüfe ob es ein echter Request ist (nicht package:discover)
                 $command = $_SERVER['argv'][1] ?? '';
                 if ($command === 'package:discover' || str_contains($command, 'package:discover')) {
                     return; // Skip beim package:discover
@@ -174,30 +173,30 @@ class CoreServiceProvider extends ServiceProvider
                 return;
             }
             
+            // Prüfe ob Tools bereits registriert sind (verhindert doppelte Registrierung)
+            if (count($registry->all()) > 0) {
+                return;
+            }
+            
+            // Tools registrieren - mit try-catch für jeden einzelnen
+            // EchoTool zuerst (keine Dependencies)
             try {
-                // Prüfe ob Tools bereits registriert sind (verhindert doppelte Registrierung)
-                if (count($registry->all()) > 0) {
-                    return;
-                }
-                
-                // Bestehende Tools registrieren
-                $registry->register($this->app->make(\Platform\Core\Tools\DataReadTool::class));
-                $registry->register($this->app->make(\Platform\Core\Tools\DataWriteTool::class));
-                
-                // Test-Tool registrieren (für Entwicklung/Testing)
-                $registry->register($this->app->make(\Platform\Core\Tools\EchoTool::class));
-                
-                if (method_exists(\Log::class, 'info')) {
-                    \Log::info('[CoreServiceProvider] Tools registriert', [
-                        'count' => count($registry->all()),
-                        'tools' => $registry->names()
-                    ]);
-                }
+                $registry->register(new \Platform\Core\Tools\EchoTool());
             } catch (\Throwable $e) {
-                // Silent fail - Log nur wenn Log verfügbar ist und App gebootet
-                if ($this->app->isBooted() && method_exists(\Log::class, 'warning')) {
-                    \Log::warning('CoreServiceProvider: Tool registration failed: ' . $e->getMessage());
-                }
+                // Silent fail
+            }
+            
+            // DataReadTool und DataWriteTool nur wenn Dependencies verfügbar sind
+            try {
+                $registry->register($this->app->make(\Platform\Core\Tools\DataReadTool::class));
+            } catch (\Throwable $e) {
+                // Silent fail - Dependencies möglicherweise nicht verfügbar
+            }
+            
+            try {
+                $registry->register($this->app->make(\Platform\Core\Tools\DataWriteTool::class));
+            } catch (\Throwable $e) {
+                // Silent fail - Dependencies möglicherweise nicht verfügbar
             }
         });
     }

@@ -48,24 +48,20 @@ class DebugToolsCommand extends Command
             }
             $this->line("   ✅ ToolRegistry Klasse gefunden");
             
-            $this->line("   Versuche ToolRegistry aufzulösen...");
-            
+            $this->line("   Versuche ToolRegistry direkt zu instanziieren (spart Memory)...");
             try {
-                $registry = app(ToolRegistry::class);
-            } catch (\Throwable $resolveError) {
-                $this->error("   ❌ Fehler beim Auflösen der ToolRegistry!");
-                $this->error("   Fehler: " . $resolveError->getMessage());
-                $this->error("   Datei: " . $resolveError->getFile() . ":" . $resolveError->getLine());
-                $this->line("   Trace:");
-                $this->line(substr($resolveError->getTraceAsString(), 0, 1500));
-                
-                // Versuche direkt zu instanziieren
-                $this->line("   → Versuche direkte Instanziierung...");
+                // Direkte Instanziierung statt app() - vermeidet afterResolving Callbacks
+                $registry = new ToolRegistry();
+                $this->line("   ✅ Direkte Instanziierung erfolgreich");
+            } catch (\Throwable $e2) {
+                $this->error("   ❌ Direkte Instanziierung fehlgeschlagen: " . $e2->getMessage());
+                $this->line("   → Versuche über app()...");
                 try {
-                    $registry = new ToolRegistry();
-                    $this->line("   ✅ Direkte Instanziierung erfolgreich");
-                } catch (\Throwable $e2) {
-                    $this->error("   ❌ Auch direkte Instanziierung fehlgeschlagen: " . $e2->getMessage());
+                    $registry = app(ToolRegistry::class);
+                    $this->line("   ✅ Über app() erfolgreich");
+                } catch (\Throwable $resolveError) {
+                    $this->error("   ❌ Auch app() fehlgeschlagen!");
+                    $this->error("   Fehler: " . $resolveError->getMessage());
                     return 1;
                 }
             }
