@@ -151,13 +151,23 @@ class CoreAiStreamController extends Controller
             } catch (\Throwable $e) {
                 echo "data: " . json_encode([
                     'error' => 'Dependency Error',
-                    'debug' => "❌ Fehler beim Laden der Dependencies:\nDatei: {$e->getFile()}\nZeile: {$e->getLine()}\nFehler: {$e->getMessage()}"
+                    'debug' => "❌ Fehler beim Laden der Dependencies:\nDatei: {$e->getFile()}\nZeile: {$e->getLine()}\nFehler: {$e->getMessage()}\nTrace: " . substr($e->getTraceAsString(), 0, 500)
                 ], JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
                 return;
             }
             
+            echo "data: " . json_encode([
+                'debug' => '✅ Alle Dependencies geladen, starte Try-Block...'
+            ], JSON_UNESCAPED_UNICODE) . "\n\n";
+            @flush();
+            
             try {
+                echo "data: " . json_encode([
+                    'debug' => '✅ Try-Block gestartet'
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+                
                 // Zusätzliche Debug-Info
                 echo "data: " . json_encode([
                     'debug' => '📋 Messages: ' . count($messages) . ' | Assistant ID: ' . ($assistantId ?: 'neu')
@@ -165,6 +175,11 @@ class CoreAiStreamController extends Controller
                 @flush();
 
                 // Use provided assistant placeholder or create a new one
+                echo "data: " . json_encode([
+                    'debug' => '📝 Erstelle/Update Assistant-Message...'
+                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+                
                 if ($assistantId) {
                     $assistantMessage = CoreChatMessage::find($assistantId);
                     if (!$assistantMessage) {
