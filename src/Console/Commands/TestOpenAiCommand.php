@@ -36,6 +36,8 @@ class TestOpenAiCommand extends Command
             
             $startTime = microtime(true);
             $this->line("  Warte auf Antwort...");
+            $this->line("  (Timeout: 20 Sekunden)");
+            $this->newLine();
             
             try {
                 $response = $openAi->chat($messages, 'gpt-4o-mini', [
@@ -47,8 +49,15 @@ class TestOpenAiCommand extends Command
                 $duration = round((microtime(true) - $startTime) * 1000);
                 $this->line("✅ Antwort erhalten (Dauer: {$duration}ms)");
                 $this->newLine();
+                
+                // Zeige vollständige Response
+                $this->line("Vollständige Response:");
+                $this->line(json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                $this->newLine();
+                
             } catch (\Throwable $chatError) {
-                $this->error("❌ Fehler beim chat() Call:");
+                $duration = round((microtime(true) - $startTime) * 1000);
+                $this->error("❌ Fehler nach {$duration}ms:");
                 $this->error("  " . $chatError->getMessage());
                 $this->error("  Datei: " . $chatError->getFile() . ":" . $chatError->getLine());
                 $this->line("  Trace: " . substr($chatError->getTraceAsString(), 0, 800));

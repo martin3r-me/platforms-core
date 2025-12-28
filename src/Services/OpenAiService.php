@@ -43,12 +43,40 @@ class OpenAiService
                 $payload['tools'] = $this->normalizeToolsForResponses($tools);
                 $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
             }
+            
+            // Debug: Log Payload
+            Log::debug('[OpenAI Chat] Sending request', [
+                'url' => $this->baseUrl . '/responses',
+                'payload_keys' => array_keys($payload),
+                'input_count' => count($payload['input'] ?? []),
+            ]);
+            
             $response = $this->http()->post($this->baseUrl . '/responses', $payload);
+            
+            // Debug: Log Response
+            Log::debug('[OpenAI Chat] Response received', [
+                'status' => $response->status(),
+                'success' => $response->successful(),
+                'body_length' => strlen($response->body()),
+            ]);
+            
             if ($response->failed()) {
                 $this->logApiError('OpenAI API Error (responses)', $response->status(), $response->body());
+                Log::error('[OpenAI Chat] Request failed', [
+                    'status' => $response->status(),
+                    'body' => substr($response->body(), 0, 500),
+                ]);
                 throw new \Exception($this->formatApiErrorMessage($response->status(), $response->body()));
             }
             $data = $response->json();
+            
+            // Debug: Log Response Data
+            Log::debug('[OpenAI Chat] Response data', [
+                'has_output_text' => isset($data['output_text']),
+                'has_content' => isset($data['content']),
+                'has_usage' => isset($data['usage']),
+                'keys' => array_keys($data),
+            ]);
             $content = $data['output_text'] ?? ($data['content'][0]['text'] ?? '');
             return [
                 'content' => $content,
