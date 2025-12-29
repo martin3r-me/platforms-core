@@ -80,33 +80,59 @@ class ToolDiscoveryService
         $allTools = $this->registry->all();
         $results = [];
 
+        // Normalisiere Intent: entferne häufige Wörter und extrahiere Keywords
+        $intentLower = strtolower(trim($intent));
+        $intentKeywords = $this->extractKeywords($intentLower);
+
         foreach ($allTools as $tool) {
             $metadata = $this->getToolMetadata($tool);
             $examples = $metadata['examples'] ?? [];
             $tags = $metadata['tags'] ?? [];
             $description = strtolower($tool->getDescription());
-            $intentLower = strtolower($intent);
+            $toolName = strtolower($tool->getName());
 
             // Prüfe, ob Intent zu Tool passt
             $score = 0;
 
             // Prüfe Examples
             foreach ($examples as $example) {
-                if (stripos($example, $intentLower) !== false) {
-                    $score += 10;
+                $exampleLower = strtolower($example);
+                foreach ($intentKeywords as $keyword) {
+                    if (stripos($exampleLower, $keyword) !== false) {
+                        $score += 10;
+                        break; // Nur einmal pro Example
+                    }
                 }
             }
 
             // Prüfe Tags
             foreach ($tags as $tag) {
-                if (stripos($intentLower, $tag) !== false) {
-                    $score += 5;
+                $tagLower = strtolower($tag);
+                foreach ($intentKeywords as $keyword) {
+                    if (stripos($tagLower, $keyword) !== false || stripos($keyword, $tagLower) !== false) {
+                        $score += 5;
+                        break; // Nur einmal pro Tag
+                    }
                 }
             }
 
-            // Prüfe Beschreibung
+            // Prüfe Tool-Name (z.B. "planner.projects.create" für "projekt erstellen")
+            foreach ($intentKeywords as $keyword) {
+                if (stripos($toolName, $keyword) !== false) {
+                    $score += 8;
+                }
+            }
+
+            // Prüfe Beschreibung (auch Teilstrings)
+            foreach ($intentKeywords as $keyword) {
+                if (stripos($description, $keyword) !== false) {
+                    $score += 3;
+                }
+            }
+
+            // Bonus: Wenn Intent-Wörter direkt in Beschreibung vorkommen
             if (stripos($description, $intentLower) !== false) {
-                $score += 3;
+                $score += 5;
             }
 
             if ($score > 0) {
@@ -122,6 +148,42 @@ class ToolDiscoveryService
         usort($results, fn($a, $b) => $b['score'] <=> $a['score']);
 
         return array_map(fn($r) => $r['tool'], $results);
+    }
+
+    /**
+     * Extrahiert relevante Keywords aus einem Intent-String
+     * 
+     * @param string $intent
+     * @return array
+     */
+    private function extractKeywords(string $intent): array
+    {
+        // Entferne häufige Stop-Wörter
+        $stopWords = ['ein', 'eine', 'einen', 'einer', 'einem', 'eines', 'der', 'die', 'das', 'den', 'dem', 'des', 
+                      'und', 'oder', 'aber', 'mit', 'für', 'von', 'zu', 'auf', 'in', 'an', 'ist', 'sind', 'war', 
+                      'waren', 'wird', 'werden', 'hat', 'haben', 'hatte', 'hatten', 'namens', 'heißt', 'heissen'];
+        
+        // Normalisiere: entferne Sonderzeichen, teile in Wörter
+        $words = preg_split('/[\s,\.!?;:]+/', $intent);
+        $keywords = [];
+        
+        foreach ($words as $word) {
+            $word = trim($word);
+            if (strlen($word) > 2 && !in_array(strtolower($word), $stopWords)) {
+                $keywords[] = strtolower($word);
+            }
+        }
+        
+        // Füge auch zusammengesetzte Begriffe hinzu (z.B. "projekt erstellen" -> ["projekt", "erstellen", "projekt erstellen"])
+        if (count($keywords) > 1) {
+            // Erstelle Bigrams (zwei aufeinanderfolgende Wörter)
+            for ($i = 0; $i < count($keywords) - 1; $i++) {
+                $bigram = $keywords[$i] . ' ' . $keywords[$i + 1];
+                $keywords[] = $bigram;
+            }
+        }
+        
+        return array_unique($keywords);
     }
 
     /**

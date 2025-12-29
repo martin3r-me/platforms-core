@@ -49,6 +49,13 @@ class CoreToolPlaygroundController extends Controller
             $registry = app(ToolRegistry::class);
             $discovery = new ToolDiscoveryService($registry);
             
+            // Debug: Prüfe ob Tools registriert sind
+            $allRegisteredTools = $registry->all();
+            $simulation['debug'] = [
+                'total_tools_registered' => count($allRegisteredTools),
+                'registered_tool_names' => array_map(fn($t) => $t->getName(), $allRegisteredTools),
+            ];
+            
             $simulation['steps'][] = [
                 'step' => 1,
                 'name' => 'Tool Discovery',
