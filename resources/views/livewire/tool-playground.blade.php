@@ -3,7 +3,7 @@
         <x-ui-page-navbar title="🔧 Tool Playground (MCP Testing)" icon="heroicon-o-wrench-screwdriver" />
     </x-slot>
 
-    <x-ui-page-container spacing="space-y-6">
+    <x-ui-page-container>
         <div>
             <h1 class="text-2xl font-bold text-[var(--ui-secondary)] mb-2">
                 🔧 Tool Playground (MCP Testing)
