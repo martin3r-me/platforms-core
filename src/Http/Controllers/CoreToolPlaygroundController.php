@@ -10,23 +10,184 @@ use Platform\Core\Tools\ToolOrchestrator;
 use Platform\Core\Tools\ToolChainPlanner;
 use Platform\Core\Tools\ToolDiscoveryService;
 use Platform\Core\Contracts\ToolContext;
+use Platform\Core\Services\OpenAiService;
 
 /**
  * Tool Playground Controller
  * 
- * Vollständiger Playground zum Testen der Tool-Orchestrierung mit vollem Debug.
- * MCP-Pattern: Testet Tool-Chains, Dependencies, Discovery, etc.
+ * Vollständiger MCP-Simulator zum Testen der Tool-Orchestrierung mit vollem Debug.
+ * MCP-Pattern: Simuliert kompletten Request-Flow, Tool-Discovery, Execution, etc.
  */
 class CoreToolPlaygroundController extends Controller
 {
-    public function index()
+    /**
+     * API-Endpoint für vollständige MCP-Simulation
+     */
+    public function simulate(Request $request)
     {
-        // Wird nicht mehr verwendet - Route zeigt direkt auf Livewire-Komponente
-        abort(404);
+        $request->validate([
+            'message' => 'required|string',
+            'options' => 'nullable|array',
+        ]);
+
+        $message = $request->input('message');
+        $options = $request->input('options', []);
+        
+        $simulation = [
+            'timestamp' => now()->toIso8601String(),
+            'user_message' => $message,
+            'steps' => [],
+            'tools_used' => [],
+            'tools_discovered' => [],
+            'chain_plan' => null,
+            'execution_flow' => [],
+            'final_response' => null,
+        ];
+
+        try {
+            // STEP 1: Tool Discovery
+            $registry = app(ToolRegistry::class);
+            $discovery = new ToolDiscoveryService($registry);
+            
+            $simulation['steps'][] = [
+                'step' => 1,
+                'name' => 'Tool Discovery',
+                'description' => 'Suche nach relevanten Tools für die Anfrage',
+                'timestamp' => now()->toIso8601String(),
+            ];
+
+            $intent = $message;
+            $discoveredTools = $discovery->findByIntent($intent);
+            $simulation['tools_discovered'] = array_map(function($tool) {
+                return [
+                    'name' => $tool->getName(),
+                    'description' => $tool->getDescription(),
+                    'has_dependencies' => $tool instanceof \Platform\Core\Contracts\ToolDependencyContract,
+                ];
+            }, $discoveredTools);
+
+            $simulation['steps'][] = [
+                'step' => 1,
+                'result' => count($discoveredTools) . ' Tools gefunden',
+                'tools' => array_map(fn($t) => $t->getName(), $discoveredTools),
+            ];
+
+            // STEP 2: Chain Planning (wenn Tool gefunden)
+            if (count($discoveredTools) > 0) {
+                $primaryTool = $discoveredTools[0];
+                $toolName = $primaryTool->getName();
+                
+                $simulation['steps'][] = [
+                    'step' => 2,
+                    'name' => 'Chain Planning',
+                    'description' => 'Plane Tool-Execution-Chain mit Dependencies',
+                    'timestamp' => now()->toIso8601String(),
+                ];
+
+                $planner = new ToolChainPlanner($registry);
+                $context = ToolContext::fromAuth();
+                
+                // Versuche Argumente aus Message zu extrahieren (vereinfacht)
+                $arguments = $this->extractArguments($message, $primaryTool);
+                
+                $plan = $planner->planChain($toolName, $arguments, $context);
+                $simulation['chain_plan'] = $plan;
+
+                $simulation['steps'][] = [
+                    'step' => 2,
+                    'result' => 'Chain geplant',
+                    'execution_order' => $plan['execution_order'] ?? [],
+                    'dependencies' => $plan['dependencies'] ?? [],
+                ];
+
+                // STEP 3: Tool Execution Simulation
+                $simulation['steps'][] = [
+                    'step' => 3,
+                    'name' => 'Tool Execution',
+                    'description' => 'Simuliere Tool-Execution mit Orchestrator',
+                    'timestamp' => now()->toIso8601String(),
+                ];
+
+                $executor = new ToolExecutor($registry);
+                $orchestrator = new ToolOrchestrator($executor, $registry);
+                
+                $executionResult = $orchestrator->executeWithDependencies(
+                    $toolName,
+                    $arguments,
+                    $context,
+                    maxDepth: 5,
+                    planFirst: true
+                );
+
+                $simulation['execution_flow'][] = [
+                    'tool' => $toolName,
+                    'arguments' => $arguments,
+                    'result' => [
+                        'success' => $executionResult->success,
+                        'has_data' => $executionResult->data !== null,
+                        'has_error' => $executionResult->error !== null,
+                    ],
+                    'timestamp' => now()->toIso8601String(),
+                ];
+
+                $simulation['tools_used'][] = [
+                    'name' => $toolName,
+                    'executed_at' => now()->toIso8601String(),
+                    'success' => $executionResult->success,
+                ];
+
+                $simulation['steps'][] = [
+                    'step' => 3,
+                    'result' => $executionResult->success ? 'Tool erfolgreich ausgeführt' : 'Tool-Fehler',
+                    'execution_time_ms' => 0, // TODO: Messen
+                ];
+
+                // STEP 4: Response Generation (simuliert)
+                $simulation['steps'][] = [
+                    'step' => 4,
+                    'name' => 'Response Generation',
+                    'description' => 'Generiere finale Antwort basierend auf Tool-Ergebnissen',
+                    'timestamp' => now()->toIso8601String(),
+                ];
+
+                if ($executionResult->success) {
+                    $simulation['final_response'] = [
+                        'type' => 'success',
+                        'message' => 'Tool erfolgreich ausgeführt. Ergebnis: ' . json_encode($executionResult->data, JSON_PRETTY_PRINT),
+                        'data' => $executionResult->data,
+                    ];
+                } else {
+                    $simulation['final_response'] = [
+                        'type' => 'error',
+                        'message' => 'Tool-Fehler: ' . ($executionResult->error['message'] ?? 'Unbekannter Fehler'),
+                        'error' => $executionResult->error,
+                    ];
+                }
+            } else {
+                $simulation['final_response'] = [
+                    'type' => 'no_tools',
+                    'message' => 'Keine passenden Tools gefunden. AI würde direkt antworten.',
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'simulation' => $simulation,
+            ]);
+
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'simulation' => $simulation,
+            ], 500);
+        }
     }
 
     /**
-     * API-Endpoint für Tool-Tests
+     * API-Endpoint für Tool-Tests (bestehend)
      */
     public function test(Request $request)
     {
@@ -180,5 +341,25 @@ class CoreToolPlaygroundController extends Controller
             ], 500);
         }
     }
-}
 
+    /**
+     * Extrahiert Argumente aus User-Message (vereinfacht)
+     */
+    private function extractArguments(string $message, $tool): array
+    {
+        // Sehr vereinfachte Extraktion - in Produktion würde man NLP verwenden
+        $arguments = [];
+        
+        // Beispiel: "Erstelle ein Projekt namens 'Test'"
+        if (preg_match("/namens?\s+['\"]([^'\"]+)['\"]/i", $message, $matches)) {
+            $arguments['name'] = $matches[1];
+        }
+        
+        // Beispiel: "im Team 5"
+        if (preg_match("/team\s+(\d+)/i", $message, $matches)) {
+            $arguments['team_id'] = (int) $matches[1];
+        }
+        
+        return $arguments;
+    }
+}

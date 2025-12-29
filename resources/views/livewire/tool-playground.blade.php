@@ -13,9 +13,141 @@
             </p>
 
             <div x-data="toolPlayground" class="space-y-6">
-                <!-- Tool Selection -->
-                <div class="bg-[var(--ui-muted-5)] rounded-lg p-4">
-                        <h2 class="text-xl font-semibold mb-4">Tool auswählen</h2>
+                <!-- Tabs: Tool Test vs MCP Simulation -->
+                <div class="border-b border-[var(--ui-border)] mb-6">
+                    <div class="flex gap-4">
+                        <button 
+                            @click="activeTab = 'test'"
+                            :class="activeTab === 'test' ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'text-[var(--ui-muted)]'"
+                            class="pb-2 px-4 font-medium"
+                        >
+                            🔧 Tool Test
+                        </button>
+                        <button 
+                            @click="activeTab = 'simulate'"
+                            :class="activeTab === 'simulate' ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'text-[var(--ui-muted)]'"
+                            class="pb-2 px-4 font-medium"
+                        >
+                            🎯 MCP Simulation (Vollständiger Flow)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- MCP Simulation Tab -->
+                <div x-show="activeTab === 'simulate'" class="space-y-6">
+                    <div class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                        <h2 class="text-xl font-semibold mb-4 text-[var(--ui-secondary)]">🎯 MCP-Simulation</h2>
+                        <p class="text-[var(--ui-muted)] mb-4">
+                            Simuliere den kompletten Request-Flow: User-Input → Tool-Discovery → Chain-Planning → Execution → Response
+                        </p>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2 text-[var(--ui-secondary)]">User-Nachricht (natürliche Sprache)</label>
+                                <textarea 
+                                    x-model="simulationMessage"
+                                    placeholder="z.B. 'Erstelle ein Projekt namens Test Projekt'"
+                                    class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] text-[var(--ui-secondary)]"
+                                    rows="3"
+                                ></textarea>
+                            </div>
+                            <button 
+                                @click="runSimulation()"
+                                :disabled="simulationLoading"
+                                class="px-4 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
+                            >
+                                <span x-show="!simulationLoading">🚀 Vollständige Simulation starten</span>
+                                <span x-show="simulationLoading">⏳ Simuliere...</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Simulation Results -->
+                    <div x-show="simulationResult" class="space-y-4">
+                        <!-- Flow Visualization -->
+                        <div class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                            <h3 class="text-lg font-semibold mb-4 text-[var(--ui-secondary)]">📊 Request-Flow</h3>
+                            <div class="space-y-3">
+                                <template x-for="(step, index) in simulationResult.steps" :key="index">
+                                    <div class="flex items-start gap-4 p-3 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
+                                        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--ui-primary)] text-white flex items-center justify-center font-bold" x-text="step.step"></div>
+                                        <div class="flex-1">
+                                            <div class="font-semibold text-[var(--ui-secondary)]" x-text="step.name"></div>
+                                            <div class="text-sm text-[var(--ui-muted)] mt-1" x-text="step.description"></div>
+                                            <div x-show="step.result" class="mt-2 text-sm text-[var(--ui-success)]" x-text="step.result"></div>
+                                            <div x-show="step.tools" class="mt-2">
+                                                <span class="text-xs text-[var(--ui-muted)]">Tools: </span>
+                                                <template x-for="tool in step.tools">
+                                                    <span class="text-xs px-2 py-1 bg-[var(--ui-primary-5)] text-[var(--ui-primary)] rounded mr-1" x-text="tool"></span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Tools Discovered -->
+                        <div x-show="simulationResult.tools_discovered?.length > 0" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                            <h3 class="text-lg font-semibold mb-4 text-[var(--ui-secondary)]">🔍 Tools entdeckt (<span x-text="simulationResult.tools_discovered?.length"></span>)</h3>
+                            <div class="space-y-2">
+                                <template x-for="tool in simulationResult.tools_discovered">
+                                    <div class="p-3 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
+                                        <div class="font-mono text-sm font-semibold text-[var(--ui-secondary)]" x-text="tool.name"></div>
+                                        <div class="text-xs text-[var(--ui-muted)] mt-1" x-text="tool.description"></div>
+                                        <div x-show="tool.has_dependencies" class="mt-2">
+                                            <span class="text-xs px-2 py-1 bg-[var(--ui-warning-5)] text-[var(--ui-warning)] rounded">Hat Dependencies</span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Chain Plan -->
+                        <div x-show="simulationResult.chain_plan" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                            <h3 class="text-lg font-semibold mb-4 text-[var(--ui-secondary)]">🔗 Chain-Plan</h3>
+                            <div class="space-y-2">
+                                <div class="text-sm text-[var(--ui-muted)] mb-2">Ausführungsreihenfolge:</div>
+                                <template x-for="(tool, index) in simulationResult.chain_plan.execution_order">
+                                    <div class="flex items-center gap-2 p-2 bg-[var(--ui-surface)] rounded">
+                                        <span class="text-xs font-bold text-[var(--ui-primary)]" x-text="(index + 1) + '.'"></span>
+                                        <span class="font-mono text-sm text-[var(--ui-secondary)]" x-text="tool"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Execution Flow -->
+                        <div x-show="simulationResult.execution_flow?.length > 0" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                            <h3 class="text-lg font-semibold mb-4 text-[var(--ui-secondary)]">⚙️ Execution-Flow</h3>
+                            <div class="space-y-2">
+                                <template x-for="(exec, index) in simulationResult.execution_flow">
+                                    <div class="p-3 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <span class="font-mono text-sm font-semibold text-[var(--ui-secondary)]" x-text="exec.tool"></span>
+                                            <span :class="exec.result.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]'" x-text="exec.result.success ? '✅' : '❌'"></span>
+                                        </div>
+                                        <div class="text-xs text-[var(--ui-muted)]" x-text="'Argumente: ' + JSON.stringify(exec.arguments)"></div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Final Response -->
+                        <div x-show="simulationResult.final_response" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                            <h3 class="text-lg font-semibold mb-4 text-[var(--ui-secondary)]">💬 Finale Antwort</h3>
+                            <div class="p-3 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
+                                <div :class="simulationResult.final_response.type === 'success' ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]'" class="font-semibold mb-2" x-text="simulationResult.final_response.message"></div>
+                                <pre x-show="simulationResult.final_response.data" class="text-xs bg-[var(--ui-muted)] p-2 rounded overflow-auto" x-text="JSON.stringify(simulationResult.final_response.data, null, 2)"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tool Test Tab -->
+                <div x-show="activeTab === 'test'" class="space-y-6">
+                    <!-- Tool Selection -->
+                    <div class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                        <h2 class="text-xl font-semibold mb-4 text-[var(--ui-secondary)]">Tool auswählen</h2>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium mb-2 text-[var(--ui-secondary)]">Tool Name</label>
@@ -136,6 +268,9 @@
     <script>
         document.addEventListener('alpine:init', () => {
             Alpine.data('toolPlayground', () => ({
+                activeTab: 'simulate', // Start mit Simulation
+                
+                // Tool Test
                 toolName: 'planner.projects.create',
                 argumentsJson: '{"name": "Test Projekt"}',
                 options: {
@@ -147,6 +282,11 @@
                 result: null,
                 debug: null,
                 availableTools: [],
+
+                // MCP Simulation
+                simulationMessage: 'Erstelle ein Projekt namens Test Projekt',
+                simulationLoading: false,
+                simulationResult: null,
 
                 async loadTools() {
                     try {
@@ -198,6 +338,36 @@
                         };
                     } finally {
                         this.loading = false;
+                    }
+                },
+
+                async runSimulation() {
+                    this.simulationLoading = true;
+                    this.simulationResult = null;
+
+                    try {
+                        const response = await fetch('{{ route("core.tools.playground.simulate") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                message: this.simulationMessage,
+                                options: {}
+                            })
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            this.simulationResult = data.simulation;
+                        } else {
+                            alert('Simulation fehlgeschlagen: ' + (data.error || 'Unbekannter Fehler'));
+                        }
+                    } catch (e) {
+                        alert('Fehler: ' + e.message);
+                    } finally {
+                        this.simulationLoading = false;
                     }
                 },
 
