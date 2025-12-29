@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Platform\Core\Services\OpenAiService;
 use Platform\Core\Tools\ToolRegistry;
 use Platform\Core\Tools\ToolExecutor;
+use Platform\Core\Tools\ToolOrchestrator;
 
 class TestOpenAiCommand extends Command
 {
@@ -124,7 +125,7 @@ class TestOpenAiCommand extends Command
                 $options['on_tool_start'] = function(string $tool) {
                     $this->line("🔧 Tool gestartet: {$tool}");
                 };
-                $options['tool_executor'] = function($toolName, $arguments) use ($toolExecutor) {
+                $options['tool_executor'] = function($toolName, $arguments) use ($toolExecutor, $registry) {
                     try {
                         $this->line("⚙️  Führe Tool aus: {$toolName}");
                         $this->line("  Argumente: " . json_encode($arguments, JSON_UNESCAPED_UNICODE));
@@ -150,10 +151,21 @@ class TestOpenAiCommand extends Command
                             $context = new \Platform\Core\Contracts\ToolContext($mockUser, $mockTeam);
                         }
                         
-                        $result = $toolExecutor->execute($toolName, $arguments, $context);
+                        // WICHTIG: Nutze ToolOrchestrator für automatische Tool-Chains
+                        $orchestrator = new ToolOrchestrator($toolExecutor, $registry);
+                        $this->line("  🔗 Nutze ToolOrchestrator für Dependency-Resolution...");
+                        
+                        $result = $orchestrator->executeWithDependencies($toolName, $arguments, $context);
                         $resultArray = $result->toArray();
                         
-                        $this->line("✅ Tool erfolgreich: " . json_encode($resultArray, JSON_UNESCAPED_UNICODE));
+                        // Prüfe, ob Dependency-Ergebnis zurückgegeben wurde
+                        if (isset($resultArray['requires_user_input']) && $resultArray['requires_user_input']) {
+                            $this->line("  📋 Dependency-Ergebnis (User-Input erforderlich):");
+                            $this->line("  " . json_encode($resultArray, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+                        } else {
+                            $this->line("✅ Tool erfolgreich: " . json_encode($resultArray, JSON_UNESCAPED_UNICODE));
+                        }
+                        
                         return $resultArray;
                     } catch (\Throwable $e) {
                         $this->error("❌ Tool Fehler: " . $e->getMessage());

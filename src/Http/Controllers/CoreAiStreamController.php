@@ -415,7 +415,7 @@ class CoreAiStreamController extends Controller
                             ], JSON_UNESCAPED_UNICODE) . "\n\n";
                             @flush();
                         };
-                        $streamOptions['tool_executor'] = function($toolName, $arguments) use ($toolExecutor) {
+                        $streamOptions['tool_executor'] = function($toolName, $arguments) use ($toolExecutor, $registry) {
                             try {
                                 echo 'data: ' . json_encode([
                                     'status' => [
@@ -427,7 +427,15 @@ class CoreAiStreamController extends Controller
                                 @flush();
                                 
                                 $context = \Platform\Core\Contracts\ToolContext::fromAuth();
-                                $result = $toolExecutor->execute($toolName, $arguments, $context);
+                                
+                                // Nutze ToolOrchestrator für automatische Tool-Chains (wenn Registry verfügbar)
+                                if ($registry !== null) {
+                                    $orchestrator = new \Platform\Core\Tools\ToolOrchestrator($toolExecutor, $registry);
+                                    $result = $orchestrator->executeWithDependencies($toolName, $arguments, $context);
+                                } else {
+                                    // Fallback: Direkte Ausführung ohne Orchestrator
+                                    $result = $toolExecutor->execute($toolName, $arguments, $context);
+                                }
                                 
                                 // Konvertiere ToolResult zu altem Format für Kompatibilität
                                 $resultArray = $result->toArray();

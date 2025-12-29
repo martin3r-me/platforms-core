@@ -21,7 +21,7 @@ class ListTeamsTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'Listet alle Teams auf, denen der aktuelle User angehört. Nutze dieses Tool, wenn der Nutzer nach Teams fragt, ein Team auswählen möchte, oder wenn du wissen musst, in welchem Team etwas erstellt werden soll.';
+        return 'Listet alle Teams auf, denen der aktuelle User angehört. RUF DIESES TOOL AUTOMATISCH AUF, wenn der Nutzer nach Teams fragt (z.B. "welche Teams stehen zur Verfügung", "zeige mir alle Teams", "in welchem Team soll..."). Nutze dieses Tool auch, wenn du wissen musst, in welchem Team etwas erstellt werden soll und der Nutzer kein Team angegeben hat.';
     }
 
     public function getSchema(): array

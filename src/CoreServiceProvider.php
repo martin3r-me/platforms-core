@@ -155,9 +155,15 @@ class CoreServiceProvider extends ServiceProvider
             }
         });
 
-        // Tool Registry & Executor als Singleton registrieren
+        // Tool Registry, Executor & Orchestrator als Singleton registrieren
         $this->app->singleton(\Platform\Core\Tools\ToolRegistry::class);
         $this->app->singleton(\Platform\Core\Tools\ToolExecutor::class);
+        $this->app->singleton(\Platform\Core\Tools\ToolOrchestrator::class, function ($app) {
+            return new \Platform\Core\Tools\ToolOrchestrator(
+                $app->make(\Platform\Core\Tools\ToolExecutor::class),
+                $app->make(\Platform\Core\Tools\ToolRegistry::class)
+            );
+        });
 
         // Tool Auto-Discovery & Registrierung (lazy - erst wenn Registry tatsächlich verwendet wird)
         // INNOVATIV: Auto-Discovery + manuelle Registrierung - Module entscheiden selbst
