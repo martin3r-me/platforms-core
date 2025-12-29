@@ -97,6 +97,7 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Console\Commands\DebugToolsCommand::class,
                 \Platform\Core\Console\Commands\TestOpenAiCommand::class,
                 \Platform\Core\Console\Commands\ListToolsCommand::class,
+                \Platform\Core\Console\Commands\TestToolOrchestrationCommand::class,
             ]);
         }
 
