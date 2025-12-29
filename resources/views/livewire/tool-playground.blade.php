@@ -4,26 +4,26 @@
     </x-slot>
 
     <x-ui-page-container spacing="space-y-6">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-[var(--ui-secondary)] mb-2">
                 🔧 Tool Playground (MCP Testing)
             </h1>
-            <p class="text-gray-600 dark:text-gray-400 mb-8">
+            <p class="text-[var(--ui-muted)] mb-6">
                 Vollständiger Playground zum Testen der Tool-Orchestrierung mit vollem Debug.
             </p>
 
-                <div x-data="toolPlayground" class="space-y-6">
-                    <!-- Tool Selection -->
-                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+            <div x-data="toolPlayground" class="space-y-6">
+                <!-- Tool Selection -->
+                <div class="bg-[var(--ui-muted-5)] rounded-lg p-4">
                         <h2 class="text-xl font-semibold mb-4">Tool auswählen</h2>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-sm font-medium mb-2">Tool Name</label>
+                                <label class="block text-sm font-medium mb-2 text-[var(--ui-secondary)]">Tool Name</label>
                                 <input 
                                     type="text" 
                                     x-model="toolName"
                                     placeholder="z.B. planner.projects.create"
-                                    class="w-full px-3 py-2 border rounded-lg dark:bg-gray-600 dark:border-gray-500"
+                                    class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] text-[var(--ui-secondary)]"
                                     list="tools-list"
                                 >
                                 <datalist id="tools-list">
@@ -33,11 +33,11 @@
                                 </datalist>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium mb-2">Argumente (JSON)</label>
+                                <label class="block text-sm font-medium mb-2 text-[var(--ui-secondary)]">Argumente (JSON)</label>
                                 <textarea 
                                     x-model="argumentsJson"
                                     placeholder='{"name": "Test Projekt"}'
-                                    class="w-full px-3 py-2 border rounded-lg font-mono text-sm dark:bg-gray-600 dark:border-gray-500"
+                                    class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg font-mono text-sm bg-[var(--ui-surface)] text-[var(--ui-secondary)]"
                                     rows="3"
                                 ></textarea>
                             </div>
@@ -58,82 +58,79 @@
                         </div>
                         <button 
                             @click="loadTools()"
-                            class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                            class="mt-4 px-4 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:opacity-90"
                         >
                             🔄 Tools laden
                         </button>
                         <button 
                             @click="testTool()"
                             :disabled="loading"
-                            class="mt-4 ml-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
+                            class="mt-4 ml-2 px-4 py-2 bg-[var(--ui-success)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
                         >
                             <span x-show="!loading">▶️ Tool testen</span>
                             <span x-show="loading">⏳ Lädt...</span>
                         </button>
                     </div>
 
-                    <!-- Results -->
-                    <div x-show="result" class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                        <h2 class="text-xl font-semibold mb-4">Ergebnis</h2>
+                <!-- Results -->
+                <div x-show="result" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                    <h2 class="text-xl font-semibold mb-4 text-[var(--ui-secondary)]">Ergebnis</h2>
                         <div class="space-y-4">
-                            <div>
-                                <span class="font-semibold">Status:</span>
-                                <span 
-                                    x-text="result.success ? '✅ Erfolg' : '❌ Fehler'"
-                                    :class="result.success ? 'text-green-600' : 'text-red-600'"
-                                ></span>
-                            </div>
-                            <div x-show="result.data">
-                                <span class="font-semibold">Daten:</span>
-                                <pre class="mt-2 p-3 bg-gray-800 text-green-400 rounded overflow-auto text-xs" x-text="JSON.stringify(result.data, null, 2)"></pre>
-                            </div>
-                            <div x-show="result.error">
-                                <span class="font-semibold text-red-600">Fehler:</span>
-                                <pre class="mt-2 p-3 bg-gray-800 text-red-400 rounded overflow-auto text-xs" x-text="JSON.stringify(result.error, null, 2)"></pre>
-                            </div>
+                    <div>
+                        <span class="font-semibold text-[var(--ui-secondary)]">Status:</span>
+                        <span 
+                            x-text="result.success ? '✅ Erfolg' : '❌ Fehler'"
+                            :class="result.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]'"
+                        ></span>
+                    </div>
+                    <div x-show="result.data">
+                        <span class="font-semibold text-[var(--ui-secondary)]">Daten:</span>
+                        <pre class="mt-2 p-3 bg-[var(--ui-muted)] text-[var(--ui-success)] rounded overflow-auto text-xs" x-text="JSON.stringify(result.data, null, 2)"></pre>
+                    </div>
+                    <div x-show="result.error">
+                        <span class="font-semibold text-[var(--ui-danger)]">Fehler:</span>
+                        <pre class="mt-2 p-3 bg-[var(--ui-muted)] text-[var(--ui-danger)] rounded overflow-auto text-xs" x-text="JSON.stringify(result.error, null, 2)"></pre>
+                    </div>
                         </div>
                     </div>
 
-                    <!-- Debug Info -->
-                    <div x-show="debug" class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                        <h2 class="text-xl font-semibold mb-4">🔍 Debug-Informationen</h2>
-                        <details class="space-y-2">
-                            <summary class="cursor-pointer font-medium">Debug-Details anzeigen</summary>
-                            <pre class="mt-2 p-3 bg-gray-800 text-yellow-400 rounded overflow-auto text-xs" x-text="JSON.stringify(debug, null, 2)"></pre>
-                        </details>
-                    </div>
+                <!-- Debug Info -->
+                <div x-show="debug" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                    <h2 class="text-xl font-semibold mb-4 text-[var(--ui-secondary)]">🔍 Debug-Informationen</h2>
+                    <details class="space-y-2">
+                        <summary class="cursor-pointer font-medium text-[var(--ui-secondary)]">Debug-Details anzeigen</summary>
+                        <pre class="mt-2 p-3 bg-[var(--ui-muted)] text-[var(--ui-warning)] rounded overflow-auto text-xs" x-text="JSON.stringify(debug, null, 2)"></pre>
+                    </details>
+                </div>
 
-                    <!-- Available Tools -->
-                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                        <h2 class="text-xl font-semibold mb-4">Verfügbare Tools (<span x-text="availableTools.length"></span>)</h2>
+                <!-- Available Tools -->
+                <div class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                    <h2 class="text-xl font-semibold mb-4 text-[var(--ui-secondary)]">Verfügbare Tools (<span x-text="availableTools.length"></span>)</h2>
                         <div class="max-h-96 overflow-y-auto">
-                            <div class="space-y-2">
-                                <template x-for="tool in availableTools">
-                                    <div class="p-2 bg-white dark:bg-gray-600 rounded border">
-                                        <div class="font-mono text-sm font-semibold" x-text="tool.name"></div>
-                                        <div class="text-xs text-gray-600 dark:text-gray-400 mt-1" x-text="tool.description"></div>
-                                        <div class="mt-2 flex gap-2">
-                                            <span 
-                                                x-show="tool.has_dependencies"
-                                                class="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs"
-                                            >
-                                                Dependencies
-                                            </span>
-                                            <span 
-                                                x-show="tool.has_metadata"
-                                                class="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded text-xs"
-                                            >
-                                                Metadata
-                                            </span>
-                                        </div>
-                                    </div>
-                                </template>
+                    <div class="space-y-2">
+                        <template x-for="tool in availableTools">
+                            <div class="p-2 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
+                                <div class="font-mono text-sm font-semibold text-[var(--ui-secondary)]" x-text="tool.name"></div>
+                                <div class="text-xs text-[var(--ui-muted)] mt-1" x-text="tool.description"></div>
+                                <div class="mt-2 flex gap-2">
+                                    <span 
+                                        x-show="tool.has_dependencies"
+                                        class="px-2 py-1 bg-[var(--ui-primary-5)] text-[var(--ui-primary)] rounded text-xs"
+                                    >
+                                        Dependencies
+                                    </span>
+                                    <span 
+                                        x-show="tool.has_metadata"
+                                        class="px-2 py-1 bg-[var(--ui-info-5)] text-[var(--ui-info)] rounded text-xs"
+                                    >
+                                        Metadata
+                                    </span>
+                                </div>
                             </div>
-                        </div>
+                        </template>
                     </div>
                 </div>
             </div>
-        </div>
     </x-ui-page-container>
 
     <script>
