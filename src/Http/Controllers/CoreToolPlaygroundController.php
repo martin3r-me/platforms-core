@@ -65,6 +65,23 @@ class CoreToolPlaygroundController extends Controller
 
             $intent = $message;
             $discoveredTools = $discovery->findByIntent($intent);
+            
+            // FALLBACK: Wenn keine Tools gefunden, versuche direkten Match
+            if (count($discoveredTools) === 0 && count($allRegisteredTools) > 0) {
+                // Versuche direkten Match über Tool-Namen
+                $intentLower = strtolower($intent);
+                foreach ($allRegisteredTools as $tool) {
+                    $toolName = strtolower($tool->getName());
+                    // Prüfe ob Intent-Wörter im Tool-Namen vorkommen
+                    if ((stripos($toolName, 'projekt') !== false || stripos($intentLower, 'projekt') !== false) && 
+                        (stripos($toolName, 'create') !== false || stripos($intentLower, 'erstellen') !== false)) {
+                        $discoveredTools[] = $tool;
+                        $simulation['debug']['fallback_match'] = $tool->getName();
+                        break;
+                    }
+                }
+            }
+            
             $simulation['tools_discovered'] = array_map(function($tool) {
                 return [
                     'name' => $tool->getName(),
@@ -350,21 +367,43 @@ class CoreToolPlaygroundController extends Controller
     }
 
     /**
-     * Extrahiert Argumente aus User-Message (vereinfacht)
+     * Extrahiert Argumente aus User-Message (verbessert)
      */
     private function extractArguments(string $message, $tool): array
     {
-        // Sehr vereinfachte Extraktion - in Produktion würde man NLP verwenden
         $arguments = [];
         
-        // Beispiel: "Erstelle ein Projekt namens 'Test'"
-        if (preg_match("/namens?\s+['\"]([^'\"]+)['\"]/i", $message, $matches)) {
-            $arguments['name'] = $matches[1];
-        }
-        
-        // Beispiel: "im Team 5"
-        if (preg_match("/team\s+(\d+)/i", $message, $matches)) {
-            $arguments['team_id'] = (int) $matches[1];
+        try {
+            // Beispiel: "Erstelle ein Projekt namens 'Test'" oder "namens Test"
+            // Pattern: namens/named/name + optional quotes + Wert
+            if (preg_match("/namens?\s+(?:['\"]?)([^'\"]+?)(?:['\"]?)(?:\s|$)/iu", $message, $matches)) {
+                $arguments['name'] = trim($matches[1]);
+            }
+            // Alternative: "Projekt Test Projekt"
+            elseif (preg_match("/(?:projekt|project)\s+([A-ZÄÖÜ][a-zäöüß\s]+?)(?:\s|$)/iu", $message, $matches)) {
+                $arguments['name'] = trim($matches[1]);
+            }
+            
+            // Beispiel: "im Team 5" oder "Team-ID: 5"
+            if (preg_match("/team[-\s]?(?:id)?[:\s]+(\d+)/iu", $message, $matches)) {
+                $arguments['team_id'] = (int) $matches[1];
+            }
+            
+            // Beispiel: "Beschreibung: ..."
+            if (preg_match("/beschreibung[:\s]+(.+?)(?:\s+(?:im|für|mit)|$)/iu", $message, $matches)) {
+                $arguments['description'] = trim($matches[1]);
+            }
+            
+            // Beispiel: "Typ: customer" oder "Typ customer"
+            if (preg_match("/typ[:\s]+(internal|customer|event|cooking)/iu", $message, $matches)) {
+                $arguments['project_type'] = strtolower($matches[1]);
+            }
+        } catch (\Throwable $e) {
+            // Bei Regex-Fehlern: leeres Array zurückgeben
+            \Log::warning('[ToolPlayground] Argument-Extraktion fehlgeschlagen', [
+                'message' => $message,
+                'error' => $e->getMessage()
+            ]);
         }
         
         return $arguments;

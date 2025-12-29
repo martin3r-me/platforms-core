@@ -117,9 +117,36 @@ class ToolDiscoveryService
             }
 
             // Prüfe Tool-Name (z.B. "planner.projects.create" für "projekt erstellen")
+            // WICHTIG: Prüfe auch einzelne Teile des Tool-Namens (z.B. "projects" oder "create")
+            $toolNameParts = explode('.', $toolName);
             foreach ($intentKeywords as $keyword) {
+                // Prüfe vollständigen Tool-Namen
                 if (stripos($toolName, $keyword) !== false) {
                     $score += 8;
+                }
+                // Prüfe einzelne Teile (z.B. "projects" in "planner.projects.create")
+                foreach ($toolNameParts as $part) {
+                    if (stripos($part, $keyword) !== false || stripos($keyword, $part) !== false) {
+                        $score += 6;
+                    }
+                }
+            }
+            
+            // BONUS: Spezielle Mappings für häufige Aktionen
+            $actionMappings = [
+                'erstellen' => ['create', 'new', 'add', 'anlegen'],
+                'anzeigen' => ['list', 'show', 'get', 'find'],
+                'löschen' => ['delete', 'remove', 'destroy'],
+                'bearbeiten' => ['update', 'edit', 'modify'],
+            ];
+            
+            foreach ($intentKeywords as $keyword) {
+                if (isset($actionMappings[$keyword])) {
+                    foreach ($actionMappings[$keyword] as $mappedAction) {
+                        if (stripos($toolName, $mappedAction) !== false) {
+                            $score += 10; // Hoher Score für Action-Matches
+                        }
+                    }
                 }
             }
 
@@ -135,10 +162,13 @@ class ToolDiscoveryService
                 $score += 5;
             }
 
-            if ($score > 0) {
+            // Mindest-Score: Auch wenn Score niedrig, aber Tool-Name enthält relevante Keywords
+            $hasRelevantKeywords = $this->hasRelevantKeywords($toolName, $intentKeywords);
+            
+            if ($score > 0 || $hasRelevantKeywords) {
                 $results[] = [
                     'tool' => $tool,
-                    'score' => $score,
+                    'score' => max($score, 1), // Mindestens Score 1 wenn relevant
                     'metadata' => $metadata
                 ];
             }
@@ -161,16 +191,19 @@ class ToolDiscoveryService
         // Entferne häufige Stop-Wörter
         $stopWords = ['ein', 'eine', 'einen', 'einer', 'einem', 'eines', 'der', 'die', 'das', 'den', 'dem', 'des', 
                       'und', 'oder', 'aber', 'mit', 'für', 'von', 'zu', 'auf', 'in', 'an', 'ist', 'sind', 'war', 
-                      'waren', 'wird', 'werden', 'hat', 'haben', 'hatte', 'hatten', 'namens', 'heißt', 'heissen'];
+                      'waren', 'wird', 'werden', 'hat', 'haben', 'hatte', 'hatten', 'namens', 'heißt', 'heissen',
+                      'test', 'bitte', 'kannst', 'kann', 'möchte', 'möchten'];
         
         // Normalisiere: entferne Sonderzeichen, teile in Wörter
-        $words = preg_split('/[\s,\.!?;:]+/', $intent);
+        // Verbesserte Regex: erlaubt auch Umlaute und mehr Zeichen
+        $words = preg_split('/[\s,\.!?;:()\[\]{}]+/u', $intent, -1, PREG_SPLIT_NO_EMPTY);
         $keywords = [];
         
         foreach ($words as $word) {
             $word = trim($word);
-            if (strlen($word) > 2 && !in_array(strtolower($word), $stopWords)) {
-                $keywords[] = strtolower($word);
+            $wordLower = mb_strtolower($word, 'UTF-8');
+            if (mb_strlen($word, 'UTF-8') > 2 && !in_array($wordLower, $stopWords)) {
+                $keywords[] = $wordLower;
             }
         }
         
@@ -184,6 +217,29 @@ class ToolDiscoveryService
         }
         
         return array_unique($keywords);
+    }
+
+    /**
+     * Prüft ob Tool-Name relevante Keywords enthält
+     */
+    private function hasRelevantKeywords(string $toolName, array $keywords): bool
+    {
+        $toolNameLower = strtolower($toolName);
+        $toolNameParts = explode('.', $toolNameLower);
+        
+        foreach ($keywords as $keyword) {
+            // Prüfe ob Keyword in Tool-Name oder Teilen vorkommt
+            if (stripos($toolNameLower, $keyword) !== false) {
+                return true;
+            }
+            foreach ($toolNameParts as $part) {
+                if (stripos($part, $keyword) !== false || stripos($keyword, $part) !== false) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
 
     /**

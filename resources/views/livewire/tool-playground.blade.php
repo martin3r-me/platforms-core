@@ -49,15 +49,26 @@
                                     class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] text-[var(--ui-secondary)]"
                                     rows="3"
                                 ></textarea>
+                                <div class="mt-2 text-xs text-[var(--ui-muted)]">
+                                    💡 Beispiele: "Erstelle ein Projekt", "Zeige mir alle Teams", "Lösche Projekt X"
+                                </div>
                             </div>
-                            <button 
-                                @click="runSimulation()"
-                                :disabled="simulationLoading"
-                                class="px-4 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
-                            >
-                                <span x-show="!simulationLoading">🚀 Vollständige Simulation starten</span>
-                                <span x-show="simulationLoading">⏳ Simuliere...</span>
-                            </button>
+                            <div class="flex gap-2">
+                                <button 
+                                    @click="runSimulation()"
+                                    :disabled="simulationLoading"
+                                    class="px-4 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
+                                >
+                                    <span x-show="!simulationLoading">🚀 Vollständige Simulation starten</span>
+                                    <span x-show="simulationLoading">⏳ Simuliere...</span>
+                                </button>
+                                <button 
+                                    @click="simulationMessage = 'Erstelle ein Projekt namens Test Projekt'"
+                                    class="px-3 py-2 bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] rounded-lg hover:opacity-90 text-sm"
+                                >
+                                    📝 Beispiel
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -145,17 +156,25 @@
                         <div class="bg-[var(--ui-muted-5)] rounded-lg p-4 border-2 border-[var(--ui-primary)]">
                             <div class="flex items-center justify-between mb-4">
                                 <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">📋 Debug-Export (Kopierbar)</h3>
-                                <button 
-                                    @click="copyDebugExport()"
-                                    class="px-3 py-1 bg-[var(--ui-primary)] text-white rounded text-sm hover:opacity-90"
-                                >
-                                    📋 Kopieren
-                                </button>
+                                <div class="flex gap-2">
+                                    <button 
+                                        @click="copyDebugExport()"
+                                        class="px-3 py-1 bg-[var(--ui-primary)] text-white rounded text-sm hover:opacity-90"
+                                    >
+                                        📋 Kopieren
+                                    </button>
+                                    <button 
+                                        @click="downloadDebugExport()"
+                                        class="px-3 py-1 bg-[var(--ui-info)] text-white rounded text-sm hover:opacity-90"
+                                    >
+                                        💾 Download
+                                    </button>
+                                </div>
                             </div>
                             <div class="relative">
                                 <pre 
                                     id="debug-export-content"
-                                    class="text-xs bg-[var(--ui-muted)] p-4 rounded overflow-auto max-h-96 font-mono text-[var(--ui-secondary)] whitespace-pre-wrap"
+                                    class="text-xs bg-[var(--ui-muted)] p-4 rounded overflow-auto max-h-96 font-mono text-[var(--ui-secondary)] whitespace-pre-wrap cursor-text select-all"
                                     x-text="getDebugExport()"
                                 ></pre>
                                 <div 
@@ -167,7 +186,7 @@
                                 </div>
                             </div>
                             <p class="text-xs text-[var(--ui-muted)] mt-2">
-                                💡 Kopiere diesen Debug-Export und teile ihn für Support/Entwicklung
+                                💡 Kopiere diesen Debug-Export und teile ihn für Support/Entwicklung. Enthält alle Details der Simulation.
                             </p>
                         </div>
                     </div>
@@ -378,6 +397,7 @@
                 async runSimulation() {
                     this.simulationLoading = true;
                     this.simulationResult = null;
+                    this.debugCopied = false;
 
                     try {
                         const response = await fetch('{{ route("core.tools.playground.simulate") }}', {
@@ -397,12 +417,29 @@
                             this.simulationResult = data.simulation;
                         } else {
                             alert('Simulation fehlgeschlagen: ' + (data.error || 'Unbekannter Fehler'));
+                            if (data.simulation) {
+                                this.simulationResult = data.simulation; // Zeige auch bei Fehler
+                            }
                         }
                     } catch (e) {
                         alert('Fehler: ' + e.message);
+                        console.error('Simulation Error:', e);
                     } finally {
                         this.simulationLoading = false;
                     }
+                },
+
+                downloadDebugExport() {
+                    const content = this.getDebugExport();
+                    const blob = new Blob([content], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `mcp-simulation-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
                 },
 
                 getDebugExport() {
