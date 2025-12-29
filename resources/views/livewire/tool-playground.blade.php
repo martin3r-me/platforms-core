@@ -226,43 +226,46 @@
                         </div>
                     </div>
 
-                <!-- Debug Info -->
-                <div x-show="debug" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
-                    <h2 class="text-xl font-semibold mb-4 text-[var(--ui-secondary)]">🔍 Debug-Informationen</h2>
-                    <details class="space-y-2">
-                        <summary class="cursor-pointer font-medium text-[var(--ui-secondary)]">Debug-Details anzeigen</summary>
-                        <pre class="mt-2 p-3 bg-[var(--ui-muted)] text-[var(--ui-warning)] rounded overflow-auto text-xs" x-text="JSON.stringify(debug, null, 2)"></pre>
-                    </details>
-                </div>
+                    <!-- Debug Info -->
+                    <div x-show="debug" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                        <h2 class="text-xl font-semibold mb-4 text-[var(--ui-secondary)]">🔍 Debug-Informationen</h2>
+                        <details class="space-y-2">
+                            <summary class="cursor-pointer font-medium text-[var(--ui-secondary)]">Debug-Details anzeigen</summary>
+                            <pre class="mt-2 p-3 bg-[var(--ui-muted)] text-[var(--ui-warning)] rounded overflow-auto text-xs" x-text="JSON.stringify(debug, null, 2)"></pre>
+                        </details>
+                    </div>
 
-                <!-- Available Tools -->
-                <div class="bg-[var(--ui-muted-5)] rounded-lg p-4">
-                    <h2 class="text-xl font-semibold mb-4 text-[var(--ui-secondary)]">Verfügbare Tools (<span x-text="availableTools.length"></span>)</h2>
+                    <!-- Available Tools -->
+                    <div class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                        <h2 class="text-xl font-semibold mb-4 text-[var(--ui-secondary)]">Verfügbare Tools (<span x-text="availableTools.length"></span>)</h2>
                         <div class="max-h-96 overflow-y-auto">
-                    <div class="space-y-2">
-                        <template x-for="tool in availableTools">
-                            <div class="p-2 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
-                                <div class="font-mono text-sm font-semibold text-[var(--ui-secondary)]" x-text="tool.name"></div>
-                                <div class="text-xs text-[var(--ui-muted)] mt-1" x-text="tool.description"></div>
-                                <div class="mt-2 flex gap-2">
-                                    <span 
-                                        x-show="tool.has_dependencies"
-                                        class="px-2 py-1 bg-[var(--ui-primary-5)] text-[var(--ui-primary)] rounded text-xs"
-                                    >
-                                        Dependencies
-                                    </span>
-                                    <span 
-                                        x-show="tool.has_metadata"
-                                        class="px-2 py-1 bg-[var(--ui-info-5)] text-[var(--ui-info)] rounded text-xs"
-                                    >
-                                        Metadata
-                                    </span>
-                                </div>
+                            <div class="space-y-2">
+                                <template x-for="tool in availableTools">
+                                    <div class="p-2 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
+                                        <div class="font-mono text-sm font-semibold text-[var(--ui-secondary)]" x-text="tool.name"></div>
+                                        <div class="text-xs text-[var(--ui-muted)] mt-1" x-text="tool.description"></div>
+                                        <div class="mt-2 flex gap-2">
+                                            <span 
+                                                x-show="tool.has_dependencies"
+                                                class="px-2 py-1 bg-[var(--ui-primary-5)] text-[var(--ui-primary)] rounded text-xs"
+                                            >
+                                                Dependencies
+                                            </span>
+                                            <span 
+                                                x-show="tool.has_metadata"
+                                                class="px-2 py-1 bg-[var(--ui-info-5)] text-[var(--ui-info)] rounded text-xs"
+                                            >
+                                                Metadata
+                                            </span>
+                                        </div>
+                                    </div>
+                                </template>
                             </div>
-                        </template>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
     </x-ui-page-container>
 
     <script>
@@ -373,8 +376,11 @@
 
                 init() {
                     // Auto-load tools on page load
-                    this.loadTools();
+                    this.$nextTick(() => {
+                        this.loadTools();
+                    });
                 }
+
             }));
         });
     </script>
