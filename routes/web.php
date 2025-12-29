@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 use Platform\Core\Http\Controllers\CoreAiStreamController;
 use Platform\Core\Http\Controllers\TeamInvitationController;
+use Platform\Core\Http\Controllers\CoreToolPlaygroundController;
 
 
 Route::post('/logout', function () {
@@ -207,5 +208,10 @@ Route::middleware(['web', 'auth'])->group(function () {
             'X-Accel-Buffering' => 'no', // Nginx buffering deaktivieren
         ]);
     })->name('core.ai.stream.test');
+    
+    // Tool Playground (MCP Testing)
+    Route::get('/core/tools/playground', [CoreToolPlaygroundController::class, 'index'])->name('core.tools.playground');
+    Route::post('/core/tools/playground/test', [CoreToolPlaygroundController::class, 'test'])->name('core.tools.playground.test');
+    Route::get('/core/tools/playground/tools', [CoreToolPlaygroundController::class, 'tools'])->name('core.tools.playground.tools');
 });
 

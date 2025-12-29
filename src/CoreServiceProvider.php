@@ -187,14 +187,30 @@ class CoreServiceProvider extends ServiceProvider
                 return;
             }
             
-            // 1. Auto-Discovery: Lade Tools automatisch aus Verzeichnissen
+            // 1. Auto-Discovery: Lade Tools automatisch aus Core UND Modulen
             try {
+                // 1.1: Core-Tools laden (LOOSE COUPLED - automatisch aus Verzeichnis)
+                $coreTools = \Platform\Core\Tools\ToolLoader::loadCoreTools();
+                foreach ($coreTools as $tool) {
+                    try {
+                        $registry->register($tool);
+                        \Log::debug("[ToolRegistry] Core-Tool via Auto-Discovery registriert: " . $tool->getName());
+                    } catch (\Throwable $e) {
+                        \Log::warning("[ToolRegistry] Core-Tool konnte nicht registriert werden", [
+                            'tool' => get_class($tool),
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
+                
+                // 1.2: Module-Tools laden
                 $modulesPath = realpath(__DIR__ . '/../../modules');
                 if ($modulesPath && is_dir($modulesPath)) {
                     $moduleTools = \Platform\Core\Tools\ToolLoader::loadFromAllModules($modulesPath);
                     foreach ($moduleTools as $tool) {
                         try {
                             $registry->register($tool);
+                            \Log::debug("[ToolRegistry] Module-Tool via Auto-Discovery registriert: " . $tool->getName());
                         } catch (\Throwable $e) {
                             \Log::warning("[ToolRegistry] Auto-Discovery Tool konnte nicht registriert werden", [
                                 'tool' => get_class($tool),
@@ -207,11 +223,15 @@ class CoreServiceProvider extends ServiceProvider
                 \Log::warning("[ToolRegistry] Auto-Discovery fehlgeschlagen", ['error' => $e->getMessage()]);
             }
             
-            // 2. Core-Tools manuell registrieren (wenn nicht bereits durch Auto-Discovery geladen)
-            // ListToolsTool zuerst (wichtig für AI - zeigt verfügbare Tools)
+            // 2. Fallback: Manuelle Registrierung nur wenn Auto-Discovery fehlgeschlagen ist
+            // (Sollte normalerweise nicht nötig sein, da Auto-Discovery Core-Tools lädt)
+            // WICHTIG: Diese Tools haben möglicherweise Dependencies, daher Fallback
+            
+            // ListToolsTool (wichtig für AI - zeigt verfügbare Tools)
             if (!$registry->has('tools.list')) {
                 try {
                     $registry->register($this->app->make(\Platform\Core\Tools\ListToolsTool::class));
+                    \Log::debug("[ToolRegistry] ListToolsTool manuell registriert (Fallback)");
                 } catch (\Throwable $e) {
                     // Silent fail
                 }
@@ -221,19 +241,14 @@ class CoreServiceProvider extends ServiceProvider
             if (!$registry->has('core.teams.list')) {
                 try {
                     $registry->register($this->app->make(\Platform\Core\Tools\ListTeamsTool::class));
+                    \Log::debug("[ToolRegistry] ListTeamsTool manuell registriert (Fallback)");
                 } catch (\Throwable $e) {
                     // Silent fail
                 }
             }
             
-            // EchoTool
-            if (!$registry->has('echo')) {
-                try {
-                    $registry->register(new \Platform\Core\Tools\EchoTool());
-                } catch (\Throwable $e) {
-                    // Silent fail
-                }
-            }
+            // Context-Tools (werden normalerweise via Auto-Discovery geladen)
+            // GetContextTool, GetUserTool, GetModulesTool werden automatisch geladen
             
             // DataReadTool und DataWriteTool nur wenn Dependencies verfügbar sind
             if (!$registry->has('data.read')) {

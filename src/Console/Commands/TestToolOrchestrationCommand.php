@@ -64,31 +64,30 @@ class TestToolOrchestrationCommand extends Command
                 $registry = app(ToolRegistry::class);
             }
             
-            // Falls immer noch leer oder core.teams.list fehlt, lade Core-Tools
+            // Falls Registry leer ist, trigger Tool-Loading (Auto-Discovery sollte dann greifen)
             $allTools = $registry->all();
-            if (count($allTools) === 0 || !$registry->has('core.teams.list')) {
-                $this->warn("⚠️  Lade Core-Tools via Auto-Discovery...");
-                try {
-                    $coreTools = \Platform\Core\Tools\ToolLoader::loadCoreTools();
-                    foreach ($coreTools as $tool) {
-                        if (!$registry->has($tool->getName())) {
-                            $registry->register($tool);
-                            $this->line("✅ " . $tool->getName() . " registriert");
-                        }
-                    }
-                } catch (\Throwable $e) {
-                    $this->warn("⚠️  Auto-Discovery fehlgeschlagen: " . $e->getMessage());
-                }
+            if (count($allTools) === 0) {
+                $this->warn("⚠️  Registry ist leer - trigger Tool-Loading...");
+                // Trigger afterResolving durch erneutes Resolven
+                app()->forgetInstance(ToolRegistry::class);
+                $registry = app(ToolRegistry::class);
+                $allTools = $registry->all();
                 
-                // Falls core.teams.list immer noch fehlt, manuell registrieren
-                if (!$registry->has('core.teams.list')) {
+                if (count($allTools) === 0) {
+                    $this->warn("⚠️  Auto-Discovery hat keine Tools geladen - lade Core-Tools manuell...");
                     try {
-                        $listTeamsTool = app(\Platform\Core\Tools\ListTeamsTool::class);
-                        $registry->register($listTeamsTool);
-                        $this->line("✅ core.teams.list manuell registriert");
+                        $coreTools = \Platform\Core\Tools\ToolLoader::loadCoreTools();
+                        foreach ($coreTools as $tool) {
+                            if (!$registry->has($tool->getName())) {
+                                $registry->register($tool);
+                                $this->line("✅ " . $tool->getName() . " via Auto-Discovery registriert");
+                            }
+                        }
                     } catch (\Throwable $e) {
-                        $this->warn("⚠️  Konnte core.teams.list nicht registrieren: " . $e->getMessage());
+                        $this->warn("⚠️  Auto-Discovery fehlgeschlagen: " . $e->getMessage());
                     }
+                } else {
+                    $this->line("✅ Auto-Discovery hat " . count($allTools) . " Tools geladen");
                 }
             }
             
