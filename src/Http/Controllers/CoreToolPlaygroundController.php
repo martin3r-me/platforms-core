@@ -21,7 +21,7 @@ class CoreToolPlaygroundController extends Controller
 {
     public function index()
     {
-        return view('platform::livewire.tool-playground');
+        return view('platform::livewire.tool-playground')->layout('platform::layouts.app');
     }
 
     /**

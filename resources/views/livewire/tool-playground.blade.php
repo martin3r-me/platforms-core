@@ -1,13 +1,16 @@
-<x-platform::layouts.app>
-    <div class="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-                <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-6">
-                    🔧 Tool Playground (MCP Testing)
-                </h1>
-                <p class="text-gray-600 dark:text-gray-400 mb-8">
-                    Vollständiger Playground zum Testen der Tool-Orchestrierung mit vollem Debug.
-                </p>
+<x-ui-page>
+    <x-slot name="navbar">
+        <x-ui-page-navbar title="🔧 Tool Playground (MCP Testing)" icon="heroicon-o-wrench-screwdriver" />
+    </x-slot>
+
+    <x-ui-page-container spacing="space-y-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-6">
+                🔧 Tool Playground (MCP Testing)
+            </h1>
+            <p class="text-gray-600 dark:text-gray-400 mb-8">
+                Vollständiger Playground zum Testen der Tool-Orchestrierung mit vollem Debug.
+            </p>
 
                 <div x-data="toolPlayground" class="space-y-6">
                     <!-- Tool Selection -->
@@ -131,7 +134,7 @@
                 </div>
             </div>
         </div>
-    </div>
+    </x-ui-page-container>
 
     <script>
         document.addEventListener('alpine:init', () => {
@@ -208,5 +211,5 @@
             }));
         });
     </script>
-</x-platform::layouts.app>
+</x-ui-page>
 
