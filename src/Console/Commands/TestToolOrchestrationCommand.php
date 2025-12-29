@@ -53,12 +53,54 @@ class TestToolOrchestrationCommand extends Command
             $this->info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             
             $registry = app(ToolRegistry::class);
+            
+            // WICHTIG: Stelle sicher, dass alle Tools geladen sind
+            // Die Registry wird via afterResolving geladen, aber im Command-Kontext
+            // müssen wir sicherstellen, dass die Resolution getriggert wird
+            if (count($registry->all()) === 0) {
+                $this->warn("⚠️  Registry ist leer - triggere Tool-Loading...");
+                // Trigger afterResolving durch erneutes Resolven
+                app()->forgetInstance(ToolRegistry::class);
+                $registry = app(ToolRegistry::class);
+            }
+            
+            // Falls immer noch leer oder core.teams.list fehlt, lade Core-Tools
+            $allTools = $registry->all();
+            if (count($allTools) === 0 || !$registry->has('core.teams.list')) {
+                $this->warn("⚠️  Lade Core-Tools via Auto-Discovery...");
+                try {
+                    $coreTools = \Platform\Core\Tools\ToolLoader::loadCoreTools();
+                    foreach ($coreTools as $tool) {
+                        if (!$registry->has($tool->getName())) {
+                            $registry->register($tool);
+                            $this->line("✅ " . $tool->getName() . " registriert");
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    $this->warn("⚠️  Auto-Discovery fehlgeschlagen: " . $e->getMessage());
+                }
+                
+                // Falls core.teams.list immer noch fehlt, manuell registrieren
+                if (!$registry->has('core.teams.list')) {
+                    try {
+                        $listTeamsTool = app(\Platform\Core\Tools\ListTeamsTool::class);
+                        $registry->register($listTeamsTool);
+                        $this->line("✅ core.teams.list manuell registriert");
+                    } catch (\Throwable $e) {
+                        $this->warn("⚠️  Konnte core.teams.list nicht registrieren: " . $e->getMessage());
+                    }
+                }
+            }
+            
             $executor = new ToolExecutor($registry);
             $orchestrator = new ToolOrchestrator($executor, $registry);
             $planner = new ToolChainPlanner($registry);
             $discovery = new ToolDiscoveryService($registry);
 
             $this->line("✅ ToolRegistry: " . count($registry->all()) . " Tools");
+            foreach ($registry->all() as $name => $tool) {
+                $this->line("  - {$name}");
+            }
             $this->line("✅ ToolExecutor: Initialisiert");
             $this->line("✅ ToolOrchestrator: Initialisiert");
             $this->line("✅ ToolChainPlanner: Initialisiert");

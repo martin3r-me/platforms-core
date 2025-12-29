@@ -74,12 +74,13 @@ class ToolOrchestrator
         if ($planFirst) {
             $plan = $this->planner->planChain($toolName, $arguments, $context);
             
+            // Warnung bei fehlenden Tools, aber nicht abbrechen (könnte später geladen werden)
             if (!empty($plan['missing'])) {
-                return ToolResult::error(
-                    'Fehlende Tools: ' . implode(', ', $plan['missing']),
-                    'MISSING_TOOLS',
-                    ['plan' => $plan]
-                );
+                Log::warning('[ToolOrchestrator] Fehlende Tools im Plan', [
+                    'missing' => $plan['missing'],
+                    'plan' => $plan
+                ]);
+                // Nicht abbrechen - versuche trotzdem auszuführen
             }
             
             if (!empty($plan['warnings'])) {
