@@ -140,6 +140,36 @@
                                 <pre x-show="simulationResult.final_response.data" class="text-xs bg-[var(--ui-muted)] p-2 rounded overflow-auto" x-text="JSON.stringify(simulationResult.final_response.data, null, 2)"></pre>
                             </div>
                         </div>
+
+                        <!-- Debug Export (Kopierbar) -->
+                        <div class="bg-[var(--ui-muted-5)] rounded-lg p-4 border-2 border-[var(--ui-primary)]">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">📋 Debug-Export (Kopierbar)</h3>
+                                <button 
+                                    @click="copyDebugExport()"
+                                    class="px-3 py-1 bg-[var(--ui-primary)] text-white rounded text-sm hover:opacity-90"
+                                >
+                                    📋 Kopieren
+                                </button>
+                            </div>
+                            <div class="relative">
+                                <pre 
+                                    id="debug-export-content"
+                                    class="text-xs bg-[var(--ui-muted)] p-4 rounded overflow-auto max-h-96 font-mono text-[var(--ui-secondary)] whitespace-pre-wrap"
+                                    x-text="getDebugExport()"
+                                ></pre>
+                                <div 
+                                    x-show="debugCopied"
+                                    class="absolute top-2 right-2 px-3 py-1 bg-[var(--ui-success)] text-white rounded text-sm"
+                                    x-transition
+                                >
+                                    ✅ Kopiert!
+                                </div>
+                            </div>
+                            <p class="text-xs text-[var(--ui-muted)] mt-2">
+                                💡 Kopiere diesen Debug-Export und teile ihn für Support/Entwicklung
+                            </p>
+                        </div>
                     </div>
                 </div>
 
@@ -290,6 +320,7 @@
                 simulationMessage: 'Erstelle ein Projekt namens Test Projekt',
                 simulationLoading: false,
                 simulationResult: null,
+                debugCopied: false,
 
                 async loadTools() {
                     try {
@@ -371,6 +402,53 @@
                         alert('Fehler: ' + e.message);
                     } finally {
                         this.simulationLoading = false;
+                    }
+                },
+
+                getDebugExport() {
+                    if (!this.simulationResult) {
+                        return 'Keine Simulation-Daten verfügbar';
+                    }
+                    
+                    const exportData = {
+                        timestamp: new Date().toISOString(),
+                        user_message: this.simulationMessage,
+                        simulation: this.simulationResult,
+                        platform_info: {
+                            url: window.location.href,
+                            user_agent: navigator.userAgent,
+                        }
+                    };
+                    
+                    return JSON.stringify(exportData, null, 2);
+                },
+
+                async copyDebugExport() {
+                    try {
+                        const content = this.getDebugExport();
+                        await navigator.clipboard.writeText(content);
+                        this.debugCopied = true;
+                        setTimeout(() => {
+                            this.debugCopied = false;
+                        }, 2000);
+                    } catch (e) {
+                        // Fallback für ältere Browser
+                        const textarea = document.createElement('textarea');
+                        textarea.value = this.getDebugExport();
+                        textarea.style.position = 'fixed';
+                        textarea.style.opacity = '0';
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        try {
+                            document.execCommand('copy');
+                            this.debugCopied = true;
+                            setTimeout(() => {
+                                this.debugCopied = false;
+                            }, 2000);
+                        } catch (err) {
+                            alert('Kopieren fehlgeschlagen. Bitte manuell kopieren.');
+                        }
+                        document.body.removeChild(textarea);
                     }
                 },
 

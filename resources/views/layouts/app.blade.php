@@ -40,6 +40,7 @@
     @livewire('core.modal-modules')
     @livewire('organization.modal-organization')
     @livewire('core.modal-tagging')
+    @livewire('core.modal-files')
     @livewire('okr.modal-key-result')
   @endauth
 
