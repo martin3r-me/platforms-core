@@ -7,12 +7,18 @@ use Platform\Core\Contracts\ToolResult;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Tool-Orchestrator
+ * Tool-Orchestrator (MCP-Pattern)
  * 
  * Verwaltet Tool-Chains und führt automatisch benötigte Tools aus.
  * 
  * LOOSE COUPLED: Tools definieren ihre Dependencies selbst via ToolDependencyContract.
  * Der Orchestrator liest diese Informationen und führt die Tool-Chains automatisch aus.
+ * 
+ * MCP-Patterns:
+ * - Tool Discovery: Via ToolRegistry
+ * - Tool Chaining: Automatische Dependency-Resolution
+ * - Context Propagation: Ergebnisse werden zwischen Tools weitergegeben
+ * - Error Handling: Graceful degradation
  * 
  * Beispiel:
  * - User: "Erstelle ein Projekt"
@@ -28,31 +34,57 @@ class ToolOrchestrator
      */
     private array $dependencyCache = [];
 
+    /**
+     * Chain Planner für Pre-Flight Checks
+     */
+    private ?ToolChainPlanner $planner = null;
+
     public function __construct(
         private ToolExecutor $executor,
         private ToolRegistry $registry
-    ) {}
+    ) {
+        $this->planner = new ToolChainPlanner($registry);
+    }
 
     /**
-     * Führt ein Tool mit automatischer Dependency-Resolution aus
+     * Führt ein Tool mit automatischer Dependency-Resolution aus (MCP-Pattern)
      * 
      * @param string $toolName Name des Tools
      * @param array $arguments Argumente für das Tool
      * @param ToolContext $context Kontext für die Ausführung
      * @param int $maxDepth Maximale Tiefe für Tool-Chains (verhindert Endlosschleifen)
+     * @param bool $planFirst Wenn true, wird die Chain zuerst geplant (Pre-Flight Check)
      * @return ToolResult Ergebnis der Ausführung
      */
     public function executeWithDependencies(
         string $toolName,
         array $arguments,
         ToolContext $context,
-        int $maxDepth = 5
+        int $maxDepth = 5,
+        bool $planFirst = false
     ): ToolResult {
         if ($maxDepth <= 0) {
             return ToolResult::error(
                 'Maximale Tool-Chain-Tiefe erreicht',
                 'MAX_DEPTH_EXCEEDED'
             );
+        }
+
+        // Optional: Chain zuerst planen (Pre-Flight Check)
+        if ($planFirst) {
+            $plan = $this->planner->planChain($toolName, $arguments, $context);
+            
+            if (!empty($plan['missing'])) {
+                return ToolResult::error(
+                    'Fehlende Tools: ' . implode(', ', $plan['missing']),
+                    'MISSING_TOOLS',
+                    ['plan' => $plan]
+                );
+            }
+            
+            if (!empty($plan['warnings'])) {
+                Log::warning('[ToolOrchestrator] Chain-Plan Warnungen', ['warnings' => $plan['warnings']]);
+            }
         }
 
         // Prüfe, ob dieses Tool Dependencies hat (loose coupled: aus Tool selbst lesen)
