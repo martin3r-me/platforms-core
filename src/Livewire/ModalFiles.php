@@ -144,13 +144,17 @@ class ModalFiles extends Component
                     'url' => $file->url,
                     'download_url' => $file->download_url,
                     'is_image' => $file->isImage(),
-                    'thumbnail' => $file->thumbnail?->url ?? null,
-                    'variants' => $file->variants->map(fn($v) => [
-                        'type' => $v->variant_type,
-                        'url' => $v->url,
-                        'width' => $v->width,
-                        'height' => $v->height,
-                    ])->toArray(),
+                    'thumbnail' => $file->variants()->where('variant_type', 'thumbnail_4_3')->first()?->url 
+                        ?? $file->variants()->where('variant_type', 'like', 'thumbnail_%')->first()?->url 
+                        ?? null,
+                    'variants' => $file->variants->mapWithKeys(function($v) {
+                        return [$v->variant_type => [
+                            'type' => $v->variant_type,
+                            'url' => $v->url,
+                            'width' => $v->width,
+                            'height' => $v->height,
+                        ]];
+                    })->toArray(),
                     'created_at' => $file->created_at->diffForHumans(),
                     'uploaded_by' => $file->user->name ?? 'Unbekannt',
                 ];

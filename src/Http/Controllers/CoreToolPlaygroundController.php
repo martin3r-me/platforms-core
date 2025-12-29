@@ -376,33 +376,37 @@ class CoreToolPlaygroundController extends Controller
         try {
             // Beispiel: "Erstelle ein Projekt namens 'Test'" oder "namens Test"
             // Pattern: namens/named/name + optional quotes + Wert
-            if (preg_match("/namens?\s+(?:['\"]?)([^'\"]+?)(?:['\"]?)(?:\s|$)/iu", $message, $matches)) {
-                $arguments['name'] = trim($matches[1]);
+            // WICHTIG: Pattern muss valide sein - verwende einfachere Variante ohne komplexe Lookaheads
+            $pattern = '/namens?\s+([^\s]+(?:\s+[^\s]+)*?)(?:\s|$)/iu';
+            $result = @preg_match($pattern, $message, $matches);
+            if ($result === 1 && isset($matches[1])) {
+                $arguments['name'] = trim($matches[1], " \t\n\r\0\x0B'\"");
             }
-            // Alternative: "Projekt Test Projekt"
-            elseif (preg_match("/(?:projekt|project)\s+([A-ZÄÖÜ][a-zäöüß\s]+?)(?:\s|$)/iu", $message, $matches)) {
+            // Alternative: "Projekt Test Projekt" - einfacheres Pattern
+            elseif (preg_match('/(?:projekt|project)\s+([A-ZÄÖÜa-zäöüß][a-zäöüß\s]+?)(?:\s|$)/iu', $message, $matches) === 1) {
                 $arguments['name'] = trim($matches[1]);
             }
             
             // Beispiel: "im Team 5" oder "Team-ID: 5"
-            if (preg_match("/team[-\s]?(?:id)?[:\s]+(\d+)/iu", $message, $matches)) {
+            if (preg_match('/team[-\s]?(?:id)?[:\s]+(\d+)/iu', $message, $matches) === 1) {
                 $arguments['team_id'] = (int) $matches[1];
             }
             
             // Beispiel: "Beschreibung: ..."
-            if (preg_match("/beschreibung[:\s]+(.+?)(?:\s+(?:im|für|mit)|$)/iu", $message, $matches)) {
+            if (preg_match('/beschreibung[:\s]+(.+?)(?:\s+(?:im|für|mit)|$)/iu', $message, $matches) === 1) {
                 $arguments['description'] = trim($matches[1]);
             }
             
             // Beispiel: "Typ: customer" oder "Typ customer"
-            if (preg_match("/typ[:\s]+(internal|customer|event|cooking)/iu", $message, $matches)) {
+            if (preg_match('/typ[:\s]+(internal|customer|event|cooking)/iu', $message, $matches) === 1) {
                 $arguments['project_type'] = strtolower($matches[1]);
             }
         } catch (\Throwable $e) {
             // Bei Regex-Fehlern: leeres Array zurückgeben
             \Log::warning('[ToolPlayground] Argument-Extraktion fehlgeschlagen', [
                 'message' => $message,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
         }
         

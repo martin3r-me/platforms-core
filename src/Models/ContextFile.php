@@ -69,7 +69,9 @@ class ContextFile extends Model
 
     public function getThumbnailAttribute()
     {
-        return $this->variants()->where('variant_type', 'thumbnail')->first();
+        // Suche nach thumbnail_4_3 (Standard), sonst erstes verfügbares Thumbnail
+        return $this->variants()->where('variant_type', 'thumbnail_4_3')->first()
+            ?? $this->variants()->where('variant_type', 'like', 'thumbnail_%')->first();
     }
 }
 

@@ -129,15 +129,40 @@
                         @forelse($uploadedFiles as $file)
                             <div class="p-4 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40 rounded-lg">
                                 <div class="flex items-start gap-4">
-                                    @if($file['is_image'] && $file['thumbnail'])
-                                        <img
-                                            src="{{ $file['thumbnail'] }}"
-                                            alt="{{ $file['original_name'] }}"
-                                            class="w-16 h-16 object-cover rounded border border-[var(--ui-border)]/40"
-                                        />
+                                    @if($file['is_image'])
+                                        {{-- Zeige Thumbnail als Vorschau, Original beim Klick --}}
+                                        <a
+                                            href="{{ $file['url'] }}"
+                                            target="_blank"
+                                            class="flex-shrink-0 group relative"
+                                            title="Klicken für Original ({{ $file['width'] }}×{{ $file['height'] }})"
+                                        >
+                                            @if($file['thumbnail'])
+                                                {{-- Thumbnail als Vorschau --}}
+                                                <img
+                                                    src="{{ $file['thumbnail'] }}"
+                                                    alt="{{ $file['original_name'] }}"
+                                                    class="w-32 h-32 object-cover rounded border-2 border-[var(--ui-border)]/40 group-hover:border-[var(--ui-primary)]/60 transition-all"
+                                                />
+                                                {{-- Overlay-Hinweis --}}
+                                                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded flex items-center justify-center transition-colors">
+                                                    <span class="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 px-2 py-1 rounded">
+                                                        Original anzeigen
+                                                    </span>
+                                                </div>
+                                            @else
+                                                {{-- Fallback: Original direkt anzeigen (aber begrenzt) --}}
+                                                <img
+                                                    src="{{ $file['url'] }}"
+                                                    alt="{{ $file['original_name'] }}"
+                                                    class="w-32 h-32 object-contain rounded border-2 border-[var(--ui-border)]/40 group-hover:border-[var(--ui-primary)]/60 transition-all"
+                                                    style="max-width: 128px; max-height: 128px;"
+                                                />
+                                            @endif
+                                        </a>
                                     @else
-                                        <div class="w-16 h-16 bg-[var(--ui-primary-5)] rounded border border-[var(--ui-border)]/40 flex items-center justify-center">
-                                            @svg('heroicon-o-document', 'w-8 h-8 text-[var(--ui-primary)]')
+                                        <div class="w-24 h-24 bg-[var(--ui-primary-5)] rounded border border-[var(--ui-border)]/40 flex items-center justify-center flex-shrink-0">
+                                            @svg('heroicon-o-document', 'w-12 h-12 text-[var(--ui-primary)]')
                                         </div>
                                     @endif
                                     
@@ -152,22 +177,86 @@
                                             @endif
                                             • {{ $file['created_at'] }}
                                         </p>
+                                        
+                                        {{-- Original-Link für Bilder --}}
+                                        @if($file['is_image'])
+                                            <div class="mt-2">
+                                                <a
+                                                    href="{{ $file['url'] }}"
+                                                    target="_blank"
+                                                    class="text-xs px-2 py-1 bg-[var(--ui-primary-5)] text-[var(--ui-primary)] rounded border border-[var(--ui-primary)]/40 hover:bg-[var(--ui-primary-10)] inline-flex items-center gap-1"
+                                                >
+                                                    @svg('heroicon-o-photo', 'w-3 h-3')
+                                                    Original anzeigen ({{ $file['width'] }}×{{ $file['height'] }})
+                                                </a>
+                                            </div>
+                                        @endif
+                                        
+                                        {{-- Varianten-Links (gruppiert nach Seitenverhältnis) --}}
                                         @if(count($file['variants']) > 0)
-                                            <div class="mt-2 flex gap-2 flex-wrap">
-                                                @foreach($file['variants'] as $variant)
-                                                    <a
-                                                        href="{{ $variant['url'] }}"
-                                                        target="_blank"
-                                                        class="text-xs px-2 py-1 bg-[var(--ui-surface)] text-[var(--ui-secondary)] rounded border border-[var(--ui-border)]/40 hover:bg-[var(--ui-muted-5)]"
-                                                    >
-                                                        {{ $variant['type'] }} ({{ $variant['width'] }}×{{ $variant['height'] }})
-                                                    </a>
+                                            @php
+                                                // Varianten nach Seitenverhältnis gruppieren
+                                                $groupedVariants = [];
+                                                foreach ($file['variants'] as $key => $variant) {
+                                                    // Key-Format: "thumbnail_4_3" -> ["thumbnail", "4_3"]
+                                                    $parts = explode('_', $key, 2);
+                                                    if (count($parts) === 2) {
+                                                        $size = $parts[0]; // thumbnail, medium, large
+                                                        $aspect = $parts[1]; // 4_3, 16_9, etc.
+                                                        if (!isset($groupedVariants[$aspect])) {
+                                                            $groupedVariants[$aspect] = [];
+                                                        }
+                                                        $groupedVariants[$aspect][$size] = $variant;
+                                                    }
+                                                }
+                                                
+                                                // Labels für Seitenverhältnisse
+                                                $aspectLabels = [
+                                                    '4_3' => '4:3',
+                                                    '16_9' => '16:9',
+                                                    '1_1' => '1:1',
+                                                    '9_16' => '9:16',
+                                                    '3_1' => '3:1',
+                                                    'original' => 'Original',
+                                                ];
+                                                
+                                                // Labels für Größen
+                                                $sizeLabels = [
+                                                    'thumbnail' => 'Thumb',
+                                                    'medium' => 'Medium',
+                                                    'large' => 'Large',
+                                                ];
+                                            @endphp
+                                            
+                                            <div class="mt-3 space-y-2">
+                                                @foreach($groupedVariants as $aspect => $sizes)
+                                                    <div>
+                                                        <div class="text-xs font-semibold text-[var(--ui-muted)] mb-1">
+                                                            {{ $aspectLabels[$aspect] ?? $aspect }}
+                                                        </div>
+                                                        <div class="flex gap-2 flex-wrap">
+                                                            @foreach(['thumbnail', 'medium', 'large'] as $size)
+                                                                @if(isset($sizes[$size]))
+                                                                    @php $variant = $sizes[$size]; @endphp
+                                                                    <a
+                                                                        href="{{ $variant['url'] }}"
+                                                                        target="_blank"
+                                                                        class="text-xs px-2 py-1 bg-[var(--ui-surface)] text-[var(--ui-secondary)] rounded border border-[var(--ui-border)]/40 hover:bg-[var(--ui-muted-5)] hover:border-[var(--ui-primary)]/60 transition-colors"
+                                                                        title="{{ $sizeLabels[$size] }}: {{ $variant['width'] }}×{{ $variant['height'] }}"
+                                                                    >
+                                                                        {{ $sizeLabels[$size] }}
+                                                                        <span class="text-[var(--ui-muted)]">({{ $variant['width'] }}×{{ $variant['height'] }})</span>
+                                                                    </a>
+                                                                @endif
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
                                                 @endforeach
                                             </div>
                                         @endif
                                     </div>
                                     
-                                    <div class="flex items-center gap-2">
+                                    <div class="flex items-center gap-2 flex-shrink-0">
                                         <a
                                             href="{{ $file['download_url'] }}"
                                             download="{{ $file['original_name'] }}"

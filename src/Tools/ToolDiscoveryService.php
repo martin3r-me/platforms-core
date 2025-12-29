@@ -196,11 +196,27 @@ class ToolDiscoveryService
         
         // Normalisiere: entferne Sonderzeichen, teile in Wörter
         // Verbesserte Regex: erlaubt auch Umlaute und mehr Zeichen
-        $words = preg_split('/[\s,\.!?;:()\[\]{}]+/u', $intent, -1, PREG_SPLIT_NO_EMPTY);
+        // WICHTIG: Pattern muss valide sein - verwende einfacheres Pattern
+        $pattern = '/[\s,\.!?;:()\[\]{}]+/u';
+        $words = @preg_split($pattern, $intent, -1, PREG_SPLIT_NO_EMPTY);
+        
+        // Fallback: Wenn preg_split fehlschlägt, verwende einfache explode
+        if ($words === false || empty($words)) {
+            // Fallback: Einfache Aufteilung nach Leerzeichen und Kommas
+            $words = preg_split('/[\s,]+/u', $intent, -1, PREG_SPLIT_NO_EMPTY);
+            if ($words === false) {
+                // Letzter Fallback: explode nach Leerzeichen
+                $words = array_filter(explode(' ', $intent), fn($w) => !empty(trim($w)));
+            }
+        }
+        
         $keywords = [];
         
         foreach ($words as $word) {
             $word = trim($word);
+            if (empty($word)) {
+                continue;
+            }
             $wordLower = mb_strtolower($word, 'UTF-8');
             if (mb_strlen($word, 'UTF-8') > 2 && !in_array($wordLower, $stopWords)) {
                 $keywords[] = $wordLower;

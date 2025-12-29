@@ -58,34 +58,45 @@ class ContextFileService
         $mimeType = $file->getMimeType();
         $isImage = str_starts_with($mimeType, 'image/');
 
-        // Dateiname: nur Token + Extension (flach, keine Ordnerstruktur)
-        $fileName = "{$token}.{$extension}";
-
-        // Datei speichern (flach im Root des Disks)
-        $path = Storage::disk($this->disk)->putFileAs('', $file, $fileName);
+        // Für Bilder: Original immer als WebP speichern
+        if ($isImage) {
+            // Bild lesen und als WebP speichern
+            $image = $this->imageManager->read($file->getRealPath());
+            $width = $image->width();
+            $height = $image->height();
+            
+            $webpEncoder = new WebpEncoder(90); // 90% Qualität
+            $webpContent = (string) $image->encode($webpEncoder);
+            
+            // Dateiname: Token + .webp
+            $fileName = "{$token}.webp";
+            $path = Storage::disk($this->disk)->put($fileName, $webpContent);
+            
+            $mimeType = 'image/webp';
+            $fileSize = strlen($webpContent);
+        } else {
+            // Nicht-Bilder: Original-Format behalten
+            $fileName = "{$token}.{$extension}";
+            $path = Storage::disk($this->disk)->putFileAs('', $file, $fileName);
+            $fileSize = $file->getSize();
+            $width = null;
+            $height = null;
+        }
 
         // Metadaten
         $meta = [
             'original_name' => $file->getClientOriginalName(),
+            'original_mime_type' => $file->getMimeType(),
             'mime_type' => $mimeType,
-            'file_size' => $file->getSize(),
+            'file_size' => $fileSize,
             'uploaded_at' => now()->toIso8601String(),
             'uploaded_by' => $user->id,
         ];
 
-        // Bild-Dimensionen extrahieren
-        $width = null;
-        $height = null;
+        // Bild-Dimensionen in Meta speichern
         if ($isImage) {
-            try {
-                $image = $this->imageManager->read(Storage::disk($this->disk)->get($path));
-                $width = $image->width();
-                $height = $image->height();
-                $meta['width'] = $width;
-                $meta['height'] = $height;
-            } catch (\Exception $e) {
-                // Ignorieren wenn Bild nicht gelesen werden kann
-            }
+            $meta['width'] = $width;
+            $meta['height'] = $height;
         }
 
         // ContextFile in Datenbank speichern
@@ -121,7 +132,7 @@ class ContextFileService
             'original_name' => $file->getClientOriginalName(),
             'url' => Storage::disk($this->disk)->url($path),
             'mime_type' => $mimeType,
-            'file_size' => $file->getSize(),
+            'file_size' => $fileSize,
             'width' => $width,
             'height' => $height,
             'variants' => $variants,
@@ -129,96 +140,111 @@ class ContextFileService
     }
 
     /**
-     * Generiert Bildvarianten
+     * Generiert Bildvarianten mit verschiedenen Seitenverhältnissen
      * 
-     * Standard: kleine Variante (thumbnail)
-     * Optional: weitere Varianten + Original behalten
+     * Seitenverhältnisse: 4:3, 16:9, 1:1, 9:16, 3:1, original
+     * Größen pro Seitenverhältnis: thumbnail, medium, large
      */
     protected function generateImageVariants(\Platform\Core\Models\ContextFile $contextFile, bool $keepOriginal = false): array
     {
         $variants = [];
-        $webpEncoder = new WebpEncoder();
+        $webpEncoder = new WebpEncoder(90);
 
         // Original lesen
         $originalContent = Storage::disk($this->disk)->get($contextFile->path);
         $originalImage = $this->imageManager->read($originalContent);
         $originalWidth = $originalImage->width();
         $originalHeight = $originalImage->height();
+        $isPortrait = $originalHeight > $originalWidth;
 
-        // Standard: Thumbnail (kleine Variante)
-        $thumbnail = $originalImage->scaleDown(300, 300);
-        $thumbnailToken = $this->generateToken();
-        $thumbnailPath = "{$thumbnailToken}.webp";
-        Storage::disk($this->disk)->put($thumbnailPath, (string) $thumbnail->encode($webpEncoder, 85));
-
-        // Variant in DB speichern
-        $variant = \Platform\Core\Models\ContextFileVariant::create([
-            'context_file_id' => $contextFile->id,
-            'variant_type' => 'thumbnail',
-            'token' => $thumbnailToken,
-            'disk' => $this->disk,
-            'path' => $thumbnailPath,
-            'width' => $thumbnail->width(),
-            'height' => $thumbnail->height(),
-            'file_size' => Storage::disk($this->disk)->size($thumbnailPath),
-        ]);
-
-        $variants['thumbnail'] = [
-            'token' => $thumbnailToken,
-            'url' => Storage::disk($this->disk)->url($thumbnailPath),
-            'width' => $thumbnail->width(),
-            'height' => $thumbnail->height(),
+        // Varianten-Definitionen: Seitenverhältnis => [thumbnail, medium, large]
+        $aspectRatios = [
+            '4_3' => [
+                'thumbnail' => [300, 225],
+                'medium' => [800, 600],
+                'large' => [1200, 900],
+            ],
+            '16_9' => [
+                'thumbnail' => [300, 169],
+                'medium' => [800, 450],
+                'large' => [1200, 675],
+            ],
+            '1_1' => [
+                'thumbnail' => [300, 300],
+                'medium' => [800, 800],
+                'large' => [1200, 1200],
+            ],
+            '9_16' => [
+                'thumbnail' => [300, 533],
+                'medium' => [800, 1422],
+                'large' => [1200, 2133],
+            ],
+            '3_1' => [
+                'thumbnail' => [300, 100],
+                'medium' => [900, 300],
+                'large' => [1500, 500],
+            ],
+            'original' => [
+                'thumbnail' => [300, null],
+                'medium' => [800, null],
+                'large' => [1200, null],
+            ],
         ];
 
-        // Weitere Varianten nur wenn gewünscht
-        if ($keepOriginal) {
-            // Medium
-            $medium = $originalImage->scaleDown(800, 800);
-            $mediumToken = $this->generateToken();
-            $mediumPath = "{$mediumToken}.webp";
-            Storage::disk($this->disk)->put($mediumPath, (string) $medium->encode($webpEncoder, 90));
+        // Für jedes Seitenverhältnis alle Größen generieren
+        foreach ($aspectRatios as $aspectRatio => $sizes) {
+            foreach ($sizes as $sizeName => $dimensions) {
+                [$width, $height] = $dimensions;
 
-            \Platform\Core\Models\ContextFileVariant::create([
-                'context_file_id' => $contextFile->id,
-                'variant_type' => 'medium',
-                'token' => $mediumToken,
-                'disk' => $this->disk,
-                'path' => $mediumPath,
-                'width' => $medium->width(),
-                'height' => $medium->height(),
-                'file_size' => Storage::disk($this->disk)->size($mediumPath),
-            ]);
+                // Bild neu lesen (jede Variante braucht frisches Original)
+                $variantImage = $this->imageManager->read($originalContent);
 
-            $variants['medium'] = [
-                'token' => $mediumToken,
-                'url' => Storage::disk($this->disk)->url($mediumPath),
-                'width' => $medium->width(),
-                'height' => $medium->height(),
-            ];
+                // Verarbeitung basierend auf Seitenverhältnis und Bild-Orientierung
+                if ($aspectRatio === 'original') {
+                    // Original-Verhältnis: nur skalieren
+                    $variantImage->scaleDown($width, $height);
+                } else {
+                    // Feste Seitenverhältnisse
+                    if ($isPortrait) {
+                        // Hochformat: contain (mit Padding)
+                        $variantImage->contain($width, $height, 'ffffff');
+                    } else {
+                        // Querformat: cover (zuschneiden)
+                        $variantImage->cover($width, $height);
+                    }
+                }
 
-            // Large
-            $large = $originalImage->scaleDown(1200, 1200);
-            $largeToken = $this->generateToken();
-            $largePath = "{$largeToken}.webp";
-            Storage::disk($this->disk)->put($largePath, (string) $large->encode($webpEncoder, 90));
+                // Token und Pfad generieren
+                $variantToken = $this->generateToken();
+                $variantPath = "{$variantToken}.webp";
 
-            \Platform\Core\Models\ContextFileVariant::create([
-                'context_file_id' => $contextFile->id,
-                'variant_type' => 'large',
-                'token' => $largeToken,
-                'disk' => $this->disk,
-                'path' => $largePath,
-                'width' => $large->width(),
-                'height' => $large->height(),
-                'file_size' => Storage::disk($this->disk)->size($largePath),
-            ]);
+                // Variante speichern
+                Storage::disk($this->disk)->put($variantPath, (string) $variantImage->encode($webpEncoder));
 
-            $variants['large'] = [
-                'token' => $largeToken,
-                'url' => Storage::disk($this->disk)->url($largePath),
-                'width' => $large->width(),
-                'height' => $large->height(),
-            ];
+                // Tatsächliche Dimensionen ermitteln (wichtig für original-Varianten)
+                $actualWidth = $variantImage->width();
+                $actualHeight = $height ?? $variantImage->height();
+
+                // Variant in DB speichern
+                $variant = \Platform\Core\Models\ContextFileVariant::create([
+                    'context_file_id' => $contextFile->id,
+                    'variant_type' => "{$sizeName}_{$aspectRatio}",
+                    'token' => $variantToken,
+                    'disk' => $this->disk,
+                    'path' => $variantPath,
+                    'width' => $actualWidth,
+                    'height' => $actualHeight,
+                    'file_size' => Storage::disk($this->disk)->size($variantPath),
+                ]);
+
+                // In Variants-Array speichern
+                $variants["{$sizeName}_{$aspectRatio}"] = [
+                    'token' => $variantToken,
+                    'url' => Storage::disk($this->disk)->url($variantPath),
+                    'width' => $actualWidth,
+                    'height' => $actualHeight,
+                ];
+            }
         }
 
         return $variants;
