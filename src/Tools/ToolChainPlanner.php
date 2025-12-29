@@ -105,13 +105,14 @@ class ToolChainPlanner
                 // Dependency zum Plan hinzufügen
                 $plan['tools'][$toolName]['dependencies'][] = $depToolName;
 
-                // Rekursiv Dependency-Tool prüfen
+                // Rekursiv Dependency-Tool prüfen (WICHTIG: VOR dem Haupt-Tool)
                 $depArgs = [];
                 $argsCallback = $dependency['args'] ?? null;
                 if ($argsCallback && is_callable($argsCallback)) {
                     $depArgs = $argsCallback($arguments, $context) ?? [];
                 }
 
+                // Dependency-Tool zuerst sammeln (wird dann im Topological Sort zuerst kommen)
                 $this->collectDependencies($depToolName, $depArgs, $context, $plan, $visited);
             }
         }
@@ -132,7 +133,10 @@ class ToolChainPlanner
             }
         }
 
-        return array_reverse($sorted); // Reverse, damit Dependencies zuerst kommen
+        // Dependencies müssen VOR dem Haupt-Tool kommen
+        // Der Topological Sort gibt Dependencies zuerst zurück, dann das Haupt-Tool
+        // Das ist bereits korrekt - kein Reverse nötig
+        return $sorted;
     }
 
     private function visit(string $toolName, array $tools, array &$visited, array &$visiting, array &$sorted): void

@@ -259,6 +259,10 @@ class TestToolOrchestrationCommand extends Command
             'name' => 'Test Team',
         ]);
 
+        // Mock: User hat Teams-Relation
+        // Für Tests: Erstelle eine Collection mit dem Mock-Team
+        $mockUser->setRelation('teams', collect([$mockTeam]));
+
         return new ToolContext($mockUser, $mockTeam);
     }
 }
