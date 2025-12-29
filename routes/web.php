@@ -209,8 +209,10 @@ Route::middleware(['web', 'auth'])->group(function () {
         ]);
     })->name('core.ai.stream.test');
     
-    // Tool Playground (MCP Testing)
-    Route::get('/core/tools/playground', [CoreToolPlaygroundController::class, 'index'])->name('core.tools.playground');
+    // Tool Playground (MCP Testing) - Livewire-Komponente
+    Route::get('/core/tools/playground', function() {
+        return \Livewire\Livewire::mount('core.tool-playground');
+    })->name('core.tools.playground');
     Route::post('/core/tools/playground/test', [CoreToolPlaygroundController::class, 'test'])->name('core.tools.playground.test');
     Route::get('/core/tools/playground/tools', [CoreToolPlaygroundController::class, 'tools'])->name('core.tools.playground.tools');
 });

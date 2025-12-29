@@ -21,7 +21,8 @@ class CoreToolPlaygroundController extends Controller
 {
     public function index()
     {
-        return view('platform::livewire.tool-playground')->layout('platform::layouts.app');
+        // Wird nicht mehr verwendet - Route zeigt direkt auf Livewire-Komponente
+        abort(404);
     }
 
     /**
