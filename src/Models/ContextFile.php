@@ -52,14 +52,26 @@ class ContextFile extends Model
 
     public function getUrlAttribute(): string
     {
-        return Storage::disk($this->disk)->url($this->path);
+        try {
+            $url = Storage::disk($this->disk)->url($this->path);
+            // Falls URL leer oder ungültig, verwende Route
+            if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
+                return route('core.context-files.show', ['token' => $this->token]);
+            }
+            return $url;
+        } catch (\Exception $e) {
+            // Fallback: Route verwenden
+            return route('core.context-files.show', ['token' => $this->token]);
+        }
     }
 
     public function getDownloadUrlAttribute(): string
     {
-        $url = Storage::disk($this->disk)->url($this->path);
+        $url = $this->url;
         $originalName = urlencode($this->original_name);
-        return "{$url}?download={$originalName}";
+        // Wenn URL bereits Query-Parameter hat, verwende &, sonst ?
+        $separator = str_contains($url, '?') ? '&' : '?';
+        return "{$url}{$separator}download={$originalName}";
     }
 
     public function isImage(): bool

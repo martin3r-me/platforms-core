@@ -46,7 +46,14 @@ class CoreToolPlaygroundController extends Controller
 
         try {
             // STEP 1: Tool Discovery
+            // WICHTIG: Alle Regex-Operationen sind in ToolDiscoveryService abgesichert
             $registry = app(ToolRegistry::class);
+            
+            // Prüfe ob Registry verfügbar ist
+            if (!$registry) {
+                throw new \RuntimeException('ToolRegistry nicht verfügbar');
+            }
+            
             $discovery = new ToolDiscoveryService($registry);
             
             // Debug: Prüfe ob Tools registriert sind
@@ -64,7 +71,15 @@ class CoreToolPlaygroundController extends Controller
             ];
 
             $intent = $message;
-            $discoveredTools = $discovery->findByIntent($intent);
+            
+            // WICHTIG: findByIntent verwendet preg_split - ist bereits abgesichert
+            try {
+                $discoveredTools = $discovery->findByIntent($intent);
+            } catch (\Throwable $e) {
+                // Bei Fehlern: leeres Array verwenden
+                $discoveredTools = [];
+                $simulation['debug']['discovery_error'] = $e->getMessage();
+            }
             
             // FALLBACK: Wenn keine Tools gefunden, versuche direkten Match
             if (count($discoveredTools) === 0 && count($allRegisteredTools) > 0) {
@@ -112,7 +127,14 @@ class CoreToolPlaygroundController extends Controller
                 $context = ToolContext::fromAuth();
                 
                 // Versuche Argumente aus Message zu extrahieren (vereinfacht)
-                $arguments = $this->extractArguments($message, $primaryTool);
+                // WICHTIG: extractArguments ist abgesichert mit try-catch und @-Operator
+                try {
+                    $arguments = $this->extractArguments($message, $primaryTool);
+                } catch (\Throwable $e) {
+                    // Bei Fehlern: leeres Array verwenden
+                    $arguments = [];
+                    $simulation['debug']['argument_extraction_error'] = $e->getMessage();
+                }
                 
                 $plan = $planner->planChain($toolName, $arguments, $context);
                 $simulation['chain_plan'] = $plan;
@@ -201,14 +223,7 @@ class CoreToolPlaygroundController extends Controller
 
         } catch (\Throwable $e) {
             // Erweitere Simulation mit Fehler-Info für Debug-Export
-            $simulation['error'] = [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => substr($e->getTraceAsString(), 0, 2000), // Begrenzt für Debug-Export
-            ];
-            
-            // Stelle sicher, dass alle Arrays initialisiert sind
+            // WICHTIG: Stelle sicher, dass alle Arrays initialisiert sind
             if (!isset($simulation['steps'])) {
                 $simulation['steps'] = [];
             }
@@ -225,13 +240,40 @@ class CoreToolPlaygroundController extends Controller
                 ];
             }
             
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
+            // Füge Fehler-Info hinzu (sicher für JSON)
+            $simulation['error'] = [
+                'message' => $e->getMessage(),
+                'file' => basename($e->getFile()), // Nur Dateiname, nicht voller Pfad
                 'line' => $e->getLine(),
-                'simulation' => $simulation,
-            ], 500);
+            ];
+            
+            // WICHTIG: Stelle sicher, dass die Antwort immer valides JSON ist
+            try {
+                return response()->json([
+                    'success' => false,
+                    'error' => $e->getMessage(),
+                    'file' => basename($e->getFile()),
+                    'line' => $e->getLine(),
+                    'simulation' => $simulation,
+                ], 500);
+            } catch (\Throwable $jsonError) {
+                // Fallback: Sehr einfache JSON-Antwort
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Fehler beim Erstellen der Antwort: ' . $e->getMessage(),
+                    'simulation' => [
+                        'timestamp' => now()->toIso8601String(),
+                        'user_message' => $message ?? 'Unbekannt',
+                        'steps' => [],
+                        'tools_discovered' => [],
+                        'execution_flow' => [],
+                        'final_response' => [
+                            'type' => 'error',
+                            'message' => 'Kritischer Fehler: ' . $e->getMessage(),
+                        ],
+                    ],
+                ], 500);
+            }
         }
     }
 
@@ -393,37 +435,39 @@ class CoreToolPlaygroundController extends Controller
 
     /**
      * Extrahiert Argumente aus User-Message (verbessert)
+     * WICHTIG: Alle Regex-Patterns sind vereinfacht und sicher
      */
     private function extractArguments(string $message, $tool): array
     {
         $arguments = [];
         
+        // WICHTIG: Verwende nur einfache, sichere Patterns
+        // Keine komplexen Lookaheads oder Lookbehinds, die Probleme verursachen können
+        
         try {
             // Beispiel: "Erstelle ein Projekt namens 'Test'" oder "namens Test"
-            // Pattern: namens/named/name + optional quotes + Wert
-            // WICHTIG: Pattern muss valide sein - verwende einfachere Variante ohne komplexe Lookaheads
-            $pattern = '/namens?\s+([^\s]+(?:\s+[^\s]+)*?)(?:\s|$)/iu';
-            $result = @preg_match($pattern, $message, $matches);
-            if ($result === 1 && isset($matches[1])) {
+            // Vereinfachtes Pattern ohne komplexe Gruppen
+            $pattern1 = '/namens?\s+([a-zA-ZÄÖÜäöüß0-9\s]+?)(?:\s|$)/iu';
+            if (@preg_match($pattern1, $message, $matches) === 1 && isset($matches[1])) {
                 $arguments['name'] = trim($matches[1], " \t\n\r\0\x0B'\"");
             }
-            // Alternative: "Projekt Test Projekt" - einfacheres Pattern
-            elseif (preg_match('/(?:projekt|project)\s+([A-ZÄÖÜa-zäöüß][a-zäöüß\s]+?)(?:\s|$)/iu', $message, $matches) === 1) {
+            // Alternative: "Projekt Test Projekt"
+            elseif (@preg_match('/(?:projekt|project)\s+([a-zA-ZÄÖÜäöüß0-9\s]+?)(?:\s|$)/iu', $message, $matches) === 1) {
                 $arguments['name'] = trim($matches[1]);
             }
             
-            // Beispiel: "im Team 5" oder "Team-ID: 5"
-            if (preg_match('/team[-\s]?(?:id)?[:\s]+(\d+)/iu', $message, $matches) === 1) {
+            // Beispiel: "im Team 5" oder "Team-ID: 5" - sehr einfaches Pattern
+            if (@preg_match('/team[-\s]?id?[:\s]+(\d+)/iu', $message, $matches) === 1) {
                 $arguments['team_id'] = (int) $matches[1];
             }
             
-            // Beispiel: "Beschreibung: ..."
-            if (preg_match('/beschreibung[:\s]+(.+?)(?:\s+(?:im|für|mit)|$)/iu', $message, $matches) === 1) {
+            // Beispiel: "Beschreibung: ..." - vereinfacht
+            if (@preg_match('/beschreibung[:\s]+(.+?)(?:\s|$)/iu', $message, $matches) === 1) {
                 $arguments['description'] = trim($matches[1]);
             }
             
             // Beispiel: "Typ: customer" oder "Typ customer"
-            if (preg_match('/typ[:\s]+(internal|customer|event|cooking)/iu', $message, $matches) === 1) {
+            if (@preg_match('/typ[:\s]+(internal|customer|event|cooking)/iu', $message, $matches) === 1) {
                 $arguments['project_type'] = strtolower($matches[1]);
             }
         } catch (\Throwable $e) {
@@ -431,7 +475,7 @@ class CoreToolPlaygroundController extends Controller
             \Log::warning('[ToolPlayground] Argument-Extraktion fehlgeschlagen', [
                 'message' => $message,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => substr($e->getTraceAsString(), 0, 500)
             ]);
         }
         

@@ -26,7 +26,9 @@ class ContextFileService
 
     public function __construct()
     {
-        $this->disk = config('filesystems.default', 'local');
+        // Verwende 'public' für öffentlich zugängliche Dateien
+        // Falls S3 oder anderer Cloud-Storage gewünscht, kann das über ENV gesetzt werden
+        $this->disk = config('filesystems.default', 'public');
         $this->imageManager = new ImageManager(new Driver());
     }
 
@@ -70,14 +72,19 @@ class ContextFileService
             
             // Dateiname: Token + .webp
             $fileName = "{$token}.webp";
-            $path = Storage::disk($this->disk)->put($fileName, $webpContent);
+            // put() gibt den vollständigen Pfad zurück, aber wir wollen nur den Dateinamen
+            Storage::disk($this->disk)->put($fileName, $webpContent);
+            $path = $fileName; // Flache Struktur: nur Dateiname
             
             $mimeType = 'image/webp';
             $fileSize = strlen($webpContent);
         } else {
             // Nicht-Bilder: Original-Format behalten
             $fileName = "{$token}.{$extension}";
+            // putFileAs mit leerem Pfad speichert im Root
             $path = Storage::disk($this->disk)->putFileAs('', $file, $fileName);
+            // putFileAs kann einen Pfad mit Slash zurückgeben, normalisieren
+            $path = ltrim($path, '/');
             $fileSize = $file->getSize();
             $width = null;
             $height = null;
@@ -111,7 +118,7 @@ class ContextFileService
             'file_name' => $fileName,
             'original_name' => $file->getClientOriginalName(),
             'mime_type' => $mimeType,
-            'file_size' => $file->getSize(),
+            'file_size' => $fileSize, // Verwende berechnete Größe, nicht $file->getSize()
             'width' => $width,
             'height' => $height,
             'meta' => $meta,

@@ -32,7 +32,17 @@ class ContextFileVariant extends Model
 
     public function getUrlAttribute(): string
     {
-        return Storage::disk($this->disk)->url($this->path);
+        try {
+            $url = Storage::disk($this->disk)->url($this->path);
+            // Falls URL leer oder ungültig, verwende Route
+            if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
+                return route('core.context-files.variant', ['token' => $this->token]);
+            }
+            return $url;
+        } catch (\Exception $e) {
+            // Fallback: Route verwenden
+            return route('core.context-files.variant', ['token' => $this->token]);
+        }
     }
 }
 
