@@ -225,6 +225,7 @@
                                                     'thumbnail' => 'Thumb',
                                                     'medium' => 'Medium',
                                                     'large' => 'Large',
+                                                    'high_resolution' => 'High Res',
                                                 ];
                                                 
                                                 // Debug: Zeige alle Varianten
@@ -239,7 +240,7 @@
                                                             <span class="text-[var(--ui-muted)]">({{ count($sizes) }} Varianten)</span>
                                                         </div>
                                                         <div class="flex gap-2 flex-wrap">
-                                                            @foreach(['thumbnail', 'medium', 'large'] as $size)
+                                                            @foreach(['thumbnail', 'medium', 'large', 'high_resolution'] as $size)
                                                                 @if(isset($sizes[$size]))
                                                                     @php $variant = $sizes[$size]; @endphp
                                                                     <a

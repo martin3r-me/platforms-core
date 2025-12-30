@@ -174,37 +174,43 @@ class ContextFileService
         $originalHeight = $originalImage->height();
         $isPortrait = $originalHeight > $originalWidth;
 
-        // Varianten-Definitionen: Seitenverhältnis => [thumbnail, medium, large]
+        // Varianten-Definitionen: Genau wie im Vorbild (Uploads/Index.php)
         $aspectRatios = [
             '4_3' => [
                 'thumbnail' => [300, 225],
                 'medium' => [800, 600],
                 'large' => [1200, 900],
+                'high_resolution' => [2400, 1800],
             ],
             '16_9' => [
                 'thumbnail' => [300, 169],
                 'medium' => [800, 450],
                 'large' => [1200, 675],
+                'high_resolution' => [2400, 1350],
             ],
             '1_1' => [
                 'thumbnail' => [300, 300],
                 'medium' => [800, 800],
                 'large' => [1200, 1200],
+                'high_resolution' => [2400, 2400],
             ],
             '9_16' => [
                 'thumbnail' => [300, 533],
                 'medium' => [800, 1422],
                 'large' => [1200, 2133],
+                'high_resolution' => [2400, 4267],
             ],
             '3_1' => [
                 'thumbnail' => [300, 100],
                 'medium' => [900, 300],
                 'large' => [1500, 500],
+                'high_resolution' => [3000, 1000],
             ],
             'original' => [
                 'thumbnail' => [300, null],
                 'medium' => [800, null],
                 'large' => [1200, null],
+                'high_resolution' => [2400, null],
             ],
         ];
 
@@ -222,31 +228,27 @@ class ContextFileService
                     $beforeHeight = $variantImage->height();
 
                     // Verarbeitung basierend auf Seitenverhältnis und Bild-Orientierung
-                    // WICHTIG: contain/cover/scaleDown müssen IMMER aufgerufen werden, auch wenn Bild kleiner ist
-                    if ($aspectRatio === 'original') {
-                        // Original-Verhältnis: nur skalieren (proportional)
-                        if ($height === null) {
-                            // Nur Breite gegeben: proportional skalieren
-                            // scaleDown skaliert nur wenn größer, aber wir wollen immer die Zielgröße
-                            if ($variantImage->width() > $width) {
-                                $variantImage->scaleDown($width, null);
-                            } else {
-                                // Bild ist kleiner: trotzdem skalieren (kann auch vergrößern, aber wir nutzen scaleDown)
-                                // Alternative: resizeDown verwenden, aber das gibt es nicht
-                                // Wir behalten Original-Größe wenn kleiner
-                            }
+                    // GENAU wie im Vorbild (Uploads/Index.php)
+                    // Prüfe ob es eine original-Variante ist (analog zu strpos($variant, '_original'))
+                    $isOriginalVariant = ($aspectRatio === 'original');
+                    
+                    if ($isPortrait) {
+                        // Hochformat-Bilder: Padding bei 4:3 und 16:9, scaleDown bei Original
+                        if (!$isOriginalVariant) {
+                            // Für 4:3, 16:9, 1:1, 9:16, 3:1 Varianten: Verwende Padding
+                            $variantImage->contain($width, $height, 'ffffff');  // Weißes Padding
                         } else {
-                            // Beide Dimensionen: scaleDown (behält Verhältnis bei)
-                            $variantImage->scaleDown($width, $height);
+                            // Für Originalverhältnis: Proportional skalieren, wenn nötig
+                            $variantImage->scaleDown($width, null);
                         }
                     } else {
-                        // Feste Seitenverhältnisse - IMMER auf Zielgröße bringen
-                        if ($isPortrait) {
-                            // Hochformat: contain (mit weißem Padding) - erzeugt IMMER exakte Größe
-                            $variantImage->contain($width, $height, 'ffffff');
+                        // Querformat-Bilder: Zuschneiden auf gewünschtes Format
+                        if (!$isOriginalVariant) {
+                            // Für 4:3, 16:9, 1:1, 9:16, 3:1 Varianten: Zuschneiden
+                            $variantImage->cover($width, $height);  // Zuschneiden auf gewünschtes Format
                         } else {
-                            // Querformat: cover (zuschneiden auf gewünschtes Format) - erzeugt IMMER exakte Größe
-                            $variantImage->cover($width, $height);
+                            // Für Originalverhältnis: Proportional skalieren
+                            $variantImage->scaleDown($width, null);
                         }
                     }
 
@@ -258,8 +260,16 @@ class ContextFileService
                     Storage::disk($this->disk)->put($variantPath, (string) $variantImage->encode($webpEncoder));
 
                     // Tatsächliche Dimensionen ermitteln (NACH Verarbeitung!)
+                    // GENAU wie im Vorbild: Bei original-Varianten Höhe nach Skalierung ermitteln
                     $actualWidth = $variantImage->width();
-                    $actualHeight = $variantImage->height();
+                    
+                    // Manuelles Ermitteln der tatsächlichen Bildhöhe für Originalvarianten
+                    if ($isOriginalVariant) {
+                        $actualHeight = $variantImage->height();  // Höhe der skalierten Variante festlegen
+                    } else {
+                        // Für feste Seitenverhältnisse: verwende definierte Höhe
+                        $actualHeight = $height;
+                    }
                     
                     // Debug-Log
                     \Log::debug("[ContextFileService] Variante generiert", [

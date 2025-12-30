@@ -442,79 +442,106 @@
                             })
                         });
 
-                        // Prüfe Response-Status
-                        if (!response.ok) {
-                            // Versuche JSON zu parsen, auch bei Fehlern
-                            let errorData;
-                            try {
-                                errorData = await response.json();
-                            } catch (jsonError) {
-                                // Wenn JSON-Parsing fehlschlägt, verwende Text
-                                const errorText = await response.text();
-                                errorData = {
-                                    success: false,
-                                    error: `HTTP ${response.status}: ${errorText}`,
-                                    error_details: {
-                                        status: response.status,
-                                        statusText: response.statusText,
-                                        raw_response: errorText.substring(0, 1000)
-                                    }
-                                };
+                        // WICHTIG: Body nur einmal lesen - klone Response für Fallback
+                        let responseData;
+                        const contentType = response.headers.get('content-type');
+                        const isJson = contentType && contentType.includes('application/json');
+                        
+                        try {
+                            // Versuche zuerst JSON zu parsen
+                            if (isJson) {
+                                responseData = await response.json();
+                            } else {
+                                // Wenn nicht JSON, lese als Text
+                                const text = await response.text();
+                                try {
+                                    // Versuche Text als JSON zu parsen
+                                    responseData = JSON.parse(text);
+                                } catch {
+                                    // Wenn Parsing fehlschlägt, erstelle Fehler-Objekt
+                                    responseData = {
+                                        success: false,
+                                        error: `HTTP ${response.status}: ${response.statusText}`,
+                                        error_details: {
+                                            status: response.status,
+                                            statusText: response.statusText,
+                                            raw_response: text.substring(0, 1000)
+                                        }
+                                    };
+                                }
                             }
-                            
+                        } catch (parseError) {
+                            // Wenn JSON-Parsing fehlschlägt, erstelle Fehler-Objekt
+                            responseData = {
+                                success: false,
+                                error: `HTTP ${response.status}: Fehler beim Parsen der Antwort`,
+                                error_details: {
+                                    status: response.status,
+                                    statusText: response.statusText,
+                                    parse_error: parseError.message
+                                }
+                            };
+                        }
+
+                        // Prüfe Response-Status oder success-Flag
+                        if (!response.ok || !responseData.success) {
                             // Zeige Fehler-Details im Playground
                             this.simulationResult = {
                                 timestamp: new Date().toISOString(),
                                 user_message: this.simulationMessage,
-                                steps: [],
-                                tools_discovered: [],
-                                execution_flow: [],
+                                steps: responseData.simulation?.steps || [],
+                                tools_discovered: responseData.simulation?.tools_discovered || [],
+                                execution_flow: responseData.simulation?.execution_flow || [],
                                 final_response: {
                                     type: 'error',
-                                    message: errorData.error || 'Unbekannter Fehler',
-                                    error_details: errorData.error_details || errorData,
+                                    message: responseData.error || 'Unbekannter Fehler',
+                                    error_details: responseData.error_details || responseData,
                                 },
-                                error: errorData.error_details || errorData,
+                                error: responseData.error_details || {
+                                    message: responseData.error || 'Unbekannter Fehler',
+                                    status: response.status,
+                                    statusText: response.statusText,
+                                },
                             };
                             
                             // Zeige auch Alert mit Details
-                            const errorMsg = errorData.error || 'Unbekannter Fehler';
-                            const errorDetails = errorData.error_details ? 
-                                `\n\nDetails:\nDatei: ${errorData.error_details.file || 'N/A'}\nZeile: ${errorData.error_details.line || 'N/A'}\nKlasse: ${errorData.error_details.class || 'N/A'}` : 
+                            const errorMsg = responseData.error || 'Unbekannter Fehler';
+                            const errorDetails = responseData.error_details ? 
+                                `\n\nDetails:\nDatei: ${responseData.error_details.file || 'N/A'}\nZeile: ${responseData.error_details.line || 'N/A'}\nKlasse: ${responseData.error_details.class || 'N/A'}` : 
                                 '';
                             alert('❌ Simulation fehlgeschlagen!\n\n' + errorMsg + errorDetails);
                             
                             return;
                         }
                         
-                        const data = await response.json();
-                        if (data.success) {
-                            this.simulationResult = data.simulation;
+                        // Erfolgreiche Antwort
+                        if (responseData.success) {
+                            this.simulationResult = responseData.simulation;
                         } else {
                             // Zeige Fehler-Details im Playground
                             this.simulationResult = {
                                 timestamp: new Date().toISOString(),
                                 user_message: this.simulationMessage,
-                                steps: data.simulation?.steps || [],
-                                tools_discovered: data.simulation?.tools_discovered || [],
-                                execution_flow: data.simulation?.execution_flow || [],
+                                steps: responseData.simulation?.steps || [],
+                                tools_discovered: responseData.simulation?.tools_discovered || [],
+                                execution_flow: responseData.simulation?.execution_flow || [],
                                 final_response: {
                                     type: 'error',
-                                    message: data.error || 'Unbekannter Fehler',
-                                    error_details: data.error_details || data,
+                                    message: responseData.error || 'Unbekannter Fehler',
+                                    error_details: responseData.error_details || responseData,
                                 },
-                                error: data.error_details || data,
+                                error: responseData.error_details || responseData,
                             };
                             
                             // Zeige Alert mit Details
-                            const errorMsg = data.error || 'Unbekannter Fehler';
-                            const errorDetails = data.error_details ? 
-                                `\n\nDetails:\nDatei: ${data.error_details.file || 'N/A'}\nZeile: ${data.error_details.line || 'N/A'}\nKlasse: ${data.error_details.class || 'N/A'}` : 
+                            const errorMsg = responseData.error || 'Unbekannter Fehler';
+                            const errorDetails = responseData.error_details ? 
+                                `\n\nDetails:\nDatei: ${responseData.error_details.file || 'N/A'}\nZeile: ${responseData.error_details.line || 'N/A'}\nKlasse: ${responseData.error_details.class || 'N/A'}` : 
                                 '';
                             alert('❌ Simulation fehlgeschlagen!\n\n' + errorMsg + errorDetails);
                         }
                     } catch (e) {
-                        // Netzwerk- oder Parsing-Fehler
+                        // Netzwerk- oder andere Fehler
                         console.error('Simulation Error:', e);
                         this.simulationResult = {
                             timestamp: new Date().toISOString(),
@@ -524,11 +551,12 @@
                             execution_flow: [],
                             final_response: {
                                 type: 'error',
-                                message: 'Netzwerk- oder Parsing-Fehler: ' + e.message,
+                                message: 'Netzwerk- oder Verbindungsfehler: ' + e.message,
                             },
                             error: {
                                 message: e.message,
                                 stack: e.stack,
+                                name: e.name,
                             },
                         };
                         alert('❌ Fehler beim Senden der Anfrage:\n\n' + e.message);
