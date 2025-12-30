@@ -442,43 +442,71 @@
                             })
                         });
 
-                        // WICHTIG: Body nur einmal lesen - klone Response für Fallback
+                        // WICHTIG: Body nur einmal lesen
                         let responseData;
                         const contentType = response.headers.get('content-type');
                         const isJson = contentType && contentType.includes('application/json');
                         
+                        // Lese Body als Text (kann dann als JSON geparst werden)
+                        const responseText = await response.text();
+                        
                         try {
-                            // Versuche zuerst JSON zu parsen
-                            if (isJson) {
-                                responseData = await response.json();
+                            // Versuche Text als JSON zu parsen
+                            if (isJson || responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
+                                responseData = JSON.parse(responseText);
                             } else {
-                                // Wenn nicht JSON, lese als Text
-                                const text = await response.text();
-                                try {
-                                    // Versuche Text als JSON zu parsen
-                                    responseData = JSON.parse(text);
-                                } catch {
-                                    // Wenn Parsing fehlschlägt, erstelle Fehler-Objekt
+                                // Wenn nicht JSON (z.B. HTML-Fehlerseite), erstelle Fehler-Objekt
+                                // Prüfe ob es HTML ist
+                                const isHtml = responseText.trim().toLowerCase().startsWith('<!doctype') || 
+                                             responseText.trim().toLowerCase().startsWith('<html');
+                                
+                                if (isHtml) {
+                                    // Extrahiere Fehler-Info aus HTML falls möglich
+                                    const titleMatch = responseText.match(/<title>(.*?)<\/title>/i);
+                                    const title = titleMatch ? titleMatch[1] : 'HTML-Fehlerseite';
+                                    
+                                    responseData = {
+                                        success: false,
+                                        error: `HTTP ${response.status}: Server-Fehler (HTML-Response statt JSON)`,
+                                        error_details: {
+                                            status: response.status,
+                                            statusText: response.statusText,
+                                            content_type: contentType || 'unknown',
+                                            is_html: true,
+                                            html_title: title,
+                                            raw_response_preview: responseText.substring(0, 500),
+                                            message: 'Der Server hat eine HTML-Fehlerseite zurückgegeben. Dies deutet auf einen fatalen PHP-Fehler hin, der vor der JSON-Response auftritt.'
+                                        }
+                                    };
+                                } else {
+                                    // Anderes Format
                                     responseData = {
                                         success: false,
                                         error: `HTTP ${response.status}: ${response.statusText}`,
                                         error_details: {
                                             status: response.status,
                                             statusText: response.statusText,
-                                            raw_response: text.substring(0, 1000)
+                                            content_type: contentType || 'unknown',
+                                            raw_response: responseText.substring(0, 1000)
                                         }
                                     };
                                 }
                             }
                         } catch (parseError) {
                             // Wenn JSON-Parsing fehlschlägt, erstelle Fehler-Objekt
+                            const isHtml = responseText.trim().toLowerCase().startsWith('<!doctype') || 
+                                         responseText.trim().toLowerCase().startsWith('<html');
+                            
                             responseData = {
                                 success: false,
                                 error: `HTTP ${response.status}: Fehler beim Parsen der Antwort`,
                                 error_details: {
                                     status: response.status,
                                     statusText: response.statusText,
-                                    parse_error: parseError.message
+                                    content_type: contentType || 'unknown',
+                                    is_html: isHtml,
+                                    parse_error: parseError.message,
+                                    raw_response_preview: responseText.substring(0, 500)
                                 }
                             };
                         }

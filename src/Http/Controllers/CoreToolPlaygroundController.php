@@ -22,27 +22,64 @@ class CoreToolPlaygroundController extends Controller
 {
     /**
      * API-Endpoint für vollständige MCP-Simulation
+     * WICHTIG: Gibt immer JSON zurück, auch bei fatalen Fehlern
      */
     public function simulate(Request $request)
     {
-        $request->validate([
-            'message' => 'required|string',
-            'options' => 'nullable|array',
-        ]);
-
-        $message = $request->input('message');
-        $options = $request->input('options', []);
+        // WICHTIG: Stelle sicher, dass immer JSON zurückgegeben wird
+        // Setze Error Handler für diese Methode
+        $previousErrorHandler = set_error_handler(function($severity, $message, $file, $line) {
+            // Konvertiere PHP-Warnungen zu Exceptions
+            if (!(error_reporting() & $severity)) {
+                return false;
+            }
+            throw new \ErrorException($message, 0, $severity, $file, $line);
+        });
         
-        $simulation = [
-            'timestamp' => now()->toIso8601String(),
-            'user_message' => $message,
-            'steps' => [],
-            'tools_used' => [],
-            'tools_discovered' => [],
-            'chain_plan' => null,
-            'execution_flow' => [],
-            'final_response' => null,
-        ];
+        try {
+            $request->validate([
+                'message' => 'required|string',
+                'options' => 'nullable|array',
+            ]);
+
+            $message = $request->input('message');
+            $options = $request->input('options', []);
+            
+            $simulation = [
+                'timestamp' => now()->toIso8601String(),
+                'user_message' => $message,
+                'steps' => [],
+                'tools_used' => [],
+                'tools_discovered' => [],
+                'chain_plan' => null,
+                'execution_flow' => [],
+                'final_response' => null,
+            ];
+        } catch (\Throwable $e) {
+            // Fehler bei Request-Validierung oder Initialisierung
+            restore_error_handler();
+            return response()->json([
+                'success' => false,
+                'error' => 'Fehler bei Request-Validierung: ' . $e->getMessage(),
+                'error_details' => [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'class' => get_class($e),
+                ],
+                'simulation' => [
+                    'timestamp' => now()->toIso8601String(),
+                    'user_message' => $request->input('message', 'Unbekannt'),
+                    'steps' => [],
+                    'tools_discovered' => [],
+                    'execution_flow' => [],
+                    'final_response' => [
+                        'type' => 'error',
+                        'message' => 'Fehler bei Request-Validierung: ' . $e->getMessage(),
+                    ],
+                ],
+            ], 500);
+        }
 
         try {
             // STEP 1: Tool Discovery
@@ -265,7 +302,10 @@ class CoreToolPlaygroundController extends Controller
                 ], 500);
             } catch (\Throwable $jsonError) {
                 // Fallback: Sehr einfache JSON-Antwort mit Fehler-Info
-                return response()->json([
+                // WICHTIG: Verwende json_encode direkt, falls response()->json() fehlschlägt
+                header('Content-Type: application/json');
+                http_response_code(500);
+                echo json_encode([
                     'success' => false,
                     'error' => 'Fehler beim Erstellen der Antwort: ' . $e->getMessage(),
                     'original_error' => [
@@ -285,7 +325,10 @@ class CoreToolPlaygroundController extends Controller
                             'message' => 'Kritischer Fehler: ' . $e->getMessage(),
                         ],
                     ],
-                ], 500);
+                ], JSON_PARTIAL_OUTPUT_ON_ERROR | JSON_UNESCAPED_UNICODE);
+                exit;
+            } finally {
+                restore_error_handler();
             }
         }
     }
