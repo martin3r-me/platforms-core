@@ -412,18 +412,96 @@
                             })
                         });
 
+                        // Prüfe Response-Status
+                        if (!response.ok) {
+                            // Versuche JSON zu parsen, auch bei Fehlern
+                            let errorData;
+                            try {
+                                errorData = await response.json();
+                            } catch (jsonError) {
+                                // Wenn JSON-Parsing fehlschlägt, verwende Text
+                                const errorText = await response.text();
+                                errorData = {
+                                    success: false,
+                                    error: `HTTP ${response.status}: ${errorText}`,
+                                    error_details: {
+                                        status: response.status,
+                                        statusText: response.statusText,
+                                        raw_response: errorText.substring(0, 1000)
+                                    }
+                                };
+                            }
+                            
+                            // Zeige Fehler-Details im Playground
+                            this.simulationResult = {
+                                timestamp: new Date().toISOString(),
+                                user_message: this.simulationMessage,
+                                steps: [],
+                                tools_discovered: [],
+                                execution_flow: [],
+                                final_response: {
+                                    type: 'error',
+                                    message: errorData.error || 'Unbekannter Fehler',
+                                    error_details: errorData.error_details || errorData,
+                                },
+                                error: errorData.error_details || errorData,
+                            };
+                            
+                            // Zeige auch Alert mit Details
+                            const errorMsg = errorData.error || 'Unbekannter Fehler';
+                            const errorDetails = errorData.error_details ? 
+                                `\n\nDetails:\nDatei: ${errorData.error_details.file || 'N/A'}\nZeile: ${errorData.error_details.line || 'N/A'}\nKlasse: ${errorData.error_details.class || 'N/A'}` : 
+                                '';
+                            alert('❌ Simulation fehlgeschlagen!\n\n' + errorMsg + errorDetails);
+                            
+                            return;
+                        }
+                        
                         const data = await response.json();
                         if (data.success) {
                             this.simulationResult = data.simulation;
                         } else {
-                            alert('Simulation fehlgeschlagen: ' + (data.error || 'Unbekannter Fehler'));
-                            if (data.simulation) {
-                                this.simulationResult = data.simulation; // Zeige auch bei Fehler
-                            }
+                            // Zeige Fehler-Details im Playground
+                            this.simulationResult = {
+                                timestamp: new Date().toISOString(),
+                                user_message: this.simulationMessage,
+                                steps: data.simulation?.steps || [],
+                                tools_discovered: data.simulation?.tools_discovered || [],
+                                execution_flow: data.simulation?.execution_flow || [],
+                                final_response: {
+                                    type: 'error',
+                                    message: data.error || 'Unbekannter Fehler',
+                                    error_details: data.error_details || data,
+                                },
+                                error: data.error_details || data,
+                            };
+                            
+                            // Zeige Alert mit Details
+                            const errorMsg = data.error || 'Unbekannter Fehler';
+                            const errorDetails = data.error_details ? 
+                                `\n\nDetails:\nDatei: ${data.error_details.file || 'N/A'}\nZeile: ${data.error_details.line || 'N/A'}\nKlasse: ${data.error_details.class || 'N/A'}` : 
+                                '';
+                            alert('❌ Simulation fehlgeschlagen!\n\n' + errorMsg + errorDetails);
                         }
                     } catch (e) {
-                        alert('Fehler: ' + e.message);
+                        // Netzwerk- oder Parsing-Fehler
                         console.error('Simulation Error:', e);
+                        this.simulationResult = {
+                            timestamp: new Date().toISOString(),
+                            user_message: this.simulationMessage,
+                            steps: [],
+                            tools_discovered: [],
+                            execution_flow: [],
+                            final_response: {
+                                type: 'error',
+                                message: 'Netzwerk- oder Parsing-Fehler: ' + e.message,
+                            },
+                            error: {
+                                message: e.message,
+                                stack: e.stack,
+                            },
+                        };
+                        alert('❌ Fehler beim Senden der Anfrage:\n\n' + e.message);
                     } finally {
                         this.simulationLoading = false;
                     }

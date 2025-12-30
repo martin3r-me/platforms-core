@@ -240,11 +240,13 @@ class CoreToolPlaygroundController extends Controller
                 ];
             }
             
-            // Füge Fehler-Info hinzu (sicher für JSON)
+            // Füge vollständige Fehler-Info hinzu (sicher für JSON)
             $simulation['error'] = [
                 'message' => $e->getMessage(),
-                'file' => basename($e->getFile()), // Nur Dateiname, nicht voller Pfad
+                'file' => $e->getFile(),
                 'line' => $e->getLine(),
+                'trace' => explode("\n", substr($e->getTraceAsString(), 0, 5000)), // Erste 5000 Zeichen als Array
+                'class' => get_class($e),
             ];
             
             // WICHTIG: Stelle sicher, dass die Antwort immer valides JSON ist
@@ -252,15 +254,26 @@ class CoreToolPlaygroundController extends Controller
                 return response()->json([
                     'success' => false,
                     'error' => $e->getMessage(),
-                    'file' => basename($e->getFile()),
-                    'line' => $e->getLine(),
+                    'error_details' => [
+                        'message' => $e->getMessage(),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                        'class' => get_class($e),
+                        'trace' => explode("\n", substr($e->getTraceAsString(), 0, 5000)),
+                    ],
                     'simulation' => $simulation,
                 ], 500);
             } catch (\Throwable $jsonError) {
-                // Fallback: Sehr einfache JSON-Antwort
+                // Fallback: Sehr einfache JSON-Antwort mit Fehler-Info
                 return response()->json([
                     'success' => false,
                     'error' => 'Fehler beim Erstellen der Antwort: ' . $e->getMessage(),
+                    'original_error' => [
+                        'message' => $e->getMessage(),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                    ],
+                    'json_error' => $jsonError->getMessage(),
                     'simulation' => [
                         'timestamp' => now()->toIso8601String(),
                         'user_message' => $message ?? 'Unbekannt',
