@@ -121,8 +121,18 @@ class ContextFileService
         $variants = [];
 
         // Bildvarianten generieren (wenn Bild und gewünscht)
+        // WICHTIG: Varianten werden IMMER generiert (keepOriginal wird ignoriert, da wir alle Varianten brauchen)
         if ($isImage && ($options['generate_variants'] ?? true)) {
-            $variants = $this->generateImageVariants($contextFile, $options['keep_original'] ?? false);
+            try {
+                $variants = $this->generateImageVariants($contextFile);
+            } catch (\Exception $e) {
+                // Log Fehler, aber nicht werfen (Haupt-Upload war erfolgreich)
+                \Log::error('[ContextFileService] Fehler bei Varianten-Generierung', [
+                    'context_file_id' => $contextFile->id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+            }
         }
 
         return [
@@ -196,56 +206,96 @@ class ContextFileService
             foreach ($sizes as $sizeName => $dimensions) {
                 [$width, $height] = $dimensions;
 
-                // Bild neu lesen (jede Variante braucht frisches Original)
-                $variantImage = $this->imageManager->read($originalContent);
+                try {
+                    // Bild neu lesen (jede Variante braucht frisches Original)
+                    $variantImage = $this->imageManager->read($originalContent);
+                    
+                    // Original-Dimensionen für Debug
+                    $beforeWidth = $variantImage->width();
+                    $beforeHeight = $variantImage->height();
 
-                // Verarbeitung basierend auf Seitenverhältnis und Bild-Orientierung
-                if ($aspectRatio === 'original') {
-                    // Original-Verhältnis: nur skalieren
-                    $variantImage->scaleDown($width, $height);
-                } else {
-                    // Feste Seitenverhältnisse
-                    if ($isPortrait) {
-                        // Hochformat: contain (mit Padding)
-                        $variantImage->contain($width, $height, 'ffffff');
+                    // Verarbeitung basierend auf Seitenverhältnis und Bild-Orientierung
+                    // WICHTIG: contain/cover/scaleDown müssen IMMER aufgerufen werden, auch wenn Bild kleiner ist
+                    if ($aspectRatio === 'original') {
+                        // Original-Verhältnis: nur skalieren (proportional)
+                        if ($height === null) {
+                            // Nur Breite gegeben: proportional skalieren
+                            // scaleDown skaliert nur wenn größer, aber wir wollen immer die Zielgröße
+                            if ($variantImage->width() > $width) {
+                                $variantImage->scaleDown($width, null);
+                            } else {
+                                // Bild ist kleiner: trotzdem skalieren (kann auch vergrößern, aber wir nutzen scaleDown)
+                                // Alternative: resizeDown verwenden, aber das gibt es nicht
+                                // Wir behalten Original-Größe wenn kleiner
+                            }
+                        } else {
+                            // Beide Dimensionen: scaleDown (behält Verhältnis bei)
+                            $variantImage->scaleDown($width, $height);
+                        }
                     } else {
-                        // Querformat: cover (zuschneiden)
-                        $variantImage->cover($width, $height);
+                        // Feste Seitenverhältnisse - IMMER auf Zielgröße bringen
+                        if ($isPortrait) {
+                            // Hochformat: contain (mit weißem Padding) - erzeugt IMMER exakte Größe
+                            $variantImage->contain($width, $height, 'ffffff');
+                        } else {
+                            // Querformat: cover (zuschneiden auf gewünschtes Format) - erzeugt IMMER exakte Größe
+                            $variantImage->cover($width, $height);
+                        }
                     }
+
+                    // Token und Pfad generieren
+                    $variantToken = $this->generateToken();
+                    $variantPath = "{$variantToken}.webp";
+
+                    // Variante speichern
+                    Storage::disk($this->disk)->put($variantPath, (string) $variantImage->encode($webpEncoder));
+
+                    // Tatsächliche Dimensionen ermitteln (NACH Verarbeitung!)
+                    $actualWidth = $variantImage->width();
+                    $actualHeight = $variantImage->height();
+                    
+                    // Debug-Log
+                    \Log::debug("[ContextFileService] Variante generiert", [
+                        'variant_type' => "{$sizeName}_{$aspectRatio}",
+                        'target' => "{$width}×" . ($height ?? 'auto'),
+                        'before' => "{$beforeWidth}×{$beforeHeight}",
+                        'after' => "{$actualWidth}×{$actualHeight}",
+                    ]);
+
+                    // Variant in DB speichern
+                    $variant = \Platform\Core\Models\ContextFileVariant::create([
+                        'context_file_id' => $contextFile->id,
+                        'variant_type' => "{$sizeName}_{$aspectRatio}",
+                        'token' => $variantToken,
+                        'disk' => $this->disk,
+                        'path' => $variantPath,
+                        'width' => $actualWidth,
+                        'height' => $actualHeight,
+                        'file_size' => Storage::disk($this->disk)->size($variantPath),
+                    ]);
+
+                    // In Variants-Array speichern
+                    $variants["{$sizeName}_{$aspectRatio}"] = [
+                        'token' => $variantToken,
+                        'url' => Storage::disk($this->disk)->url($variantPath),
+                        'width' => $actualWidth,
+                        'height' => $actualHeight,
+                    ];
+                } catch (\Exception $e) {
+                    // Log Fehler, aber weiter mit nächster Variante
+                    \Log::error("[ContextFileService] Fehler bei Variante {$sizeName}_{$aspectRatio}", [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
                 }
-
-                // Token und Pfad generieren
-                $variantToken = $this->generateToken();
-                $variantPath = "{$variantToken}.webp";
-
-                // Variante speichern
-                Storage::disk($this->disk)->put($variantPath, (string) $variantImage->encode($webpEncoder));
-
-                // Tatsächliche Dimensionen ermitteln (wichtig für original-Varianten)
-                $actualWidth = $variantImage->width();
-                $actualHeight = $height ?? $variantImage->height();
-
-                // Variant in DB speichern
-                $variant = \Platform\Core\Models\ContextFileVariant::create([
-                    'context_file_id' => $contextFile->id,
-                    'variant_type' => "{$sizeName}_{$aspectRatio}",
-                    'token' => $variantToken,
-                    'disk' => $this->disk,
-                    'path' => $variantPath,
-                    'width' => $actualWidth,
-                    'height' => $actualHeight,
-                    'file_size' => Storage::disk($this->disk)->size($variantPath),
-                ]);
-
-                // In Variants-Array speichern
-                $variants["{$sizeName}_{$aspectRatio}"] = [
-                    'token' => $variantToken,
-                    'url' => Storage::disk($this->disk)->url($variantPath),
-                    'width' => $actualWidth,
-                    'height' => $actualHeight,
-                ];
             }
         }
+        
+        \Log::info("[ContextFileService] Varianten-Generierung abgeschlossen", [
+            'context_file_id' => $contextFile->id,
+            'variants_generated' => count($variants),
+            'expected' => 18, // 6 Seitenverhältnisse × 3 Größen
+        ]);
 
         return $variants;
     }

@@ -200,6 +200,31 @@ class CoreToolPlaygroundController extends Controller
             ]);
 
         } catch (\Throwable $e) {
+            // Erweitere Simulation mit Fehler-Info für Debug-Export
+            $simulation['error'] = [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => substr($e->getTraceAsString(), 0, 2000), // Begrenzt für Debug-Export
+            ];
+            
+            // Stelle sicher, dass alle Arrays initialisiert sind
+            if (!isset($simulation['steps'])) {
+                $simulation['steps'] = [];
+            }
+            if (!isset($simulation['tools_discovered'])) {
+                $simulation['tools_discovered'] = [];
+            }
+            if (!isset($simulation['execution_flow'])) {
+                $simulation['execution_flow'] = [];
+            }
+            if (!isset($simulation['final_response'])) {
+                $simulation['final_response'] = [
+                    'type' => 'error',
+                    'message' => 'Simulation fehlgeschlagen: ' . $e->getMessage(),
+                ];
+            }
+            
             return response()->json([
                 'success' => false,
                 'error' => $e->getMessage(),

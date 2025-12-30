@@ -78,7 +78,7 @@
                         <div class="bg-[var(--ui-muted-5)] rounded-lg p-4">
                             <h3 class="text-lg font-semibold mb-4 text-[var(--ui-secondary)]">📊 Request-Flow</h3>
                             <div class="space-y-3">
-                                <template x-for="(step, index) in simulationResult.steps" :key="index">
+                                <template x-for="(step, index) in (simulationResult?.steps || [])" :key="index">
                                     <div class="flex items-start gap-4 p-3 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
                                         <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--ui-primary)] text-white flex items-center justify-center font-bold" x-text="step.step"></div>
                                         <div class="flex-1">
@@ -98,10 +98,10 @@
                         </div>
 
                         <!-- Tools Discovered -->
-                        <div x-show="simulationResult.tools_discovered?.length > 0" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
-                            <h3 class="text-lg font-semibold mb-4 text-[var(--ui-secondary)]">🔍 Tools entdeckt (<span x-text="simulationResult.tools_discovered?.length"></span>)</h3>
+                        <div x-show="simulationResult?.tools_discovered?.length > 0" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                            <h3 class="text-lg font-semibold mb-4 text-[var(--ui-secondary)]">🔍 Tools entdeckt (<span x-text="simulationResult?.tools_discovered?.length || 0"></span>)</h3>
                             <div class="space-y-2">
-                                <template x-for="tool in simulationResult.tools_discovered">
+                                <template x-for="tool in (simulationResult?.tools_discovered || [])">
                                     <div class="p-3 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
                                         <div class="font-mono text-sm font-semibold text-[var(--ui-secondary)]" x-text="tool.name"></div>
                                         <div class="text-xs text-[var(--ui-muted)] mt-1" x-text="tool.description"></div>
@@ -114,11 +114,11 @@
                         </div>
 
                         <!-- Chain Plan -->
-                        <div x-show="simulationResult.chain_plan" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                        <div x-show="simulationResult?.chain_plan" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
                             <h3 class="text-lg font-semibold mb-4 text-[var(--ui-secondary)]">🔗 Chain-Plan</h3>
                             <div class="space-y-2">
                                 <div class="text-sm text-[var(--ui-muted)] mb-2">Ausführungsreihenfolge:</div>
-                                <template x-for="(tool, index) in simulationResult.chain_plan.execution_order">
+                                <template x-for="(tool, index) in (simulationResult?.chain_plan?.execution_order || [])">
                                     <div class="flex items-center gap-2 p-2 bg-[var(--ui-surface)] rounded">
                                         <span class="text-xs font-bold text-[var(--ui-primary)]" x-text="(index + 1) + '.'"></span>
                                         <span class="font-mono text-sm text-[var(--ui-secondary)]" x-text="tool"></span>
@@ -128,10 +128,10 @@
                         </div>
 
                         <!-- Execution Flow -->
-                        <div x-show="simulationResult.execution_flow?.length > 0" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                        <div x-show="simulationResult?.execution_flow?.length > 0" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
                             <h3 class="text-lg font-semibold mb-4 text-[var(--ui-secondary)]">⚙️ Execution-Flow</h3>
                             <div class="space-y-2">
-                                <template x-for="(exec, index) in simulationResult.execution_flow">
+                                <template x-for="(exec, index) in (simulationResult?.execution_flow || [])">
                                     <div class="p-3 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
                                         <div class="flex items-center gap-2 mb-2">
                                             <span class="font-mono text-sm font-semibold text-[var(--ui-secondary)]" x-text="exec.tool"></span>
@@ -144,11 +144,11 @@
                         </div>
 
                         <!-- Final Response -->
-                        <div x-show="simulationResult.final_response" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                        <div x-show="simulationResult?.final_response" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
                             <h3 class="text-lg font-semibold mb-4 text-[var(--ui-secondary)]">💬 Finale Antwort</h3>
                             <div class="p-3 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
-                                <div :class="simulationResult.final_response.type === 'success' ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]'" class="font-semibold mb-2" x-text="simulationResult.final_response.message"></div>
-                                <pre x-show="simulationResult.final_response.data" class="text-xs bg-[var(--ui-muted)] p-2 rounded overflow-auto" x-text="JSON.stringify(simulationResult.final_response.data, null, 2)"></pre>
+                                <div :class="simulationResult?.final_response?.type === 'success' ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]'" class="font-semibold mb-2" x-text="simulationResult?.final_response?.message || 'Keine Nachricht'"></div>
+                                <pre x-show="simulationResult?.final_response?.data" class="text-xs bg-[var(--ui-muted)] p-2 rounded overflow-auto" x-text="JSON.stringify(simulationResult?.final_response?.data || {}, null, 2)"></pre>
                             </div>
                         </div>
 
@@ -260,17 +260,17 @@
                     <div>
                         <span class="font-semibold text-[var(--ui-secondary)]">Status:</span>
                         <span 
-                            x-text="result.success ? '✅ Erfolg' : '❌ Fehler'"
-                            :class="result.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]'"
+                            x-text="result?.success ? '✅ Erfolg' : '❌ Fehler'"
+                            :class="result?.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]'"
                         ></span>
                     </div>
-                    <div x-show="result.data">
+                    <div x-show="result?.data">
                         <span class="font-semibold text-[var(--ui-secondary)]">Daten:</span>
-                        <pre class="mt-2 p-3 bg-[var(--ui-muted)] text-[var(--ui-success)] rounded overflow-auto text-xs" x-text="JSON.stringify(result.data, null, 2)"></pre>
+                        <pre class="mt-2 p-3 bg-[var(--ui-muted)] text-[var(--ui-success)] rounded overflow-auto text-xs" x-text="JSON.stringify(result?.data || {}, null, 2)"></pre>
                     </div>
-                    <div x-show="result.error">
+                    <div x-show="result?.error">
                         <span class="font-semibold text-[var(--ui-danger)]">Fehler:</span>
-                        <pre class="mt-2 p-3 bg-[var(--ui-muted)] text-[var(--ui-danger)] rounded overflow-auto text-xs" x-text="JSON.stringify(result.error, null, 2)"></pre>
+                        <pre class="mt-2 p-3 bg-[var(--ui-muted)] text-[var(--ui-danger)] rounded overflow-auto text-xs" x-text="JSON.stringify(result?.error || {}, null, 2)"></pre>
                     </div>
                         </div>
                     </div>

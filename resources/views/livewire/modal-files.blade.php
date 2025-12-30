@@ -226,13 +226,17 @@
                                                     'medium' => 'Medium',
                                                     'large' => 'Large',
                                                 ];
+                                                
+                                                // Debug: Zeige alle Varianten
+                                                // \Log::info('Variants Debug', ['variants' => $file['variants'], 'grouped' => $groupedVariants]);
                                             @endphp
                                             
-                                            <div class="mt-3 space-y-2">
+                                            <div class="mt-3 space-y-3">
                                                 @foreach($groupedVariants as $aspect => $sizes)
-                                                    <div>
-                                                        <div class="text-xs font-semibold text-[var(--ui-muted)] mb-1">
-                                                            {{ $aspectLabels[$aspect] ?? $aspect }}
+                                                    <div class="p-3 bg-[var(--ui-surface)] rounded-lg border border-[var(--ui-border)]/40">
+                                                        <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-2 flex items-center gap-2">
+                                                            <span>{{ $aspectLabels[$aspect] ?? $aspect }}</span>
+                                                            <span class="text-[var(--ui-muted)]">({{ count($sizes) }} Varianten)</span>
                                                         </div>
                                                         <div class="flex gap-2 flex-wrap">
                                                             @foreach(['thumbnail', 'medium', 'large'] as $size)
@@ -241,17 +245,35 @@
                                                                     <a
                                                                         href="{{ $variant['url'] }}"
                                                                         target="_blank"
-                                                                        class="text-xs px-2 py-1 bg-[var(--ui-surface)] text-[var(--ui-secondary)] rounded border border-[var(--ui-border)]/40 hover:bg-[var(--ui-muted-5)] hover:border-[var(--ui-primary)]/60 transition-colors"
-                                                                        title="{{ $sizeLabels[$size] }}: {{ $variant['width'] }}×{{ $variant['height'] }}"
+                                                                        class="text-xs px-3 py-1.5 bg-[var(--ui-primary-5)] text-[var(--ui-primary)] rounded border border-[var(--ui-primary)]/40 hover:bg-[var(--ui-primary-10)] hover:border-[var(--ui-primary)]/60 transition-colors font-medium"
+                                                                        title="Klicken zum Öffnen: {{ $sizeLabels[$size] }} {{ $aspectLabels[$aspect] ?? $aspect }} - {{ $variant['width'] }}×{{ $variant['height'] }}px"
                                                                     >
                                                                         {{ $sizeLabels[$size] }}
-                                                                        <span class="text-[var(--ui-muted)]">({{ $variant['width'] }}×{{ $variant['height'] }})</span>
+                                                                        <span class="text-[var(--ui-primary)]/70 font-normal">({{ $variant['width'] }}×{{ $variant['height'] }})</span>
                                                                     </a>
+                                                                @else
+                                                                    <span class="text-xs px-3 py-1.5 bg-[var(--ui-muted-5)] text-[var(--ui-muted)] rounded border border-[var(--ui-border)]/40">
+                                                                        {{ $sizeLabels[$size] }} (fehlt)
+                                                                    </span>
                                                                 @endif
                                                             @endforeach
                                                         </div>
                                                     </div>
                                                 @endforeach
+                                                
+                                                {{-- Debug: Zeige alle Varianten-Keys --}}
+                                                <div class="mt-2 text-xs text-[var(--ui-muted)]">
+                                                    <details>
+                                                        <summary class="cursor-pointer hover:text-[var(--ui-secondary)]">
+                                                            Debug: {{ count($file['variants']) }} Varianten insgesamt
+                                                        </summary>
+                                                        <div class="mt-2 p-2 bg-[var(--ui-muted-5)] rounded font-mono text-xs">
+                                                            @foreach(array_keys($file['variants']) as $variantKey)
+                                                                <div>{{ $variantKey }}</div>
+                                                            @endforeach
+                                                        </div>
+                                                    </details>
+                                                </div>
                                             </div>
                                         @endif
                                     </div>
