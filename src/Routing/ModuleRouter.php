@@ -34,12 +34,12 @@ class ModuleRouter
 
         $routeGroup = Route::middleware($middlewares);
 
-        Log::info('ModuleRouter: registering route group', [
-            'module' => $key,
-            'mode'   => $mode,
-            'host'   => $baseHost,
-            'prefix' => $prefix,
-        ]);
+        // Log::debug('ModuleRouter: registering route group', [
+        //     'module' => $key,
+        //     'mode'   => $mode,
+        //     'host'   => $baseHost,
+        //     'prefix' => $prefix,
+        // ]);
 
         if ($mode === 'subdomain') {
             // Subdomain: prefix als Subdomain setzen
@@ -90,12 +90,12 @@ class ModuleRouter
 
         $routeGroup = Route::middleware($middlewares);
 
-        Log::info('ModuleRouter: registering API route group', [
-            'module' => $key,
-            'mode'   => $mode,
-            'host'   => $baseHost,
-            'prefix' => "api/{$prefix}",
-        ]);
+        // Log::debug('ModuleRouter: registering API route group', [
+        //     'module' => $key,
+        //     'mode'   => $mode,
+        //     'host'   => $baseHost,
+        //     'prefix' => "api/{$prefix}",
+        // ]);
 
         // API-Routen haben immer /api/ Prefix
         $apiPrefix = "api/{$prefix}";

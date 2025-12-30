@@ -27,7 +27,7 @@ class ToolRegistry
         }
 
         $this->tools[$name] = $tool;
-        Log::debug("[ToolRegistry] Tool '{$name}' registriert");
+        // Log::debug("[ToolRegistry] Tool '{$name}' registriert");
     }
 
     /**

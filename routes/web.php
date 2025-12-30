@@ -257,8 +257,10 @@ Route::middleware(['web', 'auth'])->group(function () {
     
     // Tool Playground (MCP Testing) - Livewire-Komponente
     Route::get('/core/tools/playground', \Platform\Core\Livewire\ToolPlayground::class)->name('core.tools.playground');
-    Route::post('/core/tools/playground/simulate', [CoreToolPlaygroundController::class, 'simulate'])->name('core.tools.playground.simulate');
-    Route::post('/core/tools/playground/test', [CoreToolPlaygroundController::class, 'test'])->name('core.tools.playground.test');
-    Route::get('/core/tools/playground/tools', [CoreToolPlaygroundController::class, 'tools'])->name('core.tools.playground.tools');
+    Route::middleware(['force.json'])->group(function () {
+        Route::post('/core/tools/playground/simulate', [CoreToolPlaygroundController::class, 'simulate'])->name('core.tools.playground.simulate');
+        Route::post('/core/tools/playground/test', [CoreToolPlaygroundController::class, 'test'])->name('core.tools.playground.test');
+        Route::get('/core/tools/playground/tools', [CoreToolPlaygroundController::class, 'tools'])->name('core.tools.playground.tools');
+    });
 });
 

@@ -57,6 +57,12 @@ class CoreServiceProvider extends ServiceProvider
             \Platform\Core\Http\Middleware\ApiAuthenticate::class
         );
 
+        // Force JSON Response Middleware registrieren (für Playground)
+        $this->app->make(\Illuminate\Routing\Router::class)->aliasMiddleware(
+            'force.json',
+            \Platform\Core\Http\Middleware\ForceJsonResponse::class
+        );
+
         // Module ServiceProvider automatisch laden
         $this->loadModuleServiceProviders();
 
@@ -194,7 +200,7 @@ class CoreServiceProvider extends ServiceProvider
                 foreach ($coreTools as $tool) {
                     try {
                         $registry->register($tool);
-                        \Log::debug("[ToolRegistry] Core-Tool via Auto-Discovery registriert: " . $tool->getName());
+                        // \Log::debug("[ToolRegistry] Core-Tool via Auto-Discovery registriert: " . $tool->getName());
                     } catch (\Throwable $e) {
                         \Log::warning("[ToolRegistry] Core-Tool konnte nicht registriert werden", [
                             'tool' => get_class($tool),
@@ -210,7 +216,7 @@ class CoreServiceProvider extends ServiceProvider
                     foreach ($moduleTools as $tool) {
                         try {
                             $registry->register($tool);
-                            \Log::debug("[ToolRegistry] Module-Tool via Auto-Discovery registriert: " . $tool->getName());
+                            // \Log::debug("[ToolRegistry] Module-Tool via Auto-Discovery registriert: " . $tool->getName());
                         } catch (\Throwable $e) {
                             \Log::warning("[ToolRegistry] Auto-Discovery Tool konnte nicht registriert werden", [
                                 'tool' => get_class($tool),
@@ -231,7 +237,7 @@ class CoreServiceProvider extends ServiceProvider
             if (!$registry->has('tools.list')) {
                 try {
                     $registry->register($this->app->make(\Platform\Core\Tools\ListToolsTool::class));
-                    \Log::debug("[ToolRegistry] ListToolsTool manuell registriert (Fallback)");
+                    // \Log::debug("[ToolRegistry] ListToolsTool manuell registriert (Fallback)");
                 } catch (\Throwable $e) {
                     // Silent fail
                 }
@@ -241,7 +247,7 @@ class CoreServiceProvider extends ServiceProvider
             if (!$registry->has('core.teams.list')) {
                 try {
                     $registry->register($this->app->make(\Platform\Core\Tools\ListTeamsTool::class));
-                    \Log::debug("[ToolRegistry] ListTeamsTool manuell registriert (Fallback)");
+                    // \Log::debug("[ToolRegistry] ListTeamsTool manuell registriert (Fallback)");
                 } catch (\Throwable $e) {
                     // Silent fail
                 }
@@ -301,8 +307,8 @@ class CoreServiceProvider extends ServiceProvider
             $aliasPath = str_replace(['\\', '/'], '.', Str::kebab(str_replace('.php', '', $relativePath)));
             $alias = $prefix . '.' . $aliasPath;
 
-            // Debug: Ausgabe der registrierten Komponente
-            \Log::info("Registering Livewire component: {$alias} -> {$class}");
+            // Debug: Ausgabe der registrierten Komponente (nur bei DEBUG-Level)
+            // \Log::debug("Registering Livewire component: {$alias} -> {$class}");
 
             try {
             Livewire::component($alias, $class);
@@ -326,10 +332,10 @@ class CoreServiceProvider extends ServiceProvider
             $serviceProviderClass = 'Platform\\'.Str::studly($moduleKey).'\\'.Str::studly($moduleKey).'ServiceProvider';
             
             if (class_exists($serviceProviderClass)) {
-                \Log::info("CoreServiceProvider: Lade {$serviceProviderClass}");
+                // \Log::debug("CoreServiceProvider: Lade {$serviceProviderClass}");
                 $this->app->register($serviceProviderClass);
             } else {
-                \Log::info("CoreServiceProvider: Klasse {$serviceProviderClass} nicht gefunden");
+                // \Log::debug("CoreServiceProvider: Klasse {$serviceProviderClass} nicht gefunden");
             }
         }
     }
