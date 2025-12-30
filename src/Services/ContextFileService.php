@@ -228,28 +228,16 @@ class ContextFileService
                     $beforeHeight = $variantImage->height();
 
                     // Verarbeitung basierend auf Seitenverhältnis und Bild-Orientierung
-                    // GENAU wie im Vorbild (Uploads/Index.php)
-                    // Prüfe ob es eine original-Variante ist (analog zu strpos($variant, '_original'))
+                    // IMMER flächiges Bild ohne Padding - passenden Ausschnitt wählen
                     $isOriginalVariant = ($aspectRatio === 'original');
                     
-                    if ($isPortrait) {
-                        // Hochformat-Bilder: Padding bei 4:3 und 16:9, scaleDown bei Original
-                        if (!$isOriginalVariant) {
-                            // Für 4:3, 16:9, 1:1, 9:16, 3:1 Varianten: Verwende Padding
-                            $variantImage->contain($width, $height, 'ffffff');  // Weißes Padding
-                        } else {
-                            // Für Originalverhältnis: Proportional skalieren, wenn nötig
-                            $variantImage->scaleDown($width, null);
-                        }
+                    if ($isOriginalVariant) {
+                        // Original-Verhältnis: Proportional skalieren (behält Seitenverhältnis)
+                        $variantImage->scaleDown($width, $height);
                     } else {
-                        // Querformat-Bilder: Zuschneiden auf gewünschtes Format
-                        if (!$isOriginalVariant) {
-                            // Für 4:3, 16:9, 1:1, 9:16, 3:1 Varianten: Zuschneiden
-                            $variantImage->cover($width, $height);  // Zuschneiden auf gewünschtes Format
-                        } else {
-                            // Für Originalverhältnis: Proportional skalieren
-                            $variantImage->scaleDown($width, null);
-                        }
+                        // Feste Seitenverhältnisse: IMMER cover() verwenden (zuschneiden, kein Padding)
+                        // Das erzeugt ein flächiges Bild mit passendem Ausschnitt
+                        $variantImage->cover($width, $height);
                     }
 
                     // Token und Pfad generieren
