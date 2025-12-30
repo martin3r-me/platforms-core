@@ -537,4 +537,148 @@ class CoreToolPlaygroundController extends Controller
         
         return $arguments;
     }
+
+    /**
+     * Tool Discovery mit Filtern (tools.list)
+     */
+    public function discovery(Request $request)
+    {
+        try {
+            $request->validate([
+                'filters' => 'nullable|array',
+            ]);
+
+            $filters = $request->input('filters', []);
+            $registry = app(ToolRegistry::class);
+            $discovery = new ToolDiscoveryService($registry);
+
+            // Nutze findByCriteria für Filterung
+            $filteredTools = $discovery->findByCriteria($filters);
+            $allTools = $registry->all();
+
+            // Konvertiere Tools zu Array-Format
+            $tools = [];
+            foreach ($filteredTools as $tool) {
+                $metadata = $discovery->getToolMetadata($tool);
+                $tools[] = [
+                    'name' => $tool->getName(),
+                    'description' => $tool->getDescription(),
+                    'module' => $this->extractModuleFromToolName($tool->getName()),
+                    'metadata' => [
+                        'category' => $metadata['category'] ?? null,
+                        'tags' => $metadata['tags'] ?? [],
+                        'read_only' => $metadata['read_only'] ?? false,
+                    ],
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'result' => [
+                    'tools' => $tools,
+                    'summary' => [
+                        'total_tools' => count($allTools),
+                        'filtered_tools' => count($tools),
+                        'filters_applied' => !empty($filters),
+                    ],
+                    'filters' => $filters,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Tool Request absenden (tools.request)
+     */
+    public function request(Request $request)
+    {
+        try {
+            $request->validate([
+                'description' => 'required|string',
+                'use_case' => 'nullable|string',
+                'suggested_name' => 'nullable|string',
+                'category' => 'nullable|string|in:query,action,utility',
+                'module' => 'nullable|string',
+            ]);
+
+            $registry = app(ToolRegistry::class);
+            $discovery = new ToolDiscoveryService($registry);
+            $requestTool = new \Platform\Core\Tools\RequestToolTool($registry, $discovery);
+
+            $context = ToolContext::fromAuth();
+            $arguments = [
+                'description' => $request->input('description'),
+                'use_case' => $request->input('use_case'),
+                'suggested_name' => $request->input('suggested_name'),
+                'category' => $request->input('category'),
+                'module' => $request->input('module'),
+            ];
+
+            $result = $requestTool->execute($arguments, $context);
+
+            return response()->json([
+                'success' => $result->success,
+                'result' => $result->data,
+                'error' => $result->error,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Tool Requests anzeigen
+     */
+    public function requests()
+    {
+        try {
+            $requests = \Platform\Core\Models\ToolRequest::query()
+                ->orderBy('created_at', 'desc')
+                ->limit(50)
+                ->get()
+                ->map(function ($request) {
+                    return [
+                        'id' => $request->id,
+                        'description' => $request->description,
+                        'use_case' => $request->use_case,
+                        'suggested_name' => $request->suggested_name,
+                        'category' => $request->category,
+                        'module' => $request->module,
+                        'status' => $request->status,
+                        'created_at' => $request->created_at->toIso8601String(),
+                        'user' => $request->user ? [
+                            'id' => $request->user->id,
+                            'name' => $request->user->name,
+                        ] : null,
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'requests' => $requests,
+                'count' => $requests->count(),
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function extractModuleFromToolName(string $toolName): string
+    {
+        if (str_contains($toolName, '.')) {
+            return explode('.', $toolName)[0];
+        }
+        return 'core';
+    }
 }

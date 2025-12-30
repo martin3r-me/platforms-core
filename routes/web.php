@@ -261,6 +261,9 @@ Route::middleware(['web', 'auth'])->group(function () {
         Route::post('/core/tools/playground/simulate', [CoreToolPlaygroundController::class, 'simulate'])->name('core.tools.playground.simulate');
         Route::post('/core/tools/playground/test', [CoreToolPlaygroundController::class, 'test'])->name('core.tools.playground.test');
         Route::get('/core/tools/playground/tools', [CoreToolPlaygroundController::class, 'tools'])->name('core.tools.playground.tools');
+        Route::post('/core/tools/playground/discovery', [CoreToolPlaygroundController::class, 'discovery'])->name('core.tools.playground.discovery');
+        Route::post('/core/tools/playground/request', [CoreToolPlaygroundController::class, 'request'])->name('core.tools.playground.request');
+        Route::get('/core/tools/playground/requests', [CoreToolPlaygroundController::class, 'requests'])->name('core.tools.playground.requests');
     });
 });
 

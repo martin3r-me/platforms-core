@@ -72,167 +72,125 @@ class ToolDiscoveryService
     /**
      * Findet Tools, die für eine bestimmte Aufgabe relevant sind
      * 
+     * WICHTIG: Diese Methode ist OPTIONAL und nur für spezielle Use-Cases (z.B. Playground).
+     * Der Standard-MCP-Flow sendet ALLE Tools an das LLM, das dann selbst entscheidet.
+     * 
+     * Für die Tool-Discovery sollte das LLM das Tool "tools.list" mit Filtern verwenden.
+     * 
      * @param string $intent Benutzer-Intent (z.B. "Projekt erstellen", "Teams auflisten")
      * @return array Relevante Tools
      */
     public function findByIntent(string $intent): array
     {
+        // MCP Best Practice: Immer alle Tools zurückgeben
+        // Das LLM kann selbst entscheiden, welche Tools es verwenden möchte
+        // Oder es kann das Tool "tools.list" mit Filtern aufrufen
+        return array_values($this->registry->all());
+    }
+    
+    /**
+     * Findet Tools nach Kriterien (für tools.list Tool)
+     * 
+     * @param array $criteria Suchkriterien (search, module, category, tag, read_only)
+     * @return array Gefundene Tools
+     */
+    public function findByCriteria(array $criteria): array
+    {
         $allTools = $this->registry->all();
         $results = [];
-
-        // Normalisiere Intent: entferne häufige Wörter und extrahiere Keywords
-        $intentLower = strtolower(trim($intent));
-        $intentKeywords = $this->extractKeywords($intentLower);
-
+        
         foreach ($allTools as $tool) {
+            $matches = true;
             $metadata = $this->getToolMetadata($tool);
-            $examples = $metadata['examples'] ?? [];
-            $tags = $metadata['tags'] ?? [];
-            $description = strtolower($tool->getDescription());
             $toolName = strtolower($tool->getName());
-
-            // Prüfe, ob Intent zu Tool passt
-            $score = 0;
-
-            // Prüfe Examples
-            foreach ($examples as $example) {
-                $exampleLower = strtolower($example);
-                foreach ($intentKeywords as $keyword) {
-                    if (stripos($exampleLower, $keyword) !== false) {
-                        $score += 10;
-                        break; // Nur einmal pro Example
-                    }
-                }
-            }
-
-            // Prüfe Tags
-            foreach ($tags as $tag) {
-                $tagLower = strtolower($tag);
-                foreach ($intentKeywords as $keyword) {
-                    if (stripos($tagLower, $keyword) !== false || stripos($keyword, $tagLower) !== false) {
-                        $score += 5;
-                        break; // Nur einmal pro Tag
-                    }
-                }
-            }
-
-            // Prüfe Tool-Name (z.B. "planner.projects.create" für "projekt erstellen")
-            // WICHTIG: Prüfe auch einzelne Teile des Tool-Namens (z.B. "projects" oder "create")
-            $toolNameParts = explode('.', $toolName);
-            foreach ($intentKeywords as $keyword) {
-                // Prüfe vollständigen Tool-Namen
-                if (stripos($toolName, $keyword) !== false) {
-                    $score += 8;
-                }
-                // Prüfe einzelne Teile (z.B. "projects" in "planner.projects.create")
-                foreach ($toolNameParts as $part) {
-                    if (stripos($part, $keyword) !== false || stripos($keyword, $part) !== false) {
-                        $score += 6;
-                    }
+            $description = strtolower($tool->getDescription());
+            
+            // Filter: search (Keyword-Suche in Name/Beschreibung)
+            if (isset($criteria['search']) && !empty($criteria['search'])) {
+                $search = strtolower($criteria['search']);
+                if (stripos($toolName, $search) === false && stripos($description, $search) === false) {
+                    $matches = false;
                 }
             }
             
-            // BONUS: Spezielle Mappings für häufige Aktionen
-            $actionMappings = [
-                'erstellen' => ['create', 'new', 'add', 'anlegen'],
-                'anzeigen' => ['list', 'show', 'get', 'find'],
-                'löschen' => ['delete', 'remove', 'destroy'],
-                'bearbeiten' => ['update', 'edit', 'modify'],
-            ];
-            
-            foreach ($intentKeywords as $keyword) {
-                if (isset($actionMappings[$keyword])) {
-                    foreach ($actionMappings[$keyword] as $mappedAction) {
-                        if (stripos($toolName, $mappedAction) !== false) {
-                            $score += 10; // Hoher Score für Action-Matches
-                        }
-                    }
+            // Filter: module
+            if (isset($criteria['module']) && !empty($criteria['module'])) {
+                $module = strtolower($criteria['module']);
+                if (!str_starts_with($toolName, $module . '.')) {
+                    $matches = false;
                 }
             }
-
-            // Prüfe Beschreibung (auch Teilstrings)
-            foreach ($intentKeywords as $keyword) {
-                if (stripos($description, $keyword) !== false) {
-                    $score += 3;
+            
+            // Filter: category
+            if (isset($criteria['category']) && ($metadata['category'] ?? null) !== $criteria['category']) {
+                $matches = false;
+            }
+            
+            // Filter: tag
+            if (isset($criteria['tag'])) {
+                $tags = $metadata['tags'] ?? [];
+                if (!in_array($criteria['tag'], $tags)) {
+                    $matches = false;
                 }
             }
-
-            // Bonus: Wenn Intent-Wörter direkt in Beschreibung vorkommen
-            if (stripos($description, $intentLower) !== false) {
-                $score += 5;
-            }
-
-            // Mindest-Score: Auch wenn Score niedrig, aber Tool-Name enthält relevante Keywords
-            $hasRelevantKeywords = $this->hasRelevantKeywords($toolName, $intentKeywords);
             
-            if ($score > 0 || $hasRelevantKeywords) {
-                $results[] = [
-                    'tool' => $tool,
-                    'score' => max($score, 1), // Mindestens Score 1 wenn relevant
-                    'metadata' => $metadata
-                ];
+            // Filter: read_only
+            if (isset($criteria['read_only'])) {
+                if (($metadata['read_only'] ?? false) !== $criteria['read_only']) {
+                    $matches = false;
+                }
+            }
+            
+            if ($matches) {
+                $results[] = $tool;
             }
         }
-
-        // Sortiere nach Score
-        usort($results, fn($a, $b) => $b['score'] <=> $a['score']);
-
-        return array_map(fn($r) => $r['tool'], $results);
+        
+        return $results;
     }
-
+    
     /**
-     * Extrahiert relevante Keywords aus einem Intent-String
+     * Vereinfachte Keyword-Extraktion (ohne Bigrams, ohne Memory-Probleme)
      * 
      * @param string $intent
-     * @return array
+     * @return array Maximal 10 Keywords
      */
-    private function extractKeywords(string $intent): array
+    private function extractSimpleKeywords(string $intent): array
     {
-        // Entferne häufige Stop-Wörter
+        // Stop-Wörter
         $stopWords = ['ein', 'eine', 'einen', 'einer', 'einem', 'eines', 'der', 'die', 'das', 'den', 'dem', 'des', 
                       'und', 'oder', 'aber', 'mit', 'für', 'von', 'zu', 'auf', 'in', 'an', 'ist', 'sind', 'war', 
                       'waren', 'wird', 'werden', 'hat', 'haben', 'hatte', 'hatten', 'namens', 'heißt', 'heissen',
                       'test', 'bitte', 'kannst', 'kann', 'möchte', 'möchten'];
         
-        // Normalisiere: entferne Sonderzeichen, teile in Wörter
-        // Verbesserte Regex: erlaubt auch Umlaute und mehr Zeichen
-        // WICHTIG: Pattern muss valide sein - verwende einfacheres Pattern
-        $pattern = '/[\s,\.!?;:()\[\]{}]+/u';
-        $words = @preg_split($pattern, $intent, -1, PREG_SPLIT_NO_EMPTY);
+        // Einfache Aufteilung nach Leerzeichen (keine komplexe Regex)
+        $words = preg_split('/\s+/u', strtolower(trim($intent)), -1, PREG_SPLIT_NO_EMPTY);
         
-        // Fallback: Wenn preg_split fehlschlägt, verwende einfache explode
+        // Fallback: Wenn preg_split fehlschlägt
         if ($words === false || empty($words)) {
-            // Fallback: Einfache Aufteilung nach Leerzeichen und Kommas
-            $words = preg_split('/[\s,]+/u', $intent, -1, PREG_SPLIT_NO_EMPTY);
-            if ($words === false) {
-                // Letzter Fallback: explode nach Leerzeichen
-                $words = array_filter(explode(' ', $intent), fn($w) => !empty(trim($w)));
-            }
+            $words = array_filter(explode(' ', strtolower(trim($intent))), fn($w) => !empty(trim($w)));
         }
         
+        // Filtere Stop-Wörter und kurze Wörter
         $keywords = [];
-        
         foreach ($words as $word) {
             $word = trim($word);
-            if (empty($word)) {
-                continue;
-            }
-            $wordLower = mb_strtolower($word, 'UTF-8');
-            if (mb_strlen($word, 'UTF-8') > 2 && !in_array($wordLower, $stopWords)) {
-                $keywords[] = $wordLower;
+            if (mb_strlen($word, 'UTF-8') > 2 && !in_array($word, $stopWords)) {
+                $keywords[] = $word;
             }
         }
         
-        // Füge auch zusammengesetzte Begriffe hinzu (z.B. "projekt erstellen" -> ["projekt", "erstellen", "projekt erstellen"])
-        if (count($keywords) > 1) {
-            // Erstelle Bigrams (zwei aufeinanderfolgende Wörter)
-            for ($i = 0; $i < count($keywords) - 1; $i++) {
-                $bigram = $keywords[$i] . ' ' . $keywords[$i + 1];
-                $keywords[] = $bigram;
-            }
-        }
-        
-        return array_unique($keywords);
+        // Maximal 10 Keywords (keine Bigrams!)
+        return array_slice(array_unique($keywords), 0, 10);
+    }
+
+    /**
+     * @deprecated Verwende extractSimpleKeywords() stattdessen
+     * Diese Methode wird nur noch für Backwards-Kompatibilität aufgerufen
+     */
+    private function extractKeywords(string $intent): array
+    {
+        return $this->extractSimpleKeywords($intent);
     }
 
     /**
@@ -261,7 +219,7 @@ class ToolDiscoveryService
     /**
      * Gibt Metadaten für ein Tool zurück
      */
-    private function getToolMetadata(ToolContract $tool): array
+    public function getToolMetadata(ToolContract $tool): array
     {
         if ($tool instanceof ToolMetadataContract) {
             return $tool->getMetadata();
@@ -337,4 +295,5 @@ class ToolDiscoveryService
                str_contains($toolName, '.describe');
     }
 }
+
 

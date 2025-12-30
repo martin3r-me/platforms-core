@@ -13,9 +13,9 @@
             </p>
 
             <div x-data="toolPlayground" class="space-y-6">
-                <!-- Tabs: Tool Test vs MCP Simulation -->
+                <!-- Tabs: Tool Test, MCP Simulation, Tool Discovery, Tool Requests -->
                 <div class="border-b border-[var(--ui-border)] mb-6">
-                    <div class="flex gap-4">
+                    <div class="flex gap-4 flex-wrap">
                         <button 
                             @click="activeTab = 'test'"
                             :class="activeTab === 'test' ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'text-[var(--ui-muted)]'"
@@ -28,7 +28,21 @@
                             :class="activeTab === 'simulate' ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'text-[var(--ui-muted)]'"
                             class="pb-2 px-4 font-medium"
                         >
-                            🎯 MCP Simulation (Vollständiger Flow)
+                            🎯 MCP Simulation
+                        </button>
+                        <button 
+                            @click="activeTab = 'discovery'"
+                            :class="activeTab === 'discovery' ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'text-[var(--ui-muted)]'"
+                            class="pb-2 px-4 font-medium"
+                        >
+                            🔍 Tool Discovery (tools.list)
+                        </button>
+                        <button 
+                            @click="activeTab = 'requests'"
+                            :class="activeTab === 'requests' ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'text-[var(--ui-muted)]'"
+                            class="pb-2 px-4 font-medium"
+                        >
+                            📝 Tool Requests (tools.request)
                         </button>
                     </div>
                 </div>
@@ -371,6 +385,30 @@
                 simulationResult: null,
                 debugCopied: false,
 
+                // Tool Discovery
+                discoveryFilters: {
+                    search: '',
+                    module: '',
+                    category: '',
+                    tag: '',
+                    read_only: false
+                },
+                discoveryLoading: false,
+                discoveryResult: null,
+
+                // Tool Requests
+                toolRequest: {
+                    description: '',
+                    use_case: '',
+                    suggested_name: '',
+                    category: '',
+                    module: ''
+                },
+                toolRequestLoading: false,
+                toolRequestResult: null,
+                toolRequests: [],
+                toolRequestsLoading: false,
+
                 async loadTools() {
                     try {
                         const response = await fetch('{{ route("core.tools.playground.tools") }}');
@@ -653,10 +691,103 @@
                     }
                 },
 
+                async runDiscovery() {
+                    this.discoveryLoading = true;
+                    this.discoveryResult = null;
+
+                    try {
+                        const filters = {};
+                        if (this.discoveryFilters.search) filters.search = this.discoveryFilters.search;
+                        if (this.discoveryFilters.module) filters.module = this.discoveryFilters.module;
+                        if (this.discoveryFilters.category) filters.category = this.discoveryFilters.category;
+                        if (this.discoveryFilters.tag) filters.tag = this.discoveryFilters.tag;
+                        if (this.discoveryFilters.read_only) filters.read_only = true;
+
+                        const response = await fetch('{{ route("core.tools.playground.discovery") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({ filters })
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            this.discoveryResult = data.result;
+                        } else {
+                            alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+                        }
+                    } catch (e) {
+                        alert('Fehler: ' + e.message);
+                    } finally {
+                        this.discoveryLoading = false;
+                    }
+                },
+
+                async submitToolRequest() {
+                    if (!this.toolRequest.description) {
+                        alert('Bitte gib eine Beschreibung ein!');
+                        return;
+                    }
+
+                    this.toolRequestLoading = true;
+                    this.toolRequestResult = null;
+
+                    try {
+                        const response = await fetch('{{ route("core.tools.playground.request") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify(this.toolRequest)
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            this.toolRequestResult = data.result;
+                            // Reset form
+                            this.toolRequest = {
+                                description: '',
+                                use_case: '',
+                                suggested_name: '',
+                                category: '',
+                                module: ''
+                            };
+                            // Reload requests
+                            this.loadToolRequests();
+                        } else {
+                            alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+                        }
+                    } catch (e) {
+                        alert('Fehler: ' + e.message);
+                    } finally {
+                        this.toolRequestLoading = false;
+                    }
+                },
+
+                async loadToolRequests() {
+                    this.toolRequestsLoading = true;
+
+                    try {
+                        const response = await fetch('{{ route("core.tools.playground.requests") }}');
+                        const data = await response.json();
+                        if (data.success) {
+                            this.toolRequests = data.requests || [];
+                        }
+                    } catch (e) {
+                        console.error('Fehler beim Laden der Requests:', e);
+                    } finally {
+                        this.toolRequestsLoading = false;
+                    }
+                },
+
                 init() {
                     // Auto-load tools on page load
                     this.$nextTick(() => {
                         this.loadTools();
+                        this.loadToolRequests();
                     });
                 }
 

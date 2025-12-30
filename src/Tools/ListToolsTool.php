@@ -4,6 +4,7 @@ namespace Platform\Core\Tools;
 
 use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Tools\ToolRegistry;
+use Platform\Core\Tools\ToolDiscoveryService;
 use Platform\Core\Registry\ModuleRegistry;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
@@ -11,12 +12,14 @@ use Platform\Core\Contracts\ToolResult;
 /**
  * Tool zum Auflisten aller verfügbaren Tools
  * 
- * Gibt dem Sprachmodell eine Übersicht über alle verfügbaren Tools und Module
+ * Gibt dem Sprachmodell eine Übersicht über alle verfügbaren Tools und Module.
+ * Das LLM kann selbst entscheiden, welche Tools es sehen möchte, indem es Filter verwendet.
  */
 class ListToolsTool implements ToolContract
 {
     public function __construct(
-        private ToolRegistry $registry
+        private ToolRegistry $registry,
+        private ToolDiscoveryService $discovery
     ) {}
 
     public function getName(): string
@@ -26,7 +29,7 @@ class ListToolsTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'Listet alle verfügbaren Tools und Module auf. Nutze dieses Tool, um zu erfahren, welche Funktionen dir zur Verfügung stehen.';
+        return 'Listet alle verfügbaren Tools und Module auf. Nutze dieses Tool, um zu erfahren, welche Funktionen dir zur Verfügung stehen. Du kannst Filter verwenden, um nur relevante Tools zu sehen (z.B. nach Modul, Suchbegriff, Kategorie oder Tag filtern).';
     }
 
     public function getSchema(): array
@@ -34,9 +37,26 @@ class ListToolsTool implements ToolContract
         return [
             'type' => 'object',
             'properties' => [
+                'search' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Suche nach Tools, deren Name oder Beschreibung diesen Begriff enthält (z.B. "projekt", "team", "erstellen")',
+                ],
                 'module' => [
                     'type' => 'string',
-                    'description' => 'Optional: Filter nach einem bestimmten Modul (z.B. "planner", "okrs")',
+                    'description' => 'Optional: Filter nach einem bestimmten Modul (z.B. "planner", "okrs", "core")',
+                ],
+                'category' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Filter nach Kategorie (z.B. "query" für Lese-Tools, "action" für Schreib-Tools, "utility" für Hilfs-Tools)',
+                    'enum' => ['query', 'action', 'utility'],
+                ],
+                'tag' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Filter nach Tag (z.B. "project", "team", "create", "list")',
+                ],
+                'read_only' => [
+                    'type' => 'boolean',
+                    'description' => 'Optional: Filter nach read-only Tools (true = nur Lese-Tools, false = nur Schreib-Tools)',
                 ],
             ],
             'required' => [],
@@ -45,56 +65,83 @@ class ListToolsTool implements ToolContract
 
     public function execute(array $arguments, \Platform\Core\Contracts\ToolContext $context): \Platform\Core\Contracts\ToolResult
     {
-        $moduleFilter = $arguments['module'] ?? null;
-        
-        $allTools = $this->registry->all();
-        $modules = ModuleRegistry::all();
-        
-        $result = [
-            'modules' => [],
-            'tools' => [],
-            'summary' => [
-                'total_modules' => count($modules),
-                'total_tools' => count($allTools),
-            ],
-        ];
-        
-        // Module-Informationen sammeln
-        foreach ($modules as $moduleKey => $moduleConfig) {
-            if ($moduleFilter && $moduleKey !== $moduleFilter) {
-                continue;
+        try {
+            // Prüfe ob Filter gesetzt sind
+            $hasFilters = !empty($arguments['search']) || 
+                         !empty($arguments['module']) || 
+                         isset($arguments['category']) || 
+                         !empty($arguments['tag']) || 
+                         isset($arguments['read_only']);
+            
+            // Wenn Filter gesetzt sind, nutze ToolDiscoveryService
+            if ($hasFilters) {
+                $criteria = array_filter([
+                    'search' => $arguments['search'] ?? null,
+                    'module' => $arguments['module'] ?? null,
+                    'category' => $arguments['category'] ?? null,
+                    'tag' => $arguments['tag'] ?? null,
+                    'read_only' => $arguments['read_only'] ?? null,
+                ], fn($v) => $v !== null && $v !== '');
+                
+                $filteredTools = $this->discovery->findByCriteria($criteria);
+            } else {
+                // Keine Filter: Alle Tools
+                $filteredTools = array_values($this->registry->all());
             }
             
-            $moduleTools = array_filter($allTools, function($tool) use ($moduleKey) {
+            $allTools = $this->registry->all();
+            $modules = ModuleRegistry::all();
+            
+            $result = [
+                'tools' => [],
+                'summary' => [
+                    'total_tools' => count($allTools),
+                    'filtered_tools' => count($filteredTools),
+                    'filters_applied' => $hasFilters,
+                ],
+            ];
+            
+            // Wenn Filter angewendet wurden, zeige auch die verwendeten Filter
+            if ($hasFilters) {
+                $result['filters'] = array_filter([
+                    'search' => $arguments['search'] ?? null,
+                    'module' => $arguments['module'] ?? null,
+                    'category' => $arguments['category'] ?? null,
+                    'tag' => $arguments['tag'] ?? null,
+                    'read_only' => $arguments['read_only'] ?? null,
+                ], fn($v) => $v !== null && $v !== '');
+            }
+            
+            // Tools-Informationen sammeln
+            foreach ($filteredTools as $tool) {
                 $toolName = $tool->getName();
-                return str_starts_with($toolName, $moduleKey . '.');
-            });
-            
-            $result['modules'][] = [
-                'key' => $moduleKey,
-                'title' => $moduleConfig['title'] ?? ucfirst($moduleKey),
-                'description' => $moduleConfig['description'] ?? null,
-                'tools_count' => count($moduleTools),
-            ];
-        }
-        
-        // Tools-Informationen sammeln
-        foreach ($allTools as $tool) {
-            $toolName = $tool->getName();
-            
-            // Filter nach Modul
-            if ($moduleFilter && !str_starts_with($toolName, $moduleFilter . '.')) {
-                continue;
+                $metadata = $this->discovery->getToolMetadata($tool);
+                
+                $toolData = [
+                    'name' => $toolName,
+                    'description' => $tool->getDescription(),
+                    'module' => $this->extractModuleFromToolName($toolName),
+                ];
+                
+                // Füge Metadaten hinzu, falls verfügbar
+                if (!empty($metadata)) {
+                    $toolData['metadata'] = [
+                        'category' => $metadata['category'] ?? null,
+                        'tags' => $metadata['tags'] ?? [],
+                        'read_only' => $metadata['read_only'] ?? false,
+                    ];
+                }
+                
+                $result['tools'][] = $toolData;
             }
             
-            $result['tools'][] = [
-                'name' => $toolName,
-                'description' => $tool->getDescription(),
-                'module' => $this->extractModuleFromToolName($toolName),
-            ];
+            return \Platform\Core\Contracts\ToolResult::success($result);
+        } catch (\Throwable $e) {
+            return \Platform\Core\Contracts\ToolResult::error(
+                'EXECUTION_ERROR',
+                'Fehler beim Auflisten der Tools: ' . $e->getMessage()
+            );
         }
-        
-        return \Platform\Core\Contracts\ToolResult::success($result);
     }
     
     private function extractModuleFromToolName(string $toolName): ?string
