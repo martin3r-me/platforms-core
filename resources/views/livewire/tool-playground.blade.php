@@ -152,6 +152,36 @@
                             </div>
                         </div>
 
+                        <!-- Error Details (wenn vorhanden) -->
+                        <div x-show="simulationResult?.error" class="bg-[var(--ui-danger-5)] rounded-lg p-4 border-2 border-[var(--ui-danger)]">
+                            <h3 class="text-lg font-semibold mb-4 text-[var(--ui-danger)]">❌ Fehler-Details</h3>
+                            <div class="space-y-3">
+                                <div x-show="simulationResult?.error?.message">
+                                    <span class="font-semibold text-[var(--ui-secondary)]">Nachricht:</span>
+                                    <div class="mt-1 p-2 bg-[var(--ui-surface)] rounded text-[var(--ui-danger)] font-mono text-sm" x-text="simulationResult?.error?.message"></div>
+                                </div>
+                                <div x-show="simulationResult?.error?.file" class="text-sm">
+                                    <span class="font-semibold text-[var(--ui-secondary)]">Datei:</span>
+                                    <span class="text-[var(--ui-muted)] ml-2" x-text="simulationResult?.error?.file"></span>
+                                </div>
+                                <div x-show="simulationResult?.error?.line" class="text-sm">
+                                    <span class="font-semibold text-[var(--ui-secondary)]">Zeile:</span>
+                                    <span class="text-[var(--ui-muted)] ml-2" x-text="simulationResult?.error?.line"></span>
+                                </div>
+                                <div x-show="simulationResult?.error?.class" class="text-sm">
+                                    <span class="font-semibold text-[var(--ui-secondary)]">Klasse:</span>
+                                    <span class="text-[var(--ui-muted)] ml-2" x-text="simulationResult?.error?.class"></span>
+                                </div>
+                                <div x-show="simulationResult?.error?.trace" class="mt-3">
+                                    <span class="font-semibold text-[var(--ui-secondary)]">Stack Trace:</span>
+                                    <pre class="mt-2 p-3 bg-[var(--ui-muted)] text-[var(--ui-danger)] rounded overflow-auto text-xs max-h-64" x-text="Array.isArray(simulationResult?.error?.trace) ? simulationResult?.error?.trace.join('\\n') : JSON.stringify(simulationResult?.error?.trace, null, 2)"></pre>
+                                </div>
+                                <div x-show="simulationResult?.error && !simulationResult?.error?.message">
+                                    <pre class="p-3 bg-[var(--ui-muted)] text-[var(--ui-danger)] rounded overflow-auto text-xs" x-text="JSON.stringify(simulationResult?.error, null, 2)"></pre>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Debug Export (Kopierbar) -->
                         <div class="bg-[var(--ui-muted-5)] rounded-lg p-4 border-2 border-[var(--ui-primary)]">
                             <div class="flex items-center justify-between mb-4">
