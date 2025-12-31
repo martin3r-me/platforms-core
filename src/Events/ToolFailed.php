@@ -23,7 +23,10 @@ class ToolFailed
         public ?\Throwable $exception = null,
         public float $duration,
         public int $memoryUsage,
-        public ?string $traceId = null
+        public ?string $traceId = null,
+        public int $retries = 0,
+        public bool $willRetry = false,
+        public ?string $errorType = null
     ) {}
 }
 

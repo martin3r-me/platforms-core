@@ -44,6 +44,11 @@ class ToolOrchestrator
      * Cache-Service für persistente Dependency-Caches
      */
     private ?ToolCacheService $cacheService = null;
+    
+    /**
+     * Dependency Resolver für DSL-Format
+     */
+    private ?DependencyResolver $dependencyResolver = null;
 
     private const DEPENDENCY_CACHE_PREFIX = 'tool_dependencies:';
     private const DEPENDENCY_CACHE_TTL = 86400; // 24 Stunden
@@ -61,6 +66,14 @@ class ToolOrchestrator
             // Service noch nicht verfügbar
             $this->cacheService = null;
         }
+        
+        // Lazy-Load DependencyResolver
+        try {
+            $this->dependencyResolver = new DependencyResolver();
+        } catch (\Throwable $e) {
+            // DependencyResolver nicht verfügbar
+            $this->dependencyResolver = null;
+        }
     }
 
     /**
@@ -71,6 +84,8 @@ class ToolOrchestrator
      * @param ToolContext $context Kontext für die Ausführung
      * @param int $maxDepth Maximale Tiefe für Tool-Chains (verhindert Endlosschleifen)
      * @param bool $planFirst Wenn true, wird die Chain zuerst geplant (Pre-Flight Check)
+     * @param string|null $conversationId Conversation-ID für Multi-Step-Runs (optional)
+     * @param int|null $runId Run-ID für Resume (optional)
      * @return ToolResult Ergebnis der Ausführung
      */
     public function executeWithDependencies(
@@ -78,13 +93,33 @@ class ToolOrchestrator
         array $arguments,
         ToolContext $context,
         int $maxDepth = 5,
-        bool $planFirst = false
+        bool $planFirst = false,
+        ?string $conversationId = null,
+        ?int $runId = null
     ): ToolResult {
         if ($maxDepth <= 0) {
             return ToolResult::error(
                 'Maximale Tool-Chain-Tiefe erreicht',
                 'MAX_DEPTH_EXCEEDED'
             );
+        }
+        
+        // Multi-Step-Run: Resume oder Create
+        $run = null;
+        $step = 0;
+        if ($this->runService && $conversationId) {
+            if ($runId) {
+                // Resume existing run
+                $run = $this->runService->getRun($runId);
+                if ($run) {
+                    $step = $run->step + 1;
+                    $toolName = $run->next_tool ?? $toolName;
+                    $arguments = $run->arguments;
+                }
+            } else {
+                // Create new run
+                $run = $this->runService->createRun($conversationId, $toolName, $arguments, $context, $step);
+            }
         }
 
         // Optional: Chain zuerst planen (Pre-Flight Check)
@@ -111,89 +146,204 @@ class ToolOrchestrator
         if ($deps && !empty($deps['dependencies'])) {
             // Führe Dependency-Tools aus
             foreach ($deps['dependencies'] as $dependency) {
-                $depToolName = $dependency['tool_name'] ?? null;
-                $condition = $dependency['condition'] ?? null;
-                $argsCallback = $dependency['args'] ?? null;
-                $mergeCallback = $dependency['merge_result'] ?? null;
-                
-                if (!$depToolName) {
-                    continue;
-                }
-                
-                // Prüfe Condition (wenn vorhanden)
-                if ($condition && is_callable($condition)) {
-                    if (!$condition($arguments, $context)) {
-                        continue; // Condition nicht erfüllt, Dependency überspringen
+                // NEUES DSL-Format prüfen
+                if (isset($dependency['requires']) && isset($dependency['resolver_tool'])) {
+                    // DSL-Format verwenden
+                    if ($this->dependencyResolver) {
+                        $resolvedArgs = $this->dependencyResolver->resolve(
+                            $dependency,
+                            $arguments,
+                            $context,
+                            $this->registry,
+                            $this->executor
+                        );
+                        
+                        if ($resolvedArgs === null) {
+                            // User-Input benötigt
+                            // Führe resolver_tool aus, um Optionen zu bekommen
+                            $resolverTool = $dependency['resolver_tool'];
+                            $depResult = $this->executor->execute($resolverTool, [], $context);
+                            
+                            if ($depResult->success) {
+                                // Speichere Run-State (wenn Service verfügbar)
+                                if ($this->runService && $run) {
+                                    $inputOptions = $this->extractInputOptions($depResult->data);
+                                    $this->runService->updateRunWaitingInput(
+                                        $run->id,
+                                        $inputOptions,
+                                        $toolName,
+                                        $arguments
+                                    );
+                                }
+                                
+                                return ToolResult::success([
+                                    'dependency_tool_result' => $depResult->data,
+                                    'message' => 'Bitte wähle aus der Liste aus.',
+                                    'requires_user_input' => true,
+                                    'next_tool' => $toolName,
+                                    'next_tool_args' => $arguments,
+                                    'run_id' => $run?->id,
+                                    'conversation_id' => $conversationId,
+                                ]);
+                            }
+                        } else {
+                            // Arguments wurden resolved
+                            $arguments = $resolvedArgs;
+                        }
                     }
-                }
-                
-                // Hole Dependency-Argumente
-                $depArgs = [];
-                if ($argsCallback && is_callable($argsCallback)) {
-                    $depArgs = $argsCallback($arguments, $context) ?? [];
-                }
-                
-                // Wenn depArgs null ist, Dependency nicht aufrufen
-                if ($depArgs === null) {
-                    continue;
-                }
+                } else {
+                    // ALTES Format (Callbacks) - für Backwards-Kompatibilität
+                    $depToolName = $dependency['tool_name'] ?? null;
+                    $condition = $dependency['condition'] ?? null;
+                    $argsCallback = $dependency['args'] ?? null;
+                    $mergeCallback = $dependency['merge_result'] ?? null;
+                    
+                    if (!$depToolName) {
+                        continue;
+                    }
+                    
+                    // Prüfe Condition (wenn vorhanden)
+                    if ($condition && is_callable($condition)) {
+                        if (!$condition($arguments, $context)) {
+                            continue; // Condition nicht erfüllt, Dependency überspringen
+                        }
+                    }
+                    
+                    // Hole Dependency-Argumente
+                    $depArgs = [];
+                    if ($argsCallback && is_callable($argsCallback)) {
+                        $depArgs = $argsCallback($arguments, $context) ?? [];
+                    }
+                    
+                    // Wenn depArgs null ist, Dependency nicht aufrufen
+                    if ($depArgs === null) {
+                        continue;
+                    }
 
-                Log::info("[ToolOrchestrator] Führe Dependency-Tool aus", [
-                    'main_tool' => $toolName,
-                    'dependency_tool' => $depToolName,
-                    'args' => $depArgs
-                ]);
-
-                // Dependency-Tool ausführen
-                $depResult = $this->executor->execute($depToolName, $depArgs, $context);
-                
-                if (!$depResult->success) {
-                    Log::warning("[ToolOrchestrator] Dependency-Tool fehlgeschlagen", [
+                    Log::info("[ToolOrchestrator] Führe Dependency-Tool aus (altes Format)", [
                         'main_tool' => $toolName,
                         'dependency_tool' => $depToolName,
-                        'error' => $depResult->error
+                        'args' => $depArgs
                     ]);
-                    // Weiter mit Haupt-Tool, auch wenn Dependency fehlschlägt
-                } else {
-                    // Merge-Result Callback ausführen (wenn vorhanden)
-                    if ($mergeCallback && is_callable($mergeCallback)) {
-                        $mergedArgs = $mergeCallback($toolName, $depResult, $arguments);
-                        
+
+                    // Dependency-Tool ausführen
+                    $depResult = $this->executor->execute($depToolName, $depArgs, $context);
+                    
+                    if (!$depResult->success) {
+                        Log::warning("[ToolOrchestrator] Dependency-Tool fehlgeschlagen", [
+                            'main_tool' => $toolName,
+                            'dependency_tool' => $depToolName,
+                            'error' => $depResult->error
+                        ]);
+                        // Weiter mit Haupt-Tool, auch wenn Dependency fehlschlägt
+                    } else {
+                        // Merge-Result Callback ausführen (wenn vorhanden)
+                        if ($mergeCallback && is_callable($mergeCallback)) {
+                            $mergedArgs = $mergeCallback($toolName, $depResult, $arguments);
+                            
                         // Wenn null zurückgegeben wird, Dependency-Ergebnis direkt zurückgeben
                         if ($mergedArgs === null) {
+                            // Speichere Run-State (wenn Service verfügbar)
+                            if ($this->runService && $run) {
+                                $inputOptions = $this->extractInputOptions($depResult->data);
+                                $this->runService->updateRunWaitingInput(
+                                    $run->id,
+                                    $inputOptions,
+                                    $toolName,
+                                    $arguments
+                                );
+                            }
+                            
                             return ToolResult::success([
                                 'dependency_tool_result' => $depResult->data,
                                 'message' => 'Bitte wähle aus der Liste aus.',
                                 'requires_user_input' => true,
                                 'next_tool' => $toolName,
-                                'next_tool_args' => $arguments
+                                'next_tool_args' => $arguments,
+                                'run_id' => $run?->id,
+                                'conversation_id' => $conversationId,
                             ]);
                         }
-                        
-                        $arguments = $mergedArgs;
-                    } else {
-                        // Standard-Merge: Versuche team_id zu setzen (für Backwards-Kompatibilität)
-                        $mergedArgs = $this->defaultMergeDependencyResult($toolName, $depToolName, $depResult, $arguments);
-                        
-                        // Wenn null zurückgegeben wird, User-Input anfordern
-                        if ($mergedArgs === null) {
-                            return ToolResult::success([
-                                'dependency_tool_result' => $depResult->data,
-                                'message' => 'Bitte wähle aus der Liste aus.',
-                                'requires_user_input' => true,
-                                'next_tool' => $toolName,
-                                'next_tool_args' => $arguments
-                            ]);
+                            
+                            $arguments = $mergedArgs;
+                        } else {
+                            // Standard-Merge: Versuche team_id zu setzen (für Backwards-Kompatibilität)
+                            $mergedArgs = $this->defaultMergeDependencyResult($toolName, $depToolName, $depResult, $arguments);
+                            
+                            // Wenn null zurückgegeben wird, User-Input anfordern
+                            if ($mergedArgs === null) {
+                                // Speichere Run-State (wenn Service verfügbar)
+                                if ($this->runService && $run) {
+                                    $inputOptions = $this->extractInputOptions($depResult->data);
+                                    $this->runService->updateRunWaitingInput(
+                                        $run->id,
+                                        $inputOptions,
+                                        $toolName,
+                                        $arguments
+                                    );
+                                }
+                                
+                                return ToolResult::success([
+                                    'dependency_tool_result' => $depResult->data,
+                                    'message' => 'Bitte wähle aus der Liste aus.',
+                                    'requires_user_input' => true,
+                                    'next_tool' => $toolName,
+                                    'next_tool_args' => $arguments,
+                                    'run_id' => $run?->id,
+                                    'conversation_id' => $conversationId,
+                                ]);
+                            }
+                            
+                            $arguments = $mergedArgs;
                         }
-                        
-                        $arguments = $mergedArgs;
                     }
                 }
             }
         }
 
         // Haupt-Tool ausführen
-        return $this->executor->execute($toolName, $arguments, $context);
+        $result = $this->executor->execute($toolName, $arguments, $context);
+        
+        // Update Run-Status (wenn Service verfügbar)
+        if ($this->runService && $run) {
+            if ($result->success) {
+                $this->runService->completeRun($run->id);
+            } else {
+                $this->runService->failRun($run->id, $result->error);
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Extrahiert Input-Optionen aus Dependency-Result
+     * 
+     * Unterstützt verschiedene Formate:
+     * - ['teams' => [...]]
+     * - ['data' => [...]]
+     * - [[...], [...]] (direkte Liste)
+     */
+    private function extractInputOptions($data): array
+    {
+        if (!is_array($data)) {
+            return [];
+        }
+        
+        // Direkte Liste?
+        if (isset($data[0]) && is_array($data[0])) {
+            return $data;
+        }
+        
+        // In einem Key verschachtelt?
+        foreach (['teams', 'data', 'items', 'results', 'list'] as $key) {
+            if (isset($data[$key]) && is_array($data[$key])) {
+                return $data[$key];
+            }
+        }
+        
+        // Fallback: Daten selbst als einzelnes Element
+        return [$data];
     }
 
     /**

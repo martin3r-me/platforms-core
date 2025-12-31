@@ -250,15 +250,30 @@ class OpenAiService
     }
     
     /**
+     * Tool-Name-Mapper (lazy-loaded)
+     */
+    private ?ToolNameMapper $nameMapper = null;
+    
+    /**
      * Normalisiert Tool-Namen für OpenAI Responses API
      * 
      * Responses API erlaubt nur: [a-zA-Z0-9_-]+
      * Mapping: "planner.projects.create" -> "planner_projects_create"
+     * 
+     * @deprecated Verwende ToolNameMapper::toProvider() stattdessen
      */
     private function normalizeToolNameForOpenAi(string $name): string
     {
-        // Ersetze Punkte durch Unterstriche
-        return str_replace('.', '_', $name);
+        if ($this->nameMapper === null) {
+            try {
+                $this->nameMapper = app(ToolNameMapper::class);
+            } catch (\Throwable $e) {
+                // Fallback: Direktes Mapping
+                return str_replace('.', '_', $name);
+            }
+        }
+        
+        return $this->nameMapper->toProvider($name);
     }
     
     /**
@@ -266,36 +281,20 @@ class OpenAiService
      * 
      * Mapping: "planner_projects_create" -> "planner.projects.create"
      * 
-     * WICHTIG: Wir müssen prüfen, welcher interne Name passt, da mehrere Tools
-     * den gleichen normalisierten Namen haben könnten (z.B. "a.b" und "a_b" beide -> "a_b")
+     * @deprecated Verwende ToolNameMapper::toCanonical() stattdessen
      */
     private function denormalizeToolNameFromOpenAi(string $openAiName): string
     {
-        // Versuche zuerst, ob es ein Tool mit genau diesem Namen gibt (für Backwards-Kompatibilität)
-        try {
-            $registry = app(ToolRegistry::class);
-            if ($registry->has($openAiName)) {
-                return $openAiName; // Tool existiert bereits mit diesem Namen
+        if ($this->nameMapper === null) {
+            try {
+                $this->nameMapper = app(ToolNameMapper::class);
+            } catch (\Throwable $e) {
+                // Fallback: Direktes Mapping
+                return str_replace('_', '.', $openAiName);
             }
-        } catch (\Throwable $e) {
-            // Registry nicht verfügbar - weiter mit Mapping
         }
         
-        // Standard-Mapping: Unterstriche zurück zu Punkten
-        // ABER: Wir müssen prüfen, ob dieser Name existiert
-        $candidateName = str_replace('_', '.', $openAiName);
-        
-        try {
-            $registry = app(ToolRegistry::class);
-            if ($registry->has($candidateName)) {
-                return $candidateName;
-            }
-        } catch (\Throwable $e) {
-            // Registry nicht verfügbar - verwende Kandidat
-        }
-        
-        // Fallback: Verwende den Kandidat-Namen (auch wenn nicht gefunden)
-        return $candidateName;
+        return $this->nameMapper->toCanonical($openAiName);
     }
 
     private function parseResponsesStream($body, callable $onDelta, array $messages, array $options): void
@@ -724,15 +723,84 @@ class OpenAiService
     /**
      * Konvertiert ein ToolContract zu OpenAI Function Format
      */
+    /**
+     * Konvertiert Tool zu OpenAI-Format mit komprimierten Manifesten
+     * 
+     * Komprimiert Tool-Manifeste für OpenAI:
+     * - Kürzt description auf max. 150 Zeichen
+     * - Minimale Schema-Definitionen (nur required fields)
+     * - Metadaten werden nicht im Schema übertragen (reduziert Token-Usage)
+     */
     private function convertToolToOpenAiFormat(\Platform\Core\Contracts\ToolContract $tool): array
     {
+        // Komprimiere Description (max 150 Zeichen)
+        $description = $tool->getDescription();
+        if (mb_strlen($description) > 150) {
+            $description = mb_substr($description, 0, 147) . '...';
+        }
+        
+        // Komprimiere Schema (nur required fields behalten, restliche Properties optional)
+        $schema = $tool->getSchema();
+        $compressedSchema = $this->compressSchema($schema);
+        
         return [
             'type' => 'function',
             'function' => [
                 'name' => $tool->getName(),
-                'description' => $tool->getDescription(),
-                'parameters' => $tool->getSchema(),
+                'description' => $description,
+                'parameters' => $compressedSchema,
             ]
         ];
+    }
+    
+    /**
+     * Komprimiert JSON Schema für OpenAI (reduziert Token-Usage)
+     * 
+     * - Behält nur required fields bei
+     * - Entfernt optionale Beschreibungen aus Properties (wenn zu lang)
+     * - Minimiert nested structures
+     */
+    private function compressSchema(array $schema): array
+    {
+        $compressed = [
+            'type' => $schema['type'] ?? 'object',
+        ];
+        
+        // Properties komprimieren
+        if (isset($schema['properties']) && is_array($schema['properties'])) {
+            $compressedProperties = [];
+            foreach ($schema['properties'] as $key => $property) {
+                $compressedProperty = [
+                    'type' => $property['type'] ?? 'string',
+                ];
+                
+                // Nur required fields behalten
+                if (isset($schema['required']) && in_array($key, $schema['required'])) {
+                    // Für required fields: kürze description auf max 50 Zeichen
+                    if (isset($property['description']) && mb_strlen($property['description']) > 50) {
+                        $compressedProperty['description'] = mb_substr($property['description'], 0, 47) . '...';
+                    } elseif (isset($property['description'])) {
+                        $compressedProperty['description'] = $property['description'];
+                    }
+                    
+                    // Enum-Werte behalten (wichtig für Validierung)
+                    if (isset($property['enum'])) {
+                        $compressedProperty['enum'] = $property['enum'];
+                    }
+                } else {
+                    // Für optionale fields: nur type, keine description (spart Tokens)
+                }
+                
+                $compressedProperties[$key] = $compressedProperty;
+            }
+            $compressed['properties'] = $compressedProperties;
+        }
+        
+        // Required fields behalten
+        if (isset($schema['required']) && is_array($schema['required'])) {
+            $compressed['required'] = $schema['required'];
+        }
+        
+        return $compressed;
     }
 }

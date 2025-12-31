@@ -60,6 +60,14 @@ class ToolExecutor
             // Service noch nicht verfügbar
             $this->rateLimitService = null;
         }
+        
+        // Lazy-Loading: Idempotency-Service
+        try {
+            $this->idempotencyService = app(ToolIdempotencyService::class);
+        } catch (\Throwable $e) {
+            // Service noch nicht verfügbar
+            $this->idempotencyService = null;
+        }
     }
 
     /**
@@ -75,6 +83,61 @@ class ToolExecutor
         $traceId = bin2hex(random_bytes(8));
         $start = microtime(true);
         $memoryStart = memory_get_usage();
+        $retries = 0;
+        $cacheHit = false;
+        $idempotencyKey = null;
+        
+        // Generiere Idempotency-Key (wenn Service verfügbar)
+        if ($this->idempotencyService) {
+            $idempotencyKey = $this->idempotencyService->generateKey($toolName, $arguments, $context);
+            
+            // Prüfe auf Duplikat (nur bei idempotenten Tools)
+            if ($tool instanceof \Platform\Core\Contracts\ToolMetadataContract) {
+                $metadata = $tool->getMetadata();
+                $isIdempotent = (bool)($metadata['idempotent'] ?? false);
+                
+                if ($isIdempotent) {
+                    $duplicate = $this->idempotencyService->checkDuplicate($idempotencyKey);
+                    if ($duplicate) {
+                        // Duplikat gefunden - gebe vorheriges Ergebnis zurück
+                        Log::info("[ToolExecutor] Duplikat erkannt, gebe vorheriges Ergebnis zurück", [
+                            'tool' => $toolName,
+                            'idempotency_key' => substr($idempotencyKey, 0, 16) . '...',
+                            'original_execution_id' => $duplicate->id,
+                        ]);
+                        
+                        $duration = microtime(true) - $start;
+                        $memoryUsage = memory_get_usage() - $memoryStart;
+                        
+                        // Erstelle Result aus vorherigem Execution
+                        $result = ToolResult::success(
+                            $duplicate->result_data ?? [],
+                            [
+                                'message' => 'Duplikat erkannt - vorheriges Ergebnis zurückgegeben',
+                                'original_execution_id' => $duplicate->id,
+                                'idempotency_key' => $idempotencyKey,
+                            ]
+                        );
+                        
+                        // Event feuern
+                        event(new ToolExecuted(
+                            $toolName,
+                            $arguments,
+                            $context,
+                            $result,
+                            $duration,
+                            $memoryUsage,
+                            $traceId,
+                            $retries,
+                            false, // Nicht aus Cache, sondern Duplikat
+                            $idempotencyKey
+                        ));
+                        
+                        return $result;
+                    }
+                }
+            }
+        }
 
         // Tool aus Registry holen
         $tool = $this->registry->get($toolName);
@@ -131,6 +194,7 @@ class ToolExecutor
                 $memoryUsage = memory_get_usage() - $memoryStart;
                 
                 // Event feuern: Tool erfolgreich ausgeführt (aus Cache)
+                $cacheHit = true;
                 event(new ToolExecuted(
                     $toolName,
                     $validationResult['data'],
@@ -138,7 +202,10 @@ class ToolExecutor
                     $cachedResult,
                     $duration,
                     $memoryUsage,
-                    $traceId
+                    $traceId,
+                    $retries,
+                    $cacheHit,
+                    $idempotencyKey
                 ));
                 
                 Log::info("[ToolExecutor] Tool aus Cache geladen", [
@@ -173,6 +240,12 @@ class ToolExecutor
                 $this->cacheService->put($toolName, $validationResult['data'], $context, $tool, $result);
             }
             
+            // Speichere Idempotency-Key (wenn Service verfügbar und erfolgreich)
+            if ($this->idempotencyService && $idempotencyKey && $result->success) {
+                // Wird später in Listener gespeichert (mit execution_id)
+                $result->metadata['idempotency_key'] = $idempotencyKey;
+            }
+            
             // Event feuern: Tool erfolgreich ausgeführt
             event(new ToolExecuted(
                 $toolName,
@@ -181,20 +254,28 @@ class ToolExecutor
                 $result,
                 $duration,
                 $memoryUsage,
-                $traceId
+                $traceId,
+                $retries,
+                $cacheHit,
+                $idempotencyKey
             ));
             
             Log::info("[ToolExecutor] Tool ausgeführt", [
                 'tool' => $toolName,
                 'success' => $result->success,
                 'duration_ms' => (int)($duration * 1000),
-                'trace_id' => $traceId
+                'trace_id' => $traceId,
+                'idempotency_key' => $idempotencyKey ? substr($idempotencyKey, 0, 16) . '...' : null,
             ]);
 
             return $result;
         } catch (\Throwable $e) {
             $duration = microtime(true) - $start;
             $memoryUsage = memory_get_usage() - $memoryStart;
+            
+            // Kategorisiere Fehler-Typ
+            $errorType = $this->categorizeError($e, $validationResult['errors'] ?? []);
+            $willRetry = $this->shouldRetry($e, $tool);
             
             // Event feuern: Tool fehlgeschlagen
             event(new ToolFailed(
@@ -206,7 +287,10 @@ class ToolExecutor
                 $e,
                 $duration,
                 $memoryUsage,
-                $traceId
+                $traceId,
+                $retries,
+                $willRetry,
+                $errorType
             ));
             
             Log::error("[ToolExecutor] Tool-Fehler", [

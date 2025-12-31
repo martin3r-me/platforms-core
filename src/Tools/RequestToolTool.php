@@ -85,10 +85,16 @@ class RequestToolTool implements ToolContract
                 );
             }
             
-            // 1. Suche nach ähnlichen Tools
+            // 1. Generiere Deduplication-Key
+            $dedupKey = $this->generateDedupKey($description, $useCase, $suggestedName, $module);
+            
+            // 2. Prüfe auf ähnliche Requests (Deduping)
+            $similarRequests = $this->findSimilarRequests($dedupKey, $description, $useCase);
+            
+            // 3. Suche nach ähnlichen Tools
             $similarTools = $this->findSimilarTools($description, $module);
             
-            // 2. Speichere den Bedarf in der Datenbank (für Entwickler)
+            // 4. Speichere den Bedarf in der Datenbank (für Entwickler)
             $requestId = $this->logToolRequest([
                 'description' => $description,
                 'use_case' => $useCase,
@@ -98,6 +104,8 @@ class RequestToolTool implements ToolContract
                 'user_id' => $context->user?->id,
                 'team_id' => $context->team?->id,
                 'similar_tools' => $similarTools,
+                'similar_requests' => $similarRequests,
+                'deduplication_key' => $dedupKey,
                 'timestamp' => now()->toIso8601String(),
             ]);
             
@@ -196,6 +204,79 @@ class RequestToolTool implements ToolContract
     }
     
     /**
+     * Generiert einen Deduplication-Key für einen Tool-Request
+     */
+    private function generateDedupKey(string $description, ?string $useCase, ?string $suggestedName, ?string $module): string
+    {
+        // Normalisiere Text (lowercase, entferne Sonderzeichen)
+        $normalizedDescription = mb_strtolower(trim($description));
+        $normalizedUseCase = $useCase ? mb_strtolower(trim($useCase)) : '';
+        $normalizedName = $suggestedName ? mb_strtolower(trim($suggestedName)) : '';
+        $normalizedModule = $module ? mb_strtolower(trim($module)) : '';
+        
+        // Erstelle Key aus normalisierten Daten
+        $keyData = [
+            'description' => $normalizedDescription,
+            'use_case' => $normalizedUseCase,
+            'suggested_name' => $normalizedName,
+            'module' => $normalizedModule,
+        ];
+        
+        return hash('sha256', json_encode($keyData));
+    }
+    
+    /**
+     * Findet ähnliche Requests (für Deduping)
+     * 
+     * @return array IDs ähnlicher Requests
+     */
+    private function findSimilarRequests(string $dedupKey, string $description, ?string $useCase): array
+    {
+        try {
+            // 1. Prüfe exakten Dedup-Key
+            $exactMatch = ToolRequest::where('deduplication_key', $dedupKey)
+                ->where('status', '!=', ToolRequest::STATUS_REJECTED) // Ignoriere abgelehnte
+                ->first();
+            
+            if ($exactMatch) {
+                return [$exactMatch->id];
+            }
+            
+            // 2. Prüfe ähnliche Beschreibungen (fuzzy matching)
+            $similar = ToolRequest::where('status', '!=', ToolRequest::STATUS_REJECTED)
+                ->where(function($query) use ($description, $useCase) {
+                    // Ähnliche Beschreibung (LIKE mit Keywords)
+                    $keywords = $this->extractKeywords($description);
+                    foreach ($keywords as $keyword) {
+                        if (mb_strlen($keyword) > 3) {
+                            $query->orWhere('description', 'like', "%{$keyword}%");
+                        }
+                    }
+                    
+                    // Ähnlicher Use-Case
+                    if ($useCase) {
+                        $useCaseKeywords = $this->extractKeywords($useCase);
+                        foreach ($useCaseKeywords as $keyword) {
+                            if (mb_strlen($keyword) > 3) {
+                                $query->orWhere('use_case', 'like', "%{$keyword}%");
+                            }
+                        }
+                    }
+                })
+                ->orderBy('created_at', 'desc')
+                ->limit(5)
+                ->get();
+            
+            return $similar->pluck('id')->toArray();
+        } catch (\Throwable $e) {
+            Log::warning('[Tool Request] Fehler beim Finden ähnlicher Requests', [
+                'error' => $e->getMessage(),
+            ]);
+            return [];
+        }
+    }
+    
+    /**
      * Speichert den Tool-Bedarf in der Datenbank (für Entwickler)
      * 
      * @return int|null Die ID des erstellten Requests
@@ -203,6 +284,18 @@ class RequestToolTool implements ToolContract
     private function logToolRequest(array $data): ?int
     {
         try {
+            // Prüfe ob bereits ähnlicher Request existiert (Deduping)
+            $dedupKey = $data['deduplication_key'] ?? null;
+            $similarRequests = $data['similar_requests'] ?? [];
+            
+            if ($dedupKey && !empty($similarRequests)) {
+                // Ähnliche Requests gefunden - logge für Entwickler
+                Log::info('[Tool Request] Ähnliche Requests gefunden', [
+                    'similar_request_ids' => $similarRequests,
+                    'description' => $data['description'],
+                ]);
+            }
+            
             // Speichere in Datenbank
             $request = ToolRequest::create([
                 'user_id' => $data['user_id'] ?? null,
@@ -214,6 +307,8 @@ class RequestToolTool implements ToolContract
                 'module' => $data['module'] ?? null,
                 'status' => ToolRequest::STATUS_PENDING,
                 'similar_tools' => $data['similar_tools'] ?? null,
+                'similar_requests' => $similarRequests,
+                'deduplication_key' => $dedupKey,
                 'metadata' => [
                     'timestamp' => $data['timestamp'] ?? now()->toIso8601String(),
                 ],
@@ -224,6 +319,7 @@ class RequestToolTool implements ToolContract
                 'request_id' => $request->id,
                 'description' => $data['description'],
                 'module' => $data['module'] ?? 'unknown',
+                'similar_requests_count' => count($similarRequests),
             ]);
             
             return $request->id; // WICHTIG: ID zurückgeben

@@ -24,11 +24,14 @@ class ToolRequest extends Model
         'developer_notes',
         'assigned_to_user_id',
         'similar_tools',
+        'similar_requests',
+        'deduplication_key',
         'metadata',
     ];
 
     protected $casts = [
         'similar_tools' => 'array',
+        'similar_requests' => 'array',
         'metadata' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',

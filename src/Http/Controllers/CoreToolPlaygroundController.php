@@ -1194,6 +1194,16 @@ class CoreToolPlaygroundController extends Controller
      * - Aufgabe → kann ich mit Tools lösen?
      * - Benötigt Hilfe → kann ich mit Tools helfen ODER User-Hilfe geben?
      */
+    /**
+     * Semantische Intent-Analyse
+     * 
+     * WICHTIG: Diese Methode entscheidet NUR:
+     * 1. Kann ohne Tools geantwortet werden? (Frage vs. Aufgabe)
+     * 2. Sind Tools erlaubt? (keine Blockierung)
+     * 3. Fehlt Funktionalität? → tools.request
+     * 
+     * ❌ KEINE Tool-Auswahl! (Das bleibt beim LLM)
+     */
     private function analyzeIntent(string $intent, ToolRegistry $registry): array
     {
         $intentLower = strtolower(trim($intent));

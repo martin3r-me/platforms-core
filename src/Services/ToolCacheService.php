@@ -19,18 +19,31 @@ class ToolCacheService
 
     /**
      * Generiert einen Cache-Key für ein Tool
+     * 
+     * Cache-Key enthält:
+     * - Tool-Name
+     * - Args-Hash (normalisierte Argumente)
+     * - User-ID
+     * - Team-ID
+     * - Scope (optional, z.B. "team:5" oder "user:10")
      */
     private function generateCacheKey(
         string $toolName,
         array $arguments,
-        ToolContext $context
+        ToolContext $context,
+        ?string $scope = null
     ): string {
-        // Cache-Key basierend auf tool_name + arguments + user_id + team_id
+        // Normalisiere Argumente und erstelle Hash
+        $normalizedArgs = $this->normalizeArguments($arguments);
+        $argsHash = hash('sha256', json_encode($normalizedArgs));
+        
+        // Cache-Key basierend auf tool_name + args_hash + user_id + team_id + scope
         $keyData = [
             'tool' => $toolName,
-            'args' => $this->normalizeArguments($arguments),
+            'args_hash' => $argsHash,
             'user_id' => $context->user?->id,
             'team_id' => $context->team?->id,
+            'scope' => $scope,
         ];
         
         return self::CACHE_PREFIX . md5(json_encode($keyData));
@@ -72,11 +85,13 @@ class ToolCacheService
             return (bool)$toolConfig;
         }
 
-        // Default: Cache nur read-only Tools
-        // Prüfe ob Tool Metadata hat und read_only ist
+        // Default: Cache nur read-only Tools mit risk_level === 'safe'
+        // Prüfe ob Tool Metadata hat und read_only + safe ist
         if ($tool instanceof \Platform\Core\Contracts\ToolMetadataContract) {
             $metadata = $tool->getMetadata();
-            return (bool)($metadata['read_only'] ?? false);
+            $readOnly = (bool)($metadata['read_only'] ?? false);
+            $riskLevel = $metadata['risk_level'] ?? 'write';
+            return $readOnly && $riskLevel === 'safe';
         }
 
         // Heuristik: Tools mit "list", "get", "describe" im Namen sind meist read-only
@@ -92,34 +107,64 @@ class ToolCacheService
 
     /**
      * Holt gecachtes Result (falls vorhanden)
+     * 
+     * Unterstützt stale-while-revalidate:
+     * - Wenn Cache fresh: direkt zurückgeben
+     * - Wenn Cache stale: zurückgeben, aber im Hintergrund aktualisieren (wird später implementiert)
      */
     public function get(
         string $toolName,
         array $arguments,
         ToolContext $context,
-        ToolContract $tool
+        ToolContract $tool,
+        ?string $scope = null
     ): ?ToolResult {
         if (!$this->shouldCache($toolName, $tool)) {
             return null;
         }
 
-        $cacheKey = $this->generateCacheKey($toolName, $arguments, $context);
+        $cacheKey = $this->generateCacheKey($toolName, $arguments, $context, $scope);
         $cached = Cache::get($cacheKey);
 
         if ($cached === null) {
             return null;
         }
 
+        // Prüfe ob Cache stale ist (stale-while-revalidate)
+        $isStale = false;
+        if (isset($cached['expires_at'])) {
+            $expiresAt = $cached['expires_at'];
+            $staleAt = $cached['stale_at'] ?? null;
+            
+            if ($staleAt && now()->timestamp > $staleAt) {
+                $isStale = true;
+            }
+        }
+
         // Rekonstruiere ToolResult aus Cache
-        return ToolResult::success(
+        $result = ToolResult::success(
             $cached['data'] ?? null,
             $cached['message'] ?? null,
-            $cached['metadata'] ?? []
+            array_merge($cached['metadata'] ?? [], [
+                'cache_hit' => true,
+                'cache_stale' => $isStale,
+            ])
         );
+
+        // TODO: Bei stale Cache: Im Hintergrund aktualisieren (wird später implementiert)
+        // if ($isStale) {
+        //     dispatch(new RefreshStaleCacheJob($toolName, $arguments, $context, $scope));
+        // }
+
+        return $result;
     }
 
     /**
      * Speichert ein Tool-Result im Cache
+     * 
+     * Unterstützt stale-while-revalidate:
+     * - TTL: Zeit bis Cache als "stale" gilt
+     * - stale_ttl: Zeit bis Cache komplett abläuft (z.B. 1h + 24h stale)
      */
     public function put(
         string $toolName,
@@ -127,7 +172,8 @@ class ToolCacheService
         ToolContext $context,
         ToolContract $tool,
         ToolResult $result,
-        ?int $ttl = null
+        ?int $ttl = null,
+        ?string $scope = null
     ): void {
         if (!$this->shouldCache($toolName, $tool)) {
             return;
@@ -138,18 +184,32 @@ class ToolCacheService
             return;
         }
 
-        $cacheKey = $this->generateCacheKey($toolName, $arguments, $context);
+        $cacheKey = $this->generateCacheKey($toolName, $arguments, $context, $scope);
         
         // TTL aus Config oder Default
         if ($ttl === null) {
             $ttl = config("tools.tools.{$toolName}.cache_ttl", self::DEFAULT_TTL);
         }
+        
+        // stale_ttl aus Config (optional, z.B. 24h = 86400)
+        $staleTtl = config("tools.tools.{$toolName}.cache_stale_ttl", null);
+        if ($staleTtl === null) {
+            // Default: 3x TTL für stale-while-revalidate
+            $staleTtl = $ttl * 3;
+        }
+
+        $now = now()->timestamp;
+        $expiresAt = $now + $ttl;
+        $staleAt = $now + $staleTtl;
 
         Cache::put($cacheKey, [
             'data' => $result->data,
             'message' => $result->metadata['message'] ?? null,
             'metadata' => $result->metadata,
-        ], $ttl);
+            'expires_at' => $expiresAt,
+            'stale_at' => $staleAt,
+            'created_at' => $now,
+        ], $staleTtl); // Cache für stale_ttl speichern
     }
 
     /**

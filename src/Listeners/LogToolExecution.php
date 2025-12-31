@@ -33,7 +33,7 @@ class LogToolExecution
         ]);
 
         // Tracke in Datenbank
-        $this->tracker->track(
+        $execution = $this->tracker->track(
             $event->toolName,
             $event->arguments,
             $event->context,
@@ -44,8 +44,24 @@ class LogToolExecution
             null, // chain_id (wird später von ToolOrchestrator gesetzt)
             null, // chain_position
             $event->result->metadata['token_usage_input'] ?? null,
-            $event->result->metadata['token_usage_output'] ?? null
+            $event->result->metadata['token_usage_output'] ?? null,
+            $event->retries,
+            null, // error_type (nur bei Fehlern)
+            array_merge($event->result->metadata ?? [], [
+                'cache_hit' => $event->cacheHit,
+                'idempotency_key' => $event->idempotencyKey,
+            ])
         );
+        
+        // Speichere Idempotency-Key in IdempotencyService (wenn verfügbar)
+        if ($event->idempotencyKey && $execution) {
+            try {
+                $idempotencyService = app(\Platform\Core\Services\ToolIdempotencyService::class);
+                $idempotencyService->storeKey($event->idempotencyKey, $execution->id);
+            } catch (\Throwable $e) {
+                // Silent fail
+            }
+        }
     }
 
     /**
@@ -80,7 +96,11 @@ class LogToolExecution
             $event->exception,
             $event->duration,
             $event->memoryUsage,
-            $event->traceId
+            $event->traceId,
+            null, // chain_id
+            null, // chain_position
+            $event->retries,
+            $event->errorType
         );
     }
 }

@@ -22,7 +22,10 @@ class ToolExecuted
         public ToolResult $result,
         public float $duration,
         public int $memoryUsage,
-        public ?string $traceId = null
+        public ?string $traceId = null,
+        public int $retries = 0,
+        public bool $cacheHit = false,
+        public ?string $idempotencyKey = null
     ) {}
 }
 

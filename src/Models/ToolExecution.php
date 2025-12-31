@@ -30,17 +30,24 @@ class ToolExecution extends Model
         'trace_id',
         'chain_id',
         'chain_position',
+        'retries',
+        'error_type',
+        'metadata',
     ];
 
     protected $casts = [
         'arguments' => 'array',
         'result_data' => 'array',
+        'metadata' => 'array',
         'success' => 'boolean',
         'duration_ms' => 'integer',
         'memory_usage_bytes' => 'integer',
         'token_usage_input' => 'integer',
         'token_usage_output' => 'integer',
         'chain_position' => 'integer',
+        'retries' => 'integer',
+        'is_retry' => 'boolean',
+        'original_run_id' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

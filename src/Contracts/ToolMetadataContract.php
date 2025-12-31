@@ -22,6 +22,9 @@ interface ToolMetadataContract
      *   'requires_team' => true, // Benötigt Team-Context
      *   'side_effects' => ['creates', 'updates', 'deletes'], // Seiteneffekte
      *   'read_only' => false, // Nur Lese-Operation
+     *   'idempotent' => false, // Tool ist idempotent (kann sicher wiederholt werden)
+     *   'risk_level' => 'safe', // safe|write|destructive - Risiko-Level
+     *   'confirmation_required' => false, // Benötigt Bestätigung vor Ausführung
      *   'examples' => [ // Beispiel-Nutzungen für AI
      *     'Erstelle ein Projekt namens "Test"',
      *     'Zeige mir alle Teams'

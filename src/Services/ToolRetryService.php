@@ -16,16 +16,33 @@ class ToolRetryService
     /**
      * Führt ein Tool mit Retry-Mechanismus aus
      * 
+     * WICHTIG: Retry nur bei idempotenten Tools!
+     * 
      * @param callable $executor Callback, der das Tool ausführt: fn() => ToolResult
      * @param string $toolName Name des Tools (für Logging)
+     * @param \Platform\Core\Contracts\ToolContract|null $tool Tool-Instanz (für Metadaten-Prüfung)
      * @param array $options Retry-Optionen (max_attempts, backoff_strategy, etc.)
      * @return ToolResult Ergebnis der Ausführung
      */
     public function executeWithRetry(
         callable $executor,
         string $toolName,
+        ?\Platform\Core\Contracts\ToolContract $tool = null,
         array $options = []
     ): ToolResult {
+        // Prüfe ob Tool idempotent ist (wenn verfügbar)
+        if ($tool instanceof \Platform\Core\Contracts\ToolMetadataContract) {
+            $metadata = $tool->getMetadata();
+            $isIdempotent = (bool)($metadata['idempotent'] ?? false);
+            
+            if (!$isIdempotent) {
+                // Tool ist nicht idempotent - kein Retry (verhindert doppelte Writes)
+                Log::info("[ToolRetry] Tool ist nicht idempotent, kein Retry", [
+                    'tool' => $toolName,
+                ]);
+                return $executor(); // Einmalige Ausführung
+            }
+        }
         $maxAttempts = $options['max_attempts'] ?? config('tools.retry.max_attempts', 3);
         $backoffStrategy = $options['backoff_strategy'] ?? config('tools.retry.backoff_strategy', 'exponential');
         $initialDelay = $options['initial_delay_ms'] ?? config('tools.retry.initial_delay_ms', 100);

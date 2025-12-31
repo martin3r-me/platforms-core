@@ -13,25 +13,29 @@ interface ToolDependencyContract
     /**
      * Gibt die Dependencies dieses Tools zurück
      * 
-     * Format:
+     * NEUES DSL-Format (empfohlen):
      * [
-     *   'required_fields' => ['field1', 'field2'], // Felder, die benötigt werden
+     *   'dependencies' => [
+     *     [
+     *       'requires' => ['team_id'], // Fehlende Felder
+     *       'resolver_tool' => 'core.teams.list',
+     *       'select_strategy' => 'auto_if_single|ask_user|fail',
+     *       'map' => [
+     *         'team_id' => '$.teams[0].id', // JSONPath für Mapping
+     *       ]
+     *     ]
+     *   ]
+     * ]
+     * 
+     * ALTES Format (für Backwards-Kompatibilität):
+     * [
+     *   'required_fields' => ['field1', 'field2'],
      *   'dependencies' => [
      *     [
      *       'tool_name' => 'core.teams.list',
-     *       'condition' => function($arguments, $context) {
-     *         // Gibt true zurück, wenn Dependency ausgeführt werden soll
-     *         return empty($arguments['team_id']);
-     *       },
-     *       'args' => function($arguments, $context) {
-     *         // Gibt Argumente für Dependency-Tool zurück
-     *         return ['include_personal' => true];
-     *       },
-     *       'merge_result' => function($mainToolName, $depResult, $arguments) {
-     *         // Merged Dependency-Ergebnis in Arguments (optional)
-     *         // Wenn null zurückgegeben wird, wird Dependency-Ergebnis direkt zurückgegeben
-     *         return $arguments; // oder null für direkte Rückgabe
-     *       }
+     *       'condition' => function($arguments, $context) { ... },
+     *       'args' => function($arguments, $context) { ... },
+     *       'merge_result' => function($mainToolName, $depResult, $arguments) { ... }
      *     ]
      *   ]
      * ]
