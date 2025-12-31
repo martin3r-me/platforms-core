@@ -8,6 +8,23 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Prüfe ob Tabelle bereits existiert (z.B. bei fehlgeschlagener Migration)
+        if (Schema::hasTable('tool_executions')) {
+            // Tabelle existiert bereits - füge nur fehlende Indexe hinzu
+            Schema::table('tool_executions', function (Blueprint $table) {
+                // Prüfe ob Index bereits existiert
+                $sm = Schema::getConnection()->getDoctrineSchemaManager();
+                $indexesFound = $sm->listTableIndexes('tool_executions');
+                $indexName = 'tool_executions_error_code_index';
+                
+                if (!isset($indexesFound[$indexName])) {
+                    $table->index('error_code');
+                }
+            });
+            return;
+        }
+        
+        // Tabelle existiert nicht - erstelle sie neu
         Schema::create('tool_executions', function (Blueprint $table) {
             $table->id();
             $table->string('tool_name', 255)->index();
