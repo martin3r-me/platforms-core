@@ -31,6 +31,7 @@ class ToolOrchestrator
 {
     /**
      * Cache für gelesene Dependencies (Performance)
+     * In-Memory Cache für aktuelle Request
      */
     private array $dependencyCache = [];
 
@@ -39,11 +40,27 @@ class ToolOrchestrator
      */
     private ?ToolChainPlanner $planner = null;
 
+    /**
+     * Cache-Service für persistente Dependency-Caches
+     */
+    private ?ToolCacheService $cacheService = null;
+
+    private const DEPENDENCY_CACHE_PREFIX = 'tool_dependencies:';
+    private const DEPENDENCY_CACHE_TTL = 86400; // 24 Stunden
+
     public function __construct(
         private ToolExecutor $executor,
         private ToolRegistry $registry
     ) {
         $this->planner = new ToolChainPlanner($registry);
+        
+        // Lazy-Load Cache-Service
+        try {
+            $this->cacheService = app(ToolCacheService::class);
+        } catch (\Throwable $e) {
+            // Service noch nicht verfügbar
+            $this->cacheService = null;
+        }
     }
 
     /**
@@ -170,32 +187,81 @@ class ToolOrchestrator
      * Liest Dependencies aus einem Tool (loose coupled)
      * 
      * Prüft, ob das Tool ToolDependencyContract implementiert und liest Dependencies.
-     * Cache wird verwendet für Performance.
+     * Nutzt sowohl In-Memory- als auch persistenten Cache für Performance.
      */
     private function getToolDependencies(string $toolName): ?array
     {
-        // Cache prüfen
+        // In-Memory Cache prüfen (für aktuelle Request)
         if (isset($this->dependencyCache[$toolName])) {
             return $this->dependencyCache[$toolName];
+        }
+        
+        // Persistent Cache prüfen (wenn verfügbar)
+        $cacheKey = self::DEPENDENCY_CACHE_PREFIX . $toolName;
+        if ($this->cacheService) {
+            $cached = Cache::get($cacheKey);
+            if ($cached !== null) {
+                $this->dependencyCache[$toolName] = $cached;
+                return $cached;
+            }
         }
         
         // Tool aus Registry holen
         $tool = $this->registry->get($toolName);
         if (!$tool) {
+            $this->dependencyCache[$toolName] = null;
             return null;
         }
         
         // Prüfe, ob Tool ToolDependencyContract implementiert
         if (!($tool instanceof \Platform\Core\Contracts\ToolDependencyContract)) {
             $this->dependencyCache[$toolName] = null;
+            // Cache auch "keine Dependencies" (verhindert wiederholte Prüfungen)
+            if ($this->cacheService) {
+                Cache::put($cacheKey, null, self::DEPENDENCY_CACHE_TTL);
+            }
             return null;
         }
         
         // Dependencies aus Tool lesen
         $deps = $tool->getDependencies();
+        
+        // In-Memory Cache
         $this->dependencyCache[$toolName] = $deps;
         
+        // Persistent Cache (wenn verfügbar)
+        if ($this->cacheService) {
+            Cache::put($cacheKey, $deps, self::DEPENDENCY_CACHE_TTL);
+        }
+        
         return $deps;
+    }
+
+    /**
+     * Invalidiert Dependency-Cache für ein Tool
+     * 
+     * Wird aufgerufen, wenn ein Tool neu registriert wird
+     */
+    public function invalidateDependencyCache(string $toolName): void
+    {
+        // In-Memory Cache
+        unset($this->dependencyCache[$toolName]);
+        
+        // Persistent Cache
+        $cacheKey = self::DEPENDENCY_CACHE_PREFIX . $toolName;
+        Cache::forget($cacheKey);
+    }
+
+    /**
+     * Invalidiert alle Dependency-Caches
+     */
+    public function invalidateAllDependencyCaches(): void
+    {
+        // In-Memory Cache
+        $this->dependencyCache = [];
+        
+        // Persistent Cache: Wird automatisch nach TTL ablaufen
+        // Später: Tag-basierte Invalidation implementieren
     }
 
     /**

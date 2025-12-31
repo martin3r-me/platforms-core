@@ -69,6 +69,9 @@ class CoreServiceProvider extends ServiceProvider
         // Konfigurationen veröffentlichen
         // Agent-Config Publishes entfernt – Agent ausgelagert
 
+        // Event-Listener für Tools registrieren
+        $this->registerToolEventListeners();
+
         // Livewire-Komponenten registrieren (mit Präfix "core")
         $this->registerLivewireComponents();
 
@@ -104,6 +107,7 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Console\Commands\TestOpenAiCommand::class,
                 \Platform\Core\Console\Commands\ListToolsCommand::class,
                 \Platform\Core\Console\Commands\TestToolOrchestrationCommand::class,
+                \Platform\Core\Console\Commands\MakeToolCommand::class,
             ]);
         }
 
@@ -317,6 +321,32 @@ class CoreServiceProvider extends ServiceProvider
                 \Log::warning("Failed to register Livewire component {$alias}: " . $e->getMessage());
             }
         }
+    }
+
+    protected function registerToolEventListeners(): void
+    {
+        // Event-Listener für Tool-Events registrieren
+        \Illuminate\Support\Facades\Event::listen(
+            \Platform\Core\Events\ToolExecuted::class,
+            \Platform\Core\Listeners\LogToolExecution::class . '@handleToolExecuted'
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \Platform\Core\Events\ToolFailed::class,
+            \Platform\Core\Listeners\LogToolExecution::class . '@handleToolFailed'
+        );
+
+        // TrackToolMetrics Listener (wird später implementiert, wenn ToolMetricsService existiert)
+        // Wird in TrackToolMetrics Listener selbst geprüft, ob Service verfügbar ist
+        \Illuminate\Support\Facades\Event::listen(
+            \Platform\Core\Events\ToolExecuted::class,
+            \Platform\Core\Listeners\TrackToolMetrics::class . '@handleToolExecuted'
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \Platform\Core\Events\ToolFailed::class,
+            \Platform\Core\Listeners\TrackToolMetrics::class . '@handleToolFailed'
+        );
     }
 
     protected function loadModuleServiceProviders(): void

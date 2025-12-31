@@ -144,14 +144,95 @@
                         <!-- Execution Flow -->
                         <div x-show="simulationResult?.execution_flow?.length > 0" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
                             <h3 class="text-lg font-semibold mb-4 text-[var(--ui-secondary)]">⚙️ Execution-Flow</h3>
-                            <div class="space-y-2">
+                            <div class="space-y-3">
                                 <template x-for="(exec, index) in (simulationResult?.execution_flow || [])">
-                                    <div class="p-3 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
+                                    <div class="p-3 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]" :class="exec.is_dependency ? 'border-l-4 border-l-[var(--ui-info)]' : ''">
                                         <div class="flex items-center gap-2 mb-2">
+                                            <span x-show="exec.is_dependency" class="text-xs text-[var(--ui-info)] font-semibold">🔗 Dependency:</span>
                                             <span class="font-mono text-sm font-semibold text-[var(--ui-secondary)]" x-text="exec.tool"></span>
                                             <span :class="exec.result.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]'" x-text="exec.result.success ? '✅' : '❌'"></span>
                                         </div>
-                                        <div class="text-xs text-[var(--ui-muted)]" x-text="'Argumente: ' + JSON.stringify(exec.arguments)"></div>
+                                        
+                                        <!-- Performance Info -->
+                                        <div x-show="exec.execution_time_ms" class="text-xs text-[var(--ui-muted)] mb-2">
+                                            ⏱️ <strong>Ausführungszeit:</strong> <span x-text="exec.execution_time_ms"></span>ms
+                                        </div>
+
+                                        <!-- Events -->
+                                        <div x-show="exec.events" class="mb-3 p-2 bg-[var(--ui-muted)] rounded">
+                                            <div class="text-xs font-semibold mb-1 text-[var(--ui-secondary)]">📡 Events:</div>
+                                            <div x-show="exec.events.tool_executed" class="text-xs text-[var(--ui-success)] mb-1">
+                                                ✅ ToolExecuted: <span x-text="Math.round(exec.events.tool_executed.duration * 1000)"></span>ms, 
+                                                Memory: <span x-text="Math.round(exec.events.tool_executed.memory_usage / 1024 / 1024 * 100) / 100"></span>MB,
+                                                Trace: <span x-text="exec.events.tool_executed.trace_id"></span>
+                                            </div>
+                                            <div x-show="exec.events.tool_failed" class="text-xs text-[var(--ui-danger)] mb-1">
+                                                ❌ ToolFailed: <span x-text="exec.events.tool_failed.error_code"></span> - 
+                                                <span x-text="exec.events.tool_failed.error_message"></span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Features Info -->
+                                        <div x-show="exec.features" class="mb-3 space-y-2">
+                                            <div class="text-xs font-semibold mb-1 text-[var(--ui-secondary)]">🔧 Features:</div>
+                                            
+                                            <!-- Cache -->
+                                            <div x-show="exec.features.cache" class="text-xs p-2 bg-[var(--ui-muted)] rounded">
+                                                <strong>💾 Cache:</strong>
+                                                <span x-show="exec.features.cache.enabled" class="text-[var(--ui-success)]">Aktiviert</span>
+                                                <span x-show="!exec.features.cache.enabled" class="text-[var(--ui-muted)]">Deaktiviert</span>
+                                                <span x-show="exec.features.cache.cached" class="text-[var(--ui-success)] ml-2">✅ Aus Cache</span>
+                                                <span x-show="!exec.features.cache.cached && exec.features.cache.enabled" class="text-[var(--ui-muted)] ml-2">❌ Nicht gecacht</span>
+                                            </div>
+
+                                            <!-- Timeout -->
+                                            <div x-show="exec.features.timeout" class="text-xs p-2 bg-[var(--ui-muted)] rounded">
+                                                <strong>⏱️ Timeout:</strong>
+                                                <span x-show="exec.features.timeout.enabled" class="text-[var(--ui-success)]">Aktiviert</span>
+                                                <span x-show="!exec.features.timeout.enabled" class="text-[var(--ui-muted)]">Deaktiviert</span>
+                                                <span x-show="exec.features.timeout.timeout_seconds" class="ml-2">
+                                                    Max: <span x-text="exec.features.timeout.timeout_seconds"></span>s
+                                                </span>
+                                            </div>
+
+                                            <!-- Validation -->
+                                            <div x-show="exec.features.validation" class="text-xs p-2 bg-[var(--ui-muted)] rounded">
+                                                <strong>✅ Validation:</strong>
+                                                <span x-show="exec.features.validation.valid" class="text-[var(--ui-success)]">Valide</span>
+                                                <span x-show="!exec.features.validation.valid" class="text-[var(--ui-danger)]">Fehler</span>
+                                                <div x-show="exec.features.validation.errors?.length > 0" class="mt-1 text-[var(--ui-danger)]">
+                                                    <template x-for="(error, i) in exec.features.validation.errors" :key="i">
+                                                        <div x-text="error"></div>
+                                                    </template>
+                                                </div>
+                                            </div>
+
+                                            <!-- Circuit Breaker -->
+                                            <div x-show="exec.features.circuit_breaker" class="text-xs p-2 bg-[var(--ui-muted)] rounded">
+                                                <strong>🔌 Circuit Breaker:</strong>
+                                                <span x-show="exec.features.circuit_breaker.enabled" class="text-[var(--ui-success)]">Aktiviert</span>
+                                                <span x-show="!exec.features.circuit_breaker.enabled" class="text-[var(--ui-muted)]">Deaktiviert</span>
+                                                <span x-show="exec.features.circuit_breaker.openai_status" class="ml-2">
+                                                    OpenAI: <span 
+                                                        x-text="exec.features.circuit_breaker.openai_status"
+                                                        :class="exec.features.circuit_breaker.openai_status === 'open' ? 'text-[var(--ui-danger)]' : 'text-[var(--ui-success)]'"
+                                                    ></span>
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div class="text-xs text-[var(--ui-muted)] mb-2">
+                                            <strong>Argumente:</strong>
+                                            <pre class="mt-1 p-2 bg-[var(--ui-muted)] rounded overflow-auto" x-text="JSON.stringify(exec.arguments, null, 2)"></pre>
+                                        </div>
+                                        <div x-show="exec.result.data" class="text-xs mt-2">
+                                            <strong class="text-[var(--ui-success)]">Ergebnis:</strong>
+                                            <pre class="mt-1 p-2 bg-[var(--ui-muted)] text-[var(--ui-success)] rounded overflow-auto" x-text="JSON.stringify(exec.result.data, null, 2)"></pre>
+                                        </div>
+                                        <div x-show="exec.result.has_error" class="text-xs mt-2">
+                                            <strong class="text-[var(--ui-danger)]">Fehler:</strong>
+                                            <pre class="mt-1 p-2 bg-[var(--ui-muted)] text-[var(--ui-danger)] rounded overflow-auto" x-text="JSON.stringify(exec.result.error, null, 2)"></pre>
+                                        </div>
                                     </div>
                                 </template>
                             </div>

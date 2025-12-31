@@ -34,6 +34,24 @@ class ToolContext
     }
 
     /**
+     * Erstellt einen neuen Context (Factory-Methode)
+     */
+    public static function create(
+        ?Authenticatable $user = null,
+        ?object $team = null,
+        array $metadata = []
+    ): self {
+        if ($user === null) {
+            $user = auth()->user();
+            if (!$user) {
+                throw new \RuntimeException('User must be authenticated');
+            }
+        }
+
+        return new self($user, $team, $metadata);
+    }
+
+    /**
      * Fügt Metadaten hinzu (für späteres Tool-Chaining)
      */
     public function withMetadata(array $metadata): self

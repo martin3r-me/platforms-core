@@ -11,6 +11,12 @@ use Platform\Core\Tools\ToolChainPlanner;
 use Platform\Core\Tools\ToolDiscoveryService;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Services\OpenAiService;
+use Platform\Core\Services\ToolCacheService;
+use Platform\Core\Services\ToolTimeoutService;
+use Platform\Core\Services\ToolValidationService;
+use Platform\Core\Services\ToolCircuitBreaker;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Tool Playground Controller
@@ -91,6 +97,37 @@ class CoreToolPlaygroundController extends Controller
                 throw new \RuntimeException('ToolRegistry nicht verfügbar');
             }
             
+            // WICHTIG: Stelle sicher, dass alle Tools geladen sind (auch core.teams.list)
+            // Prüfe ob Auto-Discovery bereits gelaufen ist
+            if (count($registry->all()) === 0) {
+                // Trigger Auto-Discovery manuell
+                try {
+                    $coreTools = \Platform\Core\Tools\ToolLoader::loadCoreTools();
+                    foreach ($coreTools as $tool) {
+                        try {
+                            $registry->register($tool);
+                        } catch (\Throwable $e) {
+                            // Silent fail
+                        }
+                    }
+                    
+                    // Module-Tools laden
+                    $modulesPath = realpath(__DIR__ . '/../../../../modules');
+                    if ($modulesPath && is_dir($modulesPath)) {
+                        $moduleTools = \Platform\Core\Tools\ToolLoader::loadFromAllModules($modulesPath);
+                        foreach ($moduleTools as $tool) {
+                            try {
+                                $registry->register($tool);
+                            } catch (\Throwable $e) {
+                                // Silent fail
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // Silent fail
+                }
+            }
+            
             $discovery = new ToolDiscoveryService($registry);
             
             // Debug: Prüfe ob Tools registriert sind
@@ -98,6 +135,7 @@ class CoreToolPlaygroundController extends Controller
             $simulation['debug'] = [
                 'total_tools_registered' => count($allRegisteredTools),
                 'registered_tool_names' => array_map(fn($t) => $t->getName(), $allRegisteredTools),
+                'has_core_teams_list' => $registry->has('core.teams.list'),
             ];
             
             $simulation['steps'][] = [
@@ -109,29 +147,25 @@ class CoreToolPlaygroundController extends Controller
 
             $intent = $message;
             
-            // WICHTIG: findByIntent verwendet preg_split - ist bereits abgesichert
+            // MCP BEST PRACTICE: Das LLM entscheidet selbst, ob es Tools braucht!
+            // Wir geben ALLE Tools zurück - das LLM filtert selbst nach Relevanz
+            // Das ist viel smarter als vorherige Filterung!
             try {
-                $discoveredTools = $discovery->findByIntent($intent);
+                // findByIntent gibt ALLE Tools zurück (MCP-Pattern)
+                // Das LLM sieht alle Tools und entscheidet selbst, ob es welche braucht
+                $allTools = $discovery->findByIntent($intent);
+                
+                // FÜR DIE SIMULATION: Zeige alle Tools, aber markiere, dass das LLM entscheidet
+                // In der echten AI-Integration würde das LLM alle Tools sehen und selbst filtern
+                $discoveredTools = $allTools;
+                
+                $simulation['debug']['mcp_pattern'] = true;
+                $simulation['debug']['total_tools_available'] = count($allTools);
+                $simulation['debug']['note'] = 'LLM sieht alle Tools und entscheidet selbst, ob es welche braucht (MCP Best Practice)';
             } catch (\Throwable $e) {
                 // Bei Fehlern: leeres Array verwenden
                 $discoveredTools = [];
                 $simulation['debug']['discovery_error'] = $e->getMessage();
-            }
-            
-            // FALLBACK: Wenn keine Tools gefunden, versuche direkten Match
-            if (count($discoveredTools) === 0 && count($allRegisteredTools) > 0) {
-                // Versuche direkten Match über Tool-Namen
-                $intentLower = strtolower($intent);
-                foreach ($allRegisteredTools as $tool) {
-                    $toolName = strtolower($tool->getName());
-                    // Prüfe ob Intent-Wörter im Tool-Namen vorkommen
-                    if ((stripos($toolName, 'projekt') !== false || stripos($intentLower, 'projekt') !== false) && 
-                        (stripos($toolName, 'create') !== false || stripos($intentLower, 'erstellen') !== false)) {
-                        $discoveredTools[] = $tool;
-                        $simulation['debug']['fallback_match'] = $tool->getName();
-                        break;
-                    }
-                }
             }
             
             $simulation['tools_discovered'] = array_map(function($tool) {
@@ -144,12 +178,36 @@ class CoreToolPlaygroundController extends Controller
 
             $simulation['steps'][] = [
                 'step' => 1,
-                'result' => count($discoveredTools) . ' Tools gefunden',
+                'result' => count($discoveredTools) . ' Tools verfügbar',
                 'tools' => array_map(fn($t) => $t->getName(), $discoveredTools),
+                'note' => 'LLM sieht alle Tools und entscheidet selbst, ob es welche braucht (MCP Best Practice)',
             ];
 
-            // STEP 2: Chain Planning (wenn Tool gefunden)
-            if (count($discoveredTools) > 0) {
+            // STEP 2: Chain Planning (wenn LLM ein Tool auswählt)
+            // WICHTIG: In der echten AI-Integration würde das LLM jetzt entscheiden:
+            // - Brauche ich ein Tool? → Tool auswählen
+            // - Kann ich direkt antworten? → Direkte Antwort (z.B. bei "wie geht es dir?")
+            // 
+            // FÜR DIE SIMULATION: Versuche das erste Tool zu verwenden (als Beispiel)
+            // In der Realität würde das LLM selbst entscheiden!
+            
+            // Prüfe ob die Nachricht überhaupt ein Tool benötigt (für Simulation)
+            // In der echten AI würde das LLM das selbst entscheiden!
+            $intentLower = strtolower(trim($intent));
+            $simpleGreetings = ['hallo', 'hi', 'hey', 'moin', 'wie geht', 'wie gehts', 'danke', 'bitte', 'ok'];
+            $needsTool = true;
+            foreach ($simpleGreetings as $greeting) {
+                if (stripos($intentLower, $greeting) !== false && 
+                    !preg_match('/\b(erstellen|anlegen|zeigen|auflisten|suchen|finden|ändern|löschen)\b/i', $intentLower)) {
+                    $needsTool = false;
+                    $simulation['debug']['llm_would_answer_directly'] = true;
+                    $simulation['debug']['reason'] = 'Einfache Begrüßung/Frage - LLM würde direkt antworten';
+                    break;
+                }
+            }
+            
+            if ($needsTool && count($discoveredTools) > 0) {
+                // LLM würde ein Tool auswählen - für Simulation nehmen wir das erste
                 $primaryTool = $discoveredTools[0];
                 $toolName = $primaryTool->getName();
                 
@@ -191,9 +249,129 @@ class CoreToolPlaygroundController extends Controller
                     'timestamp' => now()->toIso8601String(),
                 ];
 
-                $executor = new ToolExecutor($registry);
-                $orchestrator = new ToolOrchestrator($executor, $registry);
+                // Sammle Event-Informationen
+                $eventData = [
+                    'tool_executed' => null,
+                    'tool_failed' => null,
+                ];
+
+                // Tracke Dependency-Executions separat (BEVOR Haupt-Tool-Listener)
+                $dependencyExecutions = [];
+                $dependencyEventData = [];
                 
+                // Event-Listener für Dependencies (wird zuerst registriert, um alle Events zu fangen)
+                $dependencyListener = Event::listen(\Platform\Core\Events\ToolExecuted::class, function ($event) use (&$dependencyExecutions, &$dependencyEventData, $toolName) {
+                    // Nur Dependencies tracken (nicht das Haupt-Tool)
+                    if ($event->toolName !== $toolName) {
+                        $dependencyExecutions[] = [
+                            'tool' => $event->toolName,
+                            'success' => $event->result->success,
+                            'duration' => $event->duration,
+                            'memory_usage' => $event->memoryUsage,
+                            'trace_id' => $event->traceId,
+                            'result_data' => $event->result->data,
+                        ];
+                        $dependencyEventData[$event->toolName] = [
+                            'tool_executed' => [
+                                'tool' => $event->toolName,
+                                'duration' => $event->duration,
+                                'memory_usage' => $event->memoryUsage,
+                                'trace_id' => $event->traceId,
+                                'success' => $event->result->success,
+                            ],
+                        ];
+                    }
+                });
+
+                // Event-Listener für Haupt-Tool (wird nach Dependency-Listener registriert)
+                $executedListener = Event::listen(\Platform\Core\Events\ToolExecuted::class, function ($event) use (&$eventData, $toolName) {
+                    // Nur Haupt-Tool tracken
+                    if ($event->toolName === $toolName) {
+                        $eventData['tool_executed'] = [
+                            'tool' => $event->toolName,
+                            'duration' => $event->duration,
+                            'memory_usage' => $event->memoryUsage,
+                            'trace_id' => $event->traceId,
+                            'success' => $event->result->success,
+                        ];
+                    }
+                });
+
+                $failedListener = Event::listen(\Platform\Core\Events\ToolFailed::class, function ($event) use (&$eventData, $toolName) {
+                    // Nur Haupt-Tool tracken
+                    if ($event->toolName === $toolName) {
+                        $eventData['tool_failed'] = [
+                            'tool' => $event->toolName,
+                            'error_message' => $event->errorMessage,
+                            'error_code' => $event->errorCode,
+                            'duration' => $event->duration,
+                            'trace_id' => $event->traceId,
+                        ];
+                    }
+                });
+
+                $executor = app(ToolExecutor::class);
+                $orchestrator = app(ToolOrchestrator::class);
+                
+                // Sammle Feature-Informationen
+                $featureInfo = [
+                    'cache' => null,
+                    'timeout' => null,
+                    'validation' => null,
+                    'circuit_breaker' => null,
+                ];
+
+                // Cache-Status
+                try {
+                    $cacheService = app(ToolCacheService::class);
+                    $cacheKey = 'tool_result:' . md5(json_encode(['tool' => $toolName, 'args' => $arguments]));
+                    $cached = Cache::get($cacheKey);
+                    $featureInfo['cache'] = [
+                        'enabled' => config('tools.cache.enabled', true),
+                        'cached' => $cached !== null,
+                        'cache_key' => $cacheKey,
+                    ];
+                } catch (\Throwable $e) {
+                    $featureInfo['cache'] = ['enabled' => false, 'error' => $e->getMessage()];
+                }
+
+                // Timeout-Info
+                try {
+                    $timeoutService = app(ToolTimeoutService::class);
+                    $featureInfo['timeout'] = [
+                        'enabled' => $timeoutService->isEnabled(),
+                        'timeout_seconds' => $timeoutService->getTimeoutForTool($toolName),
+                    ];
+                } catch (\Throwable $e) {
+                    $featureInfo['timeout'] = ['enabled' => false, 'error' => $e->getMessage()];
+                }
+
+                // Validation-Info
+                try {
+                    $validationService = app(ToolValidationService::class);
+                    $validationResult = $validationService->validate($primaryTool, $arguments);
+                    $featureInfo['validation'] = [
+                        'valid' => $validationResult['valid'],
+                        'errors' => $validationResult['errors'],
+                        'validated_data' => $validationResult['data'],
+                    ];
+                } catch (\Throwable $e) {
+                    $featureInfo['validation'] = ['error' => $e->getMessage()];
+                }
+
+                // Circuit Breaker Status
+                try {
+                    $circuitBreaker = app(ToolCircuitBreaker::class);
+                    // Prüfe für externe Services (z.B. OpenAI)
+                    $featureInfo['circuit_breaker'] = [
+                        'enabled' => config('tools.circuit_breaker.enabled', true),
+                        'openai_status' => $circuitBreaker->isOpen('openai') ? 'open' : 'closed',
+                    ];
+                } catch (\Throwable $e) {
+                    $featureInfo['circuit_breaker'] = ['error' => $e->getMessage()];
+                }
+
+                $startTime = microtime(true);
                 $executionResult = $orchestrator->executeWithDependencies(
                     $toolName,
                     $arguments,
@@ -201,7 +379,31 @@ class CoreToolPlaygroundController extends Controller
                     maxDepth: 5,
                     planFirst: true
                 );
+                $executionTime = (microtime(true) - $startTime) * 1000;
+                
+                // Event-Listener entfernen
+                Event::forget(\Platform\Core\Events\ToolExecuted::class);
+                Event::forget(\Platform\Core\Events\ToolFailed::class);
 
+                // Füge Dependency-Executions hinzu
+                foreach ($dependencyExecutions as $depExec) {
+                    $simulation['execution_flow'][] = [
+                        'tool' => $depExec['tool'],
+                        'arguments' => [], // Dependency-Arguments werden nicht getrackt
+                        'result' => [
+                            'success' => $depExec['success'],
+                            'has_data' => $depExec['result_data'] !== null,
+                            'has_error' => !$depExec['success'],
+                            'data' => $depExec['result_data'],
+                        ],
+                        'timestamp' => now()->toIso8601String(),
+                        'execution_time_ms' => round($depExec['duration'] * 1000, 2),
+                        'events' => $dependencyEventData[$depExec['tool']] ?? null,
+                        'is_dependency' => true,
+                    ];
+                }
+
+                // Haupt-Tool-Execution
                 $simulation['execution_flow'][] = [
                     'tool' => $toolName,
                     'arguments' => $arguments,
@@ -209,20 +411,28 @@ class CoreToolPlaygroundController extends Controller
                         'success' => $executionResult->success,
                         'has_data' => $executionResult->data !== null,
                         'has_error' => $executionResult->error !== null,
+                        'error' => $executionResult->error,
+                        'data' => $executionResult->data,
                     ],
                     'timestamp' => now()->toIso8601String(),
+                    'execution_time_ms' => round($executionTime, 2),
+                    'events' => $eventData,
+                    'features' => $featureInfo,
                 ];
 
                 $simulation['tools_used'][] = [
                     'name' => $toolName,
                     'executed_at' => now()->toIso8601String(),
                     'success' => $executionResult->success,
+                    'execution_time_ms' => round($executionTime, 2),
                 ];
 
                 $simulation['steps'][] = [
                     'step' => 3,
                     'result' => $executionResult->success ? 'Tool erfolgreich ausgeführt' : 'Tool-Fehler',
-                    'execution_time_ms' => 0, // TODO: Messen
+                    'execution_time_ms' => round($executionTime, 2),
+                    'events' => $eventData,
+                    'features' => $featureInfo,
                 ];
 
                 // STEP 4: Response Generation (simuliert)
@@ -247,9 +457,14 @@ class CoreToolPlaygroundController extends Controller
                     ];
                 }
             } else {
+                // LLM würde direkt antworten (kein Tool benötigt)
                 $simulation['final_response'] = [
-                    'type' => 'no_tools',
-                    'message' => 'Keine passenden Tools gefunden. AI würde direkt antworten.',
+                    'type' => 'direct_answer',
+                    'message' => 'LLM würde direkt antworten - kein Tool benötigt',
+                    'reason' => $simulation['debug']['llm_would_answer_directly'] ?? false
+                        ? ($simulation['debug']['reason'] ?? 'Einfache Frage/Begrüßung')
+                        : 'LLM hat entschieden, dass kein Tool benötigt wird',
+                    'note' => 'In der echten AI-Integration würde das LLM alle Tools sehen, aber selbst entscheiden, dass es keine braucht',
                 ];
             }
 
