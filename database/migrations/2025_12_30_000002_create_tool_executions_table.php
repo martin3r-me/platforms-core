@@ -17,7 +17,7 @@ return new class extends Migration
             // Execution-Details
             $table->json('arguments')->nullable(); // Tool-Argumente
             $table->boolean('success')->default(false)->index();
-            $table->string('error_code', 100)->nullable()->index();
+            $table->string('error_code', 100)->nullable(); // Index wird unten hinzugefügt
             $table->text('error_message')->nullable();
             $table->text('error_trace')->nullable(); // Stack-Trace bei Fehlern
             
@@ -43,7 +43,7 @@ return new class extends Migration
             $table->index(['user_id', 'created_at']);
             $table->index(['team_id', 'created_at']);
             $table->index(['created_at', 'success']);
-            $table->index('error_code');
+            $table->index('error_code'); // Index für error_code (nur einmal!)
         });
     }
 
