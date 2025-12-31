@@ -11,16 +11,20 @@ return new class extends Migration
         // Prüfe ob Tabelle bereits existiert (z.B. bei fehlgeschlagener Migration)
         if (Schema::hasTable('tool_executions')) {
             // Tabelle existiert bereits - füge nur fehlende Indexe hinzu
-            Schema::table('tool_executions', function (Blueprint $table) {
-                // Prüfe ob Index bereits existiert
-                $sm = Schema::getConnection()->getDoctrineSchemaManager();
-                $indexesFound = $sm->listTableIndexes('tool_executions');
-                $indexName = 'tool_executions_error_code_index';
-                
-                if (!isset($indexesFound[$indexName])) {
+            try {
+                Schema::table('tool_executions', function (Blueprint $table) {
+                    // Versuche Index hinzuzufügen - wird fehlschlagen, wenn er bereits existiert
                     $table->index('error_code');
+                });
+            } catch (\Illuminate\Database\QueryException $e) {
+                // Index existiert bereits - das ist OK, einfach weitermachen
+                if (str_contains($e->getMessage(), 'Duplicate key name')) {
+                    // Index existiert bereits - nichts zu tun
+                    return;
                 }
-            });
+                // Anderer Fehler - weiterwerfen
+                throw $e;
+            }
             return;
         }
         
