@@ -173,7 +173,20 @@ class ToolOrchestrator
                         $arguments = $mergedArgs;
                     } else {
                         // Standard-Merge: Versuche team_id zu setzen (für Backwards-Kompatibilität)
-                        $arguments = $this->defaultMergeDependencyResult($toolName, $depToolName, $depResult, $arguments);
+                        $mergedArgs = $this->defaultMergeDependencyResult($toolName, $depToolName, $depResult, $arguments);
+                        
+                        // Wenn null zurückgegeben wird, User-Input anfordern
+                        if ($mergedArgs === null) {
+                            return ToolResult::success([
+                                'dependency_tool_result' => $depResult->data,
+                                'message' => 'Bitte wähle aus der Liste aus.',
+                                'requires_user_input' => true,
+                                'next_tool' => $toolName,
+                                'next_tool_args' => $arguments
+                            ]);
+                        }
+                        
+                        $arguments = $mergedArgs;
                     }
                 }
             }
@@ -275,6 +288,31 @@ class ToolOrchestrator
         ToolResult $depResult,
         array $arguments
     ): array {
+        // Spezialfall: core.teams.list → planner.projects.create
+        // Wenn mehrere Teams vorhanden sind und kein team_id angegeben, User-Input anfordern
+        if ($depToolName === 'core.teams.list' && $depResult->success && isset($depResult->data['teams'])) {
+            $teams = $depResult->data['teams'];
+            $teamCount = count($teams);
+            
+            // Wenn kein team_id in Arguments und mehrere Teams vorhanden → User-Input anfordern
+            if (empty($arguments['team_id']) && $teamCount > 1) {
+                // Gib null zurück, um User-Input anzufordern
+                return null; // Wird in execute() erkannt und führt zu requires_user_input
+            }
+            
+            // Wenn nur ein Team vorhanden, automatisch verwenden
+            if (empty($arguments['team_id']) && $teamCount === 1) {
+                $arguments['team_id'] = $teams[0]['id'];
+                return $arguments;
+            }
+            
+            // Wenn current_team_id vorhanden und kein team_id angegeben, verwende current
+            if (empty($arguments['team_id']) && isset($depResult->data['current_team_id'])) {
+                $arguments['team_id'] = $depResult->data['current_team_id'];
+                return $arguments;
+            }
+        }
+        
         // Standard: Kein automatisches Merging
         // Tools sollten ihren eigenen merge_result Callback definieren
         return $arguments;

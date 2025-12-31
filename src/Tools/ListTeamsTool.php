@@ -44,6 +44,11 @@ class ListTeamsTool implements ToolContract
             if (!$context->user) {
                 return ToolResult::error('AUTHENTICATION_REQUIRED', 'User must be authenticated to list teams.');
             }
+            
+            // Prüfe ob User die teams()-Relationship hat
+            if (!method_exists($context->user, 'teams')) {
+                return ToolResult::error('RELATIONSHIP_NOT_FOUND', 'User model hat keine teams()-Relationship.');
+            }
 
             $includePersonal = $arguments['include_personal'] ?? true;
 
