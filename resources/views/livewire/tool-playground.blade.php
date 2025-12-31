@@ -88,6 +88,53 @@
 
                     <!-- Simulation Results -->
                     <div x-show="simulationResult" class="space-y-4">
+                        <!-- Semantische Analyse -->
+                        <div x-show="simulationResult?.semantic_analysis" class="bg-[var(--ui-info-5)] rounded-lg p-4 border-2 border-[var(--ui-info)]">
+                            <h3 class="text-lg font-semibold mb-4 text-[var(--ui-info)]">🧠 Semantische Intent-Analyse</h3>
+                            <div class="space-y-3">
+                                <div class="p-3 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <span class="font-semibold text-[var(--ui-secondary)]">Intent-Typ:</span>
+                                        <span class="px-2 py-1 rounded text-sm" 
+                                              :class="simulationResult?.semantic_analysis?.intent_type === 'task' ? 'bg-[var(--ui-warning-5)] text-[var(--ui-warning)]' : 
+                                                      simulationResult?.semantic_analysis?.intent_type === 'question' ? 'bg-[var(--ui-info-5)] text-[var(--ui-info)]' : 
+                                                      'bg-[var(--ui-muted-5)] text-[var(--ui-muted)]'"
+                                              x-text="simulationResult?.semantic_analysis?.intent_type || 'unclear'"></span>
+                                    </div>
+                                    <div class="text-sm mb-2">
+                                        <span class="font-semibold text-[var(--ui-secondary)]">Kann selbstständig auflösen:</span>
+                                        <span :class="simulationResult?.semantic_analysis?.can_solve_independently ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]'" 
+                                              x-text="simulationResult?.semantic_analysis?.can_solve_independently ? '✅ Ja' : '❌ Nein'"></span>
+                                    </div>
+                                    <div class="text-sm mb-2">
+                                        <span class="font-semibold text-[var(--ui-secondary)]">Grund:</span>
+                                        <span class="text-[var(--ui-muted)]" x-text="simulationResult?.semantic_analysis?.reason || 'N/A'"></span>
+                                    </div>
+                                    <div class="text-sm mb-2">
+                                        <span class="font-semibold text-[var(--ui-secondary)]">Benötigt Tools:</span>
+                                        <span :class="simulationResult?.semantic_analysis?.needs_tools ? 'text-[var(--ui-warning)]' : 'text-[var(--ui-success)]'" 
+                                              x-text="simulationResult?.semantic_analysis?.needs_tools ? '✅ Ja' : '❌ Nein'"></span>
+                                    </div>
+                                    <div x-show="simulationResult?.semantic_analysis?.can_help_with_tools" class="text-sm mb-2">
+                                        <span class="font-semibold text-[var(--ui-success)]">✅ Kann mit Tools helfen:</span>
+                                        <span class="text-[var(--ui-success)]" x-text="simulationResult?.semantic_analysis?.relevant_tools_count + ' Tools verfügbar'"></span>
+                                    </div>
+                                    <div x-show="simulationResult?.semantic_analysis?.can_help_user" class="text-sm mb-2">
+                                        <span class="font-semibold text-[var(--ui-info)]">💡 Kann User helfen:</span>
+                                        <span class="text-[var(--ui-info)]" x-text="'Helper-Tools: ' + (simulationResult?.semantic_analysis?.helper_tools?.join(', ') || 'N/A')"></span>
+                                    </div>
+                                    <div x-show="simulationResult?.semantic_analysis?.needs_tool_request" class="text-sm mb-2">
+                                        <span class="font-semibold text-[var(--ui-warning)]">⚠️ Tool-Request nötig:</span>
+                                        <span class="text-[var(--ui-warning)]">Keine passenden Tools verfügbar</span>
+                                    </div>
+                                    <div class="mt-3 p-2 bg-[var(--ui-muted)] rounded">
+                                        <span class="font-semibold text-[var(--ui-secondary)]">Empfohlene Aktion:</span>
+                                        <div class="text-sm text-[var(--ui-secondary)] mt-1" x-text="simulationResult?.semantic_analysis?.recommended_action || 'N/A'"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Flow Visualization -->
                         <div class="bg-[var(--ui-muted-5)] rounded-lg p-4">
                             <h3 class="text-lg font-semibold mb-4 text-[var(--ui-secondary)]">📊 Request-Flow</h3>

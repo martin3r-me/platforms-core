@@ -179,14 +179,91 @@ class CoreToolPlaygroundController extends Controller
                 'has_core_teams_list' => $registry->has('core.teams.list'),
             ];
             
+            $intent = $message;
+            $intentLower = strtolower(trim($intent));
+            
+            // STEP 0: SEMANTISCHE INTENT-ANALYSE (immer an erster Stelle!)
+            $simulation['steps'][] = [
+                'step' => 0,
+                'name' => 'Semantische Intent-Analyse',
+                'description' => 'Analysiere: Kann ich das selbstständig auflösen? Frage oder Aufgabe?',
+                'timestamp' => now()->toIso8601String(),
+            ];
+            
+            // Semantische Analyse durchführen
+            $semanticAnalysis = $this->analyzeIntent($intent, $registry);
+            
+            $simulation['semantic_analysis'] = $semanticAnalysis;
+            $simulation['steps'][] = [
+                'step' => 0,
+                'result' => $semanticAnalysis['can_solve_independently'] 
+                    ? '✅ Kann selbstständig auflösen' 
+                    : '❌ Benötigt Hilfe',
+                'analysis' => $semanticAnalysis,
+            ];
+            
+            // SEMANTISCHE ANALYSE: Erste Frage - Kann ich das selbstständig auflösen?
+            $semanticAnalysis = $this->analyzeIntent($intent, $registry);
+            
+            $simulation['semantic_analysis'] = $semanticAnalysis;
+            $simulation['steps'][] = [
+                'step' => 0,
+                'result' => $semanticAnalysis['can_solve_independently'] 
+                    ? '✅ Kann selbstständig auflösen' 
+                    : '❌ Benötigt Hilfe',
+                'analysis' => $semanticAnalysis,
+            ];
+            
             $simulation['steps'][] = [
                 'step' => 1,
                 'name' => 'Tool Discovery',
-                'description' => 'Suche nach relevanten Tools für die Anfrage',
+                'description' => $semanticAnalysis['needs_tools'] 
+                    ? 'Suche nach Tools, die helfen können' 
+                    : 'Prüfe ob Tools für zusätzliche Infos nötig sind',
                 'timestamp' => now()->toIso8601String(),
             ];
-
-            $intent = $message;
+            
+            // LOOSE COUPLED: Generische Modul-Erkennung (nicht hart gecoded!)
+            // Extrahiere erwähnte Module aus dem Intent (z.B. "okr", "crm", "planner")
+            $mentionedModules = [];
+            $allRegisteredTools = $registry->all();
+            $availableModules = [];
+            
+            // Sammle alle verfügbaren Module aus Tool-Namen (z.B. "planner.projects.create" → "planner")
+            foreach ($allRegisteredTools as $tool) {
+                $toolName = $tool->getName();
+                if (str_contains($toolName, '.')) {
+                    $module = explode('.', $toolName)[0];
+                    if (!in_array($module, $availableModules)) {
+                        $availableModules[] = $module;
+                    }
+                }
+            }
+            
+            // Prüfe ob Module im Intent erwähnt werden (generisch, nicht hart gecoded!)
+            foreach ($availableModules as $module) {
+                // Prüfe ob Modul-Name oder verwandte Begriffe im Intent vorkommen
+                $modulePattern = '/\b' . preg_quote($module, '/') . '\b/i';
+                if (preg_match($modulePattern, $intentLower)) {
+                    $mentionedModules[] = $module;
+                }
+            }
+            
+            // Prüfe ob erwähnte Module Tools haben
+            $missingModuleTools = [];
+            foreach ($mentionedModules as $module) {
+                $hasModuleTool = false;
+                foreach ($allRegisteredTools as $tool) {
+                    $toolName = strtolower($tool->getName());
+                    if (str_starts_with($toolName, $module . '.')) {
+                        $hasModuleTool = true;
+                        break;
+                    }
+                }
+                if (!$hasModuleTool) {
+                    $missingModuleTools[] = $module;
+                }
+            }
             
             // MCP BEST PRACTICE: Das LLM entscheidet selbst, ob es Tools braucht!
             // Wir geben ALLE Tools zurück - das LLM filtert selbst nach Relevanz
@@ -196,12 +273,51 @@ class CoreToolPlaygroundController extends Controller
                 // Das LLM sieht alle Tools und entscheidet selbst, ob es welche braucht
                 $allTools = $discovery->findByIntent($intent);
                 
+                // LOOSE COUPLED: Wenn Module erwähnt werden, aber keine Tools existieren
+                // → Füge tools.request hinzu und filtere Tools von anderen Modulen raus
+                if (!empty($missingModuleTools)) {
+                    $requestTool = $registry->get('tools.request');
+                    if ($requestTool) {
+                        // Filtere Tools raus, die zu anderen erwähnten Modulen gehören
+                        // (aber nicht zu den fehlenden Modulen)
+                        $allTools = array_filter($allTools, function($tool) use ($missingModuleTools, $availableModules) {
+                            $toolName = strtolower($tool->getName());
+                            // Wenn Tool zu einem anderen Modul gehört (nicht zu fehlenden Modulen)
+                            foreach ($availableModules as $module) {
+                                if (!in_array($module, $missingModuleTools) && str_starts_with($toolName, $module . '.')) {
+                                    // Tool gehört zu einem anderen erwähnten Modul → rausfiltern
+                                    return false;
+                                }
+                            }
+                            return true;
+                        });
+                        $allTools = array_values($allTools); // Re-index
+                        
+                        // Füge tools.request hinzu, wenn noch nicht vorhanden
+                        $hasRequestTool = false;
+                        foreach ($allTools as $tool) {
+                            if ($tool->getName() === 'tools.request') {
+                                $hasRequestTool = true;
+                                break;
+                            }
+                        }
+                        if (!$hasRequestTool) {
+                            $allTools[] = $requestTool;
+                        }
+                        
+                        $simulation['debug']['module_intent_detected'] = $mentionedModules;
+                        $simulation['debug']['missing_module_tools'] = $missingModuleTools;
+                        $simulation['debug']['tools_request_suggested'] = true;
+                    }
+                }
+                
                 // FÜR DIE SIMULATION: Zeige alle Tools, aber markiere, dass das LLM entscheidet
                 // In der echten AI-Integration würde das LLM alle Tools sehen und selbst filtern
                 $discoveredTools = $allTools;
                 
                 $simulation['debug']['mcp_pattern'] = true;
                 $simulation['debug']['total_tools_available'] = count($allTools);
+                $simulation['debug']['available_modules'] = $availableModules;
                 $simulation['debug']['note'] = 'LLM sieht alle Tools und entscheidet selbst, ob es welche braucht (MCP Best Practice)';
             } catch (\Throwable $e) {
                 // Bei Fehlern: leeres Array verwenden
@@ -224,26 +340,58 @@ class CoreToolPlaygroundController extends Controller
                 'note' => 'LLM sieht alle Tools und entscheidet selbst, ob es welche braucht (MCP Best Practice)',
             ];
 
-            // STEP 2: Chain Planning (wenn LLM ein Tool auswählt)
+            // STEP 2: LLM-Entscheidung basierend auf semantischer Analyse
             // WICHTIG: In der echten AI-Integration würde das LLM jetzt entscheiden:
-            // - Brauche ich ein Tool? → Tool auswählen
-            // - Kann ich direkt antworten? → Direkte Antwort (z.B. bei "wie geht es dir?")
-            // 
-            // FÜR DIE SIMULATION: Versuche das erste Tool zu verwenden (als Beispiel)
-            // In der Realität würde das LLM selbst entscheiden!
+            // - Kann ich selbstständig auflösen? → Direkte Antwort
+            // - Benötige ich Tools? → Tool auswählen und Chain planen
+            // - Kann ich User helfen? → Helper-Tools verwenden
+            // - Keine Tools verfügbar? → tools.request aufrufen
             
-            // Prüfe ob die Nachricht überhaupt ein Tool benötigt (für Simulation)
-            // In der echten AI würde das LLM das selbst entscheiden!
-            $intentLower = strtolower(trim($intent));
-            $simpleGreetings = ['hallo', 'hi', 'hey', 'moin', 'wie geht', 'wie gehts', 'danke', 'bitte', 'ok'];
-            $needsTool = true;
-            foreach ($simpleGreetings as $greeting) {
-                if (stripos($intentLower, $greeting) !== false && 
-                    !preg_match('/\b(erstellen|anlegen|zeigen|auflisten|suchen|finden|ändern|löschen)\b/i', $intentLower)) {
-                    $needsTool = false;
-                    $simulation['debug']['llm_would_answer_directly'] = true;
-                    $simulation['debug']['reason'] = 'Einfache Begrüßung/Frage - LLM würde direkt antworten';
-                    break;
+            // SEMANTISCHE ENTSCHEIDUNG: Basierend auf Analyse
+            $needsTool = $semanticAnalysis['needs_tools'];
+            $canSolveIndependently = $semanticAnalysis['can_solve_independently'];
+            
+            // Wenn selbstständig lösbar → keine Tools nötig
+            if ($canSolveIndependently) {
+                $simulation['debug']['llm_would_answer_directly'] = true;
+                $simulation['debug']['reason'] = $semanticAnalysis['reason'];
+            }
+            
+            // LOOSE COUPLED: Automatisches Feedback-System
+            // Wenn LLM eine Aufgabe lösen soll, aber keine passenden Tools findet → tools.request erstellen
+            $autoRequestCreated = false;
+            if ($semanticAnalysis['needs_tool_request'] && $semanticAnalysis['intent_type'] === 'task') {
+                // Aufgabe erkannt, aber keine Tools verfügbar → automatisch Request erstellen
+                try {
+                    $requestTool = $registry->get('tools.request');
+                    if ($requestTool) {
+                        // Erstelle automatisch einen Tool-Request
+                        $context = ToolContext::fromAuth();
+                        $autoRequestResult = $requestTool->execute([
+                            'description' => "Automatisch erstellter Request für: {$message}",
+                            'use_case' => "LLM konnte Aufgabe nicht lösen, da keine passenden Tools verfügbar sind. Semantische Analyse: {$semanticAnalysis['reason']}",
+                            'suggested_name' => null,
+                            'category' => 'auto-generated',
+                            'module' => $missingModuleTools[0] ?? null,
+                        ], $context);
+                        
+                        if ($autoRequestResult->success) {
+                            $autoRequestCreated = true;
+                            $simulation['debug']['auto_tool_request_created'] = true;
+                            $simulation['debug']['auto_request_id'] = $autoRequestResult->data['request_id'] ?? null;
+                            $simulation['steps'][] = [
+                                'step' => 1.5,
+                                'name' => 'Automatischer Tool-Request',
+                                'description' => 'Da keine passenden Tools für die Aufgabe gefunden wurden, wurde automatisch ein Tool-Request erstellt.',
+                                'timestamp' => now()->toIso8601String(),
+                                'request_id' => $autoRequestResult->data['request_id'] ?? null,
+                                'reason' => $semanticAnalysis['reason'],
+                            ];
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // Silent fail - Request-Erstellung ist optional
+                    $simulation['debug']['auto_request_error'] = $e->getMessage();
                 }
             }
             
@@ -349,6 +497,20 @@ class CoreToolPlaygroundController extends Controller
                 $dependencyListener = Event::listen(\Platform\Core\Events\ToolExecuted::class, function ($event) use (&$dependencyExecutions, &$dependencyEventData, $toolName) {
                     // Nur Dependencies tracken (nicht das Haupt-Tool)
                     if ($event->toolName !== $toolName) {
+                        // Sammle vollständige Fehler-Info
+                        $errorInfo = null;
+                        if (!$event->result->success) {
+                            $errorInfo = [
+                                'error' => $event->result->error,
+                                'message' => is_array($event->result->error) 
+                                    ? ($event->result->error['message'] ?? $event->result->error) 
+                                    : ($event->result->error ?? 'EXECUTION_ERROR'),
+                                'code' => is_array($event->result->error) 
+                                    ? ($event->result->error['code'] ?? 'EXECUTION_ERROR') 
+                                    : 'EXECUTION_ERROR',
+                            ];
+                        }
+                        
                         $dependencyExecutions[] = [
                             'tool' => $event->toolName,
                             'success' => $event->result->success,
@@ -356,6 +518,7 @@ class CoreToolPlaygroundController extends Controller
                             'memory_usage' => $event->memoryUsage,
                             'trace_id' => $event->traceId,
                             'result_data' => $event->result->data,
+                            'error_info' => $errorInfo, // Vollständige Fehler-Info
                         ];
                         $dependencyEventData[$event->toolName] = [
                             'tool_executed' => [
@@ -1021,6 +1184,152 @@ class CoreToolPlaygroundController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Semantische Intent-Analyse (LOOSE & GENERISCH)
+     * 
+     * Erste Frage: Kann ich das selbstständig auflösen?
+     * - Frage → kann ich mit Wissen antworten?
+     * - Aufgabe → kann ich mit Tools lösen?
+     * - Benötigt Hilfe → kann ich mit Tools helfen ODER User-Hilfe geben?
+     */
+    private function analyzeIntent(string $intent, ToolRegistry $registry): array
+    {
+        $intentLower = strtolower(trim($intent));
+        
+        // 1. SEMANTISCHE KATEGORISIERUNG: Frage vs. Aufgabe
+        $questionPatterns = [
+            '/\b(wie|was|wo|wann|warum|welche|wer|wessen)\b/i',
+            '/\b(erkläre|beschreibe|zeige|sag|nenn)\b/i',
+            '/\?/u', // Fragezeichen
+        ];
+        
+        $taskPatterns = [
+            '/\b(erstellen|anlegen|hinzufügen|add|create|new|neu)\b/i',
+            '/\b(ändern|update|bearbeiten|edit|modify)\b/i',
+            '/\b(löschen|delete|entfernen|remove)\b/i',
+            '/\b(senden|send|verschieben|move|kopieren|copy)\b/i',
+            '/\b(zuweisen|assign|freigeben|release)\b/i',
+            '/\b(aktivieren|activate|deaktivieren|deactivate)\b/i',
+            '/\b(starten|start|stoppen|stop)\b/i',
+        ];
+        
+        $isQuestion = false;
+        $isTask = false;
+        
+        foreach ($questionPatterns as $pattern) {
+            if (preg_match($pattern, $intent)) {
+                $isQuestion = true;
+                break;
+            }
+        }
+        
+        foreach ($taskPatterns as $pattern) {
+            if (preg_match($pattern, $intent)) {
+                $isTask = true;
+                break;
+            }
+        }
+        
+        // 2. KANN ICH DAS SELBSTSTÄNDIG AUFLÖSEN?
+        $canSolveIndependently = false;
+        $reason = '';
+        
+        if ($isQuestion && !$isTask) {
+            // Reine Frage → kann mit generischem Wissen beantwortet werden
+            $canSolveIndependently = true;
+            $reason = 'Reine Frage - kann mit generischem Wissen beantwortet werden';
+        } elseif ($isTask) {
+            // Aufgabe → benötigt Tools
+            $canSolveIndependently = false;
+            $reason = 'Aufgabe erkannt - benötigt Tools zur Ausführung';
+        } else {
+            // Unklar → konservativ: benötigt Hilfe
+            $canSolveIndependently = false;
+            $reason = 'Intent unklar - prüfe ob Tools helfen können';
+        }
+        
+        // 3. BENÖTIGT TOOLS?
+        $needsTools = !$canSolveIndependently;
+        
+        // 4. KANN ICH MIT TOOLS HELFEN?
+        $allTools = $registry->all();
+        $relevantTools = [];
+        $canHelpWithTools = false;
+        
+        if ($needsTools) {
+            // Prüfe ob passende Tools existieren
+            $discovery = new ToolDiscoveryService($registry);
+            try {
+                $relevantTools = $discovery->findByIntent($intent);
+                $canHelpWithTools = count($relevantTools) > 0;
+            } catch (\Throwable $e) {
+                $canHelpWithTools = false;
+            }
+        }
+        
+        // 5. KANN ICH DEM USER HELFEN, EINFACHER ZU ANTWORTEN?
+        // (z.B. Teams auflisten, damit User wählen kann)
+        $canHelpUser = false;
+        $helperTools = [];
+        
+        if ($needsTools && !$canHelpWithTools) {
+            // Keine direkten Tools → prüfe ob Helper-Tools existieren
+            // (z.B. core.teams.list, tools.list, etc.)
+            $helperToolNames = ['core.teams.list', 'tools.list', 'core.modules.list'];
+            foreach ($helperToolNames as $helperName) {
+                $helperTool = $registry->get($helperName);
+                if ($helperTool) {
+                    $helperTools[] = $helperName;
+                    $canHelpUser = true;
+                }
+            }
+        }
+        
+        // 6. AUTOMATISCHER TOOL-REQUEST NÖTIG?
+        $needsToolRequest = false;
+        if ($isTask && !$canHelpWithTools && !$canHelpUser) {
+            // Aufgabe, aber keine Tools → automatisch Request erstellen
+            $needsToolRequest = true;
+        }
+        
+        return [
+            'intent_type' => $isTask ? 'task' : ($isQuestion ? 'question' : 'unclear'),
+            'can_solve_independently' => $canSolveIndependently,
+            'reason' => $reason,
+            'needs_tools' => $needsTools,
+            'can_help_with_tools' => $canHelpWithTools,
+            'relevant_tools_count' => count($relevantTools),
+            'can_help_user' => $canHelpUser,
+            'helper_tools' => $helperTools,
+            'needs_tool_request' => $needsToolRequest,
+            'recommended_action' => $this->getRecommendedAction($canSolveIndependently, $canHelpWithTools, $canHelpUser, $needsToolRequest),
+        ];
+    }
+    
+    /**
+     * Gibt empfohlene Aktion basierend auf semantischer Analyse zurück
+     */
+    private function getRecommendedAction(bool $canSolve, bool $canHelpWithTools, bool $canHelpUser, bool $needsRequest): string
+    {
+        if ($canSolve) {
+            return 'Direkt mit generischem Wissen antworten';
+        }
+        
+        if ($canHelpWithTools) {
+            return 'Tools verwenden um Aufgabe zu lösen';
+        }
+        
+        if ($canHelpUser) {
+            return 'Helper-Tools verwenden um User bei der Antwort zu helfen';
+        }
+        
+        if ($needsRequest) {
+            return 'Automatisch tools.request aufrufen - keine passenden Tools verfügbar';
+        }
+        
+        return 'Unklar - weitere Analyse nötig';
     }
 
     private function extractModuleFromToolName(string $toolName): string

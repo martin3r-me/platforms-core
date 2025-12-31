@@ -89,7 +89,7 @@ class RequestToolTool implements ToolContract
             $similarTools = $this->findSimilarTools($description, $module);
             
             // 2. Speichere den Bedarf in der Datenbank (für Entwickler)
-            $this->logToolRequest([
+            $requestId = $this->logToolRequest([
                 'description' => $description,
                 'use_case' => $useCase,
                 'suggested_name' => $suggestedName,
@@ -104,6 +104,7 @@ class RequestToolTool implements ToolContract
             // 3. Erstelle Response
             $result = [
                 'request_received' => true,
+                'request_id' => $requestId, // WICHTIG: ID für Tracking
                 'message' => 'Dein Bedarf wurde registriert. Hier sind ähnliche Tools, die dir vielleicht helfen:',
                 'similar_tools' => $similarTools,
                 'suggestion' => $this->generateSuggestion($description, $similarTools, $suggestedName),
@@ -196,12 +197,14 @@ class RequestToolTool implements ToolContract
     
     /**
      * Speichert den Tool-Bedarf in der Datenbank (für Entwickler)
+     * 
+     * @return int|null Die ID des erstellten Requests
      */
-    private function logToolRequest(array $data): void
+    private function logToolRequest(array $data): ?int
     {
         try {
             // Speichere in Datenbank
-            ToolRequest::create([
+            $request = ToolRequest::create([
                 'user_id' => $data['user_id'] ?? null,
                 'team_id' => $data['team_id'] ?? null,
                 'description' => $data['description'],
@@ -218,15 +221,20 @@ class RequestToolTool implements ToolContract
             
             // Logge auch für Entwickler
             Log::info('[Tool Request] Neuer Bedarf in Datenbank gespeichert', [
+                'request_id' => $request->id,
                 'description' => $data['description'],
                 'module' => $data['module'] ?? 'unknown',
             ]);
+            
+            return $request->id; // WICHTIG: ID zurückgeben
         } catch (\Throwable $e) {
             // Fallback: Nur Logging, wenn DB-Speicherung fehlschlägt
             Log::warning('[Tool Request] Fehler beim Speichern in Datenbank', [
                 'error' => $e->getMessage(),
                 'data' => $data,
             ]);
+            
+            return null; // Keine ID bei Fehler
         }
     }
     
