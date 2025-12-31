@@ -238,8 +238,68 @@
                             </div>
                         </div>
 
+                        <!-- User Input Required (Multi-Step) -->
+                        <div x-show="simulationResult?.requires_user_input || simulationResult?.final_response?.type === 'user_input_required'" class="bg-[var(--ui-warning-5)] rounded-lg p-4 border-2 border-[var(--ui-warning)]">
+                            <h3 class="text-lg font-semibold mb-4 text-[var(--ui-warning)]">👤 User-Input erforderlich</h3>
+                            <div class="p-3 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
+                                <div class="text-[var(--ui-warning)] font-semibold mb-2" x-text="simulationResult?.user_input_prompt || simulationResult?.final_response?.message || 'Bitte wähle aus der Liste aus.'"></div>
+                                
+                                <!-- Zeige verfügbare Optionen (z.B. Teams) -->
+                                <div x-show="simulationResult?.user_input_data || simulationResult?.final_response?.data" class="mt-4">
+                                    <div class="text-sm font-semibold mb-2 text-[var(--ui-secondary)]">Verfügbare Optionen:</div>
+                                    <div class="space-y-2 max-h-64 overflow-y-auto">
+                                        <!-- Teams-Liste -->
+                                        <template x-if="simulationResult?.user_input_data?.teams || simulationResult?.final_response?.data?.teams">
+                                            <template x-for="team in (simulationResult?.user_input_data?.teams || simulationResult?.final_response?.data?.teams || [])">
+                                                <div 
+                                                    @click="continueWithUserInput(team.id)"
+                                                    class="p-3 bg-[var(--ui-muted-5)] rounded border border-[var(--ui-border)] hover:bg-[var(--ui-primary-5)] cursor-pointer transition-colors"
+                                                >
+                                                    <div class="font-semibold text-[var(--ui-secondary)]" x-text="team.name"></div>
+                                                    <div class="text-xs text-[var(--ui-muted)] mt-1">
+                                                        ID: <span x-text="team.id"></span>
+                                                        <span x-show="team.is_current" class="ml-2 text-[var(--ui-success)]">(Aktuelles Team)</span>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </template>
+                                        
+                                        <!-- Generische Liste -->
+                                        <template x-if="!simulationResult?.user_input_data?.teams && !simulationResult?.final_response?.data?.teams">
+                                            <div class="text-xs text-[var(--ui-muted)] p-2 bg-[var(--ui-muted)] rounded">
+                                                <pre x-text="JSON.stringify(simulationResult?.user_input_data || simulationResult?.final_response?.data || {}, null, 2)"></pre>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                                
+                                <!-- User-Input-Feld für manuelle Eingabe -->
+                                <div class="mt-4">
+                                    <label class="block text-sm font-medium mb-2 text-[var(--ui-secondary)]">Oder manuell eingeben:</label>
+                                    <div class="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            x-model="userInputValue"
+                                            placeholder="z.B. Team-ID: 5 oder JSON: {'team_id': 5}"
+                                            class="flex-1 px-3 py-2 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] text-[var(--ui-secondary)]"
+                                        >
+                                        <button 
+                                            @click="continueWithUserInput(userInputValue)"
+                                            class="px-4 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:opacity-90"
+                                        >
+                                            ➡️ Weiter
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-4 text-xs text-[var(--ui-muted)]">
+                                    💡 In der echten AI würde das LLM jetzt auf User-Input warten und dann mit dem nächsten Tool fortfahren.
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Final Response -->
-                        <div x-show="simulationResult?.final_response" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                        <div x-show="simulationResult?.final_response && simulationResult?.final_response?.type !== 'user_input_required'" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
                             <h3 class="text-lg font-semibold mb-4 text-[var(--ui-secondary)]">💬 Finale Antwort</h3>
                             <div class="p-3 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
                                 <div :class="simulationResult?.final_response?.type === 'success' ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]'" class="font-semibold mb-2" x-text="simulationResult?.final_response?.message || 'Keine Nachricht'"></div>
@@ -465,6 +525,7 @@
                 simulationLoading: false,
                 simulationResult: null,
                 debugCopied: false,
+                userInputValue: '', // Für Multi-Step User-Input
 
                 // Tool Discovery
                 discoveryFilters: {
@@ -543,22 +604,33 @@
                     }
                 },
 
-                async runSimulation() {
+                async runSimulation(step = 0, previousResult = null, userInput = null) {
                     this.simulationLoading = true;
-                    this.simulationResult = null;
-                    this.debugCopied = false;
+                    if (step === 0) {
+                        this.simulationResult = null; // Nur beim ersten Schritt zurücksetzen
+                        this.debugCopied = false;
+                    }
 
                     try {
+                        const payload = {
+                            message: this.simulationMessage,
+                            options: {},
+                        };
+                        
+                        // Multi-Step: Füge Schritt-Info hinzu
+                        if (step > 0) {
+                            payload.step = step;
+                            payload.previous_result = previousResult;
+                            payload.user_input = userInput;
+                        }
+                        
                         const response = await fetch('{{ route("core.tools.playground.simulate") }}', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'X-CSRF-TOKEN': '{{ csrf_token() }}'
                             },
-                            body: JSON.stringify({
-                                message: this.simulationMessage,
-                                options: {}
-                            })
+                            body: JSON.stringify(payload)
                         });
 
                         // WICHTIG: Body nur einmal lesen
@@ -663,7 +735,21 @@
                         
                         // Erfolgreiche Antwort
                         if (responseData.success) {
-                            this.simulationResult = responseData.simulation;
+                            // Merge mit vorherigem Ergebnis (für Multi-Step)
+                            if (step > 0 && this.simulationResult) {
+                                // Füge neuen Schritt zu bestehendem Ergebnis hinzu
+                                this.simulationResult.steps = [...(this.simulationResult.steps || []), ...(responseData.simulation?.steps || [])];
+                                this.simulationResult.execution_flow = [...(this.simulationResult.execution_flow || []), ...(responseData.simulation?.execution_flow || [])];
+                                this.simulationResult.tools_used = [...(this.simulationResult.tools_used || []), ...(responseData.simulation?.tools_used || [])];
+                                this.simulationResult.final_response = responseData.simulation?.final_response || this.simulationResult.final_response;
+                                this.simulationResult.requires_user_input = responseData.simulation?.requires_user_input || false;
+                                this.simulationResult.user_input_prompt = responseData.simulation?.user_input_prompt || null;
+                                this.simulationResult.user_input_data = responseData.simulation?.user_input_data || null;
+                                this.simulationResult.next_tool = responseData.simulation?.next_tool || null;
+                                this.simulationResult.next_tool_args = responseData.simulation?.next_tool_args || null;
+                            } else {
+                                this.simulationResult = responseData.simulation;
+                            }
                         } else {
                             // Zeige Fehler-Details im Playground
                             this.simulationResult = {

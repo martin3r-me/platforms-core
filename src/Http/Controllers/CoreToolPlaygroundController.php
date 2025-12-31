@@ -46,20 +46,33 @@ class CoreToolPlaygroundController extends Controller
             $request->validate([
                 'message' => 'required|string',
                 'options' => 'nullable|array',
+                'step' => 'nullable|integer', // Multi-Step: Schritt-Nummer (0 = initial, 1+ = Folge-Schritte)
+                'previous_result' => 'nullable|array', // Vorheriges Ergebnis für Folge-Schritte
+                'user_input' => 'nullable|string', // User-Input für Folge-Schritte (z.B. Team-Auswahl)
             ]);
 
             $message = $request->input('message');
             $options = $request->input('options', []);
+            $step = $request->input('step', 0); // 0 = initial, 1+ = Folge-Schritte
+            $previousResult = $request->input('previous_result', []);
+            $userInput = $request->input('user_input');
             
             $simulation = [
                 'timestamp' => now()->toIso8601String(),
                 'user_message' => $message,
+                'step' => $step,
+                'is_multi_step' => $step > 0,
+                'previous_result' => $previousResult,
+                'user_input' => $userInput,
                 'steps' => [],
                 'tools_used' => [],
                 'tools_discovered' => [],
                 'chain_plan' => null,
                 'execution_flow' => [],
                 'final_response' => null,
+                'feature_status' => [], // Für neue Feature-Infos
+                'requires_user_input' => false, // Wird gesetzt, wenn User-Input benötigt wird
+                'user_input_prompt' => null, // Prompt für User-Input
             ];
         } catch (\Throwable $e) {
             // Fehler bei Request-Validierung oder Initialisierung
@@ -234,11 +247,66 @@ class CoreToolPlaygroundController extends Controller
                 }
             }
             
-            if ($needsTool && count($discoveredTools) > 0) {
-                // LLM würde ein Tool auswählen - für Simulation nehmen wir das erste
+            // Multi-Step: Wenn User-Input vorhanden ist, verwende es für das nächste Tool
+            if ($step > 0 && !empty($userInput) && !empty($previousResult)) {
+                // Folge-Schritt: User hat Input gegeben (z.B. Team-ID ausgewählt)
+                $nextTool = $previousResult['next_tool'] ?? null;
+                $nextToolArgs = $previousResult['next_tool_args'] ?? [];
+                
+                if ($nextTool) {
+                    // Merge User-Input in Tool-Arguments
+                    // Beispiel: User wählt Team-ID 5 → füge team_id zu Arguments hinzu
+                    if (is_numeric($userInput)) {
+                        $nextToolArgs['team_id'] = (int)$userInput;
+                    } else {
+                        // Versuche User-Input zu parsen (z.B. JSON)
+                        $parsed = json_decode($userInput, true);
+                        if (is_array($parsed)) {
+                            $nextToolArgs = array_merge($nextToolArgs, $parsed);
+                        } else {
+                            $nextToolArgs['user_input'] = $userInput;
+                        }
+                    }
+                    
+                    $toolName = $nextTool;
+                    $arguments = $nextToolArgs;
+                    $primaryTool = $registry->get($toolName);
+                    
+                    if (!$primaryTool) {
+                        throw new \RuntimeException("Tool '{$toolName}' nicht gefunden");
+                    }
+                    
+                    $simulation['steps'][] = [
+                        'step' => 2,
+                        'name' => 'Multi-Step: User-Input verarbeitet',
+                        'description' => "User-Input wurde verarbeitet und in Tool-Arguments übernommen",
+                        'timestamp' => now()->toIso8601String(),
+                        'user_input' => $userInput,
+                        'merged_arguments' => $arguments,
+                    ];
+                } else {
+                    throw new \RuntimeException("Kein next_tool im previous_result gefunden");
+                }
+            } elseif ($needsTool && count($discoveredTools) > 0) {
+                // Initialer Schritt: LLM würde ein Tool auswählen - für Simulation nehmen wir das erste
                 $primaryTool = $discoveredTools[0];
                 $toolName = $primaryTool->getName();
                 
+                // Versuche Argumente aus Message zu extrahieren (vereinfacht)
+                try {
+                    $arguments = $this->extractArguments($message, $primaryTool);
+                } catch (\Throwable $e) {
+                    $arguments = [];
+                    $simulation['debug']['argument_extraction_error'] = $e->getMessage();
+                }
+            } else {
+                $primaryTool = null;
+                $toolName = null;
+                $arguments = [];
+            }
+            
+            // Wenn Tool gefunden, führe Chain Planning und Execution aus
+            if ($primaryTool && $toolName) {
                 $simulation['steps'][] = [
                     'step' => 2,
                     'name' => 'Chain Planning',
@@ -248,16 +316,6 @@ class CoreToolPlaygroundController extends Controller
 
                 $planner = new ToolChainPlanner($registry);
                 $context = ToolContext::fromAuth();
-                
-                // Versuche Argumente aus Message zu extrahieren (vereinfacht)
-                // WICHTIG: extractArguments ist abgesichert mit try-catch und @-Operator
-                try {
-                    $arguments = $this->extractArguments($message, $primaryTool);
-                } catch (\Throwable $e) {
-                    // Bei Fehlern: leeres Array verwenden
-                    $arguments = [];
-                    $simulation['debug']['argument_extraction_error'] = $e->getMessage();
-                }
                 
                 $plan = $planner->planChain($toolName, $arguments, $context);
                 $simulation['chain_plan'] = $plan;
@@ -415,6 +473,15 @@ class CoreToolPlaygroundController extends Controller
 
                 // Füge Dependency-Executions hinzu
                 foreach ($dependencyExecutions as $depExec) {
+                    // Versuche vollständige Fehler-Details zu holen
+                    $errorDetails = null;
+                    if (!$depExec['success'] && isset($depExec['result_data'])) {
+                        // Wenn result_data ein Error-Objekt ist, extrahiere Details
+                        if (is_array($depExec['result_data']) && isset($depExec['result_data']['error'])) {
+                            $errorDetails = $depExec['result_data'];
+                        }
+                    }
+                    
                     $simulation['execution_flow'][] = [
                         'tool' => $depExec['tool'],
                         'arguments' => [], // Dependency-Arguments werden nicht getrackt
@@ -422,12 +489,14 @@ class CoreToolPlaygroundController extends Controller
                             'success' => $depExec['success'],
                             'has_data' => $depExec['result_data'] !== null,
                             'has_error' => !$depExec['success'],
-                            'data' => $depExec['result_data'],
+                            'data' => $depExec['success'] ? $depExec['result_data'] : null,
+                            'error' => !$depExec['success'] ? ($errorDetails['error'] ?? 'EXECUTION_ERROR') : null,
                         ],
                         'timestamp' => now()->toIso8601String(),
                         'execution_time_ms' => round($depExec['duration'] * 1000, 2),
                         'events' => $dependencyEventData[$depExec['tool']] ?? null,
                         'is_dependency' => true,
+                        'error_details' => $errorDetails,
                     ];
                 }
 
@@ -471,7 +540,23 @@ class CoreToolPlaygroundController extends Controller
                     'timestamp' => now()->toIso8601String(),
                 ];
 
-                if ($executionResult->success) {
+                // Prüfe ob User-Input benötigt wird
+                if ($executionResult->success && isset($executionResult->data['requires_user_input']) && $executionResult->data['requires_user_input'] === true) {
+                    // Tool benötigt User-Input (z.B. Team-Auswahl)
+                    $simulation['requires_user_input'] = true;
+                    $simulation['user_input_prompt'] = $executionResult->data['message'] ?? 'Bitte wähle aus der Liste aus.';
+                    $simulation['user_input_data'] = $executionResult->data['dependency_tool_result'] ?? $executionResult->data;
+                    $simulation['next_tool'] = $executionResult->data['next_tool'] ?? $toolName;
+                    $simulation['next_tool_args'] = $executionResult->data['next_tool_args'] ?? $arguments;
+                    
+                    $simulation['final_response'] = [
+                        'type' => 'user_input_required',
+                        'message' => $executionResult->data['message'] ?? 'Bitte wähle aus der Liste aus.',
+                        'data' => $executionResult->data['dependency_tool_result'] ?? $executionResult->data,
+                        'next_tool' => $executionResult->data['next_tool'] ?? $toolName,
+                        'next_tool_args' => $executionResult->data['next_tool_args'] ?? $arguments,
+                    ];
+                } elseif ($executionResult->success) {
                     $simulation['final_response'] = [
                         'type' => 'success',
                         'message' => 'Tool erfolgreich ausgeführt.',
