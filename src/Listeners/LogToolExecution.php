@@ -4,6 +4,7 @@ namespace Platform\Core\Listeners;
 
 use Platform\Core\Events\ToolExecuted;
 use Platform\Core\Events\ToolFailed;
+use Platform\Core\Services\ToolExecutionTracker;
 use Illuminate\Support\Facades\Log;
 
 /**
