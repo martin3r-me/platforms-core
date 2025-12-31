@@ -247,6 +247,16 @@ class CoreServiceProvider extends ServiceProvider
                 }
             }
             
+            // RequestToolTool (wichtig für AI - kann fehlende Tools anfordern)
+            if (!$registry->has('tools.request')) {
+                try {
+                    $registry->register($this->app->make(\Platform\Core\Tools\RequestToolTool::class));
+                    // \Log::debug("[ToolRegistry] RequestToolTool manuell registriert (Fallback)");
+                } catch (\Throwable $e) {
+                    // Silent fail
+                }
+            }
+            
             // ListTeamsTool (wichtig für AI - zeigt verfügbare Teams)
             if (!$registry->has('core.teams.list')) {
                 try {

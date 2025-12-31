@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class ToolCircuitBreakerState extends Model
 {
+    protected $table = 'tool_circuit_breakers';
+    
     protected $fillable = [
         'service_name',
         'state',

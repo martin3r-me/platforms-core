@@ -98,14 +98,17 @@ class CoreToolPlaygroundController extends Controller
             }
             
             // WICHTIG: Stelle sicher, dass alle Tools geladen sind (auch core.teams.list)
-            // Prüfe ob Auto-Discovery bereits gelaufen ist
-            if (count($registry->all()) === 0) {
+            // Prüfe ob wichtige Tools fehlen und lade sie nach
+            $allToolsBefore = $registry->all();
+            if (count($allToolsBefore) === 0 || !$registry->has('core.teams.list') || !$registry->has('tools.list')) {
                 // Trigger Auto-Discovery manuell
                 try {
                     $coreTools = \Platform\Core\Tools\ToolLoader::loadCoreTools();
                     foreach ($coreTools as $tool) {
                         try {
-                            $registry->register($tool);
+                            if (!$registry->has($tool->getName())) {
+                                $registry->register($tool);
+                            }
                         } catch (\Throwable $e) {
                             // Silent fail
                         }
@@ -117,10 +120,35 @@ class CoreToolPlaygroundController extends Controller
                         $moduleTools = \Platform\Core\Tools\ToolLoader::loadFromAllModules($modulesPath);
                         foreach ($moduleTools as $tool) {
                             try {
-                                $registry->register($tool);
+                                if (!$registry->has($tool->getName())) {
+                                    $registry->register($tool);
+                                }
                             } catch (\Throwable $e) {
                                 // Silent fail
                             }
+                        }
+                    }
+                    
+                    // Fallback: Manuelle Registrierung für wichtige Tools
+                    if (!$registry->has('core.teams.list')) {
+                        try {
+                            $registry->register(app(\Platform\Core\Tools\ListTeamsTool::class));
+                        } catch (\Throwable $e) {
+                            // Silent fail
+                        }
+                    }
+                    if (!$registry->has('tools.list')) {
+                        try {
+                            $registry->register(app(\Platform\Core\Tools\ListToolsTool::class));
+                        } catch (\Throwable $e) {
+                            // Silent fail
+                        }
+                    }
+                    if (!$registry->has('tools.request')) {
+                        try {
+                            $registry->register(app(\Platform\Core\Tools\RequestToolTool::class));
+                        } catch (\Throwable $e) {
+                            // Silent fail
                         }
                     }
                 } catch (\Throwable $e) {
@@ -446,14 +474,35 @@ class CoreToolPlaygroundController extends Controller
                 if ($executionResult->success) {
                     $simulation['final_response'] = [
                         'type' => 'success',
-                        'message' => 'Tool erfolgreich ausgeführt. Ergebnis: ' . json_encode($executionResult->data, JSON_PRETTY_PRINT),
+                        'message' => 'Tool erfolgreich ausgeführt.',
                         'data' => $executionResult->data,
+                        'metadata' => $executionResult->metadata,
                     ];
                 } else {
+                    // Fehler-Details extrahieren
+                    $errorMessage = is_array($executionResult->error) 
+                        ? ($executionResult->error['message'] ?? $executionResult->error) 
+                        : ($executionResult->error ?? 'Unbekannter Fehler');
+                    
+                    // Prüfe ob es eine Exception-Message in den Metadaten gibt
+                    if (isset($executionResult->metadata['exception_message'])) {
+                        $errorMessage = $executionResult->metadata['exception_message'];
+                    }
+                    
                     $simulation['final_response'] = [
                         'type' => 'error',
-                        'message' => 'Tool-Fehler: ' . ($executionResult->error['message'] ?? 'Unbekannter Fehler'),
-                        'error' => $executionResult->error,
+                        'message' => 'Tool-Fehler: ' . $errorMessage,
+                        'error' => [
+                            'message' => $errorMessage,
+                            'code' => $executionResult->errorCode ?? 'EXECUTION_ERROR',
+                            'metadata' => $executionResult->metadata,
+                        ],
+                        'error_details' => [
+                            'error_code' => $executionResult->errorCode ?? 'EXECUTION_ERROR',
+                            'error_message' => $errorMessage,
+                            'full_error' => $executionResult->error,
+                            'metadata' => $executionResult->metadata,
+                        ],
                     ];
                 }
             } else {
