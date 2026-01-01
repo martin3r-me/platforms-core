@@ -339,8 +339,17 @@
                                     </div>
                                 </div>
                                 
-                                <div class="mt-4 text-xs text-[var(--ui-muted)]">
-                                    💡 In der echten AI würde das LLM jetzt auf User-Input warten und dann mit dem nächsten Tool fortfahren.
+                                <div class="mt-4 flex items-center gap-2 flex-wrap">
+                                    <button 
+                                        @click="continueWithUserInput(simulationResult?.user_input_data?.current_team_id || simulationResult?.final_response?.data?.current_team_id)"
+                                        x-show="simulationResult?.user_input_data?.current_team_id || simulationResult?.final_response?.data?.current_team_id"
+                                        class="px-4 py-2 bg-[var(--ui-success)] text-white rounded-lg hover:opacity-90 text-sm"
+                                    >
+                                        ✅ Aktuelles Team verwenden (ID: <span x-text="simulationResult?.user_input_data?.current_team_id || simulationResult?.final_response?.data?.current_team_id"></span>)
+                                    </button>
+                                    <div class="text-xs text-[var(--ui-muted)]">
+                                        💡 Klicke auf ein Team oben, um die Simulation fortzusetzen, oder verwende das aktuelle Team.
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -845,6 +854,36 @@
                     }
                 },
 
+                async continueWithUserInput(userInput) {
+                    // Fortsetzen der Simulation mit User-Input
+                    if (!this.simulationResult) {
+                        alert('Keine Simulation vorhanden');
+                        return;
+                    }
+
+                    // Prüfe ob User-Input erforderlich ist
+                    if (!this.simulationResult.requires_user_input && 
+                        this.simulationResult.final_response?.type !== 'user_input_required') {
+                        alert('Kein User-Input erforderlich');
+                        return;
+                    }
+
+                    // Erstelle previous_result aus aktueller Simulation
+                    const previousResult = {
+                        next_tool: this.simulationResult.next_tool || this.simulationResult.final_response?.next_tool,
+                        next_tool_args: this.simulationResult.next_tool_args || this.simulationResult.final_response?.next_tool_args || {},
+                        requires_user_input: true,
+                        user_input_data: this.simulationResult.user_input_data || this.simulationResult.final_response?.data,
+                    };
+
+                    // Bestimme nächsten Schritt (aktueller Schritt + 1)
+                    const currentStep = this.simulationResult.step || 0;
+                    const nextStep = currentStep + 1;
+
+                    // Führe Simulation mit User-Input fort
+                    await this.runSimulation(nextStep, previousResult, String(userInput));
+                },
+
                 downloadDebugExport() {
                     const content = this.getDebugExport();
                     const blob = new Blob([content], { type: 'application/json' });
@@ -903,6 +942,29 @@
                         }
                         document.body.removeChild(textarea);
                     }
+                },
+
+                async continueWithUserInput(userInput) {
+                    // Fortsetzen der Simulation mit User-Input
+                    if (!this.simulationResult) {
+                        alert('Keine Simulation vorhanden');
+                        return;
+                    }
+
+                    // Erstelle previous_result aus aktueller Simulation
+                    const previousResult = {
+                        next_tool: this.simulationResult.next_tool || this.simulationResult.final_response?.next_tool,
+                        next_tool_args: this.simulationResult.next_tool_args || this.simulationResult.final_response?.next_tool_args || {},
+                        requires_user_input: true,
+                        user_input_data: this.simulationResult.user_input_data || this.simulationResult.final_response?.data,
+                    };
+
+                    // Bestimme nächsten Schritt (aktueller Schritt + 1)
+                    const currentStep = this.simulationResult.step || 0;
+                    const nextStep = currentStep + 1;
+
+                    // Führe Simulation mit User-Input fort
+                    await this.runSimulation(nextStep, previousResult, String(userInput));
                 },
 
                 async runDiscovery() {

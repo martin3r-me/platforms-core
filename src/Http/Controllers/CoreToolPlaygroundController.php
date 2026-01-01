@@ -436,8 +436,12 @@ class CoreToolPlaygroundController extends Controller
                 } else {
                     throw new \RuntimeException("Kein next_tool im previous_result gefunden");
                 }
-            } elseif ($needsTool && count($discoveredTools) > 0) {
-                // Initialer Schritt: LLM würde ein Tool auswählen - für Simulation nehmen wir das erste
+            } elseif ($needsTool && count($discoveredTools) > 0 && !$semanticAnalysis['can_solve_independently']) {
+                // Initialer Schritt: LLM würde ein Tool auswählen
+                // WICHTIG: In der echten AI würde das LLM selbst entscheiden, welches Tool es braucht
+                // Für die Simulation nehmen wir das erste Tool als Beispiel
+                // ABER: Nur wenn nicht selbstständig auflösbar
+                
                 $primaryTool = $discoveredTools[0];
                 $toolName = $primaryTool->getName();
                 
@@ -449,6 +453,7 @@ class CoreToolPlaygroundController extends Controller
                     $simulation['debug']['argument_extraction_error'] = $e->getMessage();
                 }
             } else {
+                // Kann selbstständig auflösen → kein Tool nötig
                 $primaryTool = null;
                 $toolName = null;
                 $arguments = [];
@@ -1408,9 +1413,44 @@ class CoreToolPlaygroundController extends Controller
             'can_help_user' => $canHelpUser,
             'helper_tools' => $helperTools,
             'needs_tool_request' => $needsToolRequest,
-            'recommended_action' => $this->getRecommendedAction($canSolveIndependently, $canHelpWithTools, $canHelpUser, $needsToolRequest),
-        ];
-    }
+                'recommended_action' => $this->getRecommendedAction($canSolveIndependently, $canHelpWithTools, $canHelpUser, $needsToolRequest),
+            ];
+        }
+        
+        /**
+         * Prüft ob es sich um eine einfache Begrüßung handelt
+         */
+        private function isSimpleGreeting(string $intent): bool
+        {
+            $intentLower = strtolower(trim($intent));
+            
+            // Einfache Begrüßungen (max. 3 Wörter, keine komplexen Strukturen)
+            $greetingPatterns = [
+                '/^(moin|hallo|hi|hey|guten\s+(morgen|tag|abend)|servus|grüß\s+(dich|gott)|ciao|tschüss|bye)$/i',
+                '/^(moin|hallo|hi|hey|guten\s+(morgen|tag|abend)|servus|grüß\s+(dich|gott)|ciao|tschüss|bye)\s*[!.]*$/i',
+                '/^(moin|hallo|hi|hey|guten\s+(morgen|tag|abend)|servus|grüß\s+(dich|gott)|ciao|tschüss|bye)\s+(wie\s+geht|was\s+macht|alles\s+klar|alles\s+gut)/i',
+            ];
+            
+            foreach ($greetingPatterns as $pattern) {
+                if (preg_match($pattern, $intentLower)) {
+                    return true;
+                }
+            }
+            
+            // Prüfe auch: sehr kurze Nachrichten (1-2 Wörter) ohne Task-Patterns
+            $words = preg_split('/\s+/u', $intentLower, -1, PREG_SPLIT_NO_EMPTY);
+            if (count($words) <= 2) {
+                // Prüfe ob es bekannte Begrüßungen sind
+                $simpleGreetings = ['moin', 'hallo', 'hi', 'hey', 'servus', 'ciao', 'tschüss', 'bye', 'guten', 'morgen', 'tag', 'abend'];
+                foreach ($words as $word) {
+                    if (in_array($word, $simpleGreetings)) {
+                        return true;
+                    }
+                }
+            }
+            
+            return false;
+        }
     
     /**
      * Gibt empfohlene Aktion basierend auf semantischer Analyse zurück
@@ -1443,4 +1483,5 @@ class CoreToolPlaygroundController extends Controller
         }
         return 'core';
     }
+    
 }
