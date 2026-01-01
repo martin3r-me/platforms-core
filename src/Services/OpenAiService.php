@@ -628,10 +628,8 @@ WICHTIG - Tool-Nutzung:
 
 WICHTIG - Mehrere Tool-Calls:
 - Du kannst MEHRERE Tool-Calls in EINER Runde machen - das System unterstützt das
-- Wenn der Nutzer sagt "lege alle Aufgaben an" oder "erstelle alle X", dann rufe das Tool MEHRMALS auf - einmal für jedes Item
-- Beispiel: Nutzer sagt "Erstelle 3 Aufgaben: A, B, C" → rufe planner.tasks.POST dreimal auf (einmal für A, einmal für B, einmal für C)
-- Du musst NICHT nach jeder Aufgabe nachfragen - wenn der Nutzer alle Informationen gegeben hat, erstelle alle direkt
-- Wenn kritische Informationen fehlen (z.B. Titel), frage nach - aber nur einmal für alle Items, nicht für jedes einzeln
+- Wenn der Nutzer mehrere Items erstellt oder löschen möchte, kannst du das entsprechende Tool mehrfach aufrufen
+- Wenn kritische Informationen fehlen, frage nach - aber nur einmal für alle Items, nicht für jedes einzeln
 
 WICHTIG - Tool-Discovery (wenn viele Tools vorhanden):
 - Wenn du nur read-only Tools (Lese-Operationen) siehst, aber Schreib-Operationen benötigst, nutze das Tool "tools.GET" mit read_only=false

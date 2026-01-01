@@ -424,13 +424,26 @@ class CoreToolPlaygroundController extends Controller
                             ];
                             
                             // Füge Assistant-Message mit Tool-Calls zu Messages hinzu
+                            // Zeige auch Tool-Aktionen im Chat (als Info)
+                            $toolActionsText = '';
+                            if (count($response['tool_calls']) > 0) {
+                                $toolActionsText = "\n\n**🔧 Ausgeführte Aktionen:**\n";
+                                foreach ($response['tool_calls'] as $toolCall) {
+                                    $toolName = $toolCall['function']['name'] ?? 'Unbekannt';
+                                    $internalToolName = $this->denormalizeToolNameFromOpenAi($toolName);
+                                    $toolActionsText .= "- {$internalToolName}\n";
+                                }
+                            }
+                            
                             $messages[] = [
                                 'role' => 'assistant',
-                                'content' => $response['content'] ?? null,
+                                'content' => ($response['content'] ?? '') . $toolActionsText,
                                 'tool_calls' => $response['tool_calls'],
                             ];
                             
                             // Führe echte Tool-Execution durch (wie in CoreAiStreamController)
+                            // WICHTIG: Mehrere Tool-Calls in einer Runde werden unterstützt - alle werden sequenziell ausgeführt
+                            // Alle Tool-Results werden gesammelt und in der nächsten Iteration der LLM präsentiert
                             foreach ($response['tool_calls'] as $toolCall) {
                                 $toolCallId = $toolCall['id'] ?? null;
                                 $toolName = $toolCall['function']['name'] ?? null;
@@ -607,22 +620,9 @@ class CoreToolPlaygroundController extends Controller
                             
                             // Zeige die ECHTE LLM-Antwort (nicht nur "würde antworten")
                             $llmContent = $response['content'] ?? 'Keine Antwort';
-                            $simulation['final_response'] = [
-                                'type' => 'direct_answer',
-                                'message' => $llmContent, // ECHTE Antwort der LLM
-                                'content' => $llmContent, // ECHTE Antwort der LLM
-                                'iterations' => $iteration,
-                                'tool_results' => $allToolResults,
-                                'raw_response' => $response, // Vollständige Response für Debugging
-                            ];
-                            
-                            // Füge finale Assistant-Message zu Messages hinzu (für Chat-Historie)
-                            $messages[] = [
-                                'role' => 'assistant',
-                                'content' => $llmContent,
-                            ];
                             
                             // Erstelle Zusammenfassung am Ende (wenn Services verfügbar)
+                            $actionSummaryText = '';
                             try {
                                 $actionSummaryService = app(\Platform\Core\Services\ActionSummaryService::class);
                                 $summary = $actionSummaryService->createSummary(
@@ -643,6 +643,31 @@ class CoreToolPlaygroundController extends Controller
                                     'actions' => $summary->actions,
                                 ];
                                 
+                                // Erstelle Executive Summary Text für Chat
+                                if ($summary->tools_executed > 0 || $summary->models_created > 0 || $summary->models_updated > 0 || $summary->models_deleted > 0) {
+                                    $actionSummaryText = "\n\n---\n**Zusammenfassung der Aktionen:**\n";
+                                    $actionSummaryText .= $summary->summary . "\n\n";
+                                    
+                                    if ($summary->models_created > 0) {
+                                        $actionSummaryText .= "✅ **Erstellt:** {$summary->models_created}\n";
+                                        foreach ($summary->created_models as $model) {
+                                            $actionSummaryText .= "  - {$model['model_type']} (ID: {$model['model_id']})\n";
+                                        }
+                                    }
+                                    if ($summary->models_updated > 0) {
+                                        $actionSummaryText .= "🔄 **Aktualisiert:** {$summary->models_updated}\n";
+                                        foreach ($summary->updated_models as $model) {
+                                            $actionSummaryText .= "  - {$model['model_type']} (ID: {$model['model_id']})\n";
+                                        }
+                                    }
+                                    if ($summary->models_deleted > 0) {
+                                        $actionSummaryText .= "🗑️ **Gelöscht:** {$summary->models_deleted}\n";
+                                        foreach ($summary->deleted_models as $model) {
+                                            $actionSummaryText .= "  - {$model['model_type']} (ID: {$model['model_id']})\n";
+                                        }
+                                    }
+                                }
+                                
                                 // Hole auch Audit Trail
                                 try {
                                     $auditTrailService = app(\Platform\Core\Services\AuditTrailService::class);
@@ -657,6 +682,24 @@ class CoreToolPlaygroundController extends Controller
                                     'error' => $e->getMessage(),
                                 ]);
                             }
+                            
+                            // Füge Action Summary zur LLM-Antwort hinzu
+                            $finalContent = $llmContent . $actionSummaryText;
+                            
+                            $simulation['final_response'] = [
+                                'type' => 'direct_answer',
+                                'message' => $finalContent, // ECHTE Antwort der LLM + Summary
+                                'content' => $finalContent, // ECHTE Antwort der LLM + Summary
+                                'iterations' => $iteration,
+                                'tool_results' => $allToolResults,
+                                'raw_response' => $response, // Vollständige Response für Debugging
+                            ];
+                            
+                            // Füge finale Assistant-Message zu Messages hinzu (für Chat-Historie)
+                            $messages[] = [
+                                'role' => 'assistant',
+                                'content' => $finalContent, // Mit Action Summary
+                            ];
                             
                             // Beende Multi-Step-Loop
                             break;
