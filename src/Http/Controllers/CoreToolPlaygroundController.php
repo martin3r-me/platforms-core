@@ -197,21 +197,11 @@ class CoreToolPlaygroundController extends Controller
             $simulation['semantic_analysis'] = $semanticAnalysis;
             $simulation['steps'][] = [
                 'step' => 0,
-                'result' => $semanticAnalysis['can_solve_independently'] 
-                    ? '✅ Kann selbstständig auflösen' 
-                    : '❌ Benötigt Hilfe',
-                'analysis' => $semanticAnalysis,
-            ];
-            
-            // SEMANTISCHE ANALYSE: Erste Frage - Kann ich das selbstständig auflösen?
-            $semanticAnalysis = $this->analyzeIntent($intent, $registry);
-            
-            $simulation['semantic_analysis'] = $semanticAnalysis;
-            $simulation['steps'][] = [
-                'step' => 0,
-                'result' => $semanticAnalysis['can_solve_independently'] 
-                    ? '✅ Kann selbstständig auflösen' 
-                    : '❌ Benötigt Hilfe',
+                'result' => $semanticAnalysis['can_solve_independently'] === null
+                    ? '🤔 LLM entscheidet selbst'
+                    : ($semanticAnalysis['can_solve_independently'] 
+                        ? '✅ Kann selbstständig auflösen' 
+                        : '❌ Benötigt Hilfe'),
                 'analysis' => $semanticAnalysis,
             ];
             
@@ -348,15 +338,14 @@ class CoreToolPlaygroundController extends Controller
             // - Kann ich User helfen? → Helper-Tools verwenden
             // - Keine Tools verfügbar? → tools.request aufrufen
             
-            // SEMANTISCHE ENTSCHEIDUNG: Basierend auf Analyse
-            $needsTool = $semanticAnalysis['needs_tools'];
-            $canSolveIndependently = $semanticAnalysis['can_solve_independently'];
+            // SEMANTISCHE ENTSCHEIDUNG: Die LLM entscheidet selbst!
+            // Die semantische Analyse gibt nur Info (intent_type), keine Entscheidung!
+            // Die LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht
+            $needsTool = null; // LLM entscheidet selbst - keine Vorentscheidung!
+            $canSolveIndependently = null; // LLM entscheidet selbst - keine Vorentscheidung!
             
-            // Wenn selbstständig lösbar → keine Tools nötig
-            if ($canSolveIndependently) {
-                $simulation['debug']['llm_would_answer_directly'] = true;
-                $simulation['debug']['reason'] = $semanticAnalysis['reason'];
-            }
+            $simulation['debug']['llm_decision'] = 'LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht';
+            $simulation['debug']['reason'] = $semanticAnalysis['reason'];
             
             // LOOSE COUPLED: Automatisches Feedback-System
             // Wenn LLM eine Aufgabe lösen soll, aber keine passenden Tools findet → tools.request erstellen
@@ -1356,10 +1345,10 @@ class CoreToolPlaygroundController extends Controller
             }
         }
         
-        // 2. GROBE EINSCHÄTZUNG (nur für Debug/Info)
-        // WICHTIG: Die LLM entscheidet selbst, ob sie Tools braucht!
-        // Wir setzen hier KEINE hardcoded Logik - die LLM sieht alle Tools und entscheidet!
-        $canSolveIndependently = false; // Default: LLM entscheidet selbst
+        // 2. KEINE HARDCODED ENTSCHEIDUNGEN!
+        // Die LLM entscheidet selbst, ob sie Tools braucht oder nicht!
+        // Wir machen nur eine grobe Kategorisierung für Info/Debug
+        $canSolveIndependently = null; // LLM entscheidet selbst - keine Vorentscheidung!
         $reason = 'LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht';
         
         // Nur für Debug/Info: Grobe Kategorisierung
@@ -1385,8 +1374,8 @@ class CoreToolPlaygroundController extends Controller
         // Die LLM entscheidet selbst:
         // - Brauche ich Tools? → Sieht alle Tools und wählt selbst
         // - Kann ich ohne Tools antworten? → Entscheidet selbst
-        $needsTools = true; // Default: LLM sieht alle Tools und entscheidet
-        $canHelpWithTools = count($relevantTools) > 0;
+        $needsTools = null; // LLM entscheidet selbst - keine Vorentscheidung!
+        $canHelpWithTools = count($relevantTools) > 0; // Nur Info: Tools sind verfügbar
         $canHelpUser = false; // LLM entscheidet selbst
         $helperTools = [];
         $needsToolRequest = false; // LLM entscheidet selbst, ob sie tools.request aufruft
