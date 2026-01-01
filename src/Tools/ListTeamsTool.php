@@ -66,7 +66,7 @@ class ListTeamsTool implements ToolContract
             }
 
             // Teams formatieren
-            $teamsList = $teams->map(function($team) {
+            $teamsList = $teams->map(function($team) use ($context) {
                 $parentTeam = $team->parentTeam;
                 return [
                     'id' => $team->id,

@@ -312,6 +312,27 @@ class ToolExecutor
     }
 
     /**
+     * Kategorisiert einen Fehler-Typ basierend auf Exception und Validierungsfehlern
+     */
+    private function categorizeError(\Throwable $e, array $validationErrors): string
+    {
+        if (!empty($validationErrors)) {
+            return 'validation';
+        }
+        if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+            return 'authorization';
+        }
+        if ($e instanceof \Illuminate\Http\Client\ConnectionException || str_contains($e->getMessage(), 'timeout')) {
+            return 'timeout';
+        }
+        if (str_contains($e->getMessage(), 'Rate Limit') || str_contains($e->getMessage(), 'rate limit')) {
+            return 'rate_limit';
+        }
+        // Weitere Kategorien nach Bedarf
+        return 'execution';
+    }
+
+    /**
      * Validiert Tool-Parameter gegen JSON Schema
      * 
      * @return array{valid: bool, data: array, errors: array}
