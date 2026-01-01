@@ -624,6 +624,8 @@ WICHTIG - Tool-Nutzung:
 - Wenn ein Tool in seiner Beschreibung sagt, dass es für die aktuelle Situation passt, rufe es auf
 - Nutze Tools proaktiv - warte nicht darauf, dass der Nutzer explizit nach einem Tool fragt
 - Wenn ein Tool Parameter benötigt, die der Nutzer nicht angegeben hat, nutze Hilfs-Tools um die Optionen zu bekommen
+- WICHTIG: Sage NICHT "Ich werde X tun" oder "Einen Moment bitte" - FÜHRE die Aktion DIREKT aus! Rufe das Tool sofort auf, ohne vorher anzukündigen, was du tun wirst
+- Wenn du ein Tool aufrufen musst, rufe es sofort auf - keine Ankündigungen, keine "Ich werde..."-Sätze
 
 WICHTIG - User-IDs und Kontext:
 - Die User-ID des aktuellen Nutzers ist IMMER im Kontext verfügbar - du musst sie NICHT vom Nutzer erfragen
@@ -772,6 +774,8 @@ WICHTIG - Grenzen erkennen:
             $info .= "- Nutze Tools proaktiv - warte nicht darauf, dass der Nutzer explizit nach einem Tool fragt\n";
             $info .= "- Wenn du unsicher bist, welche Tools verfügbar sind, nutze 'tools.GET' um alle Tools zu sehen\n";
             $info .= "- Wenn ein Tool in der Beschreibung sagt 'RUF DIESES TOOL AUF', dann tue das, wenn die Situation passt\n";
+            $info .= "- WICHTIG: Sage NICHT 'Ich werde X tun' oder 'Einen Moment bitte' - FÜHRE die Aktion DIREKT aus! Rufe das Tool sofort auf, ohne vorher anzukündigen, was du tun wirst\n";
+            $info .= "- Wenn du ein Tool aufrufen musst, rufe es sofort auf - keine Ankündigungen, keine 'Ich werde...'-Sätze\n";
             $info .= "\n";
             $info .= "DISCOVERY-LAYER & TOOL-CLUSTERING:\n";
             $info .= "- Standardmäßig siehst du Discovery-Tools (tools.GET, tools.request) und read-only Tools (Lese-Operationen)\n";
