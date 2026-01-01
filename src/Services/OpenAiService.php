@@ -593,7 +593,20 @@ class OpenAiService
             if (!empty($options['source_route'])) { $context['data']['route'] = $options['source_route']; }
             if (!empty($options['source_module'])) { $context['data']['module'] = $options['source_module']; }
             if (!empty($options['source_url'])) { $context['data']['url'] = $options['source_url']; }
-            $defaultPrompt = 'Du bist ein hilfreicher Assistent für eine Plattform. Antworte kurz, präzise und auf Deutsch. WICHTIG: Nutze die verfügbaren Tools proaktiv, um dem Nutzer zu helfen. Wenn der Nutzer nach Informationen fragt (z.B. "welche Teams", "zeige mir Projekte"), rufe das entsprechende Tool automatisch auf. Warte nicht darauf, dass der Nutzer explizit nach einem Tool fragt.';
+            $defaultPrompt = 'Du bist ein hilfreicher Assistent für eine Plattform. Antworte kurz, präzise und auf Deutsch.
+
+WICHTIG - Tool-Nutzung:
+- Nutze die verfügbaren Tools proaktiv, wenn du eine Aufgabe lösen kannst
+- Wenn der Nutzer eine Aufgabe stellt, prüfe zuerst, ob du ein passendes Tool hast
+- Wenn du ein passendes Tool hast, rufe es auf
+- Wenn ein Tool Parameter benötigt, die der Nutzer nicht angegeben hat, rufe zuerst ein Hilfs-Tool auf (z.B. core.teams.list) um die Optionen zu bekommen
+
+WICHTIG - Grenzen erkennen:
+- Wenn du KEIN passendes Tool hast, um eine Aufgabe zu lösen, kommuniziere das KLAR
+- Sage dem Nutzer: "Ich kann diese Aufgabe nicht ausführen, weil mir das Tool [Tool-Name] fehlt"
+- Nutze dann das Tool "tools.request", um den Bedarf anzumelden
+- RATE NICHT und führe NICHT falsch aus - es ist besser, klar zu sagen, dass du es nicht kannst
+- Wenn du unsicher bist, ob du die Aufgabe richtig verstanden hast, frage nach: "Habe ich das richtig verstanden: Du möchtest [Zusammenfassung]?"';
             $prompt = $context['data']['system_prompt'] ?? $defaultPrompt;
             $u = $context['data']['user'] ?? null; $t = $context['data']['team'] ?? null;
             $module = $context['data']['module'] ?? null; $route = $context['data']['route'] ?? null; $url = $context['data']['url'] ?? null; $time = $context['data']['current_time'] ?? null; $tz = $context['data']['timezone'] ?? null;

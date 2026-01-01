@@ -35,7 +35,7 @@ class RequestToolTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'Melde einen Bedarf an Tools oder Funktionen an, die dir fehlen, um eine Aufgabe qualifiziert zu erledigen. Das System wird dann ähnliche Tools vorschlagen oder den Bedarf für Entwickler dokumentieren. Nutze dieses Tool, wenn du eine Aufgabe lösen möchtest, aber dir die passenden Tools fehlen.';
+        return 'Melde einen Bedarf an Tools oder Funktionen an, die dir fehlen, um eine Aufgabe qualifiziert zu erledigen. Nutze dieses Tool, wenn du erkannt hast, dass du eine Aufgabe NICHT lösen kannst, weil dir ein benötigtes Tool fehlt. WICHTIG: Nutze dieses Tool NUR, wenn du sicher bist, dass du die Aufgabe nicht mit den verfügbaren Tools lösen kannst. Kommuniziere dem Nutzer vorher klar, dass du die Aufgabe nicht ausführen kannst, und nutze dann dieses Tool, um den Bedarf anzumelden. Das System wird dann ähnliche Tools vorschlagen oder den Bedarf für Entwickler dokumentieren.';
     }
 
     public function getSchema(): array
