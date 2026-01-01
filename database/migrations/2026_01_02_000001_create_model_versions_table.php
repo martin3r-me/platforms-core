@@ -14,7 +14,7 @@ return new class extends Migration
             // Polymorphe Beziehung zum Model
             $table->string('versionable_type');
             $table->unsignedBigInteger('versionable_id');
-            $table->index(['versionable_type', 'versionable_id']);
+            $table->index(['versionable_type', 'versionable_id'], 'mv_versionable_type_id_idx');
             
             // Versionierung
             $table->integer('version_number')->default(1); // Versionsnummer (1, 2, 3, ...)
@@ -39,10 +39,10 @@ return new class extends Migration
             
             $table->timestamps();
             
-            // Indexes
-            $table->index(['versionable_type', 'versionable_id', 'version_number']);
-            $table->index(['tool_name', 'created_at']);
-            $table->index(['trace_id', 'created_at']);
+            // Indexes (mit expliziten, kurzen Namen für MySQL-Kompatibilität)
+            $table->index(['versionable_type', 'versionable_id', 'version_number'], 'mv_versionable_idx');
+            $table->index(['tool_name', 'created_at'], 'mv_tool_created_idx');
+            $table->index(['trace_id', 'created_at'], 'mv_trace_created_idx');
         });
     }
 
