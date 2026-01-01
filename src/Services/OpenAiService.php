@@ -40,8 +40,13 @@ class OpenAiService
             } else {
                 // Tools aktivieren (Standard)
                 $tools = $this->getAvailableTools();
-                $payload['tools'] = $this->normalizeToolsForResponses($tools);
-                $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
+                if (!empty($tools)) {
+                    $payload['tools'] = $this->normalizeToolsForResponses($tools);
+                    // tool_choice ist optional - nur setzen wenn explizit angegeben
+                    if (isset($options['tool_choice'])) {
+                        $payload['tool_choice'] = $options['tool_choice'];
+                    }
+                }
             }
             
             // Debug: Log Payload
@@ -63,12 +68,39 @@ class OpenAiService
             ]);
             
             if ($response->failed()) {
-                $this->logApiError('OpenAI API Error (responses)', $response->status(), $response->body());
+                $errorBody = $response->body();
+                $this->logApiError('OpenAI API Error (responses)', $response->status(), $errorBody);
+                
+                // Versuche Fehler-Details zu extrahieren
+                $errorMessage = $this->formatApiErrorMessage($response->status(), $errorBody);
+                try {
+                    $errorJson = json_decode($errorBody, true);
+                    if ($errorJson && isset($errorJson['error'])) {
+                        $errorDetails = json_encode($errorJson['error'], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+                        $errorMessage .= "\n\nOpenAI Error Details:\n" . $errorDetails;
+                        
+                        // Zeige auch im Log für besseres Debugging
+                        Log::error('[OpenAI Chat] Error details', [
+                            'status' => $response->status(),
+                            'error' => $errorJson['error'],
+                            'payload_tools_count' => count($payload['tools'] ?? []),
+                            'payload_keys' => array_keys($payload),
+                        ]);
+                    } else {
+                        $errorMessage .= "\n\nOpenAI Response Body: " . substr($errorBody, 0, 1000);
+                    }
+                } catch (\Throwable $e) {
+                    // Ignore JSON parse errors
+                    $errorMessage .= "\n\nRaw Response: " . substr($errorBody, 0, 1000);
+                }
+                
                 Log::error('[OpenAI Chat] Request failed', [
                     'status' => $response->status(),
-                    'body' => substr($response->body(), 0, 500),
+                    'body' => substr($errorBody, 0, 500),
+                    'error_message' => $errorMessage,
                 ]);
-                throw new \Exception($this->formatApiErrorMessage($response->status(), $response->body()));
+                
+                throw new \Exception($errorMessage);
             }
             $data = $response->json();
             

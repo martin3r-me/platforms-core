@@ -346,118 +346,193 @@ class CoreToolPlaygroundController extends Controller
                     ],
                 ];
                 
-                // Tool-Executor Callback (wie in CoreAiStreamController)
-                $toolCalls = [];
-                $toolResults = [];
+                // Multi-Step-Chat: Führe so lange aus, bis LLM keine Tools mehr aufruft
+                $maxIterations = 10; // Verhindere Endlosschleifen
+                $iteration = 0;
+                $allToolResults = [];
+                $allResponses = [];
                 
                 $simulation['steps'][] = [
                     'step' => 3,
-                    'name' => 'LLM-Entscheidung',
-                    'description' => 'LLM sieht alle Tools und entscheidet selbst',
+                    'name' => 'Multi-Step-Chat',
+                    'description' => 'LLM sieht alle Tools und entscheidet selbst - Multi-Step bis finale Antwort',
                     'timestamp' => now()->toIso8601String(),
                 ];
                 
                 try {
-                    // Rufe echten OpenAiService auf (zeigt automatisch alle Tools)
-                    $response = $openAiService->chat($messages, 'gpt-4o-mini', [
-                        'max_tokens' => 2000,
-                        'temperature' => 0.7,
-                        'tools' => null, // null = Tools aktivieren (OpenAiService ruft getAvailableTools() auf)
-                    ]);
-                    
-                    $simulation['debug']['openai_response'] = [
-                        'has_content' => !empty($response['content']),
-                        'has_tool_calls' => !empty($response['tool_calls']),
-                        'tool_calls_count' => count($response['tool_calls'] ?? []),
-                        'finish_reason' => $response['finish_reason'] ?? null,
-                    ];
-                    
-                    // Wenn LLM Tool-Calls gemacht hat
-                    if (!empty($response['tool_calls'])) {
+                    while ($iteration < $maxIterations) {
+                        $iteration++;
+                        
                         $simulation['steps'][] = [
-                            'step' => 4,
-                            'name' => 'Tool-Calls erkannt',
-                            'description' => 'LLM hat entschieden, Tools aufzurufen',
+                            'step' => 3 + $iteration,
+                            'name' => "Chat-Runde {$iteration}",
+                            'description' => 'Rufe OpenAI auf - LLM entscheidet selbst',
                             'timestamp' => now()->toIso8601String(),
-                            'tool_calls' => $response['tool_calls'],
                         ];
                         
-                        // Führe echte Tool-Execution durch (wie in CoreAiStreamController)
-                        foreach ($response['tool_calls'] as $toolCall) {
-                            $toolName = $toolCall['function']['name'] ?? null;
-                            $toolArguments = json_decode($toolCall['function']['arguments'] ?? '{}', true);
-                            
-                            if (!$toolName) continue;
-                            
-                            // Tool-Name zurückmappen (von OpenAI-Format zu internem Format)
-                            $internalToolName = $this->denormalizeToolNameFromOpenAi($toolName);
-                            
+                        // Rufe echten OpenAiService auf (zeigt automatisch alle Tools)
+                        $response = $openAiService->chat($messages, 'gpt-4o-mini', [
+                            'max_tokens' => 2000,
+                            'temperature' => 0.7,
+                            'tools' => null, // null = Tools aktivieren (OpenAiService ruft getAvailableTools() auf)
+                        ]);
+                        
+                        $allResponses[] = $response;
+                        
+                        $simulation['debug']['openai_response_' . $iteration] = [
+                            'has_content' => !empty($response['content']),
+                            'has_tool_calls' => !empty($response['tool_calls']),
+                            'tool_calls_count' => count($response['tool_calls'] ?? []),
+                            'finish_reason' => $response['finish_reason'] ?? null,
+                        ];
+                        
+                        // Wenn LLM Tool-Calls gemacht hat
+                        if (!empty($response['tool_calls'])) {
                             $simulation['steps'][] = [
-                                'step' => 5,
-                                'name' => 'Tool Execution',
-                                'description' => "Führe Tool aus: {$internalToolName}",
+                                'step' => 3 + $iteration,
+                                'name' => "Tool-Calls erkannt (Runde {$iteration})",
+                                'description' => 'LLM hat entschieden, Tools aufzurufen',
                                 'timestamp' => now()->toIso8601String(),
-                                'tool' => $internalToolName,
-                                'arguments' => $toolArguments,
+                                'tool_calls' => $response['tool_calls'],
                             ];
                             
-                            // Nutze echten ToolOrchestrator (wie in CoreAiStreamController)
-                            $context = ToolContext::fromAuth();
-                            $startTime = microtime(true);
+                            // Füge Assistant-Message mit Tool-Calls zu Messages hinzu
+                            $messages[] = [
+                                'role' => 'assistant',
+                                'content' => $response['content'] ?? null,
+                                'tool_calls' => $response['tool_calls'],
+                            ];
                             
-                            try {
-                                $toolResult = $orchestrator->executeWithDependencies(
-                                    $internalToolName,
-                                    $toolArguments,
-                                    $context,
-                                    maxDepth: 5,
-                                    planFirst: true
-                                );
+                            // Führe echte Tool-Execution durch (wie in CoreAiStreamController)
+                            foreach ($response['tool_calls'] as $toolCall) {
+                                $toolCallId = $toolCall['id'] ?? null;
+                                $toolName = $toolCall['function']['name'] ?? null;
+                                $toolArguments = json_decode($toolCall['function']['arguments'] ?? '{}', true);
                                 
-                                $executionTime = (microtime(true) - $startTime) * 1000;
+                                if (!$toolName) continue;
                                 
-                                $toolResults[] = [
-                                    'tool' => $internalToolName,
-                                    'success' => $toolResult->success,
-                                    'data' => $toolResult->data,
-                                    'error' => $toolResult->error,
-                                    'execution_time_ms' => round($executionTime, 2),
-                                ];
+                                // Tool-Name zurückmappen (von OpenAI-Format zu internem Format)
+                                $internalToolName = $this->denormalizeToolNameFromOpenAi($toolName);
                                 
-                                $simulation['execution_flow'][] = [
+                                $simulation['steps'][] = [
+                                    'step' => 4 + $iteration,
+                                    'name' => 'Tool Execution',
+                                    'description' => "Führe Tool aus: {$internalToolName}",
+                                    'timestamp' => now()->toIso8601String(),
                                     'tool' => $internalToolName,
                                     'arguments' => $toolArguments,
-                                    'result' => [
+                                    'tool_call_id' => $toolCallId,
+                                ];
+                                
+                                // Nutze echten ToolOrchestrator (wie in CoreAiStreamController)
+                                $context = ToolContext::fromAuth();
+                                $startTime = microtime(true);
+                                
+                                try {
+                                    $toolResult = $orchestrator->executeWithDependencies(
+                                        $internalToolName,
+                                        $toolArguments,
+                                        $context,
+                                        maxDepth: 5,
+                                        planFirst: true
+                                    );
+                                    
+                                    $executionTime = (microtime(true) - $startTime) * 1000;
+                                    
+                                    // Konvertiere ToolResult zu OpenAI-Format
+                                    $resultArray = $toolResult->toArray();
+                                    
+                                    // Füge Tool-Result zu Messages hinzu (für Multi-Step)
+                                    $messages[] = [
+                                        'role' => 'tool',
+                                        'tool_call_id' => $toolCallId,
+                                        'content' => json_encode($resultArray, JSON_UNESCAPED_UNICODE),
+                                    ];
+                                    
+                                    $allToolResults[] = [
+                                        'iteration' => $iteration,
+                                        'tool_call_id' => $toolCallId,
+                                        'tool' => $internalToolName,
                                         'success' => $toolResult->success,
                                         'data' => $toolResult->data,
                                         'error' => $toolResult->error,
-                                    ],
-                                    'execution_time_ms' => round($executionTime, 2),
-                                ];
-                                
-                            } catch (\Throwable $e) {
-                                $executionTime = (microtime(true) - $startTime) * 1000;
-                                $toolResults[] = [
-                                    'tool' => $internalToolName,
-                                    'success' => false,
-                                    'error' => $e->getMessage(),
-                                    'execution_time_ms' => round($executionTime, 2),
-                                ];
+                                        'execution_time_ms' => round($executionTime, 2),
+                                    ];
+                                    
+                                    $simulation['execution_flow'][] = [
+                                        'iteration' => $iteration,
+                                        'tool' => $internalToolName,
+                                        'arguments' => $toolArguments,
+                                        'result' => [
+                                            'success' => $toolResult->success,
+                                            'data' => $toolResult->data,
+                                            'error' => $toolResult->error,
+                                        ],
+                                        'execution_time_ms' => round($executionTime, 2),
+                                    ];
+                                    
+                                } catch (\Throwable $e) {
+                                    $executionTime = (microtime(true) - $startTime) * 1000;
+                                    
+                                    // Fehler-Result zu Messages hinzufügen
+                                    $errorResult = [
+                                        'ok' => false,
+                                        'error' => [
+                                            'code' => 'EXECUTION_ERROR',
+                                            'message' => $e->getMessage()
+                                        ]
+                                    ];
+                                    
+                                    $messages[] = [
+                                        'role' => 'tool',
+                                        'tool_call_id' => $toolCallId,
+                                        'content' => json_encode($errorResult, JSON_UNESCAPED_UNICODE),
+                                    ];
+                                    
+                                    $allToolResults[] = [
+                                        'iteration' => $iteration,
+                                        'tool_call_id' => $toolCallId,
+                                        'tool' => $internalToolName,
+                                        'success' => false,
+                                        'error' => $e->getMessage(),
+                                        'execution_time_ms' => round($executionTime, 2),
+                                    ];
+                                }
                             }
+                            
+                            // Weiter mit nächster Iteration (LLM bekommt Tool-Results und kann weiterarbeiten)
+                            continue;
+                            
+                        } else {
+                            // LLM hat direkt geantwortet (keine Tools mehr) - Multi-Step beendet
+                            $simulation['steps'][] = [
+                                'step' => 3 + $iteration,
+                                'name' => "Finale Antwort (Runde {$iteration})",
+                                'description' => 'LLM hat finale Antwort gegeben - keine Tools mehr',
+                                'timestamp' => now()->toIso8601String(),
+                            ];
+                            
+                            $simulation['final_response'] = [
+                                'type' => 'direct_answer',
+                                'message' => $response['content'] ?? 'Keine Antwort',
+                                'content' => $response['content'],
+                                'iterations' => $iteration,
+                                'tool_results' => $allToolResults,
+                            ];
+                            
+                            // Beende Multi-Step-Loop
+                            break;
                         }
-                        
+                    }
+                    
+                    // Falls maxIterations erreicht wurde
+                    if ($iteration >= $maxIterations) {
                         $simulation['final_response'] = [
-                            'type' => 'tool_calls',
-                            'message' => 'LLM hat Tools aufgerufen',
-                            'tool_calls' => $response['tool_calls'],
-                            'tool_results' => $toolResults,
-                        ];
-                    } else {
-                        // LLM hat direkt geantwortet (keine Tools)
-                        $simulation['final_response'] = [
-                            'type' => 'direct_answer',
-                            'message' => $response['content'] ?? 'Keine Antwort',
-                            'content' => $response['content'],
+                            'type' => 'warning',
+                            'message' => "Maximale Iterationen ({$maxIterations}) erreicht",
+                            'content' => $response['content'] ?? 'Keine finale Antwort',
+                            'iterations' => $iteration,
+                            'tool_results' => $allToolResults,
                         ];
                     }
                     
