@@ -54,6 +54,11 @@ class OpenAiService
                 'url' => $this->baseUrl . '/responses',
                 'payload_keys' => array_keys($payload),
                 'input_count' => count($payload['input'] ?? []),
+                'has_tools' => isset($payload['tools']),
+                'tools_count' => isset($payload['tools']) ? count($payload['tools']) : 0,
+                'tool_names' => isset($payload['tools']) ? array_map(function($t) {
+                    return $t['name'] ?? ($t['function']['name'] ?? 'unknown');
+                }, $payload['tools']) : [],
             ]);
             
             $response = $this->http()->post($this->baseUrl . '/responses', $payload);
