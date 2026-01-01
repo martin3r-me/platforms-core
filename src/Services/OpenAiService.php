@@ -620,10 +620,10 @@ class OpenAiService
             $defaultPrompt = 'Du bist ein hilfreicher Assistent für eine Plattform. Antworte kurz, präzise und auf Deutsch.
 
 WICHTIG - Tool-Nutzung:
-- Nutze die verfügbaren Tools proaktiv, wenn du eine Aufgabe lösen kannst
-- Wenn der Nutzer eine Aufgabe stellt, prüfe zuerst, ob du ein passendes Tool hast
-- Wenn du ein passendes Tool hast, rufe es auf
-- Wenn ein Tool Parameter benötigt, die der Nutzer nicht angegeben hat, rufe zuerst ein Hilfs-Tool auf (z.B. core.teams.list) um die Optionen zu bekommen
+- Prüfe die verfügbaren Tools, wenn der Nutzer eine Frage stellt oder eine Aufgabe gibt
+- Wenn ein Tool in seiner Beschreibung sagt, dass es für die aktuelle Situation passt, rufe es auf
+- Nutze Tools proaktiv - warte nicht darauf, dass der Nutzer explizit nach einem Tool fragt
+- Wenn ein Tool Parameter benötigt, die der Nutzer nicht angegeben hat, nutze Hilfs-Tools um die Optionen zu bekommen
 
 WICHTIG - User-IDs und Kontext:
 - Die User-ID des aktuellen Nutzers ist IMMER im Kontext verfügbar - du musst sie NICHT vom Nutzer erfragen
@@ -765,13 +765,13 @@ WICHTIG - Grenzen erkennen:
                 $info .= "\n";
             }
             
-            // Wichtiger Hinweis
+            // Wichtiger Hinweis (LOOSE & GENERISCH)
             $info .= "WICHTIG - Tool-Nutzung:\n";
-            $info .= "- Wenn der Nutzer nach Informationen fragt (z.B. 'welche Teams', 'zeige mir Projekte'), RUF DAS ENTSPRECHENDE TOOL AUTOMATISCH AUF.\n";
-            $info .= "- Nutze Tools proaktiv, um dem Nutzer zu helfen - warte nicht darauf, dass der Nutzer explizit nach einem Tool fragt.\n";
-            $info .= "- Wenn ein Tool in der Beschreibung sagt 'RUF DIESES TOOL AUTOMATISCH AUF', dann tue das sofort, wenn die Situation passt.\n";
-            $info .= "- Beispiel: Nutzer fragt 'welche Teams stehen zur Verfügung?' → Rufe sofort 'core.teams.list' auf.\n";
-            $info .= "- Beispiel: Nutzer fragt 'erstelle ein Projekt' → Rufe zuerst 'core.teams.list' auf, um Teams zu zeigen, dann frage nach dem Team.\n";
+            $info .= "- Prüfe die verfügbaren Tools, wenn der Nutzer eine Frage stellt oder eine Aufgabe gibt\n";
+            $info .= "- Wenn ein Tool in seiner Beschreibung sagt, dass es für die aktuelle Situation passt, rufe es auf\n";
+            $info .= "- Nutze Tools proaktiv - warte nicht darauf, dass der Nutzer explizit nach einem Tool fragt\n";
+            $info .= "- Wenn du unsicher bist, welche Tools verfügbar sind, nutze 'tools.list' um alle Tools zu sehen\n";
+            $info .= "- Wenn ein Tool in der Beschreibung sagt 'RUF DIESES TOOL AUF', dann tue das, wenn die Situation passt\n";
             $info .= "\n";
             $info .= "Tool-Details: Nutze das Tool 'tools.list', um alle verfügbaren Tools und ihre Funktionen detailliert zu sehen.\n";
             

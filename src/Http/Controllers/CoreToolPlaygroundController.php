@@ -549,6 +549,12 @@ class CoreToolPlaygroundController extends Controller
                                 'raw_response' => $response, // Vollständige Response für Debugging
                             ];
                             
+                            // Füge finale Assistant-Message zu Messages hinzu (für Chat-Historie)
+                            $messages[] = [
+                                'role' => 'assistant',
+                                'content' => $llmContent,
+                            ];
+                            
                             // Beende Multi-Step-Loop
                             break;
                         }

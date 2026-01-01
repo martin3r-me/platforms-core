@@ -718,7 +718,8 @@
                     
                     this.simulationLoading = true;
                     
-                    // Füge User-Message zu Chat hinzu
+                    // Füge User-Message zu Chat-Anzeige hinzu (nur UI)
+                    // WICHTIG: chatHistory wird NICHT hier hinzugefügt - das Backend macht das!
                     if (step === 0) {
                         const userMsg = this.simulationMessage.trim();
                         if (userMsg) {
@@ -727,10 +728,7 @@
                                 content: userMsg,
                                 timestamp: new Date().toISOString()
                             });
-                            this.chatHistory.push({
-                                role: 'user',
-                                content: userMsg
-                            });
+                            // chatHistory wird vom Backend aktualisiert und zurückgegeben
                         }
                     }
                     
@@ -892,11 +890,8 @@
                                     })) || []
                                 });
                                 
-                                // Update Chat-Historie für nächste Runde
-                                this.chatHistory.push({
-                                    role: 'assistant',
-                                    content: finalResponse.content
-                                });
+                                // Chat-Historie wird bereits vom Backend aktualisiert und zurückgegeben
+                            // Keine manuelle Hinzufügung nötig - responseData.chat_history ist bereits vollständig
                             }
                             
                             // Merge mit vorherigem Ergebnis (für Multi-Step)
