@@ -89,6 +89,13 @@ class ToolExecutor
         $cacheHit = false;
         $idempotencyKey = null;
         
+        // Tool aus Registry holen (muss vor Idempotency-Prüfung passieren)
+        $tool = $this->registry->get($toolName);
+        if (!$tool) {
+            Log::warning("[ToolExecutor] Tool '{$toolName}' nicht gefunden", ['trace_id' => $traceId]);
+            return ToolResult::error("Tool '{$toolName}' nicht gefunden", 'TOOL_NOT_FOUND', ['trace_id' => $traceId]);
+        }
+        
         // Generiere Idempotency-Key (wenn Service verfügbar)
         if ($this->idempotencyService) {
             $idempotencyKey = $this->idempotencyService->generateKey($toolName, $arguments, $context);
@@ -139,13 +146,6 @@ class ToolExecutor
                     }
                 }
             }
-        }
-
-        // Tool aus Registry holen
-        $tool = $this->registry->get($toolName);
-        if (!$tool) {
-            Log::warning("[ToolExecutor] Tool '{$toolName}' nicht gefunden", ['trace_id' => $traceId]);
-            return ToolResult::error("Tool '{$toolName}' nicht gefunden", 'TOOL_NOT_FOUND', ['trace_id' => $traceId]);
         }
 
         // Rate Limiting prüfen (wenn aktiviert)
