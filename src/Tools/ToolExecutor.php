@@ -106,7 +106,20 @@ class ToolExecutor
         }
         
         // Generiere Idempotency-Key (wenn Service verfügbar)
-        if ($this->idempotencyService) {
+        // WICHTIG: Idempotency nur für WRITE-Operationen (POST, PUT, DELETE), nicht für GET!
+        // GET-Operationen können sich ändern (z.B. Projekt wird gelöscht), daher kein Idempotency-Caching
+        $isReadOnly = false;
+        if ($tool instanceof \Platform\Core\Contracts\ToolMetadataContract) {
+            $metadata = $tool->getMetadata();
+            $isReadOnly = (bool)($metadata['read_only'] ?? false);
+        } else {
+            // Fallback: Prüfe Tool-Name auf GET (REST-Pattern)
+            $isReadOnly = str_ends_with($toolName, '.GET');
+        }
+        
+        $idempotencyKey = null;
+        if ($this->idempotencyService && !$isReadOnly) {
+            // Nur für WRITE-Operationen: Idempotency-Caching
             $idempotencyKey = $this->idempotencyService->generateKey($toolName, $arguments, $context);
             
             // Prüfe auf Duplikat (nur bei idempotenten Tools)
