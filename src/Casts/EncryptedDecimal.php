@@ -3,9 +3,10 @@
 namespace Platform\Core\Casts;
 
 use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
+use Illuminate\Contracts\Support\Stringable;
 use Illuminate\Support\Facades\Crypt;
 
-class EncryptedDecimal implements CastsAttributes
+class EncryptedDecimal implements CastsAttributes, Stringable
 {
     protected int $decimals;
 
@@ -108,6 +109,14 @@ class EncryptedDecimal implements CastsAttributes
         }
 
         return strlen($decoded) > 16 && !ctype_print($decoded);
+    }
+
+    /**
+     * Stringable Interface Implementation
+     */
+    public function __toString(): string
+    {
+        return static::class . ':' . $this->decimals;
     }
 }
 
