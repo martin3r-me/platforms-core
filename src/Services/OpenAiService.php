@@ -229,6 +229,10 @@ class OpenAiService
                     'data_keys' => array_keys($data),
                     'has_output' => isset($data['output']),
                     'output_count' => isset($data['output']) ? count($data['output']) : 0,
+                    'output_structure' => isset($data['output']) && is_array($data['output']) && isset($data['output'][0])
+                        ? json_encode($data['output'][0], JSON_PRETTY_PRINT)
+                        : null,
+                    'full_data' => $data, // Vollständige Response für Debugging
                 ]);
             }
             
