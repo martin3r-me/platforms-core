@@ -436,27 +436,20 @@ class CoreToolPlaygroundController extends Controller
                 } else {
                     throw new \RuntimeException("Kein next_tool im previous_result gefunden");
                 }
-            } elseif ($needsTool && count($discoveredTools) > 0 && !$semanticAnalysis['can_solve_independently']) {
-                // Initialer Schritt: LLM würde ein Tool auswählen
-                // WICHTIG: In der echten AI würde das LLM selbst entscheiden, welches Tool es braucht
-                // Für die Simulation nehmen wir das erste Tool als Beispiel
-                // ABER: Nur wenn nicht selbstständig auflösbar
-                
-                $primaryTool = $discoveredTools[0];
-                $toolName = $primaryTool->getName();
-                
-                // Versuche Argumente aus Message zu extrahieren (vereinfacht)
-                try {
-                    $arguments = $this->extractArguments($message, $primaryTool);
-                } catch (\Throwable $e) {
-                    $arguments = [];
-                    $simulation['debug']['argument_extraction_error'] = $e->getMessage();
-                }
             } else {
-                // Kann selbstständig auflösen → kein Tool nötig
+                // WICHTIG: KEINE automatische Tool-Auswahl!
+                // Die LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht
+                // In der echten AI würde das LLM jetzt entscheiden:
+                // - Kann ich ohne Tools antworten? → Direkt antworten
+                // - Brauche ich Tools? → Tool auswählen und aufrufen
+                
                 $primaryTool = null;
                 $toolName = null;
                 $arguments = [];
+                
+                $simulation['debug']['llm_decision'] = 'LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht';
+                $simulation['debug']['available_tools'] = array_map(fn($t) => $t->getName(), $discoveredTools);
+                $simulation['debug']['note'] = 'In der echten AI würde das LLM jetzt selbst entscheiden, ob es ein Tool aufruft oder direkt antwortet';
             }
             
             // Wenn Tool gefunden, führe Chain Planning und Execution aus
@@ -1341,71 +1334,40 @@ class CoreToolPlaygroundController extends Controller
             }
         }
         
-        // 2. KANN ICH DAS SELBSTSTÄNDIG AUFLÖSEN?
-        // WICHTIG: Diese Analyse ist nur eine grobe Einschätzung
-        // Die LLM sieht ALLE Tools und entscheidet selbst, ob sie welche braucht (MCP Best Practice)
-        $canSolveIndependently = false;
-        $reason = '';
+        // 2. GROBE EINSCHÄTZUNG (nur für Debug/Info)
+        // WICHTIG: Die LLM entscheidet selbst, ob sie Tools braucht!
+        // Wir setzen hier KEINE hardcoded Logik - die LLM sieht alle Tools und entscheidet!
+        $canSolveIndependently = false; // Default: LLM entscheidet selbst
+        $reason = 'LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht';
         
+        // Nur für Debug/Info: Grobe Kategorisierung
         if ($isQuestion && !$isTask) {
-            // Reine Frage → könnte mit generischem Wissen beantwortet werden
-            // ABER: LLM entscheidet selbst, ob sie Tools braucht
-            $canSolveIndependently = true;
-            $reason = 'Reine Frage erkannt - LLM kann selbst entscheiden, ob Tools benötigt werden';
+            $reason = 'Frage erkannt - LLM entscheidet selbst, ob Tools benötigt werden';
         } elseif ($isTask) {
-            // Aufgabe → benötigt wahrscheinlich Tools
-            // ABER: LLM entscheidet selbst, welches Tool
-            $canSolveIndependently = false;
             $reason = 'Aufgabe erkannt - LLM entscheidet selbst, welche Tools benötigt werden';
         } else {
-            // Unklar → LLM sieht alle Tools und entscheidet selbst
-            $canSolveIndependently = false;
             $reason = 'Intent unklar - LLM sieht alle Tools und entscheidet selbst';
         }
         
-        // 3. BENÖTIGT TOOLS?
-        $needsTools = !$canSolveIndependently;
-        
-        // 4. KANN ICH MIT TOOLS HELFEN?
-        $allTools = $registry->all();
+        // 3. TOOLS VERFÜGBAR? (nur für Info)
+        // Die LLM sieht alle Tools und entscheidet selbst!
+        $discovery = new ToolDiscoveryService($registry);
         $relevantTools = [];
-        $canHelpWithTools = false;
-        
-        if ($needsTools) {
-            // Prüfe ob passende Tools existieren
-            $discovery = new ToolDiscoveryService($registry);
-            try {
-                $relevantTools = $discovery->findByIntent($intent);
-                $canHelpWithTools = count($relevantTools) > 0;
-            } catch (\Throwable $e) {
-                $canHelpWithTools = false;
-            }
+        try {
+            $relevantTools = $discovery->findByIntent($intent); // Gibt ALLE Tools zurück (MCP Best Practice)
+        } catch (\Throwable $e) {
+            $relevantTools = [];
         }
         
-        // 5. KANN ICH DEM USER HELFEN, EINFACHER ZU ANTWORTEN?
-        // (z.B. Teams auflisten, damit User wählen kann)
-        $canHelpUser = false;
+        // 4. KEINE HARDCODED LOGIK!
+        // Die LLM entscheidet selbst:
+        // - Brauche ich Tools? → Sieht alle Tools und wählt selbst
+        // - Kann ich ohne Tools antworten? → Entscheidet selbst
+        $needsTools = true; // Default: LLM sieht alle Tools und entscheidet
+        $canHelpWithTools = count($relevantTools) > 0;
+        $canHelpUser = false; // LLM entscheidet selbst
         $helperTools = [];
-        
-        if ($needsTools && !$canHelpWithTools) {
-            // Keine direkten Tools → prüfe ob Helper-Tools existieren
-            // (z.B. core.teams.list, tools.list, etc.)
-            $helperToolNames = ['core.teams.list', 'tools.list', 'core.modules.list'];
-            foreach ($helperToolNames as $helperName) {
-                $helperTool = $registry->get($helperName);
-                if ($helperTool) {
-                    $helperTools[] = $helperName;
-                    $canHelpUser = true;
-                }
-            }
-        }
-        
-        // 6. AUTOMATISCHER TOOL-REQUEST NÖTIG?
-        $needsToolRequest = false;
-        if ($isTask && !$canHelpWithTools && !$canHelpUser) {
-            // Aufgabe, aber keine Tools → automatisch Request erstellen
-            $needsToolRequest = true;
-        }
+        $needsToolRequest = false; // LLM entscheidet selbst, ob sie tools.request aufruft
         
         return [
             'intent_type' => $isTask ? 'task' : ($isQuestion ? 'question' : 'unclear'),
