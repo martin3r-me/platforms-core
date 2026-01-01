@@ -637,7 +637,20 @@ class CoreToolPlaygroundController extends Controller
                                     'models_created' => $summary->models_created,
                                     'models_updated' => $summary->models_updated,
                                     'models_deleted' => $summary->models_deleted,
+                                    'created_models' => $summary->created_models,
+                                    'updated_models' => $summary->updated_models,
+                                    'deleted_models' => $summary->deleted_models,
+                                    'actions' => $summary->actions,
                                 ];
+                                
+                                // Hole auch Audit Trail
+                                try {
+                                    $auditTrailService = app(\Platform\Core\Services\AuditTrailService::class);
+                                    $auditTrail = $auditTrailService->getAuditTrail($traceId);
+                                    $simulation['audit_trail'] = $auditTrail;
+                                } catch (\Throwable $e) {
+                                    // Silent fail - Audit Trail optional
+                                }
                             } catch (\Throwable $e) {
                                 // Silent fail - Zusammenfassung optional
                                 \Log::debug('[CoreToolPlayground] Zusammenfassung konnte nicht erstellt werden', [

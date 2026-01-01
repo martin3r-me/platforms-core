@@ -333,6 +333,129 @@
                             </div>
                         </div>
 
+                        <!-- Action Summary (Execution Summary) -->
+                        <div x-show="simulationResult?.action_summary" class="bg-[var(--ui-success-5)] rounded-lg p-4 border-2 border-[var(--ui-success)]">
+                            <h3 class="text-lg font-semibold mb-4 text-[var(--ui-success)]">📋 Execution Summary</h3>
+                            <div class="p-3 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
+                                <div class="text-sm font-semibold mb-3 text-[var(--ui-secondary)]" x-text="simulationResult?.action_summary?.summary || 'Keine Zusammenfassung verfügbar'"></div>
+                                
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                    <div class="text-center p-2 bg-[var(--ui-muted-5)] rounded">
+                                        <div class="text-2xl font-bold text-[var(--ui-primary)]" x-text="simulationResult?.action_summary?.tools_executed || 0"></div>
+                                        <div class="text-xs text-[var(--ui-muted)]">Tools ausgeführt</div>
+                                    </div>
+                                    <div class="text-center p-2 bg-[var(--ui-muted-5)] rounded">
+                                        <div class="text-2xl font-bold text-[var(--ui-success)]" x-text="simulationResult?.action_summary?.models_created || 0"></div>
+                                        <div class="text-xs text-[var(--ui-muted)]">Erstellt</div>
+                                    </div>
+                                    <div class="text-center p-2 bg-[var(--ui-muted-5)] rounded">
+                                        <div class="text-2xl font-bold text-[var(--ui-info)]" x-text="simulationResult?.action_summary?.models_updated || 0"></div>
+                                        <div class="text-xs text-[var(--ui-muted)]">Aktualisiert</div>
+                                    </div>
+                                    <div class="text-center p-2 bg-[var(--ui-muted-5)] rounded">
+                                        <div class="text-2xl font-bold text-[var(--ui-danger)]" x-text="simulationResult?.action_summary?.models_deleted || 0"></div>
+                                        <div class="text-xs text-[var(--ui-muted)]">Gelöscht</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Detaillierte Model-Änderungen -->
+                                <div x-show="simulationResult?.action_summary?.created_models?.length > 0 || simulationResult?.action_summary?.updated_models?.length > 0 || simulationResult?.action_summary?.deleted_models?.length > 0" class="mt-4 space-y-3">
+                                    <div x-show="simulationResult?.action_summary?.created_models?.length > 0">
+                                        <div class="text-xs font-semibold mb-2 text-[var(--ui-success)]">✅ Erstellt:</div>
+                                        <template x-for="model in (simulationResult?.action_summary?.created_models || [])">
+                                            <div class="text-xs p-2 bg-[var(--ui-success-5)] rounded mb-1">
+                                                <span class="font-mono" x-text="model.model_type"></span> (ID: <span x-text="model.model_id"></span>)
+                                                <span x-show="model.reason" class="text-[var(--ui-muted)] ml-2" x-text="' - ' + model.reason"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    
+                                    <div x-show="simulationResult?.action_summary?.updated_models?.length > 0">
+                                        <div class="text-xs font-semibold mb-2 text-[var(--ui-info)]">🔄 Aktualisiert:</div>
+                                        <template x-for="model in (simulationResult?.action_summary?.updated_models || [])">
+                                            <div class="text-xs p-2 bg-[var(--ui-info-5)] rounded mb-1">
+                                                <span class="font-mono" x-text="model.model_type"></span> (ID: <span x-text="model.model_id"></span>)
+                                                <span x-show="model.reason" class="text-[var(--ui-muted)] ml-2" x-text="' - ' + model.reason"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    
+                                    <div x-show="simulationResult?.action_summary?.deleted_models?.length > 0">
+                                        <div class="text-xs font-semibold mb-2 text-[var(--ui-danger)]">🗑️ Gelöscht:</div>
+                                        <template x-for="model in (simulationResult?.action_summary?.deleted_models || [])">
+                                            <div class="text-xs p-2 bg-[var(--ui-danger-5)] rounded mb-1">
+                                                <span class="font-mono" x-text="model.model_type"></span> (ID: <span x-text="model.model_id"></span>)
+                                                <span x-show="model.reason" class="text-[var(--ui-muted)] ml-2" x-text="' - ' + model.reason"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Audit Trail (Step-by-Step) -->
+                        <div x-show="simulationResult?.audit_trail" class="bg-[var(--ui-muted-5)] rounded-lg p-4">
+                            <h3 class="text-lg font-semibold mb-4 text-[var(--ui-secondary)]">📜 Audit Trail (Step-by-Step)</h3>
+                            <div class="text-xs text-[var(--ui-muted)] mb-3">
+                                Trace-ID: <span class="font-mono" x-text="simulationResult?.audit_trail?.trace_id"></span> | 
+                                <span x-text="simulationResult?.audit_trail?.total_steps || 0"></span> Schritte
+                            </div>
+                            <div class="space-y-2 max-h-96 overflow-y-auto">
+                                <template x-for="(step, index) in (simulationResult?.audit_trail?.steps || [])" :key="index">
+                                    <div class="p-3 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]" :class="step.type === 'model_change' ? 'border-l-4 border-l-[var(--ui-warning)]' : ''">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <span class="text-xs font-bold text-[var(--ui-primary)]" x-text="'Schritt ' + step.step"></span>
+                                            <span class="text-xs px-2 py-1 rounded" 
+                                                  :class="step.type === 'tool_execution' ? 'bg-[var(--ui-info-5)] text-[var(--ui-info)]' : 'bg-[var(--ui-warning-5)] text-[var(--ui-warning)]'"
+                                                  x-text="step.type === 'tool_execution' ? '🔧 Tool' : '📝 Model-Änderung'"></span>
+                                            <span class="text-xs text-[var(--ui-muted)]" x-text="step.timestamp"></span>
+                                        </div>
+                                        
+                                        <div x-show="step.type === 'tool_execution'">
+                                            <div class="font-mono text-sm font-semibold text-[var(--ui-secondary)]" x-text="step.tool_name"></div>
+                                            <div class="text-xs text-[var(--ui-muted)] mt-1" x-text="step.result_message || 'Keine Nachricht'"></div>
+                                            <div class="flex items-center gap-4 mt-2 text-xs">
+                                                <span :class="step.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]'" 
+                                                      x-text="step.success ? '✅ Erfolgreich' : '❌ Fehlgeschlagen'"></span>
+                                                <span x-show="step.duration_ms" class="text-[var(--ui-muted)]" x-text="'⏱️ ' + step.duration_ms + 'ms'"></span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div x-show="step.type === 'model_change'">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-xs font-semibold" 
+                                                      :class="step.operation === 'created' ? 'text-[var(--ui-success)]' : 
+                                                              step.operation === 'updated' ? 'text-[var(--ui-info)]' : 
+                                                              'text-[var(--ui-danger)]'"
+                                                      x-text="step.operation === 'created' ? '✅ Erstellt' : 
+                                                              step.operation === 'updated' ? '🔄 Aktualisiert' : 
+                                                              '🗑️ Gelöscht'"></span>
+                                                <span class="font-mono text-sm text-[var(--ui-secondary)]" x-text="step.model_type"></span>
+                                                <span class="text-xs text-[var(--ui-muted)]">(ID: <span x-text="step.model_id"></span>)</span>
+                                            </div>
+                                            <div x-show="step.reason" class="text-xs text-[var(--ui-muted)] mt-1" x-text="step.reason"></div>
+                                            <div x-show="step.changed_fields?.length > 0" class="text-xs text-[var(--ui-muted)] mt-1">
+                                                Geänderte Felder: <span x-text="step.changed_fields.join(', ')"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                            
+                            <!-- Summary -->
+                            <div x-show="simulationResult?.audit_trail?.summary" class="mt-4 p-3 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)]">
+                                <div class="text-xs font-semibold mb-2 text-[var(--ui-secondary)]">📊 Zusammenfassung:</div>
+                                <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                                    <div>Tools ausgeführt: <span class="font-bold" x-text="simulationResult?.audit_trail?.summary?.tools_executed || 0"></span></div>
+                                    <div>Tools erfolgreich: <span class="font-bold text-[var(--ui-success)]" x-text="simulationResult?.audit_trail?.summary?.tools_successful || 0"></span></div>
+                                    <div>Tools fehlgeschlagen: <span class="font-bold text-[var(--ui-danger)]" x-text="simulationResult?.audit_trail?.summary?.tools_failed || 0"></span></div>
+                                    <div>Models erstellt: <span class="font-bold text-[var(--ui-success)]" x-text="simulationResult?.audit_trail?.summary?.models_created || 0"></span></div>
+                                    <div>Models aktualisiert: <span class="font-bold text-[var(--ui-info)]" x-text="simulationResult?.audit_trail?.summary?.models_updated || 0"></span></div>
+                                    <div>Models gelöscht: <span class="font-bold text-[var(--ui-danger)]" x-text="simulationResult?.audit_trail?.summary?.models_deleted || 0"></span></div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- User Input Required (Multi-Step) -->
                         <div x-show="simulationResult?.requires_user_input || simulationResult?.final_response?.type === 'user_input_required'" class="bg-[var(--ui-warning-5)] rounded-lg p-4 border-2 border-[var(--ui-warning)]">
                             <h3 class="text-lg font-semibold mb-4 text-[var(--ui-warning)]">👤 User-Input erforderlich</h3>
@@ -906,6 +1029,13 @@
                                 this.simulationResult.user_input_data = responseData.simulation?.user_input_data || null;
                                 this.simulationResult.next_tool = responseData.simulation?.next_tool || null;
                                 this.simulationResult.next_tool_args = responseData.simulation?.next_tool_args || null;
+                                // Merge Action Summary und Audit Trail
+                                if (responseData.simulation?.action_summary) {
+                                    this.simulationResult.action_summary = responseData.simulation.action_summary;
+                                }
+                                if (responseData.simulation?.audit_trail) {
+                                    this.simulationResult.audit_trail = responseData.simulation.audit_trail;
+                                }
                             } else {
                                 this.simulationResult = responseData.simulation;
                             }
