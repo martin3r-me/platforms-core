@@ -20,6 +20,7 @@ class ToolExecutor
 {
     private ?ToolValidationService $validationService = null;
     private ?ToolRateLimitService $rateLimitService = null;
+    private ?ToolRetryService $retryService = null;
     private ?ToolIdempotencyService $idempotencyService = null;
 
     public function __construct(
@@ -61,6 +62,14 @@ class ToolExecutor
         } catch (\Throwable $e) {
             // Service noch nicht verfügbar
             $this->rateLimitService = null;
+        }
+        
+        // Lazy-Loading: Retry-Service
+        try {
+            $this->retryService = app(ToolRetryService::class);
+        } catch (\Throwable $e) {
+            // Service noch nicht verfügbar
+            $this->retryService = null;
         }
         
         // Lazy-Loading: Idempotency-Service
@@ -244,8 +253,11 @@ class ToolExecutor
             
             // Speichere Idempotency-Key (wenn Service verfügbar und erfolgreich)
             if ($this->idempotencyService && $idempotencyKey && $result->success) {
-                // Wird später in Listener gespeichert (mit execution_id)
-                $result->metadata['idempotency_key'] = $idempotencyKey;
+                // Erstelle neues ToolResult mit erweiterten Metadaten (metadata ist readonly)
+                $result = ToolResult::success(
+                    $result->data,
+                    array_merge($result->metadata, ['idempotency_key' => $idempotencyKey])
+                );
             }
             
             // Event feuern: Tool erfolgreich ausgeführt
