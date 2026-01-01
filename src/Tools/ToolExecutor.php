@@ -7,6 +7,7 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Events\ToolExecuted;
 use Platform\Core\Events\ToolFailed;
+use Platform\Core\Services\ToolIdempotencyService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
@@ -19,6 +20,7 @@ class ToolExecutor
 {
     private ?ToolValidationService $validationService = null;
     private ?ToolRateLimitService $rateLimitService = null;
+    private ?ToolIdempotencyService $idempotencyService = null;
 
     public function __construct(
         private ToolRegistry $registry,
