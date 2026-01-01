@@ -53,6 +53,16 @@ class LogToolExecution
             ])
         );
         
+        // Setze ToolExecution-ID im Context (für Model-Versionierung)
+        if ($execution && $event->traceId) {
+            try {
+                $contextService = app(\Platform\Core\Services\ToolExecutionContextService::class);
+                $contextService->setToolExecutionId($event->traceId, $execution->id ?? null);
+            } catch (\Throwable $e) {
+                // Silent fail - Context-Service möglicherweise nicht verfügbar
+            }
+        }
+        
         // Speichere Idempotency-Key in IdempotencyService (wenn verfügbar)
         if ($event->idempotencyKey && $execution) {
             try {

@@ -371,6 +371,10 @@ class CoreToolPlaygroundController extends Controller
                 $allToolResults = [];
                 $allResponses = [];
                 
+                // Generiere Trace-ID für diese Session (wird für Versionierung verwendet)
+                $traceId = bin2hex(random_bytes(8));
+                $simulation['trace_id'] = $traceId;
+                
                 $simulation['steps'][] = [
                     'step' => 3,
                     'name' => 'Multi-Step-Chat',
@@ -617,6 +621,29 @@ class CoreToolPlaygroundController extends Controller
                                 'role' => 'assistant',
                                 'content' => $llmContent,
                             ];
+                            
+                            // Erstelle Zusammenfassung am Ende (wenn Services verfügbar)
+                            try {
+                                $actionSummaryService = app(\Platform\Core\Services\ActionSummaryService::class);
+                                $summary = $actionSummaryService->createSummary(
+                                    $traceId,
+                                    null, // chain_id (wird später von ToolOrchestrator gesetzt)
+                                    $message,
+                                    $context
+                                );
+                                $simulation['action_summary'] = [
+                                    'summary' => $summary->summary,
+                                    'tools_executed' => $summary->tools_executed,
+                                    'models_created' => $summary->models_created,
+                                    'models_updated' => $summary->models_updated,
+                                    'models_deleted' => $summary->models_deleted,
+                                ];
+                            } catch (\Throwable $e) {
+                                // Silent fail - Zusammenfassung optional
+                                \Log::debug('[CoreToolPlayground] Zusammenfassung konnte nicht erstellt werden', [
+                                    'error' => $e->getMessage(),
+                                ]);
+                            }
                             
                             // Beende Multi-Step-Loop
                             break;

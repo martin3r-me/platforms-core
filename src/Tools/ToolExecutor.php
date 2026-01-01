@@ -244,6 +244,12 @@ class ToolExecutor
 
         // Tool ausführen (mit Timeout, falls aktiviert)
         try {
+            // Setze Tool-Execution-Context (für automatische Versionierung)
+            $toolExecutionId = null;
+            if ($this->contextService) {
+                $this->contextService->startContext($traceId, $toolName, $context);
+            }
+            
             $timeoutSeconds = $this->timeoutService?->getTimeoutForTool($toolName) ?? 30;
             
             if ($this->timeoutService && $this->timeoutService->isEnabled()) {
@@ -256,8 +262,18 @@ class ToolExecutor
                 $result = $tool->execute($validationResult['data'], $context);
             }
             
+            // Hole ToolExecution-ID (wird vom Listener gesetzt)
+            if ($this->contextService) {
+                $toolExecutionId = $this->contextService->getToolExecutionId($traceId);
+            }
+            
             $duration = microtime(true) - $start;
             $memoryUsage = memory_get_usage() - $memoryStart;
+            
+            // Beende Tool-Execution-Context (Versionierung wird automatisch erstellt)
+            if ($this->contextService) {
+                $this->contextService->endContext($traceId, $toolExecutionId);
+            }
             
             // Cache Result (nur für read-only Tools)
             if ($this->cacheService && $result->success) {
@@ -297,6 +313,11 @@ class ToolExecutor
 
             return $result;
         } catch (\Throwable $e) {
+            // Beende Tool-Execution-Context auch bei Fehler
+            if ($this->contextService) {
+                $this->contextService->endContext($traceId, null);
+            }
+            
             $duration = microtime(true) - $start;
             $memoryUsage = memory_get_usage() - $memoryStart;
             

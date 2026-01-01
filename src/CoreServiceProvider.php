@@ -169,6 +169,14 @@ class CoreServiceProvider extends ServiceProvider
         // Tool Registry, Executor & Orchestrator als Singleton registrieren
         $this->app->singleton(\Platform\Core\Tools\ToolRegistry::class);
         $this->app->singleton(\Platform\Core\Tools\ToolExecutor::class);
+        
+        // Versionierung & Audit Services
+        $this->app->singleton(\Platform\Core\Services\ModelVersioningService::class);
+        $this->app->singleton(\Platform\Core\Services\UndoService::class);
+        $this->app->singleton(\Platform\Core\Services\AuditTrailService::class);
+        $this->app->singleton(\Platform\Core\Services\ActionSummaryService::class);
+        $this->app->singleton(\Platform\Core\Services\ToolExecutionContextService::class);
+        
         $this->app->singleton(\Platform\Core\Tools\ToolOrchestrator::class, function ($app) {
             return new \Platform\Core\Tools\ToolOrchestrator(
                 $app->make(\Platform\Core\Tools\ToolExecutor::class),
@@ -366,6 +374,21 @@ class CoreServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Event::listen(
             \Platform\Core\Events\ToolFailed::class,
             \Platform\Core\Listeners\TrackToolMetrics::class . '@handleToolFailed'
+        );
+
+        // Model-Versionierung: Automatische Versionierung während Tool-Ausführungen
+        // Nutze Eloquent Events (created, updated, deleted) für alle Models
+        \Illuminate\Support\Facades\Event::listen(
+            'eloquent.created: *',
+            \Platform\Core\Listeners\ModelVersioningListener::class . '@handleCreated'
+        );
+        \Illuminate\Support\Facades\Event::listen(
+            'eloquent.updated: *',
+            \Platform\Core\Listeners\ModelVersioningListener::class . '@handleUpdated'
+        );
+        \Illuminate\Support\Facades\Event::listen(
+            'eloquent.deleted: *',
+            \Platform\Core\Listeners\ModelVersioningListener::class . '@handleDeleted'
         );
     }
 
