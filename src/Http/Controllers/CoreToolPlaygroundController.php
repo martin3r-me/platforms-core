@@ -50,6 +50,8 @@ class CoreToolPlaygroundController extends Controller
                 'step' => 'nullable|integer', // Multi-Step: Schritt-Nummer (0 = initial, 1+ = Folge-Schritte)
                 'previous_result' => 'nullable|array', // Vorheriges Ergebnis für Folge-Schritte
                 'user_input' => 'nullable|string', // User-Input für Folge-Schritte (z.B. Team-Auswahl)
+                'chat_history' => 'nullable|array', // Chat-Historie für Konversation
+                'session_id' => 'nullable|string', // Session-ID für Chat-Historie
             ]);
 
             $message = $request->input('message');
@@ -57,6 +59,8 @@ class CoreToolPlaygroundController extends Controller
             $step = $request->input('step', 0); // 0 = initial, 1+ = Folge-Schritte
             $previousResult = $request->input('previous_result', []);
             $userInput = $request->input('user_input');
+            $chatHistory = $request->input('chat_history', []); // Chat-Historie vom Frontend
+            $sessionId = $request->input('session_id', session()->getId()); // Session-ID
             
             $simulation = [
                 'timestamp' => now()->toIso8601String(),
@@ -339,12 +343,27 @@ class CoreToolPlaygroundController extends Controller
                 $orchestrator = app(ToolOrchestrator::class);
                 
                 // Erstelle Messages-Array (wie im Terminal)
-                $messages = [
-                    [
-                        'role' => 'user',
-                        'content' => $message,
-                    ],
+                // WICHTIG: Nutze Chat-Historie, wenn vorhanden, sonst starte neu
+                $messages = [];
+                
+                // Lade Chat-Historie aus Session (falls vorhanden)
+                $sessionHistory = session()->get("playground_chat_history_{$sessionId}", []);
+                
+                // Merge: Session-Historie + Frontend-Historie (Frontend hat Priorität)
+                if (!empty($chatHistory)) {
+                    $messages = $chatHistory;
+                } elseif (!empty($sessionHistory)) {
+                    $messages = $sessionHistory;
+                }
+                
+                // Füge neue User-Message hinzu
+                $messages[] = [
+                    'role' => 'user',
+                    'content' => $message,
                 ];
+                
+                // Speichere aktualisierte Historie in Session
+                session()->put("playground_chat_history_{$sessionId}", $messages);
                 
                 // Multi-Step-Chat: Führe so lange aus, bis LLM keine Tools mehr aufruft
                 $maxIterations = 10; // Verhindere Endlosschleifen
@@ -447,10 +466,12 @@ class CoreToolPlaygroundController extends Controller
                                     $resultArray = $toolResult->toArray();
                                     
                                     // Füge Tool-Result zu Messages hinzu (für Multi-Step)
+                                    // WICHTIG: Responses API unterstützt 'tool' role nicht direkt
+                                    // Konvertiere zu User-Message mit speziellem Format (wie in OpenAiService)
+                                    $toolResultText = "Tool-Result (call_id: {$toolCallId}): " . json_encode($resultArray, JSON_UNESCAPED_UNICODE);
                                     $messages[] = [
-                                        'role' => 'tool',
-                                        'tool_call_id' => $toolCallId,
-                                        'content' => json_encode($resultArray, JSON_UNESCAPED_UNICODE),
+                                        'role' => 'user', // Responses API Format
+                                        'content' => $toolResultText,
                                     ];
                                     
                                     $allToolResults[] = [
@@ -479,6 +500,7 @@ class CoreToolPlaygroundController extends Controller
                                     $executionTime = (microtime(true) - $startTime) * 1000;
                                     
                                     // Fehler-Result zu Messages hinzufügen
+                                    // WICHTIG: Responses API unterstützt 'tool' role nicht direkt
                                     $errorResult = [
                                         'ok' => false,
                                         'error' => [
@@ -487,10 +509,10 @@ class CoreToolPlaygroundController extends Controller
                                         ]
                                     ];
                                     
+                                    $errorResultText = "Tool-Result (call_id: {$toolCallId}): " . json_encode($errorResult, JSON_UNESCAPED_UNICODE);
                                     $messages[] = [
-                                        'role' => 'tool',
-                                        'tool_call_id' => $toolCallId,
-                                        'content' => json_encode($errorResult, JSON_UNESCAPED_UNICODE),
+                                        'role' => 'user', // Responses API Format
+                                        'content' => $errorResultText,
                                     ];
                                     
                                     $allToolResults[] = [
@@ -947,9 +969,15 @@ class CoreToolPlaygroundController extends Controller
                 }
             }
 
+            // Füge Chat-Historie zur Response hinzu (für Frontend)
+            $simulation['chat_history'] = $messages; // Aktualisierte Historie mit Tool-Results
+            $simulation['session_id'] = $sessionId;
+            
             return response()->json([
                 'success' => true,
                 'simulation' => $simulation,
+                'chat_history' => $messages, // Aktualisierte Historie
+                'session_id' => $sessionId,
             ]);
 
         } catch (\Throwable $e) {

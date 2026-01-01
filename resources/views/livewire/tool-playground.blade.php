@@ -49,40 +49,80 @@
 
                 <!-- MCP Simulation Tab -->
                 <div x-show="activeTab === 'simulate'" class="space-y-6">
+                    <!-- Chat Interface -->
                     <div class="bg-[var(--ui-muted-5)] rounded-lg p-4">
-                        <h2 class="text-xl font-semibold mb-4 text-[var(--ui-secondary)]">🎯 MCP-Simulation</h2>
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-xl font-semibold text-[var(--ui-secondary)]">💬 Chat (MCP-Simulation)</h2>
+                            <button 
+                                @click="clearChat()"
+                                class="px-3 py-1 bg-[var(--ui-danger)] text-white rounded text-sm hover:opacity-90"
+                            >
+                                🗑️ Chat leeren
+                            </button>
+                        </div>
                         <p class="text-[var(--ui-muted)] mb-4">
-                            Simuliere den kompletten Request-Flow: User-Input → Tool-Discovery → Chain-Planning → Execution → Response
+                            Chat mit der LLM - sie kann Tools aufrufen und komplexe Aufgaben lösen.
                         </p>
-                        <div class="space-y-4">
-                            <div>
-                                <label class="block text-sm font-medium mb-2 text-[var(--ui-secondary)]">User-Nachricht (natürliche Sprache)</label>
-                                <textarea 
-                                    x-model="simulationMessage"
-                                    placeholder="z.B. 'Erstelle ein Projekt namens Test Projekt'"
-                                    class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] text-[var(--ui-secondary)]"
-                                    rows="3"
-                                ></textarea>
-                                <div class="mt-2 text-xs text-[var(--ui-muted)]">
-                                    💡 Beispiele: "Erstelle ein Projekt", "Zeige mir alle Teams", "Lösche Projekt X"
+                        
+                        <!-- Chat Messages -->
+                        <div class="bg-[var(--ui-surface)] rounded-lg border border-[var(--ui-border)] mb-4" style="max-height: 500px; overflow-y: auto;" x-ref="chatContainer">
+                            <div class="p-4 space-y-4">
+                                <template x-if="chatMessages.length === 0">
+                                    <div class="text-center text-[var(--ui-muted)] py-8">
+                                        <p>💬 Starte die Konversation mit einer Nachricht</p>
+                                        <p class="text-xs mt-2">Beispiele: "Erstelle ein Projekt", "Zeige mir alle Teams", "Lösche Projekt X"</p>
+                                    </div>
+                                </template>
+                                
+                                <template x-for="(msg, index) in chatMessages" :key="index">
+                                    <div class="flex" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
+                                        <div 
+                                            class="max-w-[80%] rounded-lg p-3"
+                                            :class="msg.role === 'user' 
+                                                ? 'bg-[var(--ui-primary)] text-white' 
+                                                : 'bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] border border-[var(--ui-border)]'"
+                                        >
+                                            <div class="text-sm font-semibold mb-1" x-text="msg.role === 'user' ? 'Du' : 'LLM'"></div>
+                                            <div class="text-sm whitespace-pre-wrap" x-text="msg.content || '...'"></div>
+                                            <div x-show="msg.tool_calls && msg.tool_calls.length > 0" class="mt-2 pt-2 border-t border-[var(--ui-border)]">
+                                                <div class="text-xs font-semibold mb-1">🔧 Tools aufgerufen:</div>
+                                                <template x-for="toolCall in msg.tool_calls">
+                                                    <div class="text-xs font-mono mb-1" x-text="toolCall.function?.name || toolCall.name"></div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                                
+                                <div x-show="simulationLoading" class="flex justify-start">
+                                    <div class="bg-[var(--ui-muted-5)] rounded-lg p-3 border border-[var(--ui-border)]">
+                                        <div class="flex items-center gap-2 text-[var(--ui-muted)]">
+                                            <span class="animate-spin">⏳</span>
+                                            <span>LLM denkt nach...</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="flex gap-2">
-                                <button 
-                                    @click="runSimulation()"
-                                    :disabled="simulationLoading"
-                                    class="px-4 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
-                                >
-                                    <span x-show="!simulationLoading">🚀 Vollständige Simulation starten</span>
-                                    <span x-show="simulationLoading">⏳ Simuliere...</span>
-                                </button>
-                                <button 
-                                    @click="simulationMessage = 'Erstelle ein Projekt namens Test Projekt'"
-                                    class="px-3 py-2 bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] rounded-lg hover:opacity-90 text-sm"
-                                >
-                                    📝 Beispiel
-                                </button>
-                            </div>
+                        </div>
+                        
+                        <!-- Chat Input -->
+                        <div class="flex gap-2">
+                            <textarea 
+                                x-model="simulationMessage"
+                                @keydown.enter.prevent="runSimulation()"
+                                @keydown.shift.enter.prevent="simulationMessage += '\n'"
+                                placeholder="Nachricht eingeben... (Enter zum Senden, Shift+Enter für neue Zeile)"
+                                class="flex-1 px-3 py-2 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] text-[var(--ui-secondary)]"
+                                rows="2"
+                            ></textarea>
+                            <button 
+                                @click="runSimulation()"
+                                :disabled="simulationLoading || !simulationMessage.trim()"
+                                class="px-4 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50 self-end"
+                            >
+                                <span x-show="!simulationLoading">📤 Senden</span>
+                                <span x-show="simulationLoading">⏳</span>
+                            </button>
                         </div>
                     </div>
 
@@ -584,12 +624,15 @@
                 debug: null,
                 availableTools: [],
 
-                // MCP Simulation
-                simulationMessage: 'Erstelle ein Projekt namens Test Projekt',
+                // MCP Simulation - Chat
+                simulationMessage: '',
                 simulationLoading: false,
                 simulationResult: null,
                 debugCopied: false,
                 userInputValue: '', // Für Multi-Step User-Input
+                chatMessages: [], // Chat-Historie
+                chatHistory: [], // Vollständige Chat-Historie für Backend
+                sessionId: null, // Session-ID für Chat-Historie
 
                 // Tool Discovery
                 discoveryFilters: {
@@ -669,7 +712,28 @@
                 },
 
                 async runSimulation(step = 0, previousResult = null, userInput = null) {
+                    if (!this.simulationMessage.trim() && step === 0) {
+                        return; // Keine leeren Nachrichten
+                    }
+                    
                     this.simulationLoading = true;
+                    
+                    // Füge User-Message zu Chat hinzu
+                    if (step === 0) {
+                        const userMsg = this.simulationMessage.trim();
+                        if (userMsg) {
+                            this.chatMessages.push({
+                                role: 'user',
+                                content: userMsg,
+                                timestamp: new Date().toISOString()
+                            });
+                            this.chatHistory.push({
+                                role: 'user',
+                                content: userMsg
+                            });
+                        }
+                    }
+                    
                     if (step === 0) {
                         this.simulationResult = null; // Nur beim ersten Schritt zurücksetzen
                         this.debugCopied = false;
@@ -679,6 +743,8 @@
                         const payload = {
                             message: this.simulationMessage,
                             options: {},
+                            chat_history: this.chatHistory, // Sende Chat-Historie
+                            session_id: this.sessionId || this.generateSessionId(), // Session-ID
                         };
                         
                         // Multi-Step: Füge Schritt-Info hinzu
@@ -799,6 +865,40 @@
                         
                         // Erfolgreiche Antwort
                         if (responseData.success) {
+                            // Update Chat-Historie
+                            if (responseData.chat_history) {
+                                this.chatHistory = responseData.chat_history;
+                            }
+                            if (responseData.session_id) {
+                                this.sessionId = responseData.session_id;
+                            }
+                            
+                            // Füge Assistant-Response zu Chat hinzu
+                            const finalResponse = responseData.simulation?.final_response;
+                            if (finalResponse && finalResponse.content) {
+                                // Entferne letzte Assistant-Message (falls vorhanden)
+                                if (this.chatMessages.length > 0 && this.chatMessages[this.chatMessages.length - 1].role === 'assistant') {
+                                    this.chatMessages.pop();
+                                }
+                                
+                                // Füge neue Assistant-Message hinzu
+                                this.chatMessages.push({
+                                    role: 'assistant',
+                                    content: finalResponse.content,
+                                    timestamp: new Date().toISOString(),
+                                    tool_calls: responseData.simulation?.execution_flow?.map(e => ({
+                                        name: e.tool,
+                                        function: { name: e.tool }
+                                    })) || []
+                                });
+                                
+                                // Update Chat-Historie für nächste Runde
+                                this.chatHistory.push({
+                                    role: 'assistant',
+                                    content: finalResponse.content
+                                });
+                            }
+                            
                             // Merge mit vorherigem Ergebnis (für Multi-Step)
                             if (step > 0 && this.simulationResult) {
                                 // Füge neuen Schritt zu bestehendem Ergebnis hinzu
@@ -814,6 +914,18 @@
                             } else {
                                 this.simulationResult = responseData.simulation;
                             }
+                            
+                            // Leere Input-Feld
+                            if (step === 0) {
+                                this.simulationMessage = '';
+                            }
+                            
+                            // Scroll zu neuem Message
+                            this.$nextTick(() => {
+                                if (this.$refs.chatContainer) {
+                                    this.$refs.chatContainer.scrollTop = this.$refs.chatContainer.scrollHeight;
+                                }
+                            });
                         } else {
                             // Zeige Fehler-Details im Playground
                             this.simulationResult = {
@@ -1067,11 +1179,29 @@
                     }
                 },
 
+                generateSessionId() {
+                    if (!this.sessionId) {
+                        this.sessionId = 'playground_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    }
+                    return this.sessionId;
+                },
+                
+                clearChat() {
+                    if (confirm('Möchtest du wirklich den Chat leeren?')) {
+                        this.chatMessages = [];
+                        this.chatHistory = [];
+                        this.simulationResult = null;
+                        this.simulationMessage = '';
+                        this.sessionId = null;
+                    }
+                },
+                
                 init() {
                     // Auto-load tools on page load
                     this.$nextTick(() => {
                         this.loadTools();
                         this.loadToolRequests();
+                        this.generateSessionId();
                     });
                 }
 
