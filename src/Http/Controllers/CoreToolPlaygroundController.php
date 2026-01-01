@@ -10,6 +10,7 @@ use Platform\Core\Tools\ToolOrchestrator;
 use Platform\Core\Tools\ToolChainPlanner;
 use Platform\Core\Tools\ToolDiscoveryService;
 use Platform\Core\Contracts\ToolContext;
+use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Services\OpenAiService;
 use Platform\Core\Services\ToolCacheService;
 use Platform\Core\Services\ToolTimeoutService;
