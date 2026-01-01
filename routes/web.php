@@ -264,6 +264,7 @@ Route::middleware(['web', 'auth'])->group(function () {
         Route::post('/core/tools/playground/discovery', [CoreToolPlaygroundController::class, 'discovery'])->name('core.tools.playground.discovery');
         Route::post('/core/tools/playground/request', [CoreToolPlaygroundController::class, 'request'])->name('core.tools.playground.request');
         Route::get('/core/tools/playground/requests', [CoreToolPlaygroundController::class, 'requests'])->name('core.tools.playground.requests');
+        Route::post('/core/tools/playground/clear', [CoreToolPlaygroundController::class, 'clear'])->name('core.tools.playground.clear');
     });
 });
 

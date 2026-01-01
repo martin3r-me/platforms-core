@@ -1429,6 +1429,44 @@ class CoreToolPlaygroundController extends Controller
     }
 
     /**
+     * Chat-Historie löschen (neuer Thread starten)
+     */
+    public function clear(Request $request)
+    {
+        try {
+            $request->validate([
+                'session_id' => 'nullable|string',
+            ]);
+
+            $sessionId = $request->input('session_id');
+            
+            // Wenn Session-ID angegeben, lösche nur diese
+            if ($sessionId) {
+                session()->forget("playground_chat_history_{$sessionId}");
+            } else {
+                // Wenn keine Session-ID, lösche alle Playground-Sessions
+                $allKeys = array_keys(session()->all());
+                foreach ($allKeys as $key) {
+                    if (str_starts_with($key, 'playground_chat_history_')) {
+                        session()->forget($key);
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Chat-Historie gelöscht. Neuer Thread startet.',
+                'session_id' => $sessionId,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Semantische Intent-Analyse (LOOSE & GENERISCH)
      * 
      * Erste Frage: Kann ich das selbstständig auflösen?

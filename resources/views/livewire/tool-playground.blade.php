@@ -1186,13 +1186,39 @@
                     return this.sessionId;
                 },
                 
-                clearChat() {
-                    if (confirm('Möchtest du wirklich den Chat leeren?')) {
+                async clearChat() {
+                    if (confirm('Möchtest du wirklich den Chat leeren? Ein neuer Thread startet dann.')) {
+                        // Lösche Session-Historie im Backend
+                        if (this.sessionId) {
+                            try {
+                                await fetch('{{ route("core.tools.playground.clear") }}', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                                    },
+                                    body: JSON.stringify({
+                                        session_id: this.sessionId
+                                    })
+                                });
+                            } catch (e) {
+                                console.error('Fehler beim Löschen der Session-Historie:', e);
+                            }
+                        }
+                        
+                        // Frontend zurücksetzen
                         this.chatMessages = [];
                         this.chatHistory = [];
                         this.simulationResult = null;
                         this.simulationMessage = '';
-                        this.sessionId = null;
+                        this.sessionId = null; // Neue Session-ID wird beim nächsten Aufruf generiert
+                        
+                        // Scroll zurücksetzen
+                        this.$nextTick(() => {
+                            if (this.$refs.chatContainer) {
+                                this.$refs.chatContainer.scrollTop = 0;
+                            }
+                        });
                     }
                 },
                 
