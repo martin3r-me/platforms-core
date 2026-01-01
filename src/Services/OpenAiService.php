@@ -140,12 +140,31 @@ class OpenAiService
             $content = '';
             $toolCalls = null;
             
-            // Format 1: output[0].content[0].text (Responses API Format)
+            // Format 1: output[0] (Responses API Format)
             if (isset($data['output']) && is_array($data['output']) && isset($data['output'][0])) {
                 $outputItem = $data['output'][0];
                 
-                // Prüfe auf Tool-Calls direkt in output[0]
-                if (isset($outputItem['tool_calls']) && is_array($outputItem['tool_calls'])) {
+                // WICHTIG: Responses API gibt function_call direkt in output[0] zurück!
+                // Format: {"type":"function_call","name":"core_teams_list","arguments":"{...}","call_id":"..."}
+                if (isset($outputItem['type']) && $outputItem['type'] === 'function_call') {
+                    // Function-Call gefunden - konvertiere zu Tool-Call-Format
+                    if ($toolCalls === null) {
+                        $toolCalls = [];
+                    }
+                    $toolCalls[] = [
+                        'id' => $outputItem['call_id'] ?? ($outputItem['id'] ?? null),
+                        'type' => 'function',
+                        'function' => [
+                            'name' => $outputItem['name'] ?? null,
+                            'arguments' => isset($outputItem['arguments']) 
+                                ? (is_string($outputItem['arguments']) ? $outputItem['arguments'] : json_encode($outputItem['arguments']))
+                                : '{}',
+                        ],
+                    ];
+                }
+                
+                // Prüfe auf Tool-Calls direkt in output[0] (Legacy-Format)
+                elseif (isset($outputItem['tool_calls']) && is_array($outputItem['tool_calls'])) {
                     $toolCalls = $outputItem['tool_calls'];
                 }
                 
@@ -160,7 +179,7 @@ class OpenAiService
                                     $toolCalls = [];
                                 }
                                 $toolCalls[] = [
-                                    'id' => $contentItem['id'] ?? ($contentItem['tool_call_id'] ?? null),
+                                    'id' => $contentItem['id'] ?? ($contentItem['tool_call_id'] ?? $contentItem['call_id'] ?? null),
                                     'type' => 'function',
                                     'function' => [
                                         'name' => $contentItem['name'] ?? ($contentItem['function_name'] ?? $contentItem['function']['name'] ?? null),

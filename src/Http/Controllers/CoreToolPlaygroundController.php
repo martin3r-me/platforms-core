@@ -387,6 +387,7 @@ class CoreToolPlaygroundController extends Controller
                             'tool_calls_count' => count($response['tool_calls'] ?? []),
                             'finish_reason' => $response['finish_reason'] ?? null,
                             'response_keys' => array_keys($response), // Zeige alle Keys für Debugging
+                            'full_response' => $response, // Vollständige Response für Debugging
                         ];
                         
                         // Wenn LLM Tool-Calls gemacht hat
