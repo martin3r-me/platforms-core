@@ -1411,19 +1411,13 @@ class CoreToolPlaygroundController extends Controller
     {
         // WICHTIG: Nur für Debug/Info - KEINE Entscheidungen!
         // Die LLM sieht alle Tools und entscheidet selbst!
-        
-        // Einfache Kategorisierung NUR für Debug/Info (nicht für Entscheidungen!)
-        $intentLower = strtolower(trim($intent));
-        $intentType = 'unclear';
-        
-        // Begrüßungen erkennen (nur für Info)
-        $greetingPatterns = ['/^(moin|hallo|hi|hey|guten (tag|morgen|abend)|servus|grü(ß|ss)(e|i))/i'];
-        foreach ($greetingPatterns as $pattern) {
-            if (preg_match($pattern, $intentLower)) {
-                $intentType = 'greeting';
-                break;
-            }
-        }
+        // 
+        // ❌ KEINE Pattern-basierte Kategorisierung!
+        // ❌ KEINE Intent-Erkennung!
+        // ❌ KEINE automatischen Entscheidungen!
+        // 
+        // Die LLM entscheidet selbst, ob sie Tools braucht oder nicht.
+        // Diese Methode gibt nur Info zurück für Debug-Zwecke.
         
         // Tools verfügbar? (nur für Info)
         $discovery = new ToolDiscoveryService($registry);
@@ -1438,11 +1432,9 @@ class CoreToolPlaygroundController extends Controller
         // Die LLM entscheidet selbst, ob sie Tools braucht oder nicht
         
         return [
-            'intent_type' => $intentType, // Nur für Info/Debug
+            'intent_type' => 'unclear', // Immer unclear - LLM entscheidet selbst
             'can_solve_independently' => null, // LLM entscheidet selbst
-            'reason' => $intentType === 'greeting' 
-                ? 'Begrüßung erkannt - LLM entscheidet selbst, ob Tools benötigt werden'
-                : 'LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht (MCP Best Practice)',
+            'reason' => 'LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht (MCP Best Practice)',
             'needs_tools' => null, // LLM entscheidet selbst
             'can_help_with_tools' => count($relevantTools) > 0, // Nur Info: Tools sind verfügbar
             'relevant_tools_count' => count($relevantTools),
