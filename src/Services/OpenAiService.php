@@ -662,10 +662,47 @@ WICHTIG - Grenzen erkennen:
     private function buildResponsesInput(array $messages): array
     {
         $input = [];
+        $lastAssistantIndex = null;
+        
         foreach ($messages as $m) {
-            $text = is_array($m['content'] ?? null) ? json_encode($m['content']) : ($m['content'] ?? '');
-            $input[] = [ 'role' => $m['role'] ?? 'user', 'content' => $text ];
+            $role = $m['role'] ?? 'user';
+            
+            // WICHTIG: Responses API unterstützt 'tool' role nicht!
+            // Tool-Results müssen als User-Message gesendet werden
+            // Format: User-Message mit Tool-Result als Content
+            if ($role === 'tool') {
+                // Tool-Result - konvertiere zu User-Message
+                $toolCallId = $m['tool_call_id'] ?? null;
+                $content = $m['content'] ?? '';
+                
+                // Versuche Tool-Result zu parsen, um es lesbarer zu machen
+                $parsed = json_decode($content, true);
+                if (is_array($parsed)) {
+                    // Formatiere Tool-Result als lesbaren Text
+                    $resultText = "Tool-Result (call_id: {$toolCallId}): " . json_encode($parsed, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+                } else {
+                    $resultText = "Tool-Result (call_id: {$toolCallId}): " . $content;
+                }
+                
+                $input[] = [
+                    'role' => 'user',
+                    'content' => $resultText,
+                ];
+            } else {
+                // Normale Messages (user, assistant, system)
+                $text = is_array($m['content'] ?? null) ? json_encode($m['content']) : ($m['content'] ?? '');
+                $input[] = [
+                    'role' => $role,
+                    'content' => $text,
+                ];
+                
+                // Speichere Index der letzten Assistant-Message (für zukünftige Erweiterungen)
+                if ($role === 'assistant') {
+                    $lastAssistantIndex = count($input) - 1;
+                }
+            }
         }
+        
         return $input;
     }
 
