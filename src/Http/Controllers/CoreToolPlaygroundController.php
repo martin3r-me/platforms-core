@@ -12,7 +12,6 @@ use Platform\Core\Tools\ToolDiscoveryService;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Services\OpenAiService;
-use Platform\Core\Tools\ToolExecutor;
 use Platform\Core\Services\ToolCacheService;
 use Platform\Core\Services\ToolTimeoutService;
 use Platform\Core\Services\ToolValidationService;
@@ -224,6 +223,7 @@ class CoreToolPlaygroundController extends Controller
             ];
             
             // STEP 2: Zeige IMMER alle Tools (MCP Best Practice)
+            $discoveredTools = []; // Initialisiere vor dem Block
             {
                 // MCP BEST PRACTICE: Zeige IMMER alle Tools
                 // Die LLM entscheidet selbst, welches Tool sie braucht
@@ -233,9 +233,9 @@ class CoreToolPlaygroundController extends Controller
                     // Das LLM sieht alle Tools und entscheidet selbst, welches es braucht
                     $allTools = $discovery->findByIntent($intent);
                 
-                // FÜR DIE SIMULATION: Zeige alle Tools
-                // In der echten AI-Integration würde das LLM alle Tools sehen und selbst entscheiden
-                $discoveredTools = $allTools;
+                    // FÜR DIE SIMULATION: Zeige alle Tools
+                    // In der echten AI-Integration würde das LLM alle Tools sehen und selbst entscheiden
+                    $discoveredTools = $allTools;
                 
                 $simulation['debug']['mcp_pattern'] = true;
                 $simulation['debug']['total_tools_available'] = count($allTools);
@@ -462,10 +462,24 @@ class CoreToolPlaygroundController extends Controller
                     }
                     
                 } catch (\Throwable $e) {
+                    // Fehler beim OpenAI-Aufruf - füge Details hinzu
                     $simulation['final_response'] = [
                         'type' => 'error',
                         'message' => 'Fehler beim Aufruf von OpenAiService: ' . $e->getMessage(),
                         'error' => $e->getMessage(),
+                        'error_details' => [
+                            'message' => $e->getMessage(),
+                            'file' => $e->getFile(),
+                            'line' => $e->getLine(),
+                            'class' => get_class($e),
+                            'trace' => array_slice(explode("\n", $e->getTraceAsString()), 0, 10),
+                        ],
+                    ];
+                    $simulation['debug']['openai_error'] = [
+                        'message' => $e->getMessage(),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                        'class' => get_class($e),
                     ];
                 }
                 
