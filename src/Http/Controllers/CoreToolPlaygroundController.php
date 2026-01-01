@@ -1342,21 +1342,25 @@ class CoreToolPlaygroundController extends Controller
         }
         
         // 2. KANN ICH DAS SELBSTSTÄNDIG AUFLÖSEN?
+        // WICHTIG: Diese Analyse ist nur eine grobe Einschätzung
+        // Die LLM sieht ALLE Tools und entscheidet selbst, ob sie welche braucht (MCP Best Practice)
         $canSolveIndependently = false;
         $reason = '';
         
         if ($isQuestion && !$isTask) {
-            // Reine Frage → kann mit generischem Wissen beantwortet werden
+            // Reine Frage → könnte mit generischem Wissen beantwortet werden
+            // ABER: LLM entscheidet selbst, ob sie Tools braucht
             $canSolveIndependently = true;
-            $reason = 'Reine Frage - kann mit generischem Wissen beantwortet werden';
+            $reason = 'Reine Frage erkannt - LLM kann selbst entscheiden, ob Tools benötigt werden';
         } elseif ($isTask) {
-            // Aufgabe → benötigt Tools
+            // Aufgabe → benötigt wahrscheinlich Tools
+            // ABER: LLM entscheidet selbst, welches Tool
             $canSolveIndependently = false;
-            $reason = 'Aufgabe erkannt - benötigt Tools zur Ausführung';
+            $reason = 'Aufgabe erkannt - LLM entscheidet selbst, welche Tools benötigt werden';
         } else {
-            // Unklar → konservativ: benötigt Hilfe
+            // Unklar → LLM sieht alle Tools und entscheidet selbst
             $canSolveIndependently = false;
-            $reason = 'Intent unklar - prüfe ob Tools helfen können';
+            $reason = 'Intent unklar - LLM sieht alle Tools und entscheidet selbst';
         }
         
         // 3. BENÖTIGT TOOLS?
@@ -1417,41 +1421,6 @@ class CoreToolPlaygroundController extends Controller
             ];
         }
         
-        /**
-         * Prüft ob es sich um eine einfache Begrüßung handelt
-         */
-        private function isSimpleGreeting(string $intent): bool
-        {
-            $intentLower = strtolower(trim($intent));
-            
-            // Einfache Begrüßungen (max. 3 Wörter, keine komplexen Strukturen)
-            $greetingPatterns = [
-                '/^(moin|hallo|hi|hey|guten\s+(morgen|tag|abend)|servus|grüß\s+(dich|gott)|ciao|tschüss|bye)$/i',
-                '/^(moin|hallo|hi|hey|guten\s+(morgen|tag|abend)|servus|grüß\s+(dich|gott)|ciao|tschüss|bye)\s*[!.]*$/i',
-                '/^(moin|hallo|hi|hey|guten\s+(morgen|tag|abend)|servus|grüß\s+(dich|gott)|ciao|tschüss|bye)\s+(wie\s+geht|was\s+macht|alles\s+klar|alles\s+gut)/i',
-            ];
-            
-            foreach ($greetingPatterns as $pattern) {
-                if (preg_match($pattern, $intentLower)) {
-                    return true;
-                }
-            }
-            
-            // Prüfe auch: sehr kurze Nachrichten (1-2 Wörter) ohne Task-Patterns
-            $words = preg_split('/\s+/u', $intentLower, -1, PREG_SPLIT_NO_EMPTY);
-            if (count($words) <= 2) {
-                // Prüfe ob es bekannte Begrüßungen sind
-                $simpleGreetings = ['moin', 'hallo', 'hi', 'hey', 'servus', 'ciao', 'tschüss', 'bye', 'guten', 'morgen', 'tag', 'abend'];
-                foreach ($words as $word) {
-                    if (in_array($word, $simpleGreetings)) {
-                        return true;
-                    }
-                }
-            }
-            
-            return false;
-        }
-    
     /**
      * Gibt empfohlene Aktion basierend auf semantischer Analyse zurück
      */
