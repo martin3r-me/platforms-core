@@ -176,6 +176,7 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(\Platform\Core\Services\AuditTrailService::class);
         $this->app->singleton(\Platform\Core\Services\ActionSummaryService::class);
         $this->app->singleton(\Platform\Core\Services\ToolExecutionContextService::class);
+        $this->app->singleton(\Platform\Core\Services\IntentionVerificationService::class);
         
         $this->app->singleton(\Platform\Core\Tools\ToolOrchestrator::class, function ($app) {
             return new \Platform\Core\Tools\ToolOrchestrator(

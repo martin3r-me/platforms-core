@@ -619,6 +619,17 @@ class OpenAiService
             if (!empty($options['source_url'])) { $context['data']['url'] = $options['source_url']; }
             $defaultPrompt = 'Du bist ein hilfreicher Assistent für eine Plattform. Antworte kurz, präzise und auf Deutsch.
 
+WICHTIG - Tool-Namen folgen REST-Pattern:
+- Tools haben Namen wie "module.entity.GET", "module.entity.POST", "module.entity.PUT", "module.entity.DELETE"
+- GET = Lesen/Abrufen (read-only, keine Änderungen)
+- POST = Erstellen/Anlegen (write-Operation)
+- PUT = Aktualisieren/Bearbeiten (write-Operation)
+- DELETE = Löschen/Entfernen (write-Operation)
+- Wenn der Nutzer etwas lesen möchte, nutze Tools mit ".GET"
+- Wenn der Nutzer etwas erstellen möchte, nutze Tools mit ".POST"
+- Wenn der Nutzer etwas ändern möchte, nutze Tools mit ".PUT"
+- Wenn der Nutzer etwas löschen möchte, nutze Tools mit ".DELETE"
+
 WICHTIG - Tool-Nutzung:
 - Prüfe die verfügbaren Tools, wenn der Nutzer eine Frage stellt oder eine Aufgabe gibt
 - Wenn ein Tool in seiner Beschreibung sagt, dass es für die aktuelle Situation passt, rufe es auf
@@ -778,19 +789,29 @@ WICHTIG - Grenzen erkennen:
             }
             
             // Wichtiger Hinweis (LOOSE & GENERISCH)
+            $info .= "WICHTIG - Tool-Namen folgen REST-Pattern:\n";
+            $info .= "- Tools haben Namen wie 'module.entity.GET', 'module.entity.POST', 'module.entity.PUT', 'module.entity.DELETE'\n";
+            $info .= "- GET = Lesen/Abrufen (read-only, keine Änderungen)\n";
+            $info .= "- POST = Erstellen/Anlegen (write-Operation)\n";
+            $info .= "- PUT = Aktualisieren/Bearbeiten (write-Operation)\n";
+            $info .= "- DELETE = Löschen/Entfernen (write-Operation)\n";
+            $info .= "- Wenn der Nutzer etwas lesen möchte, nutze Tools mit '.GET'\n";
+            $info .= "- Wenn der Nutzer etwas erstellen möchte, nutze Tools mit '.POST'\n";
+            $info .= "- Wenn der Nutzer etwas ändern möchte, nutze Tools mit '.PUT'\n";
+            $info .= "- Wenn der Nutzer etwas löschen möchte, nutze Tools mit '.DELETE'\n";
+            $info .= "\n";
             $info .= "WICHTIG - Tool-Nutzung:\n";
             $info .= "- Prüfe die verfügbaren Tools, wenn der Nutzer eine Frage stellt oder eine Aufgabe gibt\n";
             $info .= "- Wenn ein Tool in seiner Beschreibung sagt, dass es für die aktuelle Situation passt, rufe es auf\n";
             $info .= "- Nutze Tools proaktiv - warte nicht darauf, dass der Nutzer explizit nach einem Tool fragt\n";
             $info .= "- Wenn du unsicher bist, welche Tools verfügbar sind, nutze 'tools.GET' um alle Tools zu sehen\n";
-            $info .= "- Wenn ein Tool in der Beschreibung sagt 'RUF DIESES TOOL AUF', dann tue das, wenn die Situation passt\n";
             $info .= "- WICHTIG: Sage NICHT 'Ich werde X tun' oder 'Einen Moment bitte' - FÜHRE die Aktion DIREKT aus! Rufe das Tool sofort auf, ohne vorher anzukündigen, was du tun wirst\n";
             $info .= "- Wenn du ein Tool aufrufen musst, rufe es sofort auf - keine Ankündigungen, keine 'Ich werde...'-Sätze\n";
             $info .= "\n";
             $info .= "DISCOVERY-LAYER & TOOL-CLUSTERING:\n";
-            $info .= "- Standardmäßig siehst du Discovery-Tools (tools.GET, tools.request) und read-only Tools (Lese-Operationen)\n";
-            $info .= "- Wenn du etwas ändern/erstellen/löschen musst, nutze 'tools.GET' mit read_only=false, um write Tools zu sehen\n";
-            $info .= "- Wenn du nur Daten lesen musst, reichen die read-only Tools aus\n";
+            $info .= "- Standardmäßig siehst du Discovery-Tools (tools.GET, tools.request) und read-only Tools (Lese-Operationen, enden mit '.GET')\n";
+            $info .= "- Wenn du etwas ändern/erstellen/löschen musst, nutze 'tools.GET' mit read_only=false, um write Tools zu sehen (POST, PUT, DELETE)\n";
+            $info .= "- Wenn du nur Daten lesen musst, reichen die read-only Tools aus (GET)\n";
             $info .= "- Du kannst selbst entscheiden, welche Tool-Kategorie du brauchst\n";
             $info .= "\n";
             $info .= "Tool-Details: Nutze das Tool 'tools.GET', um alle verfügbaren Tools und ihre Funktionen detailliert zu sehen.\n";

@@ -683,13 +683,74 @@ class CoreToolPlaygroundController extends Controller
                                 ]);
                             }
                             
-                            // Füge Action Summary zur LLM-Antwort hinzu
-                            $finalContent = $llmContent . $actionSummaryText;
+                            // Intention-Verifikation (optional, konfigurierbar)
+                            $verificationText = '';
+                            $enableVerification = config('tools.intention_verification.enabled', true);
+                            $maxCorrectionIterations = config('tools.intention_verification.max_correction_iterations', 2);
+                            $verificationIteration = null;
+                            
+                            if ($enableVerification && count($allToolResults) > 0 && !empty($simulation['action_summary'])) {
+                                try {
+                                    $verificationService = app(\Platform\Core\Services\IntentionVerificationService::class);
+                                    $verification = $verificationService->verify(
+                                        $message, // Original User-Request
+                                        $allToolResults,
+                                        $simulation['action_summary']
+                                    );
+                                    
+                                    if ($verification->hasIssues()) {
+                                        $verificationText = "\n\n⚠️ **Verifikation:**\n";
+                                        $verificationText .= $verification->getIssuesText();
+                                        $verificationText .= "\n\nBitte prüfe die Ergebnisse und korrigiere falls nötig.";
+                                        
+                                        // Füge Verifikations-Hinweis zu Messages hinzu (für LLM-Korrektur)
+                                        // Aber nur wenn wir noch nicht zu viele Iterationen haben
+                                        $maxIterationsForCorrection = $maxIterations - $maxCorrectionIterations;
+                                        if ($iteration < $maxIterationsForCorrection) {
+                                            $messages[] = [
+                                                'role' => 'system',
+                                                'content' => $verificationText
+                                            ];
+                                            
+                                            // Setze Flag für Verifikations-Iteration
+                                            $verificationIteration = $iteration;
+                                            
+                                            // Weiter mit nächster Iteration (LLM kann korrigieren)
+                                            $simulation['steps'][] = [
+                                                'step' => 3 + $iteration,
+                                                'name' => "Verifikation (Runde {$iteration})",
+                                                'description' => 'Verifikation hat Probleme gefunden - LLM kann korrigieren',
+                                                'timestamp' => now()->toIso8601String(),
+                                                'verification_issues' => $verification->getIssuesText(),
+                                            ];
+                                            
+                                            continue; // Weiter mit nächster Iteration
+                                        } else {
+                                            // Zu viele Iterationen - füge Verifikations-Hinweis zur finalen Antwort hinzu
+                                            $verificationText = "\n\n⚠️ **Hinweis:** " . $verification->getIssuesText();
+                                        }
+                                    }
+                                    
+                                    $simulation['verification'] = [
+                                        'is_ok' => $verification->isOk(),
+                                        'has_issues' => $verification->hasIssues(),
+                                        'issues_text' => $verification->hasIssues() ? $verification->getIssuesText() : null,
+                                    ];
+                                } catch (\Throwable $e) {
+                                    // Silent fail - Verifikation optional
+                                    \Log::debug('[CoreToolPlayground] Verifikation konnte nicht durchgeführt werden', [
+                                        'error' => $e->getMessage(),
+                                    ]);
+                                }
+                            }
+                            
+                            // Füge Action Summary und Verifikation zur LLM-Antwort hinzu
+                            $finalContent = $llmContent . $actionSummaryText . $verificationText;
                             
                             $simulation['final_response'] = [
                                 'type' => 'direct_answer',
-                                'message' => $finalContent, // ECHTE Antwort der LLM + Summary
-                                'content' => $finalContent, // ECHTE Antwort der LLM + Summary
+                                'message' => $finalContent, // ECHTE Antwort der LLM + Summary + Verifikation
+                                'content' => $finalContent, // ECHTE Antwort der LLM + Summary + Verifikation
                                 'iterations' => $iteration,
                                 'tool_results' => $allToolResults,
                                 'raw_response' => $response, // Vollständige Response für Debugging
@@ -698,7 +759,7 @@ class CoreToolPlaygroundController extends Controller
                             // Füge finale Assistant-Message zu Messages hinzu (für Chat-Historie)
                             $messages[] = [
                                 'role' => 'assistant',
-                                'content' => $finalContent, // Mit Action Summary
+                                'content' => $finalContent, // Mit Action Summary + Verifikation
                             ];
                             
                             // Beende Multi-Step-Loop

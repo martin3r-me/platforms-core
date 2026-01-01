@@ -97,5 +97,20 @@ return [
         'metrics' => env('TOOLS_METRICS', true),
         'analytics' => env('TOOLS_ANALYTICS', true),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Intention Verification
+    |--------------------------------------------------------------------------
+    |
+    | Prüft, ob die Tool-Results die ursprüngliche User-Intention erfüllen.
+    | Wenn Probleme gefunden werden, kann die LLM automatisch korrigieren.
+    |
+    */
+    'intention_verification' => [
+        'enabled' => env('TOOLS_INTENTION_VERIFICATION_ENABLED', true),
+        'max_correction_iterations' => env('TOOLS_INTENTION_VERIFICATION_MAX_ITERATIONS', 2), // Max 2 zusätzliche Iterationen für Korrektur
+        'use_llm_extraction' => env('TOOLS_INTENTION_VERIFICATION_USE_LLM', true), // LLM für komplexe Intentionen nutzen
+    ],
 ];
 
