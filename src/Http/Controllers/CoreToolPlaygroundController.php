@@ -1412,6 +1412,19 @@ class CoreToolPlaygroundController extends Controller
         // WICHTIG: Nur für Debug/Info - KEINE Entscheidungen!
         // Die LLM sieht alle Tools und entscheidet selbst!
         
+        // Einfache Kategorisierung NUR für Debug/Info (nicht für Entscheidungen!)
+        $intentLower = strtolower(trim($intent));
+        $intentType = 'unclear';
+        
+        // Begrüßungen erkennen (nur für Info)
+        $greetingPatterns = ['/^(moin|hallo|hi|hey|guten (tag|morgen|abend)|servus|grü(ß|ss)(e|i))/i'];
+        foreach ($greetingPatterns as $pattern) {
+            if (preg_match($pattern, $intentLower)) {
+                $intentType = 'greeting';
+                break;
+            }
+        }
+        
         // Tools verfügbar? (nur für Info)
         $discovery = new ToolDiscoveryService($registry);
         $relevantTools = [];
@@ -1421,13 +1434,15 @@ class CoreToolPlaygroundController extends Controller
             $relevantTools = [];
         }
         
-        // KEINE Pattern-basierte Kategorisierung mehr!
+        // KEINE Pattern-basierte Entscheidungen!
         // Die LLM entscheidet selbst, ob sie Tools braucht oder nicht
         
         return [
-            'intent_type' => 'unclear', // Keine Pattern-basierte Kategorisierung mehr
+            'intent_type' => $intentType, // Nur für Info/Debug
             'can_solve_independently' => null, // LLM entscheidet selbst
-            'reason' => 'LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht (MCP Best Practice)',
+            'reason' => $intentType === 'greeting' 
+                ? 'Begrüßung erkannt - LLM entscheidet selbst, ob Tools benötigt werden'
+                : 'LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht (MCP Best Practice)',
             'needs_tools' => null, // LLM entscheidet selbst
             'can_help_with_tools' => count($relevantTools) > 0, // Nur Info: Tools sind verfügbar
             'relevant_tools_count' => count($relevantTools),

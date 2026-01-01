@@ -806,6 +806,11 @@ class OpenAiService
                     'type' => $property['type'] ?? 'string',
                 ];
                 
+                // WICHTIG: Für Arrays muss 'items' erhalten bleiben (OpenAI-Requirement)
+                if (($property['type'] ?? '') === 'array' && isset($property['items'])) {
+                    $compressedProperty['items'] = $this->compressSchema($property['items']);
+                }
+                
                 // Nur required fields behalten
                 if (isset($schema['required']) && in_array($key, $schema['required'])) {
                     // Für required fields: kürze description auf max 50 Zeichen
@@ -821,6 +826,15 @@ class OpenAiService
                     }
                 } else {
                     // Für optionale fields: nur type, keine description (spart Tokens)
+                    // ABER: items für Arrays immer behalten!
+                    if (($property['type'] ?? '') === 'array' && isset($property['description'])) {
+                        // Für optionale Arrays: description behalten (wichtig für LLM)
+                        if (mb_strlen($property['description']) > 50) {
+                            $compressedProperty['description'] = mb_substr($property['description'], 0, 47) . '...';
+                        } else {
+                            $compressedProperty['description'] = $property['description'];
+                        }
+                    }
                 }
                 
                 $compressedProperties[$key] = $compressedProperty;
