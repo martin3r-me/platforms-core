@@ -772,6 +772,26 @@ class CoreToolPlaygroundController extends Controller
 
         } catch (\Throwable $e) {
             // Erweitere Simulation mit Fehler-Info für Debug-Export
+            // WICHTIG: Stelle sicher, dass $simulation initialisiert ist
+            if (!isset($simulation)) {
+                $userMessage = '';
+                try {
+                    $userMessage = $request->input('message', '');
+                } catch (\Throwable $reqError) {
+                    // Request nicht verfügbar
+                    $userMessage = 'Fehler beim Zugriff auf Request';
+                }
+                
+                $simulation = [
+                    'timestamp' => now()->toIso8601String(),
+                    'user_message' => $userMessage,
+                    'steps' => [],
+                    'tools_discovered' => [],
+                    'execution_flow' => [],
+                    'final_response' => null,
+                ];
+            }
+            
             // WICHTIG: Stelle sicher, dass alle Arrays initialisiert sind
             if (!isset($simulation['steps'])) {
                 $simulation['steps'] = [];
@@ -797,6 +817,18 @@ class CoreToolPlaygroundController extends Controller
                 'trace' => explode("\n", substr($e->getTraceAsString(), 0, 5000)), // Erste 5000 Zeichen als Array
                 'class' => get_class($e),
             ];
+            
+            // Füge error_details für Frontend hinzu
+            $simulation['final_response']['error_details'] = [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'class' => get_class($e),
+                'trace' => array_slice(explode("\n", $e->getTraceAsString()), 0, 20), // Erste 20 Zeilen
+            ];
+            
+            // Error Handler wiederherstellen
+            restore_error_handler();
             
             // WICHTIG: Stelle sicher, dass die Antwort immer valides JSON ist
             try {
