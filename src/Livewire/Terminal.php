@@ -7,6 +7,10 @@ use Platform\Core\Models\CoreChat;
 use Platform\Core\Models\CoreChatThread;
 use Platform\Core\Models\CoreChatMessage;
 use Platform\Core\Services\OpenAiService;
+use Platform\Core\Tools\ToolRegistry;
+use Platform\Core\Tools\ToolExecutor;
+use Platform\Core\Tools\ToolOrchestrator;
+use Platform\Core\Contracts\ToolContext;
 use Illuminate\Support\Facades\Auth;
 
 class Terminal extends Component
@@ -268,9 +272,27 @@ class Terminal extends Component
                 ->orderBy('created_at', 'asc')
                 ->get()
                 ->map(function($message) {
+                    $content = $message->content;
+                    
+                    // Wenn Tool-Message, versuche JSON zu parsen und Tool-Call-ID zu extrahieren
+                    if ($message->role === 'tool') {
+                        $parsed = json_decode($content, true);
+                        if (is_array($parsed) && isset($parsed['tool_call_id'])) {
+                            return [
+                                'role' => 'tool',
+                                'tool_call_id' => $parsed['tool_call_id'],
+                                'content' => json_encode([
+                                    'ok' => $parsed['success'] ?? true,
+                                    'data' => $parsed['data'] ?? null,
+                                    'error' => $parsed['error'] ?? null,
+                                ], JSON_UNESCAPED_UNICODE),
+                            ];
+                        }
+                    }
+                    
                     return [
                         'role' => $message->role,
-                        'content' => $message->content,
+                        'content' => $content,
                     ];
                 })
                 ->toArray();
@@ -316,19 +338,152 @@ class Terminal extends Component
 
     private function handleToolCalls(array $toolCalls)
     {
+        // WICHTIG: Nutze echte Tool-Execution wie CoreAiStreamController
+        $registry = app(ToolRegistry::class);
+        $executor = app(ToolExecutor::class);
+        $orchestrator = app(ToolOrchestrator::class);
+        $context = ToolContext::fromAuth();
+        
+        $toolResults = [];
+        
         foreach ($toolCalls as $toolCall) {
-            $this->currentTool = $toolCall['function']['name'] ?? 'unknown';
-            $this->progressText = "Tool '{$this->currentTool}' wird ausgeführt...";
+            $openAiToolName = $toolCall['function']['name'] ?? null;
+            $toolArguments = json_decode($toolCall['function']['arguments'] ?? '{}', true);
+            $toolCallId = $toolCall['id'] ?? null;
+            
+            if (!$openAiToolName) continue;
+            
+            // Tool-Name zurückmappen (von OpenAI-Format zu internem Format)
+            // OpenAI: "planner_projects_create" -> Intern: "planner.projects.create"
+            $internalToolName = str_replace('_', '.', $openAiToolName);
+            
+            $this->currentTool = $internalToolName;
+            $this->progressText = "Tool '{$internalToolName}' wird ausgeführt...";
             $this->dispatch('terminal-progress', ['text' => $this->progressText]);
-            sleep(1);
-            CoreChatMessage::create([
-                'core_chat_id' => $this->activeChatId,
-                'thread_id' => $this->activeThreadId,
-                'role' => 'tool',
-                'content' => "Tool '{$this->currentTool}' erfolgreich ausgeführt.",
-                'tokens_in' => 0,
-            ]);
+            
+            try {
+                // Nutze ToolOrchestrator für automatische Tool-Chains (wie CoreAiStreamController)
+                $result = $orchestrator->executeWithDependencies(
+                    $internalToolName,
+                    $toolArguments,
+                    $context,
+                    maxDepth: 5,
+                    planFirst: true
+                );
+                
+                // Prüfe ob User-Input benötigt wird
+                if ($result->success && isset($result->data['requires_user_input']) && $result->data['requires_user_input'] === true) {
+                    // User-Input benötigt - speichere State und zeige User-Input-UI
+                    CoreChatMessage::create([
+                        'core_chat_id' => $this->activeChatId,
+                        'thread_id' => $this->activeThreadId,
+                        'role' => 'tool',
+                        'content' => json_encode([
+                            'tool_call_id' => $toolCallId,
+                            'requires_user_input' => true,
+                            'message' => $result->data['message'] ?? 'Bitte wähle aus der Liste aus.',
+                            'data' => $result->data['dependency_tool_result'] ?? $result->data,
+                            'next_tool' => $result->data['next_tool'] ?? $internalToolName,
+                            'next_tool_args' => $result->data['next_tool_args'] ?? $toolArguments,
+                        ], JSON_UNESCAPED_UNICODE),
+                        'tokens_in' => 0,
+                    ]);
+                    
+                    // TODO: User-Input-UI anzeigen (kann später implementiert werden)
+                    // Für jetzt: Verwende aktuelles Team oder ersten Eintrag
+                    $this->progressText = 'Warte auf User-Input...';
+                    $this->dispatch('terminal-progress', ['text' => $this->progressText]);
+                    
+                    // Fallback: Verwende aktuelles Team oder ersten Eintrag
+                    $userInput = null;
+                    if (isset($result->data['dependency_tool_result']['teams'])) {
+                        $teams = $result->data['dependency_tool_result']['teams'];
+                        if (isset($result->data['current_team_id'])) {
+                            $userInput = $result->data['current_team_id'];
+                        } elseif (count($teams) === 1) {
+                            $userInput = $teams[0]['id'] ?? null;
+                        }
+                    }
+                    
+                    if ($userInput) {
+                        // Automatisch mit User-Input fortfahren
+                        $nextTool = $result->data['next_tool'] ?? $internalToolName;
+                        $nextToolArgs = $result->data['next_tool_args'] ?? $toolArguments;
+                        $nextToolArgs['team_id'] = $userInput;
+                        
+                        // Führe Tool erneut aus mit User-Input
+                        $result = $orchestrator->executeWithDependencies(
+                            $nextTool,
+                            $nextToolArgs,
+                            $context,
+                            maxDepth: 5,
+                            planFirst: true
+                        );
+                    } else {
+                        // Kein automatischer Fallback möglich - User muss eingreifen
+                        $this->loadMessages();
+                        $this->dispatch('terminal-scroll');
+                        return;
+                    }
+                }
+                
+                // Tool-Result für OpenAI-Format vorbereiten
+                $resultArray = $result->toArray();
+                $toolResults[] = [
+                    'tool_call_id' => $toolCallId,
+                    'role' => 'tool',
+                    'content' => json_encode($resultArray, JSON_UNESCAPED_UNICODE),
+                ];
+                
+                // Speichere Tool-Result in DB
+                CoreChatMessage::create([
+                    'core_chat_id' => $this->activeChatId,
+                    'thread_id' => $this->activeThreadId,
+                    'role' => 'tool',
+                    'content' => json_encode([
+                        'tool_call_id' => $toolCallId,
+                        'tool' => $internalToolName,
+                        'success' => $result->success,
+                        'data' => $result->data,
+                        'error' => $result->error,
+                    ], JSON_UNESCAPED_UNICODE),
+                    'tokens_in' => 0,
+                ]);
+                
+            } catch (\Throwable $e) {
+                // Fehler beim Tool-Execution
+                $errorResult = [
+                    'ok' => false,
+                    'error' => [
+                        'code' => 'EXECUTION_ERROR',
+                        'message' => $e->getMessage()
+                    ]
+                ];
+                
+                $toolResults[] = [
+                    'tool_call_id' => $toolCallId,
+                    'role' => 'tool',
+                    'content' => json_encode($errorResult, JSON_UNESCAPED_UNICODE),
+                ];
+                
+                CoreChatMessage::create([
+                    'core_chat_id' => $this->activeChatId,
+                    'thread_id' => $this->activeThreadId,
+                    'role' => 'tool',
+                    'content' => json_encode([
+                        'tool_call_id' => $toolCallId,
+                        'tool' => $internalToolName,
+                        'error' => $e->getMessage(),
+                    ], JSON_UNESCAPED_UNICODE),
+                    'tokens_in' => 0,
+                ]);
+            }
         }
+        
+        // Lade Messages neu (inkl. Tool-Results)
+        $this->loadMessages();
+        
+        // Rufe OpenAI erneut auf mit Tool-Results (Multi-Step)
         $this->getAiResponse();
     }
 

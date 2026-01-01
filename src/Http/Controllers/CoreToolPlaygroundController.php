@@ -12,6 +12,7 @@ use Platform\Core\Tools\ToolDiscoveryService;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Services\OpenAiService;
+use Platform\Core\Tools\ToolExecutor;
 use Platform\Core\Services\ToolCacheService;
 use Platform\Core\Services\ToolTimeoutService;
 use Platform\Core\Services\ToolValidationService;
@@ -210,143 +211,35 @@ class CoreToolPlaygroundController extends Controller
             // Stattdessen: LLM entscheidet erst, ob sie Tools braucht
             // Nur wenn LLM entscheidet, dass sie Tools braucht, zeigen wir alle Tools
             
-            // STEP 1: LLM entscheidet, ob sie Tools braucht (OHNE Tools zu zeigen)
-            // In der echten AI würde die LLM hier entscheiden:
-            // - Kann ich ohne Tools antworten? → Direkt antworten, keine Tools nötig
-            // - Brauche ich Tools? → Zeige alle Tools
+            // STEP 1: MCP BEST PRACTICE - Zeige IMMER alle Tools
+            // Die LLM entscheidet selbst, ob sie Tools braucht oder nicht
+            // Wir filtern oder entscheiden NICHT vorab!
             
-            $llmNeedsTools = null; // LLM entscheidet selbst
-            $discoveredTools = [];
+            $simulation['steps'][] = [
+                'step' => 1,
+                'name' => 'Tool Discovery',
+                'description' => 'Zeige alle verfügbaren Tools (MCP Best Practice)',
+                'timestamp' => now()->toIso8601String(),
+                'llm_decision' => 'LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht',
+            ];
             
-            // SIMULATION: Für die Simulation müssen wir die LLM-Entscheidung simulieren
-            // In der echten AI würde die LLM hier selbst entscheiden, ob sie Tools braucht
-            // Basierend auf der semantischen Analyse (intent_type) simulieren wir die Entscheidung
-            if ($semanticAnalysis['intent_type'] === 'task') {
-                // Klare Aufgabe → LLM würde Tools brauchen
-                $llmNeedsTools = true;
-                $simulation['steps'][] = [
-                    'step' => 1,
-                    'name' => 'LLM-Entscheidung',
-                    'description' => 'LLM hat entschieden: Tools werden benötigt',
-                    'timestamp' => now()->toIso8601String(),
-                    'llm_decision' => 'Tools werden benötigt (Aufgabe erkannt)',
-                ];
-            } else {
-                // Frage oder unklar → LLM würde erst prüfen, ob Tools nötig sind
-                // In der echten AI würde die LLM hier entscheiden, ob sie Tools braucht
-                $llmNeedsTools = false; // Für Simulation: LLM entscheidet, dass keine Tools nötig sind
-                $simulation['steps'][] = [
-                    'step' => 1,
-                    'name' => 'LLM-Entscheidung',
-                    'description' => 'LLM hat entschieden: Keine Tools benötigt',
-                    'timestamp' => now()->toIso8601String(),
-                    'llm_decision' => 'Keine Tools benötigt (kann direkt antworten)',
-                ];
-            }
-            
-            // STEP 2: Nur wenn LLM Tools braucht, zeigen wir alle Tools
-            if ($llmNeedsTools) {
-                $simulation['steps'][] = [
-                    'step' => 2,
-                    'name' => 'Tool Discovery',
-                    'description' => 'Zeige alle verfügbaren Tools (LLM hat entschieden, dass Tools benötigt werden)',
-                    'timestamp' => now()->toIso8601String(),
-                ];
-                
-                // LOOSE COUPLED: Generische Modul-Erkennung (nicht hart gecoded!)
-                // Extrahiere erwähnte Module aus dem Intent (z.B. "okr", "crm", "planner")
-                $mentionedModules = [];
-                $allRegisteredTools = $registry->all();
-                $availableModules = [];
-                
-                // Sammle alle verfügbaren Module aus Tool-Namen (z.B. "planner.projects.create" → "planner")
-                foreach ($allRegisteredTools as $tool) {
-                    $toolName = $tool->getName();
-                    if (str_contains($toolName, '.')) {
-                        $module = explode('.', $toolName)[0];
-                        if (!in_array($module, $availableModules)) {
-                            $availableModules[] = $module;
-                        }
-                    }
-                }
-                
-                // Prüfe ob Module im Intent erwähnt werden (generisch, nicht hart gecoded!)
-                foreach ($availableModules as $module) {
-                    // Prüfe ob Modul-Name oder verwandte Begriffe im Intent vorkommen
-                    $modulePattern = '/\b' . preg_quote($module, '/') . '\b/i';
-                    if (preg_match($modulePattern, $intentLower)) {
-                        $mentionedModules[] = $module;
-                    }
-                }
-                
-                // Prüfe ob erwähnte Module Tools haben
-                $missingModuleTools = [];
-                foreach ($mentionedModules as $module) {
-                    $hasModuleTool = false;
-                    foreach ($allRegisteredTools as $tool) {
-                        $toolName = strtolower($tool->getName());
-                        if (str_starts_with($toolName, $module . '.')) {
-                            $hasModuleTool = true;
-                            break;
-                        }
-                    }
-                    if (!$hasModuleTool) {
-                        $missingModuleTools[] = $module;
-                    }
-                }
-                
-                // MCP BEST PRACTICE: Jetzt zeigen wir ALLE Tools (nur wenn LLM sie braucht!)
+            // STEP 2: Zeige IMMER alle Tools (MCP Best Practice)
+            {
+                // MCP BEST PRACTICE: Zeige IMMER alle Tools
+                // Die LLM entscheidet selbst, welches Tool sie braucht
+                // KEINE Filterung, KEINE Pattern-basierte Entscheidungen!
                 try {
                     // findByIntent gibt ALLE Tools zurück (MCP-Pattern)
                     // Das LLM sieht alle Tools und entscheidet selbst, welches es braucht
                     $allTools = $discovery->findByIntent($intent);
                 
-                // LOOSE COUPLED: Wenn Module erwähnt werden, aber keine Tools existieren
-                // → Füge tools.request hinzu und filtere Tools von anderen Modulen raus
-                if (!empty($missingModuleTools)) {
-                    $requestTool = $registry->get('tools.request');
-                    if ($requestTool) {
-                        // Filtere Tools raus, die zu anderen erwähnten Modulen gehören
-                        // (aber nicht zu den fehlenden Modulen)
-                        $allTools = array_filter($allTools, function($tool) use ($missingModuleTools, $availableModules) {
-                            $toolName = strtolower($tool->getName());
-                            // Wenn Tool zu einem anderen Modul gehört (nicht zu fehlenden Modulen)
-                            foreach ($availableModules as $module) {
-                                if (!in_array($module, $missingModuleTools) && str_starts_with($toolName, $module . '.')) {
-                                    // Tool gehört zu einem anderen erwähnten Modul → rausfiltern
-                                    return false;
-                                }
-                            }
-                            return true;
-                        });
-                        $allTools = array_values($allTools); // Re-index
-                        
-                        // Füge tools.request hinzu, wenn noch nicht vorhanden
-                        $hasRequestTool = false;
-                        foreach ($allTools as $tool) {
-                            if ($tool->getName() === 'tools.request') {
-                                $hasRequestTool = true;
-                                break;
-                            }
-                        }
-                        if (!$hasRequestTool) {
-                            $allTools[] = $requestTool;
-                        }
-                        
-                        $simulation['debug']['module_intent_detected'] = $mentionedModules;
-                        $simulation['debug']['missing_module_tools'] = $missingModuleTools;
-                        $simulation['debug']['tools_request_suggested'] = true;
-                    }
-                }
-                
-                // FÜR DIE SIMULATION: Zeige alle Tools, aber markiere, dass das LLM entscheidet
-                // In der echten AI-Integration würde das LLM alle Tools sehen und selbst filtern
+                // FÜR DIE SIMULATION: Zeige alle Tools
+                // In der echten AI-Integration würde das LLM alle Tools sehen und selbst entscheiden
                 $discoveredTools = $allTools;
                 
-                    $simulation['debug']['mcp_pattern'] = true;
-                    $simulation['debug']['total_tools_available'] = count($allTools);
-                    $simulation['debug']['available_modules'] = $availableModules;
-                    $simulation['debug']['note'] = 'LLM sieht alle Tools und entscheidet selbst, welches sie braucht (MCP Best Practice)';
+                $simulation['debug']['mcp_pattern'] = true;
+                $simulation['debug']['total_tools_available'] = count($allTools);
+                $simulation['debug']['note'] = 'LLM sieht alle Tools und entscheidet selbst, welches sie braucht (MCP Best Practice)';
                 } catch (\Throwable $e) {
                     // Bei Fehlern: leeres Array verwenden
                     $discoveredTools = [];
@@ -367,19 +260,6 @@ class CoreToolPlaygroundController extends Controller
                     'tools' => array_map(fn($t) => $t->getName(), $discoveredTools),
                     'note' => 'LLM sieht alle Tools und entscheidet selbst, welches sie braucht (MCP Best Practice)',
                 ];
-            } else {
-                // LLM hat entschieden, dass keine Tools nötig sind
-                // Keine Tools zeigen - spart Kosten!
-                $discoveredTools = [];
-                $simulation['tools_discovered'] = [];
-                $simulation['steps'][] = [
-                    'step' => 2,
-                    'name' => 'Tool Discovery',
-                    'description' => 'Keine Tools angezeigt (LLM hat entschieden, dass keine benötigt werden)',
-                    'timestamp' => now()->toIso8601String(),
-                    'result' => 'Keine Tools angezeigt - LLM kann direkt antworten',
-                    'note' => 'Kosten-Optimierung: Tools werden nur angezeigt, wenn LLM sie benötigt',
-                ];
             }
 
             // STEP 2: LLM-Entscheidung basierend auf semantischer Analyse
@@ -398,43 +278,9 @@ class CoreToolPlaygroundController extends Controller
             $simulation['debug']['llm_decision'] = 'LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht';
             $simulation['debug']['reason'] = $semanticAnalysis['reason'];
             
-            // LOOSE COUPLED: Automatisches Feedback-System
-            // Wenn LLM eine Aufgabe lösen soll, aber keine passenden Tools findet → tools.request erstellen
-            $autoRequestCreated = false;
-            if ($semanticAnalysis['needs_tool_request'] && $semanticAnalysis['intent_type'] === 'task') {
-                // Aufgabe erkannt, aber keine Tools verfügbar → automatisch Request erstellen
-                try {
-                    $requestTool = $registry->get('tools.request');
-                    if ($requestTool) {
-                        // Erstelle automatisch einen Tool-Request
-                        $context = ToolContext::fromAuth();
-                        $autoRequestResult = $requestTool->execute([
-                            'description' => "Automatisch erstellter Request für: {$message}",
-                            'use_case' => "LLM konnte Aufgabe nicht lösen, da keine passenden Tools verfügbar sind. Semantische Analyse: {$semanticAnalysis['reason']}",
-                            'suggested_name' => null,
-                            'category' => 'auto-generated',
-                            'module' => $missingModuleTools[0] ?? null,
-                        ], $context);
-                        
-                        if ($autoRequestResult->success) {
-                            $autoRequestCreated = true;
-                            $simulation['debug']['auto_tool_request_created'] = true;
-                            $simulation['debug']['auto_request_id'] = $autoRequestResult->data['request_id'] ?? null;
-                            $simulation['steps'][] = [
-                                'step' => 1.5,
-                                'name' => 'Automatischer Tool-Request',
-                                'description' => 'Da keine passenden Tools für die Aufgabe gefunden wurden, wurde automatisch ein Tool-Request erstellt.',
-                                'timestamp' => now()->toIso8601String(),
-                                'request_id' => $autoRequestResult->data['request_id'] ?? null,
-                                'reason' => $semanticAnalysis['reason'],
-                            ];
-                        }
-                    }
-                } catch (\Throwable $e) {
-                    // Silent fail - Request-Erstellung ist optional
-                    $simulation['debug']['auto_request_error'] = $e->getMessage();
-                }
-            }
+            // WICHTIG: KEINE automatischen Tool-Requests!
+            // Die LLM entscheidet selbst, ob sie tools.request aufruft
+            // Wir erstellen keine automatischen Requests basierend auf Pattern-Matching
             
             // Multi-Step: Wenn User-Input vorhanden ist, verwende es für das nächste Tool
             if ($step > 0 && !empty($userInput) && !empty($previousResult)) {
@@ -477,44 +323,158 @@ class CoreToolPlaygroundController extends Controller
                     throw new \RuntimeException("Kein next_tool im previous_result gefunden");
                 }
             } else {
-                // SIMULATION: LLM-Entscheidung simulieren
-                // In der echten AI würde das LLM jetzt entscheiden:
-                // - Kann ich ohne Tools antworten? → Direkt antworten
-                // - Brauche ich Tools? → Tool auswählen und aufrufen
+                // WICHTIG: Nutze ECHTE Services statt Simulation!
+                // Der Playground ist die echte Test-Umgebung
                 
-                // Für die Simulation: Wenn es eine klare Aufgabe ist, wähle das passende Tool
-                // (Das simuliert die LLM-Entscheidung, ist aber nicht hardcoded - die LLM würde das auch tun)
-                if ($semanticAnalysis['intent_type'] === 'task' && count($discoveredTools) > 0) {
-                    // Klare Aufgabe erkannt → LLM würde ein Tool auswählen
-                    // In der echten AI würde die LLM das passende Tool basierend auf der Beschreibung wählen
-                    // Für die Simulation nehmen wir das erste Tool, das zur Aufgabe passt
-                    $primaryTool = $discoveredTools[0];
-                    $toolName = $primaryTool->getName();
+                $simulation['steps'][] = [
+                    'step' => 2,
+                    'name' => 'OpenAI Service aufrufen',
+                    'description' => 'Nutze echten OpenAiService.chat() - LLM entscheidet selbst',
+                    'timestamp' => now()->toIso8601String(),
+                ];
+                
+                // Nutze echten OpenAiService (wie im Terminal/CoreAiStreamController)
+                $openAiService = app(OpenAiService::class);
+                $executor = app(ToolExecutor::class);
+                $orchestrator = app(ToolOrchestrator::class);
+                
+                // Erstelle Messages-Array (wie im Terminal)
+                $messages = [
+                    [
+                        'role' => 'user',
+                        'content' => $message,
+                    ],
+                ];
+                
+                // Tool-Executor Callback (wie in CoreAiStreamController)
+                $toolCalls = [];
+                $toolResults = [];
+                
+                $simulation['steps'][] = [
+                    'step' => 3,
+                    'name' => 'LLM-Entscheidung',
+                    'description' => 'LLM sieht alle Tools und entscheidet selbst',
+                    'timestamp' => now()->toIso8601String(),
+                ];
+                
+                try {
+                    // Rufe echten OpenAiService auf (zeigt automatisch alle Tools)
+                    $response = $openAiService->chat($messages, 'gpt-4o-mini', [
+                        'max_tokens' => 2000,
+                        'temperature' => 0.7,
+                        'tools' => null, // null = Tools aktivieren (OpenAiService ruft getAvailableTools() auf)
+                    ]);
                     
-                    // Versuche Argumente aus Message zu extrahieren
-                    try {
-                        $arguments = $this->extractArguments($message, $primaryTool);
-                    } catch (\Throwable $e) {
-                        $arguments = [];
-                        $simulation['debug']['argument_extraction_error'] = $e->getMessage();
+                    $simulation['debug']['openai_response'] = [
+                        'has_content' => !empty($response['content']),
+                        'has_tool_calls' => !empty($response['tool_calls']),
+                        'tool_calls_count' => count($response['tool_calls'] ?? []),
+                        'finish_reason' => $response['finish_reason'] ?? null,
+                    ];
+                    
+                    // Wenn LLM Tool-Calls gemacht hat
+                    if (!empty($response['tool_calls'])) {
+                        $simulation['steps'][] = [
+                            'step' => 4,
+                            'name' => 'Tool-Calls erkannt',
+                            'description' => 'LLM hat entschieden, Tools aufzurufen',
+                            'timestamp' => now()->toIso8601String(),
+                            'tool_calls' => $response['tool_calls'],
+                        ];
+                        
+                        // Führe echte Tool-Execution durch (wie in CoreAiStreamController)
+                        foreach ($response['tool_calls'] as $toolCall) {
+                            $toolName = $toolCall['function']['name'] ?? null;
+                            $toolArguments = json_decode($toolCall['function']['arguments'] ?? '{}', true);
+                            
+                            if (!$toolName) continue;
+                            
+                            // Tool-Name zurückmappen (von OpenAI-Format zu internem Format)
+                            $internalToolName = $this->denormalizeToolNameFromOpenAi($toolName);
+                            
+                            $simulation['steps'][] = [
+                                'step' => 5,
+                                'name' => 'Tool Execution',
+                                'description' => "Führe Tool aus: {$internalToolName}",
+                                'timestamp' => now()->toIso8601String(),
+                                'tool' => $internalToolName,
+                                'arguments' => $toolArguments,
+                            ];
+                            
+                            // Nutze echten ToolOrchestrator (wie in CoreAiStreamController)
+                            $context = ToolContext::fromAuth();
+                            $startTime = microtime(true);
+                            
+                            try {
+                                $toolResult = $orchestrator->executeWithDependencies(
+                                    $internalToolName,
+                                    $toolArguments,
+                                    $context,
+                                    maxDepth: 5,
+                                    planFirst: true
+                                );
+                                
+                                $executionTime = (microtime(true) - $startTime) * 1000;
+                                
+                                $toolResults[] = [
+                                    'tool' => $internalToolName,
+                                    'success' => $toolResult->success,
+                                    'data' => $toolResult->data,
+                                    'error' => $toolResult->error,
+                                    'execution_time_ms' => round($executionTime, 2),
+                                ];
+                                
+                                $simulation['execution_flow'][] = [
+                                    'tool' => $internalToolName,
+                                    'arguments' => $toolArguments,
+                                    'result' => [
+                                        'success' => $toolResult->success,
+                                        'data' => $toolResult->data,
+                                        'error' => $toolResult->error,
+                                    ],
+                                    'execution_time_ms' => round($executionTime, 2),
+                                ];
+                                
+                            } catch (\Throwable $e) {
+                                $executionTime = (microtime(true) - $startTime) * 1000;
+                                $toolResults[] = [
+                                    'tool' => $internalToolName,
+                                    'success' => false,
+                                    'error' => $e->getMessage(),
+                                    'execution_time_ms' => round($executionTime, 2),
+                                ];
+                            }
+                        }
+                        
+                        $simulation['final_response'] = [
+                            'type' => 'tool_calls',
+                            'message' => 'LLM hat Tools aufgerufen',
+                            'tool_calls' => $response['tool_calls'],
+                            'tool_results' => $toolResults,
+                        ];
+                    } else {
+                        // LLM hat direkt geantwortet (keine Tools)
+                        $simulation['final_response'] = [
+                            'type' => 'direct_answer',
+                            'message' => $response['content'] ?? 'Keine Antwort',
+                            'content' => $response['content'],
+                        ];
                     }
                     
-                    $simulation['debug']['llm_decision'] = 'LLM hat entschieden, dass ein Tool benötigt wird (Aufgabe erkannt)';
-                    $simulation['debug']['selected_tool'] = $toolName;
-                    $simulation['debug']['note'] = 'In der echten AI würde das LLM das passende Tool basierend auf der Beschreibung wählen';
-                } else {
-                    // Keine klare Aufgabe oder keine Tools → LLM würde direkt antworten
-                    $primaryTool = null;
-                    $toolName = null;
-                    $arguments = [];
-                    
-                    $simulation['debug']['llm_decision'] = 'LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht';
-                    $simulation['debug']['available_tools'] = array_map(fn($t) => $t->getName(), $discoveredTools);
-                    $simulation['debug']['note'] = 'In der echten AI würde das LLM jetzt selbst entscheiden, ob es ein Tool aufruft oder direkt antwortet';
+                } catch (\Throwable $e) {
+                    $simulation['final_response'] = [
+                        'type' => 'error',
+                        'message' => 'Fehler beim Aufruf von OpenAiService: ' . $e->getMessage(),
+                        'error' => $e->getMessage(),
+                    ];
                 }
+                
+                // Keine weitere Tool-Execution nötig - wir haben bereits die echten Services genutzt
+                $primaryTool = null;
+                $toolName = null;
             }
             
-            // Wenn Tool gefunden, führe Chain Planning und Execution aus
+            // Wenn Tool gefunden (Multi-Step), führe Chain Planning und Execution aus
             if ($primaryTool && $toolName) {
                 $simulation['steps'][] = [
                     'step' => 2,
@@ -1349,70 +1309,21 @@ class CoreToolPlaygroundController extends Controller
      * - Benötigt Hilfe → kann ich mit Tools helfen ODER User-Hilfe geben?
      */
     /**
-     * Semantische Intent-Analyse
+     * Semantische Intent-Analyse (NUR für Debug/Info)
      * 
-     * WICHTIG: Diese Methode entscheidet NUR:
-     * 1. Kann ohne Tools geantwortet werden? (Frage vs. Aufgabe)
-     * 2. Sind Tools erlaubt? (keine Blockierung)
-     * 3. Fehlt Funktionalität? → tools.request
+     * WICHTIG: Diese Methode entscheidet NICHTS!
+     * Sie gibt nur Info zurück für Debug-Zwecke.
      * 
      * ❌ KEINE Tool-Auswahl! (Das bleibt beim LLM)
+     * ❌ KEINE Pattern-basierte Entscheidungen! (LLM entscheidet selbst)
+     * ❌ KEINE automatischen Tool-Requests! (LLM entscheidet selbst)
      */
     private function analyzeIntent(string $intent, ToolRegistry $registry): array
     {
-        $intentLower = strtolower(trim($intent));
-        
-        // 1. SEMANTISCHE KATEGORISIERUNG: Frage vs. Aufgabe
-        $questionPatterns = [
-            '/\b(wie|was|wo|wann|warum|welche|wer|wessen)\b/i',
-            '/\b(erkläre|beschreibe|zeige|sag|nenn)\b/i',
-            '/\?/u', // Fragezeichen
-        ];
-        
-        $taskPatterns = [
-            '/\b(erstellen|anlegen|hinzufügen|add|create|new|neu)\b/i',
-            '/\b(ändern|update|bearbeiten|edit|modify)\b/i',
-            '/\b(löschen|delete|entfernen|remove)\b/i',
-            '/\b(senden|send|verschieben|move|kopieren|copy)\b/i',
-            '/\b(zuweisen|assign|freigeben|release)\b/i',
-            '/\b(aktivieren|activate|deaktivieren|deactivate)\b/i',
-            '/\b(starten|start|stoppen|stop)\b/i',
-        ];
-        
-        $isQuestion = false;
-        $isTask = false;
-        
-        foreach ($questionPatterns as $pattern) {
-            if (preg_match($pattern, $intent)) {
-                $isQuestion = true;
-                break;
-            }
-        }
-        
-        foreach ($taskPatterns as $pattern) {
-            if (preg_match($pattern, $intent)) {
-                $isTask = true;
-                break;
-            }
-        }
-        
-        // 2. KEINE HARDCODED ENTSCHEIDUNGEN!
-        // Die LLM entscheidet selbst, ob sie Tools braucht oder nicht!
-        // Wir machen nur eine grobe Kategorisierung für Info/Debug
-        $canSolveIndependently = null; // LLM entscheidet selbst - keine Vorentscheidung!
-        $reason = 'LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht';
-        
-        // Nur für Debug/Info: Grobe Kategorisierung
-        if ($isQuestion && !$isTask) {
-            $reason = 'Frage erkannt - LLM entscheidet selbst, ob Tools benötigt werden';
-        } elseif ($isTask) {
-            $reason = 'Aufgabe erkannt - LLM entscheidet selbst, welche Tools benötigt werden';
-        } else {
-            $reason = 'Intent unklar - LLM sieht alle Tools und entscheidet selbst';
-        }
-        
-        // 3. TOOLS VERFÜGBAR? (nur für Info)
+        // WICHTIG: Nur für Debug/Info - KEINE Entscheidungen!
         // Die LLM sieht alle Tools und entscheidet selbst!
+        
+        // Tools verfügbar? (nur für Info)
         $discovery = new ToolDiscoveryService($registry);
         $relevantTools = [];
         try {
@@ -1421,29 +1332,22 @@ class CoreToolPlaygroundController extends Controller
             $relevantTools = [];
         }
         
-        // 4. KEINE HARDCODED LOGIK!
-        // Die LLM entscheidet selbst:
-        // - Brauche ich Tools? → Sieht alle Tools und wählt selbst
-        // - Kann ich ohne Tools antworten? → Entscheidet selbst
-        $needsTools = null; // LLM entscheidet selbst - keine Vorentscheidung!
-        $canHelpWithTools = count($relevantTools) > 0; // Nur Info: Tools sind verfügbar
-        $canHelpUser = false; // LLM entscheidet selbst
-        $helperTools = [];
-        $needsToolRequest = false; // LLM entscheidet selbst, ob sie tools.request aufruft
+        // KEINE Pattern-basierte Kategorisierung mehr!
+        // Die LLM entscheidet selbst, ob sie Tools braucht oder nicht
         
         return [
-            'intent_type' => $isTask ? 'task' : ($isQuestion ? 'question' : 'unclear'),
-            'can_solve_independently' => $canSolveIndependently,
-            'reason' => $reason,
-            'needs_tools' => $needsTools,
-            'can_help_with_tools' => $canHelpWithTools,
+            'intent_type' => 'unclear', // Keine Pattern-basierte Kategorisierung mehr
+            'can_solve_independently' => null, // LLM entscheidet selbst
+            'reason' => 'LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht (MCP Best Practice)',
+            'needs_tools' => null, // LLM entscheidet selbst
+            'can_help_with_tools' => count($relevantTools) > 0, // Nur Info: Tools sind verfügbar
             'relevant_tools_count' => count($relevantTools),
-            'can_help_user' => $canHelpUser,
-            'helper_tools' => $helperTools,
-            'needs_tool_request' => $needsToolRequest,
-                'recommended_action' => $this->getRecommendedAction($canSolveIndependently, $canHelpWithTools, $canHelpUser, $needsToolRequest),
-            ];
-        }
+            'can_help_user' => false, // LLM entscheidet selbst
+            'helper_tools' => [],
+            'needs_tool_request' => false, // LLM entscheidet selbst, ob sie tools.request aufruft
+            'recommended_action' => 'LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht',
+        ];
+    }
         
     /**
      * Gibt empfohlene Aktion basierend auf semantischer Analyse zurück
@@ -1481,6 +1385,17 @@ class CoreToolPlaygroundController extends Controller
             return explode('.', $toolName)[0];
         }
         return 'core';
+    }
+    
+    /**
+     * Denormalisiert Tool-Namen von OpenAI-Format zu internem Format
+     * OpenAI: "planner_projects_create" -> Intern: "planner.projects.create"
+     */
+    private function denormalizeToolNameFromOpenAi(string $openAiName): string
+    {
+        // OpenAI normalisiert Tool-Namen: "planner.projects.create" -> "planner_projects_create"
+        // Wir müssen das rückgängig machen
+        return str_replace('_', '.', $openAiName);
     }
     
 }
