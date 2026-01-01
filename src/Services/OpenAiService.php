@@ -625,7 +625,19 @@ WICHTIG - Tool-Nutzung:
 - Nutze Tools proaktiv - warte nicht darauf, dass der Nutzer explizit nach einem Tool fragt
 - Wenn ein Tool Parameter benötigt, die der Nutzer nicht angegeben hat, nutze Hilfs-Tools um die Optionen zu bekommen
 - WICHTIG: Sage NICHT "Ich werde X tun" oder "Einen Moment bitte" - FÜHRE die Aktion DIREKT aus! Rufe das Tool sofort auf, ohne vorher anzukündigen, was du tun wirst
-- Wenn du ein Tool aufrufen musst, rufe es sofort auf - keine Ankündigungen, keine "Ich werde..."-Sätze
+
+WICHTIG - Mehrere Tool-Calls:
+- Du kannst MEHRERE Tool-Calls in EINER Runde machen - das System unterstützt das
+- Wenn der Nutzer sagt "lege alle Aufgaben an" oder "erstelle alle X", dann rufe das Tool MEHRMALS auf - einmal für jedes Item
+- Beispiel: Nutzer sagt "Erstelle 3 Aufgaben: A, B, C" → rufe planner.tasks.POST dreimal auf (einmal für A, einmal für B, einmal für C)
+- Du musst NICHT nach jeder Aufgabe nachfragen - wenn der Nutzer alle Informationen gegeben hat, erstelle alle direkt
+- Wenn kritische Informationen fehlen (z.B. Titel), frage nach - aber nur einmal für alle Items, nicht für jedes einzeln
+
+WICHTIG - Tool-Discovery (wenn viele Tools vorhanden):
+- Wenn du nur read-only Tools (Lese-Operationen) siehst, aber Schreib-Operationen benötigst, nutze das Tool "tools.GET" mit read_only=false
+- Du kannst gezielt Tools anfordern: "Ich brauche write-Tools für planner" → nutze tools.GET mit filters: module="planner", read_only=false
+- Du kannst mehrere Module kombinieren: "Ich brauche read-Tools für core und write-Tools für planner" → nutze tools.GET mehrfach mit entsprechenden Filtern
+- Das Tool "tools.GET" ermöglicht es dir, gezielt Tools anzufordern, die du für eine Aufgabe benötigst
 
 WICHTIG - User-IDs und Kontext:
 - Die User-ID des aktuellen Nutzers ist IMMER im Kontext verfügbar - du musst sie NICHT vom Nutzer erfragen
@@ -879,8 +891,14 @@ WICHTIG - Grenzen erkennen:
                             $writeCount++;
                         }
                         
-                        // Discovery-Tools (immer)
-                        $isDiscoveryTool = in_array($toolName, ['tools.GET', 'tools.request']);
+                        // Discovery-Tools (immer) - ermöglichen es der LLM, verfügbare Module/Tools zu sehen
+                        $isDiscoveryTool = in_array($toolName, [
+                            'tools.GET',           // Tool-Liste anfordern
+                            'tools.request',       // Fehlende Tools anmelden
+                            'core.modules.GET',    // Verfügbare Module sehen
+                            'core.context.GET',    // Aktuellen Kontext sehen
+                            'core.teams.GET',     // Verfügbare Teams sehen
+                        ]);
                         
                         // Read-only Tools (Standard)
                         // LLM kann tools.GET mit read_only=false aufrufen, um write Tools zu sehen

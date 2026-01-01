@@ -450,12 +450,31 @@ class CoreToolPlaygroundController extends Controller
                                 // Prüfe, ob Tool existiert (BEVOR wir es ausführen)
                                 $registry = app(\Platform\Core\Tools\ToolRegistry::class);
                                 if (!$registry->has($internalToolName)) {
+                                    // Tool nicht gefunden - LOOSE: Suche ähnliche Tools und gib LLM alle Infos
+                                    $allTools = array_keys($registry->all());
+                                    $similarTools = [];
+                                    
+                                    // Finde ähnliche Tool-Namen (einfache String-Ähnlichkeit)
+                                    foreach ($allTools as $toolName) {
+                                        similar_text(strtolower($internalToolName), strtolower($toolName), $percent);
+                                        if ($percent > 60) { // Mindestens 60% Ähnlichkeit
+                                            $similarTools[] = $toolName;
+                                        }
+                                    }
+                                    
+                                    $errorMessage = "Tool '{$internalToolName}' nicht gefunden.";
+                                    if (!empty($similarTools)) {
+                                        $errorMessage .= " Ähnliche Tools: " . implode(', ', array_slice($similarTools, 0, 5));
+                                    } else {
+                                        $errorMessage .= " Verfügbare Tools: " . implode(', ', array_slice($allTools, 0, 10)) . '...';
+                                    }
+                                    
                                     // Tool nicht gefunden - füge klare Fehlermeldung hinzu
                                     $errorResult = [
                                         'ok' => false,
                                         'error' => [
                                             'code' => 'TOOL_NOT_FOUND',
-                                            'message' => "Tool '{$internalToolName}' nicht gefunden. Verfügbare Tools: " . implode(', ', array_slice(array_keys($registry->all()), 0, 10)) . '...'
+                                            'message' => $errorMessage
                                         ]
                                     ];
                                     $toolResultText = "Tool-Result (call_id: {$toolCallId}): " . json_encode($errorResult, JSON_UNESCAPED_UNICODE);

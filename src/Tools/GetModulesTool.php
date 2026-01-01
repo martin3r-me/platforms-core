@@ -22,7 +22,7 @@ class GetModulesTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'Gibt eine Liste aller verfügbaren Module zurück. Nutze dieses Tool, wenn du wissen musst, welche Module verfügbar sind oder welche Funktionen ein Modul anbietet.';
+        return 'Gibt eine Liste aller verfügbaren Module zurück. Nutze dieses Tool, wenn du wissen musst, welche Module verfügbar sind (z.B. "planner", "okrs", "core") oder welche Funktionen ein Modul anbietet. RUF DIESES TOOL AUF, wenn der Nutzer nach Modulen fragt oder wenn du wissen musst, welche Module es gibt, bevor du Tools anforderst. Mit include_tools=true siehst du auch alle Tools pro Modul.';
     }
 
     public function getSchema(): array

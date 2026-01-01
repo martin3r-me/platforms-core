@@ -31,7 +31,7 @@ class ListToolsTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'Listet alle verfügbaren Tools und Module auf. Nutze dieses Tool, um zu erfahren, welche Funktionen dir zur Verfügung stehen. Du kannst Filter verwenden, um nur relevante Tools zu sehen (z.B. nach Modul, Suchbegriff, Kategorie, Tag oder read_only filtern). WICHTIG: Wenn du nur read-only Tools (Lese-Operationen) siehst, nutze read_only=false, um write Tools (Schreib-Operationen) zu sehen.';
+        return 'Listet alle verfügbaren Tools und Module auf. Nutze dieses Tool, um gezielt Tools anzufordern, die du benötigst. BEISPIELE: "Ich brauche write-Tools für planner" → nutze filters mit module="planner" und read_only=false. "Ich brauche read-Tools für core" → nutze filters mit module="core" und read_only=true. "Ich brauche alle Tools für planner" → nutze filters mit module="planner". Du kannst Filter kombinieren: nach Modul, read_only Status, Kategorie, Tag oder Suchbegriff. WICHTIG: Wenn du nur read-only Tools siehst, nutze read_only=false, um write Tools zu sehen. Dieses Tool ermöglicht es dir, gezielt Tools anzufordern, die du für eine Aufgabe benötigst.';
     }
 
     public function getSchema(): array
