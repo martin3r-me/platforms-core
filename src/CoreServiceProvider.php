@@ -267,6 +267,16 @@ class CoreServiceProvider extends ServiceProvider
                 }
             }
             
+            // ListTeamUsersTool (wichtig für AI - zeigt Team-Mitglieder)
+            if (!$registry->has('core.teams.users.list')) {
+                try {
+                    $registry->register($this->app->make(\Platform\Core\Tools\ListTeamUsersTool::class));
+                    // \Log::debug("[ToolRegistry] ListTeamUsersTool manuell registriert (Fallback)");
+                } catch (\Throwable $e) {
+                    // Silent fail
+                }
+            }
+            
             // Context-Tools (werden normalerweise via Auto-Discovery geladen)
             // GetContextTool, GetUserTool, GetModulesTool werden automatisch geladen
             
