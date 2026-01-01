@@ -447,6 +447,50 @@ class CoreToolPlaygroundController extends Controller
                                     'tool_call_id' => $toolCallId,
                                 ];
                                 
+                                // Prüfe, ob Tool existiert (BEVOR wir es ausführen)
+                                $registry = app(\Platform\Core\Tools\ToolRegistry::class);
+                                if (!$registry->has($internalToolName)) {
+                                    // Tool nicht gefunden - füge klare Fehlermeldung hinzu
+                                    $errorResult = [
+                                        'ok' => false,
+                                        'error' => [
+                                            'code' => 'TOOL_NOT_FOUND',
+                                            'message' => "Tool '{$internalToolName}' nicht gefunden. Verfügbare Tools: " . implode(', ', array_slice(array_keys($registry->all()), 0, 10)) . '...'
+                                        ]
+                                    ];
+                                    $toolResultText = "Tool-Result (call_id: {$toolCallId}): " . json_encode($errorResult, JSON_UNESCAPED_UNICODE);
+                                    $messages[] = [
+                                        'role' => 'user',
+                                        'content' => $toolResultText,
+                                    ];
+                                    
+                                    $allToolResults[] = [
+                                        'iteration' => $iteration,
+                                        'tool_call_id' => $toolCallId,
+                                        'tool' => $internalToolName,
+                                        'success' => false,
+                                        'data' => null,
+                                        'error' => "Tool '{$internalToolName}' nicht gefunden",
+                                        'execution_time_ms' => 0,
+                                    ];
+                                    
+                                    $simulation['execution_flow'][] = [
+                                        'iteration' => $iteration,
+                                        'tool' => $internalToolName,
+                                        'arguments' => $toolArguments,
+                                        'result' => [
+                                            'success' => false,
+                                            'data' => null,
+                                            'error' => "Tool '{$internalToolName}' nicht gefunden",
+                                        ],
+                                        'execution_time_ms' => 0,
+                                    ];
+                                    
+                                    // WICHTIG: Bei TOOL_NOT_FOUND lassen wir LLM reagieren
+                                    // LLM kann dann das richtige Tool verwenden oder eine Fehlermeldung geben
+                                    continue; // Weiter mit nächstem Tool-Call
+                                }
+                                
                                 // Nutze echten ToolOrchestrator (wie in CoreAiStreamController)
                                 $context = ToolContext::fromAuth();
                                 $startTime = microtime(true);
@@ -1573,8 +1617,18 @@ class CoreToolPlaygroundController extends Controller
     private function denormalizeToolNameFromOpenAi(string $openAiName): string
     {
         // OpenAI normalisiert Tool-Namen: "planner.projects.create" -> "planner_projects_create"
-        // Wir müssen das rückgängig machen
-        return str_replace('_', '.', $openAiName);
+        // Wir müssen das rückgängig machen - nutze ToolNameMapper für intelligente Suche
+        try {
+            $nameMapper = app(\Platform\Core\Services\ToolNameMapper::class);
+            return $nameMapper->toCanonical($openAiName);
+        } catch (\Throwable $e) {
+            // Fallback: Einfaches Mapping (für Backwards-Kompatibilität)
+            \Log::warning("[CoreToolPlaygroundController] ToolNameMapper nicht verfügbar, verwende Fallback", [
+                'openai_name' => $openAiName,
+                'error' => $e->getMessage()
+            ]);
+            return str_replace('_', '.', $openAiName);
+        }
     }
     
 }
