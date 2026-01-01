@@ -381,9 +381,12 @@ class CoreToolPlaygroundController extends Controller
                         
                         $simulation['debug']['openai_response_' . $iteration] = [
                             'has_content' => !empty($response['content']),
+                            'content_preview' => !empty($response['content']) ? substr($response['content'], 0, 100) : null,
+                            'content_length' => !empty($response['content']) ? strlen($response['content']) : 0,
                             'has_tool_calls' => !empty($response['tool_calls']),
                             'tool_calls_count' => count($response['tool_calls'] ?? []),
                             'finish_reason' => $response['finish_reason'] ?? null,
+                            'response_keys' => array_keys($response), // Zeige alle Keys für Debugging
                         ];
                         
                         // Wenn LLM Tool-Calls gemacht hat
@@ -512,12 +515,15 @@ class CoreToolPlaygroundController extends Controller
                                 'timestamp' => now()->toIso8601String(),
                             ];
                             
+                            // Zeige die ECHTE LLM-Antwort (nicht nur "würde antworten")
+                            $llmContent = $response['content'] ?? 'Keine Antwort';
                             $simulation['final_response'] = [
                                 'type' => 'direct_answer',
-                                'message' => $response['content'] ?? 'Keine Antwort',
-                                'content' => $response['content'],
+                                'message' => $llmContent, // ECHTE Antwort der LLM
+                                'content' => $llmContent, // ECHTE Antwort der LLM
                                 'iterations' => $iteration,
                                 'tool_results' => $allToolResults,
+                                'raw_response' => $response, // Vollständige Response für Debugging
                             ];
                             
                             // Beende Multi-Step-Loop
