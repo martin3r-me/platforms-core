@@ -931,15 +931,19 @@ class CoreToolPlaygroundController extends Controller
                     $simulation['final_response'] = $errorResponse;
                 }
             } else {
-                // LLM würde direkt antworten (kein Tool benötigt)
-                $simulation['final_response'] = [
-                    'type' => 'direct_answer',
-                    'message' => 'LLM würde direkt antworten - kein Tool benötigt',
-                    'reason' => $simulation['debug']['llm_would_answer_directly'] ?? false
-                        ? ($simulation['debug']['reason'] ?? 'Einfache Frage/Begrüßung')
-                        : 'LLM hat entschieden, dass kein Tool benötigt wird',
-                    'note' => 'In der echten AI-Integration würde das LLM alle Tools sehen, aber selbst entscheiden, dass es keine braucht',
-                ];
+                // Fallback: Nur wenn final_response noch nicht gesetzt wurde
+                // (Der neue Multi-Step-Code setzt final_response bereits)
+                if (!isset($simulation['final_response'])) {
+                    // LLM würde direkt antworten (kein Tool benötigt)
+                    $simulation['final_response'] = [
+                        'type' => 'direct_answer',
+                        'message' => 'LLM würde direkt antworten - kein Tool benötigt',
+                        'reason' => $simulation['debug']['llm_would_answer_directly'] ?? false
+                            ? ($simulation['debug']['reason'] ?? 'Einfache Frage/Begrüßung')
+                            : 'LLM hat entschieden, dass kein Tool benötigt wird',
+                        'note' => 'In der echten AI-Integration würde das LLM alle Tools sehen, aber selbst entscheiden, dass es keine braucht',
+                    ];
+                }
             }
 
             return response()->json([
