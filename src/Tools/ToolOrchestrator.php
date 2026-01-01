@@ -49,6 +49,11 @@ class ToolOrchestrator
      * Dependency Resolver für DSL-Format
      */
     private ?DependencyResolver $dependencyResolver = null;
+    
+    /**
+     * Tool Run Service für persistente Multi-Step-Runs
+     */
+    private ?\Platform\Core\Services\ToolRunService $runService = null;
 
     private const DEPENDENCY_CACHE_PREFIX = 'tool_dependencies:';
     private const DEPENDENCY_CACHE_TTL = 86400; // 24 Stunden
@@ -73,6 +78,14 @@ class ToolOrchestrator
         } catch (\Throwable $e) {
             // DependencyResolver nicht verfügbar
             $this->dependencyResolver = null;
+        }
+        
+        // Lazy-Load ToolRunService
+        try {
+            $this->runService = app(\Platform\Core\Services\ToolRunService::class);
+        } catch (\Throwable $e) {
+            // Service noch nicht verfügbar
+            $this->runService = null;
         }
     }
 
