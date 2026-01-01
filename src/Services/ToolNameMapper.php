@@ -116,7 +116,21 @@ class ToolNameMapper
                 Cache::put($cacheKey, $canonicalName, self::CACHE_TTL);
                 return $canonicalName;
             } else {
-                // Tool existiert nicht - verwende trotzdem Mapping (für Backwards-Kompatibilität)
+                // Tool existiert nicht mit Standard-Mapping
+                // LOOSE: Suche in allen registrierten Tools nach ähnlichen Namen
+                $foundTool = $this->findSimilarToolName($providerName);
+                if ($foundTool) {
+                    // Gefunden! Cache speichern
+                    $this->mappingCache[$providerName] = $foundTool;
+                    Cache::put($cacheKey, $foundTool, self::CACHE_TTL);
+                    \Log::info("[ToolNameMapper] Ähnliches Tool gefunden (LOOSE)", [
+                        'provider_name' => $providerName,
+                        'canonical_name' => $foundTool
+                    ]);
+                    return $foundTool;
+                }
+                
+                // Kein ähnliches Tool gefunden - verwende trotzdem Standard-Mapping (für Backwards-Kompatibilität)
                 \Log::warning("[ToolNameMapper] Tool '{$canonicalName}' nicht in Registry gefunden", [
                     'provider_name' => $providerName,
                     'canonical_name' => $canonicalName
@@ -145,6 +159,99 @@ class ToolNameMapper
         
         // Sonst konvertieren
         return $this->toCanonical($name);
+    }
+    
+    /**
+     * Findet ähnlichen Tool-Namen in der Registry (LOOSE)
+     * 
+     * Vergleicht normalisierte Namen: "planner_project_slots_GET" sollte "planner.project_slots.GET" finden
+     * Funktioniert für alle Tool-Namen, ohne hardcoded Patterns
+     */
+    private function findSimilarToolName(string $providerName): ?string
+    {
+        if (!$this->registry) {
+            return null;
+        }
+        
+        // Normalisiere Provider-Name (entferne alle Trennzeichen für Vergleich)
+        $normalizedProvider = $this->normalizeForComparison($providerName);
+        
+        $allTools = $this->registry->all();
+        $bestMatch = null;
+        $bestScore = 0;
+        
+        foreach ($allTools as $toolName => $tool) {
+            // Normalisiere Tool-Name für Vergleich
+            $normalizedTool = $this->normalizeForComparison($toolName);
+            
+            // Exakter Match nach Normalisierung?
+            if ($normalizedProvider === $normalizedTool) {
+                return $toolName;
+            }
+            
+            // Ähnlichkeits-Score berechnen
+            $score = $this->calculateSimilarity($normalizedProvider, $normalizedTool);
+            if ($score > $bestScore && $score >= 0.8) { // Mindestens 80% Ähnlichkeit
+                $bestScore = $score;
+                $bestMatch = $toolName;
+            }
+        }
+        
+        return $bestMatch;
+    }
+    
+    /**
+     * Normalisiert Namen für Vergleich (entfernt Trennzeichen)
+     * 
+     * "planner.project_slots.GET" → "plannerprojectslotsGET"
+     * "planner_project_slots_GET" → "plannerprojectslotsGET"
+     */
+    private function normalizeForComparison(string $name): string
+    {
+        // Entferne alle Trennzeichen (Punkte, Unterstriche)
+        return strtolower(preg_replace('/[._-]/', '', $name));
+    }
+    
+    /**
+     * Berechnet Ähnlichkeit zwischen zwei normalisierten Namen
+     * 
+     * @return float 0.0 - 1.0 (1.0 = identisch)
+     */
+    private function calculateSimilarity(string $normalized1, string $normalized2): float
+    {
+        // Exakter Match
+        if ($normalized1 === $normalized2) {
+            return 1.0;
+        }
+        
+        // Ein Name enthält den anderen?
+        if (str_contains($normalized1, $normalized2) || str_contains($normalized2, $normalized1)) {
+            $minLen = min(strlen($normalized1), strlen($normalized2));
+            $maxLen = max(strlen($normalized1), strlen($normalized2));
+            return $minLen / $maxLen; // Verhältnis der Längen
+        }
+        
+        // Levenshtein-Distanz (vereinfacht)
+        $len1 = strlen($normalized1);
+        $len2 = strlen($normalized2);
+        $maxLen = max($len1, $len2);
+        
+        if ($maxLen === 0) {
+            return 1.0;
+        }
+        
+        // Einfache Ähnlichkeit: gemeinsame Zeichen
+        $common = 0;
+        $shorter = $len1 < $len2 ? $normalized1 : $normalized2;
+        $longer = $len1 >= $len2 ? $normalized1 : $normalized2;
+        
+        for ($i = 0; $i < strlen($shorter); $i++) {
+            if (str_contains($longer, $shorter[$i])) {
+                $common++;
+            }
+        }
+        
+        return $common / $maxLen;
     }
 }
 
