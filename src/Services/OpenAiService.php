@@ -106,11 +106,17 @@ class OpenAiService
             
             // Debug: Log Response Data - zeige vollständige Response
             Log::debug('[OpenAI Chat] Response data', [
+                'has_output' => isset($data['output']),
+                'output_count' => isset($data['output']) && is_array($data['output']) ? count($data['output']) : 0,
                 'has_output_text' => isset($data['output_text']),
                 'has_content' => isset($data['content']),
                 'content_type' => isset($data['content']) ? gettype($data['content']) : 'not set',
+                'has_tool_calls' => isset($data['tool_calls']),
                 'has_usage' => isset($data['usage']),
                 'keys' => array_keys($data),
+                'output_structure' => isset($data['output']) && is_array($data['output']) && isset($data['output'][0]) 
+                    ? ['keys' => array_keys($data['output'][0]), 'has_content' => isset($data['output'][0]['content'])]
+                    : null,
                 'full_response' => $data, // Vollständige Response für Debugging
             ]);
             
@@ -127,16 +133,51 @@ class OpenAiService
             
             // Versuche verschiedene Response-Formate
             $content = '';
+            $toolCalls = null;
             
             // Format 1: output[0].content[0].text (Responses API Format)
             if (isset($data['output']) && is_array($data['output']) && isset($data['output'][0])) {
                 $outputItem = $data['output'][0];
-                if (isset($outputItem['content']) && is_array($outputItem['content']) && isset($outputItem['content'][0])) {
-                    $contentItem = $outputItem['content'][0];
-                    if (isset($contentItem['text']) && is_string($contentItem['text'])) {
-                        $content = $contentItem['text'];
-                    } elseif (isset($contentItem['type']) && $contentItem['type'] === 'output_text' && isset($contentItem['text'])) {
-                        $content = $contentItem['text'];
+                
+                // Prüfe auf Tool-Calls direkt in output[0]
+                if (isset($outputItem['tool_calls']) && is_array($outputItem['tool_calls'])) {
+                    $toolCalls = $outputItem['tool_calls'];
+                }
+                
+                // Prüfe ob content Tool-Calls enthält
+                if (isset($outputItem['content']) && is_array($outputItem['content'])) {
+                    foreach ($outputItem['content'] as $contentItem) {
+                        // Tool-Call in content?
+                        if (isset($contentItem['type'])) {
+                            if ($contentItem['type'] === 'tool_call' || $contentItem['type'] === 'function_call') {
+                                // Tool-Call gefunden
+                                if ($toolCalls === null) {
+                                    $toolCalls = [];
+                                }
+                                $toolCalls[] = [
+                                    'id' => $contentItem['id'] ?? ($contentItem['tool_call_id'] ?? null),
+                                    'type' => 'function',
+                                    'function' => [
+                                        'name' => $contentItem['name'] ?? ($contentItem['function_name'] ?? $contentItem['function']['name'] ?? null),
+                                        'arguments' => isset($contentItem['arguments']) 
+                                            ? (is_string($contentItem['arguments']) ? $contentItem['arguments'] : json_encode($contentItem['arguments']))
+                                            : (isset($contentItem['function_arguments']) 
+                                                ? (is_string($contentItem['function_arguments']) ? $contentItem['function_arguments'] : json_encode($contentItem['function_arguments']))
+                                                : (isset($contentItem['function']['arguments']) 
+                                                    ? (is_string($contentItem['function']['arguments']) ? $contentItem['function']['arguments'] : json_encode($contentItem['function']['arguments']))
+                                                    : '{}')),
+                                    ],
+                                ];
+                                continue; // Überspringe Text-Extraktion für Tool-Calls
+                            }
+                        }
+                        
+                        // Text-Content
+                        if (isset($contentItem['text']) && is_string($contentItem['text'])) {
+                            $content = $contentItem['text'];
+                        } elseif (isset($contentItem['type']) && $contentItem['type'] === 'output_text' && isset($contentItem['text'])) {
+                            $content = $contentItem['text'];
+                        }
                     }
                 }
             }
@@ -161,17 +202,49 @@ class OpenAiService
                 $content = $data['message'];
             }
             
+            // Tool-Calls aus verschiedenen Quellen extrahieren
+            if ($toolCalls === null) {
+                // Versuche tool_calls direkt aus data
+                if (isset($data['tool_calls']) && is_array($data['tool_calls'])) {
+                    $toolCalls = $data['tool_calls'];
+                }
+                // Versuche function_calls (Legacy)
+                elseif (isset($data['function_calls']) && is_array($data['function_calls'])) {
+                    $toolCalls = array_map(function($fc) {
+                        return [
+                            'id' => $fc['id'] ?? null,
+                            'type' => 'function',
+                            'function' => [
+                                'name' => $fc['name'] ?? null,
+                                'arguments' => json_encode($fc['arguments'] ?? []),
+                            ],
+                        ];
+                    }, $data['function_calls']);
+                }
+            }
+            
             // Fallback: Wenn content leer, aber output_tokens > 0, dann ist was schiefgelaufen
             if ($content === '' && isset($data['usage']['output_tokens']) && $data['usage']['output_tokens'] > 0) {
                 Log::warning('[OpenAI Chat] Content ist leer, aber output_tokens > 0', [
-                    'data' => $data,
+                    'data_keys' => array_keys($data),
+                    'has_output' => isset($data['output']),
+                    'output_count' => isset($data['output']) ? count($data['output']) : 0,
                 ]);
             }
+            
+            // Debug: Log Tool-Calls
+            if ($toolCalls !== null) {
+                Log::debug('[OpenAI Chat] Tool-Calls gefunden', [
+                    'count' => count($toolCalls),
+                    'tool_calls' => $toolCalls,
+                ]);
+            }
+            
             return [
                 'content' => $content,
                 'usage' => $data['usage'] ?? [],
                 'model' => $data['model'] ?? $model,
-                'tool_calls' => $data['tool_calls'] ?? null,
+                'tool_calls' => $toolCalls,
                 'finish_reason' => $data['finish_reason'] ?? null,
             ];
         } catch (\Exception $e) {
