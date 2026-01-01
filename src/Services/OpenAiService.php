@@ -770,10 +770,16 @@ WICHTIG - Grenzen erkennen:
             $info .= "- Prüfe die verfügbaren Tools, wenn der Nutzer eine Frage stellt oder eine Aufgabe gibt\n";
             $info .= "- Wenn ein Tool in seiner Beschreibung sagt, dass es für die aktuelle Situation passt, rufe es auf\n";
             $info .= "- Nutze Tools proaktiv - warte nicht darauf, dass der Nutzer explizit nach einem Tool fragt\n";
-            $info .= "- Wenn du unsicher bist, welche Tools verfügbar sind, nutze 'tools.list' um alle Tools zu sehen\n";
+            $info .= "- Wenn du unsicher bist, welche Tools verfügbar sind, nutze 'tools.GET' um alle Tools zu sehen\n";
             $info .= "- Wenn ein Tool in der Beschreibung sagt 'RUF DIESES TOOL AUF', dann tue das, wenn die Situation passt\n";
             $info .= "\n";
-            $info .= "Tool-Details: Nutze das Tool 'tools.list', um alle verfügbaren Tools und ihre Funktionen detailliert zu sehen.\n";
+            $info .= "DISCOVERY-LAYER & TOOL-CLUSTERING:\n";
+            $info .= "- Standardmäßig siehst du Discovery-Tools (tools.GET, tools.request) und read-only Tools (Lese-Operationen)\n";
+            $info .= "- Wenn du etwas ändern/erstellen/löschen musst, nutze 'tools.GET' mit read_only=false, um write Tools zu sehen\n";
+            $info .= "- Wenn du nur Daten lesen musst, reichen die read-only Tools aus\n";
+            $info .= "- Du kannst selbst entscheiden, welche Tool-Kategorie du brauchst\n";
+            $info .= "\n";
+            $info .= "Tool-Details: Nutze das Tool 'tools.GET', um alle verfügbaren Tools und ihre Funktionen detailliert zu sehen.\n";
             
             return $info;
         } catch (\Throwable $e) {
@@ -813,6 +819,11 @@ WICHTIG - Grenzen erkennen:
     {
         $tools = [];
         
+        // DISCOVERY-LAYER: Skalierbare Tool-Verwaltung
+        // Wenn zu viele Tools vorhanden sind, senden wir nur Discovery-Tools
+        // LLM kann dann tools.GET aufrufen, um Tools zu sehen und gezielt anzufordern
+        $toolCountThreshold = config('openai.tool_count_threshold', 20); // Konfigurierbar
+        
         // 1. Tools aus ToolRegistry (loose gekoppelt - Module registrieren ihre Tools hier)
         // WICHTIG: Robuste Fehlerbehandlung - Chat funktioniert auch ohne Tools
         try {
@@ -842,16 +853,64 @@ WICHTIG - Grenzen erkennen:
             // Tools aus Registry holen
             try {
                 $allTools = $toolRegistry->all();
+                $totalToolCount = count($allTools);
                 
-                // Konvertiere alle registrierten Tools zu OpenAI-Format
-                foreach ($allTools as $tool) {
-                    try {
-                        $toolDef = $this->convertToolToOpenAiFormat($tool);
-                        if ($toolDef) {
-                            $tools[] = $toolDef;
+                // DISCOVERY-LAYER: Wenn zu viele Tools, nur Discovery-Tools + read-only Tools senden
+                if ($totalToolCount > $toolCountThreshold) {
+                    // Discovery-Tools + read-only Tools (Standard)
+                    // LLM kann dann tools.GET aufrufen, um write Tools zu sehen
+                    $discovery = app(\Platform\Core\Tools\ToolDiscoveryService::class);
+                    $readOnlyCount = 0;
+                    $writeCount = 0;
+                    
+                    foreach ($allTools as $tool) {
+                        $toolName = $tool->getName();
+                        $metadata = $discovery->getToolMetadata($tool);
+                        $isReadOnly = (bool)($metadata['read_only'] ?? false);
+                        
+                        // Zähle für Logging
+                        if ($isReadOnly) {
+                            $readOnlyCount++;
+                        } else {
+                            $writeCount++;
                         }
-                    } catch (\Throwable $e) {
-                        // Einzelnes Tool-Fehler - überspringen
+                        
+                        // Discovery-Tools (immer)
+                        $isDiscoveryTool = in_array($toolName, ['tools.GET', 'tools.request']);
+                        
+                        // Read-only Tools (Standard)
+                        // LLM kann tools.GET mit read_only=false aufrufen, um write Tools zu sehen
+                        if ($isDiscoveryTool || $isReadOnly) {
+                            try {
+                                $toolDef = $this->convertToolToOpenAiFormat($tool);
+                                if ($toolDef) {
+                                    $tools[] = $toolDef;
+                                }
+                            } catch (\Throwable $e) {
+                                // Einzelnes Tool-Fehler - überspringen
+                            }
+                        }
+                    }
+                    
+                    Log::info('[OpenAI Tools] Discovery-Layer aktiviert (read-only Cluster)', [
+                        'total_tools' => $totalToolCount,
+                        'read_only_tools' => $readOnlyCount,
+                        'write_tools' => $writeCount,
+                        'threshold' => $toolCountThreshold,
+                        'tools_sent' => count($tools),
+                        'note' => 'LLM kann tools.GET mit read_only=false aufrufen, um write Tools zu sehen',
+                    ]);
+                } else {
+                    // Wenige Tools: Alle senden (wie bisher)
+                    foreach ($allTools as $tool) {
+                        try {
+                            $toolDef = $this->convertToolToOpenAiFormat($tool);
+                            if ($toolDef) {
+                                $tools[] = $toolDef;
+                            }
+                        } catch (\Throwable $e) {
+                            // Einzelnes Tool-Fehler - überspringen
+                        }
                     }
                 }
             } catch (\Throwable $e) {

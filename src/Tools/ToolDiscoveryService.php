@@ -227,10 +227,12 @@ class ToolDiscoveryService
 
         // Default-Metadaten basierend auf Tool-Name
         $name = $tool->getName();
+        $httpMethod = $this->extractHttpMethod($name);
         $metadata = [
             'category' => $this->inferCategory($name),
             'tags' => $this->inferTags($name),
             'read_only' => $this->isReadOnly($name),
+            'http_method' => $httpMethod, // REST-Muster
             'requires_auth' => true,
             'requires_team' => false,
         ];
@@ -243,6 +245,17 @@ class ToolDiscoveryService
      */
     private function inferCategory(string $toolName): string
     {
+        // REST-Muster
+        if (str_ends_with($toolName, '.GET') || str_ends_with($toolName, '.get')) {
+            return 'query';
+        }
+        if (str_ends_with($toolName, '.POST') || str_ends_with($toolName, '.post') ||
+            str_ends_with($toolName, '.PUT') || str_ends_with($toolName, '.put') ||
+            str_ends_with($toolName, '.DELETE') || str_ends_with($toolName, '.delete')) {
+            return 'action';
+        }
+        
+        // Legacy-Muster (Backwards-Kompatibilität)
         if (str_contains($toolName, '.list') || str_contains($toolName, '.get') || str_contains($toolName, '.search')) {
             return 'query';
         }
@@ -286,13 +299,78 @@ class ToolDiscoveryService
 
     /**
      * Prüft, ob Tool read-only ist
+     * 
+     * REST-Muster: GET ist immer read-only
+     * POST, PUT, DELETE sind write-Operationen
      */
     private function isReadOnly(string $toolName): bool
     {
-        return str_contains($toolName, '.list') || 
-               str_contains($toolName, '.get') || 
-               str_contains($toolName, '.search') ||
-               str_contains($toolName, '.describe');
+        // REST-Muster: GET ist read-only
+        if (str_ends_with($toolName, '.GET') || str_ends_with($toolName, '.get')) {
+            return true;
+        }
+        
+        // Legacy-Muster (Backwards-Kompatibilität)
+        if (str_contains($toolName, '.list') || 
+            str_contains($toolName, '.get') || 
+            str_contains($toolName, '.search') ||
+            str_contains($toolName, '.describe')) {
+            return true;
+        }
+        
+        // POST, PUT, DELETE sind write-Operationen
+        if (str_ends_with($toolName, '.POST') || str_ends_with($toolName, '.post') ||
+            str_ends_with($toolName, '.PUT') || str_ends_with($toolName, '.put') ||
+            str_ends_with($toolName, '.DELETE') || str_ends_with($toolName, '.delete')) {
+            return false;
+        }
+        
+        // Legacy write-Muster
+        if (str_contains($toolName, '.create') || 
+            str_contains($toolName, '.update') || 
+            str_contains($toolName, '.delete')) {
+            return false;
+        }
+        
+        // Default: read-only (sicherer)
+        return true;
+    }
+    
+    /**
+     * Extrahiert HTTP-Methode aus Tool-Namen
+     * 
+     * @return string|null HTTP-Methode (GET, POST, PUT, DELETE) oder null
+     */
+    private function extractHttpMethod(string $toolName): ?string
+    {
+        if (str_ends_with($toolName, '.GET') || str_ends_with($toolName, '.get')) {
+            return 'GET';
+        }
+        if (str_ends_with($toolName, '.POST') || str_ends_with($toolName, '.post')) {
+            return 'POST';
+        }
+        if (str_ends_with($toolName, '.PUT') || str_ends_with($toolName, '.put')) {
+            return 'PUT';
+        }
+        if (str_ends_with($toolName, '.DELETE') || str_ends_with($toolName, '.delete')) {
+            return 'DELETE';
+        }
+        
+        // Legacy-Mapping
+        if (str_contains($toolName, '.list') || str_contains($toolName, '.get')) {
+            return 'GET';
+        }
+        if (str_contains($toolName, '.create')) {
+            return 'POST';
+        }
+        if (str_contains($toolName, '.update')) {
+            return 'PUT';
+        }
+        if (str_contains($toolName, '.delete')) {
+            return 'DELETE';
+        }
+        
+        return null;
     }
 }
 

@@ -15,7 +15,7 @@ class GetUserTool implements ToolContract
 {
     public function getName(): string
     {
-        return 'core.user.get';
+        return 'core.user.GET';
     }
 
     public function getDescription(): string

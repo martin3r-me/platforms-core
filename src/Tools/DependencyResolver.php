@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Log;
  * DSL-Format:
  * [
  *   'requires' => ['team_id'], // Fehlende Felder
- *   'resolver_tool' => 'core.teams.list',
+ *   'resolver_tool' => 'core.teams.GET',
  *   'select_strategy' => 'auto_if_single|ask_user|fail',
  *   'map' => [
  *     'team_id' => '$.teams[0].id', // JSONPath für Mapping

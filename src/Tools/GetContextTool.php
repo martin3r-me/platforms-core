@@ -17,7 +17,7 @@ class GetContextTool implements ToolContract
 {
     public function getName(): string
     {
-        return 'core.context.get';
+        return 'core.context.GET';
     }
 
     public function getDescription(): string

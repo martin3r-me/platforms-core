@@ -5,6 +5,7 @@ namespace Platform\Core\Tools;
 use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
+use Platform\Core\Tools\Concerns\HasStandardGetOperations;
 use Platform\Core\Models\Team;
 
 /**
@@ -14,9 +15,10 @@ use Platform\Core\Models\Team;
  */
 class ListTeamUsersTool implements ToolContract
 {
+    use HasStandardGetOperations;
     public function getName(): string
     {
-        return 'core.teams.users.list';
+        return 'core.teams.users.GET';
     }
 
     public function getDescription(): string
@@ -26,16 +28,17 @@ class ListTeamUsersTool implements ToolContract
 
     public function getSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'team_id' => [
-                    'type' => 'integer',
-                    'description' => 'Optional: ID des Teams, dessen Nutzer aufgelistet werden sollen. Wenn nicht angegeben, wird das aktuelle Team aus dem Kontext verwendet. Nutze "core.teams.list" um Teams zu finden.'
+        return $this->mergeSchemas(
+            $this->getStandardGetSchema(),
+            [
+                'properties' => [
+                    'team_id' => [
+                        'type' => 'integer',
+                        'description' => 'Optional: ID des Teams, dessen Nutzer aufgelistet werden sollen. Wenn nicht angegeben, wird das aktuelle Team aus dem Kontext verwendet. Nutze "core.teams.GET" um Teams zu finden.'
+                    ]
                 ]
-            ],
-            'required' => []
-        ];
+            ]
+        );
     }
 
     public function execute(array $arguments, ToolContext $context): ToolResult
@@ -48,25 +51,39 @@ class ListTeamUsersTool implements ToolContract
             // Team bestimmen: aus Argumenten oder Context
             $teamId = $arguments['team_id'] ?? $context->team?->id;
             if (!$teamId) {
-                return ToolResult::error('MISSING_TEAM', 'Kein Team angegeben und kein Team im Kontext gefunden. Nutze das Tool "core.teams.list" um alle verfügbaren Teams zu sehen.');
+                return ToolResult::error('MISSING_TEAM', 'Kein Team angegeben und kein Team im Kontext gefunden. Nutze das Tool "core.teams.GET" um alle verfügbaren Teams zu sehen.');
             }
 
             // Team finden
             $team = Team::find($teamId);
             if (!$team) {
-                return ToolResult::error('TEAM_NOT_FOUND', 'Das angegebene Team wurde nicht gefunden. Nutze das Tool "core.teams.list" um alle verfügbaren Teams zu sehen.');
+                return ToolResult::error('TEAM_NOT_FOUND', 'Das angegebene Team wurde nicht gefunden. Nutze das Tool "core.teams.GET" um alle verfügbaren Teams zu sehen.');
             }
 
             // Prüfe, ob User Zugriff auf dieses Team hat
             $userHasAccess = $context->user->teams()->where('teams.id', $team->id)->exists();
             if (!$userHasAccess) {
-                return ToolResult::error('ACCESS_DENIED', 'Du hast keinen Zugriff auf dieses Team. Nutze das Tool "core.teams.list" um alle verfügbaren Teams zu sehen.');
+                return ToolResult::error('ACCESS_DENIED', 'Du hast keinen Zugriff auf dieses Team. Nutze das Tool "core.teams.GET" um alle verfügbaren Teams zu sehen.');
             }
 
-            // Alle Nutzer des Teams holen
-            $users = $team->users()
-                ->orderBy('name')
-                ->get();
+            // Query aufbauen (über Relationship)
+            $query = $team->users();
+            
+            // Standard-Operationen anwenden
+            $this->applyStandardFilters($query, $arguments, [
+                'name', 'email', 'role', 'created_at'
+            ]);
+            
+            $this->applyStandardSearch($query, $arguments, ['name', 'email']);
+            
+            $this->applyStandardSort($query, $arguments, [
+                'name', 'email', 'created_at'
+            ], 'name', 'asc');
+            
+            $this->applyStandardPagination($query, $arguments);
+            
+            // Nutzer holen
+            $users = $query->get();
 
             // Nutzer formatieren
             $usersList = $users->map(function($user) use ($team, $context) {

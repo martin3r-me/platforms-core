@@ -17,7 +17,7 @@ class GetModulesTool implements ToolContract
 {
     public function getName(): string
     {
-        return 'core.modules.list';
+        return 'core.modules.GET';
     }
 
     public function getDescription(): string

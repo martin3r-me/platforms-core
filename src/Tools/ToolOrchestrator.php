@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\Log;
  * - User: "Erstelle ein Projekt"
  * - Tool 'planner.projects.create' implementiert ToolDependencyContract
  * - Orchestrator liest Dependencies aus dem Tool
- * - Orchestrator ruft automatisch core.teams.list auf (wenn team_id fehlt)
+ * - Orchestrator ruft automatisch core.teams.GET auf (wenn team_id fehlt)
  * - Orchestrator führt planner.projects.create aus
  */
 class ToolOrchestrator
@@ -451,9 +451,9 @@ class ToolOrchestrator
         ToolResult $depResult,
         array $arguments
     ): array {
-        // Spezialfall: core.teams.list → planner.projects.create
+        // Spezialfall: core.teams.GET → planner.projects.create
         // Wenn mehrere Teams vorhanden sind und kein team_id angegeben, User-Input anfordern
-        if ($depToolName === 'core.teams.list' && $depResult->success && isset($depResult->data['teams'])) {
+        if ($depToolName === 'core.teams.GET' && $depResult->success && isset($depResult->data['teams'])) {
             $teams = $depResult->data['teams'];
             $teamCount = count($teams);
             

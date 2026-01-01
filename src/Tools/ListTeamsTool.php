@@ -5,6 +5,7 @@ namespace Platform\Core\Tools;
 use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
+use Platform\Core\Tools\Concerns\HasStandardGetOperations;
 
 /**
  * Tool zum Auflisten aller Teams, denen der User angehört
@@ -14,9 +15,10 @@ use Platform\Core\Contracts\ToolResult;
  */
 class ListTeamsTool implements ToolContract
 {
+    use HasStandardGetOperations;
     public function getName(): string
     {
-        return 'core.teams.list';
+        return 'core.teams.GET';
     }
 
     public function getDescription(): string
@@ -26,16 +28,17 @@ class ListTeamsTool implements ToolContract
 
     public function getSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'include_personal' => [
-                    'type' => 'boolean',
-                    'description' => 'Optional: Soll auch persönliche Teams (personal_team = true) angezeigt werden? Standard: true'
+        return $this->mergeSchemas(
+            $this->getStandardGetSchema(),
+            [
+                'properties' => [
+                    'include_personal' => [
+                        'type' => 'boolean',
+                        'description' => 'Optional: Soll auch persönliche Teams (personal_team = true) angezeigt werden? Standard: true. Alternativ: nutze filters mit field="is_personal" und op="eq".'
+                    ]
                 ]
-            ],
-            'required' => []
-        ];
+            ]
+        );
     }
 
     public function execute(array $arguments, ToolContext $context): ToolResult
@@ -50,20 +53,31 @@ class ListTeamsTool implements ToolContract
                 return ToolResult::error('RELATIONSHIP_NOT_FOUND', 'User model hat keine teams()-Relationship.');
             }
 
+            // Query aufbauen (über Relationship)
+            $query = $context->user->teams()->with('parentTeam');
+            
+            // Standard-Operationen anwenden
+            // Hinweis: Bei Relationships müssen wir vorsichtig sein - einige Filter funktionieren direkt
+            $this->applyStandardFilters($query, $arguments, [
+                'name', 'is_personal', 'parent_team_id', 'created_at'
+            ]);
+            
+            // Legacy: include_personal (für Backwards-Kompatibilität)
             $includePersonal = $arguments['include_personal'] ?? true;
-
-            // Alle Teams des Users holen
-            $teams = $context->user->teams()
-                ->with('parentTeam')
-                ->orderBy('name')
-                ->get();
-
-            // Persönliche Teams filtern, falls nicht gewünscht
             if (!$includePersonal) {
-                $teams = $teams->filter(function($team) {
-                    return !($team->personal_team ?? false);
-                });
+                $query->where('personal_team', false);
             }
+            
+            $this->applyStandardSearch($query, $arguments, ['name']);
+            
+            $this->applyStandardSort($query, $arguments, [
+                'name', 'created_at', 'updated_at'
+            ], 'name', 'asc');
+            
+            $this->applyStandardPagination($query, $arguments);
+            
+            // Teams holen
+            $teams = $query->get();
 
             // Teams formatieren
             $teamsList = $teams->map(function($team) use ($context) {
