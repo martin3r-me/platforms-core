@@ -205,64 +205,101 @@ class CoreToolPlaygroundController extends Controller
                 'analysis' => $semanticAnalysis,
             ];
             
-            $simulation['steps'][] = [
-                'step' => 1,
-                'name' => 'Tool Discovery',
-                'description' => $semanticAnalysis['needs_tools'] 
-                    ? 'Suche nach Tools, die helfen können' 
-                    : 'Prüfe ob Tools für zusätzliche Infos nötig sind',
-                'timestamp' => now()->toIso8601String(),
-            ];
+            // WICHTIG: Kosten-Optimierung!
+            // Wir zeigen NICHT proaktiv alle Tools - das wäre teuer!
+            // Stattdessen: LLM entscheidet erst, ob sie Tools braucht
+            // Nur wenn LLM entscheidet, dass sie Tools braucht, zeigen wir alle Tools
             
-            // LOOSE COUPLED: Generische Modul-Erkennung (nicht hart gecoded!)
-            // Extrahiere erwähnte Module aus dem Intent (z.B. "okr", "crm", "planner")
-            $mentionedModules = [];
-            $allRegisteredTools = $registry->all();
-            $availableModules = [];
+            // STEP 1: LLM entscheidet, ob sie Tools braucht (OHNE Tools zu zeigen)
+            // In der echten AI würde die LLM hier entscheiden:
+            // - Kann ich ohne Tools antworten? → Direkt antworten, keine Tools nötig
+            // - Brauche ich Tools? → Zeige alle Tools
             
-            // Sammle alle verfügbaren Module aus Tool-Namen (z.B. "planner.projects.create" → "planner")
-            foreach ($allRegisteredTools as $tool) {
-                $toolName = $tool->getName();
-                if (str_contains($toolName, '.')) {
-                    $module = explode('.', $toolName)[0];
-                    if (!in_array($module, $availableModules)) {
-                        $availableModules[] = $module;
-                    }
-                }
+            $llmNeedsTools = null; // LLM entscheidet selbst
+            $discoveredTools = [];
+            
+            // SIMULATION: Für die Simulation müssen wir die LLM-Entscheidung simulieren
+            // In der echten AI würde die LLM hier selbst entscheiden, ob sie Tools braucht
+            // Basierend auf der semantischen Analyse (intent_type) simulieren wir die Entscheidung
+            if ($semanticAnalysis['intent_type'] === 'task') {
+                // Klare Aufgabe → LLM würde Tools brauchen
+                $llmNeedsTools = true;
+                $simulation['steps'][] = [
+                    'step' => 1,
+                    'name' => 'LLM-Entscheidung',
+                    'description' => 'LLM hat entschieden: Tools werden benötigt',
+                    'timestamp' => now()->toIso8601String(),
+                    'llm_decision' => 'Tools werden benötigt (Aufgabe erkannt)',
+                ];
+            } else {
+                // Frage oder unklar → LLM würde erst prüfen, ob Tools nötig sind
+                // In der echten AI würde die LLM hier entscheiden, ob sie Tools braucht
+                $llmNeedsTools = false; // Für Simulation: LLM entscheidet, dass keine Tools nötig sind
+                $simulation['steps'][] = [
+                    'step' => 1,
+                    'name' => 'LLM-Entscheidung',
+                    'description' => 'LLM hat entschieden: Keine Tools benötigt',
+                    'timestamp' => now()->toIso8601String(),
+                    'llm_decision' => 'Keine Tools benötigt (kann direkt antworten)',
+                ];
             }
             
-            // Prüfe ob Module im Intent erwähnt werden (generisch, nicht hart gecoded!)
-            foreach ($availableModules as $module) {
-                // Prüfe ob Modul-Name oder verwandte Begriffe im Intent vorkommen
-                $modulePattern = '/\b' . preg_quote($module, '/') . '\b/i';
-                if (preg_match($modulePattern, $intentLower)) {
-                    $mentionedModules[] = $module;
-                }
-            }
-            
-            // Prüfe ob erwähnte Module Tools haben
-            $missingModuleTools = [];
-            foreach ($mentionedModules as $module) {
-                $hasModuleTool = false;
+            // STEP 2: Nur wenn LLM Tools braucht, zeigen wir alle Tools
+            if ($llmNeedsTools) {
+                $simulation['steps'][] = [
+                    'step' => 2,
+                    'name' => 'Tool Discovery',
+                    'description' => 'Zeige alle verfügbaren Tools (LLM hat entschieden, dass Tools benötigt werden)',
+                    'timestamp' => now()->toIso8601String(),
+                ];
+                
+                // LOOSE COUPLED: Generische Modul-Erkennung (nicht hart gecoded!)
+                // Extrahiere erwähnte Module aus dem Intent (z.B. "okr", "crm", "planner")
+                $mentionedModules = [];
+                $allRegisteredTools = $registry->all();
+                $availableModules = [];
+                
+                // Sammle alle verfügbaren Module aus Tool-Namen (z.B. "planner.projects.create" → "planner")
                 foreach ($allRegisteredTools as $tool) {
-                    $toolName = strtolower($tool->getName());
-                    if (str_starts_with($toolName, $module . '.')) {
-                        $hasModuleTool = true;
-                        break;
+                    $toolName = $tool->getName();
+                    if (str_contains($toolName, '.')) {
+                        $module = explode('.', $toolName)[0];
+                        if (!in_array($module, $availableModules)) {
+                            $availableModules[] = $module;
+                        }
                     }
                 }
-                if (!$hasModuleTool) {
-                    $missingModuleTools[] = $module;
+                
+                // Prüfe ob Module im Intent erwähnt werden (generisch, nicht hart gecoded!)
+                foreach ($availableModules as $module) {
+                    // Prüfe ob Modul-Name oder verwandte Begriffe im Intent vorkommen
+                    $modulePattern = '/\b' . preg_quote($module, '/') . '\b/i';
+                    if (preg_match($modulePattern, $intentLower)) {
+                        $mentionedModules[] = $module;
+                    }
                 }
-            }
-            
-            // MCP BEST PRACTICE: Das LLM entscheidet selbst, ob es Tools braucht!
-            // Wir geben ALLE Tools zurück - das LLM filtert selbst nach Relevanz
-            // Das ist viel smarter als vorherige Filterung!
-            try {
-                // findByIntent gibt ALLE Tools zurück (MCP-Pattern)
-                // Das LLM sieht alle Tools und entscheidet selbst, ob es welche braucht
-                $allTools = $discovery->findByIntent($intent);
+                
+                // Prüfe ob erwähnte Module Tools haben
+                $missingModuleTools = [];
+                foreach ($mentionedModules as $module) {
+                    $hasModuleTool = false;
+                    foreach ($allRegisteredTools as $tool) {
+                        $toolName = strtolower($tool->getName());
+                        if (str_starts_with($toolName, $module . '.')) {
+                            $hasModuleTool = true;
+                            break;
+                        }
+                    }
+                    if (!$hasModuleTool) {
+                        $missingModuleTools[] = $module;
+                    }
+                }
+                
+                // MCP BEST PRACTICE: Jetzt zeigen wir ALLE Tools (nur wenn LLM sie braucht!)
+                try {
+                    // findByIntent gibt ALLE Tools zurück (MCP-Pattern)
+                    // Das LLM sieht alle Tools und entscheidet selbst, welches es braucht
+                    $allTools = $discovery->findByIntent($intent);
                 
                 // LOOSE COUPLED: Wenn Module erwähnt werden, aber keine Tools existieren
                 // → Füge tools.request hinzu und filtere Tools von anderen Modulen raus
@@ -306,30 +343,44 @@ class CoreToolPlaygroundController extends Controller
                 // In der echten AI-Integration würde das LLM alle Tools sehen und selbst filtern
                 $discoveredTools = $allTools;
                 
-                $simulation['debug']['mcp_pattern'] = true;
-                $simulation['debug']['total_tools_available'] = count($allTools);
-                $simulation['debug']['available_modules'] = $availableModules;
-                $simulation['debug']['note'] = 'LLM sieht alle Tools und entscheidet selbst, ob es welche braucht (MCP Best Practice)';
-            } catch (\Throwable $e) {
-                // Bei Fehlern: leeres Array verwenden
-                $discoveredTools = [];
-                $simulation['debug']['discovery_error'] = $e->getMessage();
-            }
-            
-            $simulation['tools_discovered'] = array_map(function($tool) {
-                return [
-                    'name' => $tool->getName(),
-                    'description' => $tool->getDescription(),
-                    'has_dependencies' => $tool instanceof \Platform\Core\Contracts\ToolDependencyContract,
-                ];
-            }, $discoveredTools);
+                    $simulation['debug']['mcp_pattern'] = true;
+                    $simulation['debug']['total_tools_available'] = count($allTools);
+                    $simulation['debug']['available_modules'] = $availableModules;
+                    $simulation['debug']['note'] = 'LLM sieht alle Tools und entscheidet selbst, welches sie braucht (MCP Best Practice)';
+                } catch (\Throwable $e) {
+                    // Bei Fehlern: leeres Array verwenden
+                    $discoveredTools = [];
+                    $simulation['debug']['discovery_error'] = $e->getMessage();
+                }
+                
+                $simulation['tools_discovered'] = array_map(function($tool) {
+                    return [
+                        'name' => $tool->getName(),
+                        'description' => $tool->getDescription(),
+                        'has_dependencies' => $tool instanceof \Platform\Core\Contracts\ToolDependencyContract,
+                    ];
+                }, $discoveredTools);
 
-            $simulation['steps'][] = [
-                'step' => 1,
-                'result' => count($discoveredTools) . ' Tools verfügbar',
-                'tools' => array_map(fn($t) => $t->getName(), $discoveredTools),
-                'note' => 'LLM sieht alle Tools und entscheidet selbst, ob es welche braucht (MCP Best Practice)',
-            ];
+                $simulation['steps'][] = [
+                    'step' => 2,
+                    'result' => count($discoveredTools) . ' Tools verfügbar',
+                    'tools' => array_map(fn($t) => $t->getName(), $discoveredTools),
+                    'note' => 'LLM sieht alle Tools und entscheidet selbst, welches sie braucht (MCP Best Practice)',
+                ];
+            } else {
+                // LLM hat entschieden, dass keine Tools nötig sind
+                // Keine Tools zeigen - spart Kosten!
+                $discoveredTools = [];
+                $simulation['tools_discovered'] = [];
+                $simulation['steps'][] = [
+                    'step' => 2,
+                    'name' => 'Tool Discovery',
+                    'description' => 'Keine Tools angezeigt (LLM hat entschieden, dass keine benötigt werden)',
+                    'timestamp' => now()->toIso8601String(),
+                    'result' => 'Keine Tools angezeigt - LLM kann direkt antworten',
+                    'note' => 'Kosten-Optimierung: Tools werden nur angezeigt, wenn LLM sie benötigt',
+                ];
+            }
 
             // STEP 2: LLM-Entscheidung basierend auf semantischer Analyse
             // WICHTIG: In der echten AI-Integration würde das LLM jetzt entscheiden:

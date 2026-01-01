@@ -103,8 +103,12 @@
                                     </div>
                                     <div class="text-sm mb-2">
                                         <span class="font-semibold text-[var(--ui-secondary)]">Kann selbstständig auflösen:</span>
-                                        <span :class="simulationResult?.semantic_analysis?.can_solve_independently ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]'" 
-                                              x-text="simulationResult?.semantic_analysis?.can_solve_independently ? '✅ Ja' : '❌ Nein'"></span>
+                                        <span x-show="simulationResult?.semantic_analysis?.can_solve_independently === null" 
+                                              class="text-[var(--ui-info)]">🤔 LLM entscheidet selbst</span>
+                                        <span x-show="simulationResult?.semantic_analysis?.can_solve_independently === true" 
+                                              class="text-[var(--ui-success)]">✅ Ja</span>
+                                        <span x-show="simulationResult?.semantic_analysis?.can_solve_independently === false" 
+                                              class="text-[var(--ui-danger)]">❌ Nein</span>
                                     </div>
                                     <div class="text-sm mb-2">
                                         <span class="font-semibold text-[var(--ui-secondary)]">Grund:</span>
@@ -112,8 +116,12 @@
                                     </div>
                                     <div class="text-sm mb-2">
                                         <span class="font-semibold text-[var(--ui-secondary)]">Benötigt Tools:</span>
-                                        <span :class="simulationResult?.semantic_analysis?.needs_tools ? 'text-[var(--ui-warning)]' : 'text-[var(--ui-success)]'" 
-                                              x-text="simulationResult?.semantic_analysis?.needs_tools ? '✅ Ja' : '❌ Nein'"></span>
+                                        <span x-show="simulationResult?.semantic_analysis?.needs_tools === null" 
+                                              class="text-[var(--ui-info)]">🤔 LLM entscheidet selbst</span>
+                                        <span x-show="simulationResult?.semantic_analysis?.needs_tools === true" 
+                                              class="text-[var(--ui-warning)]">✅ Ja</span>
+                                        <span x-show="simulationResult?.semantic_analysis?.needs_tools === false" 
+                                              class="text-[var(--ui-success)]">❌ Nein</span>
                                     </div>
                                     <div x-show="simulationResult?.semantic_analysis?.can_help_with_tools" class="text-sm mb-2">
                                         <span class="font-semibold text-[var(--ui-success)]">✅ Kann mit Tools helfen:</span>

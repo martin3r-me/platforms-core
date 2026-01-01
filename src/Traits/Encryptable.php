@@ -4,6 +4,7 @@ namespace Platform\Core\Traits;
 
 use Platform\Core\Casts\EncryptedString;
 use Platform\Core\Casts\EncryptedJson;
+use Platform\Core\Casts\EncryptedDecimal;
 use Platform\Core\Support\FieldHasher;
 
 trait Encryptable
@@ -102,6 +103,13 @@ trait Encryptable
         foreach ($this->encryptable as $field => $type) {
             if ($type === 'json') {
                 $this->casts[$field] = EncryptedJson::class;
+            } elseif ($type === 'decimal' || str_starts_with($type, 'decimal:')) {
+                // Unterstütze 'decimal' oder 'decimal:4' Format
+                $decimals = 2;
+                if (str_contains($type, ':')) {
+                    $decimals = (int) explode(':', $type)[1];
+                }
+                $this->casts[$field] = new EncryptedDecimal($decimals);
             } else {
                 $this->casts[$field] = EncryptedString::class;
             }
