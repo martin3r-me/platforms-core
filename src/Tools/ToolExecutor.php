@@ -333,6 +333,17 @@ class ToolExecutor
     }
 
     /**
+     * Prüft, ob ein Fehler einen Retry rechtfertigt
+     */
+    private function shouldRetry(\Throwable $e, ToolContract $tool): bool
+    {
+        if (!$this->retryService || !$this->retryService->isEnabledForTool($tool->getName(), $tool)) {
+            return false;
+        }
+        return $this->retryService->isRetryableException($e);
+    }
+
+    /**
      * Validiert Tool-Parameter gegen JSON Schema
      * 
      * @return array{valid: bool, data: array, errors: array}
