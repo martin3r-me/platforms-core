@@ -8,6 +8,49 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Prüfe ob Tabelle bereits existiert (z.B. bei fehlgeschlagener Migration)
+        if (Schema::hasTable('model_versions')) {
+            // Tabelle existiert bereits - füge nur fehlende Indexe hinzu
+            Schema::table('model_versions', function (Blueprint $table) {
+                // Versuche Indizes hinzuzufügen - wird fehlschlagen, wenn sie bereits existieren
+                try {
+                    $table->index(['versionable_type', 'versionable_id'], 'mv_versionable_type_id_idx');
+                } catch (\Illuminate\Database\QueryException $e) {
+                    // Index existiert bereits oder anderer Fehler - ignorieren
+                    if (!str_contains($e->getMessage(), 'Duplicate key name') && !str_contains($e->getMessage(), 'already exists')) {
+                        // Anderer Fehler - weiterwerfen
+                        throw $e;
+                    }
+                }
+                
+                try {
+                    $table->index(['versionable_type', 'versionable_id', 'version_number'], 'mv_versionable_idx');
+                } catch (\Illuminate\Database\QueryException $e) {
+                    if (!str_contains($e->getMessage(), 'Duplicate key name') && !str_contains($e->getMessage(), 'already exists')) {
+                        throw $e;
+                    }
+                }
+                
+                try {
+                    $table->index(['tool_name', 'created_at'], 'mv_tool_created_idx');
+                } catch (\Illuminate\Database\QueryException $e) {
+                    if (!str_contains($e->getMessage(), 'Duplicate key name') && !str_contains($e->getMessage(), 'already exists')) {
+                        throw $e;
+                    }
+                }
+                
+                try {
+                    $table->index(['trace_id', 'created_at'], 'mv_trace_created_idx');
+                } catch (\Illuminate\Database\QueryException $e) {
+                    if (!str_contains($e->getMessage(), 'Duplicate key name') && !str_contains($e->getMessage(), 'already exists')) {
+                        throw $e;
+                    }
+                }
+            });
+            return;
+        }
+        
+        // Tabelle existiert nicht - erstelle sie neu
         Schema::create('model_versions', function (Blueprint $table) {
             $table->id();
             
