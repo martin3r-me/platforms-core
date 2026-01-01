@@ -22,6 +22,7 @@ class ToolExecutor
     private ?ToolRateLimitService $rateLimitService = null;
     private ?ToolRetryService $retryService = null;
     private ?ToolIdempotencyService $idempotencyService = null;
+    private ?\Platform\Core\Services\ToolExecutionContextService $contextService = null;
 
     public function __construct(
         private ToolRegistry $registry,
@@ -78,6 +79,14 @@ class ToolExecutor
         } catch (\Throwable $e) {
             // Service noch nicht verfügbar
             $this->idempotencyService = null;
+        }
+        
+        // Lazy-Loading: Tool-Execution-Context-Service (für Versionierung)
+        try {
+            $this->contextService = app(\Platform\Core\Services\ToolExecutionContextService::class);
+        } catch (\Throwable $e) {
+            // Service noch nicht verfügbar
+            $this->contextService = null;
         }
     }
 
