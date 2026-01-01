@@ -1396,9 +1396,15 @@ class CoreToolPlaygroundController extends Controller
         
     /**
      * Gibt empfohlene Aktion basierend auf semantischer Analyse zurück
+     * WICHTIG: Die LLM entscheidet selbst - diese Methode gibt nur eine generische Empfehlung
      */
-    private function getRecommendedAction(bool $canSolve, bool $canHelpWithTools, bool $canHelpUser, bool $needsRequest): string
+    private function getRecommendedAction(?bool $canSolve, bool $canHelpWithTools, bool $canHelpUser, bool $needsRequest): string
     {
+        // Wenn LLM selbst entscheidet (null), gibt generische Empfehlung
+        if ($canSolve === null) {
+            return 'LLM sieht alle Tools und entscheidet selbst, ob sie welche braucht';
+        }
+        
         if ($canSolve) {
             return 'Direkt mit generischem Wissen antworten';
         }
