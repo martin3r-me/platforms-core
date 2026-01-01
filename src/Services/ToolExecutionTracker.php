@@ -56,15 +56,12 @@ class ToolExecutionTracker
                 'metadata' => $metadata ?? $result->metadata,
                 'idempotency_key' => $metadata['idempotency_key'] ?? null,
             ]);
-            
-            return $execution;
         } catch (\Throwable $e) {
             // Silent fail - Tracking sollte nicht die Tool-Ausführung blockieren
             \Log::warning('[ToolExecutionTracker] Fehler beim Tracken', [
                 'tool' => $toolName,
                 'error' => $e->getMessage(),
             ]);
-            return null;
         }
     }
 

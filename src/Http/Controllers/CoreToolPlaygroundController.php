@@ -620,15 +620,58 @@ class CoreToolPlaygroundController extends Controller
                     $featureInfo['circuit_breaker'] = ['error' => $e->getMessage()];
                 }
 
+                // Sammle PHP-Fehler während der Ausführung
+                $phpErrors = [];
+                $previousErrorHandler = set_error_handler(function($severity, $message, $file, $line) use (&$phpErrors) {
+                    $phpErrors[] = [
+                        'severity' => $severity,
+                        'message' => $message,
+                        'file' => $file,
+                        'line' => $line,
+                    ];
+                    // Weiterleiten an Standard-Error-Handler
+                    return false;
+                });
+                
                 $startTime = microtime(true);
-                $executionResult = $orchestrator->executeWithDependencies(
-                    $toolName,
-                    $arguments,
-                    $context,
-                    maxDepth: 5,
-                    planFirst: true
-                );
+                try {
+                    $executionResult = $orchestrator->executeWithDependencies(
+                        $toolName,
+                        $arguments,
+                        $context,
+                        maxDepth: 5,
+                        planFirst: true
+                    );
+                } catch (\Throwable $execError) {
+                    // Fehler während Tool-Execution
+                    $phpErrors[] = [
+                        'severity' => E_ERROR,
+                        'message' => $execError->getMessage(),
+                        'file' => $execError->getFile(),
+                        'line' => $execError->getLine(),
+                        'type' => 'exception',
+                        'class' => get_class($execError),
+                        'trace' => array_slice(explode("\n", $execError->getTraceAsString()), 0, 10),
+                    ];
+                    // Erstelle Error-Result
+                    $executionResult = ToolResult::error(
+                        $execError->getMessage(),
+                        'EXECUTION_ERROR',
+                        ['exception' => get_class($execError)]
+                    );
+                } finally {
+                    restore_error_handler();
+                    if ($previousErrorHandler) {
+                        set_error_handler($previousErrorHandler);
+                    }
+                }
                 $executionTime = (microtime(true) - $startTime) * 1000;
+                
+                // Füge PHP-Fehler zu Feature-Info hinzu
+                if (!empty($phpErrors)) {
+                    $featureInfo['php_errors'] = $phpErrors;
+                    $simulation['debug']['php_errors_during_execution'] = $phpErrors;
+                }
                 
                 // Event-Listener entfernen
                 Event::forget(\Platform\Core\Events\ToolExecuted::class);
@@ -664,7 +707,7 @@ class CoreToolPlaygroundController extends Controller
                 }
 
                 // Haupt-Tool-Execution
-                $simulation['execution_flow'][] = [
+                $executionFlowEntry = [
                     'tool' => $toolName,
                     'arguments' => $arguments,
                     'result' => [
@@ -679,6 +722,15 @@ class CoreToolPlaygroundController extends Controller
                     'events' => $eventData,
                     'features' => $featureInfo,
                 ];
+                
+                // Füge PHP-Fehler hinzu, falls vorhanden
+                if (!empty($phpErrors)) {
+                    $executionFlowEntry['php_errors'] = $phpErrors;
+                    $executionFlowEntry['result']['has_php_errors'] = true;
+                    $executionFlowEntry['result']['php_errors'] = $phpErrors;
+                }
+                
+                $simulation['execution_flow'][] = $executionFlowEntry;
 
                 $simulation['tools_used'][] = [
                     'name' => $toolName,
@@ -737,7 +789,7 @@ class CoreToolPlaygroundController extends Controller
                         $errorMessage = $executionResult->metadata['exception_message'];
                     }
                     
-                    $simulation['final_response'] = [
+                    $errorResponse = [
                         'type' => 'error',
                         'message' => 'Tool-Fehler: ' . $errorMessage,
                         'error' => [
@@ -752,6 +804,15 @@ class CoreToolPlaygroundController extends Controller
                             'metadata' => $executionResult->metadata,
                         ],
                     ];
+                    
+                    // Füge PHP-Fehler hinzu, falls vorhanden
+                    if (!empty($phpErrors)) {
+                        $errorResponse['php_errors'] = $phpErrors;
+                        $errorResponse['error_details']['php_errors'] = $phpErrors;
+                        $errorResponse['message'] .= ' (Zusätzlich wurden PHP-Fehler während der Ausführung erkannt)';
+                    }
+                    
+                    $simulation['final_response'] = $errorResponse;
                 }
             } else {
                 // LLM würde direkt antworten (kein Tool benötigt)
