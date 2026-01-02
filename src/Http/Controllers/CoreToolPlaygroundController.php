@@ -636,10 +636,37 @@ class CoreToolPlaygroundController extends Controller
                                 }
                             }
                             
-                            // Prüfe Intention-Verification NACH jedem Tool-Result (nicht nur am Ende)
-                            // Dies hilft, Loops frühzeitig zu erkennen
+                            // Prüfe Intention-Verification NACH jedem Tool-Result, aber nur wenn:
+                            // 1. Es bereits mehrere Iterationen gibt (> 2), ODER
+                            // 2. Ein Loop erkannt wurde (gleiches Tool mehrfach)
+                            // Dies verhindert, dass wir zu früh warnen, wenn die LLM noch Zwischenschritte macht
                             $enableVerification = config('tools.intention_verification.enabled', true);
-                            if ($enableVerification && count($allToolResults) > 0) {
+                            $shouldVerify = false;
+                            
+                            // Prüfe ob ein Loop erkannt wurde (gleiches Tool mehrfach)
+                            $toolCounts = [];
+                            foreach ($allToolResults as $result) {
+                                $tool = $result['tool'] ?? '';
+                                if ($tool) {
+                                    $toolCounts[$tool] = ($toolCounts[$tool] ?? 0) + 1;
+                                }
+                            }
+                            $hasLoop = false;
+                            foreach ($toolCounts as $tool => $count) {
+                                if ($count > 2) {
+                                    $hasLoop = true;
+                                    break;
+                                }
+                            }
+                            
+                            // Verifikation nur wenn:
+                            // - Es bereits mehr als 2 Iterationen gibt, ODER
+                            // - Ein Loop erkannt wurde
+                            if ($enableVerification && count($allToolResults) > 0 && (count($allToolResults) > 2 || $hasLoop)) {
+                                $shouldVerify = true;
+                            }
+                            
+                            if ($shouldVerify) {
                                 try {
                                     $verificationService = app(\Platform\Core\Services\IntentionVerificationService::class);
                                     

@@ -10,6 +10,7 @@ use Platform\Core\Events\ToolFailed;
 use Platform\Core\Services\ToolIdempotencyService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * Generischer Tool-Executor
@@ -112,6 +113,36 @@ class ToolExecutor
         if (!$tool) {
             Log::warning("[ToolExecutor] Tool '{$toolName}' nicht gefunden", ['trace_id' => $traceId]);
             return ToolResult::error("Tool '{$toolName}' nicht gefunden", 'TOOL_NOT_FOUND', ['trace_id' => $traceId]);
+        }
+        
+        // WICHTIG: Prüfe Berechtigung (Modul-Zugriff) BEVOR Tool ausgeführt wird
+        try {
+            $permissionService = app(\Platform\Core\Services\ToolPermissionService::class);
+            if (!$permissionService->hasAccess($toolName)) {
+                $moduleKey = $permissionService->extractModuleFromToolName($toolName);
+                Log::warning("[ToolExecutor] Keine Berechtigung für Tool '{$toolName}'", [
+                    'trace_id' => $traceId,
+                    'module_key' => $moduleKey,
+                    'user_id' => Auth::id(),
+                ]);
+                return ToolResult::error(
+                    "Keine Berechtigung für Tool '{$toolName}'. Du hast keinen Zugriff auf das Modul '{$moduleKey}' in diesem Team.",
+                    'PERMISSION_DENIED',
+                    ['trace_id' => $traceId, 'module_key' => $moduleKey]
+                );
+            }
+        } catch (\Throwable $e) {
+            // Fehler bei Berechtigungsprüfung - für Sicherheit: kein Zugriff
+            Log::error("[ToolExecutor] Fehler bei Berechtigungsprüfung", [
+                'tool' => $toolName,
+                'error' => $e->getMessage(),
+                'trace_id' => $traceId,
+            ]);
+            return ToolResult::error(
+                "Fehler bei Berechtigungsprüfung für Tool '{$toolName}'",
+                'PERMISSION_CHECK_FAILED',
+                ['trace_id' => $traceId]
+            );
         }
         
         // Generiere Idempotency-Key (wenn Service verfügbar)

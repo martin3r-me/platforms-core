@@ -59,6 +59,11 @@ class ListToolsTool implements ToolContract
         try {
             // Alle Tools holen
             $allTools = array_values($this->registry->all());
+            
+            // WICHTIG: Filtere Tools nach Berechtigung (Modul-Zugriff)
+            $permissionService = app(\Platform\Core\Services\ToolPermissionService::class);
+            $allTools = $permissionService->filterToolsByPermission($allTools);
+            
             $filteredTools = $allTools;
             
             // 1. Modul-Filter (einfach: nur Tools, die mit "module." beginnen)

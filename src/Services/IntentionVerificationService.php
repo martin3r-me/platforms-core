@@ -257,6 +257,10 @@ class IntentionVerificationService
         }
         
         // READ-Operationen: Prüfe ob das richtige Tool aufgerufen wurde
+        // WICHTIG: Nur warnen wenn:
+        // 1. Das erwartete Tool noch nicht aufgerufen wurde
+        // 2. UND es bereits mehrere Iterationen gibt (> 2)
+        // 3. UND das falsche Tool mehrfach aufgerufen wurde (> 2 mal)
         if ($intention->type === 'read' && $intention->target) {
             $target = Str::lower($intention->target);
             $toolsCalled = array_map(function($result) {
@@ -267,12 +271,28 @@ class IntentionVerificationService
             $expectedTool = $this->getExpectedToolForRead($target);
             
             if ($expectedTool && !in_array($expectedTool, $toolsCalled)) {
+                // Zähle wie oft das falsche Tool aufgerufen wurde
+                $toolCounts = array_count_values($toolsCalled);
+                $totalCalls = count($toolsCalled);
+                
                 // Prüfe ob ein ähnliches Tool aufgerufen wurde (z.B. core.teams.GET statt planner.projects.GET)
                 $similarTool = $this->findSimilarTool($expectedTool, $toolsCalled);
+                
                 if ($similarTool) {
-                    $issues[] = "Falsches Tool aufgerufen: '{$similarTool}' statt '{$expectedTool}'. Der User wollte '{$intention->target}' sehen - rufe '{$expectedTool}' auf!";
+                    $similarToolCount = $toolCounts[$similarTool] ?? 0;
+                    
+                    // Nur warnen wenn:
+                    // - Es bereits mehr als 2 Iterationen gibt
+                    // - UND das falsche Tool mehr als 2 mal aufgerufen wurde
+                    // - ODER es bereits mehr als 5 Iterationen gibt (dann ist es definitiv ein Loop)
+                    if ($totalCalls > 2 && ($similarToolCount > 2 || $totalCalls > 5)) {
+                        $issues[] = "Falsches Tool aufgerufen: '{$similarTool}' wurde bereits {$similarToolCount} mal aufgerufen, aber '{$expectedTool}' noch nicht! Der User wollte '{$intention->target}' sehen - rufe JETZT '{$expectedTool}' auf!";
+                    }
                 } else {
-                    $issues[] = "Das erwartete Tool '{$expectedTool}' wurde nicht aufgerufen. Der User wollte '{$intention->target}' sehen.";
+                    // Wenn das erwartete Tool noch nicht aufgerufen wurde und es bereits mehrere Iterationen gibt
+                    if ($totalCalls > 3) {
+                        $issues[] = "Das erwartete Tool '{$expectedTool}' wurde noch nicht aufgerufen (bereits {$totalCalls} Tool-Calls). Der User wollte '{$intention->target}' sehen.";
+                    }
                 }
             }
         }

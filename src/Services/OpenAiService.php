@@ -979,6 +979,10 @@ WICHTIG - Grenzen erkennen:
                 $allTools = $toolRegistry->all();
                 $totalToolCount = count($allTools);
                 
+                // WICHTIG: Filtere Tools nach Berechtigung (Modul-Zugriff)
+                $permissionService = app(\Platform\Core\Services\ToolPermissionService::class);
+                $allTools = $permissionService->filterToolsByPermission($allTools);
+                
                 // DISCOVERY-LAYER: Standardmäßig NUR Discovery-Tools senden
                 // LLM kann dann tools.GET aufrufen, um weitere Tools bei Bedarf zu sehen
                 // Das ist MCP Best Practice und skaliert auch bei 100+ Tools
