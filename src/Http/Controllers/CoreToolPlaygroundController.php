@@ -1826,9 +1826,12 @@ class CoreToolPlaygroundController extends Controller
             if ($toolName === 'core.teams.GET' && isset($data['teams'])) {
                 $text .= "Teams gefunden: " . ($data['count'] ?? count($data['teams'])) . "\n";
                 if (isset($data['current_team_id'])) {
-                    $text .= "Aktuelles Team: ID {$data['current_team_id']} ({$data['current_team_name'] ?? 'Unbekannt'})\n";
+                    $teamName = $data['current_team_name'] ?? 'Unbekannt';
+                    $text .= "Aktuelles Team: ID {$data['current_team_id']} ({$teamName})\n";
                 }
-                $text .= "\nVerwende diese Team-ID für weitere Tool-Aufrufe (z.B. planner.projects.GET mit team_id={$data['current_team_id']}).\n";
+                if (isset($data['current_team_id'])) {
+                    $text .= "\nVerwende diese Team-ID für weitere Tool-Aufrufe (z.B. planner.projects.GET mit team_id={$data['current_team_id']}).\n";
+                }
             } elseif ($toolName === 'planner.projects.GET' && isset($data['projects'])) {
                 $text .= "Projekte gefunden: " . ($data['count'] ?? count($data['projects'])) . "\n";
                 if (isset($data['team_id'])) {
