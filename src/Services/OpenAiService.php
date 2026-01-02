@@ -507,12 +507,27 @@ class OpenAiService
                         break;
                     case 'response.output_item.added':
                         // Responses API: Tool-Aufruf wurde erstellt - extrahiere Tool-Namen
-                        if (isset($decoded['item']['type']) && $decoded['item']['type'] === 'function_call') {
-                            $currentToolCall = $decoded['item']['name'] ?? ($decoded['item']['function_name'] ?? null);
-                            if ($currentToolCall && is_callable($onToolStart)) { 
-                                try { 
-                                    $onToolStart($currentToolCall); 
-                                } catch (\Throwable $e) {} 
+                        if (isset($decoded['item']['type'])) {
+                            if ($decoded['item']['type'] === 'function_call') {
+                                // Standard Function-Calling Format
+                                $currentToolCall = $decoded['item']['name'] ?? ($decoded['item']['function_name'] ?? null);
+                                if ($currentToolCall && is_callable($onToolStart)) { 
+                                    try { 
+                                        $onToolStart($currentToolCall); 
+                                    } catch (\Throwable $e) {} 
+                                }
+                            } elseif ($decoded['item']['type'] === 'mcp_call') {
+                                // MCP Format: Tool-Aufruf wurde erstellt
+                                $currentToolCall = $decoded['item']['name'] ?? ($decoded['item']['tool_name'] ?? null);
+                                if ($currentToolCall && is_callable($onToolStart)) { 
+                                    try { 
+                                        $onToolStart($currentToolCall); 
+                                    } catch (\Throwable $e) {} 
+                                }
+                                Log::debug('[OpenAI Stream] MCP call created', [
+                                    'item_id' => $decoded['item']['id'] ?? null,
+                                    'tool_name' => $currentToolCall,
+                                ]);
                             }
                         }
                         break;
@@ -526,6 +541,21 @@ class OpenAiService
                         $delta = $decoded['delta'] ?? '';
                         if (is_string($delta)) {
                             $toolArguments .= $delta;
+                        }
+                        break;
+                    case 'response.mcp_call_arguments.delta':
+                        // MCP: Partielle Tool-Argumente werden gestreamt
+                        $delta = $decoded['delta'] ?? '';
+                        if (is_string($delta)) {
+                            $toolArguments .= $delta;
+                        }
+                        // Extrahiere Tool-Namen aus item_id, falls vorhanden
+                        if (!$currentToolCall && isset($decoded['item_id'])) {
+                            // item_id könnte Tool-Informationen enthalten - für später
+                            Log::debug('[OpenAI Stream] MCP call arguments delta', [
+                                'item_id' => $decoded['item_id'] ?? null,
+                                'output_index' => $decoded['output_index'] ?? null,
+                            ]);
                         }
                         break;
                     case 'response.tool_call.delta':
@@ -544,6 +574,57 @@ class OpenAiService
                             $currentToolCall = null; 
                             $toolArguments = '';
                         }
+                        break;
+                    case 'response.mcp_call_arguments.done':
+                        // MCP: Tool-Argumente sind vollständig
+                        $arguments = $decoded['arguments'] ?? '';
+                        if (is_string($arguments)) {
+                            $toolArguments = $arguments; // Ersetze statt append, da done ist
+                        }
+                        // Führe Tool sofort aus, da Argumente vollständig sind
+                        if ($currentToolCall && $toolArguments !== '') {
+                            $this->executeToolIfReady($currentToolCall, $toolArguments, $toolExecutor, $onDelta, $messages);
+                            $currentToolCall = null; 
+                            $toolArguments = '';
+                        }
+                        Log::debug('[OpenAI Stream] MCP call arguments done', [
+                            'item_id' => $decoded['item_id'] ?? null,
+                            'output_index' => $decoded['output_index'] ?? null,
+                            'has_arguments' => !empty($arguments),
+                        ]);
+                        break;
+                    case 'response.mcp_call.completed':
+                        // MCP: Tool-Aufruf erfolgreich abgeschlossen
+                        if ($currentToolCall && $toolArguments !== '') {
+                            // Falls noch nicht ausgeführt, jetzt ausführen
+                            $this->executeToolIfReady($currentToolCall, $toolArguments, $toolExecutor, $onDelta, $messages);
+                        }
+                        Log::debug('[OpenAI Stream] MCP call completed', [
+                            'item_id' => $decoded['item_id'] ?? null,
+                            'output_index' => $decoded['output_index'] ?? null,
+                        ]);
+                        $currentToolCall = null; 
+                        $toolArguments = '';
+                        break;
+                    case 'response.mcp_call.failed':
+                        // MCP: Tool-Aufruf fehlgeschlagen
+                        $errorMessage = $decoded['error'] ?? ($decoded['message'] ?? 'MCP call failed');
+                        $onDelta("\n\n**⚠️ Tool-Fehler (MCP):** " . $errorMessage . "\n");
+                        Log::warning('[OpenAI Stream] MCP call failed', [
+                            'item_id' => $decoded['item_id'] ?? null,
+                            'output_index' => $decoded['output_index'] ?? null,
+                            'error' => $errorMessage,
+                        ]);
+                        $currentToolCall = null; 
+                        $toolArguments = '';
+                        break;
+                    case 'response.mcp_list_tools':
+                        // MCP: Tool-Liste wurde gesendet (optional - für Debugging)
+                        Log::debug('[OpenAI Stream] MCP list tools event', [
+                            'output_index' => $decoded['output_index'] ?? null,
+                            'has_tools' => isset($decoded['tools']),
+                            'tools_count' => isset($decoded['tools']) ? count($decoded['tools']) : 0,
+                        ]);
                         break;
                     case 'response.tool_call.completed':
                     case 'tool_call.completed':
@@ -641,6 +722,12 @@ WICHTIG - Mehrere Tool-Calls:
 - Du kannst MEHRERE Tool-Calls in EINER Runde machen - das System unterstützt das
 - Wenn der Nutzer mehrere Items erstellt oder löschen möchte, kannst du das entsprechende Tool mehrfach aufrufen
 - Wenn kritische Informationen fehlen, frage nach - aber nur einmal für alle Items, nicht für jedes einzeln
+
+WICHTIG - Tool-Results verarbeiten:
+- Nach jedem Tool-Result solltest du das ERGEBNIS verwenden und das NÄCHSTE Tool aufrufen
+- Wenn ein Tool-Result bereits die benötigten Informationen enthält (z.B. Team-ID), rufe das NÄCHSTE Tool auf - nicht das gleiche Tool nochmal!
+- Beispiel: Wenn "core.teams.GET" das aktuelle Team (ID 9) zurückgibt, rufe direkt "planner.projects.GET" auf - nicht "core.teams.GET" nochmal!
+- Wenn du die benötigten Informationen hast, FÜHRE die nächste Aktion aus - keine Endlosschleifen!
 
 WICHTIG - Tool-Discovery:
 - Standardmäßig siehst du NUR Discovery-Tools (tools.GET, tools.request, core.context.GET, etc.)

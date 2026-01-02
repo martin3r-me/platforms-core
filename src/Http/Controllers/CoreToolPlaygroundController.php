@@ -494,7 +494,7 @@ class CoreToolPlaygroundController extends Controller
                                             'message' => $errorMessage
                                         ]
                                     ];
-                                    $toolResultText = "Tool-Result (call_id: {$toolCallId}): " . json_encode($errorResult, JSON_UNESCAPED_UNICODE);
+                                    $toolResultText = $this->formatToolResultForLLM($internalToolName, $errorResult, $toolCallId);
                                     $messages[] = [
                                         'role' => 'user',
                                         'content' => $toolResultText,
@@ -547,8 +547,8 @@ class CoreToolPlaygroundController extends Controller
                                     
                                     // Füge Tool-Result zu Messages hinzu (für Multi-Step)
                                     // WICHTIG: Responses API unterstützt 'tool' role nicht direkt
-                                    // Konvertiere zu User-Message mit speziellem Format (wie in OpenAiService)
-                                    $toolResultText = "Tool-Result (call_id: {$toolCallId}): " . json_encode($resultArray, JSON_UNESCAPED_UNICODE);
+                                    // Format: Strukturiert und lesbar, damit LLM die Informationen erkennt
+                                    $toolResultText = $this->formatToolResultForLLM($internalToolName, $resultArray, $toolCallId);
                                     $messages[] = [
                                         'role' => 'user', // Responses API Format
                                         'content' => $toolResultText,
@@ -589,7 +589,7 @@ class CoreToolPlaygroundController extends Controller
                                         ]
                                     ];
                                     
-                                    $errorResultText = "Tool-Result (call_id: {$toolCallId}): " . json_encode($errorResult, JSON_UNESCAPED_UNICODE);
+                                    $errorResultText = $this->formatToolResultForLLM($internalToolName, $errorResult, $toolCallId);
                                     $messages[] = [
                                         'role' => 'user', // Responses API Format
                                         'content' => $errorResultText,
@@ -1792,6 +1792,71 @@ class CoreToolPlaygroundController extends Controller
             ]);
             return str_replace('_', '.', $openAiName);
         }
+    }
+    
+    /**
+     * Formatiert Tool-Results für die LLM - strukturiert und lesbar
+     * 
+     * Die LLM sollte aus der REST-Syntax selbst darauf kommen, welches Tool als nächstes aufgerufen werden muss.
+     * Diese Methode formatiert die Results so, dass die LLM die Informationen klar erkennt.
+     */
+    private function formatToolResultForLLM(string $toolName, array $resultArray, ?string $toolCallId = null): string
+    {
+        $success = $resultArray['ok'] ?? ($resultArray['success'] ?? false);
+        $data = $resultArray['data'] ?? $resultArray;
+        $error = $resultArray['error'] ?? null;
+        
+        // Basis-Format: Tool-Name und Status
+        $text = "Tool-Result: {$toolName}\n";
+        if ($toolCallId) {
+            $text .= "Call-ID: {$toolCallId}\n";
+        }
+        $text .= "Status: " . ($success ? "✅ Erfolgreich" : "❌ Fehler") . "\n\n";
+        
+        // Bei Fehler: Zeige Fehler-Informationen
+        if (!$success && $error) {
+            $errorMessage = is_array($error) ? ($error['message'] ?? json_encode($error)) : $error;
+            $text .= "Fehler: {$errorMessage}\n";
+            return $text;
+        }
+        
+        // Bei Erfolg: Formatiere Daten strukturiert
+        if ($success && is_array($data)) {
+            // Spezielle Formatierung für bekannte Tools
+            if ($toolName === 'core.teams.GET' && isset($data['teams'])) {
+                $text .= "Teams gefunden: " . ($data['count'] ?? count($data['teams'])) . "\n";
+                if (isset($data['current_team_id'])) {
+                    $text .= "Aktuelles Team: ID {$data['current_team_id']} ({$data['current_team_name'] ?? 'Unbekannt'})\n";
+                }
+                $text .= "\nVerwende diese Team-ID für weitere Tool-Aufrufe (z.B. planner.projects.GET mit team_id={$data['current_team_id']}).\n";
+            } elseif ($toolName === 'planner.projects.GET' && isset($data['projects'])) {
+                $text .= "Projekte gefunden: " . ($data['count'] ?? count($data['projects'])) . "\n";
+                if (isset($data['team_id'])) {
+                    $text .= "Team-ID: {$data['team_id']}\n";
+                }
+            } elseif ($toolName === 'tools.GET' && isset($data['tools'])) {
+                $text .= "Tools gefunden: " . ($data['summary']['filtered_tools'] ?? count($data['tools'])) . "\n";
+                $text .= "Verwende diese Tools für weitere Aktionen.\n";
+            } else {
+                // Generische Formatierung: Zeige wichtige Felder
+                $text .= "Daten:\n";
+                foreach ($data as $key => $value) {
+                    if (is_array($value) && count($value) > 5) {
+                        $text .= "- {$key}: " . count($value) . " Einträge\n";
+                    } elseif (!is_array($value) && !is_object($value)) {
+                        $text .= "- {$key}: {$value}\n";
+                    }
+                }
+            }
+            
+            // Zeige vollständige Daten als JSON (für komplexe Strukturen)
+            $text .= "\nVollständige Daten (JSON):\n" . json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        } else {
+            // Fallback: Zeige rohe Daten
+            $text .= "Daten: " . json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        }
+        
+        return $text;
     }
     
 }
