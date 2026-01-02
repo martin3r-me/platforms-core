@@ -718,10 +718,11 @@ WICHTIG - Tool-Nutzung:
 - Wenn ein Tool Parameter benötigt, die der Nutzer nicht angegeben hat, nutze Hilfs-Tools um die Optionen zu bekommen
 - WICHTIG: Sage NICHT "Ich werde X tun" oder "Einen Moment bitte" - FÜHRE die Aktion DIREKT aus! Rufe das Tool sofort auf, ohne vorher anzukündigen, was du tun wirst
 
-WICHTIG - Mehrere Tool-Calls:
+WICHTIG - Tool-Chaining:
 - Du kannst MEHRERE Tool-Calls in EINER Runde machen - das System unterstützt das
+- Du kannst Tools in mehreren Runden hintereinander aufrufen (Multi-Step) - Tool-Results werden automatisch weitergegeben
+- Tools können automatisch andere Tools aufrufen (via Dependencies) - du musst das nicht manuell machen
 - Wenn der Nutzer mehrere Items erstellt oder löschen möchte, kannst du das entsprechende Tool mehrfach aufrufen
-- Wenn kritische Informationen fehlen, frage nach - aber nur einmal für alle Items, nicht für jedes einzeln
 
 WICHTIG - Tool-Results verarbeiten:
 - Nach jedem Tool-Result solltest du das ERGEBNIS verwenden und das NÄCHSTE Tool aufrufen

@@ -29,7 +29,7 @@ class ListToolsTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'Listet alle verfügbaren Tools auf. Nutze dieses Tool, um Tools eines bestimmten Moduls zu sehen. BEISPIELE: "Ich brauche alle Tools für planner" → nutze module="planner". "Ich brauche nur Lese-Tools für planner" → nutze module="planner" und read_only=true. "Ich brauche Schreib-Tools für planner" → nutze module="planner" und read_only=false. Tools folgen REST-Pattern: module.entity.GET (Lesen), module.entity.POST (Erstellen), module.entity.PUT (Aktualisieren), module.entity.DELETE (Löschen).';
+        return 'GET /tools - Listet verfügbare Tools auf. REST-Parameter: module (optional, string) - Filter nach Modul (z.B. "planner", "crm"). read_only (optional, boolean) - Filter nach read-only Tools (true) oder write-Tools (false). category (optional, string) - Filter nach Kategorie. tags (optional, array) - Filter nach Tags. search (optional, string) - Suchbegriff. Tools folgen REST-Pattern: module.entity.GET (Lesen), module.entity.POST (Erstellen), module.entity.PUT (Aktualisieren), module.entity.DELETE (Löschen).';
     }
 
     public function getSchema(): array

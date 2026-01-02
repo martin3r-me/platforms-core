@@ -23,7 +23,7 @@ class ListTeamUsersTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'GET /teams/{team_id}/users?filters=[...]&search=...&sort=[...] - Listet Nutzer/Mitglieder eines Teams auf. REST-Parameter: team_id (optional, integer) - wenn nicht angegeben, wird aktuelles Team verwendet. filters (optional, array) - Filter-Array mit field, op, value. search (optional, string) - Suchbegriff. sort (optional, array) - Sortierung. limit/offset (optional) - Pagination. RUF DIESES TOOL AUF, wenn der Nutzer nach Team-Mitgliedern fragt.';
+        return 'GET /teams/{team_id}/users?filters=[...]&search=...&sort=[...] - Listet Nutzer/Mitglieder eines Teams auf. REST-Parameter: team_id (optional, integer) - wenn nicht angegeben, wird aktuelles Team verwendet. filters (optional, array) - Filter-Array mit field, op, value. search (optional, string) - Suchbegriff. sort (optional, array) - Sortierung mit field, dir. limit/offset (optional) - Pagination.';
     }
 
     public function getSchema(): array

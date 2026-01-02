@@ -23,7 +23,7 @@ class ListTeamsTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'GET /teams?filters=[...]&search=...&sort=[...]&include_personal={bool} - Listet Teams auf, denen der aktuelle User angehört. REST-Parameter: filters (optional, array) - Filter-Array mit field, op, value. search (optional, string) - Suchbegriff. sort (optional, array) - Sortierung. include_personal (optional, boolean) - persönliche Teams einbeziehen. limit/offset (optional) - Pagination. RUF DIESES TOOL AUF, wenn der Nutzer explizit nach Teams fragt. WICHTIG: Die meisten Tools verwenden automatisch das aktuelle Team - du musst dieses Tool NICHT aufrufen, bevor du andere Tools verwendest.';
+        return 'GET /teams?filters=[...]&search=...&sort=[...]&include_personal={bool} - Listet Teams auf, denen der aktuelle User angehört. REST-Parameter: filters (optional, array) - Filter-Array mit field, op, value. search (optional, string) - Suchbegriff. sort (optional, array) - Sortierung mit field, dir. include_personal (optional, boolean) - persönliche Teams einbeziehen. limit/offset (optional) - Pagination.';
     }
 
     public function getSchema(): array
