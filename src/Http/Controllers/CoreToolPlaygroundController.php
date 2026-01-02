@@ -18,6 +18,7 @@ use Platform\Core\Services\ToolValidationService;
 use Platform\Core\Services\ToolCircuitBreaker;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Tool Playground Controller
@@ -659,18 +660,63 @@ class CoreToolPlaygroundController extends Controller
                                     // Konvertiere ToolResult zu OpenAI-Format
                                     $resultArray = $toolResult->toArray();
                                     
-                                    // DYNAMISCHES TOOL-NACHLADEN: Wenn tools.GET aufgerufen wurde, lade die angeforderten Tools nach
-                                    if ($internalToolName === 'tools.GET' && $toolResult->success) {
+                                    // DYNAMISCHES TOOL-NACHLADEN: MCP-Pattern - Wenn tools.GET aufgerufen wurde, lade die angeforderten Tools nach
+                                    // WICHTIG: Auch wenn tools.GET fehlschlägt, können wir aus dem Request-Context ableiten, welche Tools benötigt werden
+                                    if ($internalToolName === 'tools.GET') {
                                         $requestedTools = [];
                                         
-                                        // Prüfe verschiedene mögliche Strukturen des Results
-                                        $toolsData = $resultArray['data']['tools'] ?? $resultArray['tools'] ?? [];
-                                        
-                                        if (!empty($toolsData) && is_array($toolsData)) {
-                                            foreach ($toolsData as $toolInfo) {
-                                                $toolName = $toolInfo['name'] ?? null;
-                                                if ($toolName && is_string($toolName)) {
-                                                    $requestedTools[] = $toolName;
+                                        if ($toolResult->success) {
+                                            // Erfolgreicher tools.GET Aufruf - extrahiere Tools aus Result
+                                            $toolsData = $resultArray['data']['tools'] ?? $resultArray['tools'] ?? [];
+                                            
+                                            if (!empty($toolsData) && is_array($toolsData)) {
+                                                foreach ($toolsData as $toolInfo) {
+                                                    $toolName = $toolInfo['name'] ?? null;
+                                                    if ($toolName && is_string($toolName)) {
+                                                        $requestedTools[] = $toolName;
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            // ROBUSTER MCP-ANSATZ: Auch bei Fehler können wir aus den Argumenten ableiten, welche Tools benötigt werden
+                                            // Wenn module="planner" und read_only=true, dann lade alle planner.*.GET Tools
+                                            $module = $toolArguments['module'] ?? null;
+                                            $readOnly = $toolArguments['read_only'] ?? null;
+                                            
+                                            if ($module) {
+                                                // Lade alle Tools des Moduls dynamisch nach
+                                                try {
+                                                    $registry = app(ToolRegistry::class);
+                                                    $allTools = $registry->all();
+                                                    
+                                                    foreach ($allTools as $tool) {
+                                                        $toolName = $tool->getName();
+                                                        
+                                                        // Prüfe ob Tool zum Modul gehört
+                                                        if (str_starts_with($toolName, $module . '.')) {
+                                                            // Prüfe read_only Filter
+                                                            if ($readOnly !== null) {
+                                                                $isReadOnly = str_ends_with($toolName, '.GET');
+                                                                if (($readOnly && $isReadOnly) || (!$readOnly && !$isReadOnly)) {
+                                                                    $requestedTools[] = $toolName;
+                                                                }
+                                                            } else {
+                                                                // Kein read_only Filter - lade alle Tools des Moduls
+                                                                $requestedTools[] = $toolName;
+                                                            }
+                                                        }
+                                                    }
+                                                    
+                                                    Log::info('[CoreToolPlayground] Tools aus Request-Context abgeleitet (tools.GET fehlgeschlagen)', [
+                                                        'module' => $module,
+                                                        'read_only' => $readOnly,
+                                                        'tools_count' => count($requestedTools),
+                                                        'tools' => array_slice($requestedTools, 0, 10), // Erste 10 für Logging
+                                                    ]);
+                                                } catch (\Throwable $e) {
+                                                    Log::warning('[CoreToolPlayground] Fehler beim Ableiten von Tools aus Request-Context', [
+                                                        'error' => $e->getMessage(),
+                                                    ]);
                                                 }
                                             }
                                         }
@@ -683,28 +729,31 @@ class CoreToolPlaygroundController extends Controller
                                                 'tool_names' => $requestedTools,
                                                 'count' => count($requestedTools),
                                                 'note' => 'Diese Tools sind jetzt für die nächste Iteration verfügbar',
-                                                'result_structure' => [
+                                                'loaded_from' => $toolResult->success ? 'tools.GET result' : 'request context (fallback)',
+                                                'result_structure' => $toolResult->success ? [
                                                     'has_data_tools' => isset($resultArray['data']['tools']),
                                                     'has_tools' => isset($resultArray['tools']),
-                                                    'tools_count' => count($toolsData),
-                                                ],
+                                                    'tools_count' => count($toolsData ?? []),
+                                                ] : null,
                                             ];
                                             
                                             Log::info('[CoreToolPlayground] Tools dynamisch nachgeladen', [
                                                 'tools' => $requestedTools,
                                                 'count' => count($requestedTools),
                                                 'iteration' => $iteration,
-                                                'result_structure_keys' => array_keys($resultArray),
+                                                'loaded_from' => $toolResult->success ? 'result' : 'context',
                                             ]);
                                         } else {
-                                            Log::warning('[CoreToolPlayground] Keine Tools aus tools.GET Result extrahiert', [
-                                                'result_structure' => [
+                                            Log::warning('[CoreToolPlayground] Keine Tools aus tools.GET extrahiert oder abgeleitet', [
+                                                'success' => $toolResult->success,
+                                                'result_structure' => $toolResult->success ? [
                                                     'has_data' => isset($resultArray['data']),
                                                     'has_data_tools' => isset($resultArray['data']['tools']),
                                                     'has_tools' => isset($resultArray['tools']),
                                                     'data_keys' => isset($resultArray['data']) ? array_keys($resultArray['data']) : [],
                                                     'result_keys' => array_keys($resultArray),
-                                                ],
+                                                ] : null,
+                                                'arguments' => $toolArguments,
                                             ]);
                                         }
                                     }
