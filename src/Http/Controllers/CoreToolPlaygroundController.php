@@ -493,6 +493,7 @@ class CoreToolPlaygroundController extends Controller
                             // Führe echte Tool-Execution durch (wie in CoreAiStreamController)
                             // WICHTIG: Mehrere Tool-Calls in einer Runde werden unterstützt - alle werden sequenziell ausgeführt
                             // Alle Tool-Results werden gesammelt und in der nächsten Iteration der LLM präsentiert
+                            $toolsWereLoaded = false; // Flag: Wurden Tools nach tools.GET nachgeladen?
                             foreach ($response['tool_calls'] as $toolCall) {
                                 $toolCallId = $toolCall['id'] ?? null;
                                 $toolName = $toolCall['function']['name'] ?? null;
@@ -662,6 +663,7 @@ class CoreToolPlaygroundController extends Controller
                                     
                                     // DYNAMISCHES TOOL-NACHLADEN: MCP-Pattern - Wenn tools.GET aufgerufen wurde, lade die angeforderten Tools nach
                                     // WICHTIG: Auch wenn tools.GET fehlschlägt, können wir aus dem Request-Context ableiten, welche Tools benötigt werden
+                                    $toolsWereLoaded = false;
                                     if ($internalToolName === 'tools.GET') {
                                         $requestedTools = [];
                                         
@@ -722,13 +724,14 @@ class CoreToolPlaygroundController extends Controller
                                         }
                                         
                                         if (!empty($requestedTools)) {
-                                            // Lade Tools dynamisch nach für nächste Iteration
+                                            // Lade Tools dynamisch nach - SOFORT verfügbar für diese Iteration!
                                             $openAiService->loadToolsDynamically($requestedTools);
+                                            $toolsWereLoaded = true; // Flag: Tools wurden nachgeladen
                                             
                                             $simulation['debug']['tools_dynamically_loaded_' . $iteration] = [
                                                 'tool_names' => $requestedTools,
                                                 'count' => count($requestedTools),
-                                                'note' => 'Diese Tools sind jetzt für die nächste Iteration verfügbar',
+                                                'note' => 'Diese Tools sind JETZT sofort verfügbar - neue OpenAI-Anfrage wird gemacht',
                                                 'loaded_from' => $toolResult->success ? 'tools.GET result' : 'request context (fallback)',
                                                 'result_structure' => $toolResult->success ? [
                                                     'has_data_tools' => isset($resultArray['data']['tools']),
@@ -737,7 +740,7 @@ class CoreToolPlaygroundController extends Controller
                                                 ] : null,
                                             ];
                                             
-                                            Log::info('[CoreToolPlayground] Tools dynamisch nachgeladen', [
+                                            Log::info('[CoreToolPlayground] Tools dynamisch nachgeladen - SOFORT verfügbar', [
                                                 'tools' => $requestedTools,
                                                 'count' => count($requestedTools),
                                                 'iteration' => $iteration,
@@ -899,8 +902,24 @@ class CoreToolPlaygroundController extends Controller
                             // Aktualisiere Session-Historie nach Tool-Results (für nächste User-Message)
                             session()->put("playground_chat_history_{$sessionId}", $messages);
                             
-                            // Weiter mit nächster Iteration (LLM bekommt Tool-Results und kann weiterarbeiten)
-                            continue;
+                            // WICHTIG: Wenn tools.GET aufgerufen wurde und Tools nachgeladen wurden,
+                            // müssen wir SOFORT eine neue OpenAI-Anfrage machen, damit die Tools verfügbar sind!
+                            // Sonst springen wir zur nächsten Iteration und die Tools sind erst dann verfügbar.
+                            if ($toolsWereLoaded) {
+                                $simulation['steps'][] = [
+                                    'step' => 3 + $iteration,
+                                    'name' => "Tools nachgeladen - sofortige OpenAI-Anfrage (Runde {$iteration})",
+                                    'description' => 'Tools wurden nach tools.GET nachgeladen - mache sofort neue OpenAI-Anfrage damit Tools verfügbar sind',
+                                    'timestamp' => now()->toIso8601String(),
+                                ];
+                                
+                                // Mache SOFORT eine neue OpenAI-Anfrage in der GLEICHEN Iteration
+                                // Die Tools sind jetzt verfügbar!
+                                // KEIN continue - wir machen direkt die neue Anfrage
+                            } else {
+                                // Weiter mit nächster Iteration (LLM bekommt Tool-Results und kann weiterarbeiten)
+                                continue;
+                            }
                             
                         } else {
                             // LLM hat direkt geantwortet (keine Tools mehr) - Multi-Step beendet
