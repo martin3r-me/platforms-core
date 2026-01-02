@@ -14,6 +14,35 @@ class OpenAiService
 {
     private const DEFAULT_MODEL = 'gpt-4o-mini';
     private string $baseUrl = 'https://api.openai.com/v1';
+    
+    // Loose coupling: ToolRegistry ist optional (Chat funktioniert auch ohne Tools)
+    private ?ToolRegistry $toolRegistry = null;
+    
+    public function __construct(?ToolRegistry $toolRegistry = null)
+    {
+        // Dependency Injection mit optionalem Parameter für loose coupling
+        // Falls nicht injiziert, wird es lazy über app() geladen (fallback)
+        $this->toolRegistry = $toolRegistry;
+    }
+    
+    /**
+     * Lazy-Loading für ToolRegistry (fallback wenn nicht injiziert)
+     */
+    private function getToolRegistry(): ?ToolRegistry
+    {
+        if ($this->toolRegistry === null) {
+            try {
+                $container = app();
+                if ($container->bound(ToolRegistry::class)) {
+                    $this->toolRegistry = $container->make(ToolRegistry::class);
+                }
+            } catch (\Throwable $e) {
+                // Registry nicht verfügbar - kein Problem, Chat funktioniert auch ohne Tools
+                return null;
+            }
+        }
+        return $this->toolRegistry;
+    }
 
     private function getApiKey(): string
     {
@@ -960,24 +989,60 @@ WICHTIG - Grenzen erkennen:
     public function loadToolsDynamically(array $toolNames): void
     {
         try {
-            $registry = app(ToolRegistry::class);
+            $registry = $this->getToolRegistry();
+            if ($registry === null) {
+                Log::warning('[OpenAI Tools] ToolRegistry nicht verfügbar für dynamisches Nachladen', [
+                    'tool_names' => $toolNames,
+                ]);
+                return;
+            }
+            $loadedCount = 0;
+            $notFoundCount = 0;
+            $alreadyLoadedCount = 0;
+            
             foreach ($toolNames as $toolName) {
                 if ($registry->has($toolName)) {
                     // Prüfe, ob Tool bereits geladen ist
                     if (!isset($this->dynamicallyLoadedTools[$toolName])) {
+                        $tool = $registry->get($toolName);
                         $this->dynamicallyLoadedTools[$toolName] = [
-                            'tool' => $registry->get($toolName),
+                            'tool' => $tool,
                             'loaded_at' => time(),
                             'used' => false,
                             'iterations_since_load' => 0,
                         ];
+                        $loadedCount++;
+                        Log::debug('[OpenAI Tools] Tool dynamisch geladen', [
+                            'tool_name' => $toolName,
+                            'tool_class' => get_class($tool),
+                        ]);
+                    } else {
+                        $alreadyLoadedCount++;
+                        Log::debug('[OpenAI Tools] Tool bereits geladen, überspringe', [
+                            'tool_name' => $toolName,
+                        ]);
                     }
+                } else {
+                    $notFoundCount++;
+                    Log::warning('[OpenAI Tools] Tool nicht in Registry gefunden', [
+                        'tool_name' => $toolName,
+                        'available_tools' => array_slice(array_keys($registry->all()), 0, 10), // Erste 10 für Debugging
+                    ]);
                 }
             }
+            
+            Log::info('[OpenAI Tools] Dynamisches Tool-Nachladen abgeschlossen', [
+                'requested_tools' => count($toolNames),
+                'loaded' => $loadedCount,
+                'not_found' => $notFoundCount,
+                'already_loaded' => $alreadyLoadedCount,
+                'total_dynamically_loaded' => count($this->dynamicallyLoadedTools),
+            ]);
         } catch (\Throwable $e) {
             Log::warning('[OpenAI Tools] Fehler beim dynamischen Nachladen von Tools', [
                 'tool_names' => $toolNames,
                 'error' => $e->getMessage(),
+                'trace' => substr($e->getTraceAsString(), 0, 500),
             ]);
         }
     }
@@ -1046,25 +1111,11 @@ WICHTIG - Grenzen erkennen:
         try {
             $toolRegistry = null;
             
-            // Versuche die Registry zu bekommen - sollte bereits geladen sein
-            // WICHTIG: Verwende app() Helper, da $this->app nicht existiert
-            try {
-                $container = app();
-                if ($container->bound(ToolRegistry::class)) {
-                    $toolRegistry = $container->make(ToolRegistry::class);
-                }
-            } catch (\Throwable $e) {
-                // Container-Zugriff fehlgeschlagen - kein Problem, erstelle neue Instanz
-            }
-            
-            // Falls Registry nicht gebunden, erstelle neue Instanz (ohne Callbacks)
+            // Loose coupling: ToolRegistry ist optional (Chat funktioniert auch ohne Tools)
+            $toolRegistry = $this->getToolRegistry();
             if ($toolRegistry === null) {
-                try {
-                    $toolRegistry = new ToolRegistry();
-                } catch (\Throwable $e) {
-                    // Auch direkte Instanziierung fehlgeschlagen - ohne Tools weiter
-                    return $tools; // Leeres Array zurückgeben
-                }
+                // Keine Registry verfügbar - Chat funktioniert auch ohne Tools
+                return $tools; // Leeres Array zurückgeben
             }
             
             // Tools aus Registry holen
@@ -1125,10 +1176,16 @@ WICHTIG - Grenzen erkennen:
                     $tool = $toolData['tool'];
                     
                     // Prüfe, ob Tool bereits in der Liste ist (verhindere Duplikate)
+                    // WICHTIG: Vergleiche sowohl ursprünglichen als auch normalisierten Namen
                     $alreadyIncluded = false;
+                    $normalizedToolName = $this->normalizeToolNameForOpenAi($toolName);
+                    
                     foreach ($tools as $existingTool) {
                         $existingName = $existingTool['function']['name'] ?? null;
-                        if ($existingName === $toolName) {
+                        $existingNormalized = $this->normalizeToolNameForOpenAi($existingName ?? '');
+                        
+                        // Prüfe sowohl ursprünglichen als auch normalisierten Namen
+                        if ($existingName === $toolName || $existingNormalized === $normalizedToolName) {
                             $alreadyIncluded = true;
                             break;
                         }
@@ -1141,16 +1198,27 @@ WICHTIG - Grenzen erkennen:
                                 $tools[] = $toolDef;
                                 Log::debug('[OpenAI Tools] Dynamisch nachgeladenes Tool hinzugefügt', [
                                     'tool_name' => $toolName,
+                                    'normalized_name' => $normalizedToolName,
                                     'iterations_since_load' => $toolData['iterations_since_load'],
                                     'used' => $toolData['used'],
+                                ]);
+                            } else {
+                                Log::warning('[OpenAI Tools] Tool-Definition konnte nicht erstellt werden', [
+                                    'tool_name' => $toolName,
                                 ]);
                             }
                         } catch (\Throwable $e) {
                             Log::warning('[OpenAI Tools] Fehler beim Hinzufügen von dynamisch geladenem Tool', [
                                 'tool_name' => $toolName,
                                 'error' => $e->getMessage(),
+                                'trace' => substr($e->getTraceAsString(), 0, 500),
                             ]);
                         }
+                    } else {
+                        Log::debug('[OpenAI Tools] Tool bereits in Liste enthalten, überspringe', [
+                            'tool_name' => $toolName,
+                            'normalized_name' => $normalizedToolName,
+                        ]);
                     }
                 }
                 

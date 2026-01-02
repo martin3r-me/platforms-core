@@ -660,12 +660,18 @@ class CoreToolPlaygroundController extends Controller
                                     $resultArray = $toolResult->toArray();
                                     
                                     // DYNAMISCHES TOOL-NACHLADEN: Wenn tools.GET aufgerufen wurde, lade die angeforderten Tools nach
-                                    if ($internalToolName === 'tools.GET' && $toolResult->success && isset($resultArray['data']['tools'])) {
+                                    if ($internalToolName === 'tools.GET' && $toolResult->success) {
                                         $requestedTools = [];
-                                        foreach ($resultArray['data']['tools'] as $toolInfo) {
-                                            $toolName = $toolInfo['name'] ?? null;
-                                            if ($toolName) {
-                                                $requestedTools[] = $toolName;
+                                        
+                                        // Prüfe verschiedene mögliche Strukturen des Results
+                                        $toolsData = $resultArray['data']['tools'] ?? $resultArray['tools'] ?? [];
+                                        
+                                        if (!empty($toolsData) && is_array($toolsData)) {
+                                            foreach ($toolsData as $toolInfo) {
+                                                $toolName = $toolInfo['name'] ?? null;
+                                                if ($toolName && is_string($toolName)) {
+                                                    $requestedTools[] = $toolName;
+                                                }
                                             }
                                         }
                                         
@@ -677,11 +683,28 @@ class CoreToolPlaygroundController extends Controller
                                                 'tool_names' => $requestedTools,
                                                 'count' => count($requestedTools),
                                                 'note' => 'Diese Tools sind jetzt für die nächste Iteration verfügbar',
+                                                'result_structure' => [
+                                                    'has_data_tools' => isset($resultArray['data']['tools']),
+                                                    'has_tools' => isset($resultArray['tools']),
+                                                    'tools_count' => count($toolsData),
+                                                ],
                                             ];
                                             
                                             Log::info('[CoreToolPlayground] Tools dynamisch nachgeladen', [
                                                 'tools' => $requestedTools,
                                                 'count' => count($requestedTools),
+                                                'iteration' => $iteration,
+                                                'result_structure_keys' => array_keys($resultArray),
+                                            ]);
+                                        } else {
+                                            Log::warning('[CoreToolPlayground] Keine Tools aus tools.GET Result extrahiert', [
+                                                'result_structure' => [
+                                                    'has_data' => isset($resultArray['data']),
+                                                    'has_data_tools' => isset($resultArray['data']['tools']),
+                                                    'has_tools' => isset($resultArray['tools']),
+                                                    'data_keys' => isset($resultArray['data']) ? array_keys($resultArray['data']) : [],
+                                                    'result_keys' => array_keys($resultArray),
+                                                ],
                                             ]);
                                         }
                                     }
