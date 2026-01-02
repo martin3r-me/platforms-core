@@ -1930,13 +1930,6 @@ class CoreToolPlaygroundController extends Controller
                     $teamName = $data['current_team_name'] ?? 'Unbekannt';
                     $text .= "Aktuelles Team: ID {$data['current_team_id']} ({$teamName})\n";
                 }
-                if (isset($data['current_team_id'])) {
-                    $text .= "\n";
-                    $text .= "✅ **WICHTIG - NÄCHSTER SCHRITT:**\n";
-                    $text .= "Du hast jetzt die Team-ID ({$data['current_team_id']}).\n";
-                    $text .= "Rufe JETZT 'planner.projects.GET' auf - NICHT nochmal 'core.teams.GET'!\n";
-                    $text .= "Beispiel: planner.projects.GET mit team_id={$data['current_team_id']}\n";
-                }
             } elseif ($toolName === 'planner.projects.GET' && isset($data['projects'])) {
                 $text .= "Projekte gefunden: " . ($data['count'] ?? count($data['projects'])) . "\n";
                 if (isset($data['team_id'])) {

@@ -23,7 +23,7 @@ trait HasStandardGetOperations
                 // === FILTER ===
                 'filters' => [
                     'type' => 'array',
-                    'description' => 'Optional: Array von Filtern. Jeder Filter ist ein Objekt mit "field", "op" (Operator) und "value". Beispiel: [{"field": "project_type", "op": "eq", "value": "internal"}]',
+                    'description' => 'REST-Parameter (optional): Array von Filtern. Jeder Filter: {"field": "string", "op": "eq|ne|gt|gte|lt|lte|like|in|not_in|is_null|is_not_null", "value": any}. Beispiel: [{"field": "project_type", "op": "eq", "value": "internal"}]',
                     'items' => [
                         'type' => 'object',
                         'properties' => [
@@ -47,18 +47,18 @@ trait HasStandardGetOperations
                 // === SUCHE ===
                 'search' => [
                     'type' => 'string',
-                    'description' => 'Optional: Suchbegriff für Volltext-Suche. Durchsucht standardmäßig relevante Felder (z.B. Name, Beschreibung). Beispiel: "Test Projekt"'
+                    'description' => 'REST-Parameter (optional): Suchbegriff für Volltext-Suche. Beispiel: search="Test Projekt". Durchsucht standardmäßig relevante Felder (z.B. Name, Beschreibung).'
                 ],
                 'search_fields' => [
                     'type' => 'array',
-                    'description' => 'Optional: Array von Feldnamen, die durchsucht werden sollen. Wenn nicht angegeben, werden Standard-Felder durchsucht. Beispiel: ["name", "description"]',
+                    'description' => 'REST-Parameter (optional): Array von Feldnamen, die durchsucht werden sollen. Beispiel: search_fields=["name", "description"]. Wenn nicht angegeben, werden Standard-Felder durchsucht.',
                     'items' => ['type' => 'string']
                 ],
                 
                 // === SORTIERUNG ===
                 'sort' => [
                     'type' => 'array',
-                    'description' => 'Optional: Array von Sortierungen. Jede Sortierung ist ein Objekt mit "field" und "dir" (asc/desc). Beispiel: [{"field": "name", "dir": "asc"}, {"field": "created_at", "dir": "desc"}]',
+                    'description' => 'REST-Parameter (optional): Array von Sortierungen. Jede Sortierung: {"field": "string", "dir": "asc|desc"}. Beispiel: [{"field": "name", "dir": "asc"}, {"field": "created_at", "dir": "desc"}]',
                     'items' => [
                         'type' => 'object',
                         'properties' => [
@@ -79,11 +79,11 @@ trait HasStandardGetOperations
                 // === PAGINATION ===
                 'limit' => [
                     'type' => 'integer',
-                    'description' => 'Optional: Maximale Anzahl der Ergebnisse. Standard: 50, Maximum: 1000.'
+                    'description' => 'REST-Parameter (optional): Maximale Anzahl der Ergebnisse. Beispiel: limit=50. Standard: 50, Maximum: 1000.'
                 ],
                 'offset' => [
                     'type' => 'integer',
-                    'description' => 'Optional: Anzahl der zu überspringenden Ergebnisse (für Pagination). Standard: 0.'
+                    'description' => 'REST-Parameter (optional): Anzahl der zu überspringenden Ergebnisse (für Pagination). Beispiel: offset=0. Standard: 0.'
                 ],
             ],
             'required' => []

@@ -725,10 +725,7 @@ WICHTIG - Mehrere Tool-Calls:
 
 WICHTIG - Tool-Results verarbeiten:
 - Nach jedem Tool-Result solltest du das ERGEBNIS verwenden und das NÄCHSTE Tool aufrufen
-- Wenn ein Tool-Result bereits die benötigten Informationen enthält (z.B. Team-ID), rufe das NÄCHSTE Tool auf - nicht das gleiche Tool nochmal!
-- Beispiel: Wenn "core.teams.GET" das aktuelle Team (ID 9) zurückgibt, rufe direkt "planner.projects.GET" auf - nicht "core.teams.GET" nochmal!
-- Wenn du die benötigten Informationen hast, FÜHRE die nächste Aktion aus - keine Endlosschleifen!
-- Wenn ein Tool-Result explizit sagt "Rufe JETZT planner.projects.GET auf", dann tue das SOFORT - nicht nochmal das vorherige Tool!
+- Wenn du die benötigten Informationen hast, FÜHRE die nächste Aktion aus
 
 WICHTIG - Loop-Vermeidung:
 - Rufe NIEMALS das gleiche Tool mehrfach hintereinander auf, wenn du bereits die benötigten Informationen hast

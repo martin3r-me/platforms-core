@@ -23,7 +23,7 @@ class ListTeamUsersTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'Listet alle Nutzer/Mitglieder eines Teams auf. RUF DIESES TOOL SOFORT UND AUTOMATISCH AUF, wenn der Nutzer nach Team-Mitgliedern fragt (z.B. "zeige mir alle Nutzer des Teams", "welche Personen sind im Team", "wer gehört zum Team", "alle Mitglieder anzeigen"). Nutze dieses Tool auch, wenn du wissen musst, welche Nutzer in einem Team sind, bevor du Aufgaben oder Projekte erstellst. Wenn keine Team-ID angegeben ist, wird das aktuelle Team aus dem Kontext verwendet.';
+        return 'GET /teams/{team_id}/users?filters=[...]&search=...&sort=[...] - Listet Nutzer/Mitglieder eines Teams auf. REST-Parameter: team_id (optional, integer) - wenn nicht angegeben, wird aktuelles Team verwendet. filters (optional, array) - Filter-Array mit field, op, value. search (optional, string) - Suchbegriff. sort (optional, array) - Sortierung. limit/offset (optional) - Pagination. RUF DIESES TOOL AUF, wenn der Nutzer nach Team-Mitgliedern fragt.';
     }
 
     public function getSchema(): array
@@ -34,7 +34,7 @@ class ListTeamUsersTool implements ToolContract
                 'properties' => [
                     'team_id' => [
                         'type' => 'integer',
-                        'description' => 'Optional: ID des Teams, dessen Nutzer aufgelistet werden sollen. Wenn nicht angegeben, wird das aktuelle Team aus dem Kontext verwendet. Nutze "core.teams.GET" um Teams zu finden.'
+                        'description' => 'REST-Parameter (optional): ID des Teams. Beispiel: team_id=9. Wenn nicht angegeben, wird aktuelles Team aus Kontext verwendet. Nutze "core.teams.GET" um verfügbare Team-IDs zu sehen.'
                     ]
                 ]
             ]

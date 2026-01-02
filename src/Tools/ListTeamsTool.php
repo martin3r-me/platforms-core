@@ -23,7 +23,7 @@ class ListTeamsTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'Listet alle Teams auf, denen der aktuelle User angehört. RUF DIESES TOOL SOFORT UND AUTOMATISCH AUF, wenn der Nutzer nach Teams fragt (z.B. "welche Teams stehen zur Verfügung", "zeige mir alle Teams", "in welchem Team soll...", "welche Teams stehen zur Auswahl"). Nutze dieses Tool auch, wenn du wissen musst, in welchem Team etwas erstellt werden soll und der Nutzer kein Team angegeben hat. WICHTIG: Rufe dieses Tool auf, BEVOR du dem Nutzer antwortest - nicht nur erwähnen, sondern wirklich aufrufen!';
+        return 'GET /teams?filters=[...]&search=...&sort=[...]&include_personal={bool} - Listet Teams auf, denen der aktuelle User angehört. REST-Parameter: filters (optional, array) - Filter-Array mit field, op, value. search (optional, string) - Suchbegriff. sort (optional, array) - Sortierung. include_personal (optional, boolean) - persönliche Teams einbeziehen. limit/offset (optional) - Pagination. RUF DIESES TOOL AUF, wenn der Nutzer explizit nach Teams fragt. WICHTIG: Die meisten Tools verwenden automatisch das aktuelle Team - du musst dieses Tool NICHT aufrufen, bevor du andere Tools verwendest.';
     }
 
     public function getSchema(): array
@@ -34,7 +34,7 @@ class ListTeamsTool implements ToolContract
                 'properties' => [
                     'include_personal' => [
                         'type' => 'boolean',
-                        'description' => 'Optional: Soll auch persönliche Teams (personal_team = true) angezeigt werden? Standard: true. Alternativ: nutze filters mit field="is_personal" und op="eq".'
+                        'description' => 'REST-Parameter (optional): Soll auch persönliche Teams angezeigt werden? Beispiel: include_personal=true. Standard: true. Alternativ: nutze filters mit field="is_personal" und op="eq".'
                     ]
                 ]
             ]
