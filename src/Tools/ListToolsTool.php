@@ -173,6 +173,11 @@ class ListToolsTool implements ToolContract
             $offset = max($arguments['offset'] ?? 0, 0);
             $filteredTools = array_slice($filteredTools, $offset, $limit);
             
+            // Prüfe, ob Filter angewendet wurden
+            $hasFilters = $hasLegacyFilters || 
+                        !empty($arguments['filters']) || 
+                        !empty($searchTerm);
+            
             $allTools = $this->registry->all();
             $modules = ModuleRegistry::all();
             
