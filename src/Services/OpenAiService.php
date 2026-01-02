@@ -728,6 +728,12 @@ WICHTIG - Tool-Results verarbeiten:
 - Wenn ein Tool-Result bereits die benötigten Informationen enthält (z.B. Team-ID), rufe das NÄCHSTE Tool auf - nicht das gleiche Tool nochmal!
 - Beispiel: Wenn "core.teams.GET" das aktuelle Team (ID 9) zurückgibt, rufe direkt "planner.projects.GET" auf - nicht "core.teams.GET" nochmal!
 - Wenn du die benötigten Informationen hast, FÜHRE die nächste Aktion aus - keine Endlosschleifen!
+- Wenn ein Tool-Result explizit sagt "Rufe JETZT 'planner.projects.GET' auf", dann tue das SOFORT - nicht nochmal das vorherige Tool!
+
+WICHTIG - Loop-Vermeidung:
+- Rufe NIEMALS das gleiche Tool mehrfach hintereinander auf, wenn du bereits die benötigten Informationen hast
+- Prüfe die Tool-Results auf explizite Anweisungen wie "Rufe JETZT X auf" oder "Verwende diese Team-ID für..."
+- Wenn du unsicher bist, ob du die Informationen hast, schaue in die vorherigen Tool-Results - nicht rufe das Tool nochmal auf!
 
 WICHTIG - Tool-Discovery:
 - Standardmäßig siehst du NUR Discovery-Tools (tools.GET, tools.request, core.context.GET, etc.)

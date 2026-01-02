@@ -371,6 +371,9 @@ class CoreToolPlaygroundController extends Controller
                 $allToolResults = [];
                 $allResponses = [];
                 
+                // Loop-Detection: Verhindere wiederholte Aufrufe des gleichen Tools
+                $toolCallHistory = []; // Speichert: tool_name => [count, last_call_iteration]
+                
                 // Generiere Trace-ID für diese Session (wird für Versionierung verwendet)
                 $traceId = bin2hex(random_bytes(8));
                 $simulation['trace_id'] = $traceId;
@@ -453,6 +456,33 @@ class CoreToolPlaygroundController extends Controller
                                 
                                 // Tool-Name zurückmappen (von OpenAI-Format zu internem Format)
                                 $internalToolName = $this->denormalizeToolNameFromOpenAi($toolName);
+                                
+                                // Loop-Detection: Prüfe, ob dieses Tool bereits mehrfach aufgerufen wurde
+                                if (!isset($toolCallHistory[$internalToolName])) {
+                                    $toolCallHistory[$internalToolName] = ['count' => 0, 'last_iteration' => 0, 'arguments' => []];
+                                }
+                                $toolCallHistory[$internalToolName]['count']++;
+                                $toolCallHistory[$internalToolName]['last_iteration'] = $iteration;
+                                
+                                // Wenn das Tool bereits 3+ mal aufgerufen wurde, füge Warnung hinzu
+                                if ($toolCallHistory[$internalToolName]['count'] >= 3) {
+                                    $warningMessage = "\n\n⚠️ **WICHTIG - Loop-Detection:**\n";
+                                    $warningMessage .= "Du hast das Tool '{$internalToolName}' bereits {$toolCallHistory[$internalToolName]['count']} mal aufgerufen.\n";
+                                    $warningMessage .= "Prüfe die bisherigen Tool-Results - die benötigten Informationen sind wahrscheinlich bereits vorhanden!\n";
+                                    $warningMessage .= "Verwende die Informationen aus den vorherigen Tool-Results und rufe das NÄCHSTE Tool auf.\n";
+                                    
+                                    $messages[] = [
+                                        'role' => 'system',
+                                        'content' => $warningMessage,
+                                    ];
+                                    
+                                    $simulation['steps'][] = [
+                                        'step' => 4 + $iteration,
+                                        'name' => 'Loop-Detection Warning',
+                                        'description' => "Tool '{$internalToolName}' wurde bereits {$toolCallHistory[$internalToolName]['count']} mal aufgerufen",
+                                        'timestamp' => now()->toIso8601String(),
+                                    ];
+                                }
                                 
                                 $simulation['steps'][] = [
                                     'step' => 4 + $iteration,
@@ -603,6 +633,50 @@ class CoreToolPlaygroundController extends Controller
                                         'error' => $e->getMessage(),
                                         'execution_time_ms' => round($executionTime, 2),
                                     ];
+                                }
+                            }
+                            
+                            // Prüfe Intention-Verification NACH jedem Tool-Result (nicht nur am Ende)
+                            // Dies hilft, Loops frühzeitig zu erkennen
+                            $enableVerification = config('tools.intention_verification.enabled', true);
+                            if ($enableVerification && count($allToolResults) > 0) {
+                                try {
+                                    $verificationService = app(\Platform\Core\Services\IntentionVerificationService::class);
+                                    
+                                    // Prüfe ob wir bereits ein Action Summary haben (wird später erstellt)
+                                    $actionSummary = $simulation['action_summary'] ?? [];
+                                    
+                                    // Für READ-Operationen können wir auch ohne Action Summary prüfen
+                                    $verification = $verificationService->verify(
+                                        $message, // Original User-Request
+                                        $allToolResults,
+                                        $actionSummary
+                                    );
+                                    
+                                    if ($verification->hasIssues()) {
+                                        $verificationText = "\n\n⚠️ **Verifikation (Zwischenprüfung):**\n";
+                                        $verificationText .= $verification->getIssuesText();
+                                        $verificationText .= "\n\nPrüfe die Tool-Results und rufe das RICHTIGE Tool auf!";
+                                        
+                                        // Füge Verifikations-Hinweis zu Messages hinzu (für LLM-Korrektur)
+                                        $messages[] = [
+                                            'role' => 'system',
+                                            'content' => $verificationText,
+                                        ];
+                                        
+                                        $simulation['steps'][] = [
+                                            'step' => 4 + $iteration,
+                                            'name' => 'Intention-Verification (Zwischenprüfung)',
+                                            'description' => 'Verifikation hat Probleme gefunden - LLM kann korrigieren',
+                                            'timestamp' => now()->toIso8601String(),
+                                            'verification_issues' => $verification->getIssuesText(),
+                                        ];
+                                    }
+                                } catch (\Throwable $e) {
+                                    // Silent fail - Verifikation optional
+                                    \Log::debug('[CoreToolPlayground] Zwischen-Verifikation konnte nicht durchgeführt werden', [
+                                        'error' => $e->getMessage(),
+                                    ]);
                                 }
                             }
                             
@@ -1830,7 +1904,11 @@ class CoreToolPlaygroundController extends Controller
                     $text .= "Aktuelles Team: ID {$data['current_team_id']} ({$teamName})\n";
                 }
                 if (isset($data['current_team_id'])) {
-                    $text .= "\nVerwende diese Team-ID für weitere Tool-Aufrufe (z.B. planner.projects.GET mit team_id={$data['current_team_id']}).\n";
+                    $text .= "\n";
+                    $text .= "✅ **WICHTIG - NÄCHSTER SCHRITT:**\n";
+                    $text .= "Du hast jetzt die Team-ID ({$data['current_team_id']}).\n";
+                    $text .= "Rufe JETZT 'planner.projects.GET' auf - NICHT nochmal 'core.teams.GET'!\n";
+                    $text .= "Beispiel: planner.projects.GET mit team_id={$data['current_team_id']}\n";
                 }
             } elseif ($toolName === 'planner.projects.GET' && isset($data['projects'])) {
                 $text .= "Projekte gefunden: " . ($data['count'] ?? count($data['projects'])) . "\n";

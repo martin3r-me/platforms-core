@@ -123,10 +123,11 @@ class IntentionVerificationService
             $intention->expectedCount = 1;
         }
         
-        // LIST/GET-Patterns (keine Verifikation nötig)
-        if (preg_match('/(?:zeige?|liste?|hole?|get)\s+(?:alle\s+)?(.+?)(?:\s+aus|\s+im|\s+von|$)/i', $message)) {
+        // LIST/GET-Patterns - extrahiere Target für Tool-Verifikation
+        if (preg_match('/(?:zeige?|liste?|hole?|get|anzeige?)\s+(?:alle\s+)?(.+?)(?:\s+aus|\s+im|\s+von|\s+des|\s+der|\s+dem|$)/i', $message, $matches)) {
             $intention->type = 'read';
-            // Read-Operationen brauchen keine Verifikation
+            $intention->target = trim($matches[1] ?? '');
+            // Read-Operationen brauchen Tool-Verifikation (wurde das richtige Tool aufgerufen?)
         }
         
         return $intention;
@@ -182,7 +183,13 @@ class IntentionVerificationService
      */
     protected function checkCompleteness(Intention $intention, array $actionSummary): CompletenessCheck
     {
-        if ($intention->isEmpty() || $intention->type === 'read') {
+        if ($intention->isEmpty()) {
+            return CompletenessCheck::complete();
+        }
+        
+        // READ-Operationen: Prüfe ob das richtige Tool aufgerufen wurde
+        if ($intention->type === 'read' && $intention->target) {
+            // Diese Prüfung wird in checkConsistency gemacht (welche Tools wurden aufgerufen)
             return CompletenessCheck::complete();
         }
         
@@ -249,6 +256,27 @@ class IntentionVerificationService
             $issues[] = "Einige Tools sind fehlgeschlagen: " . implode(', ', $failedTools);
         }
         
+        // READ-Operationen: Prüfe ob das richtige Tool aufgerufen wurde
+        if ($intention->type === 'read' && $intention->target) {
+            $target = Str::lower($intention->target);
+            $toolsCalled = array_map(function($result) {
+                return $result['tool'] ?? '';
+            }, $toolResults);
+            
+            // Mapping: User-Request → erwartetes Tool
+            $expectedTool = $this->getExpectedToolForRead($target);
+            
+            if ($expectedTool && !in_array($expectedTool, $toolsCalled)) {
+                // Prüfe ob ein ähnliches Tool aufgerufen wurde (z.B. core.teams.GET statt planner.projects.GET)
+                $similarTool = $this->findSimilarTool($expectedTool, $toolsCalled);
+                if ($similarTool) {
+                    $issues[] = "Falsches Tool aufgerufen: '{$similarTool}' statt '{$expectedTool}'. Der User wollte '{$intention->target}' sehen - rufe '{$expectedTool}' auf!";
+                } else {
+                    $issues[] = "Das erwartete Tool '{$expectedTool}' wurde nicht aufgerufen. Der User wollte '{$intention->target}' sehen.";
+                }
+            }
+        }
+        
         // Prüfe ob Tool-Results mit Action Summary übereinstimmen
         $toolsExecuted = count($toolResults);
         $expectedTools = $actionSummary['tools_executed'] ?? 0;
@@ -262,6 +290,70 @@ class IntentionVerificationService
         }
         
         return ConsistencyCheck::inconsistent($issues);
+    }
+    
+    /**
+     * Bestimmt das erwartete Tool für eine READ-Operation
+     */
+    protected function getExpectedToolForRead(string $target): ?string
+    {
+        $target = Str::lower(trim($target));
+        
+        // Mapping: User-Request → Tool-Name
+        $mappings = [
+            'projekt' => 'planner.projects.GET',
+            'projekte' => 'planner.projects.GET',
+            'project' => 'planner.projects.GET',
+            'projects' => 'planner.projects.GET',
+            'aufgabe' => 'planner.tasks.GET',
+            'aufgaben' => 'planner.tasks.GET',
+            'task' => 'planner.tasks.GET',
+            'tasks' => 'planner.tasks.GET',
+            'slot' => 'planner.project_slots.GET',
+            'slots' => 'planner.project_slots.GET',
+            'team' => 'core.teams.GET',
+            'teams' => 'core.teams.GET',
+            'company' => 'crm.companies.GET',
+            'companies' => 'crm.companies.GET',
+            'unternehmen' => 'crm.companies.GET',
+            'contact' => 'crm.contacts.GET',
+            'contacts' => 'crm.contacts.GET',
+            'kontakt' => 'crm.contacts.GET',
+            'kontakte' => 'crm.contacts.GET',
+        ];
+        
+        // Prüfe exakte Matches
+        if (isset($mappings[$target])) {
+            return $mappings[$target];
+        }
+        
+        // Prüfe Teil-Strings (z.B. "alle projekte" enthält "projekte")
+        foreach ($mappings as $key => $tool) {
+            if (str_contains($target, $key)) {
+                return $tool;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Findet ein ähnliches Tool (z.B. core.teams.GET statt planner.projects.GET)
+     */
+    protected function findSimilarTool(string $expectedTool, array $toolsCalled): ?string
+    {
+        // Wenn das erwartete Tool nicht aufgerufen wurde, prüfe ob ein ähnliches aufgerufen wurde
+        // z.B. "core.teams.GET" statt "planner.projects.GET" wenn User "Projekte" wollte
+        foreach ($toolsCalled as $tool) {
+            if ($tool && $tool !== $expectedTool) {
+                // Prüfe ob es ein GET-Tool ist (ähnliche Kategorie)
+                if (str_ends_with($tool, '.GET')) {
+                    return $tool;
+                }
+            }
+        }
+        
+        return null;
     }
 }
 
