@@ -1969,7 +1969,6 @@ class CoreToolPlaygroundController extends Controller
                 }
             } elseif ($toolName === 'tools.GET' && isset($data['tools'])) {
                 $text .= "Tools gefunden: " . ($data['summary']['filtered_tools'] ?? count($data['tools'])) . "\n";
-                $text .= "Verwende diese Tools für weitere Aktionen.\n";
             } else {
                 // Generische Formatierung: Zeige wichtige Felder
                 $text .= "Daten:\n";
