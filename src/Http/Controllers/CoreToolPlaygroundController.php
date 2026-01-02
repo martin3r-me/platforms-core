@@ -366,7 +366,7 @@ class CoreToolPlaygroundController extends Controller
                 session()->put("playground_chat_history_{$sessionId}", $messages);
                 
                 // Multi-Step-Chat: Führe so lange aus, bis LLM keine Tools mehr aufruft
-                $maxIterations = 10; // Verhindere Endlosschleifen
+                $maxIterations = 5; // Verhindere Endlosschleifen (reduziert von 10 auf 5)
                 $iteration = 0;
                 $allToolResults = [];
                 $allResponses = [];
@@ -464,12 +464,19 @@ class CoreToolPlaygroundController extends Controller
                                 $toolCallHistory[$internalToolName]['count']++;
                                 $toolCallHistory[$internalToolName]['last_iteration'] = $iteration;
                                 
-                                // Wenn das Tool bereits 3+ mal aufgerufen wurde, füge Warnung hinzu
-                                if ($toolCallHistory[$internalToolName]['count'] >= 3) {
-                                    $warningMessage = "\n\n⚠️ **WICHTIG - Loop-Detection:**\n";
+                                // Loop-Detection: Warnung nach 2 mal, Hinweis nach 3 mal (aber Tool wird noch ausgeführt)
+                                if ($toolCallHistory[$internalToolName]['count'] >= 2) {
+                                    $warningMessage = "\n\n⚠️ **Hinweis - Loop-Detection:**\n";
                                     $warningMessage .= "Du hast das Tool '{$internalToolName}' bereits {$toolCallHistory[$internalToolName]['count']} mal aufgerufen.\n";
-                                    $warningMessage .= "Prüfe die bisherigen Tool-Results - die benötigten Informationen sind wahrscheinlich bereits vorhanden!\n";
-                                    $warningMessage .= "Verwende die Informationen aus den vorherigen Tool-Results und rufe das NÄCHSTE Tool auf.\n";
+                                    $warningMessage .= "Prüfe bitte, ob du die benötigten Informationen bereits aus den vorherigen Tool-Results hast.\n";
+                                    
+                                    // Spezielle Hinweise für häufige Loops (nur als Hinweis, nicht als Blockierung)
+                                    if ($internalToolName === 'core.teams.GET') {
+                                        $warningMessage .= "\n💡 Tipp: 'core.teams.GET' ist meist NICHT nötig für andere Tools.\n";
+                                        $warningMessage .= "- Tools wie 'planner.projects.GET', 'crm.companies.GET', 'crm.contacts.GET' verwenden automatisch das aktuelle Team aus dem Kontext.\n";
+                                        $warningMessage .= "- Du kannst diese Tools direkt aufrufen, ohne vorher 'core.teams.GET' aufzurufen.\n";
+                                        $warningMessage .= "- Nur wenn der User explizit nach einem ANDEREN Team fragt, ist 'core.teams.GET' nötig.\n";
+                                    }
                                     
                                     $messages[] = [
                                         'role' => 'system',
@@ -482,6 +489,25 @@ class CoreToolPlaygroundController extends Controller
                                         'description' => "Tool '{$internalToolName}' wurde bereits {$toolCallHistory[$internalToolName]['count']} mal aufgerufen",
                                         'timestamp' => now()->toIso8601String(),
                                     ];
+                                }
+                                
+                                // Nach 4 mal das gleiche Tool: Stärkere Warnung (aber Tool wird noch ausgeführt - LOOSE)
+                                if ($toolCallHistory[$internalToolName]['count'] >= 4) {
+                                    $strongWarning = "\n\n🚨 **WICHTIG - Wiederholter Tool-Aufruf:**\n";
+                                    $strongWarning .= "Das Tool '{$internalToolName}' wurde bereits 4 mal aufgerufen.\n";
+                                    $strongWarning .= "Bitte prüfe die Tool-Results - die benötigten Informationen sind wahrscheinlich bereits vorhanden.\n";
+                                    $strongWarning .= "Rufe stattdessen das nächste logische Tool auf.\n";
+                                    
+                                    if ($internalToolName === 'core.teams.GET') {
+                                        $strongWarning .= "\n💡 Beispiel: Wenn der User nach Projekten fragt, rufe 'planner.projects.GET' auf (ohne team_id Parameter).\n";
+                                    }
+                                    
+                                    $messages[] = [
+                                        'role' => 'system',
+                                        'content' => $strongWarning,
+                                    ];
+                                    
+                                    // Tool wird TROTZDEM ausgeführt (LOOSE) - wir blockieren nicht, sondern warnen nur
                                 }
                                 
                                 $simulation['steps'][] = [
@@ -1923,12 +1949,18 @@ class CoreToolPlaygroundController extends Controller
         
         // Bei Erfolg: Formatiere Daten strukturiert
         if ($success && is_array($data)) {
-            // Spezielle Formatierung für bekannte Tools
+            // Spezielle Formatierung für bekannte Tools (nur Daten, keine Anweisungen)
             if ($toolName === 'core.teams.GET' && isset($data['teams'])) {
                 $text .= "Teams gefunden: " . ($data['count'] ?? count($data['teams'])) . "\n";
                 if (isset($data['current_team_id'])) {
                     $teamName = $data['current_team_name'] ?? 'Unbekannt';
                     $text .= "Aktuelles Team: ID {$data['current_team_id']} ({$teamName})\n";
+                }
+                if (!empty($data['teams']) && is_array($data['teams'])) {
+                    $text .= "\nTeams:\n";
+                    foreach (array_slice($data['teams'], 0, 10) as $team) {
+                        $text .= "- ID {$team['id']}: {$team['name']}" . (isset($team['is_current']) && $team['is_current'] ? ' (aktuell)' : '') . "\n";
+                    }
                 }
             } elseif ($toolName === 'planner.projects.GET' && isset($data['projects'])) {
                 $text .= "Projekte gefunden: " . ($data['count'] ?? count($data['projects'])) . "\n";

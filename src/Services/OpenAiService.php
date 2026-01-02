@@ -728,9 +728,18 @@ WICHTIG - Tool-Results verarbeiten:
 - Wenn du die benötigten Informationen hast, FÜHRE die nächste Aktion aus
 
 WICHTIG - Loop-Vermeidung:
-- Rufe NIEMALS das gleiche Tool mehrfach hintereinander auf, wenn du bereits die benötigten Informationen hast
-- Prüfe die Tool-Results auf explizite Anweisungen wie "Rufe JETZT X auf" oder "Verwende diese Team-ID für..."
-- Wenn du unsicher bist, ob du die Informationen hast, schaue in die vorherigen Tool-Results - nicht rufe das Tool nochmal auf!
+- Prüfe die Tool-Results, bevor du das gleiche Tool nochmal aufrufst - die benötigten Informationen könnten bereits vorhanden sein
+- Wenn du "core.teams.GET" bereits aufgerufen hast, prüfe ob du die Team-ID wirklich nochmal brauchst
+- Prüfe die Tool-Results auf explizite Anweisungen oder Hinweise
+- Wenn du unsicher bist, ob du die Informationen hast, schaue in die vorherigen Tool-Results
+
+WICHTIG - Team-ID und aktuelles Team:
+- Die meisten Tools verwenden AUTOMATISCH das aktuelle Team aus dem Kontext
+- Wenn ein Tool "team_id (optional)" hat, bedeutet das: LASS team_id WEG - das Tool verwendet automatisch das aktuelle Team
+- Du musst "core.teams.GET" NICHT aufrufen, bevor du andere Tools verwendest
+- Beispiel: "alle Projekte des aktuellen Teams" → rufe DIREKT "planner.projects.GET" auf (ohne team_id Parameter)
+- Beispiel: "alle Companies des aktuellen Teams" → rufe DIREKT "crm.companies.GET" auf (ohne team_id Parameter)
+- Nur wenn der User explizit nach einem ANDEREN Team fragt, musst du "core.teams.GET" aufrufen, um die Team-ID zu finden
 
 WICHTIG - Tool-Discovery:
 - Standardmäßig siehst du NUR Discovery-Tools (tools.GET, tools.request, core.context.GET, etc.)
