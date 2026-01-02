@@ -642,9 +642,11 @@ WICHTIG - Mehrere Tool-Calls:
 - Wenn der Nutzer mehrere Items erstellt oder löschen möchte, kannst du das entsprechende Tool mehrfach aufrufen
 - Wenn kritische Informationen fehlen, frage nach - aber nur einmal für alle Items, nicht für jedes einzeln
 
-WICHTIG - Tool-Discovery (wenn viele Tools vorhanden):
-- Wenn du nur read-only Tools (Lese-Operationen) siehst, aber Schreib-Operationen benötigst, nutze das Tool "tools.GET" mit read_only=false
-- Du kannst gezielt Tools anfordern: "Ich brauche write-Tools für planner" → nutze tools.GET mit filters: module="planner", read_only=false
+WICHTIG - Tool-Discovery:
+- Standardmäßig siehst du NUR Discovery-Tools (tools.GET, tools.request, core.context.GET, etc.)
+- Wenn du Tools benötigst, nutze "tools.GET" um sie gezielt anzufordern
+- Beispiel: Wenn du etwas löschen musst, nutze tools.GET mit filters: module="planner", read_only=false, um DELETE-Tools zu sehen
+- Beispiel: Wenn du etwas lesen musst, nutze tools.GET mit filters: module="planner", read_only=true, um GET-Tools zu sehen
 - Du kannst mehrere Module kombinieren: "Ich brauche read-Tools für core und write-Tools für planner" → nutze tools.GET mehrfach mit entsprechenden Filtern
 - Das Tool "tools.GET" ermöglicht es dir, gezielt Tools anzufordern, die du für eine Aufgabe benötigst
 
@@ -777,16 +779,9 @@ WICHTIG - Grenzen erkennen:
                 $info .= "\n";
             }
             
-            // Tool-Liste direkt anzeigen (damit AI weiß, welche Tools verfügbar sind)
-            if (count($allTools) > 0) {
-                $info .= "Verfügbare Tools:\n";
-                foreach ($allTools as $tool) {
-                    $toolName = $tool->getName();
-                    $toolDesc = $tool->getDescription();
-                    $info .= "- {$toolName}: {$toolDesc}\n";
-                }
-                $info .= "\n";
-            }
+            // KEINE Tool-Liste mehr direkt anzeigen - das widerspricht dem Discovery-Layer!
+            // Die LLM sieht standardmäßig nur Discovery-Tools und kann tools.GET aufrufen
+            // Stattdessen: Nur Module-Übersicht, damit die LLM weiß, welche Module es gibt
             
             // Wichtiger Hinweis (LOOSE & GENERISCH)
             $info .= "WICHTIG - Tool-Namen folgen REST-Pattern:\n";
@@ -809,10 +804,11 @@ WICHTIG - Grenzen erkennen:
             $info .= "- Wenn du ein Tool aufrufen musst, rufe es sofort auf - keine Ankündigungen, keine 'Ich werde...'-Sätze\n";
             $info .= "\n";
             $info .= "DISCOVERY-LAYER & TOOL-CLUSTERING:\n";
-            $info .= "- Standardmäßig siehst du Discovery-Tools (tools.GET, tools.request) und read-only Tools (Lese-Operationen, enden mit '.GET')\n";
-            $info .= "- Wenn du etwas ändern/erstellen/löschen musst, nutze 'tools.GET' mit read_only=false, um write Tools zu sehen (POST, PUT, DELETE)\n";
-            $info .= "- Wenn du nur Daten lesen musst, reichen die read-only Tools aus (GET)\n";
-            $info .= "- Du kannst selbst entscheiden, welche Tool-Kategorie du brauchst\n";
+            $info .= "- Standardmäßig siehst du NUR Discovery-Tools (tools.GET, tools.request, core.context.GET, etc.)\n";
+            $info .= "- Wenn du Tools benötigst, nutze 'tools.GET' um sie gezielt anzufordern\n";
+            $info .= "- Beispiel: Wenn du etwas löschen musst, nutze 'tools.GET' mit read_only=false und module='planner', um DELETE-Tools zu sehen\n";
+            $info .= "- Beispiel: Wenn du etwas lesen musst, nutze 'tools.GET' mit read_only=true, um GET-Tools zu sehen\n";
+            $info .= "- Du entscheidest selbst, welche Tools du brauchst und forderst sie gezielt an\n";
             $info .= "\n";
             $info .= "Tool-Details: Nutze das Tool 'tools.GET', um alle verfügbaren Tools und ihre Funktionen detailliert zu sehen.\n";
             
@@ -890,60 +886,39 @@ WICHTIG - Grenzen erkennen:
                 $allTools = $toolRegistry->all();
                 $totalToolCount = count($allTools);
                 
-                // DISCOVERY-LAYER: Wenn zu viele Tools, nur Discovery-Tools + read-only Tools senden
-                if ($totalToolCount > $toolCountThreshold) {
-                    // Discovery-Tools + read-only Tools (Standard)
-                    // LLM kann dann tools.GET aufrufen, um write Tools zu sehen
-                    $discovery = app(\Platform\Core\Tools\ToolDiscoveryService::class);
-                    $readOnlyCount = 0;
-                    $writeCount = 0;
+                // DISCOVERY-LAYER: Standardmäßig NUR Discovery-Tools senden
+                // LLM kann dann tools.GET aufrufen, um weitere Tools bei Bedarf zu sehen
+                // Das ist MCP Best Practice und skaliert auch bei 100+ Tools
+                $discovery = app(\Platform\Core\Tools\ToolDiscoveryService::class);
+                $readOnlyCount = 0;
+                $writeCount = 0;
+                
+                foreach ($allTools as $tool) {
+                    $toolName = $tool->getName();
+                    $metadata = $discovery->getToolMetadata($tool);
+                    $isReadOnly = (bool)($metadata['read_only'] ?? false);
                     
-                    foreach ($allTools as $tool) {
-                        $toolName = $tool->getName();
-                        $metadata = $discovery->getToolMetadata($tool);
-                        $isReadOnly = (bool)($metadata['read_only'] ?? false);
-                        
-                        // Zähle für Logging
-                        if ($isReadOnly) {
-                            $readOnlyCount++;
-                        } else {
-                            $writeCount++;
-                        }
-                        
-                        // Discovery-Tools (immer) - ermöglichen es der LLM, verfügbare Module/Tools zu sehen
-                        $isDiscoveryTool = in_array($toolName, [
-                            'tools.GET',           // Tool-Liste anfordern
-                            'tools.request',       // Fehlende Tools anmelden
-                            'core.modules.GET',    // Verfügbare Module sehen
-                            'core.context.GET',    // Aktuellen Kontext sehen
-                            'core.teams.GET',     // Verfügbare Teams sehen
-                        ]);
-                        
-                        // Read-only Tools (Standard)
-                        // LLM kann tools.GET mit read_only=false aufrufen, um write Tools zu sehen
-                        if ($isDiscoveryTool || $isReadOnly) {
-                            try {
-                                $toolDef = $this->convertToolToOpenAiFormat($tool);
-                                if ($toolDef) {
-                                    $tools[] = $toolDef;
-                                }
-                            } catch (\Throwable $e) {
-                                // Einzelnes Tool-Fehler - überspringen
-                            }
-                        }
+                    // Zähle für Logging
+                    if ($isReadOnly) {
+                        $readOnlyCount++;
+                    } else {
+                        $writeCount++;
                     }
                     
-                    Log::info('[OpenAI Tools] Discovery-Layer aktiviert (read-only Cluster)', [
-                        'total_tools' => $totalToolCount,
-                        'read_only_tools' => $readOnlyCount,
-                        'write_tools' => $writeCount,
-                        'threshold' => $toolCountThreshold,
-                        'tools_sent' => count($tools),
-                        'note' => 'LLM kann tools.GET mit read_only=false aufrufen, um write Tools zu sehen',
+                    // NUR Discovery-Tools (standardmäßig)
+                    // LLM kann tools.GET aufrufen, um weitere Tools zu sehen
+                    $isDiscoveryTool = in_array($toolName, [
+                        'tools.GET',           // Tool-Liste anfordern (wichtigste Discovery-Tool)
+                        'tools.request',       // Fehlende Tools anmelden
+                        'core.modules.GET',    // Verfügbare Module sehen
+                        'core.context.GET',    // Aktuellen Kontext sehen
+                        'core.user.GET',       // Aktuellen User sehen
+                        'core.teams.GET',      // Verfügbare Teams sehen
                     ]);
-                } else {
-                    // Wenige Tools: Alle senden (wie bisher)
-                    foreach ($allTools as $tool) {
+                    
+                    // NUR Discovery-Tools senden (nicht read-only!)
+                    // LLM muss aktiv tools.GET aufrufen, um weitere Tools zu sehen
+                    if ($isDiscoveryTool) {
                         try {
                             $toolDef = $this->convertToolToOpenAiFormat($tool);
                             if ($toolDef) {
@@ -954,6 +929,14 @@ WICHTIG - Grenzen erkennen:
                         }
                     }
                 }
+                
+                Log::info('[OpenAI Tools] Discovery-Layer aktiviert (nur Discovery-Tools)', [
+                    'total_tools' => $totalToolCount,
+                    'read_only_tools' => $readOnlyCount,
+                    'write_tools' => $writeCount,
+                    'discovery_tools_sent' => count($tools),
+                    'note' => 'LLM kann tools.GET aufrufen, um weitere Tools bei Bedarf zu sehen',
+                ]);
             } catch (\Throwable $e) {
                 // Registry-Zugriff fehlgeschlagen - ohne Tools weiter
             }
