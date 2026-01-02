@@ -342,6 +342,10 @@ class CoreToolPlaygroundController extends Controller
                 $executor = app(ToolExecutor::class);
                 $orchestrator = app(ToolOrchestrator::class);
                 
+                // Reset dynamisch geladene Tools bei neuer User-Anfrage (neue Session)
+                // Tools werden bei Bedarf wieder nachgeladen
+                $openAiService->resetDynamicallyLoadedTools();
+                
                 // Erstelle Messages-Array (wie im Terminal)
                 // WICHTIG: Nutze Chat-Historie, wenn vorhanden, sonst starte neu
                 $messages = [];
@@ -396,6 +400,46 @@ class CoreToolPlaygroundController extends Controller
                             'timestamp' => now()->toIso8601String(),
                         ];
                         
+                        // DEBUG: Hole Tools, die an OpenAI gesendet werden
+                        $reflection = new \ReflectionClass($openAiService);
+                        $getToolsMethod = $reflection->getMethod('getAvailableTools');
+                        $getToolsMethod->setAccessible(true);
+                        $availableTools = $getToolsMethod->invoke($openAiService);
+                        
+                        $normalizeMethod = $reflection->getMethod('normalizeToolsForResponses');
+                        $normalizeMethod->setAccessible(true);
+                        $normalizedTools = $normalizeMethod->invoke($openAiService, $availableTools);
+                        
+                        // Extrahiere Tool-Namen (vor und nach Normalisierung)
+                        $toolNamesBefore = array_map(function($t) {
+                            if (isset($t['function']['name'])) {
+                                return $t['function']['name'];
+                            }
+                            return $t['name'] ?? 'unknown';
+                        }, $availableTools);
+                        
+                        $toolNamesAfter = array_map(function($t) {
+                            return $t['name'] ?? ($t['function']['name'] ?? 'unknown');
+                        }, $normalizedTools);
+                        
+                        // Prüfe, ob dynamisch geladene Tools vorhanden sind
+                        $reflection = new \ReflectionClass($openAiService);
+                        $dynamicallyLoadedProperty = $reflection->getProperty('dynamicallyLoadedTools');
+                        $dynamicallyLoadedProperty->setAccessible(true);
+                        $dynamicallyLoadedTools = $dynamicallyLoadedProperty->getValue($openAiService);
+                        
+                        $simulation['debug']['tools_sent_to_openai_' . $iteration] = [
+                            'available_tools_count' => count($availableTools),
+                            'normalized_tools_count' => count($normalizedTools),
+                            'tool_names_before_normalization' => $toolNamesBefore,
+                            'tool_names_after_normalization' => $toolNamesAfter,
+                            'has_planner_projects_get' => in_array('planner.projects.GET', $toolNamesBefore) || in_array('planner_projects_GET', $toolNamesAfter),
+                            'has_core_teams_get' => in_array('core.teams.GET', $toolNamesBefore) || in_array('core_teams_GET', $toolNamesAfter),
+                            'dynamically_loaded_tools_count' => count($dynamicallyLoadedTools),
+                            'dynamically_loaded_tool_names' => array_keys($dynamicallyLoadedTools),
+                            'normalized_tools' => $normalizedTools, // Vollständige normalisierte Tools für Debugging
+                        ];
+                        
                         // Rufe echten OpenAiService auf (zeigt automatisch alle Tools)
                         $response = $openAiService->chat($messages, 'gpt-4o-mini', [
                             'max_tokens' => 2000,
@@ -411,6 +455,7 @@ class CoreToolPlaygroundController extends Controller
                             'content_length' => !empty($response['content']) ? strlen($response['content']) : 0,
                             'has_tool_calls' => !empty($response['tool_calls']),
                             'tool_calls_count' => count($response['tool_calls'] ?? []),
+                            'tool_calls' => $response['tool_calls'] ?? [], // Zeige alle Tool-Calls für Debugging
                             'finish_reason' => $response['finish_reason'] ?? null,
                             'response_keys' => array_keys($response), // Zeige alle Keys für Debugging
                             'full_response' => $response, // Vollständige Response für Debugging
@@ -457,6 +502,52 @@ class CoreToolPlaygroundController extends Controller
                                 // Tool-Name zurückmappen (von OpenAI-Format zu internem Format)
                                 $internalToolName = $this->denormalizeToolNameFromOpenAi($toolName);
                                 
+                                // Markiere Tool als verwendet (für Cleanup von nicht genutzten Tools)
+                                $openAiService->markToolAsUsed($internalToolName);
+                                
+                                // PRE-FLIGHT INTENTION VERIFICATION: Prüfe BEVOR Tool ausgeführt wird
+                                $enablePreFlight = config('tools.pre_flight_verification.enabled', true);
+                                $preFlightResult = null;
+                                if ($enablePreFlight) {
+                                    try {
+                                        $preFlightService = app(\Platform\Core\Services\PreFlightIntentionService::class);
+                                        $preFlightResult = $preFlightService->verify(
+                                            $message, // Original User-Request
+                                            $internalToolName,
+                                            $toolArguments,
+                                            $allToolResults
+                                        );
+                                        
+                                        if ($preFlightResult->hasIssues()) {
+                                            $simulation['steps'][] = [
+                                                'step' => 4 + $iteration,
+                                                'name' => 'Pre-Flight Verification',
+                                                'description' => 'Pre-Flight-Verification hat Probleme gefunden',
+                                                'timestamp' => now()->toIso8601String(),
+                                                'pre_flight_issues' => $preFlightResult->getIssuesText(),
+                                            ];
+                                            
+                                            // Füge Pre-Flight-Warnung zu Messages hinzu (für LLM-Korrektur)
+                                            $preFlightWarning = "\n\n🚨 **PRE-FLIGHT VERIFICATION:**\n";
+                                            $preFlightWarning .= $preFlightResult->getIssuesText();
+                                            $preFlightWarning .= "\n\n⚠️ WICHTIG: Prüfe nochmal, ob das Tool wirklich das richtige ist!";
+                                            
+                                            $messages[] = [
+                                                'role' => 'system',
+                                                'content' => $preFlightWarning,
+                                            ];
+                                            
+                                            // Tool wird TROTZDEM ausgeführt (LOOSE) - wir warnen nur
+                                            // Die LLM kann dann in der nächsten Iteration korrigieren
+                                        }
+                                    } catch (\Throwable $e) {
+                                        // Silent fail - Pre-Flight optional
+                                        \Log::debug('[CoreToolPlayground] Pre-Flight-Verification konnte nicht durchgeführt werden', [
+                                            'error' => $e->getMessage(),
+                                        ]);
+                                    }
+                                }
+                                
                                 // Loop-Detection: Prüfe, ob dieses Tool bereits mehrfach aufgerufen wurde
                                 if (!isset($toolCallHistory[$internalToolName])) {
                                     $toolCallHistory[$internalToolName] = ['count' => 0, 'last_iteration' => 0, 'arguments' => []];
@@ -464,50 +555,16 @@ class CoreToolPlaygroundController extends Controller
                                 $toolCallHistory[$internalToolName]['count']++;
                                 $toolCallHistory[$internalToolName]['last_iteration'] = $iteration;
                                 
-                                // Loop-Detection: Warnung nach 2 mal, Hinweis nach 3 mal (aber Tool wird noch ausgeführt)
+                                // Loop-Detection: Markiere für spätere Integration ins Tool-Result
+                                // Warnungen werden NICHT als separate system-Messages hinzugefügt,
+                                // sondern direkt in das Tool-Result integriert (siehe formatToolResultForLLM)
                                 if ($toolCallHistory[$internalToolName]['count'] >= 2) {
-                                    $warningMessage = "\n\n⚠️ **Hinweis - Loop-Detection:**\n";
-                                    $warningMessage .= "Du hast das Tool '{$internalToolName}' bereits {$toolCallHistory[$internalToolName]['count']} mal aufgerufen.\n";
-                                    $warningMessage .= "Prüfe bitte, ob du die benötigten Informationen bereits aus den vorherigen Tool-Results hast.\n";
-                                    
-                                    // Spezielle Hinweise für häufige Loops (nur als Hinweis, nicht als Blockierung)
-                                    if ($internalToolName === 'core.teams.GET') {
-                                        $warningMessage .= "\n💡 Tipp: 'core.teams.GET' ist meist NICHT nötig für andere Tools.\n";
-                                        $warningMessage .= "- Tools wie 'planner.projects.GET', 'crm.companies.GET', 'crm.contacts.GET' verwenden automatisch das aktuelle Team aus dem Kontext.\n";
-                                        $warningMessage .= "- Du kannst diese Tools direkt aufrufen, ohne vorher 'core.teams.GET' aufzurufen.\n";
-                                        $warningMessage .= "- Nur wenn der User explizit nach einem ANDEREN Team fragt, ist 'core.teams.GET' nötig.\n";
-                                    }
-                                    
-                                    $messages[] = [
-                                        'role' => 'system',
-                                        'content' => $warningMessage,
-                                    ];
-                                    
                                     $simulation['steps'][] = [
                                         'step' => 4 + $iteration,
                                         'name' => 'Loop-Detection Warning',
                                         'description' => "Tool '{$internalToolName}' wurde bereits {$toolCallHistory[$internalToolName]['count']} mal aufgerufen",
                                         'timestamp' => now()->toIso8601String(),
                                     ];
-                                }
-                                
-                                // Nach 4 mal das gleiche Tool: Stärkere Warnung (aber Tool wird noch ausgeführt - LOOSE)
-                                if ($toolCallHistory[$internalToolName]['count'] >= 4) {
-                                    $strongWarning = "\n\n🚨 **WICHTIG - Wiederholter Tool-Aufruf:**\n";
-                                    $strongWarning .= "Das Tool '{$internalToolName}' wurde bereits 4 mal aufgerufen.\n";
-                                    $strongWarning .= "Bitte prüfe die Tool-Results - die benötigten Informationen sind wahrscheinlich bereits vorhanden.\n";
-                                    $strongWarning .= "Rufe stattdessen das nächste logische Tool auf.\n";
-                                    
-                                    if ($internalToolName === 'core.teams.GET') {
-                                        $strongWarning .= "\n💡 Beispiel: Wenn der User nach Projekten fragt, rufe 'planner.projects.GET' auf (ohne team_id Parameter).\n";
-                                    }
-                                    
-                                    $messages[] = [
-                                        'role' => 'system',
-                                        'content' => $strongWarning,
-                                    ];
-                                    
-                                    // Tool wird TROTZDEM ausgeführt (LOOSE) - wir blockieren nicht, sondern warnen nur
                                 }
                                 
                                 $simulation['steps'][] = [
@@ -550,7 +607,8 @@ class CoreToolPlaygroundController extends Controller
                                             'message' => $errorMessage
                                         ]
                                     ];
-                                    $toolResultText = $this->formatToolResultForLLM($internalToolName, $errorResult, $toolCallId);
+                                    $loopCount = $toolCallHistory[$internalToolName]['count'] ?? 0;
+                                    $toolResultText = $this->formatToolResultForLLM($internalToolName, $errorResult, $toolCallId, $loopCount);
                                     $messages[] = [
                                         'role' => 'user',
                                         'content' => $toolResultText,
@@ -601,10 +659,39 @@ class CoreToolPlaygroundController extends Controller
                                     // Konvertiere ToolResult zu OpenAI-Format
                                     $resultArray = $toolResult->toArray();
                                     
+                                    // DYNAMISCHES TOOL-NACHLADEN: Wenn tools.GET aufgerufen wurde, lade die angeforderten Tools nach
+                                    if ($internalToolName === 'tools.GET' && $toolResult->success && isset($resultArray['data']['tools'])) {
+                                        $requestedTools = [];
+                                        foreach ($resultArray['data']['tools'] as $toolInfo) {
+                                            $toolName = $toolInfo['name'] ?? null;
+                                            if ($toolName) {
+                                                $requestedTools[] = $toolName;
+                                            }
+                                        }
+                                        
+                                        if (!empty($requestedTools)) {
+                                            // Lade Tools dynamisch nach für nächste Iteration
+                                            $openAiService->loadToolsDynamically($requestedTools);
+                                            
+                                            $simulation['debug']['tools_dynamically_loaded_' . $iteration] = [
+                                                'tool_names' => $requestedTools,
+                                                'count' => count($requestedTools),
+                                                'note' => 'Diese Tools sind jetzt für die nächste Iteration verfügbar',
+                                            ];
+                                            
+                                            Log::info('[CoreToolPlayground] Tools dynamisch nachgeladen', [
+                                                'tools' => $requestedTools,
+                                                'count' => count($requestedTools),
+                                            ]);
+                                        }
+                                    }
+                                    
                                     // Füge Tool-Result zu Messages hinzu (für Multi-Step)
                                     // WICHTIG: Responses API unterstützt 'tool' role nicht direkt
                                     // Format: Strukturiert und lesbar, damit LLM die Informationen erkennt
-                                    $toolResultText = $this->formatToolResultForLLM($internalToolName, $resultArray, $toolCallId);
+                                    // Integriere Loop-Detection-Warnungen direkt ins Tool-Result
+                                    $loopCount = $toolCallHistory[$internalToolName]['count'] ?? 0;
+                                    $toolResultText = $this->formatToolResultForLLM($internalToolName, $resultArray, $toolCallId, $loopCount);
                                     $messages[] = [
                                         'role' => 'user', // Responses API Format
                                         'content' => $toolResultText,
@@ -645,7 +732,8 @@ class CoreToolPlaygroundController extends Controller
                                         ]
                                     ];
                                     
-                                    $errorResultText = $this->formatToolResultForLLM($internalToolName, $errorResult, $toolCallId);
+                                    $loopCount = $toolCallHistory[$internalToolName]['count'] ?? 0;
+                                    $errorResultText = $this->formatToolResultForLLM($internalToolName, $errorResult, $toolCallId, $loopCount);
                                     $messages[] = [
                                         'role' => 'user', // Responses API Format
                                         'content' => $errorResultText,
@@ -732,6 +820,9 @@ class CoreToolPlaygroundController extends Controller
                                     ]);
                                 }
                             }
+                            
+                            // Cleanup: Entferne nicht genutzte Tools (nach 3 Iterationen ohne Nutzung)
+                            $openAiService->cleanupUnusedTools(3);
                             
                             // Aktualisiere Session-Historie nach Tool-Results (für nächste User-Message)
                             session()->put("playground_chat_history_{$sessionId}", $messages);
@@ -1930,7 +2021,7 @@ class CoreToolPlaygroundController extends Controller
      * Die LLM sollte aus der REST-Syntax selbst darauf kommen, welches Tool als nächstes aufgerufen werden muss.
      * Diese Methode formatiert die Results so, dass die LLM die Informationen klar erkennt.
      */
-    private function formatToolResultForLLM(string $toolName, array $resultArray, ?string $toolCallId = null): string
+    private function formatToolResultForLLM(string $toolName, array $resultArray, ?string $toolCallId = null, int $loopCount = 0): string
     {
         $success = $resultArray['ok'] ?? ($resultArray['success'] ?? false);
         $data = $resultArray['data'] ?? $resultArray;
@@ -1952,7 +2043,7 @@ class CoreToolPlaygroundController extends Controller
         
         // Bei Erfolg: Formatiere Daten strukturiert
         if ($success && is_array($data)) {
-            // Spezielle Formatierung für bekannte Tools (nur Daten, keine Anweisungen)
+            // Spezielle Formatierung für bekannte Tools
             if ($toolName === 'core.teams.GET' && isset($data['teams'])) {
                 $text .= "Teams gefunden: " . ($data['count'] ?? count($data['teams'])) . "\n";
                 if (isset($data['current_team_id'])) {
@@ -1964,6 +2055,22 @@ class CoreToolPlaygroundController extends Controller
                     foreach (array_slice($data['teams'], 0, 10) as $team) {
                         $text .= "- ID {$team['id']}: {$team['name']}" . (isset($team['is_current']) && $team['is_current'] ? ' (aktuell)' : '') . "\n";
                     }
+                }
+                
+                // WICHTIG: Wenn der User nach Projekten/Companies/Contacts fragt, rufe direkt das entsprechende Tool auf
+                // Die Team-ID ist bereits bekannt - du musst core.teams.GET NICHT nochmal aufrufen!
+                if ($loopCount === 0) {
+                    // Erstes Mal: Normale Info
+                    $text .= "\n\n💡 HINWEIS: Wenn der User nach Projekten, Companies oder Contacts fragt, rufe DIREKT 'planner.projects.GET', 'crm.companies.GET' oder 'crm.contacts.GET' auf. ";
+                    $text .= "Diese Tools verwenden automatisch das aktuelle Team (ID {$data['current_team_id']}) wenn du team_id weglässt.";
+                } else {
+                    // Loop erkannt: Stärkere Warnung
+                    $text .= "\n\n🚨 WICHTIG - LOOP ERKANNT: Du hast 'core.teams.GET' bereits {$loopCount} mal aufgerufen! ";
+                    $text .= "Du hast die Team-Informationen bereits - rufe JETZT das nächste Tool auf!\n\n";
+                    $text .= "✅ RICHTIG: Rufe 'planner.projects.GET' auf (ohne team_id Parameter - verwendet automatisch Team ID {$data['current_team_id']})\n";
+                    $text .= "❌ FALSCH: Rufe 'core.teams.GET' nochmal auf\n\n";
+                    $text .= "Die benötigten Informationen sind bereits in den vorherigen Tool-Results vorhanden. ";
+                    $text .= "Prüfe die Tool-Results und rufe das RICHTIGE Tool auf!";
                 }
             } elseif ($toolName === 'planner.projects.GET' && isset($data['projects'])) {
                 $text .= "Projekte gefunden: " . ($data['count'] ?? count($data['projects'])) . "\n";

@@ -946,6 +946,92 @@ WICHTIG - Grenzen erkennen:
         }
     }
 
+    /**
+     * Zusätzliche Tools, die dynamisch nachgeladen wurden (z.B. via tools.GET)
+     * Format: ['tool_name' => ['tool' => ToolContract, 'loaded_at' => timestamp, 'used' => bool], ...]
+     */
+    private array $dynamicallyLoadedTools = [];
+
+    /**
+     * Lädt Tools dynamisch nach (wird aufgerufen, wenn LLM tools.GET verwendet hat)
+     * 
+     * @param array $toolNames Array von Tool-Namen, die nachgeladen werden sollen
+     */
+    public function loadToolsDynamically(array $toolNames): void
+    {
+        try {
+            $registry = app(ToolRegistry::class);
+            foreach ($toolNames as $toolName) {
+                if ($registry->has($toolName)) {
+                    // Prüfe, ob Tool bereits geladen ist
+                    if (!isset($this->dynamicallyLoadedTools[$toolName])) {
+                        $this->dynamicallyLoadedTools[$toolName] = [
+                            'tool' => $registry->get($toolName),
+                            'loaded_at' => time(),
+                            'used' => false,
+                            'iterations_since_load' => 0,
+                        ];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[OpenAI Tools] Fehler beim dynamischen Nachladen von Tools', [
+                'tool_names' => $toolNames,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Markiert ein Tool als verwendet (wird aufgerufen, wenn Tool tatsächlich aufgerufen wurde)
+     * 
+     * @param string $toolName Name des verwendeten Tools
+     */
+    public function markToolAsUsed(string $toolName): void
+    {
+        if (isset($this->dynamicallyLoadedTools[$toolName])) {
+            $this->dynamicallyLoadedTools[$toolName]['used'] = true;
+            $this->dynamicallyLoadedTools[$toolName]['iterations_since_load'] = 0; // Reset
+        }
+    }
+
+    /**
+     * Entfernt nicht genutzte Tools nach einer bestimmten Anzahl von Iterationen
+     * 
+     * @param int $maxUnusedIterations Maximale Anzahl von Iterationen ohne Nutzung (Standard: 3)
+     */
+    public function cleanupUnusedTools(int $maxUnusedIterations = 3): void
+    {
+        $removedTools = [];
+        foreach ($this->dynamicallyLoadedTools as $toolName => $toolData) {
+            // Erhöhe Iterations-Zähler
+            $this->dynamicallyLoadedTools[$toolName]['iterations_since_load']++;
+            
+            // Entferne Tool, wenn:
+            // 1. Es nicht verwendet wurde UND
+            // 2. Es bereits X Iterationen geladen ist
+            if (!$toolData['used'] && $toolData['iterations_since_load'] >= $maxUnusedIterations) {
+                unset($this->dynamicallyLoadedTools[$toolName]);
+                $removedTools[] = $toolName;
+            }
+        }
+        
+        if (!empty($removedTools)) {
+            Log::info('[OpenAI Tools] Nicht genutzte Tools entfernt', [
+                'removed_tools' => $removedTools,
+                'count' => count($removedTools),
+            ]);
+        }
+    }
+
+    /**
+     * Setzt dynamisch geladene Tools zurück (für neue Sessions)
+     */
+    public function resetDynamicallyLoadedTools(): void
+    {
+        $this->dynamicallyLoadedTools = [];
+    }
+
     private function getAvailableTools(): array
     {
         $tools = [];
@@ -1034,11 +1120,48 @@ WICHTIG - Grenzen erkennen:
                     }
                 }
                 
-                Log::info('[OpenAI Tools] Discovery-Layer aktiviert (nur Discovery-Tools)', [
+                // DYNAMISCH NACHGELADENE TOOLS: Füge Tools hinzu, die via tools.GET angefordert wurden
+                foreach ($this->dynamicallyLoadedTools as $toolName => $toolData) {
+                    $tool = $toolData['tool'];
+                    
+                    // Prüfe, ob Tool bereits in der Liste ist (verhindere Duplikate)
+                    $alreadyIncluded = false;
+                    foreach ($tools as $existingTool) {
+                        $existingName = $existingTool['function']['name'] ?? null;
+                        if ($existingName === $toolName) {
+                            $alreadyIncluded = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!$alreadyIncluded) {
+                        try {
+                            $toolDef = $this->convertToolToOpenAiFormat($tool);
+                            if ($toolDef) {
+                                $tools[] = $toolDef;
+                                Log::debug('[OpenAI Tools] Dynamisch nachgeladenes Tool hinzugefügt', [
+                                    'tool_name' => $toolName,
+                                    'iterations_since_load' => $toolData['iterations_since_load'],
+                                    'used' => $toolData['used'],
+                                ]);
+                            }
+                        } catch (\Throwable $e) {
+                            Log::warning('[OpenAI Tools] Fehler beim Hinzufügen von dynamisch geladenem Tool', [
+                                'tool_name' => $toolName,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    }
+                }
+                
+                Log::info('[OpenAI Tools] Discovery-Layer aktiviert', [
                     'total_tools' => $totalToolCount,
                     'read_only_tools' => $readOnlyCount,
                     'write_tools' => $writeCount,
-                    'discovery_tools_sent' => count($tools),
+                    'discovery_tools_sent' => count($tools) - count($this->dynamicallyLoadedTools),
+                    'dynamically_loaded_tools' => count($this->dynamicallyLoadedTools),
+                    'dynamically_loaded_tool_names' => array_keys($this->dynamicallyLoadedTools),
+                    'total_tools_sent' => count($tools),
                     'note' => 'LLM kann tools.GET aufrufen, um weitere Tools bei Bedarf zu sehen',
                 ]);
             } catch (\Throwable $e) {
