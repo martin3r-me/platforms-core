@@ -733,6 +733,9 @@ class CoreToolPlaygroundController extends Controller
                                 }
                             }
                             
+                            // Aktualisiere Session-Historie nach Tool-Results (für nächste User-Message)
+                            session()->put("playground_chat_history_{$sessionId}", $messages);
+                            
                             // Weiter mit nächster Iteration (LLM bekommt Tool-Results und kann weiterarbeiten)
                             continue;
                             
