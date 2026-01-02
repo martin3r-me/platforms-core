@@ -343,8 +343,9 @@ class CoreToolPlaygroundController extends Controller
                 $executor = app(ToolExecutor::class);
                 $orchestrator = app(ToolOrchestrator::class);
                 
-                // Reset dynamisch geladene Tools bei neuer User-Anfrage (neue Session)
-                // Tools werden bei Bedarf wieder nachgeladen
+                // MCP-PATTERN: Starte immer mit Discovery-Tools nur
+                // Tools werden bei Bedarf via tools.GET nachgeladen und bleiben für diese Session verfügbar
+                // Nach der Session werden sie wieder entfernt (cleanup) - LLM kann sie bei Bedarf wieder anfordern
                 $openAiService->resetDynamicallyLoadedTools();
                 
                 // Erstelle Messages-Array (wie im Terminal)
@@ -724,15 +725,18 @@ class CoreToolPlaygroundController extends Controller
                                         }
                                         
                                         if (!empty($requestedTools)) {
-                                            // Lade Tools dynamisch nach - SOFORT verfügbar für diese Iteration!
+                                            // MCP-PATTERN: Lade Tools dynamisch nach - SOFORT verfügbar für diese Session!
+                                            // Tools bleiben für die aktuelle Multi-Step-Session verfügbar
+                                            // Nach der Session werden sie via cleanupUnusedTools() wieder entfernt
                                             $openAiService->loadToolsDynamically($requestedTools);
                                             $toolsWereLoaded = true; // Flag: Tools wurden nachgeladen
                                             
                                             $simulation['debug']['tools_dynamically_loaded_' . $iteration] = [
                                                 'tool_names' => $requestedTools,
                                                 'count' => count($requestedTools),
-                                                'note' => 'Diese Tools sind JETZT sofort verfügbar - neue OpenAI-Anfrage wird gemacht',
+                                                'note' => 'Diese Tools sind JETZT sofort verfügbar für diese Session - neue OpenAI-Anfrage wird gemacht',
                                                 'loaded_from' => $toolResult->success ? 'tools.GET result' : 'request context (fallback)',
+                                                'mcp_pattern' => 'Tools bleiben für aktuelle Session, werden danach entfernt',
                                                 'result_structure' => $toolResult->success ? [
                                                     'has_data_tools' => isset($resultArray['data']['tools']),
                                                     'has_tools' => isset($resultArray['tools']),
@@ -740,11 +744,12 @@ class CoreToolPlaygroundController extends Controller
                                                 ] : null,
                                             ];
                                             
-                                            Log::info('[CoreToolPlayground] Tools dynamisch nachgeladen - SOFORT verfügbar', [
+                                            Log::info('[CoreToolPlayground] Tools dynamisch nachgeladen - SOFORT verfügbar für diese Session', [
                                                 'tools' => $requestedTools,
                                                 'count' => count($requestedTools),
                                                 'iteration' => $iteration,
                                                 'loaded_from' => $toolResult->success ? 'result' : 'context',
+                                                'note' => 'MCP-Pattern: Tools bleiben für aktuelle Session, werden danach entfernt',
                                             ]);
                                         } else {
                                             Log::warning('[CoreToolPlayground] Keine Tools aus tools.GET extrahiert oder abgeleitet', [
