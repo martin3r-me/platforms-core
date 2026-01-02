@@ -294,18 +294,3 @@ class ToolMatch
         return $this->isMatch;
     }
 }
-
-/**
- * Repräsentiert eine extrahierte Intention
- */
-class Intention
-{
-    public ?string $type = null; // 'read', 'create', 'update', 'delete'
-    public ?string $target = null; // Was soll geändert werden (z.B. "Projekte")
-    
-    public function isEmpty(): bool
-    {
-        return $this->type === null;
-    }
-}
-
