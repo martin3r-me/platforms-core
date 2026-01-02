@@ -921,6 +921,224 @@ class CoreToolPlaygroundController extends Controller
                                 // Mache SOFORT eine neue OpenAI-Anfrage in der GLEICHEN Iteration
                                 // Die Tools sind jetzt verfügbar!
                                 // KEIN continue - wir machen direkt die neue Anfrage
+                                
+                                // Hole aktualisierte Tools (inkl. nachgeladene)
+                                $reflection = new \ReflectionClass($openAiService);
+                                $getToolsMethod = $reflection->getMethod('getAvailableTools');
+                                $getToolsMethod->setAccessible(true);
+                                $availableTools = $getToolsMethod->invoke($openAiService);
+                                
+                                $normalizeMethod = $reflection->getMethod('normalizeToolsForResponses');
+                                $normalizeMethod->setAccessible(true);
+                                $normalizedTools = $normalizeMethod->invoke($openAiService, $availableTools);
+                                
+                                $dynamicallyLoadedProperty = $reflection->getProperty('dynamicallyLoadedTools');
+                                $dynamicallyLoadedProperty->setAccessible(true);
+                                $dynamicallyLoadedTools = $dynamicallyLoadedProperty->getValue($openAiService);
+                                
+                                $toolNamesAfter = array_map(function($t) {
+                                    return $t['name'] ?? ($t['function']['name'] ?? 'unknown');
+                                }, $normalizedTools);
+                                
+                                $simulation['debug']['tools_sent_to_openai_after_load_' . $iteration] = [
+                                    'available_tools_count' => count($availableTools),
+                                    'normalized_tools_count' => count($normalizedTools),
+                                    'tool_names_after_normalization' => $toolNamesAfter,
+                                    'has_planner_projects_get' => in_array('planner.projects.GET', array_map(function($t) {
+                                        return $t['function']['name'] ?? $t['name'] ?? '';
+                                    }, $availableTools)) || in_array('planner_projects_GET', $toolNamesAfter),
+                                    'dynamically_loaded_tools_count' => count($dynamicallyLoadedTools),
+                                    'dynamically_loaded_tool_names' => array_keys($dynamicallyLoadedTools),
+                                ];
+                                
+                                Log::info('[CoreToolPlayground] Mache sofortige OpenAI-Anfrage nach Tool-Nachladen', [
+                                    'iteration' => $iteration,
+                                    'dynamically_loaded_tools' => array_keys($dynamicallyLoadedTools),
+                                    'total_tools_available' => count($availableTools),
+                                ]);
+                                
+                                // Mache SOFORT neue OpenAI-Anfrage - Tools sind jetzt verfügbar!
+                                $response = $openAiService->chat($messages, 'gpt-4o-mini', [
+                                    'max_tokens' => 2000,
+                                    'temperature' => 0.7,
+                                    'tools' => null, // null = Tools aktivieren (OpenAiService ruft getAvailableTools() auf)
+                                ]);
+                                
+                                $allResponses[] = $response;
+                                
+                                $simulation['debug']['openai_response_after_load_' . $iteration] = [
+                                    'has_content' => !empty($response['content']),
+                                    'has_tool_calls' => !empty($response['tool_calls']),
+                                    'tool_calls_count' => count($response['tool_calls'] ?? []),
+                                    'tool_calls' => $response['tool_calls'] ?? [],
+                                ];
+                                
+                                // Prüfe ob neue Tool-Calls gemacht wurden
+                                if (!empty($response['tool_calls'])) {
+                                    // Neue Tool-Calls - verarbeite sie (gehe zurück zum Anfang der Tool-Execution)
+                                    // Füge Assistant-Message hinzu
+                                    $toolActionsText = '';
+                                    if (count($response['tool_calls']) > 0) {
+                                        $toolActionsText = "\n\n**🔧 Ausgeführte Aktionen:**\n";
+                                        foreach ($response['tool_calls'] as $toolCall) {
+                                            $toolName = $toolCall['function']['name'] ?? 'Unbekannt';
+                                            $internalToolName = $this->denormalizeToolNameFromOpenAi($toolName);
+                                            $toolActionsText .= "- {$internalToolName}\n";
+                                        }
+                                    }
+                                    
+                                    $messages[] = [
+                                        'role' => 'assistant',
+                                        'content' => ($response['content'] ?? '') . $toolActionsText,
+                                        'tool_calls' => $response['tool_calls'],
+                                    ];
+                                    
+                                    // WICHTIG: Verarbeite die neuen Tool-Calls direkt (ohne zur nächsten Iteration zu springen)
+                                    // Die Tools sind jetzt verfügbar, also können wir die Tool-Calls direkt ausführen
+                                    // Setze toolsWereLoaded zurück, damit wir nicht in eine Endlosschleife geraten
+                                    $toolsWereLoaded = false;
+                                    
+                                    // Verarbeite die neuen Tool-Calls (die gleiche Logik wie oben)
+                                    // Wir sind bereits im Tool-Execution-Block, also müssen wir die Tool-Calls verarbeiten
+                                    // ABER: Wir sind bereits im foreach-Loop für die vorherigen Tool-Calls
+                                    // Lösung: Setze $response['tool_calls'] neu und lasse die while-Schleife die Tool-Calls verarbeiten
+                                    // Oder: Verarbeite die Tool-Calls direkt hier
+                                    
+                                    // Einfachste Lösung: Verarbeite die Tool-Calls direkt hier, ohne zur nächsten Iteration zu springen
+                                    // Wir wiederholen die Tool-Execution-Logik für die neuen Tool-Calls
+                                    foreach ($response['tool_calls'] as $toolCall) {
+                                        $toolCallId = $toolCall['id'] ?? null;
+                                        $toolName = $toolCall['function']['name'] ?? null;
+                                        $toolArguments = json_decode($toolCall['function']['arguments'] ?? '{}', true);
+                                        
+                                        if (!$toolName) continue;
+                                        
+                                        // Tool-Name zurückmappen
+                                        $internalToolName = $this->denormalizeToolNameFromOpenAi($toolName);
+                                        
+                                        // Markiere Tool als verwendet
+                                        $openAiService->markToolAsUsed($internalToolName);
+                                        
+                                        // PRE-FLIGHT (optional)
+                                        $enablePreFlight = config('tools.pre_flight_verification.enabled', true);
+                                        if ($enablePreFlight) {
+                                            try {
+                                                $preFlightService = app(\Platform\Core\Services\PreFlightIntentionService::class);
+                                                $preFlightResult = $preFlightService->verify(
+                                                    $message,
+                                                    $internalToolName,
+                                                    $toolArguments,
+                                                    $allToolResults
+                                                );
+                                                
+                                                if ($preFlightResult->hasIssues()) {
+                                                    $preFlightWarning = "\n\n🚨 **PRE-FLIGHT VERIFICATION:**\n";
+                                                    $preFlightWarning .= $preFlightResult->getIssuesText();
+                                                    $preFlightWarning .= "\n\n⚠️ WICHTIG: Prüfe nochmal, ob das Tool wirklich das richtige ist!";
+                                                    
+                                                    $messages[] = [
+                                                        'role' => 'system',
+                                                        'content' => $preFlightWarning,
+                                                    ];
+                                                }
+                                            } catch (\Throwable $e) {
+                                                // Silent fail
+                                            }
+                                        }
+                                        
+                                        // Loop-Detection
+                                        if (!isset($toolCallHistory[$internalToolName])) {
+                                            $toolCallHistory[$internalToolName] = ['count' => 0, 'last_iteration' => 0, 'arguments' => []];
+                                        }
+                                        $toolCallHistory[$internalToolName]['count']++;
+                                        $toolCallHistory[$internalToolName]['last_iteration'] = $iteration;
+                                        
+                                        // Loop-Detection Warning
+                                        if ($toolCallHistory[$internalToolName]['count'] >= 2) {
+                                            $simulation['steps'][] = [
+                                                'step' => 4 + $iteration,
+                                                'name' => 'Loop-Detection Warning',
+                                                'description' => "Tool '{$internalToolName}' wurde bereits {$toolCallHistory[$internalToolName]['count']} mal aufgerufen",
+                                                'timestamp' => now()->toIso8601String(),
+                                            ];
+                                        }
+                                        
+                                        // Tool Execution
+                                        $context = ToolContext::fromAuth();
+                                        $startTime = microtime(true);
+                                        
+                                        try {
+                                            $toolResult = $orchestrator->executeWithDependencies(
+                                                $internalToolName,
+                                                $toolArguments,
+                                                $context,
+                                                maxDepth: 5,
+                                                planFirst: true
+                                            );
+                                            
+                                            $executionTime = (microtime(true) - $startTime) * 1000;
+                                            $resultArray = $toolResult->toArray();
+                                            
+                                            // Tool-Result zu Messages hinzufügen
+                                            $loopCount = $toolCallHistory[$internalToolName]['count'] ?? 0;
+                                            $toolResultText = $this->formatToolResultForLLM($internalToolName, $resultArray, $toolCallId, $loopCount);
+                                            $messages[] = [
+                                                'role' => 'user',
+                                                'content' => $toolResultText,
+                                            ];
+                                            
+                                            $allToolResults[] = [
+                                                'iteration' => $iteration,
+                                                'tool_call_id' => $toolCallId,
+                                                'tool' => $internalToolName,
+                                                'success' => $toolResult->success,
+                                                'data' => $toolResult->data,
+                                                'error' => $toolResult->error,
+                                                'execution_time_ms' => round($executionTime, 2),
+                                            ];
+                                        } catch (\Throwable $e) {
+                                            $executionTime = (microtime(true) - $startTime) * 1000;
+                                            $errorResult = [
+                                                'ok' => false,
+                                                'error' => [
+                                                    'code' => 'EXECUTION_ERROR',
+                                                    'message' => $e->getMessage()
+                                                ]
+                                            ];
+                                            
+                                            $loopCount = $toolCallHistory[$internalToolName]['count'] ?? 0;
+                                            $errorResultText = $this->formatToolResultForLLM($internalToolName, $errorResult, $toolCallId, $loopCount);
+                                            $messages[] = [
+                                                'role' => 'user',
+                                                'content' => $errorResultText,
+                                            ];
+                                            
+                                            $allToolResults[] = [
+                                                'iteration' => $iteration,
+                                                'tool_call_id' => $toolCallId,
+                                                'tool' => $internalToolName,
+                                                'success' => false,
+                                                'error' => $e->getMessage(),
+                                                'execution_time_ms' => round($executionTime, 2),
+                                            ];
+                                        }
+                                    }
+                                    
+                                    // Nach Verarbeitung der Tool-Calls: Weiter mit nächster Iteration
+                                    // (die Tool-Results sind jetzt in $messages, LLM kann sie in der nächsten Iteration sehen)
+                                    continue;
+                                } else {
+                                    // LLM hat direkt geantwortet - beende
+                                    $llmContent = $response['content'] ?? 'Keine Antwort';
+                                    $simulation['final_response'] = [
+                                        'type' => 'direct_answer',
+                                        'message' => $llmContent,
+                                        'content' => $llmContent,
+                                        'iterations' => $iteration,
+                                        'tool_results' => $allToolResults,
+                                    ];
+                                    break; // Beende while-Schleife
+                                }
                             } else {
                                 // Weiter mit nächster Iteration (LLM bekommt Tool-Results und kann weiterarbeiten)
                                 continue;
