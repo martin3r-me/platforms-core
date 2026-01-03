@@ -491,8 +491,30 @@ class CoreToolPlaygroundController extends Controller
                 ];
                 
                 try {
+                    // Frühe Stoppbedingung: Wenn die LLM 3x das gleiche Tool mit dem gleichen Fehler aufruft
+                    $failedToolCalls = []; // Speichert: tool => [error => count]
+                    
                     while ($iteration < $maxIterations) {
                         $iteration++;
+                        
+                        // Prüfe auf frühe Stoppbedingung: 3x gleiches Tool mit gleichem Fehler
+                        if ($iteration >= 3) {
+                            foreach ($failedToolCalls as $tool => $errors) {
+                                foreach ($errors as $error => $count) {
+                                    if ($count >= 3) {
+                                        // LLM ruft 3x das gleiche Tool mit dem gleichen Fehler auf → früher stoppen
+                                        $simulation['final_response'] = [
+                                            'type' => 'warning',
+                                            'message' => "Früher Stopp: Tool '{$tool}' wurde 3x mit Fehler '{$error}' aufgerufen",
+                                            'content' => $response['content'] ?? 'Keine finale Antwort',
+                                            'iterations' => $iteration,
+                                            'tool_results' => $allToolResults,
+                                        ];
+                                        break 2; // Breche aus beiden Loops
+                                    }
+                                }
+                            }
+                        }
                         
                         $simulation['steps'][] = [
                             'step' => 3 + $iteration,
@@ -1104,6 +1126,30 @@ class CoreToolPlaygroundController extends Controller
                                         'content' => $toolResultText,
                                     ];
                                     
+                                    // Tracke fehlgeschlagene Tool-Calls für frühe Stoppbedingung
+                                    if (!$toolResult->success && $toolResult->error) {
+                                        $errorKey = is_string($toolResult->error) ? $toolResult->error : ($toolResult->errorCode ?? 'UNKNOWN');
+                                        if (!isset($failedToolCalls[$internalToolName])) {
+                                            $failedToolCalls[$internalToolName] = [];
+                                        }
+                                        if (!isset($failedToolCalls[$internalToolName][$errorKey])) {
+                                            $failedToolCalls[$internalToolName][$errorKey] = 0;
+                                        }
+                                        $failedToolCalls[$internalToolName][$errorKey]++;
+                                        
+                                        // Frühe Stoppbedingung: 3x gleiches Tool mit gleichem Fehler
+                                        if ($failedToolCalls[$internalToolName][$errorKey] >= 3) {
+                                            $simulation['final_response'] = [
+                                                'type' => 'warning',
+                                                'message' => "Früher Stopp: Tool '{$internalToolName}' wurde 3x mit Fehler '{$errorKey}' aufgerufen",
+                                                'content' => $response['content'] ?? 'Keine finale Antwort',
+                                                'iterations' => $iteration,
+                                                'tool_results' => $allToolResults,
+                                            ];
+                                            break 2; // Breche aus beiden Loops
+                                        }
+                                    }
+                                    
                                     $allToolResults[] = [
                                         'iteration' => $iteration,
                                         'tool_call_id' => $toolCallId,
@@ -1228,10 +1274,16 @@ class CoreToolPlaygroundController extends Controller
                                          * nicht in den verfügbaren Tools ist, dann laden wir on-demand die Tools des erwarteten
                                          * Moduls per internem tools.GET nach (ohne dass die LLM erst tools.GET wählen muss).
                                          *
+                                         * WICHTIG: Auto-Injection greift auch, wenn Tools bereits geladen wurden, aber das
+                                         * erwartete Tool fehlt (z.B. wenn nur WRITE-Tools geladen wurden, aber GET benötigt wird).
+                                         *
                                          * Ziel: "Injection im laufenden RUN" robuster machen.
                                          */
                                         $enableAutoInjection = config('tools.mcp.auto_injection_on_loop', true);
-                                        if ($enableAutoInjection && $hasLoop && !$toolsWereLoaded) {
+                                        // Auto-Injection wenn:
+                                        // 1. Loop erkannt UND Tools noch nicht geladen, ODER
+                                        // 2. Loop erkannt UND erwartetes Tool fehlt (auch wenn Tools bereits geladen wurden)
+                                        if ($enableAutoInjection && $hasLoop) {
                                             try {
                                                 $expectedTool = $verificationService->expectedToolFor($message);
                                                 if ($expectedTool) {
@@ -1252,7 +1304,10 @@ class CoreToolPlaygroundController extends Controller
                                                     $expectedModule = explode('.', $expectedTool)[0] ?? null;
                                                     $expectedIsAvailable = in_array($expectedTool, $availableToolNamesNow, true);
 
-                                                    if ($expectedModule && !$expectedIsAvailable) {
+                                                    // Auto-Injection wenn: Tools noch nicht geladen ODER erwartetes Tool fehlt
+                                                    $shouldInject = (!$toolsWereLoaded) || (!$expectedIsAvailable);
+                                                    
+                                                    if ($expectedModule && $shouldInject && !$expectedIsAvailable) {
                                                         $autoArgs = [
                                                             'module' => $expectedModule,
                                                             // WICHTIG: Lade ALLE Tools (GET, POST, PUT, DELETE) - nicht nur read_only
