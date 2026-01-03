@@ -524,27 +524,33 @@ class CoreToolPlaygroundController extends Controller
                                             $allToolResults
                                         );
                                         
-                                        if ($preFlightResult->hasIssues()) {
+                                        // Self-Reflection: Immer einen Hinweis geben (auch wenn keine Issues)
+                                        // Die LLM soll selbst reflektieren, bevor sie ein Tool aufruft
+                                        $reflectionText = $preFlightResult->getIssuesText();
+                                        
+                                        // Immer Self-Reflection-Prompt anzeigen (auch bei OK)
+                                        // Die LLM soll sich immer fragen: "Ist das Tool das richtige?"
+                                        if ($reflectionText) {
                                             $simulation['steps'][] = [
                                                 'step' => 4 + $iteration,
-                                                'name' => 'Pre-Flight Verification',
-                                                'description' => 'Pre-Flight-Verification hat Probleme gefunden',
+                                                'name' => 'Pre-Flight Self-Reflection',
+                                                'description' => 'Self-Reflection: LLM prüft selbst, ob das Tool passt',
                                                 'timestamp' => now()->toIso8601String(),
-                                                'pre_flight_issues' => $preFlightResult->getIssuesText(),
+                                                'pre_flight_issues' => $reflectionText,
+                                                'is_issue' => $preFlightResult->hasIssues(),
                                             ];
                                             
-                                            // Füge Pre-Flight-Warnung zu Messages hinzu (für LLM-Korrektur)
-                                            $preFlightWarning = "\n\n🚨 **PRE-FLIGHT VERIFICATION:**\n";
-                                            $preFlightWarning .= $preFlightResult->getIssuesText();
-                                            $preFlightWarning .= "\n\n⚠️ WICHTIG: Prüfe nochmal, ob das Tool wirklich das richtige ist!";
+                                            // Füge Self-Reflection-Prompt zu Messages hinzu
+                                            // Die LLM kann dann selbst entscheiden, ob sie das Tool aufruft
+                                            $selfReflectionPrompt = "\n\n" . $reflectionText;
                                             
                                             $messages[] = [
                                                 'role' => 'system',
-                                                'content' => $preFlightWarning,
+                                                'content' => $selfReflectionPrompt,
                                             ];
                                             
-                                            // Tool wird TROTZDEM ausgeführt (LOOSE) - wir warnen nur
-                                            // Die LLM kann dann in der nächsten Iteration korrigieren
+                                            // Tool wird TROTZDEM ausgeführt (LOOSE) - aber LLM hat Self-Reflection gemacht
+                                            // Die LLM kann dann in der nächsten Iteration korrigieren oder tools.GET nutzen
                                         }
                                     } catch (\Throwable $e) {
                                         // Silent fail - Pre-Flight optional
@@ -1100,23 +1106,56 @@ class CoreToolPlaygroundController extends Controller
                                 ]);
                                 
                                 // Mache SOFORT neue OpenAI-Anfrage - Tools sind jetzt verfügbar!
-                                $response = $openAiService->chat($messages, 'gpt-4o-mini', [
-                                    'max_tokens' => 2000,
-                                    'temperature' => 0.7,
-                                    'tools' => null, // null = Tools aktivieren (OpenAiService ruft getAvailableTools() auf)
-                                ]);
+                                // WICHTIG: Error-Handling - auch bei Fehler bleiben die Tools für nächste Iteration verfügbar
+                                try {
+                                    $response = $openAiService->chat($messages, 'gpt-4o-mini', [
+                                        'max_tokens' => 2000,
+                                        'temperature' => 0.7,
+                                        'tools' => null, // null = Tools aktivieren (OpenAiService ruft getAvailableTools() auf)
+                                    ]);
+                                    
+                                    $allResponses[] = $response;
+                                    
+                                    $simulation['debug']['openai_response_after_load_' . $iteration] = [
+                                        'status' => 'success',
+                                        'has_content' => !empty($response['content']),
+                                        'has_tool_calls' => !empty($response['tool_calls']),
+                                        'tool_calls_count' => count($response['tool_calls'] ?? []),
+                                        'tool_calls' => $response['tool_calls'] ?? [],
+                                    ];
+                                    
+                                    Log::info('[CoreToolPlayground] Sofortige OpenAI-Anfrage nach Tool-Injection erfolgreich', [
+                                        'iteration' => $iteration,
+                                        'has_tool_calls' => !empty($response['tool_calls']),
+                                        'tool_calls_count' => count($response['tool_calls'] ?? []),
+                                    ]);
+                                } catch (\Throwable $e) {
+                                    // WICHTIG: Auch bei Fehler bleiben die Tools geladen für die nächste Iteration!
+                                    // Die Tools wurden erfolgreich injiziert, nur die OpenAI-Anfrage ist fehlgeschlagen
+                                    $simulation['debug']['openai_response_after_load_' . $iteration] = [
+                                        'status' => 'error',
+                                        'error' => $e->getMessage(),
+                                        'error_class' => get_class($e),
+                                        'note' => 'Tools wurden erfolgreich injiziert, aber OpenAI-Anfrage fehlgeschlagen. Tools bleiben für nächste Iteration verfügbar.',
+                                        'injected_tools' => $injectedTools,
+                                        'tools_still_available' => true,
+                                    ];
+                                    
+                                    Log::warning('[CoreToolPlayground] Sofortige OpenAI-Anfrage nach Tool-Injection fehlgeschlagen', [
+                                        'iteration' => $iteration,
+                                        'error' => $e->getMessage(),
+                                        'error_class' => get_class($e),
+                                        'injected_tools' => $injectedTools,
+                                        'note' => 'Tools bleiben für nächste Iteration verfügbar',
+                                    ]);
+                                    
+                                    // Setze response auf null, damit wir zur nächsten Iteration springen
+                                    // Die Tools sind geladen und werden in der nächsten Iteration verfügbar sein
+                                    $response = null;
+                                }
                                 
-                                $allResponses[] = $response;
-                                
-                                $simulation['debug']['openai_response_after_load_' . $iteration] = [
-                                    'has_content' => !empty($response['content']),
-                                    'has_tool_calls' => !empty($response['tool_calls']),
-                                    'tool_calls_count' => count($response['tool_calls'] ?? []),
-                                    'tool_calls' => $response['tool_calls'] ?? [],
-                                ];
-                                
-                                // Prüfe ob neue Tool-Calls gemacht wurden
-                                if (!empty($response['tool_calls'])) {
+                                // Prüfe ob neue Tool-Calls gemacht wurden (nur wenn response nicht null ist)
+                                if ($response !== null && !empty($response['tool_calls'])) {
                                     // Neue Tool-Calls - verarbeite sie (gehe zurück zum Anfang der Tool-Execution)
                                     // Füge Assistant-Message hinzu
                                     $toolActionsText = '';
@@ -1139,6 +1178,11 @@ class CoreToolPlaygroundController extends Controller
                                     // Die Tools sind jetzt verfügbar, also können wir die Tool-Calls direkt ausführen
                                     // Setze toolsWereLoaded zurück, damit wir nicht in eine Endlosschleife geraten
                                     $toolsWereLoaded = false;
+                                } else if ($response === null) {
+                                    // OpenAI-Anfrage fehlgeschlagen, aber Tools sind geladen
+                                    // Springe zur nächsten Iteration, damit die Tools in der nächsten Runde verfügbar sind
+                                    $toolsWereLoaded = false; // Reset flag, damit wir nicht in Endlosschleife geraten
+                                    continue; // Springe zur nächsten Iteration
                                     
                                     // Verarbeite die neuen Tool-Calls (die gleiche Logik wie oben)
                                     // Wir sind bereits im Tool-Execution-Block, also müssen wir die Tool-Calls verarbeiten

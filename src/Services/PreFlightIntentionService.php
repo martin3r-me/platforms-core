@@ -38,6 +38,15 @@ class PreFlightIntentionService
     /**
      * Prüft BEVOR ein Tool ausgeführt wird, ob es das richtige ist
      * 
+     * SELF-REFLECTION-PATTERN: Die LLM reflektiert selbst
+     * - Was will die LLM lösen?
+     * - Mit welchem Tool will sie das tun?
+     * - Ist das Tool das richtige?
+     * - Gibt es bessere Tools?
+     * - Braucht sie überhaupt ein Tool?
+     * 
+     * Wir geben nur einen Self-Reflection-Prompt, die LLM entscheidet selbst (LOOSE)
+     * 
      * @param string $userIntent Die ursprüngliche User-Anfrage
      * @param string $toolName Das Tool, das aufgerufen werden soll
      * @param array $toolArguments Die Argumente für das Tool
@@ -50,25 +59,94 @@ class PreFlightIntentionService
         array $toolArguments = [],
         array $previousToolResults = []
     ): PreFlightResult {
-        // 1. Extrahiere Intention aus User-Request
-        $intention = $this->extractIntention($userIntent);
-        
-        // 2. Prüfe ob das Tool zur Intention passt
-        $toolMatch = $this->checkToolMatch($intention, $toolName, $previousToolResults);
-        
-        // 3. Prüfe ob es ein besser passendes Tool gibt
-        $betterTool = $this->findBetterTool($intention, $toolName, $previousToolResults);
-        
-        // 4. Prüfe ob das Tool bereits mehrfach aufgerufen wurde (Loop-Detection)
+        // Loop-Detection: Prüfe ob das Tool bereits mehrfach aufgerufen wurde
         $loopDetected = $this->detectLoop($toolName, $previousToolResults);
         
-        // 5. Erstelle Result
-        if (!$toolMatch->isMatch() || $betterTool !== null || $loopDetected) {
-            return PreFlightResult::withIssues($toolMatch, $betterTool, $loopDetected, $intention);
+        // Erstelle Self-Reflection-Prompt für die LLM
+        $reflectionPrompt = $this->buildSelfReflectionPrompt($userIntent, $toolName, $toolArguments, $previousToolResults);
+        
+        // Erstelle ToolMatch mit Self-Reflection-Hinweis
+        $toolMatch = new ToolMatch();
+        $toolMatch->toolName = $toolName;
+        $toolMatch->isMatch = true; // Default: true (LOOSE - LLM entscheidet selbst)
+        $toolMatch->confidence = 0.5;
+        $toolMatch->reason = 'Self-Reflection: LLM prüft selbst, ob das Tool passt';
+        $toolMatch->reflectionPrompt = $reflectionPrompt; // Für Debugging
+        
+        // Keine Intent-Extraktion mehr (LLM macht das selbst)
+        $intention = new Intention();
+        
+        // Immer Self-Reflection-Hinweis geben (auch wenn keine Loop erkannt)
+        // Die LLM soll sich immer fragen: "Ist das Tool das richtige?"
+        // Aber wir markieren es nur als "Issue" wenn Loop erkannt wurde
+        if ($loopDetected) {
+            $result = PreFlightResult::withIssues(
+                $toolMatch, 
+                null, // Kein besseres Tool vorgeschlagen - LLM soll selbst suchen
+                $loopDetected, 
+                $intention
+            );
+            $result->setReflectionPrompt($reflectionPrompt);
+            return $result;
         }
         
-        return PreFlightResult::ok();
+        // Auch bei OK geben wir Self-Reflection-Hinweis (aber nicht als Issue)
+        // Die LLM kann selbst entscheiden, ob sie reflektieren will
+        $result = PreFlightResult::ok();
+        // Setze reflectionPrompt auch bei OK (für Controller)
+        $result->setReflectionPrompt($reflectionPrompt);
+        return $result;
     }
+    
+    /**
+     * Baut einen Self-Reflection-Prompt für die LLM
+     * 
+     * Die LLM soll sich selbst fragen:
+     * - Was will ich eigentlich lösen?
+     * - Ist dieses Tool das richtige?
+     * - Gibt es bessere Tools?
+     * - Brauche ich überhaupt ein Tool?
+     */
+    protected function buildSelfReflectionPrompt(
+        string $userIntent,
+        string $toolName,
+        array $toolArguments,
+        array $previousToolResults
+    ): string {
+        $prompt = "🤔 **SELF-REFLECTION (Pre-Flight):**\n\n";
+        $prompt .= "Bevor du das Tool '{$toolName}' aufrufst, reflektiere kurz:\n\n";
+        $prompt .= "1. **Was will ich eigentlich lösen?**\n";
+        $prompt .= "   User-Anfrage: {$userIntent}\n\n";
+        $prompt .= "2. **Ist dieses Tool das richtige?**\n";
+        $prompt .= "   Tool: {$toolName}\n";
+        if (!empty($toolArguments)) {
+            $prompt .= "   Argumente: " . json_encode($toolArguments, JSON_UNESCAPED_UNICODE) . "\n";
+        }
+        $prompt .= "\n";
+        $prompt .= "3. **Gibt es bessere Tools?**\n";
+        $prompt .= "   - Nutze 'tools.GET' um nach besseren Tools zu suchen\n";
+        $prompt .= "   - Prüfe, ob ein anderes Tool besser zur Anfrage passt\n\n";
+        $prompt .= "4. **Brauche ich überhaupt ein Tool?**\n";
+        $prompt .= "   - Kann ich die Anfrage mit vorhandenen Informationen beantworten?\n";
+        $prompt .= "   - Sind die vorherigen Tool-Results ausreichend?\n\n";
+        
+        if (!empty($previousToolResults)) {
+            $prompt .= "**Vorherige Tool-Results:**\n";
+            foreach (array_slice($previousToolResults, -3) as $result) {
+                $tool = $result['tool'] ?? 'unknown';
+                $success = $result['success'] ?? false;
+                $prompt .= "- {$tool}: " . ($success ? '✅ Erfolgreich' : '❌ Fehlgeschlagen') . "\n";
+            }
+            $prompt .= "\n";
+        }
+        
+        $prompt .= "⚠️ **WICHTIG:** Du entscheidest selbst (LOOSE-Pattern). ";
+        $prompt .= "Wenn du unsicher bist, nutze 'tools.GET' um nach besseren Tools zu suchen, ";
+        $prompt .= "oder beantworte die Frage direkt mit vorhandenen Informationen.\n";
+        
+        return $prompt;
+    }
+    
 
     /**
      * Extrahiert die Intention aus der User-Nachricht
@@ -79,16 +157,36 @@ class PreFlightIntentionService
         
         $intention = new Intention();
         
-        // READ-Patterns
-        if (preg_match('/zeig.*?(?:alle|die)\s+(.+?)(?:\s+aus|\s+im|\s+von|\s+des|$)/i', $userMessage, $matches)) {
+        // READ-Patterns - erweitert für bessere Erkennung
+        // Pattern 1: "zeig/liste ... alle/die ..."
+        if (preg_match('/(?:zeig|liste|gib|gebe).*?(?:alle|die|mir|bitte)?\s+(.+?)(?:\s+aus|\s+im|\s+von|\s+des|$)/i', $userMessage, $matches)) {
             $intention->type = 'read';
             $intention->target = trim($matches[1] ?? '');
-        } elseif (preg_match('/list.*?(?:alle|die)\s+(.+?)(?:\s+aus|\s+im|\s+von|\s+des|$)/i', $userMessage, $matches)) {
+        } 
+        // Pattern 2: "alle/die ... aus/im/von/des"
+        elseif (preg_match('/(?:alle|die)\s+(.+?)(?:\s+aus|\s+im|\s+von|\s+des|$)/i', $userMessage, $matches)) {
             $intention->type = 'read';
             $intention->target = trim($matches[1] ?? '');
-        } elseif (preg_match('/(?:alle|die)\s+(.+?)(?:\s+aus|\s+im|\s+von|\s+des|$)/i', $userMessage, $matches)) {
+        }
+        // Pattern 3: "... slots und aufgaben ..." oder "... aufgaben und slots ..."
+        elseif (preg_match('/(?:slots|aufgaben|tasks|project_slots).*?(?:und|,)?\s*(?:aufgaben|tasks|slots|project_slots)/i', $userMessage, $matches)) {
             $intention->type = 'read';
-            $intention->target = trim($matches[1] ?? '');
+            $intention->target = 'slots und aufgaben';
+        }
+        // Pattern 4: "... slots ..." oder "... aufgaben ..."
+        elseif (preg_match('/(?:slots|aufgaben|tasks|project_slots)/i', $userMessage, $matches)) {
+            $intention->type = 'read';
+            $intention->target = trim($matches[0] ?? '');
+        }
+        // Pattern 5: "... des Projektes" oder "... des Projekts"
+        elseif (preg_match('/des\s+(?:projekt|projektes|projekts)/i', $userMessage, $matches)) {
+            $intention->type = 'read';
+            // Versuche mehr Kontext zu extrahieren
+            if (preg_match('/(?:slots|aufgaben|tasks).*?des\s+(?:projekt|projektes|projekts)/i', $userMessage, $contextMatches)) {
+                $intention->target = 'slots und aufgaben des projektes';
+            } else {
+                $intention->target = 'projekt';
+            }
         }
         
         return $intention;
@@ -162,6 +260,16 @@ class PreFlightIntentionService
     protected function getExpectedToolForRead(string $target): ?string
     {
         $target = strtolower(trim($target));
+        
+        // Slots und Aufgaben (kombiniert) - benötigt project_slots.GET
+        if (preg_match('/(?:slots.*?aufgaben|aufgaben.*?slots|project_slots)/i', $target)) {
+            return 'planner.project_slots.GET';
+        }
+        
+        // Nur Slots
+        if (preg_match('/^slots$|^project_slots$/i', $target)) {
+            return 'planner.project_slots.GET';
+        }
         
         // Projekte
         if (preg_match('/projekt/i', $target)) {
@@ -253,25 +361,18 @@ class PreFlightResult
 
     public function getIssuesText(): string
     {
-        if ($this->isOk) {
-            return '';
-        }
-
         $issues = [];
 
-        if ($this->loopDetected) {
+        // Loop-Detection (nur wenn Issue)
+        if (!$this->isOk && $this->loopDetected) {
             $issues[] = "⚠️ LOOP ERKANNT: Das Tool '{$this->toolMatch->toolName}' wurde bereits mehrfach aufgerufen!";
+            $issues[] = "💡 HINWEIS: Prüfe, ob du wirklich nochmal das gleiche Tool aufrufen musst, oder ob du mit den vorhandenen Tool-Results weiterarbeiten kannst.";
         }
 
-        if (!$this->toolMatch->isMatch()) {
-            $issues[] = "❌ FALSCHES TOOL: {$this->toolMatch->reason}";
-            if ($this->toolMatch->expectedTool) {
-                $issues[] = "✅ RICHTIGES TOOL: Rufe stattdessen '{$this->toolMatch->expectedTool}' auf!";
-            }
-        }
-
-        if ($this->betterTool) {
-            $issues[] = "💡 BESSERES TOOL: '{$this->betterTool}' wäre besser geeignet als '{$this->toolMatch->toolName}'";
+        // Self-Reflection-Prompt (immer zeigen, wenn vorhanden - auch bei OK)
+        $prompt = $this->reflectionPrompt ?? $this->toolMatch->reflectionPrompt ?? null;
+        if ($prompt) {
+            $issues[] = $prompt;
         }
 
         return implode("\n", $issues);
@@ -288,6 +389,7 @@ class ToolMatch
     public float $confidence = 0.0;
     public string $reason = '';
     public ?string $expectedTool = null;
+    public ?string $reflectionPrompt = null; // Self-Reflection-Prompt für die LLM
 
     public function isMatch(): bool
     {

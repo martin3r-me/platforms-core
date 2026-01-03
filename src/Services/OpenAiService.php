@@ -78,16 +78,25 @@ class OpenAiService
                 }
             }
             
-            // Debug: Log Payload
+            // Debug: Log Payload mit Größen-Info für cURL-Fehler-Debugging
+            $payloadSize = strlen(json_encode($payload));
+            $inputSize = isset($payload['input']) ? strlen(json_encode($payload['input'])) : 0;
+            $toolsSize = isset($payload['tools']) ? strlen(json_encode($payload['tools'])) : 0;
+            
             Log::debug('[OpenAI Chat] Sending request', [
                 'url' => $this->baseUrl . '/responses',
                 'payload_keys' => array_keys($payload),
+                'payload_size_bytes' => $payloadSize,
+                'payload_size_kb' => round($payloadSize / 1024, 2),
                 'input_count' => count($payload['input'] ?? []),
+                'input_size_bytes' => $inputSize,
                 'has_tools' => isset($payload['tools']),
                 'tools_count' => isset($payload['tools']) ? count($payload['tools']) : 0,
+                'tools_size_bytes' => $toolsSize,
                 'tool_names' => isset($payload['tools']) ? array_map(function($t) {
                     return $t['name'] ?? ($t['function']['name'] ?? 'unknown');
                 }, $payload['tools']) : [],
+                'note' => 'cURL error 52 (Empty reply) kann bei großen Requests auftreten',
             ]);
             
             $response = $this->http()->post($this->baseUrl . '/responses', $payload);
@@ -128,11 +137,34 @@ class OpenAiService
                     $errorMessage .= "\n\nRaw Response: " . substr($errorBody, 0, 1000);
                 }
                 
-                Log::error('[OpenAI Chat] Request failed', [
+                // Erweiterte Error-Logging für cURL-Fehler
+                $isCurlError = str_contains($errorMessage, 'cURL error') || str_contains($errorMessage, 'Empty reply');
+                $errorContext = [
                     'status' => $response->status(),
                     'body' => substr($errorBody, 0, 500),
                     'error_message' => $errorMessage,
-                ]);
+                ];
+                
+                if ($isCurlError) {
+                    // Spezielle Logging für cURL-Fehler
+                    $errorContext['curl_error'] = true;
+                    $errorContext['payload_size_kb'] = isset($payloadSize) ? round($payloadSize / 1024, 2) : 'unknown';
+                    $errorContext['input_count'] = count($payload['input'] ?? []);
+                    $errorContext['tools_count'] = count($payload['tools'] ?? []);
+                    $errorContext['possible_causes'] = [
+                        'Request zu groß (Payload > 1MB kann Probleme verursachen)',
+                        'Server-Überlastung (OpenAI-Server hat Verbindung geschlossen)',
+                        'Netzwerk-Timeout (Verbindung wurde unterbrochen)',
+                        'Zu viele Tools (kann Request-Größe erhöhen)',
+                    ];
+                    $errorContext['suggestions'] = [
+                        'Chat-Historie kürzen (ältere Messages entfernen)',
+                        'Weniger Tools senden (nur relevante Tools)',
+                        'Request später erneut versuchen',
+                    ];
+                }
+                
+                Log::error('[OpenAI Chat] Request failed', $errorContext);
                 
                 throw new \Exception($errorMessage);
             }
