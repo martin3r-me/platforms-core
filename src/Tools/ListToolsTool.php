@@ -68,11 +68,14 @@ class ListToolsTool implements ToolContract
             
             // 1. Modul-Filter (einfach: nur Tools, die mit "module." beginnen)
             $module = $arguments['module'] ?? null;
+            $moduleFilterApplied = false;
             if ($module) {
+                $beforeModuleFilter = count($filteredTools);
                 $filteredTools = array_filter($filteredTools, function($tool) use ($module) {
                     $toolName = $tool->getName();
                     return str_starts_with($toolName, $module . '.');
                 });
+                $moduleFilterApplied = true;
             }
             
             // 2. Read-Only Filter (GET = read-only, POST/PUT/DELETE = write)
@@ -85,14 +88,29 @@ class ListToolsTool implements ToolContract
                 });
             }
             
-            // 3. Such-Filter (auf Name und Beschreibung)
+            // 3. Such-Filter (auf Name und Beschreibung) - normalisiert (Punkte/Unterstriche ignorieren)
             $searchTerm = $arguments['search'] ?? null;
             if ($searchTerm) {
                 $term = strtolower($searchTerm);
-                $filteredTools = array_filter($filteredTools, function($tool) use ($term) {
+                // Normalisiere Suchbegriff: Punkte und Unterstriche entfernen
+                $normalizedTerm = str_replace(['.', '_', '-'], '', $term);
+                
+                $filteredTools = array_filter($filteredTools, function($tool) use ($term, $normalizedTerm) {
                     $name = strtolower($tool->getName());
                     $description = strtolower($tool->getDescription());
-                    return str_contains($name, $term) || str_contains($description, $term);
+                    
+                    // Standard-Suche (exakt)
+                    if (str_contains($name, $term) || str_contains($description, $term)) {
+                        return true;
+                    }
+                    
+                    // Normalisierte Suche (Punkte/Unterstriche ignorieren)
+                    $normalizedName = str_replace(['.', '_', '-'], '', $name);
+                    if (str_contains($normalizedName, $normalizedTerm)) {
+                        return true;
+                    }
+                    
+                    return false;
                 });
             }
             
@@ -113,6 +131,50 @@ class ListToolsTool implements ToolContract
                     'filters_applied' => $hasFilters,
                 ],
             ];
+            
+            // 4. Fuzzy Fallback: Wenn Modul-Filter keine Ergebnisse liefert, aber Suche vorhanden ist
+            // → Versuche auch ohne Modul-Filter zu suchen (für Fälle wie "project.get" → "planner.project.GET")
+            if ($moduleFilterApplied && count($filteredTools) === 0 && !empty($searchTerm)) {
+                $allToolsForFuzzy = array_values($this->registry->all());
+                $permissionService = app(\Platform\Core\Services\ToolPermissionService::class);
+                $allToolsForFuzzy = $permissionService->filterToolsByPermission($allToolsForFuzzy);
+                
+                $term = strtolower($searchTerm);
+                $normalizedTerm = str_replace(['.', '_', '-'], '', $term);
+                
+                $fuzzyMatches = array_filter($allToolsForFuzzy, function($tool) use ($term, $normalizedTerm, $arguments) {
+                    $name = strtolower($tool->getName());
+                    $description = strtolower($tool->getDescription());
+                    
+                    // Normalisierte Suche
+                    $normalizedName = str_replace(['.', '_', '-'], '', $name);
+                    $matchesSearch = str_contains($normalizedName, $normalizedTerm) || str_contains($description, $term);
+                    
+                    // Read-Only Filter anwenden, falls vorhanden
+                    if (isset($arguments['read_only'])) {
+                        $readOnly = (bool)$arguments['read_only'];
+                        $isReadOnly = str_ends_with($tool->getName(), '.GET');
+                        if ($readOnly && !$isReadOnly) {
+                            return false;
+                        }
+                        if (!$readOnly && $isReadOnly) {
+                            return false;
+                        }
+                    }
+                    
+                    return $matchesSearch;
+                });
+                
+                if (count($fuzzyMatches) > 0) {
+                    $filteredTools = array_values($fuzzyMatches);
+                    usort($filteredTools, function($a, $b) {
+                        return strcmp($a->getName(), $b->getName());
+                    });
+                    $result['fuzzy_match'] = true;
+                    $result['fuzzy_match_note'] = "Modul '{$module}' nicht gefunden, aber ähnliche Tools gefunden (ohne Modul-Filter)";
+                    $result['summary']['filtered_tools'] = count($filteredTools);
+                }
+            }
             
             // Wenn Filter angewendet wurden, zeige sie an
             if ($hasFilters) {
