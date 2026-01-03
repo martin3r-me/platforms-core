@@ -1147,6 +1147,7 @@
                         const userMsg = this.simulationMessage.trim();
                         if (userMsg) {
                             this.chatMessages.push({
+                                type: 'message',
                                 role: 'user',
                                 content: userMsg,
                                 timestamp: new Date().toISOString()
@@ -1196,41 +1197,55 @@
                         let buffer = '';
                         let currentSimulation = null;
                         
+                        let currentEventType = 'message';
+                        let currentEventData = null;
+                        
                         while (true) {
                             const { done, value } = await reader.read();
-                            if (done) break;
+                            if (done) {
+                                // Verarbeite letztes Event falls vorhanden
+                                if (currentEventData) {
+                                    this.handleStreamEvent(currentEventType, currentEventData);
+                                    if (currentEventType === 'simulation.complete') {
+                                        currentSimulation = currentEventData;
+                                    }
+                                }
+                                break;
+                            }
                             
                             buffer += decoder.decode(value, { stream: true });
                             const lines = buffer.split('\n');
                             buffer = lines.pop() || '';
                             
-                            let eventType = 'message';
-                            let eventData = null;
-                            
                             for (let i = 0; i < lines.length; i++) {
                                 const line = lines[i].trim();
+                                
                                 if (line.startsWith('event:')) {
-                                    eventType = line.substring(6).trim();
-                                } else if (line.startsWith('data:')) {
-                                    try {
-                                        eventData = JSON.parse(line.substring(5).trim());
-                                    } catch (e) {
-                                        eventData = line.substring(5).trim();
-                                    }
-                                } else if (line === '') {
-                                    // Leere Zeile = Event-Ende
-                                    if (eventData) {
-                                        this.handleStreamEvent(eventType, eventData);
-                                        
-                                        // Sammle Simulation-Daten
-                                        if (eventType === 'simulation.complete') {
-                                            currentSimulation = eventData;
-                                        } else if (eventType === 'simulation.start') {
-                                            currentSimulation = { timestamp: eventData.timestamp, user_message: eventData.user_message };
+                                    // Neues Event beginnt - verarbeite vorheriges Event falls vorhanden
+                                    if (currentEventData) {
+                                        this.handleStreamEvent(currentEventType, currentEventData);
+                                        if (currentEventType === 'simulation.complete') {
+                                            currentSimulation = currentEventData;
                                         }
                                     }
-                                    eventType = 'message';
-                                    eventData = null;
+                                    currentEventType = line.substring(6).trim();
+                                    currentEventData = null;
+                                } else if (line.startsWith('data:')) {
+                                    try {
+                                        currentEventData = JSON.parse(line.substring(5).trim());
+                                    } catch (e) {
+                                        currentEventData = line.substring(5).trim();
+                                    }
+                                } else if (line === '') {
+                                    // Leere Zeile = Event-Ende - SOFORT verarbeiten
+                                    if (currentEventData) {
+                                        this.handleStreamEvent(currentEventType, currentEventData);
+                                        if (currentEventType === 'simulation.complete') {
+                                            currentSimulation = currentEventData;
+                                        }
+                                    }
+                                    currentEventType = 'message';
+                                    currentEventData = null;
                                 }
                             }
                         }
@@ -1238,18 +1253,6 @@
                         // Finale Simulation-Daten setzen
                         if (currentSimulation) {
                             this.simulationResult = currentSimulation;
-                            
-                            // Füge Assistant-Response zu Chat hinzu
-                            if (currentSimulation.final_response?.content) {
-                                if (this.chatMessages.length > 0 && this.chatMessages[this.chatMessages.length - 1].role === 'assistant') {
-                                    this.chatMessages.pop();
-                                }
-                                this.chatMessages.push({
-                                    role: 'assistant',
-                                    content: currentSimulation.final_response.content,
-                                    timestamp: new Date().toISOString(),
-                                });
-                            }
                             
                             // Update Chat-Historie
                             if (currentSimulation.chat_history) {
@@ -1363,6 +1366,51 @@
                             content: eventData.content,
                             iterations: eventData.iterations,
                         };
+                        
+                        // SOFORT: Füge finale Antwort als Chat-Message hinzu
+                        if (eventData.content) {
+                            // Entferne letzte Assistant-Message falls vorhanden
+                            const lastMsg = this.chatMessages[this.chatMessages.length - 1];
+                            if (lastMsg && lastMsg.role === 'assistant') {
+                                this.chatMessages.pop();
+                            }
+                            
+                            // Füge neue Assistant-Message hinzu
+                            this.chatMessages.push({
+                                type: 'message',
+                                role: 'assistant',
+                                content: eventData.content,
+                                timestamp: new Date().toISOString(),
+                            });
+                            
+                            // Auto-Scroll
+                            this.$nextTick(() => {
+                                if (this.$refs.chatContainer) {
+                                    this.$refs.chatContainer.scrollTop = this.$refs.chatContainer.scrollHeight;
+                                }
+                            });
+                        }
+                    } else if (eventType === 'simulation.complete') {
+                        // Finale Antwort aus simulation.complete hinzufügen
+                        if (eventData.final_response?.content) {
+                            const lastMsg = this.chatMessages[this.chatMessages.length - 1];
+                            if (lastMsg && lastMsg.role === 'assistant') {
+                                this.chatMessages.pop();
+                            }
+                            
+                            this.chatMessages.push({
+                                type: 'message',
+                                role: 'assistant',
+                                content: eventData.final_response.content,
+                                timestamp: new Date().toISOString(),
+                            });
+                            
+                            this.$nextTick(() => {
+                                if (this.$refs.chatContainer) {
+                                    this.$refs.chatContainer.scrollTop = this.$refs.chatContainer.scrollHeight;
+                                }
+                            });
+                        }
                     }
                 },
                 
