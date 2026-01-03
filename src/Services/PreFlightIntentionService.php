@@ -326,6 +326,7 @@ class PreFlightResult
     protected ?string $betterTool = null;
     protected bool $loopDetected = false;
     protected ?Intention $intention = null;
+    protected ?string $reflectionPrompt = null;
 
     public static function ok(): self
     {
@@ -357,6 +358,21 @@ class PreFlightResult
     public function hasIssues(): bool
     {
         return !$this->isOk;
+    }
+
+    /**
+     * Setzt den Self-Reflection-Prompt (LOOSE) damit Controller ihn immer anzeigen kann,
+     * ohne dass PreFlight hart eingreift.
+     */
+    public function setReflectionPrompt(string $prompt): self
+    {
+        $this->reflectionPrompt = $prompt;
+        return $this;
+    }
+
+    public function getReflectionPrompt(): ?string
+    {
+        return $this->reflectionPrompt;
     }
 
     public function getIssuesText(): string

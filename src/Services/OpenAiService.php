@@ -309,8 +309,10 @@ class OpenAiService
                 }
             }
             
-            // Fallback: Wenn content leer, aber output_tokens > 0, dann ist was schiefgelaufen
-            if ($content === '' && isset($data['usage']['output_tokens']) && $data['usage']['output_tokens'] > 0) {
+            // Fallback: Wenn content leer, aber output_tokens > 0 UND es gibt auch keine Tool-Calls,
+            // dann ist wahrscheinlich was schiefgelaufen.
+            // (Bei function_call ist empty content normal.)
+            if ($content === '' && ($toolCalls === null) && isset($data['usage']['output_tokens']) && $data['usage']['output_tokens'] > 0) {
                 Log::warning('[OpenAI Chat] Content ist leer, aber output_tokens > 0', [
                     'data_keys' => array_keys($data),
                     'has_output' => isset($data['output']),

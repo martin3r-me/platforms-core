@@ -45,10 +45,12 @@ class ActionSummaryService
         // Generiere Zusammenfassung
         $summary = $this->generateSummaryText($actions, $createdModels, $updatedModels, $deletedModels);
 
-        return LlmActionSummary::create([
+        // trace_id ist unique → bei mehrfachen Calls (Recovery/Retry) updaten statt Duplicate-Key zu werfen
+        return LlmActionSummary::updateOrCreate([
+            'trace_id' => $traceId,
+        ], [
             'user_id' => $context?->user?->id,
             'team_id' => $context?->team?->id,
-            'trace_id' => $traceId,
             'chain_id' => $chainId,
             'user_message' => $userMessage,
             'summary' => $summary,
