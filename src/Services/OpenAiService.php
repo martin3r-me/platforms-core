@@ -800,6 +800,12 @@ WICHTIG - Tool-Nutzung:
 - Wenn ein Tool Parameter benötigt, die der Nutzer nicht angegeben hat, nutze Hilfs-Tools um die Optionen zu bekommen
 - WICHTIG: Sage NICHT "Ich werde X tun" oder "Einen Moment bitte" - FÜHRE die Aktion DIREKT aus! Rufe das Tool sofort auf, ohne vorher anzukündigen, was du tun wirst
 
+WICHTIG - REST-basierte Tools und tools.GET:
+- Tools folgen REST-Pattern: module.entity.GET (Lesen), module.entity.POST (Erstellen), module.entity.PUT (Aktualisieren), module.entity.DELETE (Löschen)
+- Wenn du 'tools.GET' aufrufst, werden standardmäßig ALLE Tools angezeigt (GET, POST, PUT, DELETE)
+- Nutze 'read_only: true' nur, wenn du explizit nur lesen willst (z.B. für Exploration)
+- Wenn du etwas erstellen/ändern/löschen musst, rufe 'tools.GET' OHNE 'read_only' auf, um alle Tools zu sehen
+
 WICHTIG - Tool-Chaining:
 - Du kannst MEHRERE Tool-Calls in EINER Runde machen - das System unterstützt das
 - Du kannst Tools in mehreren Runden hintereinander aufrufen (Multi-Step) - Tool-Results werden automatisch weitergegeben

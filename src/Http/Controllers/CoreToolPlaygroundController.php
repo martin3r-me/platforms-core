@@ -1255,8 +1255,9 @@ class CoreToolPlaygroundController extends Controller
                                                     if ($expectedModule && !$expectedIsAvailable) {
                                                         $autoArgs = [
                                                             'module' => $expectedModule,
-                                                            // READ-only Tools für READ-Intent (wir injizieren minimal)
-                                                            'read_only' => str_ends_with($expectedTool, '.GET'),
+                                                            // WICHTIG: Lade ALLE Tools (GET, POST, PUT, DELETE) - nicht nur read_only
+                                                            // Die LLM entscheidet selbst, welche Tools sie braucht (REST-basiert)
+                                                            // 'read_only' wird NICHT gesetzt → alle Tools werden geladen
                                                             'search' => '',
                                                         ];
 
@@ -3009,37 +3010,47 @@ class CoreToolPlaygroundController extends Controller
      * Keine hardcodierten Tool-/Modul-Namen - funktioniert für alle Tools
      * 
      * MCP Best Practice: Tools sollten idempotent sein und success: true (HTTP 200) zurückgeben
+     * 
+     * Prüft auch GET-Operationen: Wenn gleiche GET-Argumente bereits erfolgreich waren,
+     * sind die Daten bereits vorhanden - keine erneute Abfrage nötig
      */
     private function detectDuplicateAction(string $toolName, array $arguments, array $allToolResults): ?array
     {
-        // Nur für WRITE-Operationen prüfen (POST, PUT, DELETE) - nicht für GET
-        if (!preg_match('/\.(POST|PUT|DELETE)$/', $toolName)) {
-            return null;
+        // Systematisch: Prüfe für ALLE Operationen (GET, POST, PUT, DELETE)
+        // GET-Operationen können auch mehrfach mit gleichen Argumenten aufgerufen werden
+        $isWriteOperation = preg_match('/\.(POST|PUT|DELETE)$/', $toolName);
+        $isReadOperation = preg_match('/\.GET$/', $toolName);
+        
+        if (!$isWriteOperation && !$isReadOperation) {
+            return null; // Unbekannte Operation
         }
         
-        // Systematisch: Nutze Idempotency-Service wenn verfügbar
-        try {
-            $idempotencyService = app(\Platform\Core\Services\ToolIdempotencyService::class);
-            $context = \Platform\Core\Contracts\ToolContext::fromAuth();
-            
-            $idempotencyKey = $idempotencyService->generateKey($toolName, $arguments, $context);
-            
-            // Prüfe ob bereits ein erfolgreicher Run mit diesem Key existiert
-            $duplicate = $idempotencyService->checkDuplicate($idempotencyKey);
-            if ($duplicate && $duplicate->success) {
-                return [
-                    'type' => 'idempotency',
-                    'message' => "Diese Aktion wurde bereits erfolgreich ausgeführt (Idempotency-Key erkannt).",
-                    'previous_result' => $duplicate->result_data ?? [],
-                    'previous_execution_id' => $duplicate->id,
-                ];
+        // Systematisch: Nutze Idempotency-Service wenn verfügbar (nur für WRITE-Operationen)
+        if ($isWriteOperation) {
+            try {
+                $idempotencyService = app(\Platform\Core\Services\ToolIdempotencyService::class);
+                $context = \Platform\Core\Contracts\ToolContext::fromAuth();
+                
+                $idempotencyKey = $idempotencyService->generateKey($toolName, $arguments, $context);
+                
+                // Prüfe ob bereits ein erfolgreicher Run mit diesem Key existiert
+                $duplicate = $idempotencyService->checkDuplicate($idempotencyKey);
+                if ($duplicate && $duplicate->success) {
+                    return [
+                        'type' => 'idempotency',
+                        'message' => "Diese Aktion wurde bereits erfolgreich ausgeführt (Idempotency-Key erkannt).",
+                        'previous_result' => $duplicate->result_data ?? [],
+                        'previous_execution_id' => $duplicate->id,
+                    ];
+                }
+            } catch (\Throwable $e) {
+                // Idempotency-Service nicht verfügbar - nutze Fallback
             }
-        } catch (\Throwable $e) {
-            // Idempotency-Service nicht verfügbar - nutze Fallback
         }
         
-        // Fallback: Systematisch durch erfolgreiche Tool-Results gehen
+        // Systematisch durch erfolgreiche Tool-Results gehen
         // Generisch: Prüfe ob gleiches Tool mit ähnlichen Argumenten bereits erfolgreich war
+        // Funktioniert für GET (Daten bereits vorhanden) und WRITE (Aktion bereits ausgeführt)
         foreach ($allToolResults as $previousResult) {
             if (!($previousResult['success'] ?? false)) {
                 continue; // Nur erfolgreiche Results prüfen (entspricht HTTP 200)
@@ -3053,6 +3064,16 @@ class CoreToolPlaygroundController extends Controller
             if ($previousTool === $toolName) {
                 // Gleiches Tool: Prüfe ob Argumente ähnlich sind (generisch)
                 if ($this->areArgumentsSimilar($arguments, $previousArgs)) {
+                    // Für GET-Operationen: Daten sind bereits vorhanden
+                    if ($isReadOperation) {
+                        return [
+                            'type' => 'duplicate_read',
+                            'message' => "Diese Abfrage wurde bereits erfolgreich ausgeführt. Die Daten sind bereits in den vorherigen Tool-Results vorhanden.",
+                            'previous_result' => $previousData,
+                            'previous_iteration' => $previousResult['iteration'] ?? null,
+                        ];
+                    }
+                    // Für WRITE-Operationen: Aktion wurde bereits ausgeführt
                     return [
                         'type' => 'duplicate',
                         'message' => "Diese Aktion wurde bereits erfolgreich ausgeführt.",
@@ -3136,20 +3157,32 @@ class CoreToolPlaygroundController extends Controller
         
         // Systematische Duplikat-Erkennung: Informiere LLM wenn ähnliche Aktion bereits erfolgreich war
         if ($duplicateInfo && $success) {
-            $text .= "⚠️ **HINWEIS - Duplikat erkannt:**\n";
-            $text .= $duplicateInfo['message'] . "\n";
-            if (isset($duplicateInfo['previous_iteration'])) {
-                $text .= "Die Aktion wurde bereits in Iteration {$duplicateInfo['previous_iteration']} erfolgreich ausgeführt.\n";
-            }
-            if (!empty($duplicateInfo['previous_result'])) {
-                $prevData = $duplicateInfo['previous_result'];
-                if (isset($prevData['id']) || isset($prevData['uuid'])) {
-                    $id = $prevData['id'] ?? $prevData['uuid'] ?? 'N/A';
-                    $name = $prevData['name'] ?? $prevData['title'] ?? '';
-                    $text .= "Vorheriges Ergebnis: ID {$id}" . ($name ? " ({$name})" : '') . "\n";
+            // Für GET-Operationen: Daten sind bereits vorhanden
+            if ($duplicateInfo['type'] === 'duplicate_read') {
+                $text .= "⚠️ **HINWEIS - Duplikat erkannt:**\n";
+                $text .= $duplicateInfo['message'] . "\n";
+                if (isset($duplicateInfo['previous_iteration'])) {
+                    $text .= "Die Abfrage wurde bereits in Iteration {$duplicateInfo['previous_iteration']} erfolgreich ausgeführt.\n";
                 }
+                $text .= "\n💡 **Empfehlung:** Nutze die bereits vorhandenen Daten aus den vorherigen Tool-Results. ";
+                $text .= "Du musst dieses Tool NICHT nochmal aufrufen - die Daten sind bereits verfügbar.\n\n";
+            } else {
+                // Für WRITE-Operationen: Aktion wurde bereits ausgeführt
+                $text .= "⚠️ **HINWEIS - Duplikat erkannt:**\n";
+                $text .= $duplicateInfo['message'] . "\n";
+                if (isset($duplicateInfo['previous_iteration'])) {
+                    $text .= "Die Aktion wurde bereits in Iteration {$duplicateInfo['previous_iteration']} erfolgreich ausgeführt.\n";
+                }
+                if (!empty($duplicateInfo['previous_result'])) {
+                    $prevData = $duplicateInfo['previous_result'];
+                    if (isset($prevData['id']) || isset($prevData['uuid'])) {
+                        $id = $prevData['id'] ?? $prevData['uuid'] ?? 'N/A';
+                        $name = $prevData['name'] ?? $prevData['title'] ?? '';
+                        $text .= "Vorheriges Ergebnis: ID {$id}" . ($name ? " ({$name})" : '') . "\n";
+                    }
+                }
+                $text .= "\n💡 **Empfehlung:** Prüfe ob diese Aktion wirklich nochmal ausgeführt werden muss, oder ob das vorherige Ergebnis bereits ausreicht.\n\n";
             }
-            $text .= "\n💡 **Empfehlung:** Prüfe ob diese Aktion wirklich nochmal ausgeführt werden muss, oder ob das vorherige Ergebnis bereits ausreicht.\n\n";
         }
         
         // Bei Fehler: Zeige Fehler-Informationen

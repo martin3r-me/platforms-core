@@ -281,18 +281,28 @@ class IntentionVerificationService
             // Tools kommunizieren ihre Cascade-Löschungen selbst (z.B. deleted_*_count, cascade_deleted)
             $actualDeleted = $this->analyzeActualDeletions($intention, $toolResults, $modelsDeleted);
             
+            // Generisch: Normalisiere Target (entferne spezifische Kontexte wie "im aktuellen Team")
+            $normalizedTarget = $this->normalizeTarget($intention->target);
+            
             if ($intention->isAll) {
                 // "Lösche alle X" - prüfe ob überhaupt etwas gelöscht wurde
                 if ($actualDeleted['total'] === 0) {
                     return CompletenessCheck::incomplete(
-                        "Es sollten alle '{$intention->target}' gelöscht werden, aber es wurde nichts gelöscht."
+                        "Es sollten alle '{$normalizedTarget}' gelöscht werden, aber es wurde nichts gelöscht."
                     );
                 }
             } elseif ($intention->expectedCount !== null) {
                 // "Lösche 3 X" - prüfe ob genug gelöscht wurden
                 if ($actualDeleted['total'] < $intention->expectedCount) {
                     return CompletenessCheck::incomplete(
-                        "Es sollten {$intention->expectedCount} '{$intention->target}' gelöscht werden, aber nur {$actualDeleted['total']} wurden gelöscht."
+                        "Es sollten {$intention->expectedCount} '{$normalizedTarget}' gelöscht werden, aber nur {$actualDeleted['total']} wurden gelöscht."
+                    );
+                }
+            } else {
+                // Einzelnes Löschen ohne explizite Anzahl - prüfe ob überhaupt etwas gelöscht wurde
+                if ($actualDeleted['total'] === 0) {
+                    return CompletenessCheck::incomplete(
+                        "Es sollten '{$normalizedTarget}' gelöscht werden, aber es wurde nichts gelöscht."
                     );
                 }
             }
@@ -688,6 +698,45 @@ class IntentionVerificationService
         }
         
         return null;
+    }
+    
+    /**
+     * Normalisiert Target-String (entfernt spezifische Kontexte)
+     * 
+     * Generisch: Entfernt Phrasen wie "im aktuellen Team", "aus dem Projekt", etc.
+     * Macht die Verifikation generischer und weniger spezifisch
+     */
+    protected function normalizeTarget(?string $target): string
+    {
+        if (empty($target)) {
+            return 'Elemente';
+        }
+        
+        $normalized = Str::lower(trim($target));
+        
+        // Entferne spezifische Kontexte (generisch)
+        $contextPatterns = [
+            '/\s+im\s+aktuellen\s+team/i',
+            '/\s+aus\s+dem\s+aktuellen\s+team/i',
+            '/\s+im\s+team/i',
+            '/\s+aus\s+dem\s+team/i',
+            '/\s+aus\s+dem\s+projekt/i',
+            '/\s+im\s+projekt/i',
+            '/\s+des\s+projekts/i',
+            '/\s+des\s+projektes/i',
+        ];
+        
+        foreach ($contextPatterns as $pattern) {
+            $normalized = preg_replace($pattern, '', $normalized);
+        }
+        
+        // Entferne "doppelte" - ist redundant
+        $normalized = preg_replace('/\s*doppelte?\s*/i', '', $normalized);
+        
+        // Trim und normalisiere
+        $normalized = trim($normalized);
+        
+        return !empty($normalized) ? $normalized : 'Elemente';
     }
 }
 

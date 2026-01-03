@@ -29,7 +29,7 @@ class ListToolsTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'GET /tools - Listet verfügbare Tools auf. REST-Parameter: module (optional, string) - Filter nach Modul (z.B. "planner", "crm"). read_only (optional, boolean) - Filter nach read-only Tools (true) oder write-Tools (false). category (optional, string) - Filter nach Kategorie. tags (optional, array) - Filter nach Tags. search (optional, string) - Suchbegriff. Tools folgen REST-Pattern: module.entity.GET (Lesen), module.entity.POST (Erstellen), module.entity.PUT (Aktualisieren), module.entity.DELETE (Löschen).';
+        return 'GET /tools - Listet verfügbare Tools auf. WICHTIG: Standardmäßig werden ALLE Tools angezeigt (GET, POST, PUT, DELETE). Tools folgen REST-Pattern: module.entity.GET (Lesen), module.entity.POST (Erstellen), module.entity.PUT (Aktualisieren), module.entity.DELETE (Löschen). REST-Parameter: module (optional, string) - Filter nach Modul (z.B. "planner" zeigt alle planner.* Tools). read_only (optional, boolean) - Nur für Exploration: true = nur GET-Tools, false = nur POST/PUT/DELETE. Wenn nicht angegeben, werden ALLE Tools angezeigt. search (optional, string) - Suchbegriff.';
     }
 
     public function getSchema(): array
@@ -43,7 +43,7 @@ class ListToolsTool implements ToolContract
                 ],
                 'read_only' => [
                     'type' => 'boolean',
-                    'description' => 'Optional: true = nur Lese-Tools (GET), false = nur Schreib-Tools (POST, PUT, DELETE). Wenn nicht angegeben, werden alle Tools angezeigt (sowohl GET als auch POST/PUT/DELETE).',
+                    'description' => 'Optional: Nur für Exploration. true = nur Lese-Tools (GET), false = nur Schreib-Tools (POST, PUT, DELETE). WICHTIG: Wenn nicht angegeben, werden standardmäßig ALLE Tools angezeigt (GET, POST, PUT, DELETE). Nutze diesen Filter nur, wenn du explizit nur lesen oder nur schreiben willst.',
                 ],
                 'search' => [
                     'type' => 'string',
