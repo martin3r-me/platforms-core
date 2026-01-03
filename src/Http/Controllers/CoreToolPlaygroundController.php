@@ -343,9 +343,11 @@ class CoreToolPlaygroundController extends Controller
                 $executor = app(ToolExecutor::class);
                 $orchestrator = app(ToolOrchestrator::class);
                 
-                // MCP-PATTERN: Starte immer mit Discovery-Tools nur
-                // Tools werden bei Bedarf via tools.GET nachgeladen und bleiben für diese Session verfügbar
-                // Nach der Session werden sie wieder entfernt (cleanup) - LLM kann sie bei Bedarf wieder anfordern
+                // MCP-PATTERN: On-Demand Tool Injection
+                // Starte immer mit Discovery-Tools nur (core.teams.GET, tools.GET, tools.request)
+                // LLM ruft tools.GET auf, wenn sie Tools braucht → Tools werden SOFORT nachgeladen und verfügbar gemacht
+                // Bei neuer User-Anfrage: Tools werden zurückgesetzt → LLM kann sie bei Bedarf wieder anfordern
+                // KEINE Session-Persistenz: Jede User-Anfrage startet frisch, LLM entscheidet selbst, welche Tools sie braucht
                 $openAiService->resetDynamicallyLoadedTools();
                 
                 // Erstelle Messages-Array (wie im Terminal)
@@ -662,7 +664,9 @@ class CoreToolPlaygroundController extends Controller
                                     // Konvertiere ToolResult zu OpenAI-Format
                                     $resultArray = $toolResult->toArray();
                                     
-                                    // DYNAMISCHES TOOL-NACHLADEN: MCP-Pattern - Wenn tools.GET aufgerufen wurde, lade die angeforderten Tools nach
+                                    // ON-DEMAND TOOL INJECTION: MCP-Pattern
+                                    // Wenn tools.GET aufgerufen wurde, lade die angeforderten Tools SOFORT nach
+                                    // Tools werden in der gleichen Iteration verfügbar gemacht (sofortige OpenAI-Anfrage)
                                     // WICHTIG: Auch wenn tools.GET fehlschlägt, können wir aus dem Request-Context ableiten, welche Tools benötigt werden
                                     $toolsWereLoaded = false;
                                     if ($internalToolName === 'tools.GET') {
@@ -670,7 +674,19 @@ class CoreToolPlaygroundController extends Controller
                                         
                                         if ($toolResult->success) {
                                             // Erfolgreicher tools.GET Aufruf - extrahiere Tools aus Result
+                                            // WICHTIG: tools.GET kann verschiedene Strukturen zurückgeben:
+                                            // 1. {"data": {"tools": [...]}} (Standard)
+                                            // 2. {"tools": [...]} (Alternative)
+                                            // 3. {"data": {"tools": [...]}, "tools": [...]} (Beide vorhanden)
                                             $toolsData = $resultArray['data']['tools'] ?? $resultArray['tools'] ?? [];
+                                            
+                                            Log::info('[CoreToolPlayground] Extrahiere Tools aus tools.GET Result', [
+                                                'has_data_tools' => isset($resultArray['data']['tools']),
+                                                'has_tools' => isset($resultArray['tools']),
+                                                'tools_data_count' => is_array($toolsData) ? count($toolsData) : 0,
+                                                'result_keys' => array_keys($resultArray),
+                                                'data_keys' => isset($resultArray['data']) ? array_keys($resultArray['data']) : [],
+                                            ]);
                                             
                                             if (!empty($toolsData) && is_array($toolsData)) {
                                                 foreach ($toolsData as $toolInfo) {
@@ -679,6 +695,21 @@ class CoreToolPlaygroundController extends Controller
                                                         $requestedTools[] = $toolName;
                                                     }
                                                 }
+                                                
+                                                Log::info('[CoreToolPlayground] Tools aus tools.GET extrahiert', [
+                                                    'extracted_tools' => $requestedTools,
+                                                    'count' => count($requestedTools),
+                                                ]);
+                                            } else {
+                                                Log::warning('[CoreToolPlayground] Keine Tools in tools.GET Result gefunden', [
+                                                    'tools_data_type' => gettype($toolsData),
+                                                    'tools_data_empty' => empty($toolsData),
+                                                    'result_structure' => [
+                                                        'has_data' => isset($resultArray['data']),
+                                                        'has_data_tools' => isset($resultArray['data']['tools']),
+                                                        'has_tools' => isset($resultArray['tools']),
+                                                    ],
+                                                ]);
                                             }
                                         } else {
                                             // ROBUSTER MCP-ANSATZ: Auch bei Fehler können wir aus den Argumenten ableiten, welche Tools benötigt werden
@@ -725,11 +756,21 @@ class CoreToolPlaygroundController extends Controller
                                         }
                                         
                                         if (!empty($requestedTools)) {
-                                            // MCP-PATTERN: Lade Tools dynamisch nach - SOFORT verfügbar für diese Session!
+                                            // ON-DEMAND TOOL INJECTION: MCP-Pattern
+                                            // Lade Tools dynamisch nach - SOFORT verfügbar für diese Multi-Step-Session!
                                             // Tools bleiben für die aktuelle Multi-Step-Session verfügbar
-                                            // Nach der Session werden sie via cleanupUnusedTools() wieder entfernt
+                                            // Bei neuer User-Anfrage werden sie zurückgesetzt (LLM kann sie bei Bedarf wieder anfordern)
+                                            // ON-DEMAND TOOL INJECTION: Lade Tools dynamisch nach - SOFORT verfügbar!
+                                            // Tools bleiben für die aktuelle Multi-Step-Session verfügbar
+                                            // Bei neuer User-Anfrage werden sie zurückgesetzt (MCP-Pattern)
                                             $openAiService->loadToolsDynamically($requestedTools);
                                             $toolsWereLoaded = true; // Flag: Tools wurden nachgeladen
+                                            
+                                            Log::info('[CoreToolPlayground] Tools on-demand nachgeladen - SOFORT verfügbar', [
+                                                'tools' => $requestedTools,
+                                                'count' => count($requestedTools),
+                                                'pattern' => 'MCP: Tools bleiben für aktuelle Multi-Step-Session, werden bei neuer User-Anfrage zurückgesetzt',
+                                            ]);
                                             
                                             $simulation['debug']['tools_dynamically_loaded_' . $iteration] = [
                                                 'tool_names' => $requestedTools,

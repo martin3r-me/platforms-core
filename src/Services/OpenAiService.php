@@ -1097,6 +1097,17 @@ WICHTIG - Grenzen erkennen:
         $this->dynamicallyLoadedTools = [];
     }
 
+    /**
+     * Gibt die Liste der dynamisch geladenen Tools zurück.
+     * Wird für die Persistenz in der Session benötigt.
+     *
+     * @return array Array von Tool-Namen (Keys von $dynamicallyLoadedTools)
+     */
+    public function getDynamicallyLoadedTools(): array
+    {
+        return array_keys($this->dynamicallyLoadedTools);
+    }
+
     private function getAvailableTools(): array
     {
         $tools = [];
