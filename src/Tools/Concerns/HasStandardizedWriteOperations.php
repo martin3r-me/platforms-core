@@ -149,5 +149,33 @@ trait HasStandardizedWriteOperations
             $modelId
         );
     }
+
+    /**
+     * Merged ein Schema mit Standard-Write-Schema-Feldern
+     * 
+     * @param array $customSchema Custom Schema-Properties
+     * @return array Vollständiges Schema mit Standard-Feldern
+     */
+    protected function mergeWriteSchema(array $customSchema): array
+    {
+        // Standard-Schema-Struktur
+        $baseSchema = [
+            'type' => 'object',
+            'properties' => [],
+            'required' => [],
+        ];
+
+        // Merge Custom-Properties
+        if (isset($customSchema['properties'])) {
+            $baseSchema['properties'] = array_merge($baseSchema['properties'], $customSchema['properties']);
+        }
+
+        // Merge Required-Felder
+        if (isset($customSchema['required'])) {
+            $baseSchema['required'] = array_merge($baseSchema['required'], $customSchema['required']);
+        }
+
+        return $baseSchema;
+    }
 }
 

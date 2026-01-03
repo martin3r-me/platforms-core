@@ -85,7 +85,7 @@
                         <!-- Chat Messages -->
                         <div class="bg-[var(--ui-surface)] rounded-lg border border-[var(--ui-border)] mb-4" style="max-height: 500px; overflow-y: auto;" x-ref="chatContainer">
                             <div class="p-4 space-y-2">
-                                <template x-if="chatMessages.length === 0 && (!useStreaming || streamingEvents.length === 0)">
+                                <template x-if="!chatMessages || chatMessages.length === 0">
                                     <div class="text-center text-[var(--ui-muted)] py-8">
                                         <p>💬 Starte die Konversation mit einer Nachricht</p>
                                         <p class="text-xs mt-2">Beispiele: "Erstelle ein Projekt", "Zeige mir alle Teams", "Lösche Projekt X"</p>
@@ -93,16 +93,17 @@
                                 </template>
                                 
                                 <!-- Kombinierter Chat-Verlauf (Messages + Events) -->
-                                <template x-for="(item, index) in getCombinedChatHistory()" :key="'chat-' + index">
+                                <!-- WICHTIG: Direkt auf chatMessages zugreifen, nicht über Funktion -->
+                                <template x-for="(item, index) in chatMessages" :key="'chat-' + index">
                                     <!-- Event (schlicht, linksbündig) -->
-                                    <div x-show="item.type === 'event'" class="flex justify-start">
+                                    <div x-show="item && item.type === 'event'" class="flex justify-start">
                                         <div class="text-[10px] text-[var(--ui-muted)] opacity-60">
-                                            <span x-text="item.message"></span>
+                                            <span x-text="item.message || ''"></span>
                                         </div>
                                     </div>
                                     
                                     <!-- Chat Message -->
-                                    <div x-show="item.type === 'message'" class="flex" :class="item.role === 'user' ? 'justify-end' : 'justify-start'">
+                                    <div x-show="item && item.type === 'message'" class="flex" :class="item.role === 'user' ? 'justify-end' : 'justify-start'">
                                         <div 
                                             class="max-w-[80%] rounded-lg p-3"
                                             :class="item.role === 'user' 
@@ -779,12 +780,18 @@
                 simulationResult: null,
                 debugCopied: false,
                 userInputValue: '', // Für Multi-Step User-Input
-                chatMessages: [], // Chat-Historie
+                chatMessages: [], // Chat-Historie (WICHTIG: Muss Array sein für Alpine.js)
                 chatHistory: [], // Vollständige Chat-Historie für Backend
                 sessionId: null, // Session-ID für Chat-Historie
                 useStreaming: true, // Streaming-Modus aktivieren
                 streamingEvents: [], // Events während Streaming
                 eventSource: null, // EventSource-Instanz
+                
+                // Helper: Force Alpine.js Update
+                forceUpdate() {
+                    // Trigger Alpine.js Reaktivität durch temporäre Änderung
+                    this.chatMessages = [...this.chatMessages];
+                },
 
                 // Tool Discovery
                 discoveryFilters: {
@@ -1346,10 +1353,23 @@
                     
                     // Füge Event SOFORT in Chat-Verlauf ein
                     // WICHTIG: Neue Array-Referenz für Alpine.js Reaktivität
-                    const newMessages = [...this.chatMessages, eventMessage];
-                    this.chatMessages = newMessages;
+                    if (!this.chatMessages) {
+                        this.chatMessages = [];
+                    }
+                    this.chatMessages = [...this.chatMessages, eventMessage];
+                    
+                    // DEBUG: Log nach Hinzufügen
+                    console.log('[Chat Messages Count]', this.chatMessages.length, this.chatMessages);
+                    
+                    // Force Alpine.js Update (falls nötig)
+                    this.$nextTick(() => {
+                        // Trigger Reaktivität
+                    });
                     
                     // Füge auch zu streamingEvents hinzu (für Debugging)
+                    if (!this.streamingEvents) {
+                        this.streamingEvents = [];
+                    }
                     this.streamingEvents = [...this.streamingEvents, {
                         type: eventType,
                         data: eventData,
@@ -1363,12 +1383,13 @@
                     }
                     
                     // SOFORT Auto-Scroll zu neuem Event
-                    setTimeout(() => {
+                    // Verwende requestAnimationFrame für sofortige DOM-Updates
+                    requestAnimationFrame(() => {
                         const container = this.$refs.chatContainer;
                         if (container) {
                             container.scrollTop = container.scrollHeight;
                         }
-                    }, 10);
+                    });
                     
                     // Update Simulation-Result für bestimmte Events
                     if (eventType === 'simulation.start') {
@@ -1495,7 +1516,8 @@
                 
                 getCombinedChatHistory() {
                     // Kombiniere Chat-Messages und Events in chronologischer Reihenfolge
-                    const combined = [...this.chatMessages];
+                    // WICHTIG: Erstelle neue Array-Referenz für Alpine.js Reaktivität
+                    const combined = this.chatMessages ? [...this.chatMessages] : [];
                     
                     // Sortiere nach Timestamp
                     combined.sort((a, b) => {
@@ -1503,6 +1525,11 @@
                         const timeB = new Date(b.timestamp || 0).getTime();
                         return timeA - timeB;
                     });
+                    
+                    // DEBUG: Log für Debugging
+                    if (combined.length > 0 && combined.length !== (this.chatMessages?.length || 0)) {
+                        console.log('[getCombinedChatHistory]', combined.length, 'messages');
+                    }
                     
                     return combined;
                 },
