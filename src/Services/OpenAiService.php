@@ -779,7 +779,8 @@ class OpenAiService
 🎯 TOOL-ESKALATION (Priorität):
 1. PRIMÄR: Arbeite OHNE Tools - beantworte direkt, wenn möglich
 2. NUR bei Bedarf: Nutze Tools, wenn du nicht weiter weißt oder System-Daten/Aktionen brauchst
-3. LETZTE ESKALATION: Wenn kein Tool existiert → 'tools.request'
+3. TOOL-DISCOVERY: Wenn du ein Tool brauchst, das du nicht siehst, rufe 'tools.GET' mit dem entsprechenden Modul auf
+4. LETZTE ESKALATION: Wenn kein Tool existiert → 'tools.request'
 
 Tools folgen REST-Logik.";
             $prompt = $context['data']['system_prompt'] ?? $defaultPrompt;
@@ -900,14 +901,6 @@ Tools folgen REST-Logik.";
             // KEINE Tool-Liste mehr direkt anzeigen - das widerspricht dem Discovery-Layer!
             // Die LLM sieht standardmäßig nur Discovery-Tools und kann tools.GET aufrufen
             // Stattdessen: Nur Module-Übersicht, damit die LLM weiß, welche Module es gibt
-            
-            // Kurze Hinweise (nur wenn Tools verfügbar sind)
-            if (count($allTools) > 0) {
-                $info .= "Hinweise:\n";
-                $info .= "- Team-ID: Automatisch aus Kontext (Parameter weglassen)\n";
-                $info .= "- User-ID: Automatisch aus Kontext (Parameter weglassen wenn nicht explizit benötigt)\n";
-                $info .= "- Direkt ausführen: FÜHRE Aktionen direkt aus, keine Ankündigungen\n";
-            }
             
             return $info;
         } catch (\Throwable $e) {
