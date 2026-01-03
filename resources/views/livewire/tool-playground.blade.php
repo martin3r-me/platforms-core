@@ -1218,27 +1218,36 @@
                             buffer = lines.pop() || '';
                             
                             for (let i = 0; i < lines.length; i++) {
-                                const line = lines[i].trim();
+                                const line = lines[i];
+                                const trimmed = line.trim();
                                 
-                                if (line.startsWith('event:')) {
+                                if (trimmed.startsWith('event:')) {
                                     // Neues Event beginnt - verarbeite vorheriges Event falls vorhanden
-                                    if (currentEventData) {
+                                    if (currentEventData !== null) {
+                                        // SOFORT verarbeiten bevor neues Event beginnt
                                         this.handleStreamEvent(currentEventType, currentEventData);
                                         if (currentEventType === 'simulation.complete') {
                                             currentSimulation = currentEventData;
                                         }
                                     }
-                                    currentEventType = line.substring(6).trim();
+                                    currentEventType = trimmed.substring(6).trim();
                                     currentEventData = null;
-                                } else if (line.startsWith('data:')) {
+                                } else if (trimmed.startsWith('data:')) {
                                     try {
-                                        currentEventData = JSON.parse(line.substring(5).trim());
+                                        const dataStr = trimmed.substring(5).trim();
+                                        if (dataStr) {
+                                            currentEventData = JSON.parse(dataStr);
+                                        }
                                     } catch (e) {
-                                        currentEventData = line.substring(5).trim();
+                                        const dataStr = trimmed.substring(5).trim();
+                                        if (dataStr) {
+                                            currentEventData = dataStr;
+                                        }
                                     }
-                                } else if (line === '') {
+                                } else if (trimmed === '') {
                                     // Leere Zeile = Event-Ende - SOFORT verarbeiten
-                                    if (currentEventData) {
+                                    if (currentEventData !== null) {
+                                        // SOFORT verarbeiten - nicht warten
                                         this.handleStreamEvent(currentEventType, currentEventData);
                                         if (currentEventType === 'simulation.complete') {
                                             currentSimulation = currentEventData;
@@ -1295,7 +1304,7 @@
                         eventData: eventData
                     };
                     
-                    // Füge Event SOFORT in Chat-Verlauf ein (vor den Messages)
+                    // Füge Event SOFORT in Chat-Verlauf ein
                     this.chatMessages.push(eventMessage);
                     
                     // Füge auch zu streamingEvents hinzu (für Debugging)
@@ -1311,12 +1320,12 @@
                         this.streamingEvents.shift();
                     }
                     
-                    // SOFORT Auto-Scroll zu neuem Event
-                    this.$nextTick(() => {
+                    // SOFORT Auto-Scroll zu neuem Event (ohne $nextTick für sofortige Reaktion)
+                    setTimeout(() => {
                         if (this.$refs.chatContainer) {
                             this.$refs.chatContainer.scrollTop = this.$refs.chatContainer.scrollHeight;
                         }
-                    });
+                    }, 10);
                     
                     // Update Simulation-Result für bestimmte Events
                     if (eventType === 'simulation.start') {
@@ -1383,33 +1392,44 @@
                                 timestamp: new Date().toISOString(),
                             });
                             
-                            // Auto-Scroll
-                            this.$nextTick(() => {
+                            // Auto-Scroll sofort
+                            setTimeout(() => {
                                 if (this.$refs.chatContainer) {
                                     this.$refs.chatContainer.scrollTop = this.$refs.chatContainer.scrollHeight;
                                 }
-                            });
+                            }, 10);
                         }
                     } else if (eventType === 'simulation.complete') {
                         // Finale Antwort aus simulation.complete hinzufügen
                         if (eventData.final_response?.content) {
-                            const lastMsg = this.chatMessages[this.chatMessages.length - 1];
-                            if (lastMsg && lastMsg.role === 'assistant') {
-                                this.chatMessages.pop();
-                            }
+                            // Prüfe ob bereits eine Assistant-Message mit diesem Content vorhanden ist
+                            const hasAssistantMsg = this.chatMessages.some(msg => 
+                                msg.role === 'assistant' && 
+                                msg.type === 'message' && 
+                                msg.content === eventData.final_response.content
+                            );
                             
-                            this.chatMessages.push({
-                                type: 'message',
-                                role: 'assistant',
-                                content: eventData.final_response.content,
-                                timestamp: new Date().toISOString(),
-                            });
-                            
-                            this.$nextTick(() => {
-                                if (this.$refs.chatContainer) {
-                                    this.$refs.chatContainer.scrollTop = this.$refs.chatContainer.scrollHeight;
+                            if (!hasAssistantMsg) {
+                                // Entferne letzte Assistant-Message falls vorhanden (um Duplikate zu vermeiden)
+                                const lastMsg = this.chatMessages[this.chatMessages.length - 1];
+                                if (lastMsg && lastMsg.role === 'assistant' && lastMsg.type === 'message') {
+                                    this.chatMessages.pop();
                                 }
-                            });
+                                
+                                // Füge finale Antwort hinzu
+                                this.chatMessages.push({
+                                    type: 'message',
+                                    role: 'assistant',
+                                    content: eventData.final_response.content,
+                                    timestamp: new Date().toISOString(),
+                                });
+                                
+                                setTimeout(() => {
+                                    if (this.$refs.chatContainer) {
+                                        this.$refs.chatContainer.scrollTop = this.$refs.chatContainer.scrollHeight;
+                                    }
+                                }, 10);
+                            }
                         }
                     }
                 },
