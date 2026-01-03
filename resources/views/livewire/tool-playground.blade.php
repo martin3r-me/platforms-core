@@ -1145,12 +1145,12 @@
                     if (step === 0) {
                         const userMsg = this.simulationMessage.trim();
                         if (userMsg) {
-                            this.chatMessages.push({
+                            this.chatMessages = [...this.chatMessages, {
                                 type: 'message',
                                 role: 'user',
                                 content: userMsg,
                                 timestamp: new Date().toISOString()
-                            });
+                            }];
                         }
                     }
                     
@@ -1328,28 +1328,31 @@
                         eventData: eventData
                     };
                     
-                    // Füge Event SOFORT in Chat-Verlauf ein (synchron, nicht async)
-                    this.chatMessages.push(eventMessage);
+                    // Füge Event SOFORT in Chat-Verlauf ein
+                    // WICHTIG: Alpine.js sieht Array-Mutationen automatisch, aber wir müssen sicherstellen, dass es reaktiv bleibt
+                    this.chatMessages = [...this.chatMessages, eventMessage];
                     
                     // Füge auch zu streamingEvents hinzu (für Debugging)
-                    this.streamingEvents.push({
+                    this.streamingEvents = [...this.streamingEvents, {
                         type: eventType,
                         data: eventData,
                         timestamp: new Date().toISOString(),
                         message: eventMessage.message
-                    });
+                    }];
                     
                     // Begrenze Events auf 50 (älteste zuerst entfernen)
                     if (this.streamingEvents.length > 50) {
-                        this.streamingEvents.shift();
+                        this.streamingEvents = this.streamingEvents.slice(-50);
                     }
                     
-                    // SOFORT Auto-Scroll zu neuem Event (synchron)
-                    requestAnimationFrame(() => {
-                        if (this.$refs.chatContainer) {
-                            this.$refs.chatContainer.scrollTop = this.$refs.chatContainer.scrollHeight;
+                    // SOFORT Auto-Scroll zu neuem Event
+                    // Verwende setTimeout(0) um sicherzustellen, dass DOM aktualisiert ist
+                    setTimeout(() => {
+                        const container = this.$refs.chatContainer;
+                        if (container) {
+                            container.scrollTop = container.scrollHeight;
                         }
-                    });
+                    }, 0);
                     
                     // Update Simulation-Result für bestimmte Events
                     if (eventType === 'simulation.start') {
@@ -1403,25 +1406,30 @@
                         // SOFORT: Füge finale Antwort als Chat-Message hinzu
                         if (eventData.content) {
                             // Entferne letzte Assistant-Message falls vorhanden
-                            const lastMsg = this.chatMessages[this.chatMessages.length - 1];
+                            let newMessages = [...this.chatMessages];
+                            const lastMsg = newMessages[newMessages.length - 1];
                             if (lastMsg && lastMsg.role === 'assistant' && lastMsg.type === 'message') {
-                                this.chatMessages.pop();
+                                newMessages.pop();
                             }
                             
-                            // Füge neue Assistant-Message hinzu (SOFORT, synchron)
-                            this.chatMessages.push({
+                            // Füge neue Assistant-Message hinzu (SOFORT)
+                            newMessages.push({
                                 type: 'message',
                                 role: 'assistant',
                                 content: eventData.content,
                                 timestamp: new Date().toISOString(),
                             });
                             
+                            // Setze neues Array - Alpine.js sieht die Änderung sofort
+                            this.chatMessages = newMessages;
+                            
                             // Auto-Scroll sofort
-                            requestAnimationFrame(() => {
-                                if (this.$refs.chatContainer) {
-                                    this.$refs.chatContainer.scrollTop = this.$refs.chatContainer.scrollHeight;
+                            setTimeout(() => {
+                                const container = this.$refs.chatContainer;
+                                if (container) {
+                                    container.scrollTop = container.scrollHeight;
                                 }
-                            });
+                            }, 0);
                         }
                     } else if (eventType === 'simulation.complete') {
                         // Finale Antwort aus simulation.complete hinzufügen
@@ -1435,24 +1443,29 @@
                             
                             if (!hasAssistantMsg) {
                                 // Entferne letzte Assistant-Message falls vorhanden (um Duplikate zu vermeiden)
-                                const lastMsg = this.chatMessages[this.chatMessages.length - 1];
+                                let newMessages = [...this.chatMessages];
+                                const lastMsg = newMessages[newMessages.length - 1];
                                 if (lastMsg && lastMsg.role === 'assistant' && lastMsg.type === 'message') {
-                                    this.chatMessages.pop();
+                                    newMessages.pop();
                                 }
                                 
-                                // Füge finale Antwort hinzu (SOFORT, synchron)
-                                this.chatMessages.push({
+                                // Füge finale Antwort hinzu (SOFORT)
+                                newMessages.push({
                                     type: 'message',
                                     role: 'assistant',
                                     content: eventData.final_response.content,
                                     timestamp: new Date().toISOString(),
                                 });
                                 
-                                requestAnimationFrame(() => {
-                                    if (this.$refs.chatContainer) {
-                                        this.$refs.chatContainer.scrollTop = this.$refs.chatContainer.scrollHeight;
+                                // Setze neues Array - Alpine.js sieht die Änderung sofort
+                                this.chatMessages = newMessages;
+                                
+                                setTimeout(() => {
+                                    const container = this.$refs.chatContainer;
+                                    if (container) {
+                                        container.scrollTop = container.scrollHeight;
                                     }
-                                });
+                                }, 0);
                             }
                         }
                     }
