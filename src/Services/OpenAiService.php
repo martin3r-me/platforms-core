@@ -63,24 +63,29 @@ class OpenAiService
                 'max_output_tokens' => $options['max_tokens'] ?? 1000,
                 'temperature' => $options['temperature'] ?? 0.7,
             ];
-            if (isset($options['tools']) && $options['tools'] === false) {
-                // Tools explizit deaktiviert - nichts hinzufügen
-            } else {
-                // Tools aktivieren (Standard)
-                $tools = $this->getAvailableTools();
-                if (!empty($tools)) {
-                    $payload['tools'] = $this->normalizeToolsForResponses($tools);
-                    // tool_choice ist optional - nur setzen wenn explizit angegeben
-                    if (isset($options['tool_choice'])) {
-                        $payload['tool_choice'] = $options['tool_choice'];
-                    }
-                }
+        if (isset($options['tools']) && $options['tools'] === false) {
+            // Tools explizit deaktiviert - nichts hinzufügen
+        } else {
+            // MCP-Format: Tools nach Modulen gruppieren
+            $mcpServers = $this->buildMcpServers();
+            if (!empty($mcpServers)) {
+                $payload['mcp_servers'] = $mcpServers;
             }
+        }
             
             // Debug: Log Payload mit Größen-Info für cURL-Fehler-Debugging
             $payloadSize = strlen(json_encode($payload));
             $inputSize = isset($payload['input']) ? strlen(json_encode($payload['input'])) : 0;
-            $toolsSize = isset($payload['tools']) ? strlen(json_encode($payload['tools'])) : 0;
+            $mcpServersSize = isset($payload['mcp_servers']) ? strlen(json_encode($payload['mcp_servers'])) : 0;
+            
+            $totalTools = 0;
+            $serverNames = [];
+            if (isset($payload['mcp_servers'])) {
+                foreach ($payload['mcp_servers'] as $serverName => $server) {
+                    $serverNames[] = $serverName;
+                    $totalTools += count($server['tools'] ?? []);
+                }
+            }
             
             Log::debug('[OpenAI Chat] Sending request', [
                 'url' => $this->baseUrl . '/responses',
@@ -89,12 +94,11 @@ class OpenAiService
                 'payload_size_kb' => round($payloadSize / 1024, 2),
                 'input_count' => count($payload['input'] ?? []),
                 'input_size_bytes' => $inputSize,
-                'has_tools' => isset($payload['tools']),
-                'tools_count' => isset($payload['tools']) ? count($payload['tools']) : 0,
-                'tools_size_bytes' => $toolsSize,
-                'tool_names' => isset($payload['tools']) ? array_map(function($t) {
-                    return $t['name'] ?? ($t['function']['name'] ?? 'unknown');
-                }, $payload['tools']) : [],
+                'has_mcp_servers' => isset($payload['mcp_servers']),
+                'mcp_servers_count' => count($payload['mcp_servers'] ?? []),
+                'total_tools' => $totalTools,
+                'mcp_servers_size_bytes' => $mcpServersSize,
+                'server_names' => $serverNames,
                 'note' => 'cURL error 52 (Empty reply) kann bei großen Requests auftreten',
             ]);
             
@@ -122,10 +126,11 @@ class OpenAiService
                         $errorMessage .= "\n\nOpenAI Error Details:\n" . $errorDetails;
                         
                         // Zeige auch im Log für besseres Debugging
+                        $mcpServersCount = isset($payload['mcp_servers']) ? count($payload['mcp_servers']) : 0;
                         Log::error('[OpenAI Chat] Error details', [
                             'status' => $response->status(),
                             'error' => $errorJson['error'],
-                            'payload_tools_count' => count($payload['tools'] ?? []),
+                            'payload_mcp_servers_count' => $mcpServersCount,
                             'payload_keys' => array_keys($payload),
                         ]);
                     } else {
@@ -357,29 +362,40 @@ class OpenAiService
         if (isset($options['tools']) && $options['tools'] === false) {
             // Tools explizit deaktiviert - nichts hinzufügen
         } else {
-            // Tools aktivieren (Standard)
-            $tools = $this->getAvailableTools();
-            $payload['tools'] = $this->normalizeToolsForResponses($tools);
-            $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
+            // MCP-Format: Tools nach Modulen gruppieren
+            $mcpServers = $this->buildMcpServers();
+            if (!empty($mcpServers)) {
+                $payload['mcp_servers'] = $mcpServers;
+            }
             
-            // Debug: Log Tools (nur wenn Logging aktiviert ist)
+            // Debug: Log MCP Servers (nur wenn Logging aktiviert ist)
             if (config('app.debug', false)) {
-                Log::debug('[OpenAI Stream] Tools aktiviert', [
-                    'tool_count' => count($tools),
-                    'tool_names' => array_map(function($t) {
-                        return $t['function']['name'] ?? $t['name'] ?? 'unknown';
-                    }, $tools),
+                $totalTools = 0;
+                foreach ($mcpServers as $serverName => $server) {
+                    $totalTools += count($server['tools'] ?? []);
+                }
+                Log::debug('[OpenAI Stream] MCP Servers aktiviert', [
+                    'server_count' => count($mcpServers),
+                    'total_tools' => $totalTools,
+                    'servers' => array_keys($mcpServers),
                 ]);
             }
         }
-        // Debug: Log Payload (nur wenn Debug aktiviert)
-        if (config('app.debug', false)) {
-            Log::debug('[OpenAI Stream] Sending payload', [
-                'payload_keys' => array_keys($payload),
-                'tools_count' => count($payload['tools'] ?? []),
-                'tools' => $payload['tools'] ?? [],
-            ]);
-        }
+            // Debug: Log Payload (nur wenn Debug aktiviert)
+            if (config('app.debug', false)) {
+                $totalTools = 0;
+                if (isset($payload['mcp_servers'])) {
+                    foreach ($payload['mcp_servers'] as $serverName => $server) {
+                        $totalTools += count($server['tools'] ?? []);
+                    }
+                }
+                Log::debug('[OpenAI Stream] Sending payload', [
+                    'payload_keys' => array_keys($payload),
+                    'mcp_servers_count' => count($payload['mcp_servers'] ?? []),
+                    'total_tools' => $totalTools,
+                    'server_names' => array_keys($payload['mcp_servers'] ?? []),
+                ]);
+            }
         
         $response = $this->http(withStream: true)->post($this->baseUrl . '/responses', $payload);
         if ($response->failed()) {
@@ -497,6 +513,7 @@ class OpenAiService
     {
         $buffer = '';
         $currentEvent = null; $currentToolCall = null; $toolArguments = '';
+        $currentMcpServer = null; // MCP: Server-Name für aktuellen Tool-Call
         $onToolStart = $options['on_tool_start'] ?? null; $toolExecutor = $options['tool_executor'] ?? null;
         $onDebug = $options['on_debug'] ?? null; // Optional: Debug-Callback für detailliertes Logging
         $eventCount = 0;
@@ -582,6 +599,7 @@ class OpenAiService
                             } elseif ($decoded['item']['type'] === 'mcp_call') {
                                 // MCP Format: Tool-Aufruf wurde erstellt
                                 $currentToolCall = $decoded['item']['name'] ?? ($decoded['item']['tool_name'] ?? null);
+                                $currentMcpServer = $decoded['item']['server'] ?? ($decoded['server_name'] ?? null);
                                 if ($currentToolCall && is_callable($onToolStart)) { 
                                     try { 
                                         $onToolStart($currentToolCall); 
@@ -590,6 +608,7 @@ class OpenAiService
                                 Log::debug('[OpenAI Stream] MCP call created', [
                                     'item_id' => $decoded['item']['id'] ?? null,
                                     'tool_name' => $currentToolCall,
+                                    'server' => $currentMcpServer,
                                 ]);
                             }
                         }
@@ -644,10 +663,15 @@ class OpenAiService
                         if (is_string($arguments)) {
                             $toolArguments = $arguments; // Ersetze statt append, da done ist
                         }
+                        // Extrahiere Server-Name, falls nicht bereits gesetzt
+                        if (!$currentMcpServer && isset($decoded['server'])) {
+                            $currentMcpServer = $decoded['server'];
+                        }
                         // Führe Tool sofort aus, da Argumente vollständig sind
                         if ($currentToolCall && $toolArguments !== '') {
-                            $this->executeToolIfReady($currentToolCall, $toolArguments, $toolExecutor, $onDelta, $messages);
+                            $this->executeToolIfReady($currentToolCall, $toolArguments, $toolExecutor, $onDelta, $messages, $currentMcpServer);
                             $currentToolCall = null; 
+                            $currentMcpServer = null;
                             $toolArguments = '';
                         }
                         Log::debug('[OpenAI Stream] MCP call arguments done', [
@@ -658,15 +682,20 @@ class OpenAiService
                         break;
                     case 'response.mcp_call.completed':
                         // MCP: Tool-Aufruf erfolgreich abgeschlossen
+                        if (!$currentMcpServer && isset($decoded['server'])) {
+                            $currentMcpServer = $decoded['server'];
+                        }
                         if ($currentToolCall && $toolArguments !== '') {
                             // Falls noch nicht ausgeführt, jetzt ausführen
-                            $this->executeToolIfReady($currentToolCall, $toolArguments, $toolExecutor, $onDelta, $messages);
+                            $this->executeToolIfReady($currentToolCall, $toolArguments, $toolExecutor, $onDelta, $messages, $currentMcpServer);
                         }
                         Log::debug('[OpenAI Stream] MCP call completed', [
                             'item_id' => $decoded['item_id'] ?? null,
                             'output_index' => $decoded['output_index'] ?? null,
+                            'server' => $currentMcpServer,
                         ]);
                         $currentToolCall = null; 
+                        $currentMcpServer = null;
                         $toolArguments = '';
                         break;
                     case 'response.mcp_call.failed':
@@ -682,12 +711,33 @@ class OpenAiService
                         $toolArguments = '';
                         break;
                     case 'response.mcp_list_tools':
-                        // MCP: Tool-Liste wurde gesendet (optional - für Debugging)
+                    case 'response.mcp_list_tools.in_progress':
+                    case 'response.mcp_list_tools.completed':
+                    case 'response.mcp_list_tools.failed':
+                        // MCP: Tool-Liste wurde angefordert/geladen
+                        $serverName = $decoded['server'] ?? ($decoded['server_name'] ?? null);
+                        $tools = $decoded['tools'] ?? [];
+                        
                         Log::debug('[OpenAI Stream] MCP list tools event', [
+                            'event' => $currentEvent,
+                            'server' => $serverName,
                             'output_index' => $decoded['output_index'] ?? null,
-                            'has_tools' => isset($decoded['tools']),
-                            'tools_count' => isset($decoded['tools']) ? count($decoded['tools']) : 0,
+                            'has_tools' => !empty($tools),
+                            'tools_count' => count($tools),
                         ]);
+                        
+                        // Wenn Tools geladen wurden, können wir sie dynamisch hinzufügen
+                        if ($currentEvent === 'response.mcp_list_tools.completed' && !empty($tools) && $serverName) {
+                            // Tools wurden erfolgreich geladen - können für zukünftige Calls verwendet werden
+                            // Hinweis: Aktueller Stream hat bereits die Tools, aber für nächste Iterationen
+                            Log::info('[OpenAI Stream] MCP tools loaded', [
+                                'server' => $serverName,
+                                'tools_count' => count($tools),
+                                'tool_names' => array_map(function($t) {
+                                    return $t['name'] ?? 'unknown';
+                                }, $tools),
+                            ]);
+                        }
                         break;
                     case 'response.tool_call.completed':
                     case 'tool_call.completed':
@@ -704,13 +754,19 @@ class OpenAiService
         }
     }
 
-    private function executeToolIfReady(?string $toolName, string $toolArguments, $toolExecutor, callable $onDelta, array $messages): void
+    private function executeToolIfReady(?string $toolName, string $toolArguments, $toolExecutor, callable $onDelta, array $messages, ?string $mcpServerName = null): void
     {
         if (!$toolName || $toolArguments === '') { return; }
         try {
-            // WICHTIG: Tool-Name zurückmappen (von OpenAI-Format zu internem Format)
-            // OpenAI: "planner_projects_create" -> Intern: "planner.projects.create"
-            $internalToolName = $this->denormalizeToolNameFromOpenAi($toolName);
+            // MCP-Format: Tool-Name ohne Modul-Präfix (z.B. "projects.GET")
+            // Modul kommt aus Server-Name (z.B. "planner")
+            // Kombiniert: "planner.projects.GET"
+            if ($mcpServerName) {
+                $internalToolName = $mcpServerName . '.' . $toolName;
+            } else {
+                // Fallback: Standard Denormalisierung (für Backwards-Kompatibilität)
+                $internalToolName = $this->denormalizeToolNameFromOpenAi($toolName);
+            }
             
             $arguments = json_decode($toolArguments, true);
             $result = null;
@@ -1310,5 +1366,93 @@ Tools folgen REST-Logik.";
         }
         
         return $compressed;
+    }
+
+    /**
+     * Baut MCP-Server-Struktur aus verfügbaren Tools
+     * Gruppiert Tools nach Modulen (z.B. planner, core)
+     */
+    private function buildMcpServers(): array
+    {
+        $tools = $this->getAvailableTools();
+        $mcpServers = [];
+        
+        foreach ($tools as $tool) {
+            // Extrahiere Tool-Name und Modul
+            $toolName = $tool['function']['name'] ?? null;
+            if (!$toolName) {
+                continue;
+            }
+            
+            // Modul aus Tool-Namen extrahieren (z.B. "planner.projects.GET" -> "planner")
+            $module = $this->extractModuleFromToolName($toolName);
+            
+            // Initialisiere Server, falls nicht vorhanden
+            if (!isset($mcpServers[$module])) {
+                $mcpServers[$module] = [
+                    'tools' => [],
+                ];
+            }
+            
+            // Konvertiere Tool zu MCP-Format
+            $mcpTool = $this->convertToolToMcpFormat($tool);
+            if ($mcpTool) {
+                $mcpServers[$module]['tools'][] = $mcpTool;
+            }
+        }
+        
+        return $mcpServers;
+    }
+
+    /**
+     * Konvertiert ein Tool von Standard Function-Calling Format zu MCP-Format
+     */
+    private function convertToolToMcpFormat(array $tool): ?array
+    {
+        if (!isset($tool['function']) || !is_array($tool['function'])) {
+            return null;
+        }
+        
+        $fn = $tool['function'];
+        $originalName = $fn['name'] ?? null;
+        if (!$originalName) {
+            return null;
+        }
+        
+        // MCP-Format: Tool-Name ohne Modul-Präfix (z.B. "projects.GET" statt "planner.projects.GET")
+        $toolNameWithoutModule = $this->removeModulePrefix($originalName);
+        
+        // MCP nutzt "inputSchema" statt "parameters"
+        $inputSchema = $fn['parameters'] ?? [];
+        
+        return [
+            'name' => $toolNameWithoutModule,
+            'description' => $fn['description'] ?? '',
+            'inputSchema' => $inputSchema,
+        ];
+    }
+
+    /**
+     * Extrahiert Modul aus Tool-Namen (z.B. "planner.projects.GET" -> "planner")
+     */
+    private function extractModuleFromToolName(string $toolName): string
+    {
+        if (str_contains($toolName, '.')) {
+            $parts = explode('.', $toolName);
+            return $parts[0];
+        }
+        return 'core';
+    }
+
+    /**
+     * Entfernt Modul-Präfix aus Tool-Namen (z.B. "planner.projects.GET" -> "projects.GET")
+     */
+    private function removeModulePrefix(string $toolName): string
+    {
+        if (str_contains($toolName, '.')) {
+            $parts = explode('.', $toolName, 2);
+            return $parts[1] ?? $toolName;
+        }
+        return $toolName;
     }
 }

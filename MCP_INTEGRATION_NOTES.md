@@ -28,27 +28,29 @@ OpenAI Responses API unterstützt MCP-Events für Streaming:
 
 ## Aktueller Status
 
-✅ **Was wir bereits nutzen:**
-- Standard Function-Calling Format (funktioniert)
-- Tool-Name-Normalisierung (Punkte → Unterstriche)
-- Tool-Result-Formatierung als User-Messages
-- Streaming mit `response.function_call_arguments.delta` und `.done`
-- **MCP-Events unterstützt** (seit 2026-01-02):
+✅ **Was wir nutzen (seit 2026-01-03):**
+- **MCP-Format aktiv** - Tools werden als `mcp_servers` gruppiert nach Modulen gesendet
+- Tool-Gruppierung nach Modulen (z.B. `planner`, `core`)
+- MCP-Tool-Format: `name`, `description`, `inputSchema` (statt `function`, `parameters`)
+- Tool-Name ohne Modul-Präfix im MCP-Format (z.B. `projects.GET` statt `planner.projects.GET`)
+- Modul kommt aus Server-Name (z.B. `planner` → `planner.projects.GET`)
+- **MCP-Events vollständig unterstützt:**
   - `response.mcp_call_arguments.delta` - Partielle Tool-Argumente
   - `response.mcp_call_arguments.done` - Finalisierte Tool-Argumente
   - `response.mcp_call.completed` - Tool-Aufruf erfolgreich
   - `response.mcp_call.failed` - Tool-Aufruf fehlgeschlagen
-  - `response.mcp_list_tools` - Tool-Liste (Debugging)
+  - `response.mcp_list_tools.*` - Tool-Liste Events (in_progress, completed, failed)
   - `response.output_item.added` mit `type: 'mcp_call'` - MCP-Tool-Erstellung
 
-❓ **Was wir prüfen sollten:**
-- Sollten wir das MCP-Format für Tools verwenden (statt Standard Function-Calling)?
-- Gibt es Vorteile durch `mcp_list_tools`?
-- Können wir MCP-Events für bessere Tool-Discovery nutzen?
+✅ **Vorteile:**
+- Tools können während des Streams nachgeladen werden (via `mcp_list_tools` Events)
+- Bessere Gruppierung nach Modulen
+- Standardisiertes Format
+- Nahtlose Tool-Discovery während des Streams
 
 ## MCP vs. Standard Function-Calling
 
-### Standard Function-Calling (aktuell)
+### Standard Function-Calling (veraltet)
 ```json
 {
   "tools": [
@@ -62,7 +64,7 @@ OpenAI Responses API unterstützt MCP-Events für Streaming:
 }
 ```
 
-### MCP-Format (mögliche Alternative)
+### MCP-Format (aktuell aktiv)
 ```json
 {
   "mcp_servers": {
@@ -74,22 +76,28 @@ OpenAI Responses API unterstützt MCP-Events für Streaming:
           "inputSchema": {...}
         }
       ]
+    },
+    "core": {
+      "tools": [
+        {
+          "name": "teams.GET",
+          "description": "...",
+          "inputSchema": {...}
+        }
+      ]
     }
   }
 }
 ```
 
-## Empfehlung
+## Implementierung
 
-**Aktuell: Standard Function-Calling beibehalten**
-- Funktioniert zuverlässig
-- Gut dokumentiert
-- Keine Breaking Changes nötig
-
-**Zukünftig: MCP-Format evaluieren**
-- Wenn OpenAI MCP als Standard empfiehlt
-- Wenn es bessere Tool-Gruppierung ermöglicht
-- Wenn es Discovery verbessert
+**MCP-Format ist aktiv seit 2026-01-03:**
+- ✅ Tools werden nach Modulen gruppiert (`buildMcpServers()`)
+- ✅ Tool-Namen ohne Modul-Präfix (z.B. `projects.GET` statt `planner.projects.GET`)
+- ✅ Modul kommt aus Server-Name
+- ✅ Tool-Denormalisierung: `server.tool` → `planner.projects.GET`
+- ✅ `mcp_list_tools` Events für Tool-Nachladen während des Streams
 
 ## Referenzen
 

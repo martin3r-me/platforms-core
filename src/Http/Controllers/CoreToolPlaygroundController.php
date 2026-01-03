@@ -3735,13 +3735,110 @@ class CoreToolPlaygroundController extends Controller
                                 'normalized_tools' => $normalizedTools,
                             ];
                             
-                            // Rufe OpenAI auf
+                            // Rufe OpenAI auf mit Streaming
+                            $responseContent = '';
+                            $responseToolCalls = [];
+                            $responseFinishReason = null;
+                            $streamError = null;
+                            
                             try {
-                                $response = $openAiService->chat($messages, 'gpt-4o-mini', [
+                                // Sammle Tool-Calls während des Streams
+                                $toolCallsCollector = [];
+                                $currentStreamingToolCall = null;
+                                $currentStreamingToolArguments = '';
+                                
+                                $openAiService->streamChat($messages, function($delta) use ($sendEvent, &$responseContent) {
+                                    // Stream Delta als SSE-Event weiterleiten
+                                    $responseContent .= $delta;
+                                    $sendEvent('llm.delta', [
+                                        'delta' => $delta,
+                                        'content' => $responseContent,
+                                    ]);
+                                }, 'gpt-4o-mini', [
                                     'max_tokens' => 2000,
                                     'temperature' => 0.7,
                                     'tools' => null,
+                                    'on_tool_start' => function($toolName) use ($sendEvent, $iteration, &$currentStreamingToolCall) {
+                                        // WICHTIG: $toolName ist bereits denormalisiert (internes Format)
+                                        // Aber wir brauchen den originalen OpenAI-Namen
+                                        // Speichere internen Namen, wir finden OpenAI-Namen später
+                                        $currentStreamingToolCall = $toolName;
+                                        $sendEvent('llm.tool_call.start', [
+                                            'iteration' => $iteration,
+                                            'tool' => $toolName,
+                                        ]);
+                                    },
+                                    'on_debug' => function($eventType, $data) use (&$toolCallsCollector, &$currentStreamingToolCall, &$currentStreamingToolArguments) {
+                                        // Sammle Tool-Calls direkt aus den Streaming-Events (vor Denormalisierung)
+                                        if ($eventType === 'response.output_item.added' && isset($data['item']['type'])) {
+                                            if ($data['item']['type'] === 'function_call') {
+                                                $openAiToolName = $data['item']['name'] ?? ($data['item']['function_name'] ?? null);
+                                                if ($openAiToolName) {
+                                                    $currentStreamingToolCall = $openAiToolName; // OpenAI-Format
+                                                    $toolCallsCollector[$openAiToolName] = [
+                                                        'name' => $openAiToolName,
+                                                        'arguments' => '',
+                                                    ];
+                                                }
+                                            }
+                                        } elseif ($eventType === 'response.function_call_arguments.delta') {
+                                            if ($currentStreamingToolCall && isset($data['delta'])) {
+                                                if (!isset($toolCallsCollector[$currentStreamingToolCall])) {
+                                                    $toolCallsCollector[$currentStreamingToolCall] = [
+                                                        'name' => $currentStreamingToolCall,
+                                                        'arguments' => '',
+                                                    ];
+                                                }
+                                                $toolCallsCollector[$currentStreamingToolCall]['arguments'] .= $data['delta'];
+                                                $currentStreamingToolArguments = $toolCallsCollector[$currentStreamingToolCall]['arguments'];
+                                            }
+                                        } elseif ($eventType === 'response.function_call_arguments.done') {
+                                            if ($currentStreamingToolCall && isset($data['arguments'])) {
+                                                $toolCallsCollector[$currentStreamingToolCall]['arguments'] = $data['arguments'];
+                                                $currentStreamingToolArguments = $data['arguments'];
+                                            }
+                                        }
+                                    },
+                                    'tool_executor' => function($toolName, $arguments) use (&$responseToolCalls, &$toolCallsCollector, &$currentStreamingToolCall) {
+                                        // Tool-Call sammeln (NICHT ausführen - wird später in normalem Flow gemacht)
+                                        // WICHTIG: $toolName ist bereits denormalisiert (internes Format)
+                                        // Finde den originalen OpenAI-Namen aus toolCallsCollector
+                                        $openAiToolName = $currentStreamingToolCall;
+                                        
+                                        // Falls nicht gefunden, suche nach internem Namen
+                                        if (!$openAiToolName) {
+                                            foreach ($toolCallsCollector as $openAiName => $toolCallData) {
+                                                $internalName = str_replace('_', '.', $openAiName);
+                                                if ($internalName === $toolName) {
+                                                    $openAiToolName = $openAiName;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Falls immer noch nicht gefunden, normalisiere internen Namen
+                                        if (!$openAiToolName) {
+                                            $openAiToolName = str_replace('.', '_', $toolName);
+                                        }
+                                        
+                                        $responseToolCalls[] = [
+                                            'function' => [
+                                                'name' => $openAiToolName, // OpenAI-Format (wird später denormalisiert)
+                                                'arguments' => json_encode($arguments),
+                                            ],
+                                        ];
+                                        $currentStreamingToolCall = null;
+                                        return null; // Tool wird NICHT hier ausgeführt, sondern später im normalen Flow
+                                    },
                                 ]);
+                                
+                                // Response zusammenbauen
+                                $response = [
+                                    'content' => $responseContent,
+                                    'tool_calls' => $responseToolCalls,
+                                    'finish_reason' => $responseFinishReason ?? 'stop',
+                                ];
+                                
                             } catch (\Illuminate\Http\Client\ConnectionException $e) {
                                 $simulation['debug']['openai_error_' . $iteration] = [
                                     'type' => 'connection_exception',
@@ -3751,11 +3848,38 @@ class CoreToolPlaygroundController extends Controller
                                 
                                 $trimmedMessages = array_slice($messages, -8);
                                 try {
-                                    $response = $openAiService->chat($trimmedMessages, 'gpt-4o-mini', [
+                                    $responseContent = '';
+                                    $responseToolCalls = [];
+                                    $currentToolCall = null;
+                                    
+                                    $openAiService->streamChat($trimmedMessages, function($delta) use ($sendEvent, &$responseContent) {
+                                        $responseContent .= $delta;
+                                        $sendEvent('llm.delta', [
+                                            'delta' => $delta,
+                                            'content' => $responseContent,
+                                        ]);
+                                    }, 'gpt-4o-mini', [
                                         'max_tokens' => 1500,
                                         'temperature' => 0.7,
                                         'tools' => null,
+                                        'tool_executor' => function($toolName, $arguments) use (&$responseToolCalls) {
+                                            // Tool-Call sammeln (NICHT ausführen)
+                                            $responseToolCalls[] = [
+                                                'function' => [
+                                                    'name' => $toolName,
+                                                    'arguments' => json_encode($arguments),
+                                                ],
+                                            ];
+                                            return null;
+                                        },
                                     ]);
+                                    
+                                    $response = [
+                                        'content' => $responseContent,
+                                        'tool_calls' => $responseToolCalls,
+                                        'finish_reason' => $responseFinishReason ?? 'stop',
+                                    ];
+                                    
                                     $simulation['debug']['openai_error_' . $iteration]['retry'] = 'success';
                                 } catch (\Throwable $e2) {
                                     $simulation['debug']['openai_error_' . $iteration]['retry'] = 'failed';
@@ -3765,6 +3889,31 @@ class CoreToolPlaygroundController extends Controller
                                         'message' => "Fehler beim Aufruf von OpenAiService: " . $e2->getMessage(),
                                         'error' => $e2->getMessage(),
                                         'note' => 'OpenAI Request ist fehlgeschlagen (auch nach Retry). Tool-Results sind vorhanden; bitte erneut versuchen.',
+                                    ];
+                                    $sendEvent('simulation.complete', $simulation);
+                                    return;
+                                }
+                            } catch (\Throwable $e) {
+                                $streamError = $e->getMessage();
+                                $simulation['debug']['openai_error_' . $iteration] = [
+                                    'type' => 'stream_error',
+                                    'message' => $streamError,
+                                ];
+                                
+                                // Fallback: Versuche non-streaming chat
+                                try {
+                                    $response = $openAiService->chat($messages, 'gpt-4o-mini', [
+                                        'max_tokens' => 2000,
+                                        'temperature' => 0.7,
+                                        'tools' => null,
+                                    ]);
+                                    $simulation['debug']['openai_error_' . $iteration]['fallback'] = 'success';
+                                } catch (\Throwable $e2) {
+                                    $simulation['debug']['openai_error_' . $iteration]['fallback'] = 'failed';
+                                    $simulation['final_response'] = [
+                                        'type' => 'error',
+                                        'message' => "Fehler beim Aufruf von OpenAiService: " . $e2->getMessage(),
+                                        'error' => $e2->getMessage(),
                                     ];
                                     $sendEvent('simulation.complete', $simulation);
                                     return;
