@@ -497,6 +497,7 @@ class CoreToolPlaygroundController extends Controller
                             // WICHTIG: Mehrere Tool-Calls in einer Runde werden unterstützt - alle werden sequenziell ausgeführt
                             // Alle Tool-Results werden gesammelt und in der nächsten Iteration der LLM präsentiert
                             $toolsWereLoaded = false; // Flag: Wurden Tools nach tools.GET nachgeladen?
+                            $injectedTools = []; // Liste der nachgeladenen Tools (für Debugging)
                             foreach ($response['tool_calls'] as $toolCall) {
                                 $toolCallId = $toolCall['id'] ?? null;
                                 $toolName = $toolCall['function']['name'] ?? null;
@@ -664,145 +665,229 @@ class CoreToolPlaygroundController extends Controller
                                     // Konvertiere ToolResult zu OpenAI-Format
                                     $resultArray = $toolResult->toArray();
                                     
-                                    // ON-DEMAND TOOL INJECTION: MCP-Pattern
-                                    // Wenn tools.GET aufgerufen wurde, lade die angeforderten Tools SOFORT nach
-                                    // Tools werden in der gleichen Iteration verfügbar gemacht (sofortige OpenAI-Anfrage)
-                                    // WICHTIG: Auch wenn tools.GET fehlschlägt, können wir aus dem Request-Context ableiten, welche Tools benötigt werden
-                                    $toolsWereLoaded = false;
+                                    // ====================================================================
+                                    // TOOL INJECTION: Strategischer Ablauf mit umfassendem Debugging
+                                    // ====================================================================
                                     if ($internalToolName === 'tools.GET') {
+                                        $injectionDebug = [
+                                            'step' => 'TOOL_INJECTION_START',
+                                            'iteration' => $iteration,
+                                            'tool_call_id' => $toolCallId,
+                                            'arguments' => $toolArguments,
+                                            'success' => $toolResult->success,
+                                        ];
+                                        
+                                        // STEP 1: Tracken was tools.GET zurückgegeben hat
+                                        $toolsData = [];
                                         $requestedTools = [];
                                         
                                         if ($toolResult->success) {
-                                            // Erfolgreicher tools.GET Aufruf - extrahiere Tools aus Result
-                                            // WICHTIG: tools.GET kann verschiedene Strukturen zurückgeben:
-                                            // 1. {"data": {"tools": [...]}} (Standard)
-                                            // 2. {"tools": [...]} (Alternative)
-                                            // 3. {"data": {"tools": [...]}, "tools": [...]} (Beide vorhanden)
-                                            $toolsData = $resultArray['data']['tools'] ?? $resultArray['tools'] ?? [];
-                                            
-                                            Log::info('[CoreToolPlayground] Extrahiere Tools aus tools.GET Result', [
+                                            $injectionDebug['step_1'] = 'TOOLS_GET_SUCCESS';
+                                            $injectionDebug['step_1_result'] = [
+                                                'has_data' => isset($resultArray['data']),
                                                 'has_data_tools' => isset($resultArray['data']['tools']),
                                                 'has_tools' => isset($resultArray['tools']),
-                                                'tools_data_count' => is_array($toolsData) ? count($toolsData) : 0,
                                                 'result_keys' => array_keys($resultArray),
                                                 'data_keys' => isset($resultArray['data']) ? array_keys($resultArray['data']) : [],
-                                            ]);
+                                            ];
                                             
+                                            // Extrahiere Tools aus Result (verschiedene Strukturen möglich)
+                                            $toolsData = $resultArray['data']['tools'] ?? $resultArray['tools'] ?? [];
+                                            $injectionDebug['step_1_tools_data'] = [
+                                                'count' => is_array($toolsData) ? count($toolsData) : 0,
+                                                'type' => gettype($toolsData),
+                                                'is_array' => is_array($toolsData),
+                                                'is_empty' => empty($toolsData),
+                                            ];
+                                            
+                                            // STEP 2: Tools extrahieren
                                             if (!empty($toolsData) && is_array($toolsData)) {
+                                                $injectionDebug['step_2'] = 'EXTRACT_TOOLS_FROM_RESULT';
                                                 foreach ($toolsData as $toolInfo) {
                                                     $toolName = $toolInfo['name'] ?? null;
                                                     if ($toolName && is_string($toolName)) {
                                                         $requestedTools[] = $toolName;
                                                     }
                                                 }
-                                                
-                                                Log::info('[CoreToolPlayground] Tools aus tools.GET extrahiert', [
-                                                    'extracted_tools' => $requestedTools,
+                                                $injectionDebug['step_2_extracted'] = [
                                                     'count' => count($requestedTools),
-                                                ]);
+                                                    'tools' => $requestedTools,
+                                                ];
                                             } else {
-                                                Log::warning('[CoreToolPlayground] Keine Tools in tools.GET Result gefunden', [
-                                                    'tools_data_type' => gettype($toolsData),
-                                                    'tools_data_empty' => empty($toolsData),
-                                                    'result_structure' => [
-                                                        'has_data' => isset($resultArray['data']),
-                                                        'has_data_tools' => isset($resultArray['data']['tools']),
-                                                        'has_tools' => isset($resultArray['tools']),
-                                                    ],
-                                                ]);
+                                                $injectionDebug['step_2'] = 'NO_TOOLS_IN_RESULT';
+                                                $injectionDebug['step_2_reason'] = 'tools.GET erfolgreich, aber keine Tools gefunden (möglicherweise search-Parameter ohne Treffer)';
                                             }
                                         } else {
-                                            // ROBUSTER MCP-ANSATZ: Auch bei Fehler können wir aus den Argumenten ableiten, welche Tools benötigt werden
-                                            // Wenn module="planner" und read_only=true, dann lade alle planner.*.GET Tools
+                                            $injectionDebug['step_1'] = 'TOOLS_GET_FAILED';
+                                            $injectionDebug['step_1_error'] = $toolResult->error ?? 'Unknown error';
+                                        }
+                                        
+                                        // STEP 3: Fallback-Logik wenn keine Tools extrahiert wurden
+                                        if (empty($requestedTools)) {
+                                            $injectionDebug['step_3'] = 'FALLBACK_LOGIC';
                                             $module = $toolArguments['module'] ?? null;
                                             $readOnly = $toolArguments['read_only'] ?? null;
                                             
+                                            $injectionDebug['step_3_params'] = [
+                                                'module' => $module,
+                                                'read_only' => $readOnly,
+                                                'has_module' => !empty($module),
+                                            ];
+                                            
                                             if ($module) {
-                                                // Lade alle Tools des Moduls dynamisch nach
                                                 try {
                                                     $registry = app(ToolRegistry::class);
                                                     $allTools = $registry->all();
+                                                    $injectionDebug['step_3_registry'] = [
+                                                        'total_tools_in_registry' => count($allTools),
+                                                    ];
                                                     
                                                     foreach ($allTools as $tool) {
                                                         $toolName = $tool->getName();
                                                         
-                                                        // Prüfe ob Tool zum Modul gehört
                                                         if (str_starts_with($toolName, $module . '.')) {
-                                                            // Prüfe read_only Filter
                                                             if ($readOnly !== null) {
                                                                 $isReadOnly = str_ends_with($toolName, '.GET');
                                                                 if (($readOnly && $isReadOnly) || (!$readOnly && !$isReadOnly)) {
                                                                     $requestedTools[] = $toolName;
                                                                 }
                                                             } else {
-                                                                // Kein read_only Filter - lade alle Tools des Moduls
                                                                 $requestedTools[] = $toolName;
                                                             }
                                                         }
                                                     }
                                                     
-                                                    Log::info('[CoreToolPlayground] Tools aus Request-Context abgeleitet (tools.GET fehlgeschlagen)', [
-                                                        'module' => $module,
-                                                        'read_only' => $readOnly,
-                                                        'tools_count' => count($requestedTools),
-                                                        'tools' => array_slice($requestedTools, 0, 10), // Erste 10 für Logging
-                                                    ]);
+                                                    $injectionDebug['step_3_fallback_result'] = [
+                                                        'count' => count($requestedTools),
+                                                        'tools' => $requestedTools,
+                                                        'reason' => $toolResult->success ? 'tools.GET erfolgreich, aber keine Tools gefunden' : 'tools.GET fehlgeschlagen',
+                                                    ];
                                                 } catch (\Throwable $e) {
-                                                    Log::warning('[CoreToolPlayground] Fehler beim Ableiten von Tools aus Request-Context', [
-                                                        'error' => $e->getMessage(),
-                                                    ]);
+                                                    $injectionDebug['step_3_error'] = $e->getMessage();
                                                 }
+                                            } else {
+                                                $injectionDebug['step_3_skipped'] = 'Kein module-Parameter vorhanden';
                                             }
+                                        } else {
+                                            $injectionDebug['step_3'] = 'SKIPPED';
+                                            $injectionDebug['step_3_reason'] = 'Tools bereits aus Result extrahiert';
                                         }
                                         
+                                        // STEP 4: Tools nachladen
                                         if (!empty($requestedTools)) {
-                                            // ON-DEMAND TOOL INJECTION: MCP-Pattern
-                                            // Lade Tools dynamisch nach - SOFORT verfügbar für diese Multi-Step-Session!
-                                            // Tools bleiben für die aktuelle Multi-Step-Session verfügbar
-                                            // Bei neuer User-Anfrage werden sie zurückgesetzt (LLM kann sie bei Bedarf wieder anfordern)
-                                            // ON-DEMAND TOOL INJECTION: Lade Tools dynamisch nach - SOFORT verfügbar!
-                                            // Tools bleiben für die aktuelle Multi-Step-Session verfügbar
-                                            // Bei neuer User-Anfrage werden sie zurückgesetzt (MCP-Pattern)
-                                            $openAiService->loadToolsDynamically($requestedTools);
-                                            $toolsWereLoaded = true; // Flag: Tools wurden nachgeladen
-                                            
-                                            Log::info('[CoreToolPlayground] Tools on-demand nachgeladen - SOFORT verfügbar', [
-                                                'tools' => $requestedTools,
+                                            $injectionDebug['step_4'] = 'LOAD_TOOLS';
+                                            $injectionDebug['step_4_before'] = [
+                                                'tools_to_load' => $requestedTools,
                                                 'count' => count($requestedTools),
-                                                'pattern' => 'MCP: Tools bleiben für aktuelle Multi-Step-Session, werden bei neuer User-Anfrage zurückgesetzt',
-                                            ]);
-                                            
-                                            $simulation['debug']['tools_dynamically_loaded_' . $iteration] = [
-                                                'tool_names' => $requestedTools,
-                                                'count' => count($requestedTools),
-                                                'note' => 'Diese Tools sind JETZT sofort verfügbar für diese Session - neue OpenAI-Anfrage wird gemacht',
-                                                'loaded_from' => $toolResult->success ? 'tools.GET result' : 'request context (fallback)',
-                                                'mcp_pattern' => 'Tools bleiben für aktuelle Session, werden danach entfernt',
-                                                'result_structure' => $toolResult->success ? [
-                                                    'has_data_tools' => isset($resultArray['data']['tools']),
-                                                    'has_tools' => isset($resultArray['tools']),
-                                                    'tools_count' => count($toolsData ?? []),
-                                                ] : null,
                                             ];
                                             
-                                            Log::info('[CoreToolPlayground] Tools dynamisch nachgeladen - SOFORT verfügbar für diese Session', [
-                                                'tools' => $requestedTools,
-                                                'count' => count($requestedTools),
+                                            // Prüfe Tools VOR dem Nachladen
+                                            $reflection = new \ReflectionClass($openAiService);
+                                            $dynamicallyLoadedProperty = $reflection->getProperty('dynamicallyLoadedTools');
+                                            $dynamicallyLoadedProperty->setAccessible(true);
+                                            $toolsBeforeLoad = $dynamicallyLoadedProperty->getValue($openAiService);
+                                            $injectionDebug['step_4_before_loaded'] = [
+                                                'count' => count($toolsBeforeLoad),
+                                                'tools' => array_keys($toolsBeforeLoad),
+                                            ];
+                                            
+                                            // Nachladen
+                                            $openAiService->loadToolsDynamically($requestedTools);
+                                            $toolsWereLoaded = true;
+                                            $injectedTools = $requestedTools; // Speichere für Debugging außerhalb des if-Blocks
+                                            
+                                            // Prüfe Tools NACH dem Nachladen
+                                            $toolsAfterLoad = $dynamicallyLoadedProperty->getValue($openAiService);
+                                            $injectionDebug['step_4_after'] = [
+                                                'count' => count($toolsAfterLoad),
+                                                'tools' => array_keys($toolsAfterLoad),
+                                                'newly_loaded' => array_diff(array_keys($toolsAfterLoad), array_keys($toolsBeforeLoad)),
+                                            ];
+                                            
+                                            // STEP 5: Verfügbarkeit prüfen
+                                            $injectionDebug['step_5'] = 'VERIFY_AVAILABILITY';
+                                            $getToolsMethod = $reflection->getMethod('getAvailableTools');
+                                            $getToolsMethod->setAccessible(true);
+                                            $availableTools = $getToolsMethod->invoke($openAiService);
+                                            
+                                            $normalizeMethod = $reflection->getMethod('normalizeToolsForResponses');
+                                            $normalizeMethod->setAccessible(true);
+                                            $normalizedTools = $normalizeMethod->invoke($openAiService, $availableTools);
+                                            
+                                            $availableToolNames = [];
+                                            foreach ($availableTools as $tool) {
+                                                $name = $tool['function']['name'] ?? $tool['name'] ?? null;
+                                                if ($name) {
+                                                    $availableToolNames[] = $name;
+                                                }
+                                            }
+                                            
+                                            $normalizedToolNames = array_map(function($t) {
+                                                return $t['name'] ?? ($t['function']['name'] ?? 'unknown');
+                                            }, $normalizedTools);
+                                            
+                                            // Prüfe ob nachgeladene Tools wirklich verfügbar sind
+                                            $injectionDebug['step_5_verification'] = [];
+                                            foreach ($requestedTools as $requestedTool) {
+                                                // Normalisiere Tool-Name für OpenAI (planner.projects.GET -> planner_projects_GET)
+                                                try {
+                                                    $nameMapper = app(\Platform\Core\Services\ToolNameMapper::class);
+                                                    $normalizedRequested = $nameMapper->toProvider($requestedTool);
+                                                } catch (\Throwable $e) {
+                                                    $normalizedRequested = str_replace('.', '_', $requestedTool);
+                                                }
+                                                
+                                                // Prüfe in verschiedenen Formaten
+                                                $foundInAvailable = in_array($requestedTool, $availableToolNames);
+                                                $foundInNormalized = in_array($normalizedRequested, $normalizedToolNames);
+                                                $isAvailable = $foundInAvailable || $foundInNormalized;
+                                                
+                                                $injectionDebug['step_5_verification'][] = [
+                                                    'requested' => $requestedTool,
+                                                    'normalized' => $normalizedRequested,
+                                                    'is_available' => $isAvailable,
+                                                    'found_in_available' => $foundInAvailable,
+                                                    'found_in_normalized' => $foundInNormalized,
+                                                ];
+                                            }
+                                            
+                                            $injectionDebug['step_5_summary'] = [
+                                                'total_available_tools' => count($availableTools),
+                                                'total_normalized_tools' => count($normalizedTools),
+                                                'available_tool_names' => $availableToolNames,
+                                                'normalized_tool_names' => $normalizedToolNames,
+                                                'all_requested_available' => count(array_filter($injectionDebug['step_5_verification'], fn($v) => $v['is_available'])) === count($requestedTools),
+                                            ];
+                                            
+                                            $injectionDebug['step_6'] = 'INJECTION_COMPLETE';
+                                            $injectionDebug['step_6_next'] = 'Sofortige OpenAI-Anfrage wird gemacht, damit Tools verfügbar sind';
+                                            
+                                            // Speichere Debug-Info
+                                            $simulation['debug']['tool_injection_' . $iteration] = $injectionDebug;
+                                            
+                                            Log::info('[CoreToolPlayground] Tool-Injection abgeschlossen', [
                                                 'iteration' => $iteration,
-                                                'loaded_from' => $toolResult->success ? 'result' : 'context',
-                                                'note' => 'MCP-Pattern: Tools bleiben für aktuelle Session, werden danach entfernt',
+                                                'tools_requested' => count($requestedTools),
+                                                'tools_loaded' => count($toolsAfterLoad),
+                                                'tools_available' => count($availableTools),
+                                                'all_available' => $injectionDebug['step_5_summary']['all_requested_available'],
                                             ]);
                                         } else {
-                                            Log::warning('[CoreToolPlayground] Keine Tools aus tools.GET extrahiert oder abgeleitet', [
-                                                'success' => $toolResult->success,
+                                            $injectionDebug['step_4'] = 'SKIPPED';
+                                            $injectionDebug['step_4_reason'] = 'Keine Tools zum Nachladen';
+                                            $injectionDebug['step_5'] = 'SKIPPED';
+                                            $injectionDebug['step_6'] = 'INJECTION_FAILED';
+                                            
+                                            $simulation['debug']['tool_injection_' . $iteration] = $injectionDebug;
+                                            
+                                            Log::warning('[CoreToolPlayground] Tool-Injection fehlgeschlagen - keine Tools gefunden', [
+                                                'iteration' => $iteration,
+                                                'arguments' => $toolArguments,
                                                 'result_structure' => $toolResult->success ? [
                                                     'has_data' => isset($resultArray['data']),
                                                     'has_data_tools' => isset($resultArray['data']['tools']),
                                                     'has_tools' => isset($resultArray['tools']),
-                                                    'data_keys' => isset($resultArray['data']) ? array_keys($resultArray['data']) : [],
-                                                    'result_keys' => array_keys($resultArray),
                                                 ] : null,
-                                                'arguments' => $toolArguments,
                                             ]);
                                         }
                                     }
@@ -981,21 +1066,37 @@ class CoreToolPlaygroundController extends Controller
                                     return $t['name'] ?? ($t['function']['name'] ?? 'unknown');
                                 }, $normalizedTools);
                                 
+                                // STEP 6: Debug-Info für sofortige OpenAI-Anfrage
+                                $availableToolNamesForDebug = [];
+                                foreach ($availableTools as $tool) {
+                                    $name = $tool['function']['name'] ?? $tool['name'] ?? null;
+                                    if ($name) {
+                                        $availableToolNamesForDebug[] = $name;
+                                    }
+                                }
+                                
                                 $simulation['debug']['tools_sent_to_openai_after_load_' . $iteration] = [
+                                    'step' => 'IMMEDIATE_OPENAI_REQUEST_AFTER_INJECTION',
                                     'available_tools_count' => count($availableTools),
                                     'normalized_tools_count' => count($normalizedTools),
+                                    'tool_names_before_normalization' => $availableToolNamesForDebug,
                                     'tool_names_after_normalization' => $toolNamesAfter,
-                                    'has_planner_projects_get' => in_array('planner.projects.GET', array_map(function($t) {
-                                        return $t['function']['name'] ?? $t['name'] ?? '';
-                                    }, $availableTools)) || in_array('planner_projects_GET', $toolNamesAfter),
                                     'dynamically_loaded_tools_count' => count($dynamicallyLoadedTools),
                                     'dynamically_loaded_tool_names' => array_keys($dynamicallyLoadedTools),
+                                    'verification' => [
+                                        'all_injected_tools_available' => !empty($injectedTools) ? count(array_intersect($injectedTools, $availableToolNamesForDebug)) === count($injectedTools) : false,
+                                        'injected_tools' => $injectedTools,
+                                        'available_tools' => $availableToolNamesForDebug,
+                                        'missing_tools' => !empty($injectedTools) ? array_diff($injectedTools, $availableToolNamesForDebug) : [],
+                                    ],
                                 ];
                                 
-                                Log::info('[CoreToolPlayground] Mache sofortige OpenAI-Anfrage nach Tool-Nachladen', [
+                                Log::info('[CoreToolPlayground] Sofortige OpenAI-Anfrage nach Tool-Injection', [
                                     'iteration' => $iteration,
                                     'dynamically_loaded_tools' => array_keys($dynamicallyLoadedTools),
                                     'total_tools_available' => count($availableTools),
+                                    'injected_tools_count' => count($injectedTools),
+                                    'all_available' => !empty($injectedTools) ? count(array_intersect($injectedTools, $availableToolNamesForDebug)) === count($injectedTools) : false,
                                 ]);
                                 
                                 // Mache SOFORT neue OpenAI-Anfrage - Tools sind jetzt verfügbar!
