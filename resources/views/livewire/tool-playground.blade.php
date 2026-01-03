@@ -92,36 +92,27 @@
                                     </div>
                                 </template>
                                 
-                                <!-- Kombinierter Chat-Verlauf (Messages + Events) -->
-                                <!-- WICHTIG: Direkt auf chatMessages zugreifen, nicht über Funktion -->
-                                <!-- x-effect: Force Alpine.js Reaktivität bei Änderungen -->
-                                <div x-effect="chatMessages.length" style="display: none;"></div>
-                                <template x-for="(item, index) in chatMessages" :key="'chat-' + index">
-                                    <!-- Event (schlicht, linksbündig) -->
-                                    <div x-show="item && item.type === 'event'" class="flex justify-start">
-                                        <div class="text-[10px] text-[var(--ui-muted)] opacity-60">
-                                            <span x-text="item.message || ''"></span>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Chat Message -->
-                                    <div x-show="item && item.type === 'message'" class="flex" :class="item.role === 'user' ? 'justify-end' : 'justify-start'">
-                                        <div 
-                                            class="max-w-[80%] rounded-lg p-3"
-                                            :class="item.role === 'user' 
-                                                ? 'bg-[var(--ui-primary)] text-white' 
-                                                : 'bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] border border-[var(--ui-border)]'"
-                                        >
-                                            <div class="text-sm font-semibold mb-1" x-text="item.role === 'user' ? 'Du' : 'LLM'"></div>
-                                            <div class="text-sm whitespace-pre-wrap" x-text="item.content || '...'"></div>
-                                            <div x-show="item.tool_calls && item.tool_calls.length > 0" class="mt-2 pt-2 border-t border-[var(--ui-border)]">
-                                                <div class="text-xs font-semibold mb-1">🔧 Tools aufgerufen:</div>
-                                                <template x-for="toolCall in item.tool_calls">
-                                                    <div class="text-xs font-mono mb-1" x-text="toolCall.function?.name || toolCall.name"></div>
-                                                </template>
+                                <!-- Chat-Verlauf: Nur Messages (keine Events im Chat) -->
+                                <template x-for="(item, index) in chatMessages" :key="'msg-' + index">
+                                    <template x-if="item && item.type === 'message'">
+                                        <div class="flex" :class="item.role === 'user' ? 'justify-end' : 'justify-start'">
+                                            <div 
+                                                class="max-w-[80%] rounded-lg p-3"
+                                                :class="item.role === 'user' 
+                                                    ? 'bg-[var(--ui-primary)] text-white' 
+                                                    : 'bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] border border-[var(--ui-border)]'"
+                                            >
+                                                <div class="text-sm font-semibold mb-1" x-text="item.role === 'user' ? 'Du' : 'LLM'"></div>
+                                                <div class="text-sm whitespace-pre-wrap" x-text="item.content || '...'"></div>
+                                                <div x-show="item.tool_calls && item.tool_calls.length > 0" class="mt-2 pt-2 border-t border-[var(--ui-border)]">
+                                                    <div class="text-xs font-semibold mb-1">🔧 Tools aufgerufen:</div>
+                                                    <template x-for="toolCall in item.tool_calls">
+                                                        <div class="text-xs font-mono mb-1" x-text="toolCall.function?.name || toolCall.name"></div>
+                                                    </template>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    </template>
                                 </template>
                                 
                                 <div x-show="simulationLoading" class="flex justify-start">
@@ -1344,44 +1335,8 @@
                     // DEBUG: Log Event
                     console.log('[SSE Event]', eventType, eventData);
                     
-                    // SOFORT: Füge Event direkt in Chat-Verlauf ein (Real-time)
-                    const eventMessage = {
-                        type: 'event',
-                        message: this.getEventMessage(eventType, eventData),
-                        timestamp: new Date().toISOString(),
-                        eventType: eventType,
-                        eventData: eventData
-                    };
-                    
-                    // Füge Event SOFORT in Chat-Verlauf ein
-                    // WICHTIG: Neue Array-Referenz für Alpine.js Reaktivität
-                    if (!this.chatMessages) {
-                        this.chatMessages = [];
-                    }
-                    
-                    // SOFORT hinzufügen - Alpine.js sollte die Änderungen sofort sehen
-                    // Neue Array-Referenz für Alpine.js Reaktivität
-                    this.chatMessages = [...this.chatMessages, eventMessage];
-                    
-                    // DEBUG: Log nach Hinzufügen
-                    console.log('[Chat Messages Count]', this.chatMessages.length);
-                    
-                    // Force Alpine.js Update durch explizite Reaktivität
-                    // Verwende requestAnimationFrame um sicherzustellen, dass Alpine.js die Änderung sieht
-                    requestAnimationFrame(() => {
-                        // Trigger Reaktivität durch erneutes Setzen (Alpine.js erkennt die Änderung)
-                        this.chatMessages = [...this.chatMessages];
-                        
-                        // Force Scroll nach DOM-Update
-                        requestAnimationFrame(() => {
-                            const container = this.$refs.chatContainer;
-                            if (container) {
-                                container.scrollTop = container.scrollHeight;
-                            }
-                        });
-                    });
-                    
-                    // Füge auch zu streamingEvents hinzu (für Debugging)
+                    // Events werden NICHT mehr im Chat angezeigt (nur Messages)
+                    // Füge nur zu streamingEvents hinzu (für Debugging)
                     if (!this.streamingEvents) {
                         this.streamingEvents = [];
                     }
@@ -1389,15 +1344,13 @@
                         type: eventType,
                         data: eventData,
                         timestamp: new Date().toISOString(),
-                        message: eventMessage.message
+                        message: this.getEventMessage(eventType, eventData)
                     }];
                     
                     // Begrenze Events auf 50 (älteste zuerst entfernen)
                     if (this.streamingEvents.length > 50) {
                         this.streamingEvents = this.streamingEvents.slice(-50);
                     }
-                    
-                    // Scroll wird bereits in requestAnimationFrame oben gehandhabt
                     
                     // Update Simulation-Result für bestimmte Events
                     if (eventType === 'simulation.start') {
@@ -1449,8 +1402,13 @@
                             iterations: eventData.iterations,
                         };
                         
-                        // SOFORT: Füge finale Antwort als Chat-Message hinzu
+                        // WICHTIG: Füge finale Antwort SOFORT als Chat-Message hinzu
                         if (eventData.content) {
+                            // Initialisiere chatMessages falls nicht vorhanden
+                            if (!this.chatMessages) {
+                                this.chatMessages = [];
+                            }
+                            
                             // Entferne letzte Assistant-Message falls vorhanden (um Duplikate zu vermeiden)
                             let newMessages = [...this.chatMessages];
                             const lastMsg = newMessages[newMessages.length - 1];
@@ -1458,26 +1416,30 @@
                                 newMessages.pop();
                             }
                             
-                            // Füge neue Assistant-Message hinzu (SOFORT)
-                            newMessages.push({
+                            // Füge neue Assistant-Message hinzu
+                            const assistantMessage = {
                                 type: 'message',
                                 role: 'assistant',
                                 content: eventData.content,
                                 timestamp: new Date().toISOString(),
-                            });
+                            };
+                            newMessages.push(assistantMessage);
                             
                             // Setze neues Array - Alpine.js sieht die Änderung sofort
                             this.chatMessages = newMessages;
-                            console.log('[Chat Messages after final response]', this.chatMessages.length);
+                            console.log('[Chat Messages after final response]', this.chatMessages.length, assistantMessage);
                             
-                            // Auto-Scroll nach DOM-Update
-                            this.$nextTick(() => {
-                                requestAnimationFrame(() => {
+                            // Force Alpine.js Update
+                            requestAnimationFrame(() => {
+                                this.chatMessages = [...this.chatMessages];
+                                
+                                // Auto-Scroll
+                                setTimeout(() => {
                                     const container = this.$refs.chatContainer;
                                     if (container) {
                                         container.scrollTop = container.scrollHeight;
                                     }
-                                });
+                                }, 100);
                             });
                         }
                     } else if (eventType === 'simulation.complete') {
