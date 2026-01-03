@@ -51,6 +51,30 @@ class IntentionVerificationService
     }
 
     /**
+     * Bestimmt (heuristisch) das erwartete Tool für die ursprüngliche User-Anfrage.
+     *
+     * Zweck: Der Controller kann damit im laufenden Run "auto-injecten", wenn das erwartete Tool
+     * noch nicht verfügbar ist (z.B. nur Discovery-Tools aktiv).
+     *
+     * IMPORTANT: Loose-Pattern bleibt erhalten – das ist nur ein Hinweis/Helper für Robustheit.
+     */
+    public function expectedToolFor(string $originalIntent): ?string
+    {
+        $intention = $this->extractIntention($originalIntent);
+
+        if ($intention->isEmpty() || !$intention->type) {
+            return null;
+        }
+
+        if ($intention->type === 'read' && $intention->target) {
+            return $this->getExpectedToolForRead(Str::lower($intention->target));
+        }
+
+        // Für Updates/Writes ist aktuell kein robustes Mapping hinterlegt – vorerst nur READ.
+        return null;
+    }
+
+    /**
      * Extrahiert die Intention aus der User-Nachricht
      */
     protected function extractIntention(string $userMessage): Intention
@@ -286,7 +310,15 @@ class IntentionVerificationService
                     // - UND das falsche Tool mehr als 2 mal aufgerufen wurde
                     // - ODER es bereits mehr als 5 Iterationen gibt (dann ist es definitiv ein Loop)
                     if ($totalCalls > 2 && ($similarToolCount > 2 || $totalCalls > 5)) {
-                        $issues[] = "Falsches Tool aufgerufen: '{$similarTool}' wurde bereits {$similarToolCount} mal aufgerufen, aber '{$expectedTool}' noch nicht! Der User wollte '{$intention->target}' sehen - rufe JETZT '{$expectedTool}' auf!";
+                        // Extrahiere Modul aus erwartetem Tool (z.B. "planner.projects.GET" -> "planner")
+                        $module = explode('.', $expectedTool)[0] ?? null;
+                        $issueText = "Falsches Tool aufgerufen: '{$similarTool}' wurde bereits {$similarToolCount} mal aufgerufen, aber '{$expectedTool}' noch nicht! Der User wollte '{$intention->target}' sehen.\n\n";
+                        $issueText .= "⚠️ **KRITISCH:** Das Tool '{$expectedTool}' ist möglicherweise NICHT in deiner Tool-Liste verfügbar!\n";
+                        $issueText .= "📋 **LÖSUNG:** Rufe ZUERST 'tools.GET' auf mit: {\"module\": \"{$module}\", \"read_only\": true}\n";
+                        $issueText .= "✅ RICHTIG (Schritt 1): Rufe 'tools.GET' auf um '{$expectedTool}' zu laden\n";
+                        $issueText .= "✅ RICHTIG (Schritt 2): Nach dem Nachladen rufe '{$expectedTool}' auf!\n";
+                        $issueText .= "❌ FALSCH: Rufe '{$similarTool}' nochmal auf!";
+                        $issues[] = $issueText;
                     }
                 } else {
                     // Wenn das erwartete Tool noch nicht aufgerufen wurde und es bereits mehrere Iterationen gibt

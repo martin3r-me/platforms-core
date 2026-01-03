@@ -100,6 +100,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | MCP (Micro-Capability Pattern)
+    |--------------------------------------------------------------------------
+    |
+    | On-Demand Tool Injection – startet mit Discovery-Tools und lädt bei Bedarf nach.
+    |
+    */
+    'mcp' => [
+        /*
+         * Wenn die Simulation in einen Loop läuft (z.B. wiederholt core.teams.GET),
+         * und das erwartete Tool (z.B. planner.projects.GET) nicht verfügbar ist,
+         * versucht der Playground im laufenden Run automatisch die passenden Tools
+         * per internem tools.GET nachzuladen (on-demand, nicht "alle Tools").
+         */
+        'auto_injection_on_loop' => env('TOOLS_MCP_AUTO_INJECTION_ON_LOOP', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Intention Verification
     |--------------------------------------------------------------------------
     |

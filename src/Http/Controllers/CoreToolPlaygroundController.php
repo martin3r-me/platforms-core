@@ -1024,6 +1024,108 @@ class CoreToolPlaygroundController extends Controller
                                             'timestamp' => now()->toIso8601String(),
                                             'verification_issues' => $verification->getIssuesText(),
                                         ];
+
+                                        /**
+                                         * MCP ROBUSTNESS: Auto-Injection im laufenden Run
+                                         *
+                                         * Wenn wir in einem Tool-Loop stecken und das erwartete Tool (z.B. planner.projects.GET)
+                                         * nicht in den verfügbaren Tools ist, dann laden wir on-demand die Tools des erwarteten
+                                         * Moduls per internem tools.GET nach (ohne dass die LLM erst tools.GET wählen muss).
+                                         *
+                                         * Ziel: "Injection im laufenden RUN" robuster machen.
+                                         */
+                                        $enableAutoInjection = config('tools.mcp.auto_injection_on_loop', true);
+                                        if ($enableAutoInjection && $hasLoop && !$toolsWereLoaded) {
+                                            try {
+                                                $expectedTool = $verificationService->expectedToolFor($message);
+                                                if ($expectedTool) {
+                                                    // Prüfe ob expectedTool bereits verfügbar ist
+                                                    $reflection = new \ReflectionClass($openAiService);
+                                                    $getToolsMethod = $reflection->getMethod('getAvailableTools');
+                                                    $getToolsMethod->setAccessible(true);
+                                                    $availableToolsNow = $getToolsMethod->invoke($openAiService);
+
+                                                    $availableToolNamesNow = [];
+                                                    foreach ($availableToolsNow as $tool) {
+                                                        $name = $tool['function']['name'] ?? $tool['name'] ?? null;
+                                                        if ($name) {
+                                                            $availableToolNamesNow[] = $name;
+                                                        }
+                                                    }
+
+                                                    $expectedModule = explode('.', $expectedTool)[0] ?? null;
+                                                    $expectedIsAvailable = in_array($expectedTool, $availableToolNamesNow, true);
+
+                                                    if ($expectedModule && !$expectedIsAvailable) {
+                                                        $autoArgs = [
+                                                            'module' => $expectedModule,
+                                                            // READ-only Tools für READ-Intent (wir injizieren minimal)
+                                                            'read_only' => str_ends_with($expectedTool, '.GET'),
+                                                            'search' => '',
+                                                        ];
+
+                                                        $simulation['steps'][] = [
+                                                            'step' => 4 + $iteration,
+                                                            'name' => 'MCP Auto-Injection (Loop Recovery)',
+                                                            'description' => "Auto-Injection aktiviert: Lade Tools für Modul '{$expectedModule}' nach, weil '{$expectedTool}' nicht verfügbar ist",
+                                                            'timestamp' => now()->toIso8601String(),
+                                                            'expected_tool' => $expectedTool,
+                                                            'auto_args' => $autoArgs,
+                                                        ];
+
+                                                        $context = \Platform\Core\Tools\ToolContext::fromAuth();
+                                                        $autoToolResult = $orchestrator->executeWithDependencies(
+                                                            'tools.GET',
+                                                            $autoArgs,
+                                                            $context,
+                                                            maxDepth: 3,
+                                                            planFirst: true
+                                                        );
+
+                                                        $autoResultArray = [
+                                                            'ok' => (bool)($autoToolResult->success ?? false),
+                                                            'data' => $autoToolResult->data ?? null,
+                                                            'error' => $autoToolResult->error ?? null,
+                                                        ];
+
+                                                        $autoTools = [];
+                                                        $autoData = $autoResultArray['data'] ?? [];
+                                                        if (is_array($autoData) && isset($autoData['tools']) && is_array($autoData['tools'])) {
+                                                            foreach ($autoData['tools'] as $t) {
+                                                                $name = $t['name'] ?? null;
+                                                                if ($name) {
+                                                                    $autoTools[] = $name;
+                                                                }
+                                                            }
+                                                        }
+
+                                                        $simulation['debug']['tool_auto_injection_' . $iteration] = [
+                                                            'status' => $autoResultArray['ok'] ? 'success' : 'error',
+                                                            'expected_tool' => $expectedTool,
+                                                            'module' => $expectedModule,
+                                                            'auto_args' => $autoArgs,
+                                                            'tools_found' => $autoTools,
+                                                            'tools_found_count' => count($autoTools),
+                                                            'note' => 'Auto-Injection nur bei Loop + expected tool missing; on-demand MCP-Hardening',
+                                                        ];
+
+                                                        if (!empty($autoTools)) {
+                                                            $openAiService->loadToolsDynamically($autoTools);
+                                                            $toolsWereLoaded = true;
+                                                            $injectedTools = $autoTools;
+                                                        }
+                                                    }
+                                                }
+                                            } catch (\Throwable $e) {
+                                                \Log::debug('[CoreToolPlayground] MCP Auto-Injection fehlgeschlagen', [
+                                                    'error' => $e->getMessage(),
+                                                ]);
+                                                $simulation['debug']['tool_auto_injection_' . $iteration] = [
+                                                    'status' => 'error',
+                                                    'error' => $e->getMessage(),
+                                                ];
+                                            }
+                                        }
                                     }
                                 } catch (\Throwable $e) {
                                     // Silent fail - Verifikation optional
@@ -2594,7 +2696,10 @@ class CoreToolPlaygroundController extends Controller
                     // Loop erkannt: Stärkere Warnung
                     $text .= "\n\n🚨 WICHTIG - LOOP ERKANNT: Du hast 'core.teams.GET' bereits {$loopCount} mal aufgerufen! ";
                     $text .= "Du hast die Team-Informationen bereits - rufe JETZT das nächste Tool auf!\n\n";
-                    $text .= "✅ RICHTIG: Rufe 'planner.projects.GET' auf (ohne team_id Parameter - verwendet automatisch Team ID {$data['current_team_id']})\n";
+                    $text .= "⚠️ **KRITISCH:** Das Tool 'planner.projects.GET' ist möglicherweise NICHT in deiner Tool-Liste verfügbar!\n";
+                    $text .= "📋 **LÖSUNG:** Rufe ZUERST 'tools.GET' mit module='planner' auf, um die benötigten Tools zu laden!\n\n";
+                    $text .= "✅ RICHTIG (Schritt 1): Rufe 'tools.GET' auf mit: {\"module\": \"planner\", \"read_only\": true}\n";
+                    $text .= "✅ RICHTIG (Schritt 2): Nach dem Nachladen rufe 'planner.projects.GET' auf (ohne team_id Parameter - verwendet automatisch Team ID {$data['current_team_id']})\n";
                     $text .= "❌ FALSCH: Rufe 'core.teams.GET' nochmal auf\n\n";
                     $text .= "Die benötigten Informationen sind bereits in den vorherigen Tool-Results vorhanden. ";
                     $text .= "Prüfe die Tool-Results und rufe das RICHTIGE Tool auf!";
