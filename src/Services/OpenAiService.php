@@ -738,14 +738,26 @@ class OpenAiService
 
     private function http(bool $withStream = false): PendingRequest
     {
+        $timeoutSeconds = (int) config('tools.openai.timeout_seconds', 60);
+        $connectTimeoutSeconds = (int) config('tools.openai.connect_timeout_seconds', 10);
+        $retryAttempts = (int) config('tools.openai.retry_attempts', 3);
+        $retryMinMs = (int) config('tools.openai.retry_sleep_min_ms', 400);
+        $retryMaxMs = (int) config('tools.openai.retry_sleep_max_ms', 1200);
+        if ($retryMinMs < 0) { $retryMinMs = 0; }
+        if ($retryMaxMs < $retryMinMs) { $retryMaxMs = $retryMinMs; }
+
         $request = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $this->getApiKey(),
                 'Content-Type' => 'application/json',
                 'User-Agent' => 'Glowkit-Core/1.0 (+Laravel)'
             ])
-            ->timeout(20)
-            ->connectTimeout(5)
-            ->retry(1, random_int(250, 500), function ($exception, $request) { return $exception instanceof ConnectionException; });
+            ->timeout($timeoutSeconds)
+            ->connectTimeout($connectTimeoutSeconds)
+            ->retry(
+                $retryAttempts,
+                random_int($retryMinMs, $retryMaxMs),
+                function ($exception, $request) { return $exception instanceof ConnectionException; }
+            );
         if ($withStream) { $request = $request->withOptions(['stream' => true]); }
         return $request;
     }

@@ -57,6 +57,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | OpenAI HTTP Client
+    |--------------------------------------------------------------------------
+    |
+    | Netzwerk-/HTTP-Tuning für OpenAI Requests (Responses API).
+    | Wichtig für Stabilität bei größeren Inputs/Tool-Ergebnissen.
+    |
+    */
+    'openai' => [
+        // Gesamt-Timeout pro Request (in Sekunden)
+        'timeout_seconds' => env('TOOLS_OPENAI_TIMEOUT_SECONDS', 60),
+        // Connect-Timeout (in Sekunden)
+        'connect_timeout_seconds' => env('TOOLS_OPENAI_CONNECT_TIMEOUT_SECONDS', 10),
+        // Retry-Versuche bei ConnectionException (z.B. cURL 28/52)
+        'retry_attempts' => env('TOOLS_OPENAI_RETRY_ATTEMPTS', 3),
+        // Retry-Delay (ms) – wird pro Attempt zufällig zwischen min/max gewählt
+        'retry_sleep_min_ms' => env('TOOLS_OPENAI_RETRY_SLEEP_MIN_MS', 400),
+        'retry_sleep_max_ms' => env('TOOLS_OPENAI_RETRY_SLEEP_MAX_MS', 1200),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Circuit Breaker Configuration
     |--------------------------------------------------------------------------
     */

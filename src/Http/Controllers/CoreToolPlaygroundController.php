@@ -445,11 +445,52 @@ class CoreToolPlaygroundController extends Controller
                         ];
                         
                         // Rufe echten OpenAiService auf (zeigt automatisch alle Tools)
-                        $response = $openAiService->chat($messages, 'gpt-4o-mini', [
-                            'max_tokens' => 2000,
-                            'temperature' => 0.7,
-                            'tools' => null, // null = Tools aktivieren (OpenAiService ruft getAvailableTools() auf)
-                        ]);
+                        // WICHTIG: Robustheit bei transienten OpenAI Netzwerkfehlern (cURL 28/52)
+                        try {
+                            $response = $openAiService->chat($messages, 'gpt-4o-mini', [
+                                'max_tokens' => 2000,
+                                'temperature' => 0.7,
+                                'tools' => null, // null = Tools aktivieren (OpenAiService ruft getAvailableTools() auf)
+                            ]);
+                        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+                            // Fallback: Retry mit gekürzter Historie (reduziert Payload & Latenz)
+                            $simulation['debug']['openai_error_' . $iteration] = [
+                                'type' => 'connection_exception',
+                                'message' => $e->getMessage(),
+                                'note' => 'Retry mit gekürzten Messages (last 8) wird versucht',
+                            ];
+                            \Log::warning('[CoreToolPlayground] OpenAI ConnectionException - retry with trimmed messages', [
+                                'iteration' => $iteration,
+                                'error' => $e->getMessage(),
+                                'messages_count' => count($messages),
+                            ]);
+
+                            $trimmedMessages = array_slice($messages, -8);
+                            try {
+                                $response = $openAiService->chat($trimmedMessages, 'gpt-4o-mini', [
+                                    'max_tokens' => 1500,
+                                    'temperature' => 0.7,
+                                    'tools' => null,
+                                ]);
+                                $simulation['debug']['openai_error_' . $iteration]['retry'] = 'success';
+                            } catch (\Throwable $e2) {
+                                $simulation['debug']['openai_error_' . $iteration]['retry'] = 'failed';
+                                $simulation['debug']['openai_error_' . $iteration]['retry_error'] = $e2->getMessage();
+                                // Graceful exit: wir geben die Simulation inkl. Tool-Results zurück
+                                return response()->json([
+                                    'timestamp' => now()->toIso8601String(),
+                                    'user_message' => '',
+                                    'simulation' => array_merge($simulation, [
+                                        'final_response' => [
+                                            'type' => 'error',
+                                            'message' => "Fehler beim Aufruf von OpenAiService: " . $e2->getMessage(),
+                                            'error' => $e2->getMessage(),
+                                            'note' => 'OpenAI Request ist fehlgeschlagen (auch nach Retry). Tool-Results sind vorhanden; bitte erneut versuchen.',
+                                        ],
+                                    ]),
+                                ]);
+                            }
+                        }
                         
                         $allResponses[] = $response;
                         
