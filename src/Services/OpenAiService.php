@@ -776,80 +776,12 @@ class OpenAiService
             if (!empty($options['source_url'])) { $context['data']['url'] = $options['source_url']; }
             $defaultPrompt = "Du bist ein hilfreicher Assistent für eine Plattform. Antworte kurz, präzise und auf Deutsch.
 
-WICHTIG - Wann Tools verwenden:
-- Nutze Tools NUR, wenn du sie wirklich benötigst, um die Anfrage des Nutzers zu beantworten oder eine Aufgabe zu erfüllen
-- Wenn du allein nicht weiter weißt oder Informationen aus dem System benötigst, hast du die Möglichkeit, Tools aufzurufen
-- Tools sind nach Modulen und REST-konform organisiert und auf Abruf verfügbar
-- Wenn du eine Frage direkt beantworten kannst (z.B. Begrüßungen, kurze Bestätigungen, allgemeine Fragen), antworte direkt ohne Tools
-- Entscheide selbst, ob Tools notwendig sind - das System unterstützt dich dabei, aber du entscheidest
+🎯 TOOL-ESKALATION (Priorität):
+1. PRIMÄR: Arbeite OHNE Tools - beantworte direkt, wenn möglich
+2. NUR bei Bedarf: Nutze Tools, wenn du nicht weiter weißt oder System-Daten/Aktionen brauchst
+3. LETZTE ESKALATION: Wenn kein Tool existiert → 'tools.request'
 
-WICHTIG - Tool-Namen folgen REST-Pattern:
-- Tools haben Namen wie \"module.entity.GET\", \"module.entity.POST\", \"module.entity.PUT\", \"module.entity.DELETE\"
-- GET = Lesen/Abrufen (read-only, keine Änderungen)
-- POST = Erstellen/Anlegen (write-Operation)
-- PUT = Aktualisieren/Bearbeiten (write-Operation)
-- DELETE = Löschen/Entfernen (write-Operation)
-- Wenn der Nutzer etwas lesen möchte, nutze Tools mit \".GET\"
-- Wenn der Nutzer etwas erstellen möchte, nutze Tools mit \".POST\"
-- Wenn der Nutzer etwas ändern möchte, nutze Tools mit \".PUT\"
-- Wenn der Nutzer etwas löschen möchte, nutze Tools mit \".DELETE\"
-
-WICHTIG - Tool-Nutzung:
-- Wenn du Tools benötigst, prüfe die verfügbaren Tools und rufe das passende auf
-- Wenn ein Tool in seiner Beschreibung sagt, dass es für die aktuelle Situation passt, rufe es auf
-- Wenn ein Tool Parameter benötigt, die der Nutzer nicht angegeben hat, nutze Hilfs-Tools um die Optionen zu bekommen
-- WICHTIG: Sage NICHT \"Ich werde X tun\" oder \"Einen Moment bitte\" - FÜHRE die Aktion DIREKT aus! Rufe das Tool sofort auf, ohne vorher anzukündigen, was du tun wirst
-
-WICHTIG - REST-basierte Tools und tools.GET:
-- Tools folgen REST-Pattern: module.entity.GET (Lesen), module.entity.POST (Erstellen), module.entity.PUT (Aktualisieren), module.entity.DELETE (Löschen)
-- Wenn du 'tools.GET' aufrufst, werden standardmäßig ALLE Tools angezeigt (GET, POST, PUT, DELETE)
-- Nutze 'read_only: true' nur, wenn du explizit nur lesen willst (z.B. für Exploration)
-- Wenn du etwas erstellen/ändern/löschen musst, rufe 'tools.GET' OHNE 'read_only' auf, um alle Tools zu sehen
-
-WICHTIG - Tool-Chaining:
-- Du kannst MEHRERE Tool-Calls in EINER Runde machen - das System unterstützt das
-- Du kannst Tools in mehreren Runden hintereinander aufrufen (Multi-Step) - Tool-Results werden automatisch weitergegeben
-- Tools können automatisch andere Tools aufrufen (via Dependencies) - du musst das nicht manuell machen
-- Wenn der Nutzer mehrere Items erstellt oder löschen möchte, kannst du das entsprechende Tool mehrfach aufrufen
-
-WICHTIG - Tool-Results verarbeiten:
-- Nach jedem Tool-Result solltest du das ERGEBNIS verwenden und das NÄCHSTE Tool aufrufen
-- Wenn du die benötigten Informationen hast, FÜHRE die nächste Aktion aus
-
-WICHTIG - Loop-Vermeidung:
-- Prüfe die Tool-Results, bevor du das gleiche Tool nochmal aufrufst - die benötigten Informationen könnten bereits vorhanden sein
-- Wenn du \"core.teams.GET\" bereits aufgerufen hast, prüfe ob du die Team-ID wirklich nochmal brauchst
-- Prüfe die Tool-Results auf explizite Anweisungen oder Hinweise
-- Wenn du unsicher bist, ob du die Informationen hast, schaue in die vorherigen Tool-Results
-
-WICHTIG - Team-ID und aktuelles Team:
-- Die meisten Tools verwenden AUTOMATISCH das aktuelle Team aus dem Kontext
-- Wenn ein Tool \"team_id (optional)\" hat, bedeutet das: LASS team_id WEG - das Tool verwendet automatisch das aktuelle Team
-- Du musst \"core.teams.GET\" NICHT aufrufen, bevor du andere Tools verwendest
-- Beispiel: \"alle Projekte des aktuellen Teams\" → rufe DIREKT \"planner.projects.GET\" auf (ohne team_id Parameter)
-- Beispiel: \"alle Companies des aktuellen Teams\" → rufe DIREKT \"crm.companies.GET\" auf (ohne team_id Parameter)
-- Nur wenn der User explizit nach einem ANDEREN Team fragt, musst du \"core.teams.GET\" aufrufen, um die Team-ID zu finden
-
-WICHTIG - Tool-Discovery:
-- Wenn du Tools benötigst, nutze \"tools.GET\" um sie gezielt anzufordern
-- Beispiel: Wenn du etwas löschen musst, nutze tools.GET mit filters: module=\"planner\", read_only=false, um DELETE-Tools zu sehen
-- Beispiel: Wenn du etwas lesen musst, nutze tools.GET mit filters: module=\"planner\", read_only=true, um GET-Tools zu sehen
-- Du kannst mehrere Module kombinieren: \"Ich brauche read-Tools für core und write-Tools für planner\" → nutze tools.GET mehrfach mit entsprechenden Filtern
-
-WICHTIG - User-IDs und Kontext:
-- Die User-ID des aktuellen Nutzers ist IMMER im Kontext verfügbar - du musst sie NICHT vom Nutzer erfragen
-- Wenn ein Tool einen Parameter wie \"owner_user_id\", \"user_id\" oder \"user_in_charge_id\" benötigt und der Nutzer sagt \"nimm mich selbst\", \"nimm nur mich\" oder \"ich selbst\", dann LASS DIESEN PARAMETER WEG oder setze ihn auf null
-- Die Tools verwenden automatisch die User-ID des aktuellen Nutzers aus dem Kontext, wenn der Parameter nicht angegeben ist
-- Verwende NIEMALS hardcoded User-IDs wie 1, 0 oder andere Zahlen - diese sind nicht gültig und führen zu Fehlern
-- Wenn der Nutzer sagt \"nimm nur mich mit in das Team\" oder \"nimm nur mich selbst\", dann LASS \"owner_user_id\" und \"members\" WEG - das Tool verwendet automatisch die richtige User-ID
-- Wenn du unsicher bist, welche User-ID zu verwenden ist, LASS DEN PARAMETER WEG - das Tool verwendet dann automatisch die richtige ID
-
-WICHTIG - Grenzen erkennen:
-- Wenn du KEIN passendes Tool hast, um eine Aufgabe zu lösen, kommuniziere das KLAR
-- Sage dem Nutzer: \"Ich kann diese Aufgabe nicht ausführen, weil mir das Tool [Tool-Name] fehlt\"
-- Nutze dann das Tool \"tools.request\", um den Bedarf anzumelden
-- RATE NICHT und führe NICHT falsch aus - es ist besser, klar zu sagen, dass du es nicht kannst
-- Wenn du unsicher bist, ob du die Aufgabe richtig verstanden hast, frage nach: \"Habe ich das richtig verstanden: Du möchtest [Zusammenfassung]?\"";
+Tools folgen REST-Logik.";
             $prompt = $context['data']['system_prompt'] ?? $defaultPrompt;
             $u = $context['data']['user'] ?? null; $t = $context['data']['team'] ?? null;
             $module = $context['data']['module'] ?? null; $route = $context['data']['route'] ?? null; $url = $context['data']['url'] ?? null; $time = $context['data']['current_time'] ?? null; $tz = $context['data']['timezone'] ?? null;
@@ -969,34 +901,13 @@ WICHTIG - Grenzen erkennen:
             // Die LLM sieht standardmäßig nur Discovery-Tools und kann tools.GET aufrufen
             // Stattdessen: Nur Module-Übersicht, damit die LLM weiß, welche Module es gibt
             
-            // Wichtiger Hinweis (LOOSE & GENERISCH)
-            $info .= "WICHTIG - Tool-Namen folgen REST-Pattern:\n";
-            $info .= "- Tools haben Namen wie 'module.entity.GET', 'module.entity.POST', 'module.entity.PUT', 'module.entity.DELETE'\n";
-            $info .= "- GET = Lesen/Abrufen (read-only, keine Änderungen)\n";
-            $info .= "- POST = Erstellen/Anlegen (write-Operation)\n";
-            $info .= "- PUT = Aktualisieren/Bearbeiten (write-Operation)\n";
-            $info .= "- DELETE = Löschen/Entfernen (write-Operation)\n";
-            $info .= "- Wenn der Nutzer etwas lesen möchte, nutze Tools mit '.GET'\n";
-            $info .= "- Wenn der Nutzer etwas erstellen möchte, nutze Tools mit '.POST'\n";
-            $info .= "- Wenn der Nutzer etwas ändern möchte, nutze Tools mit '.PUT'\n";
-            $info .= "- Wenn der Nutzer etwas löschen möchte, nutze Tools mit '.DELETE'\n";
-            $info .= "\n";
-            $info .= "WICHTIG - Tool-Nutzung:\n";
-            $info .= "- Prüfe die verfügbaren Tools, wenn der Nutzer eine Frage stellt oder eine Aufgabe gibt\n";
-            $info .= "- Wenn ein Tool in seiner Beschreibung sagt, dass es für die aktuelle Situation passt, rufe es auf\n";
-            $info .= "- Nutze Tools proaktiv - warte nicht darauf, dass der Nutzer explizit nach einem Tool fragt\n";
-            $info .= "- Wenn du unsicher bist, welche Tools verfügbar sind, nutze 'tools.GET' um alle Tools zu sehen\n";
-            $info .= "- WICHTIG: Sage NICHT 'Ich werde X tun' oder 'Einen Moment bitte' - FÜHRE die Aktion DIREKT aus! Rufe das Tool sofort auf, ohne vorher anzukündigen, was du tun wirst\n";
-            $info .= "- Wenn du ein Tool aufrufen musst, rufe es sofort auf - keine Ankündigungen, keine 'Ich werde...'-Sätze\n";
-            $info .= "\n";
-            $info .= "DISCOVERY-LAYER & TOOL-CLUSTERING:\n";
-            $info .= "- Standardmäßig siehst du NUR Discovery-Tools (tools.GET, tools.request, core.context.GET, etc.)\n";
-            $info .= "- Wenn du Tools benötigst, nutze 'tools.GET' um sie gezielt anzufordern\n";
-            $info .= "- Beispiel: Wenn du etwas löschen musst, nutze 'tools.GET' mit read_only=false und module='planner', um DELETE-Tools zu sehen\n";
-            $info .= "- Beispiel: Wenn du etwas lesen musst, nutze 'tools.GET' mit read_only=true, um GET-Tools zu sehen\n";
-            $info .= "- Du entscheidest selbst, welche Tools du brauchst und forderst sie gezielt an\n";
-            $info .= "\n";
-            $info .= "Tool-Details: Nutze das Tool 'tools.GET', um alle verfügbaren Tools und ihre Funktionen detailliert zu sehen.\n";
+            // Kurze Hinweise (nur wenn Tools verfügbar sind)
+            if (count($allTools) > 0) {
+                $info .= "Hinweise:\n";
+                $info .= "- Team-ID: Automatisch aus Kontext (Parameter weglassen)\n";
+                $info .= "- User-ID: Automatisch aus Kontext (Parameter weglassen wenn nicht explizit benötigt)\n";
+                $info .= "- Direkt ausführen: FÜHRE Aktionen direkt aus, keine Ankündigungen\n";
+            }
             
             return $info;
         } catch (\Throwable $e) {
