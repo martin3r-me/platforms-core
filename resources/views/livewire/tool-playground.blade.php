@@ -66,22 +66,6 @@
                         </div>
                     </div>
                     
-                    <!-- Streaming Events (Live Updates) -->
-                    <div x-show="useStreaming && streamingEvents.length > 0" class="bg-[var(--ui-info-5)] rounded-lg p-4 border-2 border-[var(--ui-info)]">
-                        <h3 class="text-lg font-semibold mb-4 text-[var(--ui-info)]">📡 Live Events</h3>
-                        <div class="space-y-2 max-h-64 overflow-y-auto">
-                            <template x-for="(event, index) in streamingEvents" :key="index">
-                                <div class="p-2 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)] text-xs">
-                                    <div class="flex items-center gap-2 mb-1">
-                                        <span class="font-mono font-semibold text-[var(--ui-info)]" x-text="event.type"></span>
-                                        <span class="text-[var(--ui-muted)]" x-text="new Date(event.timestamp).toLocaleTimeString()"></span>
-                                    </div>
-                                    <div class="text-[var(--ui-secondary)]" x-text="event.message || JSON.stringify(event.data || {})"></div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                    
                     <!-- Chat Interface -->
                     <div class="bg-[var(--ui-muted-5)] rounded-lg p-4">
                         <div class="flex items-center justify-between mb-4">
@@ -100,15 +84,27 @@
                         
                         <!-- Chat Messages -->
                         <div class="bg-[var(--ui-surface)] rounded-lg border border-[var(--ui-border)] mb-4" style="max-height: 500px; overflow-y: auto;" x-ref="chatContainer">
-                            <div class="p-4 space-y-4">
-                                <template x-if="chatMessages.length === 0">
+                            <div class="p-4 space-y-2">
+                                <template x-if="chatMessages.length === 0 && (!useStreaming || streamingEvents.length === 0)">
                                     <div class="text-center text-[var(--ui-muted)] py-8">
                                         <p>💬 Starte die Konversation mit einer Nachricht</p>
                                         <p class="text-xs mt-2">Beispiele: "Erstelle ein Projekt", "Zeige mir alle Teams", "Lösche Projekt X"</p>
                                     </div>
                                 </template>
                                 
-                                <template x-for="(msg, index) in chatMessages" :key="index">
+                                <!-- Streaming Events (dezent, klein) -->
+                                <template x-if="useStreaming">
+                                    <template x-for="(event, index) in streamingEvents" :key="'event-' + index">
+                                        <div class="flex justify-center">
+                                            <div class="px-2 py-1 bg-[var(--ui-muted)] rounded text-[10px] text-[var(--ui-muted)] opacity-70">
+                                                <span class="font-mono" x-text="event.type"></span>
+                                                <span class="ml-1" x-text="event.message"></span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </template>
+                                
+                                <template x-for="(msg, index) in chatMessages" :key="'msg-' + index">
                                     <div class="flex" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
                                         <div 
                                             class="max-w-[80%] rounded-lg p-3"
@@ -1291,17 +1287,26 @@
                 
                 handleStreamEvent(eventType, eventData) {
                     // Füge Event zu Liste hinzu
-                    this.streamingEvents.push({
+                    const event = {
                         type: eventType,
                         data: eventData,
                         timestamp: new Date().toISOString(),
                         message: this.getEventMessage(eventType, eventData)
-                    });
+                    };
                     
-                    // Begrenze Events auf 100 (älteste zuerst entfernen)
-                    if (this.streamingEvents.length > 100) {
+                    this.streamingEvents.push(event);
+                    
+                    // Begrenze Events auf 50 (älteste zuerst entfernen)
+                    if (this.streamingEvents.length > 50) {
                         this.streamingEvents.shift();
                     }
+                    
+                    // Auto-Scroll zu neuem Event
+                    this.$nextTick(() => {
+                        if (this.$refs.chatContainer) {
+                            this.$refs.chatContainer.scrollTop = this.$refs.chatContainer.scrollHeight;
+                        }
+                    });
                     
                     // Update Simulation-Result für bestimmte Events
                     if (eventType === 'simulation.start') {
