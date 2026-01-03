@@ -92,31 +92,28 @@
                                     </div>
                                 </template>
                                 
-                                <!-- Streaming Events (dezent, klein) -->
-                                <template x-if="useStreaming">
-                                    <template x-for="(event, index) in streamingEvents" :key="'event-' + index">
-                                        <div class="flex justify-center">
-                                            <div class="px-2 py-1 bg-[var(--ui-muted)] rounded text-[10px] text-[var(--ui-muted)] opacity-70">
-                                                <span class="font-mono" x-text="event.type"></span>
-                                                <span class="ml-1" x-text="event.message"></span>
-                                            </div>
+                                <!-- Kombinierter Chat-Verlauf (Messages + Events) -->
+                                <template x-for="(item, index) in getCombinedChatHistory()" :key="'chat-' + index">
+                                    <!-- Event (schlicht, linksbündig) -->
+                                    <div x-show="item.type === 'event'" class="flex justify-start">
+                                        <div class="text-[10px] text-[var(--ui-muted)] opacity-60">
+                                            <span x-text="item.message"></span>
                                         </div>
-                                    </template>
-                                </template>
-                                
-                                <template x-for="(msg, index) in chatMessages" :key="'msg-' + index">
-                                    <div class="flex" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
+                                    </div>
+                                    
+                                    <!-- Chat Message -->
+                                    <div x-show="item.type === 'message'" class="flex" :class="item.role === 'user' ? 'justify-end' : 'justify-start'">
                                         <div 
                                             class="max-w-[80%] rounded-lg p-3"
-                                            :class="msg.role === 'user' 
+                                            :class="item.role === 'user' 
                                                 ? 'bg-[var(--ui-primary)] text-white' 
                                                 : 'bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] border border-[var(--ui-border)]'"
                                         >
-                                            <div class="text-sm font-semibold mb-1" x-text="msg.role === 'user' ? 'Du' : 'LLM'"></div>
-                                            <div class="text-sm whitespace-pre-wrap" x-text="msg.content || '...'"></div>
-                                            <div x-show="msg.tool_calls && msg.tool_calls.length > 0" class="mt-2 pt-2 border-t border-[var(--ui-border)]">
+                                            <div class="text-sm font-semibold mb-1" x-text="item.role === 'user' ? 'Du' : 'LLM'"></div>
+                                            <div class="text-sm whitespace-pre-wrap" x-text="item.content || '...'"></div>
+                                            <div x-show="item.tool_calls && item.tool_calls.length > 0" class="mt-2 pt-2 border-t border-[var(--ui-border)]">
                                                 <div class="text-xs font-semibold mb-1">🔧 Tools aufgerufen:</div>
-                                                <template x-for="toolCall in msg.tool_calls">
+                                                <template x-for="toolCall in item.tool_calls">
                                                     <div class="text-xs font-mono mb-1" x-text="toolCall.function?.name || toolCall.name"></div>
                                                 </template>
                                             </div>
@@ -1286,22 +1283,32 @@
                 },
                 
                 handleStreamEvent(eventType, eventData) {
-                    // Füge Event zu Liste hinzu
-                    const event = {
+                    // SOFORT: Füge Event direkt in Chat-Verlauf ein (Real-time)
+                    const eventMessage = {
+                        type: 'event',
+                        message: this.getEventMessage(eventType, eventData),
+                        timestamp: new Date().toISOString(),
+                        eventType: eventType,
+                        eventData: eventData
+                    };
+                    
+                    // Füge Event SOFORT in Chat-Verlauf ein (vor den Messages)
+                    this.chatMessages.push(eventMessage);
+                    
+                    // Füge auch zu streamingEvents hinzu (für Debugging)
+                    this.streamingEvents.push({
                         type: eventType,
                         data: eventData,
                         timestamp: new Date().toISOString(),
-                        message: this.getEventMessage(eventType, eventData)
-                    };
-                    
-                    this.streamingEvents.push(event);
+                        message: eventMessage.message
+                    });
                     
                     // Begrenze Events auf 50 (älteste zuerst entfernen)
                     if (this.streamingEvents.length > 50) {
                         this.streamingEvents.shift();
                     }
                     
-                    // Auto-Scroll zu neuem Event
+                    // SOFORT Auto-Scroll zu neuem Event
                     this.$nextTick(() => {
                         if (this.$refs.chatContainer) {
                             this.$refs.chatContainer.scrollTop = this.$refs.chatContainer.scrollHeight;
@@ -1357,6 +1364,20 @@
                             iterations: eventData.iterations,
                         };
                     }
+                },
+                
+                getCombinedChatHistory() {
+                    // Kombiniere Chat-Messages und Events in chronologischer Reihenfolge
+                    const combined = [...this.chatMessages];
+                    
+                    // Sortiere nach Timestamp
+                    combined.sort((a, b) => {
+                        const timeA = new Date(a.timestamp || 0).getTime();
+                        const timeB = new Date(b.timestamp || 0).getTime();
+                        return timeA - timeB;
+                    });
+                    
+                    return combined;
                 },
                 
                 getEventMessage(eventType, eventData) {
