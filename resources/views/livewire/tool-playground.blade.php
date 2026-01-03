@@ -92,27 +92,33 @@
                                     </div>
                                 </template>
                                 
-                                <!-- Chat-Verlauf: Nur Messages (keine Events im Chat) -->
-                                <template x-for="(item, index) in chatMessages" :key="'msg-' + index">
-                                    <template x-if="item && item.type === 'message'">
-                                        <div class="flex" :class="item.role === 'user' ? 'justify-end' : 'justify-start'">
-                                            <div 
-                                                class="max-w-[80%] rounded-lg p-3"
-                                                :class="item.role === 'user' 
-                                                    ? 'bg-[var(--ui-primary)] text-white' 
-                                                    : 'bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] border border-[var(--ui-border)]'"
-                                            >
-                                                <div class="text-sm font-semibold mb-1" x-text="item.role === 'user' ? 'Du' : 'LLM'"></div>
-                                                <div class="text-sm whitespace-pre-wrap" x-text="item.content || '...'"></div>
-                                                <div x-show="item.tool_calls && item.tool_calls.length > 0" class="mt-2 pt-2 border-t border-[var(--ui-border)]">
-                                                    <div class="text-xs font-semibold mb-1">🔧 Tools aufgerufen:</div>
-                                                    <template x-for="toolCall in item.tool_calls">
-                                                        <div class="text-xs font-mono mb-1" x-text="toolCall.function?.name || toolCall.name"></div>
-                                                    </template>
-                                                </div>
+                                <!-- Chat-Verlauf: Messages + Events -->
+                                <template x-for="(item, index) in chatMessages" :key="'chat-' + index">
+                                    <!-- Event (schlicht, linksbündig) -->
+                                    <div x-show="item && item.type === 'event'" class="flex justify-start">
+                                        <div class="text-[10px] text-[var(--ui-muted)] opacity-60">
+                                            <span x-text="item.message || ''"></span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Chat Message -->
+                                    <div x-show="item && item.type === 'message'" class="flex" :class="item.role === 'user' ? 'justify-end' : 'justify-start'">
+                                        <div 
+                                            class="max-w-[80%] rounded-lg p-3"
+                                            :class="item.role === 'user' 
+                                                ? 'bg-[var(--ui-primary)] text-white' 
+                                                : 'bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] border border-[var(--ui-border)]'"
+                                        >
+                                            <div class="text-sm font-semibold mb-1" x-text="item.role === 'user' ? 'Du' : 'LLM'"></div>
+                                            <div class="text-sm whitespace-pre-wrap" x-text="item.content || '...'"></div>
+                                            <div x-show="item.tool_calls && item.tool_calls.length > 0" class="mt-2 pt-2 border-t border-[var(--ui-border)]">
+                                                <div class="text-xs font-semibold mb-1">🔧 Tools aufgerufen:</div>
+                                                <template x-for="toolCall in item.tool_calls">
+                                                    <div class="text-xs font-mono mb-1" x-text="toolCall.function?.name || toolCall.name"></div>
+                                                </template>
                                             </div>
                                         </div>
-                                    </template>
+                                    </div>
                                 </template>
                                 
                                 <div x-show="simulationLoading" class="flex justify-start">
@@ -1335,8 +1341,41 @@
                     // DEBUG: Log Event
                     console.log('[SSE Event]', eventType, eventData);
                     
-                    // Events werden NICHT mehr im Chat angezeigt (nur Messages)
-                    // Füge nur zu streamingEvents hinzu (für Debugging)
+                    // Initialisiere chatMessages falls nicht vorhanden
+                    if (!this.chatMessages) {
+                        this.chatMessages = [];
+                    }
+                    
+                    // Füge Event SOFORT in Chat-Verlauf ein (Real-time)
+                    const eventMessage = {
+                        type: 'event',
+                        message: this.getEventMessage(eventType, eventData),
+                        timestamp: new Date().toISOString(),
+                        eventType: eventType,
+                        eventData: eventData
+                    };
+                    
+                    // SOFORT hinzufügen - Neue Array-Referenz für Alpine.js Reaktivität
+                    this.chatMessages = [...this.chatMessages, eventMessage];
+                    
+                    // DEBUG: Log nach Hinzufügen
+                    console.log('[Chat Messages Count]', this.chatMessages.length);
+                    
+                    // Force Alpine.js Update durch explizite Reaktivität
+                    requestAnimationFrame(() => {
+                        // Trigger Reaktivität durch erneutes Setzen (Alpine.js erkennt die Änderung)
+                        this.chatMessages = [...this.chatMessages];
+                        
+                        // Force Scroll nach DOM-Update
+                        requestAnimationFrame(() => {
+                            const container = this.$refs.chatContainer;
+                            if (container) {
+                                container.scrollTop = container.scrollHeight;
+                            }
+                        });
+                    });
+                    
+                    // Füge auch zu streamingEvents hinzu (für Debugging)
                     if (!this.streamingEvents) {
                         this.streamingEvents = [];
                     }
@@ -1344,7 +1383,7 @@
                         type: eventType,
                         data: eventData,
                         timestamp: new Date().toISOString(),
-                        message: this.getEventMessage(eventType, eventData)
+                        message: eventMessage.message
                     }];
                     
                     // Begrenze Events auf 50 (älteste zuerst entfernen)
