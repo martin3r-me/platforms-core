@@ -2619,7 +2619,6 @@ class CoreToolPlaygroundController extends Controller
         }
 
         return $value;
-        }
     }
 
     /**
