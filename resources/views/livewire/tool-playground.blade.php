@@ -124,8 +124,7 @@
                                 <div x-show="simulationLoading" class="flex justify-start">
                                     <div class="bg-[var(--ui-muted-5)] rounded-lg p-3 border border-[var(--ui-border)]">
                                         <div class="flex items-center gap-2 text-[var(--ui-muted)]">
-                                            <span class="animate-spin">⏳</span>
-                                            <span>LLM denkt nach...</span>
+                                            <span class="text-xs">...</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1197,55 +1196,79 @@
                         let buffer = '';
                         let currentSimulation = null;
                         
+                        // Parse SSE-Stream in Echtzeit
                         let currentEventType = 'message';
                         let currentEventData = null;
+                        let currentDataLine = '';
                         
                         while (true) {
                             const { done, value } = await reader.read();
                             if (done) {
                                 // Verarbeite letztes Event falls vorhanden
-                                if (currentEventData) {
-                                    this.handleStreamEvent(currentEventType, currentEventData);
-                                    if (currentEventType === 'simulation.complete') {
-                                        currentSimulation = currentEventData;
+                                if (currentEventData !== null || currentDataLine.trim()) {
+                                    if (currentDataLine.trim()) {
+                                        try {
+                                            currentEventData = JSON.parse(currentDataLine.trim());
+                                        } catch (e) {
+                                            currentEventData = currentDataLine.trim();
+                                        }
+                                    }
+                                    if (currentEventData !== null) {
+                                        this.handleStreamEvent(currentEventType, currentEventData);
+                                        if (currentEventType === 'simulation.complete') {
+                                            currentSimulation = currentEventData;
+                                        }
                                     }
                                 }
                                 break;
                             }
                             
                             buffer += decoder.decode(value, { stream: true });
-                            const lines = buffer.split('\n');
-                            buffer = lines.pop() || '';
                             
-                            for (let i = 0; i < lines.length; i++) {
-                                const line = lines[i];
+                            // Verarbeite Buffer Zeile für Zeile
+                            let newlineIndex;
+                            while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+                                const line = buffer.substring(0, newlineIndex);
+                                buffer = buffer.substring(newlineIndex + 1);
+                                
                                 const trimmed = line.trim();
                                 
                                 if (trimmed.startsWith('event:')) {
-                                    // Neues Event beginnt - verarbeite vorheriges Event falls vorhanden
-                                    if (currentEventData !== null) {
-                                        // SOFORT verarbeiten bevor neues Event beginnt
-                                        this.handleStreamEvent(currentEventType, currentEventData);
-                                        if (currentEventType === 'simulation.complete') {
-                                            currentSimulation = currentEventData;
+                                    // Neues Event beginnt - verarbeite vorheriges Event SOFORT
+                                    if (currentEventData !== null || currentDataLine.trim()) {
+                                        if (currentDataLine.trim() && currentEventData === null) {
+                                            try {
+                                                currentEventData = JSON.parse(currentDataLine.trim());
+                                            } catch (e) {
+                                                currentEventData = currentDataLine.trim();
+                                            }
+                                        }
+                                        if (currentEventData !== null) {
+                                            // SOFORT verarbeiten - nicht warten
+                                            this.handleStreamEvent(currentEventType, currentEventData);
+                                            if (currentEventType === 'simulation.complete') {
+                                                currentSimulation = currentEventData;
+                                            }
                                         }
                                     }
                                     currentEventType = trimmed.substring(6).trim();
                                     currentEventData = null;
+                                    currentDataLine = '';
                                 } else if (trimmed.startsWith('data:')) {
-                                    try {
-                                        const dataStr = trimmed.substring(5).trim();
-                                        if (dataStr) {
-                                            currentEventData = JSON.parse(dataStr);
-                                        }
-                                    } catch (e) {
-                                        const dataStr = trimmed.substring(5).trim();
-                                        if (dataStr) {
-                                            currentEventData = dataStr;
-                                        }
+                                    // Data-Zeile - sammle Daten
+                                    const dataStr = trimmed.substring(5).trim();
+                                    if (dataStr) {
+                                        currentDataLine += dataStr;
                                     }
                                 } else if (trimmed === '') {
                                     // Leere Zeile = Event-Ende - SOFORT verarbeiten
+                                    if (currentDataLine.trim()) {
+                                        try {
+                                            currentEventData = JSON.parse(currentDataLine.trim());
+                                        } catch (e) {
+                                            currentEventData = currentDataLine.trim();
+                                        }
+                                    }
                                     if (currentEventData !== null) {
                                         // SOFORT verarbeiten - nicht warten
                                         this.handleStreamEvent(currentEventType, currentEventData);
@@ -1255,6 +1278,7 @@
                                     }
                                     currentEventType = 'message';
                                     currentEventData = null;
+                                    currentDataLine = '';
                                 }
                             }
                         }
@@ -1304,7 +1328,7 @@
                         eventData: eventData
                     };
                     
-                    // Füge Event SOFORT in Chat-Verlauf ein
+                    // Füge Event SOFORT in Chat-Verlauf ein (synchron, nicht async)
                     this.chatMessages.push(eventMessage);
                     
                     // Füge auch zu streamingEvents hinzu (für Debugging)
@@ -1320,12 +1344,12 @@
                         this.streamingEvents.shift();
                     }
                     
-                    // SOFORT Auto-Scroll zu neuem Event (ohne $nextTick für sofortige Reaktion)
-                    setTimeout(() => {
+                    // SOFORT Auto-Scroll zu neuem Event (synchron)
+                    requestAnimationFrame(() => {
                         if (this.$refs.chatContainer) {
                             this.$refs.chatContainer.scrollTop = this.$refs.chatContainer.scrollHeight;
                         }
-                    }, 10);
+                    });
                     
                     // Update Simulation-Result für bestimmte Events
                     if (eventType === 'simulation.start') {
@@ -1380,11 +1404,11 @@
                         if (eventData.content) {
                             // Entferne letzte Assistant-Message falls vorhanden
                             const lastMsg = this.chatMessages[this.chatMessages.length - 1];
-                            if (lastMsg && lastMsg.role === 'assistant') {
+                            if (lastMsg && lastMsg.role === 'assistant' && lastMsg.type === 'message') {
                                 this.chatMessages.pop();
                             }
                             
-                            // Füge neue Assistant-Message hinzu
+                            // Füge neue Assistant-Message hinzu (SOFORT, synchron)
                             this.chatMessages.push({
                                 type: 'message',
                                 role: 'assistant',
@@ -1393,11 +1417,11 @@
                             });
                             
                             // Auto-Scroll sofort
-                            setTimeout(() => {
+                            requestAnimationFrame(() => {
                                 if (this.$refs.chatContainer) {
                                     this.$refs.chatContainer.scrollTop = this.$refs.chatContainer.scrollHeight;
                                 }
-                            }, 10);
+                            });
                         }
                     } else if (eventType === 'simulation.complete') {
                         // Finale Antwort aus simulation.complete hinzufügen
@@ -1416,7 +1440,7 @@
                                     this.chatMessages.pop();
                                 }
                                 
-                                // Füge finale Antwort hinzu
+                                // Füge finale Antwort hinzu (SOFORT, synchron)
                                 this.chatMessages.push({
                                     type: 'message',
                                     role: 'assistant',
@@ -1424,11 +1448,11 @@
                                     timestamp: new Date().toISOString(),
                                 });
                                 
-                                setTimeout(() => {
+                                requestAnimationFrame(() => {
                                     if (this.$refs.chatContainer) {
                                         this.$refs.chatContainer.scrollTop = this.$refs.chatContainer.scrollHeight;
                                     }
-                                }, 10);
+                                });
                             }
                         }
                     }
