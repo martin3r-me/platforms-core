@@ -66,26 +66,20 @@ class OpenAiService
         if (isset($options['tools']) && $options['tools'] === false) {
             // Tools explizit deaktiviert - nichts hinzufügen
         } else {
-            // MCP-Format: Tools nach Modulen gruppieren
-            $mcpServers = $this->buildMcpServers();
-            if (!empty($mcpServers)) {
-                $payload['mcp_servers'] = $mcpServers;
+            // Standard tools Array (MCP-Events kommen während des Streams)
+            $tools = $this->getAvailableTools();
+            if (!empty($tools)) {
+                $payload['tools'] = $this->normalizeToolsForResponses($tools);
+                if (isset($options['tool_choice'])) {
+                    $payload['tool_choice'] = $options['tool_choice'];
+                }
             }
         }
             
             // Debug: Log Payload mit Größen-Info für cURL-Fehler-Debugging
             $payloadSize = strlen(json_encode($payload));
             $inputSize = isset($payload['input']) ? strlen(json_encode($payload['input'])) : 0;
-            $mcpServersSize = isset($payload['mcp_servers']) ? strlen(json_encode($payload['mcp_servers'])) : 0;
-            
-            $totalTools = 0;
-            $serverNames = [];
-            if (isset($payload['mcp_servers'])) {
-                foreach ($payload['mcp_servers'] as $serverName => $server) {
-                    $serverNames[] = $serverName;
-                    $totalTools += count($server['tools'] ?? []);
-                }
-            }
+            $toolsSize = isset($payload['tools']) ? strlen(json_encode($payload['tools'])) : 0;
             
             Log::debug('[OpenAI Chat] Sending request', [
                 'url' => $this->baseUrl . '/responses',
@@ -94,11 +88,12 @@ class OpenAiService
                 'payload_size_kb' => round($payloadSize / 1024, 2),
                 'input_count' => count($payload['input'] ?? []),
                 'input_size_bytes' => $inputSize,
-                'has_mcp_servers' => isset($payload['mcp_servers']),
-                'mcp_servers_count' => count($payload['mcp_servers'] ?? []),
-                'total_tools' => $totalTools,
-                'mcp_servers_size_bytes' => $mcpServersSize,
-                'server_names' => $serverNames,
+                'has_tools' => isset($payload['tools']),
+                'tools_count' => isset($payload['tools']) ? count($payload['tools']) : 0,
+                'tools_size_bytes' => $toolsSize,
+                'tool_names' => isset($payload['tools']) ? array_map(function($t) {
+                    return $t['name'] ?? ($t['function']['name'] ?? 'unknown');
+                }, $payload['tools']) : [],
                 'note' => 'cURL error 52 (Empty reply) kann bei großen Requests auftreten',
             ]);
             
@@ -126,11 +121,10 @@ class OpenAiService
                         $errorMessage .= "\n\nOpenAI Error Details:\n" . $errorDetails;
                         
                         // Zeige auch im Log für besseres Debugging
-                        $mcpServersCount = isset($payload['mcp_servers']) ? count($payload['mcp_servers']) : 0;
                         Log::error('[OpenAI Chat] Error details', [
                             'status' => $response->status(),
                             'error' => $errorJson['error'],
-                            'payload_mcp_servers_count' => $mcpServersCount,
+                            'payload_tools_count' => count($payload['tools'] ?? []),
                             'payload_keys' => array_keys($payload),
                         ]);
                     } else {
@@ -362,38 +356,27 @@ class OpenAiService
         if (isset($options['tools']) && $options['tools'] === false) {
             // Tools explizit deaktiviert - nichts hinzufügen
         } else {
-            // MCP-Format: Tools nach Modulen gruppieren
-            $mcpServers = $this->buildMcpServers();
-            if (!empty($mcpServers)) {
-                $payload['mcp_servers'] = $mcpServers;
-            }
+            // Standard tools Array (MCP-Events kommen während des Streams)
+            $tools = $this->getAvailableTools();
+            $payload['tools'] = $this->normalizeToolsForResponses($tools);
+            $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
             
-            // Debug: Log MCP Servers (nur wenn Logging aktiviert ist)
+            // Debug: Log Tools (nur wenn Logging aktiviert ist)
             if (config('app.debug', false)) {
-                $totalTools = 0;
-                foreach ($mcpServers as $serverName => $server) {
-                    $totalTools += count($server['tools'] ?? []);
-                }
-                Log::debug('[OpenAI Stream] MCP Servers aktiviert', [
-                    'server_count' => count($mcpServers),
-                    'total_tools' => $totalTools,
-                    'servers' => array_keys($mcpServers),
+                Log::debug('[OpenAI Stream] Tools aktiviert', [
+                    'tool_count' => count($tools),
+                    'tool_names' => array_map(function($t) {
+                        return $t['function']['name'] ?? $t['name'] ?? 'unknown';
+                    }, $tools),
                 ]);
             }
         }
             // Debug: Log Payload (nur wenn Debug aktiviert)
             if (config('app.debug', false)) {
-                $totalTools = 0;
-                if (isset($payload['mcp_servers'])) {
-                    foreach ($payload['mcp_servers'] as $serverName => $server) {
-                        $totalTools += count($server['tools'] ?? []);
-                    }
-                }
                 Log::debug('[OpenAI Stream] Sending payload', [
                     'payload_keys' => array_keys($payload),
-                    'mcp_servers_count' => count($payload['mcp_servers'] ?? []),
-                    'total_tools' => $totalTools,
-                    'server_names' => array_keys($payload['mcp_servers'] ?? []),
+                    'tools_count' => count($payload['tools'] ?? []),
+                    'tools' => $payload['tools'] ?? [],
                 ]);
             }
         

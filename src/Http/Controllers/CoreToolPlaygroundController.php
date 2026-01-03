@@ -4027,6 +4027,55 @@ class CoreToolPlaygroundController extends Controller
                                     // Prüfe, ob Tool existiert
                                     $registry = app(\Platform\Core\Tools\ToolRegistry::class);
                                     if (!$registry->has($internalToolName)) {
+                                        // MCP Best Practice: Auto-Injection - Versuche Tool nachzuladen
+                                        $module = $this->extractModuleFromToolName($internalToolName);
+                                        $autoInjectionSuccess = false;
+                                        
+                                        if ($module) {
+                                            try {
+                                                $context = ToolContext::fromAuth();
+                                                $autoResult = $orchestrator->executeWithDependencies(
+                                                    'tools.GET',
+                                                    ['module' => $module],
+                                                    $context,
+                                                    maxDepth: 1,
+                                                    planFirst: false
+                                                );
+                                                
+                                                if ($autoResult->success && isset($autoResult->data['tools'])) {
+                                                    $autoTools = array_map(function($t) {
+                                                        return $t['name'] ?? ($t['function']['name'] ?? 'unknown');
+                                                    }, $autoResult->data['tools']);
+                                                    
+                                                    $openAiService->loadToolsDynamically($autoTools);
+                                                    $toolsWereLoaded = true;
+                                                    $injectedTools = array_values(array_unique(array_merge($injectedTools, $autoTools)));
+                                                    
+                                                    $sendEvent('tool.auto_injection', [
+                                                        'iteration' => $iteration,
+                                                        'expected_tool' => $internalToolName,
+                                                        'module' => $module,
+                                                        'injected_tools' => $autoTools,
+                                                    ]);
+                                                    
+                                                    // Prüfe nochmal, ob Tool jetzt verfügbar ist
+                                                    if ($registry->has($internalToolName)) {
+                                                        $autoInjectionSuccess = true;
+                                                        // Tool ist jetzt verfügbar, aber Stream läuft bereits
+                                                        // Fehler zurückgeben, Tool ist für nächste Iteration verfügbar
+                                                    }
+                                                }
+                                            } catch (\Throwable $e) {
+                                                // Silent fail - Auto-Injection fehlgeschlagen
+                                                Log::debug('[Tool Playground] Auto-Injection fehlgeschlagen', [
+                                                    'tool' => $internalToolName,
+                                                    'module' => $module,
+                                                    'error' => $e->getMessage(),
+                                                ]);
+                                            }
+                                        }
+                                        
+                                        // Fehler-Message zusammenstellen
                                         $allTools = array_keys($registry->all());
                                         $similarTools = [];
                                         
@@ -4038,6 +4087,12 @@ class CoreToolPlaygroundController extends Controller
                                         }
                                         
                                         $errorMessage = "Tool '{$internalToolName}' nicht gefunden.";
+                                        if ($autoInjectionSuccess) {
+                                            $errorMessage .= " Tool wurde nachgeladen und ist in der nächsten Iteration verfügbar.";
+                                        } elseif ($module) {
+                                            $errorMessage .= " Versuche Tools für Modul '{$module}' nachzuladen...";
+                                        }
+                                        
                                         if (!empty($similarTools)) {
                                             $errorMessage .= " Ähnliche Tools: " . implode(', ', array_slice($similarTools, 0, 5));
                                         } else {
@@ -4064,14 +4119,16 @@ class CoreToolPlaygroundController extends Controller
                                             'tool' => $internalToolName,
                                             'success' => false,
                                             'data' => null,
-                                            'error' => "Tool '{$internalToolName}' nicht gefunden",
+                                            'error' => "Tool '{$internalToolName}' nicht gefunden" . ($autoInjectionSuccess ? ' (wurde nachgeladen)' : ''),
                                             'execution_time_ms' => 0,
                                         ];
                                         
                                         $sendEvent('tool.execution.error', [
                                             'iteration' => $iteration,
                                             'tool' => $internalToolName,
-                                            'error' => "Tool '{$internalToolName}' nicht gefunden",
+                                            'error' => "Tool '{$internalToolName}' nicht gefunden" . ($autoInjectionSuccess ? ' (wurde nachgeladen)' : ''),
+                                            'auto_injection_attempted' => $module !== null,
+                                            'auto_injection_success' => $autoInjectionSuccess,
                                         ]);
                                         
                                         continue;
