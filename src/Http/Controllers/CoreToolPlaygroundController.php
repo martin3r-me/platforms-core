@@ -1094,7 +1094,11 @@ class CoreToolPlaygroundController extends Controller
                                     // Format: Strukturiert und lesbar, damit LLM die Informationen erkennt
                                     // Integriere Loop-Detection-Warnungen direkt ins Tool-Result
                                     $loopCount = $toolCallHistory[$internalToolName]['count'] ?? 0;
-                                    $toolResultText = $this->formatToolResultForLLM($internalToolName, $resultArray, $toolCallId, $loopCount);
+                                    
+                                    // Systematische Duplikat-Erkennung: Prüfe ob ähnliche Aktion bereits erfolgreich war
+                                    $duplicateInfo = $this->detectDuplicateAction($internalToolName, $toolArguments, $allToolResults);
+                                    
+                                    $toolResultText = $this->formatToolResultForLLM($internalToolName, $resultArray, $toolCallId, $loopCount, $duplicateInfo);
                                     $messages[] = [
                                         'role' => 'user', // Responses API Format
                                         'content' => $toolResultText,
@@ -1104,6 +1108,7 @@ class CoreToolPlaygroundController extends Controller
                                         'iteration' => $iteration,
                                         'tool_call_id' => $toolCallId,
                                         'tool' => $internalToolName,
+                                        'arguments' => $toolArguments, // Für Duplikat-Erkennung
                                         'success' => $toolResult->success,
                                         'data' => $toolResult->data,
                                         'error' => $toolResult->error,
@@ -1587,7 +1592,11 @@ class CoreToolPlaygroundController extends Controller
                                             
                                             // Tool-Result zu Messages hinzufügen
                                             $loopCount = $toolCallHistory[$internalToolName]['count'] ?? 0;
-                                            $toolResultText = $this->formatToolResultForLLM($internalToolName, $resultArray, $toolCallId, $loopCount);
+                                            
+                                            // Systematische Duplikat-Erkennung: Prüfe ob ähnliche Aktion bereits erfolgreich war
+                                            $duplicateInfo = $this->detectDuplicateAction($internalToolName, $toolArguments, $allToolResults);
+                                            
+                                            $toolResultText = $this->formatToolResultForLLM($internalToolName, $resultArray, $toolCallId, $loopCount, $duplicateInfo);
                                             $messages[] = [
                                                 'role' => 'user',
                                                 'content' => $toolResultText,
@@ -1597,6 +1606,7 @@ class CoreToolPlaygroundController extends Controller
                                                 'iteration' => $iteration,
                                                 'tool_call_id' => $toolCallId,
                                                 'tool' => $internalToolName,
+                                                'arguments' => $toolArguments, // Für Duplikat-Erkennung
                                                 'success' => $toolResult->success,
                                                 'data' => $toolResult->data,
                                                 'error' => $toolResult->error,
@@ -2993,12 +3003,125 @@ class CoreToolPlaygroundController extends Controller
     }
     
     /**
+     * Systematische Duplikat-Erkennung: Prüft ob ähnliche Aktion bereits erfolgreich war
+     * 
+     * Loose & Systematisch: Nutzt Idempotency-Service und analysiert Tool-Results generisch
+     * Keine hardcodierten Tool-/Modul-Namen - funktioniert für alle Tools
+     * 
+     * MCP Best Practice: Tools sollten idempotent sein und success: true (HTTP 200) zurückgeben
+     */
+    private function detectDuplicateAction(string $toolName, array $arguments, array $allToolResults): ?array
+    {
+        // Nur für WRITE-Operationen prüfen (POST, PUT, DELETE) - nicht für GET
+        if (!preg_match('/\.(POST|PUT|DELETE)$/', $toolName)) {
+            return null;
+        }
+        
+        // Systematisch: Nutze Idempotency-Service wenn verfügbar
+        try {
+            $idempotencyService = app(\Platform\Core\Services\ToolIdempotencyService::class);
+            $context = \Platform\Core\Contracts\ToolContext::fromAuth();
+            
+            $idempotencyKey = $idempotencyService->generateKey($toolName, $arguments, $context);
+            
+            // Prüfe ob bereits ein erfolgreicher Run mit diesem Key existiert
+            $duplicate = $idempotencyService->checkDuplicate($idempotencyKey);
+            if ($duplicate && $duplicate->success) {
+                return [
+                    'type' => 'idempotency',
+                    'message' => "Diese Aktion wurde bereits erfolgreich ausgeführt (Idempotency-Key erkannt).",
+                    'previous_result' => $duplicate->result_data ?? [],
+                    'previous_execution_id' => $duplicate->id,
+                ];
+            }
+        } catch (\Throwable $e) {
+            // Idempotency-Service nicht verfügbar - nutze Fallback
+        }
+        
+        // Fallback: Systematisch durch erfolgreiche Tool-Results gehen
+        // Generisch: Prüfe ob gleiches Tool mit ähnlichen Argumenten bereits erfolgreich war
+        foreach ($allToolResults as $previousResult) {
+            if (!($previousResult['success'] ?? false)) {
+                continue; // Nur erfolgreiche Results prüfen (entspricht HTTP 200)
+            }
+            
+            $previousTool = $previousResult['tool'] ?? '';
+            $previousData = $previousResult['data'] ?? [];
+            $previousArgs = $previousResult['arguments'] ?? [];
+            
+            // Prüfe ob gleiches Tool bereits erfolgreich war
+            if ($previousTool === $toolName) {
+                // Gleiches Tool: Prüfe ob Argumente ähnlich sind (generisch)
+                if ($this->areArgumentsSimilar($arguments, $previousArgs)) {
+                    return [
+                        'type' => 'duplicate',
+                        'message' => "Diese Aktion wurde bereits erfolgreich ausgeführt.",
+                        'previous_result' => $previousData,
+                        'previous_iteration' => $previousResult['iteration'] ?? null,
+                    ];
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Prüft ob zwei Argumente ähnlich sind (loose Matching, generisch)
+     * 
+     * Systematisch: Normalisiert Argumente und prüft wichtige Felder
+     * Keine hardcodierten Feld-Namen - funktioniert für alle Tools
+     */
+    private function areArgumentsSimilar(array $args1, array $args2): bool
+    {
+        // Normalisiere: Entferne null-Werte und sortiere
+        $normalize = function($args) {
+            $normalized = [];
+            foreach ($args as $key => $value) {
+                if ($value !== null && $value !== '') {
+                    $normalized[$key] = is_string($value) ? trim(strtolower($value)) : $value;
+                }
+            }
+            ksort($normalized);
+            return $normalized;
+        };
+        
+        $norm1 = $normalize($args1);
+        $norm2 = $normalize($args2);
+        
+        // Generisch: Prüfe ob alle nicht-null-Felder übereinstimmen
+        // Wenn alle Felder übereinstimmen, ist es wahrscheinlich ein Duplikat
+        if (empty($norm1) || empty($norm2)) {
+            return false; // Leere Argumente sind nicht ähnlich
+        }
+        
+        // Prüfe ob alle Keys übereinstimmen
+        $keys1 = array_keys($norm1);
+        $keys2 = array_keys($norm2);
+        
+        if (count($keys1) !== count($keys2)) {
+            return false; // Unterschiedliche Anzahl von Argumenten
+        }
+        
+        // Prüfe ob alle Werte übereinstimmen
+        $matches = 0;
+        foreach ($keys1 as $key) {
+            if (isset($norm2[$key]) && $norm1[$key] === $norm2[$key]) {
+                $matches++;
+            }
+        }
+        
+        // Wenn alle Felder übereinstimmen, ist es ein Duplikat
+        return $matches === count($keys1);
+    }
+    
+    /**
      * Formatiert Tool-Results für die LLM - strukturiert und lesbar
      * 
      * Die LLM sollte aus der REST-Syntax selbst darauf kommen, welches Tool als nächstes aufgerufen werden muss.
      * Diese Methode formatiert die Results so, dass die LLM die Informationen klar erkennt.
      */
-    private function formatToolResultForLLM(string $toolName, array $resultArray, ?string $toolCallId = null, int $loopCount = 0): string
+    private function formatToolResultForLLM(string $toolName, array $resultArray, ?string $toolCallId = null, int $loopCount = 0, ?array $duplicateInfo = null): string
     {
         $success = $resultArray['ok'] ?? ($resultArray['success'] ?? false);
         $data = $resultArray['data'] ?? $resultArray;
@@ -3010,6 +3133,24 @@ class CoreToolPlaygroundController extends Controller
             $text .= "Call-ID: {$toolCallId}\n";
         }
         $text .= "Status: " . ($success ? "✅ Erfolgreich" : "❌ Fehler") . "\n\n";
+        
+        // Systematische Duplikat-Erkennung: Informiere LLM wenn ähnliche Aktion bereits erfolgreich war
+        if ($duplicateInfo && $success) {
+            $text .= "⚠️ **HINWEIS - Duplikat erkannt:**\n";
+            $text .= $duplicateInfo['message'] . "\n";
+            if (isset($duplicateInfo['previous_iteration'])) {
+                $text .= "Die Aktion wurde bereits in Iteration {$duplicateInfo['previous_iteration']} erfolgreich ausgeführt.\n";
+            }
+            if (!empty($duplicateInfo['previous_result'])) {
+                $prevData = $duplicateInfo['previous_result'];
+                if (isset($prevData['id']) || isset($prevData['uuid'])) {
+                    $id = $prevData['id'] ?? $prevData['uuid'] ?? 'N/A';
+                    $name = $prevData['name'] ?? $prevData['title'] ?? '';
+                    $text .= "Vorheriges Ergebnis: ID {$id}" . ($name ? " ({$name})" : '') . "\n";
+                }
+            }
+            $text .= "\n💡 **Empfehlung:** Prüfe ob diese Aktion wirklich nochmal ausgeführt werden muss, oder ob das vorherige Ergebnis bereits ausreicht.\n\n";
+        }
         
         // Bei Fehler: Zeige Fehler-Informationen
         if (!$success && $error) {
