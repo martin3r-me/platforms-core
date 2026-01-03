@@ -36,8 +36,8 @@ class IntentionVerificationService
         // 1. Extrahiere Intention aus User-Request
         $intention = $this->extractIntention($originalIntent);
         
-        // 2. Prüfe Vollständigkeit basierend auf Action Summary
-        $completeness = $this->checkCompleteness($intention, $actionSummary);
+        // 2. Prüfe Vollständigkeit basierend auf Action Summary und Tool-Results (systematisch)
+        $completeness = $this->checkCompleteness($intention, $actionSummary, $toolResults);
         
         // 3. Prüfe Konsistenz (z.B. "Ich habe X erstellt" vs. tatsächlich erstellt)
         $consistency = $this->checkConsistency($intention, $toolResults, $actionSummary);
@@ -257,9 +257,9 @@ class IntentionVerificationService
     }
 
     /**
-     * Prüft Vollständigkeit basierend auf Action Summary
+     * Prüft Vollständigkeit basierend auf Action Summary und Tool-Results
      */
-    protected function checkCompleteness(Intention $intention, array $actionSummary): CompletenessCheck
+    protected function checkCompleteness(Intention $intention, array $actionSummary, array $toolResults = []): CompletenessCheck
     {
         if ($intention->isEmpty()) {
             return CompletenessCheck::complete();
@@ -275,20 +275,24 @@ class IntentionVerificationService
         $modelsUpdated = $actionSummary['models_updated'] ?? 0;
         $modelsDeleted = $actionSummary['models_deleted'] ?? 0;
         
-        // DELETE-Check
+        // DELETE-Check: Systematisch Tool-Results analysieren für automatisch gelöschte Entitäten
         if ($intention->type === 'delete') {
+            // Analysiere Tool-Results systematisch & generisch: Erkenne automatisch gelöschte Entitäten
+            // Tools kommunizieren ihre Cascade-Löschungen selbst (z.B. deleted_*_count, cascade_deleted)
+            $actualDeleted = $this->analyzeActualDeletions($intention, $toolResults, $modelsDeleted);
+            
             if ($intention->isAll) {
                 // "Lösche alle X" - prüfe ob überhaupt etwas gelöscht wurde
-                if ($modelsDeleted === 0) {
+                if ($actualDeleted['total'] === 0) {
                     return CompletenessCheck::incomplete(
                         "Es sollten alle '{$intention->target}' gelöscht werden, aber es wurde nichts gelöscht."
                     );
                 }
             } elseif ($intention->expectedCount !== null) {
-                // "Lösche 3 X" - prüfe ob genau 3 gelöscht wurden
-                if ($modelsDeleted < $intention->expectedCount) {
+                // "Lösche 3 X" - prüfe ob genug gelöscht wurden
+                if ($actualDeleted['total'] < $intention->expectedCount) {
                     return CompletenessCheck::incomplete(
-                        "Es sollten {$intention->expectedCount} '{$intention->target}' gelöscht werden, aber nur {$modelsDeleted} wurden gelöscht."
+                        "Es sollten {$intention->expectedCount} '{$intention->target}' gelöscht werden, aber nur {$actualDeleted['total']} wurden gelöscht."
                     );
                 }
             }
@@ -314,6 +318,118 @@ class IntentionVerificationService
         
         return CompletenessCheck::complete();
     }
+    
+    /**
+     * Analysiert systematisch die Tool-Results, um tatsächlich gelöschte Entitäten zu erkennen
+     * Berücksichtigt automatisch gelöschte abhängige Entitäten, die von Tools kommuniziert werden
+     * 
+     * Loose & Systematisch: Generisch - keine hardcodierten Tool-/Modul-Namen
+     * Tools kommunizieren ihre Cascade-Löschungen selbst (z.B. deleted_*_count, cascade_deleted, etc.)
+     */
+    protected function analyzeActualDeletions(Intention $intention, array $toolResults, int $modelsDeletedFromSummary): array
+    {
+        $target = Str::lower(trim($intention->target ?? ''));
+        $actualDeleted = [
+            'total' => $modelsDeletedFromSummary,
+            'cascade_deletions' => [], // Generisch: Alle automatisch gelöschten Entitäten
+        ];
+        
+        // Systematisch durch Tool-Results: Generisch nach Cascade-Löschungen suchen
+        // Tools kommunizieren ihre Cascade-Löschungen selbst (z.B. deleted_*_count, cascade_deleted, etc.)
+        foreach ($toolResults as $result) {
+            if (!($result['success'] ?? false)) {
+                continue;
+            }
+            
+            $data = $result['data'] ?? [];
+            if (!is_array($data)) {
+                continue;
+            }
+            
+            // Generisch: Suche nach Patterns für automatisch gelöschte Entitäten
+            // Tools können verschiedene Patterns verwenden:
+            // - deleted_*_count (z.B. deleted_tasks_count, deleted_slots_count)
+            // - cascade_deleted (Array mit gelöschten Entitäten)
+            // - deleted_dependencies (Array)
+            
+            $cascadeDeleted = [];
+            
+            // Pattern 1: deleted_*_count (z.B. deleted_tasks_count, deleted_slots_count)
+            foreach ($data as $key => $value) {
+                if (preg_match('/^deleted_(.+?)_count$/', $key, $matches)) {
+                    $entityType = $matches[1] ?? '';
+                    $count = (int)$value;
+                    if ($count > 0) {
+                        $cascadeDeleted[$entityType] = ($cascadeDeleted[$entityType] ?? 0) + $count;
+                    }
+                }
+            }
+            
+            // Pattern 2: cascade_deleted (Array)
+            if (isset($data['cascade_deleted']) && is_array($data['cascade_deleted'])) {
+                foreach ($data['cascade_deleted'] as $entityType => $count) {
+                    $cascadeDeleted[$entityType] = ($cascadeDeleted[$entityType] ?? 0) + (int)$count;
+                }
+            }
+            
+            // Pattern 3: deleted_dependencies (Array)
+            if (isset($data['deleted_dependencies']) && is_array($data['deleted_dependencies'])) {
+                foreach ($data['deleted_dependencies'] as $entityType => $count) {
+                    $cascadeDeleted[$entityType] = ($cascadeDeleted[$entityType] ?? 0) + (int)$count;
+                }
+            }
+            
+            // Speichere Cascade-Löschungen generisch
+            if (!empty($cascadeDeleted)) {
+                foreach ($cascadeDeleted as $entityType => $count) {
+                    $actualDeleted['cascade_deletions'][$entityType] = 
+                        ($actualDeleted['cascade_deletions'][$entityType] ?? 0) + $count;
+                }
+            }
+        }
+        
+        // Systematisch: Berechne total basierend auf tatsächlich gelöschten Entitäten
+        // Loose: Berücksichtige automatisch gelöschte Entitäten, wenn User diese löschen wollte
+        // Generisch: Prüfe ob User-Intention zu automatisch gelöschten Entitäten passt
+        if (!empty($actualDeleted['cascade_deletions'])) {
+            foreach ($actualDeleted['cascade_deletions'] as $entityType => $count) {
+                // Generisch: Prüfe ob User diese Entität löschen wollte (loose Pattern-Matching)
+                if ($this->targetMatchesEntity($target, $entityType)) {
+                    $actualDeleted['total'] += $count;
+                }
+            }
+        }
+        
+        return $actualDeleted;
+    }
+    
+    /**
+     * Prüft generisch, ob User-Intention zu einer Entität passt (loose Pattern-Matching)
+     * Keine hardcodierten Entitäts-Namen - generisch für alle Module/Tools
+     */
+    protected function targetMatchesEntity(string $target, string $entityType): bool
+    {
+        $target = Str::lower(trim($target));
+        $entityType = Str::lower(trim($entityType));
+        
+        // Generisch: Prüfe ob Target die Entität enthält oder ähnlich ist
+        // Loose: Unterstützt verschiedene Sprachen und Pluralformen
+        return str_contains($target, $entityType) || 
+               str_contains($entityType, $target) ||
+               $this->isPluralOrSingular($target, $entityType);
+    }
+    
+    /**
+     * Prüft generisch, ob zwei Strings Plural/Singular-Varianten sind
+     */
+    protected function isPluralOrSingular(string $str1, string $str2): bool
+    {
+        // Einfache Heuristik: Prüfe ob ein String mit 's' endet und der andere nicht (oder umgekehrt)
+        $str1Trimmed = rtrim($str1, 's');
+        $str2Trimmed = rtrim($str2, 's');
+        
+        return $str1Trimmed === $str2Trimmed || $str2Trimmed === $str1Trimmed;
+    }
 
     /**
      * Prüft Konsistenz zwischen Tool-Results und Action Summary
@@ -323,10 +439,122 @@ class IntentionVerificationService
         $issues = [];
         
         // Prüfe ob alle Tool-Calls erfolgreich waren
+        // Systematisch & Generisch: Prüfe ob fehlgeschlagene Tools eigentlich nicht nötig waren
+        // (z.B. Entität wurde bereits durch Cascade-Löschung gelöscht)
         $failedTools = [];
+        $cascadeDeletions = []; // Generisch: Alle automatisch gelöschten Entitäten
+        
+        // Systematisch durch Tool-Results: Sammle alle Cascade-Löschungen generisch
         foreach ($toolResults as $result) {
             if (!($result['success'] ?? false)) {
-                $failedTools[] = $result['tool'] ?? 'Unbekannt';
+                continue;
+            }
+            
+            $data = $result['data'] ?? [];
+            if (!is_array($data)) {
+                continue;
+            }
+            
+            // Generisch: Suche nach Cascade-Löschungen (wie in analyzeActualDeletions)
+            foreach ($data as $key => $value) {
+                if (preg_match('/^deleted_(.+?)_count$/', $key, $matches)) {
+                    $entityType = $matches[1] ?? '';
+                    $count = (int)$value;
+                    if ($count > 0) {
+                        $cascadeDeletions[$entityType] = ($cascadeDeletions[$entityType] ?? 0) + $count;
+                    }
+                }
+            }
+            
+            if (isset($data['cascade_deleted']) && is_array($data['cascade_deleted'])) {
+                foreach ($data['cascade_deleted'] as $entityType => $count) {
+                    $cascadeDeletions[$entityType] = ($cascadeDeletions[$entityType] ?? 0) + (int)$count;
+                }
+            }
+            
+            if (isset($data['deleted_dependencies']) && is_array($data['deleted_dependencies'])) {
+                foreach ($data['deleted_dependencies'] as $entityType => $count) {
+                    $cascadeDeletions[$entityType] = ($cascadeDeletions[$entityType] ?? 0) + (int)$count;
+                }
+            }
+        }
+        
+        // Prüfe fehlgeschlagene Tools systematisch & generisch
+        foreach ($toolResults as $result) {
+            if (!($result['success'] ?? false)) {
+                $tool = $result['tool'] ?? 'Unbekannt';
+                $error = $result['error'] ?? '';
+                $errorCode = $result['error_code'] ?? '';
+                
+                // Generisch prüfen: War das fehlgeschlagene Tool eigentlich nicht nötig?
+                // Prüfe ob Fehler darauf hindeutet, dass Entität bereits gelöscht wurde
+                $shouldIgnore = false;
+                
+                // Pattern 1: Error-Codes die auf "bereits gelöscht" hindeuten
+                $notFoundErrors = ['NOT_FOUND', 'ALREADY_DELETED', 'ENTITY_NOT_FOUND', 'RESOURCE_NOT_FOUND'];
+                if (in_array($errorCode, $notFoundErrors, true)) {
+                    // Generisch: Prüfe ob diese Entität durch Cascade-Löschung bereits gelöscht wurde
+                    // Extrahiere Entitätstyp aus Tool-Namen (z.B. "planner.slots.DELETE" -> "slots")
+                    $toolParts = explode('.', $tool);
+                    if (count($toolParts) >= 2) {
+                        $entityType = $toolParts[count($toolParts) - 2] ?? ''; // Vorletztes Element
+                        $entityType = str_replace('_', '', $entityType); // Normalisiere (z.B. "project_slots" -> "projectslots")
+                        
+                        // Generisch: Prüfe ob diese Entität durch Cascade gelöscht wurde
+                        foreach ($cascadeDeletions as $cascadeType => $count) {
+                            $cascadeTypeNormalized = str_replace('_', '', Str::lower($cascadeType));
+                            $entityTypeNormalized = Str::lower($entityType);
+                            
+                            if ($cascadeTypeNormalized === $entityTypeNormalized || 
+                                str_contains($cascadeTypeNormalized, $entityTypeNormalized) ||
+                                str_contains($entityTypeNormalized, $cascadeTypeNormalized)) {
+                                // Entität wurde bereits durch Cascade gelöscht - kein echtes Problem
+                                $shouldIgnore = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // Pattern 2: Error-Message enthält Hinweise auf "bereits gelöscht"
+                if (!$shouldIgnore && !empty($error)) {
+                    $errorLower = Str::lower($error);
+                    $alreadyDeletedPatterns = [
+                        'bereits gelöscht',
+                        'already deleted',
+                        'nicht gefunden',
+                        'not found',
+                        'existiert nicht',
+                        'does not exist',
+                    ];
+                    
+                    foreach ($alreadyDeletedPatterns as $pattern) {
+                        if (str_contains($errorLower, $pattern)) {
+                            // Generisch: Prüfe ob durch Cascade gelöscht (wie oben)
+                            $toolParts = explode('.', $tool);
+                            if (count($toolParts) >= 2) {
+                                $entityType = $toolParts[count($toolParts) - 2] ?? '';
+                                $entityType = str_replace('_', '', $entityType);
+                                
+                                foreach ($cascadeDeletions as $cascadeType => $count) {
+                                    $cascadeTypeNormalized = str_replace('_', '', Str::lower($cascadeType));
+                                    $entityTypeNormalized = Str::lower($entityType);
+                                    
+                                    if ($cascadeTypeNormalized === $entityTypeNormalized || 
+                                        str_contains($cascadeTypeNormalized, $entityTypeNormalized) ||
+                                        str_contains($entityTypeNormalized, $cascadeTypeNormalized)) {
+                                        $shouldIgnore = true;
+                                        break 2;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                if (!$shouldIgnore) {
+                    $failedTools[] = $tool;
+                }
             }
         }
         
