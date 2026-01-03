@@ -1106,9 +1106,33 @@ class CoreToolPlaygroundController extends Controller
                                 ]);
                                 
                                 // Mache SOFORT neue OpenAI-Anfrage - Tools sind jetzt verfügbar!
+                                // WICHTIG: Füge System-Message hinzu, damit LLM weiß, dass Tools jetzt verfügbar sind
+                                $toolsAvailableMessage = "\n\n✅ **TOOLS NACHGELADEN:**\n";
+                                $toolsAvailableMessage .= "Die folgenden Tools wurden soeben nachgeladen und sind JETZT verfügbar:\n";
+                                foreach ($injectedTools as $tool) {
+                                    $toolsAvailableMessage .= "- {$tool}\n";
+                                }
+                                $toolsAvailableMessage .= "\n💡 **WICHTIG:** Du kannst diese Tools JETZT verwenden! ";
+                                $toolsAvailableMessage .= "Rufe das passende Tool auf, um die User-Anfrage zu erfüllen.\n";
+                                
+                                // Füge System-Message hinzu (vor der sofortigen Anfrage)
+                                $messagesForImmediateRequest = $messages;
+                                $messagesForImmediateRequest[] = [
+                                    'role' => 'system',
+                                    'content' => $toolsAvailableMessage,
+                                ];
+                                
+                                // Debug: Zeige welche Messages gesendet werden
+                                $simulation['debug']['messages_before_immediate_request_' . $iteration] = [
+                                    'total_messages' => count($messagesForImmediateRequest),
+                                    'last_3_messages' => array_slice($messagesForImmediateRequest, -3),
+                                    'has_tools_available_message' => true,
+                                    'injected_tools' => $injectedTools,
+                                ];
+                                
                                 // WICHTIG: Error-Handling - auch bei Fehler bleiben die Tools für nächste Iteration verfügbar
                                 try {
-                                    $response = $openAiService->chat($messages, 'gpt-4o-mini', [
+                                    $response = $openAiService->chat($messagesForImmediateRequest, 'gpt-4o-mini', [
                                         'max_tokens' => 2000,
                                         'temperature' => 0.7,
                                         'tools' => null, // null = Tools aktivieren (OpenAiService ruft getAvailableTools() auf)
@@ -1119,9 +1143,12 @@ class CoreToolPlaygroundController extends Controller
                                     $simulation['debug']['openai_response_after_load_' . $iteration] = [
                                         'status' => 'success',
                                         'has_content' => !empty($response['content']),
+                                        'content_preview' => !empty($response['content']) ? substr($response['content'], 0, 200) : null,
                                         'has_tool_calls' => !empty($response['tool_calls']),
                                         'tool_calls_count' => count($response['tool_calls'] ?? []),
                                         'tool_calls' => $response['tool_calls'] ?? [],
+                                        'finish_reason' => $response['finish_reason'] ?? null,
+                                        'note' => 'Wenn has_tool_calls=false, hat LLM nur Text generiert statt Tool aufzurufen',
                                     ];
                                     
                                     Log::info('[CoreToolPlayground] Sofortige OpenAI-Anfrage nach Tool-Injection erfolgreich', [
