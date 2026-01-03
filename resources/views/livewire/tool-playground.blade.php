@@ -283,14 +283,14 @@
                                         <!-- Events -->
                                         <div x-show="exec.events" class="mb-3 p-2 bg-[var(--ui-muted)] rounded">
                                             <div class="text-xs font-semibold mb-1 text-[var(--ui-secondary)]">📡 Events:</div>
-                                            <div x-show="exec.events.tool_executed" class="text-xs text-[var(--ui-success)] mb-1">
-                                                ✅ ToolExecuted: <span x-text="Math.round(exec.events.tool_executed.duration * 1000)"></span>ms, 
-                                                Memory: <span x-text="Math.round(exec.events.tool_executed.memory_usage / 1024 / 1024 * 100) / 100"></span>MB,
-                                                Trace: <span x-text="exec.events.tool_executed.trace_id"></span>
+                                            <div x-show="exec.events && exec.events.tool_executed" class="text-xs text-[var(--ui-success)] mb-1">
+                                                ✅ ToolExecuted: <span x-text="exec.events?.tool_executed ? Math.round(exec.events.tool_executed.duration * 1000) : 0"></span>ms, 
+                                                Memory: <span x-text="exec.events?.tool_executed ? Math.round(exec.events.tool_executed.memory_usage / 1024 / 1024 * 100) / 100 : 0"></span>MB,
+                                                Trace: <span x-text="exec.events?.tool_executed?.trace_id || ''"></span>
                                             </div>
-                                            <div x-show="exec.events.tool_failed" class="text-xs text-[var(--ui-danger)] mb-1">
-                                                ❌ ToolFailed: <span x-text="exec.events.tool_failed.error_code"></span> - 
-                                                <span x-text="exec.events.tool_failed.error_message"></span>
+                                            <div x-show="exec.events && exec.events.tool_failed" class="text-xs text-[var(--ui-danger)] mb-1">
+                                                ❌ ToolFailed: <span x-text="exec.events?.tool_failed?.error_code || ''"></span> - 
+                                                <span x-text="exec.events?.tool_failed?.error_message || ''"></span>
                                             </div>
                                         </div>
 
@@ -299,45 +299,45 @@
                                             <div class="text-xs font-semibold mb-1 text-[var(--ui-secondary)]">🔧 Features:</div>
                                             
                                             <!-- Cache -->
-                                            <div x-show="exec.features.cache" class="text-xs p-2 bg-[var(--ui-muted)] rounded">
+                                            <div x-show="exec.features && exec.features.cache" class="text-xs p-2 bg-[var(--ui-muted)] rounded">
                                                 <strong>💾 Cache:</strong>
-                                                <span x-show="exec.features.cache.enabled" class="text-[var(--ui-success)]">Aktiviert</span>
-                                                <span x-show="!exec.features.cache.enabled" class="text-[var(--ui-muted)]">Deaktiviert</span>
-                                                <span x-show="exec.features.cache.cached" class="text-[var(--ui-success)] ml-2">✅ Aus Cache</span>
-                                                <span x-show="!exec.features.cache.cached && exec.features.cache.enabled" class="text-[var(--ui-muted)] ml-2">❌ Nicht gecacht</span>
+                                                <span x-show="exec.features?.cache?.enabled" class="text-[var(--ui-success)]">Aktiviert</span>
+                                                <span x-show="exec.features?.cache && !exec.features.cache.enabled" class="text-[var(--ui-muted)]">Deaktiviert</span>
+                                                <span x-show="exec.features?.cache?.cached" class="text-[var(--ui-success)] ml-2">✅ Aus Cache</span>
+                                                <span x-show="exec.features?.cache && !exec.features.cache.cached && exec.features.cache.enabled" class="text-[var(--ui-muted)] ml-2">❌ Nicht gecacht</span>
                                             </div>
 
                                             <!-- Timeout -->
-                                            <div x-show="exec.features.timeout" class="text-xs p-2 bg-[var(--ui-muted)] rounded">
+                                            <div x-show="exec.features && exec.features.timeout" class="text-xs p-2 bg-[var(--ui-muted)] rounded">
                                                 <strong>⏱️ Timeout:</strong>
-                                                <span x-show="exec.features.timeout.enabled" class="text-[var(--ui-success)]">Aktiviert</span>
-                                                <span x-show="!exec.features.timeout.enabled" class="text-[var(--ui-muted)]">Deaktiviert</span>
-                                                <span x-show="exec.features.timeout.timeout_seconds" class="ml-2">
-                                                    Max: <span x-text="exec.features.timeout.timeout_seconds"></span>s
+                                                <span x-show="exec.features?.timeout?.enabled" class="text-[var(--ui-success)]">Aktiviert</span>
+                                                <span x-show="exec.features?.timeout && !exec.features.timeout.enabled" class="text-[var(--ui-muted)]">Deaktiviert</span>
+                                                <span x-show="exec.features?.timeout?.timeout_seconds" class="ml-2">
+                                                    Max: <span x-text="exec.features?.timeout?.timeout_seconds || ''"></span>s
                                                 </span>
                                             </div>
 
                                             <!-- Validation -->
-                                            <div x-show="exec.features.validation" class="text-xs p-2 bg-[var(--ui-muted)] rounded">
+                                            <div x-show="exec.features && exec.features.validation" class="text-xs p-2 bg-[var(--ui-muted)] rounded">
                                                 <strong>✅ Validation:</strong>
-                                                <span x-show="exec.features.validation.valid" class="text-[var(--ui-success)]">Valide</span>
-                                                <span x-show="!exec.features.validation.valid" class="text-[var(--ui-danger)]">Fehler</span>
-                                                <div x-show="exec.features.validation.errors?.length > 0" class="mt-1 text-[var(--ui-danger)]">
-                                                    <template x-for="(error, i) in exec.features.validation.errors" :key="i">
+                                                <span x-show="exec.features?.validation?.valid" class="text-[var(--ui-success)]">Valide</span>
+                                                <span x-show="exec.features?.validation && !exec.features.validation.valid" class="text-[var(--ui-danger)]">Fehler</span>
+                                                <div x-show="exec.features?.validation?.errors && exec.features.validation.errors.length > 0" class="mt-1 text-[var(--ui-danger)]">
+                                                    <template x-for="(error, i) in (exec.features?.validation?.errors || [])" :key="i">
                                                         <div x-text="error"></div>
                                                     </template>
                                                 </div>
                                             </div>
 
                                             <!-- Circuit Breaker -->
-                                            <div x-show="exec.features.circuit_breaker" class="text-xs p-2 bg-[var(--ui-muted)] rounded">
+                                            <div x-show="exec.features && exec.features.circuit_breaker" class="text-xs p-2 bg-[var(--ui-muted)] rounded">
                                                 <strong>🔌 Circuit Breaker:</strong>
-                                                <span x-show="exec.features.circuit_breaker.enabled" class="text-[var(--ui-success)]">Aktiviert</span>
-                                                <span x-show="!exec.features.circuit_breaker.enabled" class="text-[var(--ui-muted)]">Deaktiviert</span>
-                                                <span x-show="exec.features.circuit_breaker.openai_status" class="ml-2">
+                                                <span x-show="exec.features?.circuit_breaker?.enabled" class="text-[var(--ui-success)]">Aktiviert</span>
+                                                <span x-show="exec.features?.circuit_breaker && !exec.features.circuit_breaker.enabled" class="text-[var(--ui-muted)]">Deaktiviert</span>
+                                                <span x-show="exec.features?.circuit_breaker?.openai_status" class="ml-2">
                                                     OpenAI: <span 
-                                                        x-text="exec.features.circuit_breaker.openai_status"
-                                                        :class="exec.features.circuit_breaker.openai_status === 'open' ? 'text-[var(--ui-danger)]' : 'text-[var(--ui-success)]'"
+                                                        x-text="exec.features?.circuit_breaker?.openai_status || ''"
+                                                        :class="exec.features?.circuit_breaker?.openai_status === 'open' ? 'text-[var(--ui-danger)]' : 'text-[var(--ui-success)]'"
                                                     ></span>
                                                 </span>
                                             </div>
@@ -1356,15 +1356,24 @@
                     if (!this.chatMessages) {
                         this.chatMessages = [];
                     }
-                    this.chatMessages = [...this.chatMessages, eventMessage];
                     
-                    // DEBUG: Log nach Hinzufügen
-                    console.log('[Chat Messages Count]', this.chatMessages.length, this.chatMessages);
-                    
-                    // Force Alpine.js Update (falls nötig)
-                    this.$nextTick(() => {
-                        // Trigger Reaktivität
-                    });
+                    // SOFORT hinzufügen (ohne requestAnimationFrame für Echtzeit)
+                    // Alpine.js sollte die Änderungen sofort sehen, wenn wir eine neue Array-Referenz setzen
+                    // WICHTIG: Verwende setTimeout(0) um sicherzustellen, dass Alpine.js die Änderungen sieht
+                    setTimeout(() => {
+                        this.chatMessages = [...this.chatMessages, eventMessage];
+                        
+                        // DEBUG: Log nach Hinzufügen
+                        console.log('[Chat Messages Count]', this.chatMessages.length);
+                        
+                        // Force Scroll nach DOM-Update
+                        requestAnimationFrame(() => {
+                            const container = this.$refs.chatContainer;
+                            if (container) {
+                                container.scrollTop = container.scrollHeight;
+                            }
+                        });
+                    }, 0);
                     
                     // Füge auch zu streamingEvents hinzu (für Debugging)
                     if (!this.streamingEvents) {
@@ -1382,14 +1391,7 @@
                         this.streamingEvents = this.streamingEvents.slice(-50);
                     }
                     
-                    // SOFORT Auto-Scroll zu neuem Event
-                    // Verwende requestAnimationFrame für sofortige DOM-Updates
-                    requestAnimationFrame(() => {
-                        const container = this.$refs.chatContainer;
-                        if (container) {
-                            container.scrollTop = container.scrollHeight;
-                        }
-                    });
+                    // Scroll wird bereits in requestAnimationFrame oben gehandhabt
                     
                     // Update Simulation-Result für bestimmte Events
                     if (eventType === 'simulation.start') {
@@ -1443,32 +1445,35 @@
                         
                         // SOFORT: Füge finale Antwort als Chat-Message hinzu
                         if (eventData.content) {
-                            // Entferne letzte Assistant-Message falls vorhanden
-                            let newMessages = [...this.chatMessages];
-                            const lastMsg = newMessages[newMessages.length - 1];
-                            if (lastMsg && lastMsg.role === 'assistant' && lastMsg.type === 'message') {
-                                newMessages.pop();
-                            }
-                            
-                            // Füge neue Assistant-Message hinzu (SOFORT)
-                            newMessages.push({
-                                type: 'message',
-                                role: 'assistant',
-                                content: eventData.content,
-                                timestamp: new Date().toISOString(),
-                            });
-                            
-                            // Setze neues Array - Alpine.js sieht die Änderung sofort
-                            this.chatMessages = newMessages;
-                            console.log('[Chat Messages after final response]', this.chatMessages.length);
-                            
-                            // Auto-Scroll sofort
+                            // Verwende setTimeout(0) um sicherzustellen, dass Alpine.js die Änderungen sieht
                             setTimeout(() => {
-                                const container = this.$refs.chatContainer;
-                                if (container) {
-                                    container.scrollTop = container.scrollHeight;
+                                // Entferne letzte Assistant-Message falls vorhanden
+                                let newMessages = [...this.chatMessages];
+                                const lastMsg = newMessages[newMessages.length - 1];
+                                if (lastMsg && lastMsg.role === 'assistant' && lastMsg.type === 'message') {
+                                    newMessages.pop();
                                 }
-                            }, 10);
+                                
+                                // Füge neue Assistant-Message hinzu (SOFORT)
+                                newMessages.push({
+                                    type: 'message',
+                                    role: 'assistant',
+                                    content: eventData.content,
+                                    timestamp: new Date().toISOString(),
+                                });
+                                
+                                // Setze neues Array - Alpine.js sieht die Änderung sofort
+                                this.chatMessages = newMessages;
+                                console.log('[Chat Messages after final response]', this.chatMessages.length);
+                                
+                                // Auto-Scroll sofort
+                                requestAnimationFrame(() => {
+                                    const container = this.$refs.chatContainer;
+                                    if (container) {
+                                        container.scrollTop = container.scrollHeight;
+                                    }
+                                });
+                            }, 0);
                         }
                     } else if (eventType === 'simulation.complete') {
                         console.log('[Simulation Complete]', eventData);
