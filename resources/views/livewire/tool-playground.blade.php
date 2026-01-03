@@ -94,6 +94,8 @@
                                 
                                 <!-- Kombinierter Chat-Verlauf (Messages + Events) -->
                                 <!-- WICHTIG: Direkt auf chatMessages zugreifen, nicht über Funktion -->
+                                <!-- x-effect: Force Alpine.js Reaktivität bei Änderungen -->
+                                <div x-effect="chatMessages.length" style="display: none;"></div>
                                 <template x-for="(item, index) in chatMessages" :key="'chat-' + index">
                                     <!-- Event (schlicht, linksbündig) -->
                                     <div x-show="item && item.type === 'event'" class="flex justify-start">
@@ -1364,8 +1366,13 @@
                     // DEBUG: Log nach Hinzufügen
                     console.log('[Chat Messages Count]', this.chatMessages.length);
                     
-                    // Force Scroll nach DOM-Update (asynchron, damit DOM aktualisiert wird)
-                    this.$nextTick(() => {
+                    // Force Alpine.js Update durch explizite Reaktivität
+                    // Verwende requestAnimationFrame um sicherzustellen, dass Alpine.js die Änderung sieht
+                    requestAnimationFrame(() => {
+                        // Trigger Reaktivität durch erneutes Setzen (Alpine.js erkennt die Änderung)
+                        this.chatMessages = [...this.chatMessages];
+                        
+                        // Force Scroll nach DOM-Update
                         requestAnimationFrame(() => {
                             const container = this.$refs.chatContainer;
                             if (container) {
