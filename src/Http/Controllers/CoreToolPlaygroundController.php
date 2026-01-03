@@ -19,6 +19,7 @@ use Platform\Core\Services\ToolCircuitBreaker;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Tool Playground Controller
@@ -2637,7 +2638,7 @@ class CoreToolPlaygroundController extends Controller
                 'debug' => $debug,
             ], 500);
         }
-    }
+        }
 
     /**
      * Rekursive UTF-8 Sanitization für JSON Responses.
@@ -3308,6 +3309,1125 @@ class CoreToolPlaygroundController extends Controller
         }
         
         return $text;
+    }
+    
+    /**
+     * SSE-Streaming-Version von simulate()
+     * Sendet Events während der Multi-Step-Iterationen
+     * 
+     * WICHTIG: Diese Methode enthält die vollständige Logik aus simulate(),
+     * aber sendet Events während des Prozesses statt am Ende JSON zurückzugeben.
+     */
+    public function simulateStream(Request $request): StreamedResponse
+    {
+        return new StreamedResponse(function() use ($request) {
+            // Helper-Funktion für SSE-Events
+            $sendEvent = function(string $event, array $data) {
+                echo "event: {$event}\n";
+                echo "data: " . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+            };
+            
+            // WICHTIG: Stelle sicher, dass immer Events gesendet werden, auch bei fatalen Fehlern
+            $previousErrorHandler = set_error_handler(function($severity, $message, $file, $line) use ($sendEvent) {
+                if (!(error_reporting() & $severity)) {
+                    return false;
+                }
+                $sendEvent('simulation.error', [
+                    'error' => $message,
+                    'file' => $file,
+                    'line' => $line,
+                    'severity' => $severity,
+                ]);
+                throw new \ErrorException($message, 0, $severity, $file, $line);
+            });
+            
+            try {
+                $request->validate([
+                    'message' => 'required|string',
+                    'options' => 'nullable|array',
+                    'step' => 'nullable|integer',
+                    'previous_result' => 'nullable|array',
+                    'user_input' => 'nullable|string',
+                    'chat_history' => 'nullable|array',
+                    'session_id' => 'nullable|string',
+                ]);
+
+                $message = $request->input('message');
+                $options = $request->input('options', []);
+                $step = $request->input('step', 0);
+                $previousResult = $request->input('previous_result', []);
+                $userInput = $request->input('user_input');
+                $chatHistory = $request->input('chat_history', []);
+                $sessionId = $request->input('session_id', session()->getId());
+                
+                // Initialisierung
+                $simulation = [
+                    'timestamp' => now()->toIso8601String(),
+                    'user_message' => $message,
+                    'step' => $step,
+                    'is_multi_step' => $step > 0,
+                    'previous_result' => $previousResult,
+                    'user_input' => $userInput,
+                    'steps' => [],
+                    'tools_used' => [],
+                    'tools_discovered' => [],
+                    'chain_plan' => null,
+                    'execution_flow' => [],
+                    'final_response' => null,
+                    'feature_status' => [],
+                    'requires_user_input' => false,
+                    'user_input_prompt' => null,
+                ];
+                
+                $sendEvent('simulation.start', [
+                    'timestamp' => $simulation['timestamp'],
+                    'user_message' => $message,
+                ]);
+                
+                // STEP 1: Tool Discovery
+                $registry = app(ToolRegistry::class);
+                if (!$registry) {
+                    throw new \RuntimeException('ToolRegistry nicht verfügbar');
+                }
+                
+                // WICHTIG: Stelle sicher, dass alle Tools geladen sind
+                $allToolsBefore = $registry->all();
+                if (count($allToolsBefore) === 0 || !$registry->has('core.teams.list') || !$registry->has('tools.list')) {
+                    try {
+                        $coreTools = \Platform\Core\Tools\ToolLoader::loadCoreTools();
+                        foreach ($coreTools as $tool) {
+                            try {
+                                if (!$registry->has($tool->getName())) {
+                                    $registry->register($tool);
+                                }
+                            } catch (\Throwable $e) {
+                                // Silent fail
+                            }
+                        }
+                        
+                        $modulesPath = realpath(__DIR__ . '/../../../../modules');
+                        if ($modulesPath && is_dir($modulesPath)) {
+                            $moduleTools = \Platform\Core\Tools\ToolLoader::loadFromAllModules($modulesPath);
+                            foreach ($moduleTools as $tool) {
+                                try {
+                                    if (!$registry->has($tool->getName())) {
+                                        $registry->register($tool);
+                                    }
+                                } catch (\Throwable $e) {
+                                    // Silent fail
+                                }
+                            }
+                        }
+                        
+                        if (!$registry->has('core.teams.list')) {
+                            try {
+                                $registry->register(app(\Platform\Core\Tools\ListTeamsTool::class));
+                            } catch (\Throwable $e) {
+                                // Silent fail
+                            }
+                        }
+                        if (!$registry->has('tools.list')) {
+                            try {
+                                $registry->register(app(\Platform\Core\Tools\ListToolsTool::class));
+                            } catch (\Throwable $e) {
+                                // Silent fail
+                            }
+                        }
+                        if (!$registry->has('tools.request')) {
+                            try {
+                                $registry->register(app(\Platform\Core\Tools\RequestToolTool::class));
+                            } catch (\Throwable $e) {
+                                // Silent fail
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        // Silent fail
+                    }
+                }
+                
+                $discovery = new ToolDiscoveryService($registry);
+                
+                $allRegisteredTools = $registry->all();
+                $simulation['debug'] = [
+                    'total_tools_registered' => count($allRegisteredTools),
+                    'registered_tool_names' => array_map(fn($t) => $t->getName(), $allRegisteredTools),
+                    'has_core_teams_list' => $registry->has('core.teams.list'),
+                ];
+                
+                $intent = $message;
+                $intentLower = strtolower(trim($intent));
+                
+                // STEP 0: SEMANTISCHE INTENT-ANALYSE
+                $sendEvent('step.semantic_analysis', [
+                    'step' => 0,
+                    'name' => 'Semantische Intent-Analyse',
+                    'description' => 'Analysiere: Kann ich das selbstständig auflösen? Frage oder Aufgabe?',
+                ]);
+                
+                $semanticAnalysis = $this->analyzeIntent($intent, $registry);
+                $simulation['semantic_analysis'] = $semanticAnalysis;
+                
+                $sendEvent('step.semantic_analysis.result', [
+                    'step' => 0,
+                    'result' => $semanticAnalysis['can_solve_independently'] === null
+                        ? '🤔 LLM entscheidet selbst'
+                        : ($semanticAnalysis['can_solve_independently'] 
+                            ? '✅ Kann selbstständig auflösen' 
+                            : '❌ Benötigt Hilfe'),
+                    'analysis' => $semanticAnalysis,
+                ]);
+                
+                // STEP 1: Tool Discovery
+                $sendEvent('step.discovery', [
+                    'step' => 1,
+                    'name' => 'Tool Discovery',
+                    'description' => 'Zeige alle verfügbaren Tools (MCP Best Practice)',
+                ]);
+                
+                $discoveredTools = [];
+                try {
+                    $allTools = $discovery->findByIntent($intent);
+                    $discoveredTools = $allTools;
+                    
+                    $simulation['debug']['mcp_pattern'] = true;
+                    $simulation['debug']['total_tools_available'] = count($allTools);
+                    $simulation['debug']['note'] = 'LLM sieht alle Tools und entscheidet selbst, welches sie braucht (MCP Best Practice)';
+                } catch (\Throwable $e) {
+                    $discoveredTools = [];
+                    $simulation['debug']['discovery_error'] = $e->getMessage();
+                }
+                
+                $simulation['tools_discovered'] = array_map(function($tool) {
+                    return [
+                        'name' => $tool->getName(),
+                        'description' => $tool->getDescription(),
+                        'has_dependencies' => $tool instanceof \Platform\Core\Contracts\ToolDependencyContract,
+                    ];
+                }, $discoveredTools);
+                
+                $sendEvent('step.discovery.result', [
+                    'step' => 1,
+                    'result' => count($discoveredTools) . ' Tools verfügbar',
+                    'tools' => array_map(fn($t) => $t->getName(), $discoveredTools),
+                ]);
+                
+                // Multi-Step: Wenn User-Input vorhanden ist, verwende es für das nächste Tool
+                if ($step > 0 && !empty($userInput) && !empty($previousResult)) {
+                    $nextTool = $previousResult['next_tool'] ?? null;
+                    $nextToolArgs = $previousResult['next_tool_args'] ?? [];
+                    
+                    if ($nextTool) {
+                        if (is_numeric($userInput)) {
+                            $nextToolArgs['team_id'] = (int)$userInput;
+                        } else {
+                            $parsed = json_decode($userInput, true);
+                            if (is_array($parsed)) {
+                                $nextToolArgs = array_merge($nextToolArgs, $parsed);
+                            } else {
+                                $nextToolArgs['user_input'] = $userInput;
+                            }
+                        }
+                        
+                        $toolName = $nextTool;
+                        $arguments = $nextToolArgs;
+                        $primaryTool = $registry->get($toolName);
+                        
+                        if (!$primaryTool) {
+                            throw new \RuntimeException("Tool '{$toolName}' nicht gefunden");
+                        }
+                        
+                        $sendEvent('step.multistep.user_input', [
+                            'step' => 2,
+                            'name' => 'Multi-Step: User-Input verarbeitet',
+                            'user_input' => $userInput,
+                            'merged_arguments' => $arguments,
+                        ]);
+                    } else {
+                        throw new \RuntimeException("Kein next_tool im previous_result gefunden");
+                    }
+                } else {
+                    // Nutze echten OpenAiService
+                    $sendEvent('step.openai.init', [
+                        'step' => 2,
+                        'name' => 'OpenAI Service aufrufen',
+                        'description' => 'Nutze echten OpenAiService.chat() - LLM entscheidet selbst',
+                    ]);
+                    
+                    $openAiService = app(OpenAiService::class);
+                    $executor = app(ToolExecutor::class);
+                    $orchestrator = app(ToolOrchestrator::class);
+                    
+                    $openAiService->resetDynamicallyLoadedTools();
+                    
+                    $messages = [];
+                    $sessionHistory = session()->get("playground_chat_history_{$sessionId}", []);
+                    
+                    if (!empty($chatHistory)) {
+                        $messages = $chatHistory;
+                    } elseif (!empty($sessionHistory)) {
+                        $messages = $sessionHistory;
+                    }
+                    
+                    $messages[] = [
+                        'role' => 'user',
+                        'content' => $message,
+                    ];
+                    
+                    // Objective / Current-Task
+                    $objectiveEnabled = (bool) config('tools.mcp.objective_enabled', true);
+                    if ($objectiveEnabled) {
+                        $objectiveKey = "playground_objective_{$sessionId}";
+                        $objective = session()->get($objectiveKey);
+                        $raw = trim((string) $message);
+                        $lower = mb_strtolower($raw);
+                        $acks = [
+                            'ok','ok.','okay','okay.','danke','danke.','danke dir','danke dir.','thx','jo','ja','yes','passt','super','gut','alles klar',
+                            'ok danke','ok danke.','ok, danke','ok, danke.','ok, danke dir','ok, danke dir.',
+                            'moin','moin!','moin.','hi','hi!','hi.','hallo','hallo!','hallo.','hey','hey!','hey.','servus','servus!','servus.',
+                            'guten morgen','guten morgen!','guten tag','guten tag!','guten abend','guten abend!'
+                        ];
+                        $isAck = ($raw === '' || in_array($lower, $acks, true) || mb_strlen($lower) <= 3);
+                        
+                        if (!$isAck) {
+                            $objective = $raw;
+                            session()->put($objectiveKey, $objective);
+                        }
+                        
+                        if (is_string($objective) && trim($objective) !== '') {
+                            $lastSystem = null;
+                            for ($i = count($messages) - 1; $i >= 0; $i--) {
+                                if (($messages[$i]['role'] ?? null) === 'system') {
+                                    $lastSystem = $messages[$i]['content'] ?? null;
+                                    break;
+                                }
+                            }
+                            $objectiveMarker = "🎯 Aktuelles Ziel:";
+                            $alreadyPresent = is_string($lastSystem) && str_contains($lastSystem, $objectiveMarker);
+                            if (!$alreadyPresent) {
+                                $messages[] = [
+                                    'role' => 'system',
+                                    'content' =>
+                                        "{$objectiveMarker} {$objective}\n" .
+                                        "Bitte halte dieses Ziel im Blick und arbeite selbstständig mit Tools, bis es erledigt ist oder du blockiert bist.\n" .
+                                        "LOOSE: Du entscheidest selbst, welche Tools du nutzt. 'tools.request' nur, wenn wirklich kein Tool existiert.",
+                                ];
+                            }
+                        }
+                    }
+                    
+                    session()->put("playground_chat_history_{$sessionId}", $messages);
+                    
+                    $maxIterations = 5;
+                    $iteration = 0;
+                    $allToolResults = [];
+                    $allResponses = [];
+                    
+                    $enableCompletionGate = (bool) config('tools.mcp.completion_gate_enabled', true);
+                    $completionGateAttempts = 0;
+                    $maxCompletionGateAttempts = (int) config('tools.mcp.completion_gate_max_attempts', 2);
+                    if ($maxCompletionGateAttempts < 0) { $maxCompletionGateAttempts = 0; }
+                    
+                    $deriveEffectiveIntentMessage = function() use (&$messages, $message): string {
+                        $raw = trim((string)$message);
+                        $lower = mb_strtolower($raw);
+                        $acks = [
+                            'ok','ok.','okay','okay.','danke','danke.','danke dir','danke dir.','thx','jo','ja','yes','passt','super','gut','alles klar'
+                        ];
+                        $isAck = ($raw === '' || in_array($lower, $acks, true) || mb_strlen($lower) <= 3);
+                        if (!$isAck) {
+                            return $raw;
+                        }
+                        foreach (array_reverse($messages) as $m) {
+                            if (($m['role'] ?? null) !== 'user') { continue; }
+                            $c = $m['content'] ?? '';
+                            if (!is_string($c)) { continue; }
+                            $cTrim = trim($c);
+                            if ($cTrim === '') { continue; }
+                            if (str_starts_with($cTrim, 'Tool-Result:')) { continue; }
+                            $cLower = mb_strtolower($cTrim);
+                            if (in_array($cLower, $acks, true) || mb_strlen($cLower) <= 3) { continue; }
+                            if (mb_strlen($cTrim) >= 12) {
+                                return $cTrim;
+                            }
+                        }
+                        return $raw;
+                    };
+                    
+                    $toolCallHistory = [];
+                    $traceId = bin2hex(random_bytes(8));
+                    $simulation['trace_id'] = $traceId;
+                    
+                    $sendEvent('step.multistep.start', [
+                        'step' => 3,
+                        'name' => 'Multi-Step-Chat',
+                        'description' => 'LLM sieht alle Tools und entscheidet selbst - Multi-Step bis finale Antwort',
+                        'trace_id' => $traceId,
+                    ]);
+                    
+                    try {
+                        $failedToolCalls = [];
+                        
+                        while ($iteration < $maxIterations) {
+                            $iteration++;
+                            
+                            if ($iteration >= 3) {
+                                foreach ($failedToolCalls as $tool => $errors) {
+                                    foreach ($errors as $error => $count) {
+                                        if ($count >= 3) {
+                                            $simulation['final_response'] = [
+                                                'type' => 'warning',
+                                                'message' => "Früher Stopp: Tool '{$tool}' wurde 3x mit Fehler '{$error}' aufgerufen",
+                                                'content' => $response['content'] ?? 'Keine finale Antwort',
+                                                'iterations' => $iteration,
+                                                'tool_results' => $allToolResults,
+                                            ];
+                                            $sendEvent('iteration.early_stop', [
+                                                'iteration' => $iteration,
+                                                'reason' => "Tool '{$tool}' wurde 3x mit Fehler '{$error}' aufgerufen",
+                                            ]);
+                                            break 2;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            $sendEvent('iteration.start', [
+                                'iteration' => $iteration,
+                                'name' => "Chat-Runde {$iteration}",
+                                'description' => 'Rufe OpenAI auf - LLM entscheidet selbst',
+                            ]);
+                            
+                            // DEBUG: Hole Tools
+                            $reflection = new \ReflectionClass($openAiService);
+                            $getToolsMethod = $reflection->getMethod('getAvailableTools');
+                            $getToolsMethod->setAccessible(true);
+                            $availableTools = $getToolsMethod->invoke($openAiService);
+                            
+                            $normalizeMethod = $reflection->getMethod('normalizeToolsForResponses');
+                            $normalizeMethod->setAccessible(true);
+                            $normalizedTools = $normalizeMethod->invoke($openAiService, $availableTools);
+                            
+                            $toolNamesBefore = array_map(function($t) {
+                                if (isset($t['function']['name'])) {
+                                    return $t['function']['name'];
+                                }
+                                return $t['name'] ?? 'unknown';
+                            }, $availableTools);
+                            
+                            $toolNamesAfter = array_map(function($t) {
+                                return $t['name'] ?? ($t['function']['name'] ?? 'unknown');
+                            }, $normalizedTools);
+                            
+                            $dynamicallyLoadedProperty = $reflection->getProperty('dynamicallyLoadedTools');
+                            $dynamicallyLoadedProperty->setAccessible(true);
+                            $dynamicallyLoadedTools = $dynamicallyLoadedProperty->getValue($openAiService);
+                            
+                            $simulation['debug']['tools_sent_to_openai_' . $iteration] = [
+                                'available_tools_count' => count($availableTools),
+                                'normalized_tools_count' => count($normalizedTools),
+                                'tool_names_before_normalization' => $toolNamesBefore,
+                                'tool_names_after_normalization' => $toolNamesAfter,
+                                'has_planner_projects_get' => in_array('planner.projects.GET', $toolNamesBefore) || in_array('planner_projects_GET', $toolNamesAfter),
+                                'has_core_teams_get' => in_array('core.teams.GET', $toolNamesBefore) || in_array('core_teams_GET', $toolNamesAfter),
+                                'dynamically_loaded_tools_count' => count($dynamicallyLoadedTools),
+                                'dynamically_loaded_tool_names' => array_keys($dynamicallyLoadedTools),
+                                'normalized_tools' => $normalizedTools,
+                            ];
+                            
+                            // Rufe OpenAI auf
+                            try {
+                                $response = $openAiService->chat($messages, 'gpt-4o-mini', [
+                                    'max_tokens' => 2000,
+                                    'temperature' => 0.7,
+                                    'tools' => null,
+                                ]);
+                            } catch (\Illuminate\Http\Client\ConnectionException $e) {
+                                $simulation['debug']['openai_error_' . $iteration] = [
+                                    'type' => 'connection_exception',
+                                    'message' => $e->getMessage(),
+                                    'note' => 'Retry mit gekürzten Messages (last 8) wird versucht',
+                                ];
+                                
+                                $trimmedMessages = array_slice($messages, -8);
+                                try {
+                                    $response = $openAiService->chat($trimmedMessages, 'gpt-4o-mini', [
+                                        'max_tokens' => 1500,
+                                        'temperature' => 0.7,
+                                        'tools' => null,
+                                    ]);
+                                    $simulation['debug']['openai_error_' . $iteration]['retry'] = 'success';
+                                } catch (\Throwable $e2) {
+                                    $simulation['debug']['openai_error_' . $iteration]['retry'] = 'failed';
+                                    $simulation['debug']['openai_error_' . $iteration]['retry_error'] = $e2->getMessage();
+                                    $simulation['final_response'] = [
+                                        'type' => 'error',
+                                        'message' => "Fehler beim Aufruf von OpenAiService: " . $e2->getMessage(),
+                                        'error' => $e2->getMessage(),
+                                        'note' => 'OpenAI Request ist fehlgeschlagen (auch nach Retry). Tool-Results sind vorhanden; bitte erneut versuchen.',
+                                    ];
+                                    $sendEvent('simulation.complete', $simulation);
+                                    return;
+                                }
+                            }
+                            
+                            $allResponses[] = $response;
+                            
+                            $simulation['debug']['openai_response_' . $iteration] = [
+                                'has_content' => !empty($response['content']),
+                                'content_preview' => !empty($response['content']) ? substr($response['content'], 0, 100) : null,
+                                'content_length' => !empty($response['content']) ? strlen($response['content']) : 0,
+                                'has_tool_calls' => !empty($response['tool_calls']),
+                                'tool_calls_count' => count($response['tool_calls'] ?? []),
+                                'tool_calls' => $response['tool_calls'] ?? [],
+                                'finish_reason' => $response['finish_reason'] ?? null,
+                            ];
+                            
+                            // Wenn LLM Tool-Calls gemacht hat
+                            if (!empty($response['tool_calls'])) {
+                                $sendEvent('iteration.tool_calls', [
+                                    'iteration' => $iteration,
+                                    'tool_calls' => $response['tool_calls'],
+                                ]);
+                                
+                                $toolActionsText = '';
+                                if (count($response['tool_calls']) > 0) {
+                                    $toolActionsText = "\n\n**🔧 Ausgeführte Aktionen:**\n";
+                                    foreach ($response['tool_calls'] as $toolCall) {
+                                        $toolName = $toolCall['function']['name'] ?? 'Unbekannt';
+                                        $internalToolName = $this->denormalizeToolNameFromOpenAi($toolName);
+                                        $toolActionsText .= "- {$internalToolName}\n";
+                                    }
+                                }
+                                
+                                $messages[] = [
+                                    'role' => 'assistant',
+                                    'content' => ($response['content'] ?? '') . $toolActionsText,
+                                    'tool_calls' => $response['tool_calls'],
+                                ];
+                                
+                                $toolsWereLoaded = false;
+                                $injectedTools = [];
+                                
+                                foreach ($response['tool_calls'] as $toolCall) {
+                                    $toolCallId = $toolCall['id'] ?? null;
+                                    $toolName = $toolCall['function']['name'] ?? null;
+                                    $toolArguments = json_decode($toolCall['function']['arguments'] ?? '{}', true);
+                                    
+                                    if (!$toolName) continue;
+                                    
+                                    $internalToolName = $this->denormalizeToolNameFromOpenAi($toolName);
+                                    $openAiService->markToolAsUsed($internalToolName);
+                                    
+                                    // Pre-Flight Intention Verification
+                                    $enablePreFlight = config('tools.pre_flight_verification.enabled', true);
+                                    $preFlightResult = null;
+                                    if ($enablePreFlight) {
+                                        try {
+                                            $preFlightService = app(\Platform\Core\Services\PreFlightIntentionService::class);
+                                            $preFlightResult = $preFlightService->verify(
+                                                $message,
+                                                $internalToolName,
+                                                $toolArguments,
+                                                $allToolResults
+                                            );
+                                            
+                                            $reflectionText = $preFlightResult->getIssuesText();
+                                            
+                                            if ($reflectionText) {
+                                                $sendEvent('tool.preflight', [
+                                                    'iteration' => $iteration,
+                                                    'tool' => $internalToolName,
+                                                    'pre_flight_issues' => $reflectionText,
+                                                    'is_issue' => $preFlightResult->hasIssues(),
+                                                ]);
+                                                
+                                                $selfReflectionPrompt = "\n\n" . $reflectionText;
+                                                $messages[] = [
+                                                    'role' => 'system',
+                                                    'content' => $selfReflectionPrompt,
+                                                ];
+                                            }
+                                        } catch (\Throwable $e) {
+                                            // Silent fail
+                                        }
+                                    }
+                                    
+                                    // Loop-Detection
+                                    if (!isset($toolCallHistory[$internalToolName])) {
+                                        $toolCallHistory[$internalToolName] = ['count' => 0, 'last_iteration' => 0, 'arguments' => []];
+                                    }
+                                    $toolCallHistory[$internalToolName]['count']++;
+                                    $toolCallHistory[$internalToolName]['last_iteration'] = $iteration;
+                                    
+                                    if ($toolCallHistory[$internalToolName]['count'] >= 2) {
+                                        $sendEvent('tool.loop_warning', [
+                                            'iteration' => $iteration,
+                                            'tool' => $internalToolName,
+                                            'count' => $toolCallHistory[$internalToolName]['count'],
+                                        ]);
+                                    }
+                                    
+                                    $sendEvent('tool.execution.start', [
+                                        'iteration' => $iteration,
+                                        'tool' => $internalToolName,
+                                        'arguments' => $toolArguments,
+                                        'tool_call_id' => $toolCallId,
+                                    ]);
+                                    
+                                    // Prüfe, ob Tool existiert
+                                    $registry = app(\Platform\Core\Tools\ToolRegistry::class);
+                                    if (!$registry->has($internalToolName)) {
+                                        $allTools = array_keys($registry->all());
+                                        $similarTools = [];
+                                        
+                                        foreach ($allTools as $toolName) {
+                                            similar_text(strtolower($internalToolName), strtolower($toolName), $percent);
+                                            if ($percent > 60) {
+                                                $similarTools[] = $toolName;
+                                            }
+                                        }
+                                        
+                                        $errorMessage = "Tool '{$internalToolName}' nicht gefunden.";
+                                        if (!empty($similarTools)) {
+                                            $errorMessage .= " Ähnliche Tools: " . implode(', ', array_slice($similarTools, 0, 5));
+                                        } else {
+                                            $errorMessage .= " Verfügbare Tools: " . implode(', ', array_slice($allTools, 0, 10)) . '...';
+                                        }
+                                        
+                                        $errorResult = [
+                                            'ok' => false,
+                                            'error' => [
+                                                'code' => 'TOOL_NOT_FOUND',
+                                                'message' => $errorMessage
+                                            ]
+                                        ];
+                                        $loopCount = $toolCallHistory[$internalToolName]['count'] ?? 0;
+                                        $toolResultText = $this->formatToolResultForLLM($internalToolName, $errorResult, $toolCallId, $loopCount);
+                                        $messages[] = [
+                                            'role' => 'user',
+                                            'content' => $toolResultText,
+                                        ];
+                                        
+                                        $allToolResults[] = [
+                                            'iteration' => $iteration,
+                                            'tool_call_id' => $toolCallId,
+                                            'tool' => $internalToolName,
+                                            'success' => false,
+                                            'data' => null,
+                                            'error' => "Tool '{$internalToolName}' nicht gefunden",
+                                            'execution_time_ms' => 0,
+                                        ];
+                                        
+                                        $sendEvent('tool.execution.error', [
+                                            'iteration' => $iteration,
+                                            'tool' => $internalToolName,
+                                            'error' => "Tool '{$internalToolName}' nicht gefunden",
+                                        ]);
+                                        
+                                        continue;
+                                    }
+                                    
+                                    // tools.request Guardrail
+                                    if ($internalToolName === 'tools.request') {
+                                        $candidate = $toolArguments['module'] ?? null;
+                                        if (is_string($candidate) && str_contains($candidate, '.') && preg_match('/\.(GET|POST|PUT|DELETE)$/', $candidate)) {
+                                            if ($registry->has($candidate)) {
+                                                $openAiService->loadToolsDynamically([$candidate]);
+                                                $toolsWereLoaded = true;
+                                                $injectedTools = array_values(array_unique(array_merge($injectedTools, [$candidate])));
+                                                
+                                                $sendEvent('tool.injection', [
+                                                    'iteration' => $iteration,
+                                                    'requested_tool' => $candidate,
+                                                    'reason' => "tools.request wurde abgefangen, weil '{$candidate}' existiert",
+                                                ]);
+                                                
+                                                $messages[] = [
+                                                    'role' => 'system',
+                                                    'content' =>
+                                                        "✅ **Hinweis (loose Guardrail):** Das Tool '{$candidate}' existiert und wurde soeben nachgeladen.\n" .
+                                                        "Bitte nutze jetzt dieses Tool, um die User-Anfrage zu erfüllen. 'tools.request' nur, wenn wirklich kein passendes Tool existiert.",
+                                                ];
+                                                
+                                                $allToolResults[] = [
+                                                    'iteration' => $iteration,
+                                                    'tool_call_id' => $toolCallId,
+                                                    'tool' => 'tools.request',
+                                                    'success' => true,
+                                                    'data' => [
+                                                        'skipped' => true,
+                                                        'reason' => "Tool existiert – Auto-Injection von '{$candidate}'",
+                                                        'injected_tool' => $candidate,
+                                                    ],
+                                                    'error' => null,
+                                                    'execution_time_ms' => 0,
+                                                ];
+                                                
+                                                continue;
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Führe Tool aus
+                                    $context = ToolContext::fromAuth();
+                                    $startTime = microtime(true);
+                                    
+                                    try {
+                                        $toolResult = $orchestrator->executeWithDependencies(
+                                            $internalToolName,
+                                            $toolArguments,
+                                            $context,
+                                            maxDepth: 5,
+                                            planFirst: true
+                                        );
+                                        
+                                        $executionTime = (microtime(true) - $startTime) * 1000;
+                                        
+                                        $resultArray = $toolResult->toArray();
+                                        
+                                        // Tool Injection für tools.GET
+                                        if ($internalToolName === 'tools.GET') {
+                                            $injectionDebug = [
+                                                'step' => 'TOOL_INJECTION_START',
+                                                'iteration' => $iteration,
+                                                'tool_call_id' => $toolCallId,
+                                                'arguments' => $toolArguments,
+                                                'success' => $toolResult->success,
+                                            ];
+                                            
+                                            if ($toolResult->success && isset($resultArray['data']['tools'])) {
+                                                $tools = $resultArray['data']['tools'];
+                                                $toolNames = array_map(function($t) {
+                                                    return $t['name'] ?? ($t['function']['name'] ?? 'unknown');
+                                                }, $tools);
+                                                
+                                                $injectionDebug['step_2'] = 'TOOLS_FOUND_IN_RESULT';
+                                                $injectionDebug['tools_count'] = count($tools);
+                                                $injectionDebug['tool_names'] = $toolNames;
+                                                
+                                                if (count($tools) > 0) {
+                                                    $openAiService->loadToolsDynamically($toolNames);
+                                                    $toolsWereLoaded = true;
+                                                    $injectedTools = array_values(array_unique(array_merge($injectedTools, $toolNames)));
+                                                    
+                                                    $injectionDebug['step_3'] = 'TOOLS_INJECTED';
+                                                    $injectionDebug['injected_tools'] = $injectedTools;
+                                                    
+                                                    $sendEvent('tool.injection', [
+                                                        'iteration' => $iteration,
+                                                        'tools' => $toolNames,
+                                                        'count' => count($tools),
+                                                    ]);
+                                                }
+                                                
+                                                $simulation['debug']['tool_injection_' . $iteration] = $injectionDebug;
+                                            }
+                                        }
+                                        
+                                        $loopCount = $toolCallHistory[$internalToolName]['count'] ?? 0;
+                                        $duplicateInfo = $this->detectDuplicateAction($internalToolName, $toolArguments, $allToolResults);
+                                        
+                                        $toolResultText = $this->formatToolResultForLLM($internalToolName, $resultArray, $toolCallId, $loopCount, $duplicateInfo);
+                                        $messages[] = [
+                                            'role' => 'user',
+                                            'content' => $toolResultText,
+                                        ];
+                                        
+                                        if (!$toolResult->success && $toolResult->error) {
+                                            $errorKey = is_string($toolResult->error) ? $toolResult->error : ($toolResult->errorCode ?? 'UNKNOWN');
+                                            if (!isset($failedToolCalls[$internalToolName])) {
+                                                $failedToolCalls[$internalToolName] = [];
+                                            }
+                                            if (!isset($failedToolCalls[$internalToolName][$errorKey])) {
+                                                $failedToolCalls[$internalToolName][$errorKey] = 0;
+                                            }
+                                            $failedToolCalls[$internalToolName][$errorKey]++;
+                                            
+                                            if ($failedToolCalls[$internalToolName][$errorKey] >= 3) {
+                                                $simulation['final_response'] = [
+                                                    'type' => 'warning',
+                                                    'message' => "Früher Stopp: Tool '{$internalToolName}' wurde 3x mit Fehler '{$errorKey}' aufgerufen",
+                                                    'content' => $response['content'] ?? 'Keine finale Antwort',
+                                                    'iterations' => $iteration,
+                                                    'tool_results' => $allToolResults,
+                                                ];
+                                                $sendEvent('iteration.early_stop', [
+                                                    'iteration' => $iteration,
+                                                    'reason' => "Tool '{$internalToolName}' wurde 3x mit Fehler '{$errorKey}' aufgerufen",
+                                                ]);
+                                                break 2;
+                                            }
+                                        }
+                                        
+                                        $allToolResults[] = [
+                                            'iteration' => $iteration,
+                                            'tool_call_id' => $toolCallId,
+                                            'tool' => $internalToolName,
+                                            'arguments' => $toolArguments,
+                                            'success' => $toolResult->success,
+                                            'data' => $toolResult->data,
+                                            'error' => $toolResult->error,
+                                            'execution_time_ms' => round($executionTime, 2),
+                                        ];
+                                        
+                                        $sendEvent('tool.execution.result', [
+                                            'iteration' => $iteration,
+                                            'tool' => $internalToolName,
+                                            'success' => $toolResult->success,
+                                            'execution_time_ms' => round($executionTime, 2),
+                                            'has_data' => !empty($toolResult->data),
+                                        ]);
+                                        
+                                    } catch (\Throwable $e) {
+                                        $executionTime = (microtime(true) - $startTime) * 1000;
+                                        
+                                        $errorResult = [
+                                            'ok' => false,
+                                            'error' => [
+                                                'code' => 'EXECUTION_ERROR',
+                                                'message' => $e->getMessage()
+                                            ]
+                                        ];
+                                        
+                                        $loopCount = $toolCallHistory[$internalToolName]['count'] ?? 0;
+                                        $errorResultText = $this->formatToolResultForLLM($internalToolName, $errorResult, $toolCallId, $loopCount);
+                                        $messages[] = [
+                                            'role' => 'user',
+                                            'content' => $errorResultText,
+                                        ];
+                                        
+                                        $allToolResults[] = [
+                                            'iteration' => $iteration,
+                                            'tool_call_id' => $toolCallId,
+                                            'tool' => $internalToolName,
+                                            'success' => false,
+                                            'error' => $e->getMessage(),
+                                            'execution_time_ms' => round($executionTime, 2),
+                                        ];
+                                        
+                                        $sendEvent('tool.execution.error', [
+                                            'iteration' => $iteration,
+                                            'tool' => $internalToolName,
+                                            'error' => $e->getMessage(),
+                                        ]);
+                                    }
+                                }
+                                
+                                // Intention Verification
+                                $enableVerification = config('tools.intention_verification.enabled', true);
+                                $shouldVerify = false;
+                                
+                                $toolCounts = [];
+                                foreach ($allToolResults as $result) {
+                                    $tool = $result['tool'] ?? '';
+                                    if ($tool) {
+                                        $toolCounts[$tool] = ($toolCounts[$tool] ?? 0) + 1;
+                                    }
+                                }
+                                $hasLoop = false;
+                                foreach ($toolCounts as $tool => $count) {
+                                    if ($count > 2) {
+                                        $hasLoop = true;
+                                        break;
+                                    }
+                                }
+                                
+                                if ($enableVerification && count($allToolResults) > 0 && (count($allToolResults) > 2 || $hasLoop)) {
+                                    $shouldVerify = true;
+                                }
+                                
+                                if ($shouldVerify) {
+                                    try {
+                                        $verificationService = app(\Platform\Core\Services\IntentionVerificationService::class);
+                                        $actionSummary = $simulation['action_summary'] ?? [];
+                                        $verification = $verificationService->verify(
+                                            $message,
+                                            $allToolResults,
+                                            $actionSummary
+                                        );
+                                        
+                                        if ($verification->hasIssues()) {
+                                            $verificationText = "\n\n⚠️ **Verifikation (Zwischenprüfung):**\n";
+                                            $verificationText .= $verification->getIssuesText();
+                                            $verificationText .= "\n\nPrüfe die Tool-Results und rufe das RICHTIGE Tool auf!";
+                                            
+                                            $messages[] = [
+                                                'role' => 'system',
+                                                'content' => $verificationText,
+                                            ];
+                                            
+                                            $sendEvent('verification.issues', [
+                                                'iteration' => $iteration,
+                                                'issues' => $verification->getIssuesText(),
+                                            ]);
+                                            
+                                            // Auto-Injection
+                                            $enableAutoInjection = config('tools.mcp.auto_injection_on_loop', true);
+                                            if ($enableAutoInjection && $hasLoop) {
+                                                try {
+                                                    $expectedTool = $verificationService->expectedToolFor($message);
+                                                    if ($expectedTool) {
+                                                        $reflection = new \ReflectionClass($openAiService);
+                                                        $getToolsMethod = $reflection->getMethod('getAvailableTools');
+                                                        $getToolsMethod->setAccessible(true);
+                                                        $availableToolsNow = $getToolsMethod->invoke($openAiService);
+                                                        
+                                                        $availableToolNamesNow = [];
+                                                        foreach ($availableToolsNow as $tool) {
+                                                            $availableToolNamesNow[] = $tool['function']['name'] ?? $tool['name'] ?? 'unknown';
+                                                        }
+                                                        
+                                                        $expectedIsAvailable = in_array($expectedTool, $availableToolNamesNow) || 
+                                                                               in_array(str_replace('.', '_', $expectedTool), $availableToolNamesNow);
+                                                        
+                                                        if (!$expectedIsAvailable) {
+                                                            $module = $this->extractModuleFromToolName($expectedTool);
+                                                            $autoArgs = ['module' => $module];
+                                                            $autoResult = $orchestrator->executeWithDependencies('tools.GET', $autoArgs, $context, maxDepth: 1, planFirst: false);
+                                                            
+                                                            if ($autoResult->success && isset($autoResult->data['tools'])) {
+                                                                $autoTools = array_map(function($t) {
+                                                                    return $t['name'] ?? ($t['function']['name'] ?? 'unknown');
+                                                                }, $autoResult->data['tools']);
+                                                                $openAiService->loadToolsDynamically($autoTools);
+                                                                
+                                                                $sendEvent('tool.auto_injection', [
+                                                                    'iteration' => $iteration,
+                                                                    'expected_tool' => $expectedTool,
+                                                                    'module' => $module,
+                                                                    'injected_tools' => $autoTools,
+                                                                ]);
+                                                            }
+                                                        }
+                                                    }
+                                                } catch (\Throwable $e) {
+                                                    // Silent fail
+                                                }
+                                            }
+                                        }
+                                        
+                                        $simulation['verification'] = [
+                                            'is_ok' => $verification->isOk(),
+                                            'has_issues' => $verification->hasIssues(),
+                                            'issues_text' => $verification->hasIssues() ? $verification->getIssuesText() : null,
+                                        ];
+                                    } catch (\Throwable $e) {
+                                        // Silent fail
+                                    }
+                                }
+                                
+                                // Weiter mit nächster Iteration
+                                continue;
+                            }
+                            
+                            // Wenn LLM keine Tool-Calls gemacht hat → finale Antwort
+                            $llmContent = $response['content'] ?? '';
+                            
+                            // Action Summary
+                            $actionSummaryText = '';
+                            $actionSummary = [];
+                            if (count($allToolResults) > 0) {
+                                $actionSummary = [
+                                    'total_tools_called' => count($allToolResults),
+                                    'successful_tools' => count(array_filter($allToolResults, fn($r) => $r['success'] ?? false)),
+                                    'failed_tools' => count(array_filter($allToolResults, fn($r) => !($r['success'] ?? false))),
+                                    'tools' => array_map(function($r) {
+                                        return [
+                                            'tool' => $r['tool'] ?? 'unknown',
+                                            'success' => $r['success'] ?? false,
+                                            'iteration' => $r['iteration'] ?? null,
+                                        ];
+                                    }, $allToolResults),
+                                ];
+                                $simulation['action_summary'] = $actionSummary;
+                                
+                                if (count($allToolResults) > 0) {
+                                    $actionSummaryText = "\n\n**📊 Zusammenfassung der ausgeführten Aktionen:**\n";
+                                    foreach ($allToolResults as $result) {
+                                        $tool = $result['tool'] ?? 'Unbekannt';
+                                        $success = $result['success'] ?? false;
+                                        $status = $success ? '✅' : '❌';
+                                        $actionSummaryText .= "{$status} {$tool}\n";
+                                    }
+                                }
+                            }
+                            
+                            // Finale Verifikation
+                            $verificationText = '';
+                            $enableVerification = config('tools.intention_verification.enabled', true);
+                            $maxCorrectionIterations = config('tools.intention_verification.max_correction_iterations', 2);
+                            $verificationIteration = null;
+                            
+                            if ($enableVerification && count($allToolResults) > 0 && !empty($simulation['action_summary'])) {
+                                try {
+                                    $verificationService = app(\Platform\Core\Services\IntentionVerificationService::class);
+                                    $verification = $verificationService->verify(
+                                        $message,
+                                        $allToolResults,
+                                        $simulation['action_summary']
+                                    );
+                                    
+                                    if ($verification->hasIssues()) {
+                                        $verificationText = "\n\n⚠️ **Verifikation:**\n";
+                                        $verificationText .= $verification->getIssuesText();
+                                        $verificationText .= "\n\nBitte prüfe die Ergebnisse und korrigiere falls nötig.";
+                                        
+                                        $maxIterationsForCorrection = $maxIterations - $maxCorrectionIterations;
+                                        if ($iteration < $maxIterationsForCorrection) {
+                                            $messages[] = [
+                                                'role' => 'system',
+                                                'content' => $verificationText
+                                            ];
+                                            
+                                            $verificationIteration = $iteration;
+                                            
+                                            $sendEvent('verification.issues', [
+                                                'iteration' => $iteration,
+                                                'issues' => $verification->getIssuesText(),
+                                                'will_retry' => true,
+                                            ]);
+                                            
+                                            continue;
+                                        } else {
+                                            $verificationText = "\n\n⚠️ **Hinweis:** " . $verification->getIssuesText();
+                                        }
+                                    }
+                                    
+                                    $simulation['verification'] = [
+                                        'is_ok' => $verification->isOk(),
+                                        'has_issues' => $verification->hasIssues(),
+                                        'issues_text' => $verification->hasIssues() ? $verification->getIssuesText() : null,
+                                    ];
+                                } catch (\Throwable $e) {
+                                    // Silent fail
+                                }
+                            }
+                            
+                            $finalContent = $llmContent . $actionSummaryText . $verificationText;
+                            
+                            $simulation['final_response'] = [
+                                'type' => 'direct_answer',
+                                'message' => $finalContent,
+                                'content' => $finalContent,
+                                'iterations' => $iteration,
+                                'tool_results' => $allToolResults,
+                                'raw_response' => $response,
+                            ];
+                            
+                            $messages[] = [
+                                'role' => 'assistant',
+                                'content' => $finalContent,
+                            ];
+                            
+                            $sendEvent('iteration.final_response', [
+                                'iteration' => $iteration,
+                                'content' => $finalContent,
+                                'iterations' => $iteration,
+                            ]);
+                            
+                            break;
+                        }
+                        
+                        // Falls maxIterations erreicht wurde
+                        if (
+                            $iteration >= $maxIterations
+                            && (!isset($simulation['final_response']) || ($simulation['final_response']['type'] ?? null) !== 'direct_answer')
+                        ) {
+                            $simulation['final_response'] = [
+                                'type' => 'warning',
+                                'message' => "Maximale Iterationen ({$maxIterations}) erreicht",
+                                'content' => $response['content'] ?? 'Keine finale Antwort',
+                                'iterations' => $iteration,
+                                'tool_results' => $allToolResults,
+                            ];
+                            
+                            $sendEvent('iteration.max_reached', [
+                                'iteration' => $iteration,
+                                'max_iterations' => $maxIterations,
+                            ]);
+                        }
+                        
+                    } catch (\Throwable $e) {
+                        $simulation['final_response'] = [
+                            'type' => 'error',
+                            'message' => 'Fehler beim Aufruf von OpenAiService: ' . $e->getMessage(),
+                            'error' => $e->getMessage(),
+                            'error_details' => [
+                                'message' => $e->getMessage(),
+                                'file' => $e->getFile(),
+                                'line' => $e->getLine(),
+                                'class' => get_class($e),
+                                'trace' => array_slice(explode("\n", $e->getTraceAsString()), 0, 10),
+                            ],
+                        ];
+                        $simulation['debug']['openai_error'] = [
+                            'message' => $e->getMessage(),
+                            'file' => $e->getFile(),
+                            'line' => $e->getLine(),
+                            'class' => get_class($e),
+                        ];
+                        
+                        $sendEvent('simulation.error', [
+                            'error' => $e->getMessage(),
+                            'file' => $e->getFile(),
+                            'line' => $e->getLine(),
+                        ]);
+                    }
+                    
+                    $primaryTool = null;
+                    $toolName = null;
+                }
+                
+                // Wenn Tool gefunden (Multi-Step), führe Chain Planning und Execution aus
+                if ($primaryTool && $toolName) {
+                    $sendEvent('step.chain_planning', [
+                        'step' => 2,
+                        'name' => 'Chain Planning',
+                        'description' => 'Plane Tool-Execution-Chain mit Dependencies',
+                    ]);
+                    
+                    $planner = new ToolChainPlanner($registry);
+                    $context = ToolContext::fromAuth();
+                    
+                    $plan = $planner->planChain($toolName, $arguments, $context);
+                    $simulation['chain_plan'] = $plan;
+                    
+                    $sendEvent('step.chain_planning.result', [
+                        'step' => 2,
+                        'result' => 'Chain geplant',
+                        'execution_order' => $plan['execution_order'] ?? [],
+                        'dependencies' => $plan['dependencies'] ?? [],
+                    ]);
+                    
+                    // Tool Execution würde hier folgen (vereinfacht für Streaming)
+                    $sendEvent('step.execution', [
+                        'step' => 3,
+                        'name' => 'Tool Execution',
+                        'description' => 'Simuliere Tool-Execution mit Orchestrator',
+                    ]);
+                }
+                
+                // Finale Simulation-Daten senden
+                $sendEvent('simulation.complete', $simulation);
+                
+            } catch (\Throwable $e) {
+                $sendEvent('simulation.error', [
+                    'error' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => array_slice(explode("\n", $e->getTraceAsString()), 0, 10),
+                ]);
+            } finally {
+                if ($previousErrorHandler) {
+                    set_error_handler($previousErrorHandler);
+                }
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'X-Accel-Buffering' => 'no', // Nginx: Disable buffering
+        ]);
     }
     
 }

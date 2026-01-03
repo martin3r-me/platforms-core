@@ -49,6 +49,39 @@
 
                 <!-- MCP Simulation Tab -->
                 <div x-show="activeTab === 'simulate'" class="space-y-6">
+                    <!-- Streaming Toggle -->
+                    <div class="bg-[var(--ui-muted-5)] rounded-lg p-3 border border-[var(--ui-border)]">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <span class="text-sm font-semibold text-[var(--ui-secondary)]">📡 Streaming-Modus:</span>
+                                <span class="text-xs text-[var(--ui-muted)] ml-2">Echtzeit-Updates während der Simulation</span>
+                            </div>
+                            <label class="flex items-center cursor-pointer">
+                                <input type="checkbox" x-model="useStreaming" class="mr-2">
+                                <span class="text-sm" :class="useStreaming ? 'text-[var(--ui-success)]' : 'text-[var(--ui-muted)]'">
+                                    <span x-show="useStreaming">✅ Aktiv</span>
+                                    <span x-show="!useStreaming">❌ Inaktiv</span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Streaming Events (Live Updates) -->
+                    <div x-show="useStreaming && streamingEvents.length > 0" class="bg-[var(--ui-info-5)] rounded-lg p-4 border-2 border-[var(--ui-info)]">
+                        <h3 class="text-lg font-semibold mb-4 text-[var(--ui-info)]">📡 Live Events</h3>
+                        <div class="space-y-2 max-h-64 overflow-y-auto">
+                            <template x-for="(event, index) in streamingEvents" :key="index">
+                                <div class="p-2 bg-[var(--ui-surface)] rounded border border-[var(--ui-border)] text-xs">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="font-mono font-semibold text-[var(--ui-info)]" x-text="event.type"></span>
+                                        <span class="text-[var(--ui-muted)]" x-text="new Date(event.timestamp).toLocaleTimeString()"></span>
+                                    </div>
+                                    <div class="text-[var(--ui-secondary)]" x-text="event.message || JSON.stringify(event.data || {})"></div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                    
                     <!-- Chat Interface -->
                     <div class="bg-[var(--ui-muted-5)] rounded-lg p-4">
                         <div class="flex items-center justify-between mb-4">
@@ -62,6 +95,7 @@
                         </div>
                         <p class="text-[var(--ui-muted)] mb-4">
                             Chat mit der LLM - sie kann Tools aufrufen und komplexe Aufgaben lösen.
+                            <span x-show="useStreaming" class="text-[var(--ui-info)]">📡 Streaming aktiv - Events werden in Echtzeit angezeigt.</span>
                         </p>
                         
                         <!-- Chat Messages -->
@@ -756,6 +790,9 @@
                 chatMessages: [], // Chat-Historie
                 chatHistory: [], // Vollständige Chat-Historie für Backend
                 sessionId: null, // Session-ID für Chat-Historie
+                useStreaming: true, // Streaming-Modus aktivieren
+                streamingEvents: [], // Events während Streaming
+                eventSource: null, // EventSource-Instanz
 
                 // Tool Discovery
                 discoveryFilters: {
@@ -837,6 +874,11 @@
                 async runSimulation(step = 0, previousResult = null, userInput = null) {
                     if (!this.simulationMessage.trim() && step === 0) {
                         return; // Keine leeren Nachrichten
+                    }
+                    
+                    // Verwende Streaming wenn aktiviert
+                    if (this.useStreaming) {
+                        return await this.runSimulationStream(step, previousResult, userInput);
                     }
                     
                     this.simulationLoading = true;
@@ -1097,6 +1139,243 @@
                     } finally {
                         this.simulationLoading = false;
                     }
+                },
+
+                async runSimulationStream(step = 0, previousResult = null, userInput = null) {
+                    if (!this.simulationMessage.trim() && step === 0) {
+                        return;
+                    }
+                    
+                    this.simulationLoading = true;
+                    this.streamingEvents = [];
+                    
+                    // Füge User-Message zu Chat-Anzeige hinzu
+                    if (step === 0) {
+                        const userMsg = this.simulationMessage.trim();
+                        if (userMsg) {
+                            this.chatMessages.push({
+                                role: 'user',
+                                content: userMsg,
+                                timestamp: new Date().toISOString()
+                            });
+                        }
+                    }
+                    
+                    if (step === 0) {
+                        this.simulationResult = null;
+                        this.debugCopied = false;
+                    }
+                    
+                    // Erstelle Payload
+                    const payload = {
+                        message: this.simulationMessage,
+                        options: {},
+                        chat_history: this.chatHistory,
+                        session_id: this.sessionId || this.generateSessionId(),
+                    };
+                    
+                    if (step > 0) {
+                        payload.step = step;
+                        payload.previous_result = previousResult;
+                        payload.user_input = userInput;
+                    }
+                    
+                    // Verwende Fetch mit ReadableStream für SSE (POST mit JSON)
+                    const url = '{{ route("core.tools.playground.simulate.stream") }}';
+                    
+                    try {
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'text/event-stream',
+                            },
+                            body: JSON.stringify(payload)
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        const reader = response.body.getReader();
+                        const decoder = new TextDecoder();
+                        let buffer = '';
+                        let currentSimulation = null;
+                        
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            
+                            buffer += decoder.decode(value, { stream: true });
+                            const lines = buffer.split('\n');
+                            buffer = lines.pop() || '';
+                            
+                            let eventType = 'message';
+                            let eventData = null;
+                            
+                            for (let i = 0; i < lines.length; i++) {
+                                const line = lines[i].trim();
+                                if (line.startsWith('event:')) {
+                                    eventType = line.substring(6).trim();
+                                } else if (line.startsWith('data:')) {
+                                    try {
+                                        eventData = JSON.parse(line.substring(5).trim());
+                                    } catch (e) {
+                                        eventData = line.substring(5).trim();
+                                    }
+                                } else if (line === '') {
+                                    // Leere Zeile = Event-Ende
+                                    if (eventData) {
+                                        this.handleStreamEvent(eventType, eventData);
+                                        
+                                        // Sammle Simulation-Daten
+                                        if (eventType === 'simulation.complete') {
+                                            currentSimulation = eventData;
+                                        } else if (eventType === 'simulation.start') {
+                                            currentSimulation = { timestamp: eventData.timestamp, user_message: eventData.user_message };
+                                        }
+                                    }
+                                    eventType = 'message';
+                                    eventData = null;
+                                }
+                            }
+                        }
+                        
+                        // Finale Simulation-Daten setzen
+                        if (currentSimulation) {
+                            this.simulationResult = currentSimulation;
+                            
+                            // Füge Assistant-Response zu Chat hinzu
+                            if (currentSimulation.final_response?.content) {
+                                if (this.chatMessages.length > 0 && this.chatMessages[this.chatMessages.length - 1].role === 'assistant') {
+                                    this.chatMessages.pop();
+                                }
+                                this.chatMessages.push({
+                                    role: 'assistant',
+                                    content: currentSimulation.final_response.content,
+                                    timestamp: new Date().toISOString(),
+                                });
+                            }
+                            
+                            // Update Chat-Historie
+                            if (currentSimulation.chat_history) {
+                                this.chatHistory = currentSimulation.chat_history;
+                            }
+                        }
+                        
+                        // Leere Input-Feld
+                        if (step === 0) {
+                            this.simulationMessage = '';
+                        }
+                        
+                        // Scroll zu neuem Message
+                        this.$nextTick(() => {
+                            if (this.$refs.chatContainer) {
+                                this.$refs.chatContainer.scrollTop = this.$refs.chatContainer.scrollHeight;
+                            }
+                        });
+                        
+                    } catch (e) {
+                        console.error('Streaming Error:', e);
+                        this.streamingEvents.push({
+                            type: 'error',
+                            message: 'Fehler beim Streaming: ' + e.message,
+                            timestamp: new Date().toISOString(),
+                        });
+                        alert('❌ Fehler beim Streaming:\n\n' + e.message);
+                    } finally {
+                        this.simulationLoading = false;
+                    }
+                },
+                
+                handleStreamEvent(eventType, eventData) {
+                    // Füge Event zu Liste hinzu
+                    this.streamingEvents.push({
+                        type: eventType,
+                        data: eventData,
+                        timestamp: new Date().toISOString(),
+                        message: this.getEventMessage(eventType, eventData)
+                    });
+                    
+                    // Begrenze Events auf 100 (älteste zuerst entfernen)
+                    if (this.streamingEvents.length > 100) {
+                        this.streamingEvents.shift();
+                    }
+                    
+                    // Update Simulation-Result für bestimmte Events
+                    if (eventType === 'simulation.start') {
+                        if (!this.simulationResult) {
+                            this.simulationResult = {
+                                timestamp: eventData.timestamp,
+                                user_message: eventData.user_message,
+                                steps: [],
+                                execution_flow: [],
+                            };
+                        }
+                    } else if (eventType.startsWith('step.')) {
+                        if (!this.simulationResult) {
+                            this.simulationResult = { steps: [], execution_flow: [] };
+                        }
+                        if (!this.simulationResult.steps) {
+                            this.simulationResult.steps = [];
+                        }
+                        this.simulationResult.steps.push({
+                            step: eventData.step || this.simulationResult.steps.length,
+                            name: eventData.name || eventType,
+                            description: eventData.description || '',
+                            result: eventData.result,
+                            timestamp: new Date().toISOString(),
+                        });
+                    } else if (eventType === 'tool.execution.result') {
+                        if (!this.simulationResult) {
+                            this.simulationResult = { execution_flow: [] };
+                        }
+                        if (!this.simulationResult.execution_flow) {
+                            this.simulationResult.execution_flow = [];
+                        }
+                        this.simulationResult.execution_flow.push({
+                            tool: eventData.tool,
+                            result: {
+                                success: eventData.success,
+                                data: eventData.data,
+                            },
+                            execution_time_ms: eventData.execution_time_ms,
+                        });
+                    } else if (eventType === 'iteration.final_response') {
+                        if (!this.simulationResult) {
+                            this.simulationResult = {};
+                        }
+                        this.simulationResult.final_response = {
+                            type: 'direct_answer',
+                            content: eventData.content,
+                            iterations: eventData.iterations,
+                        };
+                    }
+                },
+                
+                getEventMessage(eventType, eventData) {
+                    const messages = {
+                        'simulation.start': '🚀 Simulation gestartet',
+                        'simulation.complete': '✅ Simulation abgeschlossen',
+                        'simulation.error': '❌ Fehler: ' + (eventData.error || 'Unbekannt'),
+                        'step.discovery': '🔍 Tool Discovery',
+                        'step.semantic_analysis': '🧠 Semantische Analyse',
+                        'step.openai.init': '🤖 OpenAI Service initialisiert',
+                        'step.multistep.start': '🔄 Multi-Step gestartet',
+                        'iteration.start': `🔄 Iteration ${eventData.iteration || '?'} gestartet`,
+                        'iteration.tool_calls': `🔧 ${eventData.tool_calls?.length || 0} Tool-Calls`,
+                        'iteration.final_response': '💬 Finale Antwort erhalten',
+                        'iteration.max_reached': '⚠️ Maximale Iterationen erreicht',
+                        'tool.execution.start': `🔧 Tool: ${eventData.tool || 'Unbekannt'}`,
+                        'tool.execution.result': `✅ Tool: ${eventData.tool || 'Unbekannt'} (${eventData.execution_time_ms || 0}ms)`,
+                        'tool.execution.error': `❌ Tool: ${eventData.tool || 'Unbekannt'} - ${eventData.error || 'Fehler'}`,
+                        'tool.injection': `💉 Tools injiziert: ${eventData.tools?.length || 0}`,
+                        'tool.loop_warning': `⚠️ Loop erkannt: ${eventData.tool || 'Unbekannt'} (${eventData.count || 0}x)`,
+                        'verification.issues': '⚠️ Verifikation: Probleme gefunden',
+                    };
+                    
+                    return messages[eventType] || `${eventType}: ${JSON.stringify(eventData).substring(0, 100)}`;
                 },
 
                 async continueWithUserInput(userInput) {

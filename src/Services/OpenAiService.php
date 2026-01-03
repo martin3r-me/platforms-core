@@ -7,7 +7,6 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Tools\CoreContextTool;
-use Platform\Core\Tools\ToolBroker;
 use Platform\Core\Tools\ToolRegistry;
 
 class OpenAiService
@@ -879,7 +878,7 @@ Tools folgen REST-Logik.";
                 return '';
             }
             
-            $info = "Verfügbare Funktionen:\n\n";
+            $info = "";
             
             // Module-Übersicht
             if (count($modules) > 0) {
@@ -1212,52 +1211,6 @@ Tools folgen REST-Logik.";
             // Chat funktioniert auch ohne Tools
         }
         
-        // 2. Legacy: Entity-basierte Tools aus ToolBroker (optional, falls verfügbar)
-        // Diese können später entfernt werden, wenn alle Module auf ToolRegistry umgestellt sind
-        try {
-            // Prüfe ob ToolBroker verfügbar ist (optional)
-            $container = app();
-            if (!$container->bound(ToolBroker::class)) {
-                // ToolBroker nicht verfügbar - kein Problem, wir verwenden nur ToolRegistry
-                return $tools;
-            }
-            $toolBroker = $container->make(ToolBroker::class);
-            $capabilities = $toolBroker->getAvailableCapabilities();
-            
-            // Entity-basierte Tools
-            foreach ($capabilities['available_entities'] ?? [] as $entity) {
-                foreach ($capabilities['available_operations'] ?? [] as $operation) {
-                    try {
-                $toolDef = $toolBroker->getToolDefinition($entity, $operation);
-                        if ($toolDef) { 
-                            $tools[] = $toolDef; 
-                            Log::debug('[OpenAI Tools] Added legacy tool', ['entity' => $entity, 'operation' => $operation]); 
-                        }
-                    } catch (\Throwable $e) {
-                        Log::warning('[OpenAI Tools] Legacy tool failed', [
-                            'entity' => $entity,
-                            'operation' => $operation,
-                            'error' => $e->getMessage()
-                        ]);
-                    }
-            }
-        }
-            
-            // Write Tool
-            try {
-                $writeTool = $toolBroker->getWriteToolDefinition();
-                if ($writeTool) {
-                    $tools[] = $writeTool;
-                }
-            } catch (\Throwable $e) {
-                Log::warning('[OpenAI Tools] Write tool failed', ['error' => $e->getMessage()]);
-            }
-        } catch (\Throwable $e) {
-            // ToolBroker nicht verfügbar - kein Problem, wir verwenden nur ToolRegistry
-            Log::debug('[OpenAI Tools] ToolBroker not available', ['error' => $e->getMessage()]);
-        }
-        
-        Log::info('[OpenAI Tools] Final tools', ['count' => count($tools)]);
         return $tools;
     }
 
