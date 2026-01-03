@@ -1151,6 +1151,15 @@
                                 content: userMsg,
                                 timestamp: new Date().toISOString()
                             }];
+                            
+                            // Test: Füge sofort ein Test-Event hinzu
+                            this.chatMessages = [...this.chatMessages, {
+                                type: 'event',
+                                message: '🚀 Stream gestartet...',
+                                timestamp: new Date().toISOString(),
+                                eventType: 'test',
+                                eventData: {}
+                            }];
                         }
                     }
                     
@@ -1205,82 +1214,86 @@
                             const { done, value } = await reader.read();
                             if (done) {
                                 // Verarbeite letztes Event falls vorhanden
-                                if (currentEventData !== null || currentDataLine.trim()) {
-                                    if (currentDataLine.trim()) {
-                                        try {
-                                            currentEventData = JSON.parse(currentDataLine.trim());
-                                        } catch (e) {
-                                            currentEventData = currentDataLine.trim();
-                                        }
+                                if (currentDataLine.trim()) {
+                                    try {
+                                        currentEventData = JSON.parse(currentDataLine.trim());
+                                    } catch (e) {
+                                        currentEventData = currentDataLine.trim();
                                     }
-                                    if (currentEventData !== null) {
-                                        this.handleStreamEvent(currentEventType, currentEventData);
-                                        if (currentEventType === 'simulation.complete') {
-                                            currentSimulation = currentEventData;
-                                        }
+                                }
+                                if (currentEventData !== null) {
+                                    this.handleStreamEvent(currentEventType, currentEventData);
+                                    if (currentEventType === 'simulation.complete') {
+                                        currentSimulation = currentEventData;
                                     }
                                 }
                                 break;
                             }
                             
-                            buffer += decoder.decode(value, { stream: true });
+                        const chunk = decoder.decode(value, { stream: true });
+                        buffer += chunk;
+                        
+                        // DEBUG: Log raw chunk
+                        if (chunk.length > 0) {
+                            console.log('[SSE Chunk]', chunk.substring(0, 100));
+                        }
+                        
+                        // Verarbeite Buffer Zeile für Zeile
+                        let newlineIndex;
+                        while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+                            const line = buffer.substring(0, newlineIndex);
+                            buffer = buffer.substring(newlineIndex + 1);
                             
-                            // Verarbeite Buffer Zeile für Zeile
-                            let newlineIndex;
-                            while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-                                const line = buffer.substring(0, newlineIndex);
-                                buffer = buffer.substring(newlineIndex + 1);
-                                
-                                const trimmed = line.trim();
-                                
-                                if (trimmed.startsWith('event:')) {
-                                    // Neues Event beginnt - verarbeite vorheriges Event SOFORT
-                                    if (currentEventData !== null || currentDataLine.trim()) {
-                                        if (currentDataLine.trim() && currentEventData === null) {
-                                            try {
-                                                currentEventData = JSON.parse(currentDataLine.trim());
-                                            } catch (e) {
-                                                currentEventData = currentDataLine.trim();
-                                            }
-                                        }
-                                        if (currentEventData !== null) {
-                                            // SOFORT verarbeiten - nicht warten
-                                            this.handleStreamEvent(currentEventType, currentEventData);
-                                            if (currentEventType === 'simulation.complete') {
-                                                currentSimulation = currentEventData;
-                                            }
-                                        }
+                            const trimmed = line.trim();
+                            
+                            if (trimmed.startsWith('event:')) {
+                                // Neues Event beginnt - verarbeite vorheriges Event SOFORT
+                                if (currentDataLine.trim()) {
+                                    try {
+                                        currentEventData = JSON.parse(currentDataLine.trim());
+                                    } catch (e) {
+                                        console.warn('[SSE] Failed to parse data before new event:', currentDataLine.trim(), e);
+                                        currentEventData = currentDataLine.trim();
                                     }
-                                    currentEventType = trimmed.substring(6).trim();
-                                    currentEventData = null;
-                                    currentDataLine = '';
-                                } else if (trimmed.startsWith('data:')) {
-                                    // Data-Zeile - sammle Daten
-                                    const dataStr = trimmed.substring(5).trim();
-                                    if (dataStr) {
-                                        currentDataLine += dataStr;
-                                    }
-                                } else if (trimmed === '') {
-                                    // Leere Zeile = Event-Ende - SOFORT verarbeiten
-                                    if (currentDataLine.trim()) {
-                                        try {
-                                            currentEventData = JSON.parse(currentDataLine.trim());
-                                        } catch (e) {
-                                            currentEventData = currentDataLine.trim();
-                                        }
-                                    }
-                                    if (currentEventData !== null) {
-                                        // SOFORT verarbeiten - nicht warten
-                                        this.handleStreamEvent(currentEventType, currentEventData);
-                                        if (currentEventType === 'simulation.complete') {
-                                            currentSimulation = currentEventData;
-                                        }
-                                    }
-                                    currentEventType = 'message';
-                                    currentEventData = null;
-                                    currentDataLine = '';
                                 }
+                                if (currentEventData !== null) {
+                                    // SOFORT verarbeiten - nicht warten
+                                    this.handleStreamEvent(currentEventType, currentEventData);
+                                    if (currentEventType === 'simulation.complete') {
+                                        currentSimulation = currentEventData;
+                                    }
+                                }
+                                currentEventType = trimmed.substring(6).trim();
+                                currentEventData = null;
+                                currentDataLine = '';
+                                console.log('[SSE] New event type:', currentEventType);
+                            } else if (trimmed.startsWith('data:')) {
+                                // Data-Zeile - sammle Daten (kann mehrzeilig sein)
+                                const dataStr = trimmed.substring(5);
+                                currentDataLine += dataStr;
+                            } else if (trimmed === '') {
+                                // Leere Zeile = Event-Ende - SOFORT verarbeiten
+                                if (currentDataLine.trim()) {
+                                    try {
+                                        currentEventData = JSON.parse(currentDataLine.trim());
+                                        console.log('[SSE] Parsed event data:', currentEventType, currentEventData);
+                                    } catch (e) {
+                                        console.warn('[SSE] Failed to parse event data:', currentDataLine.trim(), e);
+                                        currentEventData = currentDataLine.trim();
+                                    }
+                                }
+                                if (currentEventData !== null) {
+                                    // SOFORT verarbeiten - nicht warten
+                                    this.handleStreamEvent(currentEventType, currentEventData);
+                                    if (currentEventType === 'simulation.complete') {
+                                        currentSimulation = currentEventData;
+                                    }
+                                }
+                                currentEventType = 'message';
+                                currentEventData = null;
+                                currentDataLine = '';
                             }
+                        }
                         }
                         
                         // Finale Simulation-Daten setzen
@@ -1319,6 +1332,9 @@
                 },
                 
                 handleStreamEvent(eventType, eventData) {
+                    // DEBUG: Log Event
+                    console.log('[SSE Event]', eventType, eventData);
+                    
                     // SOFORT: Füge Event direkt in Chat-Verlauf ein (Real-time)
                     const eventMessage = {
                         type: 'event',
@@ -1329,8 +1345,9 @@
                     };
                     
                     // Füge Event SOFORT in Chat-Verlauf ein
-                    // WICHTIG: Alpine.js sieht Array-Mutationen automatisch, aber wir müssen sicherstellen, dass es reaktiv bleibt
-                    this.chatMessages = [...this.chatMessages, eventMessage];
+                    // WICHTIG: Neue Array-Referenz für Alpine.js Reaktivität
+                    const newMessages = [...this.chatMessages, eventMessage];
+                    this.chatMessages = newMessages;
                     
                     // Füge auch zu streamingEvents hinzu (für Debugging)
                     this.streamingEvents = [...this.streamingEvents, {
@@ -1346,13 +1363,12 @@
                     }
                     
                     // SOFORT Auto-Scroll zu neuem Event
-                    // Verwende setTimeout(0) um sicherzustellen, dass DOM aktualisiert ist
                     setTimeout(() => {
                         const container = this.$refs.chatContainer;
                         if (container) {
                             container.scrollTop = container.scrollHeight;
                         }
-                    }, 0);
+                    }, 10);
                     
                     // Update Simulation-Result für bestimmte Events
                     if (eventType === 'simulation.start') {
@@ -1394,6 +1410,7 @@
                             execution_time_ms: eventData.execution_time_ms,
                         });
                     } else if (eventType === 'iteration.final_response') {
+                        console.log('[Final Response]', eventData);
                         if (!this.simulationResult) {
                             this.simulationResult = {};
                         }
@@ -1422,6 +1439,7 @@
                             
                             // Setze neues Array - Alpine.js sieht die Änderung sofort
                             this.chatMessages = newMessages;
+                            console.log('[Chat Messages after final response]', this.chatMessages.length);
                             
                             // Auto-Scroll sofort
                             setTimeout(() => {
@@ -1429,9 +1447,10 @@
                                 if (container) {
                                     container.scrollTop = container.scrollHeight;
                                 }
-                            }, 0);
+                            }, 10);
                         }
                     } else if (eventType === 'simulation.complete') {
+                        console.log('[Simulation Complete]', eventData);
                         // Finale Antwort aus simulation.complete hinzufügen
                         if (eventData.final_response?.content) {
                             // Prüfe ob bereits eine Assistant-Message mit diesem Content vorhanden ist
@@ -1440,6 +1459,8 @@
                                 msg.type === 'message' && 
                                 msg.content === eventData.final_response.content
                             );
+                            
+                            console.log('[Has Assistant Msg]', hasAssistantMsg);
                             
                             if (!hasAssistantMsg) {
                                 // Entferne letzte Assistant-Message falls vorhanden (um Duplikate zu vermeiden)
@@ -1459,13 +1480,14 @@
                                 
                                 // Setze neues Array - Alpine.js sieht die Änderung sofort
                                 this.chatMessages = newMessages;
+                                console.log('[Chat Messages after complete]', this.chatMessages.length);
                                 
                                 setTimeout(() => {
                                     const container = this.$refs.chatContainer;
                                     if (container) {
                                         container.scrollTop = container.scrollHeight;
                                     }
-                                }, 0);
+                                }, 10);
                             }
                         }
                     }
