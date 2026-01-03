@@ -2571,6 +2571,7 @@ class CoreToolPlaygroundController extends Controller
                 'debug' => $debug,
             ], 500);
         }
+    }
 
     /**
      * Rekursive UTF-8 Sanitization für JSON Responses.
