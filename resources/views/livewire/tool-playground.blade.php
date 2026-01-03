@@ -93,6 +93,8 @@
                                 </template>
                                 
                                 <!-- Chat-Verlauf: Messages + Events -->
+                                <!-- x-effect: Force Alpine.js Reaktivität bei Änderungen -->
+                                <div x-effect="chatMessages.length" style="display: none;"></div>
                                 <template x-for="(item, index) in chatMessages" :key="'chat-' + index">
                                     <!-- Event (schlicht, linksbündig) -->
                                     <div x-show="item && item.type === 'event'" class="flex justify-start">
@@ -1361,18 +1363,12 @@
                     // DEBUG: Log nach Hinzufügen
                     console.log('[Chat Messages Count]', this.chatMessages.length);
                     
-                    // Force Alpine.js Update durch explizite Reaktivität
-                    requestAnimationFrame(() => {
-                        // Trigger Reaktivität durch erneutes Setzen (Alpine.js erkennt die Änderung)
-                        this.chatMessages = [...this.chatMessages];
-                        
-                        // Force Scroll nach DOM-Update
-                        requestAnimationFrame(() => {
-                            const container = this.$refs.chatContainer;
-                            if (container) {
-                                container.scrollTop = container.scrollHeight;
-                            }
-                        });
+                    // Force Scroll nach DOM-Update (asynchron, damit DOM aktualisiert wird)
+                    this.$nextTick(() => {
+                        const container = this.$refs.chatContainer;
+                        if (container) {
+                            container.scrollTop = container.scrollHeight;
+                        }
                     });
                     
                     // Füge auch zu streamingEvents hinzu (für Debugging)
