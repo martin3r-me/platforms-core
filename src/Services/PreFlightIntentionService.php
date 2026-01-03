@@ -383,7 +383,7 @@ class PreFlightResult
         if (!$this->isOk && $this->loopDetected) {
             $issues[] = "⚠️ LOOP ERKANNT: Das Tool '{$this->toolMatch->toolName}' wurde bereits mehrfach aufgerufen!";
             $issues[] = "💡 HINWEIS: Prüfe, ob du wirklich nochmal das gleiche Tool aufrufen musst, oder ob du mit den vorhandenen Tool-Results weiterarbeiten kannst.";
-        }
+            }
 
         // Self-Reflection-Prompt (immer zeigen, wenn vorhanden - auch bei OK)
         $prompt = $this->reflectionPrompt ?? $this->toolMatch->reflectionPrompt ?? null;

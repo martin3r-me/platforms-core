@@ -14,7 +14,7 @@ class OpenAiService
 {
     private const DEFAULT_MODEL = 'gpt-4o-mini';
     private string $baseUrl = 'https://api.openai.com/v1';
-    
+
     // Loose coupling: ToolRegistry ist optional (Chat funktioniert auch ohne Tools)
     private ?ToolRegistry $toolRegistry = null;
     
@@ -206,60 +206,60 @@ class OpenAiService
                 $toolCalls = [];
                 foreach ($data['output'] as $outputItem) {
                     if (!is_array($outputItem)) { continue; }
-                    
+                
                     // Responses API kann function_call direkt als output item liefern
                     // Format: {"type":"function_call","name":"...","arguments":"{...}","call_id":"..."}
-                    if (isset($outputItem['type']) && $outputItem['type'] === 'function_call') {
-                        $toolCalls[] = [
-                            'id' => $outputItem['call_id'] ?? ($outputItem['id'] ?? null),
-                            'type' => 'function',
-                            'function' => [
-                                'name' => $outputItem['name'] ?? null,
-                                'arguments' => isset($outputItem['arguments'])
-                                    ? (is_string($outputItem['arguments']) ? $outputItem['arguments'] : json_encode($outputItem['arguments']))
-                                    : '{}',
-                            ],
-                        ];
+                if (isset($outputItem['type']) && $outputItem['type'] === 'function_call') {
+                    $toolCalls[] = [
+                        'id' => $outputItem['call_id'] ?? ($outputItem['id'] ?? null),
+                        'type' => 'function',
+                        'function' => [
+                            'name' => $outputItem['name'] ?? null,
+                            'arguments' => isset($outputItem['arguments']) 
+                                ? (is_string($outputItem['arguments']) ? $outputItem['arguments'] : json_encode($outputItem['arguments']))
+                                : '{}',
+                        ],
+                    ];
                         continue;
-                    }
-                    
+                }
+                
                     // Legacy: tool_calls direkt in output item
                     if (isset($outputItem['tool_calls']) && is_array($outputItem['tool_calls'])) {
                         $toolCalls = array_merge($toolCalls, $outputItem['tool_calls']);
-                    }
-                    
+                }
+                
                     // content kann gemischte Items enthalten (Text + function_call)
-                    if (isset($outputItem['content']) && is_array($outputItem['content'])) {
-                        foreach ($outputItem['content'] as $contentItem) {
+                if (isset($outputItem['content']) && is_array($outputItem['content'])) {
+                    foreach ($outputItem['content'] as $contentItem) {
                             if (!is_array($contentItem)) { continue; }
                             
-                            // Tool-Call in content?
+                        // Tool-Call in content?
                             if (isset($contentItem['type']) && ($contentItem['type'] === 'tool_call' || $contentItem['type'] === 'function_call')) {
                                 $toolCalls[] = [
                                     'id' => $contentItem['id'] ?? ($contentItem['tool_call_id'] ?? $contentItem['call_id'] ?? null),
                                     'type' => 'function',
                                     'function' => [
                                         'name' => $contentItem['name'] ?? ($contentItem['function_name'] ?? ($contentItem['function']['name'] ?? null)),
-                                        'arguments' => isset($contentItem['arguments'])
+                                        'arguments' => isset($contentItem['arguments']) 
                                             ? (is_string($contentItem['arguments']) ? $contentItem['arguments'] : json_encode($contentItem['arguments']))
-                                            : (isset($contentItem['function_arguments'])
+                                            : (isset($contentItem['function_arguments']) 
                                                 ? (is_string($contentItem['function_arguments']) ? $contentItem['function_arguments'] : json_encode($contentItem['function_arguments']))
-                                                : (isset($contentItem['function']['arguments'])
+                                                : (isset($contentItem['function']['arguments']) 
                                                     ? (is_string($contentItem['function']['arguments']) ? $contentItem['function']['arguments'] : json_encode($contentItem['function']['arguments']))
                                                     : '{}')),
                                     ],
                                 ];
                                 continue;
-                            }
-                            
+                        }
+                        
                             // Text-Content (kann mehrere Segmente enthalten → append)
-                            if (isset($contentItem['text']) && is_string($contentItem['text'])) {
+                        if (isset($contentItem['text']) && is_string($contentItem['text'])) {
                                 $content .= $contentItem['text'];
                             } elseif (isset($contentItem['type']) && $contentItem['type'] === 'output_text' && isset($contentItem['text']) && is_string($contentItem['text'])) {
                                 $content .= $contentItem['text'];
-                            }
                         }
                     }
+                }
                 }
                 
                 if (empty($toolCalls)) {
@@ -1068,7 +1068,7 @@ WICHTIG - Grenzen erkennen:
                         Log::debug('[OpenAI Tools] Tool bereits geladen, überspringe', [
                             'tool_name' => $toolName,
                         ]);
-                    }
+                }
                 } else {
                     $notFoundCount++;
                     Log::warning('[OpenAI Tools] Tool nicht in Registry gefunden', [
@@ -1173,7 +1173,7 @@ WICHTIG - Grenzen erkennen:
             $toolRegistry = $this->getToolRegistry();
             if ($toolRegistry === null) {
                 // Keine Registry verfügbar - Chat funktioniert auch ohne Tools
-                return $tools; // Leeres Array zurückgeben
+                    return $tools; // Leeres Array zurückgeben
             }
             
             // Tools aus Registry holen

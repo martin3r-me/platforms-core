@@ -106,6 +106,15 @@ class CoreToolPlaygroundController extends Controller
             ], 500);
         }
 
+        /**
+         * MCP Best Practice: Das LLM entscheidet selbst, ob es Tools benötigt oder nicht.
+         * Wir umgehen das LLM NICHT mit hardcodierten Pattern-Erkennungen.
+         * 
+         * Hinweis: Der vorherige "Trivial Short-Circuit" wurde entfernt, da er nicht
+         * MCP-konform war. Das LLM ist intelligent genug, um selbst zu erkennen,
+         * ob es Tools benötigt oder direkt antworten kann.
+         */
+
         try {
             // STEP 1: Tool Discovery
             // WICHTIG: Alle Regex-Operationen sind in ToolDiscoveryService abgesichert
@@ -385,7 +394,11 @@ class CoreToolPlaygroundController extends Controller
                     $raw = trim((string) $message);
                     $lower = mb_strtolower($raw);
                     $acks = [
-                        'ok','ok.','okay','okay.','danke','danke.','danke dir','danke dir.','thx','jo','ja','yes','passt','super','gut','alles klar'
+                        'ok','ok.','okay','okay.','danke','danke.','danke dir','danke dir.','thx','jo','ja','yes','passt','super','gut','alles klar',
+                        'ok danke','ok danke.','ok, danke','ok, danke.','ok, danke dir','ok, danke dir.',
+                        // Greetings sollen KEIN Objective starten
+                        'moin','moin!','moin.','hi','hi!','hi.','hallo','hallo!','hallo.','hey','hey!','hey.','servus','servus!','servus.',
+                        'guten morgen','guten morgen!','guten tag','guten tag!','guten abend','guten abend!'
                     ];
                     $isAck = ($raw === '' || in_array($lower, $acks, true) || mb_strlen($lower) <= 3);
 
@@ -531,11 +544,11 @@ class CoreToolPlaygroundController extends Controller
                         // Rufe echten OpenAiService auf (zeigt automatisch alle Tools)
                         // WICHTIG: Robustheit bei transienten OpenAI Netzwerkfehlern (cURL 28/52)
                         try {
-                            $response = $openAiService->chat($messages, 'gpt-4o-mini', [
-                                'max_tokens' => 2000,
-                                'temperature' => 0.7,
-                                'tools' => null, // null = Tools aktivieren (OpenAiService ruft getAvailableTools() auf)
-                            ]);
+                        $response = $openAiService->chat($messages, 'gpt-4o-mini', [
+                            'max_tokens' => 2000,
+                            'temperature' => 0.7,
+                            'tools' => null, // null = Tools aktivieren (OpenAiService ruft getAvailableTools() auf)
+                        ]);
                         } catch (\Illuminate\Http\Client\ConnectionException $e) {
                             // Fallback: Retry mit gekürzter Historie (reduziert Payload & Latenz)
                             $simulation['debug']['openai_error_' . $iteration] = [
@@ -888,11 +901,11 @@ class CoreToolPlaygroundController extends Controller
                                             if (!empty($toolsData) && is_array($toolsData)) {
                                                 $injectionDebug['step_2'] = 'EXTRACT_TOOLS_FROM_RESULT';
                                                 foreach ($toolsData as $toolInfo) {
-                                                    $toolName = $toolInfo['name'] ?? null;
+                                            $toolName = $toolInfo['name'] ?? null;
                                                     if ($toolName && is_string($toolName)) {
-                                                        $requestedTools[] = $toolName;
-                                                    }
-                                                }
+                                                $requestedTools[] = $toolName;
+                                            }
+                                        }
                                                 $injectionDebug['step_2_extracted'] = [
                                                     'count' => count($requestedTools),
                                                     'tools' => $requestedTools,
@@ -943,7 +956,7 @@ class CoreToolPlaygroundController extends Controller
                                                     
                                                     $injectionDebug['step_3_fallback_result'] = [
                                                         'count' => count($requestedTools),
-                                                        'tools' => $requestedTools,
+                                                'tools' => $requestedTools,
                                                         'reason' => $toolResult->success ? 'tools.GET erfolgreich, aber keine Tools gefunden' : 'tools.GET fehlgeschlagen',
                                                     ];
                                                 } catch (\Throwable $e) {
@@ -1684,8 +1697,8 @@ class CoreToolPlaygroundController extends Controller
                                     break; // Beende while-Schleife
                                 }
                             } else {
-                                // Weiter mit nächster Iteration (LLM bekommt Tool-Results und kann weiterarbeiten)
-                                continue;
+                            // Weiter mit nächster Iteration (LLM bekommt Tool-Results und kann weiterarbeiten)
+                            continue;
                             }
                             
                         } else {
@@ -1898,7 +1911,10 @@ class CoreToolPlaygroundController extends Controller
                     }
                     
                     // Falls maxIterations erreicht wurde
-                    if ($iteration >= $maxIterations) {
+                    if (
+                        $iteration >= $maxIterations
+                        && (!isset($simulation['final_response']) || ($simulation['final_response']['type'] ?? null) !== 'direct_answer')
+                    ) {
                         $simulation['final_response'] = [
                             'type' => 'warning',
                             'message' => "Maximale Iterationen ({$maxIterations}) erreicht",
@@ -2316,12 +2332,14 @@ class CoreToolPlaygroundController extends Controller
             $simulation['chat_history'] = $messages; // Aktualisierte Historie mit Tool-Results
             $simulation['session_id'] = $sessionId;
             
-            return response()->json([
+            $payload = [
                 'success' => true,
                 'simulation' => $simulation,
                 'chat_history' => $messages, // Aktualisierte Historie
                 'session_id' => $sessionId,
-            ]);
+            ];
+            $payload = $this->sanitizeForJson($payload);
+            return response()->json($payload);
 
         } catch (\Throwable $e) {
             // Erweitere Simulation mit Fehler-Info für Debug-Export
@@ -2385,7 +2403,7 @@ class CoreToolPlaygroundController extends Controller
             
             // WICHTIG: Stelle sicher, dass die Antwort immer valides JSON ist
             try {
-                return response()->json([
+                $payload = [
                     'success' => false,
                     'error' => $e->getMessage(),
                     'error_details' => [
@@ -2396,7 +2414,9 @@ class CoreToolPlaygroundController extends Controller
                         'trace' => explode("\n", substr($e->getTraceAsString(), 0, 5000)),
                     ],
                     'simulation' => $simulation,
-                ], 500);
+                ];
+                $payload = $this->sanitizeForJson($payload);
+                return response()->json($payload, 500);
             } catch (\Throwable $jsonError) {
                 // Fallback: Sehr einfache JSON-Antwort mit Fehler-Info
                 // WICHTIG: Verwende json_encode direkt, falls response()->json() fehlschlägt
@@ -2550,6 +2570,54 @@ class CoreToolPlaygroundController extends Controller
                 'trace' => substr($e->getTraceAsString(), 0, 1000),
                 'debug' => $debug,
             ], 500);
+        }
+
+    /**
+     * Rekursive UTF-8 Sanitization für JSON Responses.
+     *
+     * Laravel wirft sonst "Malformed UTF-8 characters" beim response()->json().
+     * Wir entfernen/normalisieren ungültige Bytes (loose, aber robust).
+     */
+    protected function sanitizeForJson(mixed $value): mixed
+    {
+        if (is_string($value)) {
+            if (mb_check_encoding($value, 'UTF-8')) {
+                return $value;
+            }
+            $clean = @iconv('UTF-8', 'UTF-8//IGNORE', $value);
+            if ($clean === false || $clean === null) {
+                return '';
+            }
+            return $clean;
+        }
+
+        if (is_array($value)) {
+            $out = [];
+            foreach ($value as $k => $v) {
+                // Keys können auch "komisch" sein – safe cast
+                $safeKey = is_string($k) ? (mb_check_encoding($k, 'UTF-8') ? $k : ((string)@iconv('UTF-8', 'UTF-8//IGNORE', $k))) : $k;
+                $out[$safeKey] = $this->sanitizeForJson($v);
+            }
+            return $out;
+        }
+
+        if (is_object($value)) {
+            // Versuche JsonSerializable/Arrayable sinnvoll zu serialisieren
+            if ($value instanceof \JsonSerializable) {
+                return $this->sanitizeForJson($value->jsonSerialize());
+            }
+            if (method_exists($value, 'toArray')) {
+                try {
+                    return $this->sanitizeForJson($value->toArray());
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+            }
+            // Fallback: string cast
+            return $this->sanitizeForJson((string) $value);
+        }
+
+        return $value;
         }
     }
 

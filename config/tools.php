@@ -146,6 +146,16 @@ return [
          */
         'completion_gate_enabled' => env('TOOLS_MCP_COMPLETION_GATE_ENABLED', true),
         'completion_gate_max_attempts' => env('TOOLS_MCP_COMPLETION_GATE_MAX_ATTEMPTS', 2),
+
+        /*
+         * Trivial-Short-Circuit (Greeting/Ack) - DEPRECATED:
+         * Diese Funktion wurde entfernt, da sie nicht MCP-konform war.
+         * Das LLM entscheidet selbst, ob es Tools benötigt oder direkt antworten kann.
+         * MCP Best Practice: Alle Tools anbieten, LLM entscheidet selbst.
+         * 
+         * Diese Config-Option wird ignoriert, aber aus Kompatibilitätsgründen beibehalten.
+         */
+        'trivial_short_circuit_enabled' => env('TOOLS_MCP_TRIVIAL_SHORT_CIRCUIT_ENABLED', false),
     ],
 
     /*
