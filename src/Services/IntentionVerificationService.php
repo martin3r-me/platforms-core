@@ -70,7 +70,61 @@ class IntentionVerificationService
             return $this->getExpectedToolForRead(Str::lower($intention->target));
         }
 
-        // Für Updates/Writes ist aktuell kein robustes Mapping hinterlegt – vorerst nur READ.
+        if (in_array($intention->type, ['create', 'update', 'delete'], true) && $intention->target) {
+            return $this->getExpectedToolForWrite(Str::lower($intention->target), $intention->type);
+        }
+
+        return null;
+    }
+
+    /**
+     * Bestimmt das erwartete Tool für WRITE-Operationen (create/update/delete).
+     *
+     * IMPORTANT: Loose – es ist nur ein Helper für Auto-Injection/Guardrails,
+     * kein harter Enforcer.
+     */
+    protected function getExpectedToolForWrite(string $target, string $type): ?string
+    {
+        $target = Str::lower(trim($target));
+
+        $suffix = match ($type) {
+            'create' => 'POST',
+            'update' => 'PUT',
+            'delete' => 'DELETE',
+            default => null,
+        };
+        if ($suffix === null) { return null; }
+
+        // Grobes Entity-Mapping (de/en)
+        $entityMap = [
+            // planner
+            'aufgabe' => 'planner.tasks',
+            'aufgaben' => 'planner.tasks',
+            'task' => 'planner.tasks',
+            'tasks' => 'planner.tasks',
+            'slot' => 'planner.project_slots',
+            'slots' => 'planner.project_slots',
+            'projekt' => 'planner.projects',
+            'projekte' => 'planner.projects',
+            'project' => 'planner.projects',
+            'projects' => 'planner.projects',
+            // crm
+            'company' => 'crm.companies',
+            'companies' => 'crm.companies',
+            'unternehmen' => 'crm.companies',
+            'firma' => 'crm.companies',
+            'contact' => 'crm.contacts',
+            'contacts' => 'crm.contacts',
+            'kontakt' => 'crm.contacts',
+            'kontakte' => 'crm.contacts',
+        ];
+
+        foreach ($entityMap as $needle => $base) {
+            if ($target === $needle || str_contains($target, $needle)) {
+                return $base . '.' . $suffix;
+            }
+        }
+
         return null;
     }
 

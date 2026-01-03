@@ -201,70 +201,71 @@ class OpenAiService
             $content = '';
             $toolCalls = null;
             
-            // Format 1: output[0] (Responses API Format)
-            if (isset($data['output']) && is_array($data['output']) && isset($data['output'][0])) {
-                $outputItem = $data['output'][0];
-                
-                // WICHTIG: Responses API gibt function_call direkt in output[0] zurück!
-                // Format: {"type":"function_call","name":"core_teams_list","arguments":"{...}","call_id":"..."}
-                if (isset($outputItem['type']) && $outputItem['type'] === 'function_call') {
-                    // Function-Call gefunden - konvertiere zu Tool-Call-Format
-                    if ($toolCalls === null) {
-                        $toolCalls = [];
+            // Format 1: output[*] (Responses API Format) – wichtig für mehrere Tool-Calls pro Runde
+            if (isset($data['output']) && is_array($data['output']) && count($data['output']) > 0) {
+                $toolCalls = [];
+                foreach ($data['output'] as $outputItem) {
+                    if (!is_array($outputItem)) { continue; }
+                    
+                    // Responses API kann function_call direkt als output item liefern
+                    // Format: {"type":"function_call","name":"...","arguments":"{...}","call_id":"..."}
+                    if (isset($outputItem['type']) && $outputItem['type'] === 'function_call') {
+                        $toolCalls[] = [
+                            'id' => $outputItem['call_id'] ?? ($outputItem['id'] ?? null),
+                            'type' => 'function',
+                            'function' => [
+                                'name' => $outputItem['name'] ?? null,
+                                'arguments' => isset($outputItem['arguments'])
+                                    ? (is_string($outputItem['arguments']) ? $outputItem['arguments'] : json_encode($outputItem['arguments']))
+                                    : '{}',
+                            ],
+                        ];
+                        continue;
                     }
-                    $toolCalls[] = [
-                        'id' => $outputItem['call_id'] ?? ($outputItem['id'] ?? null),
-                        'type' => 'function',
-                        'function' => [
-                            'name' => $outputItem['name'] ?? null,
-                            'arguments' => isset($outputItem['arguments']) 
-                                ? (is_string($outputItem['arguments']) ? $outputItem['arguments'] : json_encode($outputItem['arguments']))
-                                : '{}',
-                        ],
-                    ];
-                }
-                
-                // Prüfe auf Tool-Calls direkt in output[0] (Legacy-Format)
-                elseif (isset($outputItem['tool_calls']) && is_array($outputItem['tool_calls'])) {
-                    $toolCalls = $outputItem['tool_calls'];
-                }
-                
-                // Prüfe ob content Tool-Calls enthält
-                if (isset($outputItem['content']) && is_array($outputItem['content'])) {
-                    foreach ($outputItem['content'] as $contentItem) {
-                        // Tool-Call in content?
-                        if (isset($contentItem['type'])) {
-                            if ($contentItem['type'] === 'tool_call' || $contentItem['type'] === 'function_call') {
-                                // Tool-Call gefunden
-                                if ($toolCalls === null) {
-                                    $toolCalls = [];
-                                }
+                    
+                    // Legacy: tool_calls direkt in output item
+                    if (isset($outputItem['tool_calls']) && is_array($outputItem['tool_calls'])) {
+                        $toolCalls = array_merge($toolCalls, $outputItem['tool_calls']);
+                    }
+                    
+                    // content kann gemischte Items enthalten (Text + function_call)
+                    if (isset($outputItem['content']) && is_array($outputItem['content'])) {
+                        foreach ($outputItem['content'] as $contentItem) {
+                            if (!is_array($contentItem)) { continue; }
+                            
+                            // Tool-Call in content?
+                            if (isset($contentItem['type']) && ($contentItem['type'] === 'tool_call' || $contentItem['type'] === 'function_call')) {
                                 $toolCalls[] = [
                                     'id' => $contentItem['id'] ?? ($contentItem['tool_call_id'] ?? $contentItem['call_id'] ?? null),
                                     'type' => 'function',
                                     'function' => [
-                                        'name' => $contentItem['name'] ?? ($contentItem['function_name'] ?? $contentItem['function']['name'] ?? null),
-                                        'arguments' => isset($contentItem['arguments']) 
+                                        'name' => $contentItem['name'] ?? ($contentItem['function_name'] ?? ($contentItem['function']['name'] ?? null)),
+                                        'arguments' => isset($contentItem['arguments'])
                                             ? (is_string($contentItem['arguments']) ? $contentItem['arguments'] : json_encode($contentItem['arguments']))
-                                            : (isset($contentItem['function_arguments']) 
+                                            : (isset($contentItem['function_arguments'])
                                                 ? (is_string($contentItem['function_arguments']) ? $contentItem['function_arguments'] : json_encode($contentItem['function_arguments']))
-                                                : (isset($contentItem['function']['arguments']) 
+                                                : (isset($contentItem['function']['arguments'])
                                                     ? (is_string($contentItem['function']['arguments']) ? $contentItem['function']['arguments'] : json_encode($contentItem['function']['arguments']))
                                                     : '{}')),
                                     ],
                                 ];
-                                continue; // Überspringe Text-Extraktion für Tool-Calls
+                                continue;
                             }
-                        }
-                        
-                        // Text-Content
-                        if (isset($contentItem['text']) && is_string($contentItem['text'])) {
-                            $content = $contentItem['text'];
-                        } elseif (isset($contentItem['type']) && $contentItem['type'] === 'output_text' && isset($contentItem['text'])) {
-                            $content = $contentItem['text'];
+                            
+                            // Text-Content (kann mehrere Segmente enthalten → append)
+                            if (isset($contentItem['text']) && is_string($contentItem['text'])) {
+                                $content .= $contentItem['text'];
+                            } elseif (isset($contentItem['type']) && $contentItem['type'] === 'output_text' && isset($contentItem['text']) && is_string($contentItem['text'])) {
+                                $content .= $contentItem['text'];
+                            }
                         }
                     }
                 }
+                
+                if (empty($toolCalls)) {
+                    $toolCalls = null;
+                }
+                $content = trim($content);
             }
             // Format 2: output_text (String) - Legacy
             elseif (isset($data['output_text']) && is_string($data['output_text'])) {

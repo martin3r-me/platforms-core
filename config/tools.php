@@ -135,6 +135,17 @@ return [
          * per internem tools.GET nachzuladen (on-demand, nicht "alle Tools").
          */
         'auto_injection_on_loop' => env('TOOLS_MCP_AUTO_INJECTION_ON_LOOP', true),
+        // Persistiertes Objective/Current-Task pro Playground-Session (loose)
+        'objective_enabled' => env('TOOLS_MCP_OBJECTIVE_ENABLED', true),
+
+        /*
+         * Loose Completion-Gate:
+         * Wenn die LLM eine finale Text-Antwort gibt, aber Verifikation noch Issues sieht,
+         * geben wir der LLM noch ein paar Recovery-Runden (ohne tool_choice=required).
+         * Das ist NICHT hart – es verhindert nur ein zu frühes "Fertig", wenn noch etwas offen ist.
+         */
+        'completion_gate_enabled' => env('TOOLS_MCP_COMPLETION_GATE_ENABLED', true),
+        'completion_gate_max_attempts' => env('TOOLS_MCP_COMPLETION_GATE_MAX_ATTEMPTS', 2),
     ],
 
     /*

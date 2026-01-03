@@ -369,6 +369,54 @@ class CoreToolPlaygroundController extends Controller
                     'role' => 'user',
                     'content' => $message,
                 ];
+
+                /**
+                 * MCP: Objective / Current-Task (loose, aber stabil)
+                 *
+                 * Ziel: Die LLM soll das "aktuelle Ziel" auch bei Ack-Messages (ok/danke/...) behalten,
+                 * und der Runner soll nicht durch ein "ok" die Intention verlieren.
+                 *
+                 * Wir speichern das Objective pro Playground-Session in der Session.
+                 */
+                $objectiveEnabled = (bool) config('tools.mcp.objective_enabled', true);
+                if ($objectiveEnabled) {
+                    $objectiveKey = "playground_objective_{$sessionId}";
+                    $objective = session()->get($objectiveKey);
+                    $raw = trim((string) $message);
+                    $lower = mb_strtolower($raw);
+                    $acks = [
+                        'ok','ok.','okay','okay.','danke','danke.','danke dir','danke dir.','thx','jo','ja','yes','passt','super','gut','alles klar'
+                    ];
+                    $isAck = ($raw === '' || in_array($lower, $acks, true) || mb_strlen($lower) <= 3);
+
+                    // Update Objective nur, wenn User wirklich eine neue substanzielle Aufgabe/Frage stellt
+                    if (!$isAck) {
+                        $objective = $raw;
+                        session()->put($objectiveKey, $objective);
+                    }
+
+                    if (is_string($objective) && trim($objective) !== '') {
+                        // Vermeide Spam: nur hinzufügen, wenn die letzte System-Message nicht bereits das Objective ist
+                        $lastSystem = null;
+                        for ($i = count($messages) - 1; $i >= 0; $i--) {
+                            if (($messages[$i]['role'] ?? null) === 'system') {
+                                $lastSystem = $messages[$i]['content'] ?? null;
+                                break;
+                            }
+                        }
+                        $objectiveMarker = "🎯 Aktuelles Ziel:";
+                        $alreadyPresent = is_string($lastSystem) && str_contains($lastSystem, $objectiveMarker);
+                        if (!$alreadyPresent) {
+                            $messages[] = [
+                                'role' => 'system',
+                                'content' =>
+                                    "{$objectiveMarker} {$objective}\n" .
+                                    "Bitte halte dieses Ziel im Blick und arbeite selbstständig mit Tools, bis es erledigt ist oder du blockiert bist.\n" .
+                                    "LOOSE: Du entscheidest selbst, welche Tools du nutzt. 'tools.request' nur, wenn wirklich kein Tool existiert.",
+                            ];
+                        }
+                    }
+                }
                 
                 // Speichere aktualisierte Historie in Session
                 session()->put("playground_chat_history_{$sessionId}", $messages);
@@ -378,6 +426,42 @@ class CoreToolPlaygroundController extends Controller
                 $iteration = 0;
                 $allToolResults = [];
                 $allResponses = [];
+
+                // MCP: Loose Completion-Gate (verhindert zu frühes "final", aber ohne harte Tool-Vorgaben)
+                $enableCompletionGate = (bool) config('tools.mcp.completion_gate_enabled', true);
+                $completionGateAttempts = 0;
+                $maxCompletionGateAttempts = (int) config('tools.mcp.completion_gate_max_attempts', 2);
+                if ($maxCompletionGateAttempts < 0) { $maxCompletionGateAttempts = 0; }
+
+                // Heuristik: Wenn User nur "ok/danke/..." schreibt, nutze letzte sinnvolle User-Intention aus Historie.
+                $deriveEffectiveIntentMessage = function() use (&$messages, $message): string {
+                    $raw = trim((string)$message);
+                    $lower = mb_strtolower($raw);
+                    $acks = [
+                        'ok','ok.','okay','okay.','danke','danke.','danke dir','danke dir.','thx','jo','ja','yes','passt','super','gut','alles klar'
+                    ];
+                    $isAck = ($raw === '' || in_array($lower, $acks, true) || mb_strlen($lower) <= 3);
+                    if (!$isAck) {
+                        return $raw;
+                    }
+
+                    // Suche rückwärts nach einer substantiellen User-Message (keine Tool-Results, kein Ack)
+                    foreach (array_reverse($messages) as $m) {
+                        if (($m['role'] ?? null) !== 'user') { continue; }
+                        $c = $m['content'] ?? '';
+                        if (!is_string($c)) { continue; }
+                        $cTrim = trim($c);
+                        if ($cTrim === '') { continue; }
+                        if (str_starts_with($cTrim, 'Tool-Result:')) { continue; }
+                        $cLower = mb_strtolower($cTrim);
+                        if (in_array($cLower, $acks, true) || mb_strlen($cLower) <= 3) { continue; }
+                        // Bevorzugt: "lange" Messages (typischerweise echte Aufgaben)
+                        if (mb_strlen($cTrim) >= 12) {
+                            return $cTrim;
+                        }
+                    }
+                    return $raw;
+                };
                 
                 // Loop-Detection: Verhindere wiederholte Aufrufe des gleichen Tools
                 $toolCallHistory = []; // Speichert: tool_name => [count, last_call_iteration]
@@ -692,6 +776,59 @@ class CoreToolPlaygroundController extends Controller
                                     // WICHTIG: Bei TOOL_NOT_FOUND lassen wir LLM reagieren
                                     // LLM kann dann das richtige Tool verwenden oder eine Fehlermeldung geben
                                     continue; // Weiter mit nächstem Tool-Call
+                                }
+
+                                /**
+                                 * tools.request Guardrail (loose):
+                                 * Wenn die LLM tools.request aufruft, aber das gewünschte Tool existiert,
+                                 * dann injizieren wir das Tool und lassen die LLM weiterarbeiten – statt zu eskalieren.
+                                 *
+                                 * Ziel: weniger "mehrere Anläufe" und weniger falsche Escalation.
+                                 */
+                                if ($internalToolName === 'tools.request') {
+                                    $candidate = $toolArguments['module'] ?? null;
+                                    if (is_string($candidate) && str_contains($candidate, '.') && preg_match('/\.(GET|POST|PUT|DELETE)$/', $candidate)) {
+                                        if ($registry->has($candidate)) {
+                                            // Tool existiert – injiziere es on-demand
+                                            $openAiService->loadToolsDynamically([$candidate]);
+                                            $toolsWereLoaded = true;
+                                            $injectedTools = array_values(array_unique(array_merge($injectedTools, [$candidate])));
+
+                                            $simulation['steps'][] = [
+                                                'step' => 4 + $iteration,
+                                                'name' => 'tools.request Guardrail (Auto-Injection)',
+                                                'description' => "tools.request wurde abgefangen, weil '{$candidate}' existiert – Tool wurde nachgeladen",
+                                                'timestamp' => now()->toIso8601String(),
+                                                'requested_tool' => $candidate,
+                                            ];
+
+                                            // Statt tools.request auszuführen: gib der LLM einen Hinweis (loose) und weiter
+                                            $messages[] = [
+                                                'role' => 'system',
+                                                'content' =>
+                                                    "✅ **Hinweis (loose Guardrail):** Das Tool '{$candidate}' existiert und wurde soeben nachgeladen.\n" .
+                                                    "Bitte nutze jetzt dieses Tool, um die User-Anfrage zu erfüllen. 'tools.request' nur, wenn wirklich kein passendes Tool existiert.",
+                                            ];
+
+                                            // Schreibe einen neutralen Tool-Result-Eintrag, damit die LLM den Schritt erkennt
+                                            $allToolResults[] = [
+                                                'iteration' => $iteration,
+                                                'tool_call_id' => $toolCallId,
+                                                'tool' => 'tools.request',
+                                                'success' => true,
+                                                'data' => [
+                                                    'skipped' => true,
+                                                    'reason' => "Tool existiert – Auto-Injection von '{$candidate}'",
+                                                    'injected_tool' => $candidate,
+                                                ],
+                                                'error' => null,
+                                                'execution_time_ms' => 0,
+                                            ];
+
+                                            // Kein executeWithDependencies für tools.request
+                                            continue;
+                                        }
+                                    }
                                 }
                                 
                                 // Nutze echten ToolOrchestrator (wie in CoreAiStreamController)
@@ -1484,7 +1621,58 @@ class CoreToolPlaygroundController extends Controller
                                     // (die Tool-Results sind jetzt in $messages, LLM kann sie in der nächsten Iteration sehen)
                                     continue;
                                 } else {
-                                    // LLM hat direkt geantwortet - beende
+                                    // LLM hat direkt geantwortet - ggf. Completion-Gate anwenden (loose)
+                                    if ($enableCompletionGate && $completionGateAttempts < $maxCompletionGateAttempts && count($allToolResults) > 0) {
+                                        try {
+                                            $effectiveIntent = $deriveEffectiveIntentMessage();
+                                            $actionSummary = [];
+                                            try {
+                                                $actionSummaryService = app(\Platform\Core\Services\ActionSummaryService::class);
+                                                $summary = $actionSummaryService->createSummary($traceId, null, $effectiveIntent, $context);
+                                                $actionSummary = [
+                                                    'summary' => $summary->summary,
+                                                    'tools_executed' => $summary->tools_executed,
+                                                    'models_created' => $summary->models_created,
+                                                    'models_updated' => $summary->models_updated,
+                                                    'models_deleted' => $summary->models_deleted,
+                                                    'created_models' => $summary->created_models,
+                                                    'updated_models' => $summary->updated_models,
+                                                    'deleted_models' => $summary->deleted_models,
+                                                    'actions' => $summary->actions,
+                                                ];
+                                            } catch (\Throwable $e) {
+                                                // ActionSummary optional
+                                            }
+
+                                            $verificationService = app(\Platform\Core\Services\IntentionVerificationService::class);
+                                            $verification = $verificationService->verify($effectiveIntent, $allToolResults, $actionSummary);
+                                            if ($verification->hasIssues()) {
+                                                $completionGateAttempts++;
+                                                $simulation['steps'][] = [
+                                                    'step' => 3 + $iteration,
+                                                    'name' => 'Completion Gate (loose)',
+                                                    'description' => 'LLM wollte final antworten, aber Verifikation sieht noch offene Punkte → gebe der LLM eine Recovery-Runde',
+                                                    'timestamp' => now()->toIso8601String(),
+                                                    'attempt' => $completionGateAttempts,
+                                                    'issues' => $verification->getIssuesText(),
+                                                    'effective_intent' => $effectiveIntent,
+                                                ];
+                                                $messages[] = [
+                                                    'role' => 'system',
+                                                    'content' =>
+                                                        "⚠️ **Hinweis (loose Completion-Gate):**\n" .
+                                                        $verification->getIssuesText() .
+                                                        "\n\nBitte prüfe die bisherigen Tool-Results und entscheide selbst, welche nächsten Tools sinnvoll sind. " .
+                                                        "Wenn du etwas erstellen/ändern/löschen musst, stelle sicher, dass du die passenden Tools via 'tools.GET' nachlädst und dann direkt ausführst. " .
+                                                        "Nutze 'tools.request' nur, wenn wirklich kein passendes Tool existiert.",
+                                                ];
+                                                continue; // Recovery-Runde
+                                            }
+                                        } catch (\Throwable $e) {
+                                            // Silent fail (loose)
+                                        }
+                                    }
+
                                     $llmContent = $response['content'] ?? 'Keine Antwort';
                                     $simulation['final_response'] = [
                                         'type' => 'direct_answer',
@@ -1508,6 +1696,57 @@ class CoreToolPlaygroundController extends Controller
                                 'description' => 'LLM hat finale Antwort gegeben - keine Tools mehr',
                                 'timestamp' => now()->toIso8601String(),
                             ];
+
+                            // Loose Completion-Gate: vor dem Finalisieren nochmal prüfen, ob noch Issues offen sind
+                            if ($enableCompletionGate && $completionGateAttempts < $maxCompletionGateAttempts && count($allToolResults) > 0) {
+                                try {
+                                    $effectiveIntent = $deriveEffectiveIntentMessage();
+                                    $actionSummary = [];
+                                    try {
+                                        $actionSummaryService = app(\Platform\Core\Services\ActionSummaryService::class);
+                                        $summary = $actionSummaryService->createSummary($traceId, null, $effectiveIntent, $context);
+                                        $actionSummary = [
+                                            'summary' => $summary->summary,
+                                            'tools_executed' => $summary->tools_executed,
+                                            'models_created' => $summary->models_created,
+                                            'models_updated' => $summary->models_updated,
+                                            'models_deleted' => $summary->models_deleted,
+                                            'created_models' => $summary->created_models,
+                                            'updated_models' => $summary->updated_models,
+                                            'deleted_models' => $summary->deleted_models,
+                                            'actions' => $summary->actions,
+                                        ];
+                                    } catch (\Throwable $e) {
+                                        // ActionSummary optional
+                                    }
+
+                                    $verificationService = app(\Platform\Core\Services\IntentionVerificationService::class);
+                                    $verification = $verificationService->verify($effectiveIntent, $allToolResults, $actionSummary);
+                                    if ($verification->hasIssues()) {
+                                        $completionGateAttempts++;
+                                        $simulation['steps'][] = [
+                                            'step' => 3 + $iteration,
+                                            'name' => 'Completion Gate (loose)',
+                                            'description' => 'LLM wollte final antworten, aber Verifikation sieht noch offene Punkte → Recovery-Runde',
+                                            'timestamp' => now()->toIso8601String(),
+                                            'attempt' => $completionGateAttempts,
+                                            'issues' => $verification->getIssuesText(),
+                                            'effective_intent' => $effectiveIntent,
+                                        ];
+                                        $messages[] = [
+                                            'role' => 'system',
+                                            'content' =>
+                                                "⚠️ **Hinweis (loose Completion-Gate):**\n" .
+                                                $verification->getIssuesText() .
+                                                "\n\nBitte prüfe die bisherigen Tool-Results und entscheide selbst, welche nächsten Tools sinnvoll sind. " .
+                                                "Wenn du Tools benötigst, nutze 'tools.GET' um sie gezielt nachzuladen und führe sie dann direkt aus.",
+                                        ];
+                                        continue; // Recovery-Runde
+                                    }
+                                } catch (\Throwable $e) {
+                                    // Silent fail (loose)
+                                }
+                            }
                             
                             // Zeige die ECHTE LLM-Antwort (nicht nur "würde antworten")
                             $llmContent = $response['content'] ?? 'Keine Antwort';
