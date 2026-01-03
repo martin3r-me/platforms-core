@@ -1357,23 +1357,22 @@
                         this.chatMessages = [];
                     }
                     
-                    // SOFORT hinzufügen (ohne requestAnimationFrame für Echtzeit)
-                    // Alpine.js sollte die Änderungen sofort sehen, wenn wir eine neue Array-Referenz setzen
-                    // WICHTIG: Verwende setTimeout(0) um sicherzustellen, dass Alpine.js die Änderungen sieht
-                    setTimeout(() => {
-                        this.chatMessages = [...this.chatMessages, eventMessage];
-                        
-                        // DEBUG: Log nach Hinzufügen
-                        console.log('[Chat Messages Count]', this.chatMessages.length);
-                        
-                        // Force Scroll nach DOM-Update
+                    // SOFORT hinzufügen - Alpine.js sollte die Änderungen sofort sehen
+                    // Neue Array-Referenz für Alpine.js Reaktivität
+                    this.chatMessages = [...this.chatMessages, eventMessage];
+                    
+                    // DEBUG: Log nach Hinzufügen
+                    console.log('[Chat Messages Count]', this.chatMessages.length);
+                    
+                    // Force Scroll nach DOM-Update (asynchron, damit DOM aktualisiert wird)
+                    this.$nextTick(() => {
                         requestAnimationFrame(() => {
                             const container = this.$refs.chatContainer;
                             if (container) {
                                 container.scrollTop = container.scrollHeight;
                             }
                         });
-                    }, 0);
+                    });
                     
                     // Füge auch zu streamingEvents hinzu (für Debugging)
                     if (!this.streamingEvents) {
@@ -1445,39 +1444,39 @@
                         
                         // SOFORT: Füge finale Antwort als Chat-Message hinzu
                         if (eventData.content) {
-                            // Verwende setTimeout(0) um sicherzustellen, dass Alpine.js die Änderungen sieht
-                            setTimeout(() => {
-                                // Entferne letzte Assistant-Message falls vorhanden
-                                let newMessages = [...this.chatMessages];
-                                const lastMsg = newMessages[newMessages.length - 1];
-                                if (lastMsg && lastMsg.role === 'assistant' && lastMsg.type === 'message') {
-                                    newMessages.pop();
-                                }
-                                
-                                // Füge neue Assistant-Message hinzu (SOFORT)
-                                newMessages.push({
-                                    type: 'message',
-                                    role: 'assistant',
-                                    content: eventData.content,
-                                    timestamp: new Date().toISOString(),
-                                });
-                                
-                                // Setze neues Array - Alpine.js sieht die Änderung sofort
-                                this.chatMessages = newMessages;
-                                console.log('[Chat Messages after final response]', this.chatMessages.length);
-                                
-                                // Auto-Scroll sofort
+                            // Entferne letzte Assistant-Message falls vorhanden (um Duplikate zu vermeiden)
+                            let newMessages = [...this.chatMessages];
+                            const lastMsg = newMessages[newMessages.length - 1];
+                            if (lastMsg && lastMsg.role === 'assistant' && lastMsg.type === 'message') {
+                                newMessages.pop();
+                            }
+                            
+                            // Füge neue Assistant-Message hinzu (SOFORT)
+                            newMessages.push({
+                                type: 'message',
+                                role: 'assistant',
+                                content: eventData.content,
+                                timestamp: new Date().toISOString(),
+                            });
+                            
+                            // Setze neues Array - Alpine.js sieht die Änderung sofort
+                            this.chatMessages = newMessages;
+                            console.log('[Chat Messages after final response]', this.chatMessages.length);
+                            
+                            // Auto-Scroll nach DOM-Update
+                            this.$nextTick(() => {
                                 requestAnimationFrame(() => {
                                     const container = this.$refs.chatContainer;
                                     if (container) {
                                         container.scrollTop = container.scrollHeight;
                                     }
                                 });
-                            }, 0);
+                            });
                         }
                     } else if (eventType === 'simulation.complete') {
                         console.log('[Simulation Complete]', eventData);
-                        // Finale Antwort aus simulation.complete hinzufügen
+                        // Finale Antwort sollte bereits bei iteration.final_response hinzugefügt worden sein
+                        // Falls nicht, füge sie hier hinzu (Fallback)
                         if (eventData.final_response?.content) {
                             // Prüfe ob bereits eine Assistant-Message mit diesem Content vorhanden ist
                             const hasAssistantMsg = this.chatMessages.some(msg => 
@@ -1508,12 +1507,15 @@
                                 this.chatMessages = newMessages;
                                 console.log('[Chat Messages after complete]', this.chatMessages.length);
                                 
-                                setTimeout(() => {
-                                    const container = this.$refs.chatContainer;
-                                    if (container) {
-                                        container.scrollTop = container.scrollHeight;
-                                    }
-                                }, 10);
+                                // Auto-Scroll nach DOM-Update
+                                this.$nextTick(() => {
+                                    requestAnimationFrame(() => {
+                                        const container = this.$refs.chatContainer;
+                                        if (container) {
+                                            container.scrollTop = container.scrollHeight;
+                                        }
+                                    });
+                                });
                             }
                         }
                     }
