@@ -65,6 +65,9 @@ return [
     |
     */
     'openai' => [
+        // Default Model für Responses API (muss im OpenAI Account verfügbar sein)
+        // Beispiel: gpt-5, gpt-4.1, gpt-4o-mini, ...
+        'model' => env('TOOLS_OPENAI_MODEL', 'gpt-5'),
         // Gesamt-Timeout pro Request (in Sekunden)
         'timeout_seconds' => env('TOOLS_OPENAI_TIMEOUT_SECONDS', 60),
         // Connect-Timeout (in Sekunden)

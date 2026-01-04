@@ -3,6 +3,7 @@
 namespace Platform\Core\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Platform\Core\Tools\ToolRegistry;
 use Platform\Core\Tools\ToolExecutor;
 use Platform\Core\Services\OpenAiService;
@@ -141,6 +142,31 @@ class SimpleToolController extends Controller
     }
 
     /**
+     * List available OpenAI models (for UI selection).
+     * NOTE: This reflects the account/API key capabilities.
+     */
+    public function models(Request $request): JsonResponse
+    {
+        $openAiService = app(OpenAiService::class);
+        $models = $openAiService->getModels();
+
+        // Normalize to a simple list of ids
+        $ids = [];
+        foreach ($models as $m) {
+            if (is_array($m) && isset($m['id']) && is_string($m['id'])) {
+                $ids[] = $m['id'];
+            }
+        }
+        sort($ids);
+
+        return response()->json([
+            'success' => true,
+            'models' => $ids,
+            'count' => count($ids),
+        ]);
+    }
+
+    /**
      * Normalisiert Tool-Namen von OpenAI Format zu Internal Format
      * z.B. "planner_projects_GET" → "planner.projects.GET"
      */
@@ -242,6 +268,7 @@ class SimpleToolController extends Controller
                     $request->validate([
                         'message' => 'required|string',
                         'chat_history' => 'nullable|array', // Conversation-Historie
+                        'model' => 'nullable|string',
                     ]);
                 } catch (\Throwable $e) {
                     $sendEvent('error', [
@@ -252,6 +279,19 @@ class SimpleToolController extends Controller
 
                 $userMessage = $request->input('message');
                 $chatHistory = $request->input('chat_history', []);
+                $model = $request->input('model');
+
+                // Basic guard: allow only typical model id characters
+                if (is_string($model) && $model !== '') {
+                    if (!preg_match('/^[a-zA-Z0-9._:-]+$/', $model)) {
+                        $sendEvent('error', [
+                            'error' => "Invalid model format: {$model}",
+                        ]);
+                        return;
+                    }
+                } else {
+                    $model = null;
+                }
                 
                 // Services
                 $openAiService = app(OpenAiService::class);
@@ -285,13 +325,13 @@ class SimpleToolController extends Controller
                 $thinking = '';
 
                 try {
-                    $openAiService->streamChat(
+                $openAiService->streamChat(
                     $messages,
                     function(string $delta) use ($sendEvent, &$assistant) {
                         $assistant .= $delta;
                         $sendEvent('assistant.delta', ['delta' => $delta, 'content' => $assistant]);
                     },
-                    'gpt-5.2-thinking',
+                        $model ?: config('tools.openai.model', 'gpt-5'),
                     [
                         'tools' => false,
                         'temperature' => 0.7,
@@ -305,7 +345,7 @@ class SimpleToolController extends Controller
                             $sendEvent('thinking.delta', ['delta' => $delta, 'content' => $thinking]);
                         },
                     ]
-                    );
+                );
                 } catch (\Throwable $e) {
                     $sendEvent('error', [
                         'error' => 'OpenAI stream failed: ' . $e->getMessage(),

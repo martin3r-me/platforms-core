@@ -11,7 +11,8 @@ use Platform\Core\Tools\ToolRegistry;
 
 class OpenAiService
 {
-    private const DEFAULT_MODEL = 'gpt-5.2-thinking';
+    // Default model; prefer config('tools.openai.model') at runtime.
+    private const DEFAULT_MODEL = 'gpt-5';
     private string $baseUrl = 'https://api.openai.com/v1';
 
     // Loose coupling: ToolRegistry ist optional (Chat funktioniert auch ohne Tools)
@@ -54,6 +55,8 @@ class OpenAiService
 
     public function chat(array $messages, string $model = self::DEFAULT_MODEL, array $options = []): array
     {
+        // Allow runtime override via config
+        $model = $options['model'] ?? config('tools.openai.model', $model);
         $messagesWithContext = $this->buildMessagesWithContext($messages, $options);
         $responsesInput = $this->buildResponsesInput($messagesWithContext);
         
@@ -370,6 +373,8 @@ class OpenAiService
 
     public function streamChat(array $messages, callable $onDelta, string $model = self::DEFAULT_MODEL, array $options = []): void
     {
+        // Allow runtime override via config
+        $model = $options['model'] ?? config('tools.openai.model', $model);
         $messagesWithContext = $this->buildMessagesWithContext($messages, $options);
         $payload = [
             'model' => $model,
