@@ -86,6 +86,7 @@
 
     <script>
       (() => {
+        const boot = () => {
         const url = '{{ route("core.tools.simple.stream") }}';
         const modelsUrl = '{{ route("core.tools.simple.models") }}';
         const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
@@ -339,6 +340,17 @@
             input.focus();
           }
         });
+        };
+
+        // Important: this script sits inside the main slot of <x-ui-page>.
+        // The right "activity" sidebar is rendered AFTER the slot, so we must wait
+        // until the full DOM is parsed; otherwise elements like #realtimeClear are null
+        // and the whole script crashes (breaking Send).
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', boot, { once: true });
+        } else {
+          boot();
+        }
       })();
     </script>
   </x-ui-page-container>
