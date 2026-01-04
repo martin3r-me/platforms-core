@@ -444,6 +444,15 @@
                 try { data = JSON.parse(raw); } catch { data = { raw }; }
 
                 switch (currentEvent) {
+                  case 'assistant.reset':
+                    rtAssistant.textContent = '';
+                    break;
+                  case 'reasoning.reset':
+                    rtReasoning.textContent = '';
+                    break;
+                  case 'thinking.reset':
+                    rtThinking.textContent = '';
+                    break;
                   case 'assistant.delta':
                     if (data?.delta) rtAssistant.textContent += data.delta;
                     break;

@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Platform\Core\Tools\ToolRegistry;
 use Platform\Core\Tools\ToolExecutor;
 use Platform\Core\Services\OpenAiService;
+use Platform\Core\Services\ToolNameMapper;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Illuminate\Support\Facades\Log;
@@ -280,6 +281,10 @@ class SimpleToolController extends Controller
                 
                 // Services
                 $openAiService = app(OpenAiService::class);
+                $executor = app(ToolExecutor::class);
+                $nameMapper = app(ToolNameMapper::class);
+                $context = ToolContext::fromAuth();
+                $openAiService->resetDynamicallyLoadedTools();
 
                 // Initialisiere Messages mit Historie (nur role+content)
                 $messages = [];
@@ -304,94 +309,198 @@ class SimpleToolController extends Controller
 
                 $sendEvent('start', ['message' => '🚀 Starte...']);
 
-                // Chat-only Streaming (keine Tools, keine Iterationen)
-                $assistant = '';
-                $reasoning = '';
-                $thinking = '';
-                $debugEventCount = 0;
+                // Best-practice tool loop (stream per iteration; execute tools server-side; continue until no tool calls)
+                $maxIterations = 6;
                 $usageSent = false;
+                $debugEventCount = 0;
 
-                try {
-                $openAiService->streamChat(
-                    $messages,
-                    function(string $delta) use ($sendEvent, &$assistant) {
-                        $assistant .= $delta;
-                        $sendEvent('assistant.delta', ['delta' => $delta, 'content' => $assistant]);
-                    },
-                        $model,
-                    [
-                        // OpenAI built-in tool (no internal tool execution)
-                        'tools' => [
-                            ['type' => 'web_search'],
-                        ],
-                        'max_tokens' => 2000,
-                        'with_context' => false,
-                        // Tools-ready: actually let the model "think"
-                        // This should trigger reasoning_summary_text / reasoning_text stream events (model-dependent).
-                        'reasoning' => [
-                            'effort' => 'medium',
-                        ],
-                        // Optional: forward selected OpenAI stream events to the client for debugging/observability
-                        'on_debug' => function(?string $event, array $decoded) use ($sendEvent, &$debugEventCount, &$usageSent) {
-                            $event = $event ?? '';
-                            // Debug mode: forward EVERYTHING (cap only for safety)
-                            if ($debugEventCount >= 2000) return;
-                            $debugEventCount++;
+                for ($iteration = 1; $iteration <= $maxIterations; $iteration++) {
+                    $assistant = '';
+                    $reasoning = '';
+                    $thinking = '';
+                    $toolCallsCollector = [];
+                    $currentStreamingToolCall = null;
 
-                            // Emit token usage as a dedicated event once available (usually on response.completed)
-                            if (!$usageSent) {
-                                $usage = $decoded['response']['usage'] ?? null;
-                                if (is_array($usage) && !empty($usage)) {
-                                    $usageSent = true;
-                                    $sendEvent('usage', [
-                                        'model' => $decoded['response']['model'] ?? null,
-                                        'usage' => $usage,
-                                    ]);
+                    $sendEvent('assistant.reset', []);
+                    $sendEvent('reasoning.reset', []);
+                    $sendEvent('thinking.reset', []);
+                    $sendEvent('openai.event', [
+                        'event' => 'server.iteration.start',
+                        'preview' => ['iteration' => $iteration],
+                        'raw' => null,
+                    ]);
+
+                    try {
+                        $openAiService->streamChat(
+                            $messages,
+                            function(string $delta) use ($sendEvent, &$assistant) {
+                                $assistant .= $delta;
+                                $sendEvent('assistant.delta', ['delta' => $delta, 'content' => $assistant]);
+                            },
+                            $model,
+                            [
+                                'include_web_search' => true,
+                                'max_tokens' => 2000,
+                                'with_context' => false,
+                                'reasoning' => [
+                                    'effort' => 'medium',
+                                ],
+                                'on_debug' => function(?string $event, array $decoded) use (
+                                    $sendEvent,
+                                    &$debugEventCount,
+                                    &$usageSent,
+                                    &$toolCallsCollector,
+                                    &$currentStreamingToolCall
+                                ) {
+                                    $event = $event ?? '';
+                                    if ($debugEventCount < 2000) {
+                                        $debugEventCount++;
+                                        $preview = [
+                                            'keys' => array_keys($decoded),
+                                            'type' => $decoded['type'] ?? ($decoded['item']['type'] ?? null),
+                                            'id' => $decoded['id'] ?? ($decoded['item']['id'] ?? ($decoded['item_id'] ?? null)),
+                                            'name' => $decoded['name'] ?? ($decoded['item']['name'] ?? null),
+                                            'status' => $decoded['status'] ?? null,
+                                            'query' => $decoded['query'] ?? ($decoded['input']['query'] ?? ($decoded['item']['query'] ?? null)),
+                                        ];
+                                        $raw = json_encode($decoded, JSON_UNESCAPED_UNICODE);
+                                        if (is_string($raw) && strlen($raw) > 2000) {
+                                            $raw = substr($raw, 0, 2000) . '…';
+                                        }
+                                        $sendEvent('openai.event', [
+                                            'event' => $event,
+                                            'preview' => array_filter($preview, fn($v) => $v !== null && $v !== ''),
+                                            'raw' => $raw,
+                                        ]);
+                                    }
+
+                                    // Emit token usage once it appears (usually on response.completed)
+                                    if (!$usageSent) {
+                                        $usage = $decoded['response']['usage'] ?? null;
+                                        if (is_array($usage) && !empty($usage)) {
+                                            $usageSent = true;
+                                            $sendEvent('usage', [
+                                                'model' => $decoded['response']['model'] ?? null,
+                                                'usage' => $usage,
+                                            ]);
+                                        }
+                                    }
+
+                                    // Collect function calls (best practice: execute after stream, then re-call model with tool results)
+                                    if ($event === 'response.output_item.added' && isset($decoded['item']['type']) && $decoded['item']['type'] === 'function_call') {
+                                        $openAiToolName = $decoded['item']['name'] ?? null;
+                                        if (is_string($openAiToolName) && $openAiToolName !== '') {
+                                            $currentStreamingToolCall = $openAiToolName;
+                                            $toolCallsCollector[$openAiToolName] = [
+                                                'name' => $openAiToolName,
+                                                'arguments' => '',
+                                            ];
+                                        }
+                                    } elseif ($event === 'response.function_call_arguments.delta') {
+                                        $delta = $decoded['delta'] ?? '';
+                                        if ($currentStreamingToolCall && is_string($delta)) {
+                                            $toolCallsCollector[$currentStreamingToolCall]['arguments'] .= $delta;
+                                        }
+                                    } elseif ($event === 'response.function_call_arguments.done') {
+                                        $args = $decoded['arguments'] ?? '';
+                                        if ($currentStreamingToolCall && is_string($args)) {
+                                            $toolCallsCollector[$currentStreamingToolCall]['arguments'] = $args;
+                                        }
+                                        $currentStreamingToolCall = null;
+                                    }
+                                },
+                                'on_reasoning_delta' => function(string $delta) use ($sendEvent, &$reasoning) {
+                                    $reasoning .= $delta;
+                                    $sendEvent('reasoning.delta', ['delta' => $delta, 'content' => $reasoning]);
+                                },
+                                'on_thinking_delta' => function(string $delta) use ($sendEvent, &$thinking) {
+                                    $thinking .= $delta;
+                                    $sendEvent('thinking.delta', ['delta' => $delta, 'content' => $thinking]);
+                                },
+                            ]
+                        );
+                    } catch (\Throwable $e) {
+                        $sendEvent('error', [
+                            'error' => 'OpenAI stream failed: ' . $e->getMessage(),
+                        ]);
+                        return;
+                    }
+
+                    // No tool calls → final answer
+                    if (empty($toolCallsCollector)) {
+                        $messages[] = ['role' => 'assistant', 'content' => $assistant];
+                        $sendEvent('complete', [
+                            'assistant' => $assistant,
+                            'reasoning' => $reasoning,
+                            'thinking' => $thinking,
+                            'chat_history' => $messages,
+                        ]);
+                        return;
+                    }
+
+                    // Execute tool calls
+                    foreach ($toolCallsCollector as $openAiToolName => $call) {
+                        $canonical = $nameMapper->toCanonical($openAiToolName);
+                        $argsJson = $call['arguments'] ?? '';
+                        $args = json_decode($argsJson, true);
+                        if (!is_array($args)) { $args = []; }
+
+                        $sendEvent('openai.event', [
+                            'event' => 'server.tool.execute',
+                            'preview' => ['tool' => $canonical],
+                            'raw' => null,
+                        ]);
+
+                        try {
+                            $toolResult = $executor->execute($canonical, $args, $context);
+                            $toolArray = $toolResult->toArray();
+
+                            // Special case: tools.GET with explicit filters → load tools dynamically for next iteration
+                            if ($canonical === 'tools.GET') {
+                                $module = $args['module'] ?? null;
+                                $search = $args['search'] ?? null;
+                                $hasExplicitRequest = !empty($module) || !empty($search);
+                                if ($hasExplicitRequest) {
+                                    $toolsData = $toolArray['data']['tools'] ?? $toolArray['tools'] ?? [];
+                                    $requestedTools = [];
+                                    if (is_array($toolsData)) {
+                                        foreach ($toolsData as $t) {
+                                            $n = $t['name'] ?? null;
+                                            if (is_string($n) && $n !== '') { $requestedTools[] = $n; }
+                                        }
+                                    }
+                                    if (!empty($requestedTools)) {
+                                        $openAiService->loadToolsDynamically($requestedTools);
+                                        $sendEvent('openai.event', [
+                                            'event' => 'server.tools.loaded',
+                                            'preview' => ['count' => count($requestedTools)],
+                                            'raw' => json_encode(['tools' => $requestedTools], JSON_UNESCAPED_UNICODE),
+                                        ]);
+                                    }
                                 }
                             }
 
-                            $preview = [
-                                'keys' => array_keys($decoded),
-                                'type' => $decoded['type'] ?? ($decoded['item']['type'] ?? null),
-                                'id' => $decoded['id'] ?? ($decoded['item']['id'] ?? ($decoded['item_id'] ?? null)),
-                                'name' => $decoded['name'] ?? ($decoded['item']['name'] ?? null),
-                                'status' => $decoded['status'] ?? null,
-                                'query' => $decoded['query'] ?? ($decoded['input']['query'] ?? ($decoded['item']['query'] ?? null)),
+                            // Feed tool result back into the next iteration (best practice)
+                            $messages[] = [
+                                'role' => 'tool',
+                                'tool_call_id' => $openAiToolName,
+                                'content' => json_encode($toolArray, JSON_UNESCAPED_UNICODE),
                             ];
-                            $raw = json_encode($decoded, JSON_UNESCAPED_UNICODE);
-                            if (is_string($raw) && strlen($raw) > 2000) {
-                                $raw = substr($raw, 0, 2000) . '…';
-                            }
-                            $sendEvent('openai.event', [
-                                'event' => $event,
-                                'preview' => array_filter($preview, fn($v) => $v !== null && $v !== ''),
-                                'raw' => $raw,
-                            ]);
-                        },
-                        'on_reasoning_delta' => function(string $delta) use ($sendEvent, &$reasoning) {
-                            $reasoning .= $delta;
-                            $sendEvent('reasoning.delta', ['delta' => $delta, 'content' => $reasoning]);
-                        },
-                        'on_thinking_delta' => function(string $delta) use ($sendEvent, &$thinking) {
-                            $thinking .= $delta;
-                            $sendEvent('thinking.delta', ['delta' => $delta, 'content' => $thinking]);
-                        },
-                    ]
-                );
-                } catch (\Throwable $e) {
-                    $sendEvent('error', [
-                        'error' => 'OpenAI stream failed: ' . $e->getMessage(),
-                    ]);
-                    return;
+                        } catch (\Throwable $e) {
+                            $messages[] = [
+                                'role' => 'tool',
+                                'tool_call_id' => $openAiToolName,
+                                'content' => json_encode([
+                                    'success' => false,
+                                    'error' => $e->getMessage(),
+                                ], JSON_UNESCAPED_UNICODE),
+                            ];
+                        }
+                    }
                 }
 
-                // Chat-History für Client (nur user+assistant)
-                $messages[] = ['role' => 'assistant', 'content' => $assistant];
-                $sendEvent('complete', [
-                    'assistant' => $assistant,
-                    'reasoning' => $reasoning,
-                    'thinking' => $thinking,
-                    'chat_history' => $messages,
+                $sendEvent('error', [
+                    'error' => 'Max iterations reached while executing tools.',
                 ]);
                 return;
 

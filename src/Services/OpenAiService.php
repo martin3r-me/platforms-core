@@ -433,6 +433,18 @@ class OpenAiService
                 ]);
             }
         }
+
+        // Optional: prepend OpenAI built-in tools (e.g. web_search) while still using internal discovery tools.
+        if (!empty($options['include_web_search'])) {
+            $payload['tools'] = $payload['tools'] ?? [];
+            $hasWebSearch = false;
+            foreach ($payload['tools'] as $t) {
+                if (($t['type'] ?? null) === 'web_search') { $hasWebSearch = true; break; }
+            }
+            if (!$hasWebSearch) {
+                array_unshift($payload['tools'], ['type' => 'web_search']);
+            }
+        }
         // Debug: Log Payload (nur wenn Debug aktiviert)
         if (config('app.debug', false)) {
             Log::debug('[OpenAI Stream] Sending payload', [
