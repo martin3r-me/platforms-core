@@ -89,12 +89,18 @@
       $simpleModelsUrl = route('core.tools.simple.models');
     @endphp
 
+    <script>
+      // Provide URLs for the verbatim JS block below (no Blade parsing inside that block).
+      window.__simpleStreamUrl = @json($simpleStreamUrl);
+      window.__simpleModelsUrl = @json($simpleModelsUrl);
+    </script>
+
     @verbatim
     <script>
       (() => {
         const boot = () => {
-        const url = '__SIMPLE_STREAM_URL__';
-        const modelsUrl = '__SIMPLE_MODELS_URL__';
+        const url = window.__simpleStreamUrl;
+        const modelsUrl = window.__simpleModelsUrl;
         const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
         // Simple Playground: fixed model for now (explicit user request)
         const serverDefaultModel = 'gpt-5.2';
@@ -360,16 +366,5 @@
       })();
     </script>
     @endverbatim
-
-    <script>
-      // Replace placeholders injected inside @verbatim script
-      (function(){
-        const s = document.currentScript?.previousElementSibling;
-        if (!s || s.tagName !== 'SCRIPT') return;
-        s.text = s.text
-          .replaceAll('__SIMPLE_STREAM_URL__', @json($simpleStreamUrl))
-          .replaceAll('__SIMPLE_MODELS_URL__', @json($simpleModelsUrl));
-      })();
-    </script>
   </x-ui-page-container>
 </x-ui-page>
