@@ -1,4 +1,4 @@
-<div class="flex flex-col h-screen" x-data="simpleToolPlayground()" x-init="init()">
+<div class="flex flex-col h-screen">
     <!-- Header -->
     <div class="border-b border-[var(--ui-border)] p-4">
         <h1 class="text-xl font-semibold text-[var(--ui-secondary)]">Simple Tool Playground</h1>
@@ -6,42 +6,46 @@
     </div>
 
     <!-- Chat Messages -->
-    <div class="flex-1 overflow-y-auto p-4 space-y-4" x-ref="messages">
-        <template x-for="(msg, index) in messages" :key="index">
-            <div class="flex" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
-                <div class="max-w-3xl rounded-lg p-3" 
-                     :class="msg.role === 'user' 
-                        ? 'bg-[var(--ui-primary)] text-white' 
-                        : 'bg-[var(--ui-surface)] border border-[var(--ui-border)]'">
-                    <div class="text-sm font-semibold mb-1" x-text="msg.role === 'user' ? 'Du' : 'Assistant'"></div>
-                    <div class="whitespace-pre-wrap" x-html="msg.content"></div>
+    <div class="flex-1 overflow-y-auto p-4 space-y-4" x-ref="messages" x-data="{ scrollToBottom() { this.$nextTick(() => { const el = this.$refs.messages; if(el) el.scrollTop = el.scrollHeight; }); } }">
+        @foreach($messages as $msg)
+            <div class="flex {{ $msg['role'] === 'user' ? 'justify-end' : 'justify-start' }}">
+                <div class="max-w-3xl rounded-lg p-3 {{ $msg['role'] === 'user' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-surface)] border border-[var(--ui-border)]' }}">
+                    <div class="text-sm font-semibold mb-1">{{ $msg['role'] === 'user' ? 'Du' : 'Assistant' }}</div>
+                    <div class="whitespace-pre-wrap">{{ $msg['content'] }}</div>
                 </div>
             </div>
-        </template>
+        @endforeach
 
         <!-- Streaming Content -->
-        <div x-show="streamingContent" class="flex justify-start">
-            <div class="max-w-3xl rounded-lg p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]">
-                <div class="text-sm font-semibold mb-1">Assistant</div>
-                <div class="whitespace-pre-wrap" x-html="streamingContent"></div>
-                <div class="mt-2 text-xs text-[var(--ui-muted)] animate-pulse">●</div>
+        @if($isStreaming || !empty($streamingContent))
+            <div class="flex justify-start">
+                <div class="max-w-3xl rounded-lg p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]">
+                    <div class="text-sm font-semibold mb-1">Assistant</div>
+                    <div class="whitespace-pre-wrap" wire:live>{{ $streamingContent }}</div>
+                    @if($currentTool)
+                        <div class="mt-2 text-xs text-[var(--ui-muted)]">🔧 {{ $currentTool }}</div>
+                    @endif
+                    @if($isStreaming)
+                        <div class="mt-2 text-xs text-[var(--ui-muted)] animate-pulse">●</div>
+                    @endif
+                </div>
             </div>
-        </div>
+        @endif
     </div>
 
     <!-- Input -->
     <div class="border-t border-[var(--ui-border)] p-4">
-        <form @submit.prevent="sendMessage()" class="flex gap-2">
+        <form wire:submit.prevent="sendMessage" class="flex gap-2">
             <input 
                 type="text" 
-                x-model="inputMessage"
-                :disabled="isStreaming"
-                :placeholder="isStreaming ? 'Verarbeite...' : 'Nachricht eingeben...'"
-                class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                wire:model.live="message"
+                @disabled($isStreaming)
+                placeholder="{{ $isStreaming ? 'Verarbeite...' : 'Nachricht eingeben...' }}"
+                class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] disabled:opacity-50"
             />
             <button 
                 type="submit"
-                :disabled="isStreaming || !inputMessage.trim()"
+                @disabled($isStreaming || empty(trim($message)))
                 class="px-6 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90 disabled:opacity-50"
             >
                 Senden
@@ -51,222 +55,134 @@
 </div>
 
 <script>
-function simpleToolPlayground() {
-    return {
-        messages: @js($messages),
-        inputMessage: '',
-        streamingContent: '',
-        isStreaming: false,
-        eventSource: null,
+document.addEventListener('livewire:init', () => {
+    let streamReader = null;
+    let isStreaming = false;
 
-        init() {
-            // Livewire Events
-            Livewire.on('start-stream', (data) => {
-                this.startStream(data.message);
-            });
-        },
+    // SSE Stream Handler
+    Livewire.on('start-stream', (data) => {
+        if (isStreaming) {
+            if (streamReader) {
+                streamReader.cancel();
+            }
+        }
 
-        sendMessage() {
-            if (!this.inputMessage.trim() || this.isStreaming) {
-                return;
+        isStreaming = true;
+        const userMessage = data.message;
+        const url = '{{ route("core.tools.simple.stream") }}';
+        
+        // Bereite Chat-Historie vor (ohne letzte User-Message)
+        const chatHistory = @js($messages);
+        const historyForRequest = chatHistory.slice(0, -1).map(msg => ({
+            role: msg.role,
+            content: msg.content,
+        }));
+
+        // POST Request mit Fetch (SSE)
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'text/event-stream',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+            },
+            body: JSON.stringify({ 
+                message: userMessage,
+                chat_history: historyForRequest,
+            }),
+        }).then(response => {
+            if (!response.ok) {
+                throw new Error('Stream failed');
             }
 
-            const userMessage = this.inputMessage.trim();
-            this.inputMessage = '';
-            
-            // Füge User-Message hinzu
-            this.messages.push({
-                role: 'user',
-                content: userMessage,
-            });
+            const reader = response.body.getReader();
+            streamReader = reader;
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let currentEvent = null;
 
-            this.isStreaming = true;
-            this.startStream(userMessage);
-        },
-
-        // Bereite Chat-Historie für Request vor (ohne die letzte User-Message, die wird separat gesendet)
-        getChatHistory() {
-            // Entferne letzte User-Message (wird separat als 'message' gesendet)
-            const history = [...this.messages];
-            if (history.length > 0 && history[history.length - 1].role === 'user') {
-                history.pop();
-            }
-            
-            return history.map(msg => ({
-                role: msg.role,
-                content: msg.content,
-            }));
-        },
-
-        startStream(userMessage) {
-            // Alte Verbindung schließen
-            if (this.eventSource) {
-                this.eventSource.close();
-            }
-
-            this.streamingContent = '';
-            const url = '{{ route("core.tools.simple.stream") }}';
-
-            // POST Request mit Fetch (SSE)
-            fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'text/event-stream',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                },
-                body: JSON.stringify({ 
-                    message: userMessage,
-                    chat_history: this.getChatHistory(), // Sende Chat-Historie mit
-                }),
-            }).then(response => {
-                if (!response.ok) {
-                    throw new Error('Stream failed');
-                }
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = '';
-                let currentEvent = null;
-
-                const readChunk = () => {
-                    reader.read().then(({ done, value }) => {
-                        if (done) {
-                            this.finishStream();
-                            return;
-                        }
-
-                        buffer += decoder.decode(value, { stream: true });
-                        const lines = buffer.split('\n');
-                        buffer = lines.pop() || '';
-
-                        for (const line of lines) {
-                            if (line.trim() === '') continue;
-                            
-                            if (line.startsWith('event: ')) {
-                                currentEvent = line.substring(7).trim();
-                                continue;
-                            }
-
-                            if (line.startsWith('data: ')) {
-                                try {
-                                    const data = JSON.parse(line.substring(6));
-                                    this.handleEvent(currentEvent || 'message', data);
-                                } catch (e) {
-                                    console.warn('Failed to parse SSE data:', line, e);
-                                }
-                            }
-                        }
-
-                        readChunk();
-                    }).catch(err => {
-                        console.error('Stream error:', err);
-                        this.finishStream();
-                    });
-                };
-
-                readChunk();
-            }).catch(err => {
-                console.error('Fetch error:', err);
-                this.finishStream();
-            });
-        },
-
-        handleEvent(eventType, data) {
-            console.log('[SSE Event]', eventType, data);
-            
-            // Content Updates (Streaming)
-            if (eventType === 'llm.delta' && data.delta) {
-                this.streamingContent = (this.streamingContent || '') + data.delta;
-                this.scrollToBottom();
-            }
-
-            if (eventType === 'llm.content' && data.content) {
-                this.streamingContent = data.content;
-                this.scrollToBottom();
-            }
-
-            // Tool Events
-            if (eventType === 'tool.detected' && data.tool) {
-                console.log(`[Tool] Detected: ${data.tool}`);
-            }
-
-            if (eventType === 'tool.start' && data.tool) {
-                console.log(`[Tool] Start: ${data.tool}`);
-                this.streamingContent += `\n\n🔧 Führe Tool aus: ${data.tool}...\n`;
-                this.scrollToBottom();
-            }
-
-            if (eventType === 'tool.complete' && data.tool) {
-                console.log(`[Tool] Complete: ${data.tool}`);
-                this.streamingContent += ` ✅\n`;
-                this.scrollToBottom();
-            }
-
-            if (eventType === 'tool.error' && data.tool) {
-                this.streamingContent += `\n❌ Fehler: ${data.error || 'Unbekannter Fehler'}\n`;
-                this.scrollToBottom();
-            }
-
-            // Iteration Events
-            if (eventType === 'iteration.start') {
-                console.log(`[Iteration] Start: ${data.iteration}`);
-            }
-
-            // Completion
-            if (eventType === 'complete') {
-                // Füge Assistant-Response hinzu (falls noch nicht vorhanden)
-                const finalContent = data.message || this.streamingContent;
-                if (finalContent) {
-                    // Prüfe ob letzte Message bereits Assistant ist (könnte durch Streaming schon da sein)
-                    const lastMsg = this.messages[this.messages.length - 1];
-                    if (lastMsg && lastMsg.role === 'assistant') {
-                        // Update bestehende Message
-                        lastMsg.content = finalContent;
-                    } else {
-                        // Neue Message hinzufügen
-                        this.messages.push({
-                            role: 'assistant',
-                            content: finalContent,
-                        });
+            const readChunk = () => {
+                reader.read().then(({ done, value }) => {
+                    if (done) {
+                        isStreaming = false;
+                        return;
                     }
-                }
-                
-                // Update Chat-Historie falls vom Server zurückgegeben
-                if (data.chat_history && Array.isArray(data.chat_history)) {
-                    this.messages = data.chat_history;
-                }
-                
-                this.finishStream();
-            }
 
-            // Errors
-            if (eventType === 'error') {
-                const errorMsg = data.error || 'Unbekannter Fehler';
-                this.messages.push({
-                    role: 'assistant',
-                    content: `❌ Fehler: ${errorMsg}`,
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.trim() === '') continue;
+                        
+                        if (line.startsWith('event: ')) {
+                            currentEvent = line.substring(7).trim();
+                            continue;
+                        }
+
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.substring(6));
+                                handleSSEEvent(currentEvent || 'message', data);
+                            } catch (e) {
+                                console.warn('Failed to parse SSE data:', line, e);
+                            }
+                        }
+                    }
+
+                    readChunk();
+                }).catch(err => {
+                    console.error('Stream error:', err);
+                    isStreaming = false;
+                    @this.call('handleStreamError', err.message);
                 });
-                this.finishStream();
-            }
-        },
+            };
 
-        finishStream() {
-            this.streamingContent = '';
-            this.eventSource = null;
-            this.isStreaming = false;
-            @this.set('isStreaming', false);
-            this.scrollToBottom();
-        },
+            readChunk();
+        }).catch(err => {
+            console.error('Fetch error:', err);
+            isStreaming = false;
+            @this.call('handleStreamError', err.message);
+        });
+    });
 
-        scrollToBottom() {
-            this.$nextTick(() => {
-                const messagesEl = this.$refs.messages;
-                if (messagesEl) {
-                    messagesEl.scrollTop = messagesEl.scrollHeight;
-                }
-            });
-        },
-    };
-}
+    function handleSSEEvent(eventType, data) {
+        // Content Updates (Streaming)
+        if (eventType === 'llm.delta' && data.delta) {
+            @this.call('handleStreamDelta', data.delta);
+        }
+
+        if (eventType === 'llm.content' && data.content) {
+            // Setze kompletten Content
+            @this.set('streamingContent', data.content);
+        }
+
+        // Tool Events
+        if (eventType === 'tool.start' && data.tool) {
+            @this.call('handleToolStart', data.tool);
+        }
+
+        if (eventType === 'tool.complete' && data.tool) {
+            @this.call('handleToolComplete', data.tool);
+        }
+
+        if (eventType === 'tool.error' && data.tool) {
+            @this.set('streamingContent', @this.get('streamingContent') + `\n❌ Fehler: ${data.error || 'Unbekannter Fehler'}\n`);
+        }
+
+        // Completion
+        if (eventType === 'complete') {
+            const content = data.message || @this.get('streamingContent');
+            @this.call('handleStreamComplete', content, data.chat_history);
+            isStreaming = false;
+        }
+
+        // Errors
+        if (eventType === 'error') {
+            const errorMsg = data.error || 'Unbekannter Fehler';
+            @this.call('handleStreamError', errorMsg);
+            isStreaming = false;
+        }
+    }
+});
 </script>
