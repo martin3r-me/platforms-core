@@ -1021,7 +1021,34 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
             $status >= 500 => 'DEPENDENCY_FAILED',
             default => 'INTERNAL_ERROR',
         };
-        return $prefix . ': OpenAI request failed (HTTP ' . $status . ').';
+        // Versuche OpenAI Error JSON zu extrahieren (hilft enorm beim Debugging von 400ern)
+        $details = null;
+        try {
+            $json = json_decode($body, true);
+            if (is_array($json) && isset($json['error']) && is_array($json['error'])) {
+                $err = $json['error'];
+                $details = trim(implode(' | ', array_filter([
+                    isset($err['type']) ? ('type=' . $err['type']) : null,
+                    isset($err['code']) ? ('code=' . $err['code']) : null,
+                    isset($err['param']) ? ('param=' . $err['param']) : null,
+                    isset($err['message']) ? ('message=' . $err['message']) : null,
+                ])));
+            }
+        } catch (\Throwable $e) {
+            $details = null;
+        }
+
+        $msg = $prefix . ': OpenAI request failed (HTTP ' . $status . ').';
+        if (is_string($details) && $details !== '') {
+            $msg .= ' ' . $details;
+        } else {
+            // Fallback: Body snippet (ohne riesige Dumps)
+            $snippet = trim(substr($body, 0, 600));
+            if ($snippet !== '') {
+                $msg .= ' body=' . $snippet;
+            }
+        }
+        return $msg;
     }
 
     public function getModels(): array
