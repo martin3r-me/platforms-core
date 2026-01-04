@@ -890,195 +890,189 @@ class CoreToolPlaygroundController extends Controller
                                                 'is_empty' => empty($toolsData),
                                             ];
                                             
-                                            // STEP 2: Tools extrahieren
+                                            // STEP 2: Prüfe ob LLM explizit Tools angefragt hat (via module oder search)
+                                        // Nur dann laden wir nach - sonst hat LLM nur "gesehen", nicht "angefordert"
+                                        $module = $toolArguments['module'] ?? null;
+                                        $search = $toolArguments['search'] ?? null;
+                                        $hasExplicitRequest = !empty($module) || !empty($search);
+                                        
+                                        $injectionDebug['step_2'] = 'CHECK_EXPLICIT_REQUEST';
+                                        $injectionDebug['step_2_params'] = [
+                                            'module' => $module,
+                                            'search' => $search,
+                                            'has_explicit_request' => $hasExplicitRequest,
+                                        ];
+                                        
+                                        if (!$hasExplicitRequest) {
+                                            // LLM hat tools.GET ohne Filter aufgerufen → nur "sehen", nicht nachladen
+                                            $injectionDebug['step_2_decision'] = 'NO_LOAD';
+                                            $injectionDebug['step_2_reason'] = 'LLM hat tools.GET ohne Filter aufgerufen - nur anzeigen, nicht nachladen';
+                                            $injectionDebug['step_3'] = 'SKIPPED';
+                                            $injectionDebug['step_4'] = 'SKIPPED';
+                                            $simulation['debug']['tool_injection_' . $iteration] = $injectionDebug;
+                                        } else {
+                                            // LLM hat explizit nach Tools gefragt (module oder search) → nachladen
+                                            $injectionDebug['step_2_decision'] = 'LOAD';
+                                            
+                                            // STEP 3: Tools extrahieren (nur die, die LLM explizit angefragt hat)
                                             if (!empty($toolsData) && is_array($toolsData)) {
-                                                $injectionDebug['step_2'] = 'EXTRACT_TOOLS_FROM_RESULT';
+                                                $injectionDebug['step_3'] = 'EXTRACT_TOOLS_FROM_RESULT';
                                                 foreach ($toolsData as $toolInfo) {
-                                            $toolName = $toolInfo['name'] ?? null;
+                                                    $toolName = $toolInfo['name'] ?? null;
                                                     if ($toolName && is_string($toolName)) {
-                                                $requestedTools[] = $toolName;
-                                            }
-                                        }
-                                                $injectionDebug['step_2_extracted'] = [
+                                                        $requestedTools[] = $toolName;
+                                                    }
+                                                }
+                                                $injectionDebug['step_3_extracted'] = [
                                                     'count' => count($requestedTools),
                                                     'tools' => $requestedTools,
                                                 ];
                                             } else {
-                                                $injectionDebug['step_2'] = 'NO_TOOLS_IN_RESULT';
-                                                $injectionDebug['step_2_reason'] = 'tools.GET erfolgreich, aber keine Tools gefunden (möglicherweise search-Parameter ohne Treffer)';
-                                            }
-                                        } else {
-                                            $injectionDebug['step_1'] = 'TOOLS_GET_FAILED';
-                                            $injectionDebug['step_1_error'] = $toolResult->error ?? 'Unknown error';
-                                        }
-                                        
-                                        // STEP 3: Fallback-Logik wenn keine Tools extrahiert wurden
-                                        if (empty($requestedTools)) {
-                                            $injectionDebug['step_3'] = 'FALLBACK_LOGIC';
-                                            $module = $toolArguments['module'] ?? null;
-                                            $readOnly = $toolArguments['read_only'] ?? null;
-                                            
-                                            $injectionDebug['step_3_params'] = [
-                                                'module' => $module,
-                                                'read_only' => $readOnly,
-                                                'has_module' => !empty($module),
-                                            ];
-                                            
-                                            if ($module) {
-                                                try {
-                                                    $registry = app(ToolRegistry::class);
-                                                    $allTools = $registry->all();
-                                                    $injectionDebug['step_3_registry'] = [
-                                                        'total_tools_in_registry' => count($allTools),
-                                                    ];
-                                                    
-                                                    foreach ($allTools as $tool) {
-                                                        $toolName = $tool->getName();
+                                                $injectionDebug['step_3'] = 'NO_TOOLS_IN_RESULT';
+                                                
+                                                // Fallback: Wenn module-Parameter vorhanden, aber keine Tools im Result
+                                                // → Lade direkt aus Registry
+                                                if ($module) {
+                                                    try {
+                                                        $registry = app(ToolRegistry::class);
+                                                        $allTools = $registry->all();
                                                         
-                                                        if (str_starts_with($toolName, $module . '.')) {
-                                                            if ($readOnly !== null) {
-                                                                $isReadOnly = str_ends_with($toolName, '.GET');
-                                                                if (($readOnly && $isReadOnly) || (!$readOnly && !$isReadOnly)) {
-                                                                    $requestedTools[] = $toolName;
-                                                                }
-                                                            } else {
+                                                        foreach ($allTools as $tool) {
+                                                            $toolName = $tool->getName();
+                                                            if (str_starts_with($toolName, $module . '.')) {
                                                                 $requestedTools[] = $toolName;
                                                             }
                                                         }
+                                                        
+                                                        $injectionDebug['step_3_fallback'] = [
+                                                            'count' => count($requestedTools),
+                                                            'tools' => $requestedTools,
+                                                            'reason' => 'tools.GET erfolgreich, aber keine Tools im Result - Fallback auf Registry',
+                                                        ];
+                                                    } catch (\Throwable $e) {
+                                                        $injectionDebug['step_3_fallback_error'] = $e->getMessage();
+                                                    }
+                                                }
+                                            }
+                                            
+                                            // STEP 4: Tools nachladen (nur wenn LLM explizit angefragt hat)
+                                            if (!empty($requestedTools)) {
+                                                $injectionDebug['step_4'] = 'LOAD_TOOLS';
+                                                $injectionDebug['step_4_before'] = [
+                                                    'tools_to_load' => $requestedTools,
+                                                    'count' => count($requestedTools),
+                                                ];
+                                                
+                                                // Prüfe Tools VOR dem Nachladen
+                                                $reflection = new \ReflectionClass($openAiService);
+                                                $dynamicallyLoadedProperty = $reflection->getProperty('dynamicallyLoadedTools');
+                                                $dynamicallyLoadedProperty->setAccessible(true);
+                                                $toolsBeforeLoad = $dynamicallyLoadedProperty->getValue($openAiService);
+                                                $injectionDebug['step_4_before_loaded'] = [
+                                                    'count' => count($toolsBeforeLoad),
+                                                    'tools' => array_keys($toolsBeforeLoad),
+                                                ];
+                                                
+                                                // Nachladen
+                                                $openAiService->loadToolsDynamically($requestedTools);
+                                                $toolsWereLoaded = true;
+                                                $injectedTools = $requestedTools; // Speichere für Debugging außerhalb des if-Blocks
+                                                
+                                                // Prüfe Tools NACH dem Nachladen
+                                                $toolsAfterLoad = $dynamicallyLoadedProperty->getValue($openAiService);
+                                                $injectionDebug['step_4_after'] = [
+                                                    'count' => count($toolsAfterLoad),
+                                                    'tools' => array_keys($toolsAfterLoad),
+                                                    'newly_loaded' => array_diff(array_keys($toolsAfterLoad), array_keys($toolsBeforeLoad)),
+                                                ];
+                                                
+                                                // STEP 5: Verfügbarkeit prüfen
+                                                $injectionDebug['step_5'] = 'VERIFY_AVAILABILITY';
+                                                $getToolsMethod = $reflection->getMethod('getAvailableTools');
+                                                $getToolsMethod->setAccessible(true);
+                                                $availableTools = $getToolsMethod->invoke($openAiService);
+                                                
+                                                $normalizeMethod = $reflection->getMethod('normalizeToolsForResponses');
+                                                $normalizeMethod->setAccessible(true);
+                                                $normalizedTools = $normalizeMethod->invoke($openAiService, $availableTools);
+                                                
+                                                $availableToolNames = [];
+                                                foreach ($availableTools as $tool) {
+                                                    $name = $tool['function']['name'] ?? $tool['name'] ?? null;
+                                                    if ($name) {
+                                                        $availableToolNames[] = $name;
+                                                    }
+                                                }
+                                                
+                                                $normalizedToolNames = array_map(function($t) {
+                                                    return $t['name'] ?? ($t['function']['name'] ?? 'unknown');
+                                                }, $normalizedTools);
+                                                
+                                                // Prüfe ob nachgeladene Tools wirklich verfügbar sind
+                                                $injectionDebug['step_5_verification'] = [];
+                                                foreach ($requestedTools as $requestedTool) {
+                                                    // Normalisiere Tool-Name für OpenAI (planner.projects.GET -> planner_projects_GET)
+                                                    try {
+                                                        $nameMapper = app(\Platform\Core\Services\ToolNameMapper::class);
+                                                        $normalizedRequested = $nameMapper->toProvider($requestedTool);
+                                                    } catch (\Throwable $e) {
+                                                        $normalizedRequested = str_replace('.', '_', $requestedTool);
                                                     }
                                                     
-                                                    $injectionDebug['step_3_fallback_result'] = [
-                                                        'count' => count($requestedTools),
-                                                'tools' => $requestedTools,
-                                                        'reason' => $toolResult->success ? 'tools.GET erfolgreich, aber keine Tools gefunden' : 'tools.GET fehlgeschlagen',
+                                                    // Prüfe in verschiedenen Formaten
+                                                    $foundInAvailable = in_array($requestedTool, $availableToolNames);
+                                                    $foundInNormalized = in_array($normalizedRequested, $normalizedToolNames);
+                                                    $isAvailable = $foundInAvailable || $foundInNormalized;
+                                                    
+                                                    $injectionDebug['step_5_verification'][] = [
+                                                        'requested' => $requestedTool,
+                                                        'normalized' => $normalizedRequested,
+                                                        'is_available' => $isAvailable,
+                                                        'found_in_available' => $foundInAvailable,
+                                                        'found_in_normalized' => $foundInNormalized,
                                                     ];
-                                                } catch (\Throwable $e) {
-                                                    $injectionDebug['step_3_error'] = $e->getMessage();
-                                                }
-                                            } else {
-                                                $injectionDebug['step_3_skipped'] = 'Kein module-Parameter vorhanden';
-                                            }
-                                        } else {
-                                            $injectionDebug['step_3'] = 'SKIPPED';
-                                            $injectionDebug['step_3_reason'] = 'Tools bereits aus Result extrahiert';
-                                        }
-                                        
-                                        // STEP 4: Tools nachladen
-                                        if (!empty($requestedTools)) {
-                                            $injectionDebug['step_4'] = 'LOAD_TOOLS';
-                                            $injectionDebug['step_4_before'] = [
-                                                'tools_to_load' => $requestedTools,
-                                                'count' => count($requestedTools),
-                                            ];
-                                            
-                                            // Prüfe Tools VOR dem Nachladen
-                                            $reflection = new \ReflectionClass($openAiService);
-                                            $dynamicallyLoadedProperty = $reflection->getProperty('dynamicallyLoadedTools');
-                                            $dynamicallyLoadedProperty->setAccessible(true);
-                                            $toolsBeforeLoad = $dynamicallyLoadedProperty->getValue($openAiService);
-                                            $injectionDebug['step_4_before_loaded'] = [
-                                                'count' => count($toolsBeforeLoad),
-                                                'tools' => array_keys($toolsBeforeLoad),
-                                            ];
-                                            
-                                            // Nachladen
-                                            $openAiService->loadToolsDynamically($requestedTools);
-                                            $toolsWereLoaded = true;
-                                            $injectedTools = $requestedTools; // Speichere für Debugging außerhalb des if-Blocks
-                                            
-                                            // Prüfe Tools NACH dem Nachladen
-                                            $toolsAfterLoad = $dynamicallyLoadedProperty->getValue($openAiService);
-                                            $injectionDebug['step_4_after'] = [
-                                                'count' => count($toolsAfterLoad),
-                                                'tools' => array_keys($toolsAfterLoad),
-                                                'newly_loaded' => array_diff(array_keys($toolsAfterLoad), array_keys($toolsBeforeLoad)),
-                                            ];
-                                            
-                                            // STEP 5: Verfügbarkeit prüfen
-                                            $injectionDebug['step_5'] = 'VERIFY_AVAILABILITY';
-                                            $getToolsMethod = $reflection->getMethod('getAvailableTools');
-                                            $getToolsMethod->setAccessible(true);
-                                            $availableTools = $getToolsMethod->invoke($openAiService);
-                                            
-                                            $normalizeMethod = $reflection->getMethod('normalizeToolsForResponses');
-                                            $normalizeMethod->setAccessible(true);
-                                            $normalizedTools = $normalizeMethod->invoke($openAiService, $availableTools);
-                                            
-                                            $availableToolNames = [];
-                                            foreach ($availableTools as $tool) {
-                                                $name = $tool['function']['name'] ?? $tool['name'] ?? null;
-                                                if ($name) {
-                                                    $availableToolNames[] = $name;
-                                                }
-                                            }
-                                            
-                                            $normalizedToolNames = array_map(function($t) {
-                                                return $t['name'] ?? ($t['function']['name'] ?? 'unknown');
-                                            }, $normalizedTools);
-                                            
-                                            // Prüfe ob nachgeladene Tools wirklich verfügbar sind
-                                            $injectionDebug['step_5_verification'] = [];
-                                            foreach ($requestedTools as $requestedTool) {
-                                                // Normalisiere Tool-Name für OpenAI (planner.projects.GET -> planner_projects_GET)
-                                                try {
-                                                    $nameMapper = app(\Platform\Core\Services\ToolNameMapper::class);
-                                                    $normalizedRequested = $nameMapper->toProvider($requestedTool);
-                                                } catch (\Throwable $e) {
-                                                    $normalizedRequested = str_replace('.', '_', $requestedTool);
                                                 }
                                                 
-                                                // Prüfe in verschiedenen Formaten
-                                                $foundInAvailable = in_array($requestedTool, $availableToolNames);
-                                                $foundInNormalized = in_array($normalizedRequested, $normalizedToolNames);
-                                                $isAvailable = $foundInAvailable || $foundInNormalized;
-                                                
-                                                $injectionDebug['step_5_verification'][] = [
-                                                    'requested' => $requestedTool,
-                                                    'normalized' => $normalizedRequested,
-                                                    'is_available' => $isAvailable,
-                                                    'found_in_available' => $foundInAvailable,
-                                                    'found_in_normalized' => $foundInNormalized,
+                                                $injectionDebug['step_5_summary'] = [
+                                                    'total_available_tools' => count($availableTools),
+                                                    'total_normalized_tools' => count($normalizedTools),
+                                                    'available_tool_names' => $availableToolNames,
+                                                    'normalized_tool_names' => $normalizedToolNames,
+                                                    'all_requested_available' => count(array_filter($injectionDebug['step_5_verification'], fn($v) => $v['is_available'])) === count($requestedTools),
                                                 ];
+                                                
+                                                $injectionDebug['step_6'] = 'INJECTION_COMPLETE';
+                                                $injectionDebug['step_6_next'] = 'Sofortige OpenAI-Anfrage wird gemacht, damit Tools verfügbar sind';
+                                                
+                                                // Speichere Debug-Info
+                                                $simulation['debug']['tool_injection_' . $iteration] = $injectionDebug;
+                                                
+                                                Log::info('[CoreToolPlayground] Tool-Injection abgeschlossen', [
+                                                    'iteration' => $iteration,
+                                                    'tools_requested' => count($requestedTools),
+                                                    'tools_loaded' => count($toolsAfterLoad),
+                                                    'tools_available' => count($availableTools),
+                                                    'all_available' => $injectionDebug['step_5_summary']['all_requested_available'],
+                                                ]);
+                                            } else {
+                                                $injectionDebug['step_4'] = 'SKIPPED';
+                                                $injectionDebug['step_4_reason'] = 'Keine Tools zum Nachladen';
+                                                $injectionDebug['step_5'] = 'SKIPPED';
+                                                $injectionDebug['step_6'] = 'INJECTION_FAILED';
+                                                
+                                                $simulation['debug']['tool_injection_' . $iteration] = $injectionDebug;
+                                                
+                                                Log::warning('[CoreToolPlayground] Tool-Injection fehlgeschlagen - keine Tools gefunden', [
+                                                    'iteration' => $iteration,
+                                                    'arguments' => $toolArguments,
+                                                    'result_structure' => $toolResult->success ? [
+                                                        'has_data' => isset($resultArray['data']),
+                                                        'has_data_tools' => isset($resultArray['data']['tools']),
+                                                        'has_tools' => isset($resultArray['tools']),
+                                                    ] : null,
+                                                ]);
                                             }
-                                            
-                                            $injectionDebug['step_5_summary'] = [
-                                                'total_available_tools' => count($availableTools),
-                                                'total_normalized_tools' => count($normalizedTools),
-                                                'available_tool_names' => $availableToolNames,
-                                                'normalized_tool_names' => $normalizedToolNames,
-                                                'all_requested_available' => count(array_filter($injectionDebug['step_5_verification'], fn($v) => $v['is_available'])) === count($requestedTools),
-                                            ];
-                                            
-                                            $injectionDebug['step_6'] = 'INJECTION_COMPLETE';
-                                            $injectionDebug['step_6_next'] = 'Sofortige OpenAI-Anfrage wird gemacht, damit Tools verfügbar sind';
-                                            
-                                            // Speichere Debug-Info
-                                            $simulation['debug']['tool_injection_' . $iteration] = $injectionDebug;
-                                            
-                                            Log::info('[CoreToolPlayground] Tool-Injection abgeschlossen', [
-                                                'iteration' => $iteration,
-                                                'tools_requested' => count($requestedTools),
-                                                'tools_loaded' => count($toolsAfterLoad),
-                                                'tools_available' => count($availableTools),
-                                                'all_available' => $injectionDebug['step_5_summary']['all_requested_available'],
-                                            ]);
-                                        } else {
-                                            $injectionDebug['step_4'] = 'SKIPPED';
-                                            $injectionDebug['step_4_reason'] = 'Keine Tools zum Nachladen';
-                                            $injectionDebug['step_5'] = 'SKIPPED';
-                                            $injectionDebug['step_6'] = 'INJECTION_FAILED';
-                                            
-                                            $simulation['debug']['tool_injection_' . $iteration] = $injectionDebug;
-                                            
-                                            Log::warning('[CoreToolPlayground] Tool-Injection fehlgeschlagen - keine Tools gefunden', [
-                                                'iteration' => $iteration,
-                                                'arguments' => $toolArguments,
-                                                'result_structure' => $toolResult->success ? [
-                                                    'has_data' => isset($resultArray['data']),
-                                                    'has_data_tools' => isset($resultArray['data']['tools']),
-                                                    'has_tools' => isset($resultArray['tools']),
-                                                ] : null,
-                                            ]);
+                                        }
                                         }
                                     }
                                     
@@ -1182,16 +1176,17 @@ class CoreToolPlaygroundController extends Controller
                             }
                             $hasLoop = false;
                             foreach ($toolCounts as $tool => $count) {
-                                if ($count > 2) {
+                                // Loop bereits nach 2. Aufruf erkennen (nicht erst nach 3.)
+                                if ($count >= 2) {
                                     $hasLoop = true;
                                     break;
                                 }
                             }
                             
                             // Verifikation nur wenn:
-                            // - Es bereits mehr als 2 Iterationen gibt, ODER
+                            // - Es bereits mehr als 1 Iteration gibt, ODER
                             // - Ein Loop erkannt wurde
-                            if ($enableVerification && count($allToolResults) > 0 && (count($allToolResults) > 2 || $hasLoop)) {
+                            if ($enableVerification && count($allToolResults) > 0 && (count($allToolResults) > 1 || $hasLoop)) {
                                 $shouldVerify = true;
                             }
                             
@@ -1225,114 +1220,6 @@ class CoreToolPlaygroundController extends Controller
                                             'timestamp' => now()->toIso8601String(),
                                             'verification_issues' => $verification->getIssuesText(),
                                         ];
-                                    }
-                                    
-                                    /**
-                                     * MCP ROBUSTNESS: Auto-Injection im laufenden Run
-                                     *
-                                     * Wenn wir in einem Tool-Loop stecken und das erwartete Tool (z.B. planner.projects.GET)
-                                     * nicht in den verfügbaren Tools ist, dann laden wir on-demand die Tools des erwarteten
-                                     * Moduls per internem tools.GET nach (ohne dass die LLM erst tools.GET wählen muss).
-                                     *
-                                     * WICHTIG: Auto-Injection greift unabhängig von hasIssues() - nur basierend auf Loop-Erkennung.
-                                     * Dies stellt sicher, dass Tools nachgeladen werden, auch wenn keine expliziten Issues gefunden wurden.
-                                     */
-                                    $enableAutoInjection = config('tools.mcp.auto_injection_on_loop', true);
-                                    // Auto-Injection wenn:
-                                    // 1. Loop erkannt UND Tools noch nicht geladen, ODER
-                                    // 2. Loop erkannt UND erwartetes Tool fehlt (auch wenn Tools bereits geladen wurden)
-                                    if ($enableAutoInjection && $hasLoop) {
-                                        try {
-                                            $expectedTool = $verificationService->expectedToolFor($message);
-                                            if ($expectedTool) {
-                                                // Prüfe ob expectedTool bereits verfügbar ist
-                                                $reflection = new \ReflectionClass($openAiService);
-                                                $getToolsMethod = $reflection->getMethod('getAvailableTools');
-                                                $getToolsMethod->setAccessible(true);
-                                                $availableToolsNow = $getToolsMethod->invoke($openAiService);
-
-                                                $availableToolNamesNow = [];
-                                                foreach ($availableToolsNow as $tool) {
-                                                    $name = $tool['function']['name'] ?? $tool['name'] ?? null;
-                                                    if ($name) {
-                                                        $availableToolNamesNow[] = $name;
-                                                    }
-                                                }
-
-                                                $expectedModule = explode('.', $expectedTool)[0] ?? null;
-                                                $expectedIsAvailable = in_array($expectedTool, $availableToolNamesNow, true);
-
-                                                // Auto-Injection wenn: Tools noch nicht geladen ODER erwartetes Tool fehlt
-                                                $shouldInject = (!$toolsWereLoaded) || (!$expectedIsAvailable);
-                                                
-                                                if ($expectedModule && $shouldInject && !$expectedIsAvailable) {
-                                                    $autoArgs = [
-                                                        'module' => $expectedModule,
-                                                        // WICHTIG: Lade ALLE Tools (GET, POST, PUT, DELETE) - nicht nur read_only
-                                                        // Die LLM entscheidet selbst, welche Tools sie braucht (REST-basiert)
-                                                        // 'read_only' wird NICHT gesetzt → alle Tools werden geladen
-                                                        'search' => '',
-                                                    ];
-
-                                                    $simulation['steps'][] = [
-                                                        'step' => 4 + $iteration,
-                                                        'name' => 'MCP Auto-Injection (Loop Recovery)',
-                                                        'description' => "Auto-Injection aktiviert: Lade Tools für Modul '{$expectedModule}' nach, weil '{$expectedTool}' nicht verfügbar ist",
-                                                        'timestamp' => now()->toIso8601String(),
-                                                        'expected_tool' => $expectedTool,
-                                                        'auto_args' => $autoArgs,
-                                                    ];
-
-                                                    $context = \Platform\Core\Tools\ToolContext::fromAuth();
-                                                    $autoToolResult = $executor->execute(
-                                                        'tools.GET',
-                                                        $autoArgs,
-                                                        $context
-                                                    );
-
-                                                    $autoResultArray = [
-                                                        'ok' => (bool)($autoToolResult->success ?? false),
-                                                        'data' => $autoToolResult->data ?? null,
-                                                        'error' => $autoToolResult->error ?? null,
-                                                    ];
-
-                                                    $autoTools = [];
-                                                    $autoData = $autoResultArray['data'] ?? [];
-                                                    if (is_array($autoData) && isset($autoData['tools']) && is_array($autoData['tools'])) {
-                                                        foreach ($autoData['tools'] as $t) {
-                                                            $name = $t['name'] ?? null;
-                                                            if ($name) {
-                                                                $autoTools[] = $name;
-                                                            }
-                                                        }
-                                                    }
-
-                                                    $simulation['debug']['tool_auto_injection_' . $iteration] = [
-                                                        'status' => $autoResultArray['ok'] ? 'success' : 'error',
-                                                        'expected_tool' => $expectedTool,
-                                                        'module' => $expectedModule,
-                                                        'auto_args' => $autoArgs,
-                                                        'tools_found' => $autoTools,
-                                                        'tools_found_count' => count($autoTools),
-                                                        'note' => 'Auto-Injection nur bei Loop + expected tool missing; on-demand MCP-Hardening',
-                                                    ];
-
-                                                    if (!empty($autoTools)) {
-                                                        $openAiService->loadToolsDynamically($autoTools);
-                                                        $toolsWereLoaded = true;
-                                                        $injectedTools = $autoTools;
-                                                    }
-                                                }
-                                            }
-                                        } catch (\Throwable $e) {
-                                            \Log::debug('[CoreToolPlayground] MCP Auto-Injection fehlgeschlagen', [
-                                                'error' => $e->getMessage(),
-                                            ]);
-                                            $simulation['debug']['tool_auto_injection_' . $iteration] = [
-                                                'status' => 'error',
-                                                'error' => $e->getMessage(),
-                                            ];
-                                        }
                                     }
                                 } catch (\Throwable $e) {
                                     // Silent fail - Verifikation optional
@@ -3975,7 +3862,16 @@ class CoreToolPlaygroundController extends Controller
                                                 'success' => $toolResult->success,
                                             ];
                                             
-                                            if ($toolResult->success && isset($resultArray['data']['tools'])) {
+                                            // Prüfe ob LLM explizit Tools angefragt hat (via module oder search)
+                                            $module = $toolArguments['module'] ?? null;
+                                            $search = $toolArguments['search'] ?? null;
+                                            $hasExplicitRequest = !empty($module) || !empty($search);
+                                            
+                                            $injectionDebug['has_explicit_request'] = $hasExplicitRequest;
+                                            $injectionDebug['module'] = $module;
+                                            $injectionDebug['search'] = $search;
+                                            
+                                            if ($hasExplicitRequest && $toolResult->success && isset($resultArray['data']['tools'])) {
                                                 $tools = $resultArray['data']['tools'];
                                                 $toolNames = array_map(function($t) {
                                                     return $t['name'] ?? ($t['function']['name'] ?? 'unknown');
@@ -3999,9 +3895,14 @@ class CoreToolPlaygroundController extends Controller
                                                         'count' => count($tools),
                                                     ]);
                                                 }
-                                                
-                                                $simulation['debug']['tool_injection_' . $iteration] = $injectionDebug;
+                                            } else {
+                                                $injectionDebug['step_2'] = 'NO_LOAD';
+                                                $injectionDebug['reason'] = $hasExplicitRequest 
+                                                    ? 'tools.GET fehlgeschlagen oder keine Tools gefunden'
+                                                    : 'LLM hat tools.GET ohne Filter aufgerufen - nur anzeigen, nicht nachladen';
                                             }
+                                            
+                                            $simulation['debug']['tool_injection_' . $iteration] = $injectionDebug;
                                         }
                                         
                                         $loopCount = $toolCallHistory[$internalToolName]['count'] ?? 0;
@@ -4093,13 +3994,14 @@ class CoreToolPlaygroundController extends Controller
                                 }
                                 $hasLoop = false;
                                 foreach ($toolCounts as $tool => $count) {
-                                    if ($count > 2) {
+                                    // Loop bereits nach 2. Aufruf erkennen (nicht erst nach 3.)
+                                    if ($count >= 2) {
                                         $hasLoop = true;
                                         break;
                                     }
                                 }
                                 
-                                if ($enableVerification && count($allToolResults) > 0 && (count($allToolResults) > 2 || $hasLoop)) {
+                                if ($enableVerification && count($allToolResults) > 0 && (count($allToolResults) > 1 || $hasLoop)) {
                                     $shouldVerify = true;
                                 }
                                 
@@ -4125,50 +4027,6 @@ class CoreToolPlaygroundController extends Controller
                                                 'iteration' => $iteration,
                                                 'issues' => $verification->getIssuesText(),
                                             ]);
-                                        }
-                                        
-                                        // Auto-Injection unabhängig von hasIssues() - nur basierend auf Loop-Erkennung
-                                        $enableAutoInjection = config('tools.mcp.auto_injection_on_loop', true);
-                                        if ($enableAutoInjection && $hasLoop) {
-                                            try {
-                                                $expectedTool = $verificationService->expectedToolFor($message);
-                                                if ($expectedTool) {
-                                                    $reflection = new \ReflectionClass($openAiService);
-                                                    $getToolsMethod = $reflection->getMethod('getAvailableTools');
-                                                    $getToolsMethod->setAccessible(true);
-                                                    $availableToolsNow = $getToolsMethod->invoke($openAiService);
-                                                    
-                                                    $availableToolNamesNow = [];
-                                                    foreach ($availableToolsNow as $tool) {
-                                                        $availableToolNamesNow[] = $tool['function']['name'] ?? $tool['name'] ?? 'unknown';
-                                                    }
-                                                    
-                                                    $expectedIsAvailable = in_array($expectedTool, $availableToolNamesNow) || 
-                                                                           in_array(str_replace('.', '_', $expectedTool), $availableToolNamesNow);
-                                                    
-                                                    if (!$expectedIsAvailable) {
-                                                        $module = $this->extractModuleFromToolName($expectedTool);
-                                                        $autoArgs = ['module' => $module];
-                                                        $autoResult = $executor->execute('tools.GET', $autoArgs, $context);
-                                                        
-                                                        if ($autoResult->success && isset($autoResult->data['tools'])) {
-                                                            $autoTools = array_map(function($t) {
-                                                                return $t['name'] ?? ($t['function']['name'] ?? 'unknown');
-                                                            }, $autoResult->data['tools']);
-                                                            $openAiService->loadToolsDynamically($autoTools);
-                                                            
-                                                            $sendEvent('tool.auto_injection', [
-                                                                'iteration' => $iteration,
-                                                                'expected_tool' => $expectedTool,
-                                                                'module' => $module,
-                                                                'injected_tools' => $autoTools,
-                                                            ]);
-                                                        }
-                                                    }
-                                                }
-                                            } catch (\Throwable $e) {
-                                                // Silent fail
-                                            }
                                         }
                                         
                                         $simulation['verification'] = [
