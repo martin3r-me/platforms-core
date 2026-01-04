@@ -809,17 +809,15 @@ class CoreToolPlaygroundController extends Controller
                                     }
                                 }
                                 
-                                // Nutze echten ToolOrchestrator (wie in CoreAiStreamController)
+                                // LOOSE: Nutze direkten ToolExecutor (LLM entscheidet selbst über Dependencies)
                                 $context = ToolContext::fromAuth();
                                 $startTime = microtime(true);
                                 
                                 try {
-                                    $toolResult = $orchestrator->executeWithDependencies(
+                                    $toolResult = $executor->execute(
                                         $internalToolName,
                                         $toolArguments,
-                                        $context,
-                                        maxDepth: 5,
-                                        planFirst: true
+                                        $context
                                     );
                                     
                                     $executionTime = (microtime(true) - $startTime) * 1000;
@@ -1257,12 +1255,10 @@ class CoreToolPlaygroundController extends Controller
                                                         ];
 
                                                         $context = \Platform\Core\Tools\ToolContext::fromAuth();
-                                                        $autoToolResult = $orchestrator->executeWithDependencies(
+                                                        $autoToolResult = $executor->execute(
                                                             'tools.GET',
                                                             $autoArgs,
-                                                            $context,
-                                                            maxDepth: 3,
-                                                            planFirst: true
+                                                            $context
                                                         );
 
                                                         $autoResultArray = [
@@ -2001,12 +1997,11 @@ class CoreToolPlaygroundController extends Controller
                 
                 $startTime = microtime(true);
                 try {
-                    $executionResult = $orchestrator->executeWithDependencies(
+                    // LOOSE: Nutze direkten ToolExecutor (LLM entscheidet selbst über Dependencies)
+                    $executionResult = $executor->execute(
                         $toolName,
                         $arguments,
-                        $context,
-                        maxDepth: 5,
-                        planFirst: true
+                        $context
                     );
                 } catch (\Throwable $execError) {
                     // Fehler während Tool-Execution
@@ -2394,16 +2389,15 @@ class CoreToolPlaygroundController extends Controller
             // Tool ausführen
             if ($useOrchestrator) {
                 $debug['execution'] = [
-                    'method' => 'orchestrator',
+                    'method' => 'direct',
                     'tool' => $toolName,
                     'arguments' => $arguments,
                 ];
-                $result = $orchestrator->executeWithDependencies(
+                // LOOSE: Nutze direkten ToolExecutor (LLM entscheidet selbst über Dependencies)
+                $result = $executor->execute(
                     $toolName,
                     $arguments,
-                    $context,
-                    maxDepth: 5,
-                    planFirst: $showPlan
+                    $context
                 );
             } else {
                 $debug['execution'] = [
@@ -3765,12 +3759,10 @@ class CoreToolPlaygroundController extends Controller
                                         if ($module) {
                                             try {
                                                 $context = ToolContext::fromAuth();
-                                                $autoResult = $orchestrator->executeWithDependencies(
+                                                $autoResult = $executor->execute(
                                                     'tools.GET',
                                                     ['module' => $module],
-                                                    $context,
-                                                    maxDepth: 1,
-                                                    planFirst: false
+                                                    $context
                                                 );
                                                 
                                                 if ($autoResult->success && isset($autoResult->data['tools'])) {
@@ -3909,12 +3901,11 @@ class CoreToolPlaygroundController extends Controller
                                     $startTime = microtime(true);
                                     
                                     try {
-                                        $toolResult = $orchestrator->executeWithDependencies(
+                                        // LOOSE: Nutze direkten ToolExecutor (LLM entscheidet selbst über Dependencies)
+                                        $toolResult = $executor->execute(
                                             $internalToolName,
                                             $toolArguments,
-                                            $context,
-                                            maxDepth: 5,
-                                            planFirst: true
+                                            $context
                                         );
                                         
                                         $executionTime = (microtime(true) - $startTime) * 1000;
@@ -4104,7 +4095,7 @@ class CoreToolPlaygroundController extends Controller
                                                         if (!$expectedIsAvailable) {
                                                             $module = $this->extractModuleFromToolName($expectedTool);
                                                             $autoArgs = ['module' => $module];
-                                                            $autoResult = $orchestrator->executeWithDependencies('tools.GET', $autoArgs, $context, maxDepth: 1, planFirst: false);
+                                                            $autoResult = $executor->execute('tools.GET', $autoArgs, $context);
                                                             
                                                             if ($autoResult->success && isset($autoResult->data['tools'])) {
                                                                 $autoTools = array_map(function($t) {
