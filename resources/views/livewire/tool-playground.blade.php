@@ -96,22 +96,22 @@
                                 <template x-for="(item, index) in chatMessages" :key="'msg-' + index">
                                     <template x-if="item && item.type === 'message'">
                                         <div class="flex" :class="item.role === 'user' ? 'justify-end' : 'justify-start'">
-                                            <div 
-                                                class="max-w-[80%] rounded-lg p-3"
+                                        <div 
+                                            class="max-w-[80%] rounded-lg p-3"
                                                 :class="item.role === 'user' 
-                                                    ? 'bg-[var(--ui-primary)] text-white' 
-                                                    : 'bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] border border-[var(--ui-border)]'"
-                                            >
+                                                ? 'bg-[var(--ui-primary)] text-white' 
+                                                : 'bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] border border-[var(--ui-border)]'"
+                                        >
                                                 <div class="text-sm font-semibold mb-1" x-text="item.role === 'user' ? 'Du' : 'LLM'"></div>
                                                 <div class="text-sm whitespace-pre-wrap" x-text="item.content || '...'"></div>
                                                 <div x-show="item.tool_calls && item.tool_calls.length > 0" class="mt-2 pt-2 border-t border-[var(--ui-border)]">
-                                                    <div class="text-xs font-semibold mb-1">🔧 Tools aufgerufen:</div>
+                                                <div class="text-xs font-semibold mb-1">🔧 Tools aufgerufen:</div>
                                                     <template x-for="toolCall in item.tool_calls">
-                                                        <div class="text-xs font-mono mb-1" x-text="toolCall.function?.name || toolCall.name"></div>
-                                                    </template>
-                                                </div>
+                                                    <div class="text-xs font-mono mb-1" x-text="toolCall.function?.name || toolCall.name"></div>
+                                                </template>
                                             </div>
                                         </div>
+                                    </div>
                                     </template>
                                 </template>
                                 

@@ -88,18 +88,18 @@ class OpenAiService
                 'max_output_tokens' => $options['max_tokens'] ?? 1000,
                 'temperature' => $options['temperature'] ?? 0.7,
             ];
-        if (isset($options['tools']) && $options['tools'] === false) {
-            // Tools explizit deaktiviert - nichts hinzufügen
-        } else {
+            if (isset($options['tools']) && $options['tools'] === false) {
+                // Tools explizit deaktiviert - nichts hinzufügen
+            } else {
             // Standard tools Array (MCP-Events kommen während des Streams)
-            $tools = $this->getAvailableTools();
-            if (!empty($tools)) {
-                $payload['tools'] = $this->normalizeToolsForResponses($tools);
-                if (isset($options['tool_choice'])) {
-                    $payload['tool_choice'] = $options['tool_choice'];
+                $tools = $this->getAvailableTools();
+                if (!empty($tools)) {
+                    $payload['tools'] = $this->normalizeToolsForResponses($tools);
+                    if (isset($options['tool_choice'])) {
+                        $payload['tool_choice'] = $options['tool_choice'];
+                    }
                 }
             }
-        }
             
             // Debug: Log Payload mit Größen-Info für cURL-Fehler-Debugging
             $payloadSize = strlen(json_encode($payload));
@@ -396,14 +396,14 @@ class OpenAiService
                 ]);
             }
         }
-            // Debug: Log Payload (nur wenn Debug aktiviert)
-            if (config('app.debug', false)) {
-                Log::debug('[OpenAI Stream] Sending payload', [
-                    'payload_keys' => array_keys($payload),
-                    'tools_count' => count($payload['tools'] ?? []),
-                    'tools' => $payload['tools'] ?? [],
-                ]);
-            }
+        // Debug: Log Payload (nur wenn Debug aktiviert)
+        if (config('app.debug', false)) {
+            Log::debug('[OpenAI Stream] Sending payload', [
+                'payload_keys' => array_keys($payload),
+                'tools_count' => count($payload['tools'] ?? []),
+                'tools' => $payload['tools'] ?? [],
+            ]);
+        }
         
         $response = $this->http(withStream: true)->post($this->baseUrl . '/responses', $payload);
         if ($response->failed()) {
@@ -744,7 +744,7 @@ class OpenAiService
                                 'tool_names' => array_map(function($t) {
                                     return $t['name'] ?? 'unknown';
                                 }, $tools),
-                            ]);
+                        ]);
                         }
                         break;
                     case 'response.tool_call.completed':
@@ -773,7 +773,7 @@ class OpenAiService
                 $internalToolName = $mcpServerName . '.' . $toolName;
             } else {
                 // Fallback: Standard Denormalisierung (für Backwards-Kompatibilität)
-                $internalToolName = $this->denormalizeToolNameFromOpenAi($toolName);
+            $internalToolName = $this->denormalizeToolNameFromOpenAi($toolName);
             }
             
             $arguments = json_decode($toolArguments, true);
@@ -1365,7 +1365,7 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
             if (empty($compressedProperties)) {
                 $compressed['properties'] = new \stdClass();
             } else {
-                $compressed['properties'] = $compressedProperties;
+            $compressed['properties'] = $compressedProperties;
             }
         } elseif (($schema['type'] ?? 'object') === 'object') {
             // Wenn kein properties im Schema, aber type ist "object", füge leeres Objekt hinzu

@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Platform\Core\Http\Controllers\CoreAiStreamController;
 use Platform\Core\Http\Controllers\TeamInvitationController;
 use Platform\Core\Http\Controllers\CoreToolPlaygroundController;
+use Platform\Core\Http\Controllers\SimpleToolController;
 
 
 Route::post('/logout', function () {
@@ -257,7 +258,12 @@ Route::middleware(['web', 'auth'])->group(function () {
     
     // Tool Playground (MCP Testing) - Livewire-Komponente
     Route::get('/core/tools/playground', \Platform\Core\Livewire\ToolPlayground::class)->name('core.tools.playground');
+    Route::get('/core/tools/simple', \Platform\Core\Livewire\SimpleToolPlayground::class)->name('core.tools.simple');
     Route::middleware(['force.json'])->group(function () {
+        // Minimaler Tool Controller (neu, einfach)
+        Route::post('/core/tools/simple', [SimpleToolController::class, 'handle'])->name('core.tools.simple');
+        Route::post('/core/tools/simple/stream', [SimpleToolController::class, 'stream'])->name('core.tools.simple.stream');
+        
         Route::post('/core/tools/playground/simulate', [CoreToolPlaygroundController::class, 'simulate'])->name('core.tools.playground.simulate');
         Route::post('/core/tools/playground/simulate/stream', [CoreToolPlaygroundController::class, 'simulateStream'])->name('core.tools.playground.simulate.stream');
         Route::post('/core/tools/playground/test', [CoreToolPlaygroundController::class, 'test'])->name('core.tools.playground.test');
