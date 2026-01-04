@@ -1162,6 +1162,35 @@ class CoreToolPlaygroundController extends Controller
                                         'execution_time_ms' => round($executionTime, 2),
                                     ];
                                     
+                                    // Loop-Detection: Prüfe auch bei erfolgreichen Calls, ob Tool mit ähnlichen Argumenten mehrfach aufgerufen wurde
+                                    if ($toolResult->success && $iteration >= 3) {
+                                        $successfulCalls = array_filter($allToolResults, function($r) use ($internalToolName) {
+                                            return ($r['tool'] ?? '') === $internalToolName && ($r['success'] ?? false);
+                                        });
+                                        
+                                        if (count($successfulCalls) >= 3) {
+                                            // Prüfe ob alle erfolgreichen Calls ähnliche Argumente haben
+                                            $similarCount = 0;
+                                            foreach ($successfulCalls as $call) {
+                                                if ($this->areArgumentsSimilar($toolArguments, $call['arguments'] ?? [])) {
+                                                    $similarCount++;
+                                                }
+                                            }
+                                            
+                                            // Wenn 3x+ erfolgreich mit ähnlichen Argumenten → Loop erkannt
+                                            if ($similarCount >= 3) {
+                                                $simulation['final_response'] = [
+                                                    'type' => 'warning',
+                                                    'message' => "Früher Stopp: Tool '{$internalToolName}' wurde {$similarCount}x erfolgreich mit ähnlichen Argumenten aufgerufen (Loop erkannt)",
+                                                    'content' => $response['content'] ?? 'Keine finale Antwort',
+                                                    'iterations' => $iteration,
+                                                    'tool_results' => $allToolResults,
+                                                ];
+                                                break 2; // Breche aus beiden Loops
+                                            }
+                                        }
+                                    }
+                                    
                                     $simulation['execution_flow'][] = [
                                         'iteration' => $iteration,
                                         'tool' => $internalToolName,
@@ -4284,6 +4313,39 @@ class CoreToolPlaygroundController extends Controller
                                             'execution_time_ms' => round($executionTime, 2),
                                             'has_data' => !empty($toolResult->data),
                                         ]);
+                                        
+                                        // Loop-Detection: Prüfe auch bei erfolgreichen Calls, ob Tool mit ähnlichen Argumenten mehrfach aufgerufen wurde
+                                        if ($toolResult->success && $iteration >= 3) {
+                                            $successfulCalls = array_filter($allToolResults, function($r) use ($internalToolName) {
+                                                return ($r['tool'] ?? '') === $internalToolName && ($r['success'] ?? false);
+                                            });
+                                            
+                                            if (count($successfulCalls) >= 3) {
+                                                // Prüfe ob alle erfolgreichen Calls ähnliche Argumente haben
+                                                $similarCount = 0;
+                                                foreach ($successfulCalls as $call) {
+                                                    if ($this->areArgumentsSimilar($toolArguments, $call['arguments'] ?? [])) {
+                                                        $similarCount++;
+                                                    }
+                                                }
+                                                
+                                                // Wenn 3x+ erfolgreich mit ähnlichen Argumenten → Loop erkannt
+                                                if ($similarCount >= 3) {
+                                                    $simulation['final_response'] = [
+                                                        'type' => 'warning',
+                                                        'message' => "Früher Stopp: Tool '{$internalToolName}' wurde {$similarCount}x erfolgreich mit ähnlichen Argumenten aufgerufen (Loop erkannt)",
+                                                        'content' => $response['content'] ?? 'Keine finale Antwort',
+                                                        'iterations' => $iteration,
+                                                        'tool_results' => $allToolResults,
+                                                    ];
+                                                    $sendEvent('iteration.early_stop', [
+                                                        'iteration' => $iteration,
+                                                        'reason' => "Tool '{$internalToolName}' wurde {$similarCount}x erfolgreich mit ähnlichen Argumenten aufgerufen (Loop erkannt)",
+                                                    ]);
+                                                    break 2; // Breche aus beiden Loops
+                                                }
+                                            }
+                                        }
                                         
                                     } catch (\Throwable $e) {
                                         $executionTime = (microtime(true) - $startTime) * 1000;
