@@ -386,18 +386,34 @@ class OpenAiService
         if (isset($options['tools']) && $options['tools'] === false) {
             // Tools explizit deaktiviert - nichts hinzufügen
         } else {
-            // Standard tools Array (MCP-Events kommen während des Streams)
-            $tools = $this->getAvailableTools();
-            $payload['tools'] = $this->normalizeToolsForResponses($tools);
-            $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
+            // Tools aktiviert:
+            // - Wenn $options['tools'] ein Array ist, nutzen wir es direkt (z.B. OpenAI built-in Tools wie web_search)
+            // - Sonst: Standard = interne Tools aus Registry
+            if (isset($options['tools']) && is_array($options['tools'])) {
+                $payload['tools'] = $options['tools'];
+                $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
+            } else {
+                // Standard tools Array (MCP-Events kommen während des Streams)
+                $tools = $this->getAvailableTools();
+                $payload['tools'] = $this->normalizeToolsForResponses($tools);
+                $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
+                
+                // Debug: Log Tools (nur wenn Logging aktiviert ist)
+                if (config('app.debug', false)) {
+                    Log::debug('[OpenAI Stream] Tools aktiviert', [
+                        'tool_count' => count($tools),
+                        'tool_names' => array_map(function($t) {
+                            return $t['function']['name'] ?? $t['name'] ?? 'unknown';
+                        }, $tools),
+                    ]);
+                }
+            }
             
             // Debug: Log Tools (nur wenn Logging aktiviert ist)
             if (config('app.debug', false)) {
-                Log::debug('[OpenAI Stream] Tools aktiviert', [
-                    'tool_count' => count($tools),
-                    'tool_names' => array_map(function($t) {
-                        return $t['function']['name'] ?? $t['name'] ?? 'unknown';
-                    }, $tools),
+                Log::debug('[OpenAI Stream] Tool payload (final)', [
+                    'tool_count' => count($payload['tools'] ?? []),
+                    'tool_types' => array_values(array_unique(array_map(fn($t) => $t['type'] ?? 'unknown', $payload['tools'] ?? []))),
                 ]);
             }
         }

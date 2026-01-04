@@ -4,7 +4,7 @@
   </x-slot>
 
   <x-slot name="sidebar">
-    <x-ui-page-sidebar title="Model" width="w-80" :defaultOpen="true" side="left" storeKey="simpleModelOpen">
+    <x-ui-page-sidebar title="Model" width="w-80" :defaultOpen="true" side="left">
       <div class="p-4 space-y-4">
         <div class="flex items-center justify-between">
           <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Auswahl</div>
@@ -33,7 +33,7 @@
   </x-slot>
 
   <x-slot name="activity">
-    <x-ui-page-sidebar title="Realtime" width="w-80" :defaultOpen="true" side="right" storeKey="simpleRealtimeOpen">
+    <x-ui-page-sidebar title="Realtime" width="w-80" :defaultOpen="true" side="right" storeKey="activityOpen">
       <div class="p-4 space-y-4">
         <div class="flex items-center justify-between">
           <div class="text-xs text-[var(--ui-muted)]">
@@ -280,6 +280,14 @@
                   case 'thinking.delta':
                     if (data?.delta) rtThinking.textContent += data.delta;
                     break;
+                  case 'openai.event': {
+                    const ev = data?.event || 'openai.event';
+                    const p = data?.preview ? JSON.stringify(data.preview) : '';
+                    const raw = data?.raw ? String(data.raw) : '';
+                    rtLog(p ? `${ev} ${p}` : ev);
+                    if (raw) rtLog(raw);
+                    break;
+                  }
                   case 'complete': {
                     const assistant = data?.assistant || rtAssistant.textContent;
                     messages.push({ role: 'assistant', content: assistant });

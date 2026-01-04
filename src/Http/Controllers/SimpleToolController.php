@@ -324,6 +324,7 @@ class SimpleToolController extends Controller
                 $assistant = '';
                 $reasoning = '';
                 $thinking = '';
+                $debugEventCount = 0;
 
                 try {
                 $openAiService->streamChat(
@@ -334,10 +335,38 @@ class SimpleToolController extends Controller
                     },
                         $model ?: config('tools.openai.model', 'gpt-5'),
                     [
-                        'tools' => false,
+                        // OpenAI built-in tool (no internal tool execution)
+                        'tools' => [
+                            ['type' => 'web_search'],
+                        ],
                         'temperature' => 0.7,
                         'max_tokens' => 2000,
                         'with_context' => false,
+                        // Optional: forward selected OpenAI stream events to the client for debugging/observability
+                        'on_debug' => function(?string $event, array $decoded) use ($sendEvent, &$debugEventCount) {
+                            $event = $event ?? '';
+                            // Debug mode: forward EVERYTHING (cap only for safety)
+                            if ($debugEventCount >= 2000) return;
+                            $debugEventCount++;
+
+                            $preview = [
+                                'keys' => array_keys($decoded),
+                                'type' => $decoded['type'] ?? ($decoded['item']['type'] ?? null),
+                                'id' => $decoded['id'] ?? ($decoded['item']['id'] ?? ($decoded['item_id'] ?? null)),
+                                'name' => $decoded['name'] ?? ($decoded['item']['name'] ?? null),
+                                'status' => $decoded['status'] ?? null,
+                                'query' => $decoded['query'] ?? ($decoded['input']['query'] ?? ($decoded['item']['query'] ?? null)),
+                            ];
+                            $raw = json_encode($decoded, JSON_UNESCAPED_UNICODE);
+                            if (is_string($raw) && strlen($raw) > 2000) {
+                                $raw = substr($raw, 0, 2000) . '…';
+                            }
+                            $sendEvent('openai.event', [
+                                'event' => $event,
+                                'preview' => array_filter($preview, fn($v) => $v !== null && $v !== ''),
+                                'raw' => $raw,
+                            ]);
+                        },
                         'on_reasoning_delta' => function(string $delta) use ($sendEvent, &$reasoning) {
                             $reasoning .= $delta;
                             $sendEvent('reasoning.delta', ['delta' => $delta, 'content' => $reasoning]);
