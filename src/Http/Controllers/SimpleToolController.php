@@ -232,10 +232,23 @@ class SimpleToolController extends Controller
             };
 
             try {
-                $request->validate([
-                    'message' => 'required|string',
-                    'chat_history' => 'nullable|array', // Conversation-Historie
+                // Debug: Eingehende Header/Body (hilft bei 400)
+                $sendEvent('debug.request', [
+                    'content_type' => $request->header('Content-Type'),
+                    'accept' => $request->header('Accept'),
                 ]);
+
+                try {
+                    $request->validate([
+                        'message' => 'required|string',
+                        'chat_history' => 'nullable|array', // Conversation-Historie
+                    ]);
+                } catch (\Throwable $e) {
+                    $sendEvent('error', [
+                        'error' => 'Validation failed: ' . $e->getMessage(),
+                    ]);
+                    return;
+                }
 
                 $userMessage = $request->input('message');
                 $chatHistory = $request->input('chat_history', []);
@@ -271,7 +284,8 @@ class SimpleToolController extends Controller
                 $reasoning = '';
                 $thinking = '';
 
-                $openAiService->streamChat(
+                try {
+                    $openAiService->streamChat(
                     $messages,
                     function(string $delta) use ($sendEvent, &$assistant) {
                         $assistant .= $delta;
@@ -291,7 +305,13 @@ class SimpleToolController extends Controller
                             $sendEvent('thinking.delta', ['delta' => $delta, 'content' => $thinking]);
                         },
                     ]
-                );
+                    );
+                } catch (\Throwable $e) {
+                    $sendEvent('error', [
+                        'error' => 'OpenAI stream failed: ' . $e->getMessage(),
+                    ]);
+                    return;
+                }
 
                 // Chat-History für Client (nur user+assistant)
                 $messages[] = ['role' => 'assistant', 'content' => $assistant];

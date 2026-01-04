@@ -262,7 +262,6 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::middleware(['force.json'])->group(function () {
         // Minimaler Tool Controller (neu, einfach)
         Route::post('/core/tools/simple', [SimpleToolController::class, 'handle'])->name('core.tools.simple');
-        Route::post('/core/tools/simple/stream', [SimpleToolController::class, 'stream'])->name('core.tools.simple.stream');
         
         Route::post('/core/tools/playground/simulate', [CoreToolPlaygroundController::class, 'simulate'])->name('core.tools.playground.simulate');
         Route::post('/core/tools/playground/simulate/stream', [CoreToolPlaygroundController::class, 'simulateStream'])->name('core.tools.playground.simulate.stream');
@@ -273,5 +272,8 @@ Route::middleware(['web', 'auth'])->group(function () {
         Route::get('/core/tools/playground/requests', [CoreToolPlaygroundController::class, 'requests'])->name('core.tools.playground.requests');
         Route::post('/core/tools/playground/clear', [CoreToolPlaygroundController::class, 'clear'])->name('core.tools.playground.clear');
     });
+
+    // SSE darf NICHT unter force.json laufen, sonst wird Content-Type auf application/json überschrieben.
+    Route::post('/core/tools/simple/stream', [SimpleToolController::class, 'stream'])->name('core.tools.simple.stream');
 });
 
