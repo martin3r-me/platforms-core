@@ -3,89 +3,85 @@
     <x-ui-page-navbar title="Simple Chat Playground" icon="heroicon-o-chat-bubble-left-right" />
   </x-slot>
 
-  <x-ui-page-container>
-    <div class="grid grid-cols-12 gap-4 h-[calc(100vh-10rem)]">
-      <!-- Model picker -->
-      <div class="col-span-12 lg:col-span-3">
-        <div class="border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] p-4 h-full flex flex-col">
-          <div class="flex items-center justify-between">
-            <div class="text-sm font-semibold text-[var(--ui-secondary)]">Model</div>
-            <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
-          </div>
-
-          <div class="mt-2">
-            <div class="text-xs text-[var(--ui-muted)] mb-1">Ausgewählt (Drop Zone)</div>
-            <div id="modelDropZone" class="min-h-[44px] px-3 py-2 rounded border border-dashed border-[var(--ui-border)] bg-[var(--ui-bg)] text-sm">
-              <span id="selectedModelLabel" class="text-[var(--ui-secondary)]">—</span>
-            </div>
-            <div class="mt-2 text-xs text-[var(--ui-muted)]">Drag ein Model aus der Liste hier rein (oder Doppelklick).</div>
-          </div>
-
-          <div class="mt-4">
-            <div class="text-xs text-[var(--ui-muted)] mb-1">Fallback Dropdown</div>
-            <select id="modelSelect" class="w-full px-3 py-2 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-sm"></select>
-          </div>
-
-          <div class="mt-4 flex-1 overflow-y-auto">
-            <div class="text-xs text-[var(--ui-muted)] mb-2">Verfügbare Models</div>
-            <div id="modelsList" class="space-y-2"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Chat -->
-      <div class="col-span-12 lg:col-span-6 flex flex-col">
-        <div class="flex-1 overflow-y-auto p-4 space-y-4 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)]" id="chatScroll">
-          <div id="chatList" class="space-y-4"></div>
+  <x-slot name="sidebar">
+    <x-ui-page-sidebar title="Model" width="w-80" :defaultOpen="true" side="left" storeKey="simpleModelOpen">
+      <div class="p-4 space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Auswahl</div>
+          <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
         </div>
 
-        <form id="chatForm" class="mt-4 flex gap-2">
-          <input
-            id="chatInput"
-            type="text"
-            class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-            placeholder="Nachricht eingeben…"
-            autocomplete="off"
-          />
-          <button id="chatSend" type="submit" class="px-6 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90">
-            Senden
-          </button>
-        </form>
-      </div>
-
-      <!-- Realtime panel -->
-      <div class="col-span-12 lg:col-span-3">
-        <div class="border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] p-4 h-full flex flex-col">
-          <div class="flex items-center justify-between">
-            <div class="text-sm font-semibold text-[var(--ui-secondary)]">Realtime</div>
-            <button id="realtimeClear" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Clear</button>
+        <div>
+          <div class="text-xs text-[var(--ui-muted)] mb-1">Ausgewählt (Drop Zone)</div>
+          <div id="modelDropZone" class="min-h-[44px] px-3 py-2 rounded border border-dashed border-[var(--ui-border)] bg-[var(--ui-bg)] text-sm">
+            <span id="selectedModelLabel" class="text-[var(--ui-secondary)]">—</span>
           </div>
-          <div class="mt-2 text-xs text-[var(--ui-muted)]">
+          <div class="mt-2 text-xs text-[var(--ui-muted)]">Drag ein Model aus der Liste hier rein (oder Doppelklick).</div>
+        </div>
+
+        <div>
+          <div class="text-xs text-[var(--ui-muted)] mb-1">Fallback Dropdown</div>
+          <select id="modelSelect" class="w-full px-3 py-2 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-sm"></select>
+        </div>
+
+        <div class="pt-2 border-t border-[var(--ui-border)]">
+          <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] mb-2">Verfügbare Models</div>
+          <div id="modelsList" class="space-y-2 max-h-[calc(100vh-22rem)] overflow-y-auto pr-1"></div>
+        </div>
+      </div>
+    </x-ui-page-sidebar>
+  </x-slot>
+
+  <x-slot name="activity">
+    <x-ui-page-sidebar title="Realtime" width="w-80" :defaultOpen="true" side="right" storeKey="simpleRealtimeOpen">
+      <div class="p-4 space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="text-xs text-[var(--ui-muted)]">
             Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
           </div>
-
-          <div class="mt-4 flex-1 overflow-y-auto space-y-4">
-            <div>
-              <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Assistant (live)</div>
-              <pre id="rtAssistant" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[80px]"></pre>
-            </div>
-            <div>
-              <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Reasoning (summary, live)</div>
-              <pre id="rtReasoning" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px]"></pre>
-            </div>
-            <div>
-              <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Thinking (detailed, live)</div>
-              <pre id="rtThinking" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px]"></pre>
-            </div>
-            <div>
-              <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Events</div>
-              <div id="rtEvents" class="text-xs space-y-1 text-[var(--ui-muted)]"></div>
-            </div>
-          </div>
-
-          <div id="rtStatus" class="mt-3 text-xs text-[var(--ui-muted)]">idle</div>
+          <button id="realtimeClear" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Clear</button>
         </div>
+
+        <div>
+          <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Assistant (live)</div>
+          <pre id="rtAssistant" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[80px] max-h-[30vh] overflow-y-auto"></pre>
+        </div>
+        <div>
+          <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Reasoning (summary, live)</div>
+          <pre id="rtReasoning" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px] max-h-[20vh] overflow-y-auto"></pre>
+        </div>
+        <div>
+          <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Thinking (detailed, live)</div>
+          <pre id="rtThinking" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px] max-h-[20vh] overflow-y-auto"></pre>
+        </div>
+        <div class="pt-2 border-t border-[var(--ui-border)]">
+          <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Events</div>
+          <div id="rtEvents" class="text-xs space-y-1 text-[var(--ui-muted)] max-h-[18vh] overflow-y-auto pr-1"></div>
+        </div>
+
+        <div id="rtStatus" class="text-xs text-[var(--ui-muted)]">idle</div>
       </div>
+    </x-ui-page-sidebar>
+  </x-slot>
+
+  <x-ui-page-container>
+    <div class="flex flex-col h-[calc(100vh-12rem)]">
+      <div class="flex-1 overflow-y-auto p-4 space-y-4 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)]" id="chatScroll">
+        <div id="chatList" class="space-y-4"></div>
+      </div>
+
+      <form id="chatForm" class="mt-4 flex gap-2">
+        <input
+          id="chatInput"
+          type="text"
+          class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+          placeholder="Nachricht eingeben…"
+          autocomplete="off"
+        />
+        <button id="chatSend" type="submit" class="px-6 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90">
+          Senden
+        </button>
+      </form>
     </div>
 
     <script>
