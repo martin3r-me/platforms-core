@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
  */
 class OpenAiProvider implements LLMProviderContract
 {
-    public const DEFAULT_MODEL = 'gpt-4o-mini-2024-07-18';
+    public const DEFAULT_MODEL = 'gpt-5.2-thinking';
 
     public function __construct(
         private OpenAiService $openAiService
@@ -46,8 +46,11 @@ class OpenAiProvider implements LLMProviderContract
     public function getAvailableModels(): array
     {
         return [
-            'gpt-4o-mini-2024-07-18',
+            'gpt-5.2-thinking',
+            'gpt-5.2-instant',
+            'gpt-5.2-pro',
             'gpt-4o-2024-08-06',
+            'gpt-4o-mini-2024-07-18',
             'gpt-4-turbo',
             'gpt-3.5-turbo',
         ];

@@ -11,7 +11,7 @@ use Platform\Core\Tools\ToolRegistry;
 
 class OpenAiService
 {
-    private const DEFAULT_MODEL = 'gpt-4o-mini';
+    private const DEFAULT_MODEL = 'gpt-5.2-thinking';
     private string $baseUrl = 'https://api.openai.com/v1';
 
     // Loose coupling: ToolRegistry ist optional (Chat funktioniert auch ohne Tools)
