@@ -55,10 +55,35 @@ class OpenAiService
     public function chat(array $messages, string $model = self::DEFAULT_MODEL, array $options = []): array
     {
         $messagesWithContext = $this->buildMessagesWithContext($messages, $options);
+        $responsesInput = $this->buildResponsesInput($messagesWithContext);
+        
+        // DEBUG: Prüfe ob Tool-Results in Input sind
+        $debugInfo = [
+            'original_messages_count' => count($messages),
+            'messages_with_context_count' => count($messagesWithContext),
+            'responses_input_count' => count($responsesInput),
+            'has_tool_results' => false,
+            'tool_result_inputs' => [],
+        ];
+        
+        foreach ($responsesInput as $idx => $input) {
+            if (($input['role'] ?? '') === 'user' && str_contains($input['content'] ?? '', 'Tool-Result:')) {
+                $debugInfo['has_tool_results'] = true;
+                $debugInfo['tool_result_inputs'][] = [
+                    'index' => $idx,
+                    'role' => $input['role'] ?? 'unknown',
+                    'content_preview' => substr($input['content'] ?? '', 0, 200),
+                    'content_length' => strlen($input['content'] ?? ''),
+                ];
+            }
+        }
+        
+        \Log::debug('[OpenAiService] Messages Debug', $debugInfo);
+        
         try {
             $payload = [
                 'model' => $model,
-                'input' => $this->buildResponsesInput($messagesWithContext),
+                'input' => $responsesInput,
                 'stream' => false,
                 'max_output_tokens' => $options['max_tokens'] ?? 1000,
                 'temperature' => $options['temperature'] ?? 0.7,

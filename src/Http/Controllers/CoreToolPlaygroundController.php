@@ -545,6 +545,29 @@ class CoreToolPlaygroundController extends Controller
                             'normalized_tools' => $normalizedTools, // Vollständige normalisierte Tools für Debugging
                         ];
                         
+                        // DEBUG: Prüfe welche Messages an OpenAI gesendet werden
+                        $messagesDebug = [
+                            'total_messages' => count($messages),
+                            'last_10_messages' => array_slice($messages, -10),
+                            'has_tool_results' => false,
+                            'tool_result_messages' => [],
+                        ];
+                        
+                        // Prüfe ob Tool-Results in Messages sind
+                        foreach ($messages as $idx => $msg) {
+                            if (($msg['role'] ?? '') === 'user' && str_contains($msg['content'] ?? '', 'Tool-Result:')) {
+                                $messagesDebug['has_tool_results'] = true;
+                                $messagesDebug['tool_result_messages'][] = [
+                                    'index' => $idx,
+                                    'role' => $msg['role'] ?? 'unknown',
+                                    'content_preview' => substr($msg['content'] ?? '', 0, 200),
+                                    'content_length' => strlen($msg['content'] ?? ''),
+                                ];
+                            }
+                        }
+                        
+                        $simulation['debug']['messages_sent_to_openai_' . $iteration] = $messagesDebug;
+                        
                         // Rufe echten OpenAiService auf (zeigt automatisch alle Tools)
                         // WICHTIG: Robustheit bei transienten OpenAI Netzwerkfehlern (cURL 28/52)
                         try {
@@ -1346,6 +1369,23 @@ class CoreToolPlaygroundController extends Controller
                             
                             // Cleanup: Entferne nicht genutzte Tools (nach 3 Iterationen ohne Nutzung)
                             $openAiService->cleanupUnusedTools(3);
+                            
+                            // DEBUG: Prüfe Messages nach Tool-Execution
+                            $messagesAfterExecution = [
+                                'total_messages' => count($messages),
+                                'last_5_messages' => array_slice($messages, -5),
+                                'has_tool_results' => false,
+                                'tool_result_count' => 0,
+                            ];
+                            
+                            foreach ($messages as $msg) {
+                                if (($msg['role'] ?? '') === 'user' && str_contains($msg['content'] ?? '', 'Tool-Result:')) {
+                                    $messagesAfterExecution['has_tool_results'] = true;
+                                    $messagesAfterExecution['tool_result_count']++;
+                                }
+                            }
+                            
+                            $simulation['debug']['messages_after_execution_' . $iteration] = $messagesAfterExecution;
                             
                             // Aktualisiere Session-Historie nach Tool-Results (für nächste User-Message)
                             session()->put("playground_chat_history_{$sessionId}", $messages);
@@ -3616,6 +3656,29 @@ class CoreToolPlaygroundController extends Controller
                                 'dynamically_loaded_tool_names' => array_keys($dynamicallyLoadedTools),
                                 'normalized_tools' => $normalizedTools,
                             ];
+                            
+                            // DEBUG: Prüfe welche Messages an OpenAI gesendet werden
+                            $messagesDebug = [
+                                'total_messages' => count($messages),
+                                'last_10_messages' => array_slice($messages, -10),
+                                'has_tool_results' => false,
+                                'tool_result_messages' => [],
+                            ];
+                            
+                            // Prüfe ob Tool-Results in Messages sind
+                            foreach ($messages as $idx => $msg) {
+                                if (($msg['role'] ?? '') === 'user' && str_contains($msg['content'] ?? '', 'Tool-Result:')) {
+                                    $messagesDebug['has_tool_results'] = true;
+                                    $messagesDebug['tool_result_messages'][] = [
+                                        'index' => $idx,
+                                        'role' => $msg['role'] ?? 'unknown',
+                                        'content_preview' => substr($msg['content'] ?? '', 0, 200),
+                                        'content_length' => strlen($msg['content'] ?? ''),
+                                    ];
+                                }
+                            }
+                            
+                            $simulation['debug']['messages_sent_to_openai_' . $iteration] = $messagesDebug;
                             
                             // Rufe OpenAI auf mit Streaming
                             $responseContent = '';
