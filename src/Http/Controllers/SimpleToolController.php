@@ -309,6 +309,7 @@ class SimpleToolController extends Controller
                 $reasoning = '';
                 $thinking = '';
                 $debugEventCount = 0;
+                $usageSent = false;
 
                 try {
                 $openAiService->streamChat(
@@ -327,11 +328,23 @@ class SimpleToolController extends Controller
                         'max_tokens' => 2000,
                         'with_context' => false,
                         // Optional: forward selected OpenAI stream events to the client for debugging/observability
-                        'on_debug' => function(?string $event, array $decoded) use ($sendEvent, &$debugEventCount) {
+                        'on_debug' => function(?string $event, array $decoded) use ($sendEvent, &$debugEventCount, &$usageSent) {
                             $event = $event ?? '';
                             // Debug mode: forward EVERYTHING (cap only for safety)
                             if ($debugEventCount >= 2000) return;
                             $debugEventCount++;
+
+                            // Emit token usage as a dedicated event once available (usually on response.completed)
+                            if (!$usageSent) {
+                                $usage = $decoded['response']['usage'] ?? null;
+                                if (is_array($usage) && !empty($usage)) {
+                                    $usageSent = true;
+                                    $sendEvent('usage', [
+                                        'model' => $decoded['response']['model'] ?? null,
+                                        'usage' => $usage,
+                                    ]);
+                                }
+                            }
 
                             $preview = [
                                 'keys' => array_keys($decoded),

@@ -39,12 +39,41 @@
           <div class="text-xs text-[var(--ui-muted)]">
             Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
           </div>
-          <button id="realtimeClear" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Clear</button>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-[var(--ui-muted)] inline-flex items-center gap-2 select-none">
+              <input id="rtVerbose" type="checkbox" class="accent-[var(--ui-primary)]" />
+              verbose
+            </label>
+            <button id="realtimeClear" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Clear</button>
+          </div>
         </div>
 
         <div>
           <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Assistant (live)</div>
           <pre id="rtAssistant" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[80px] max-h-[30vh] overflow-y-auto"></pre>
+        </div>
+
+        <div>
+          <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Tokens</div>
+          <div id="rtUsage" class="grid grid-cols-2 gap-2">
+            <div class="border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] p-2">
+              <div class="text-[10px] text-[var(--ui-muted)]">Input</div>
+              <div id="rtTokensIn" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
+            </div>
+            <div class="border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] p-2">
+              <div class="text-[10px] text-[var(--ui-muted)]">Output</div>
+              <div id="rtTokensOut" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
+            </div>
+            <div class="border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] p-2">
+              <div class="text-[10px] text-[var(--ui-muted)]">Total</div>
+              <div id="rtTokensTotal" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
+            </div>
+            <div class="border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] p-2">
+              <div class="text-[10px] text-[var(--ui-muted)]">Cached / Reasoning</div>
+              <div id="rtTokensExtra" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
+            </div>
+          </div>
+          <div id="rtUsageModel" class="mt-1 text-[10px] text-[var(--ui-muted)]"></div>
         </div>
         <div>
           <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Reasoning (summary, live)</div>
@@ -56,7 +85,7 @@
         </div>
         <div class="pt-2 border-t border-[var(--ui-border)]">
           <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Events</div>
-          <div id="rtEvents" class="text-xs space-y-1 text-[var(--ui-muted)] max-h-[18vh] overflow-y-auto pr-1"></div>
+          <div id="rtEvents" class="text-xs space-y-2 text-[var(--ui-muted)] max-h-[18vh] overflow-y-auto pr-1"></div>
         </div>
 
         <div id="rtStatus" class="text-xs text-[var(--ui-muted)]">idle</div>
@@ -124,6 +153,12 @@
         const rtThinking = document.getElementById('rtThinking');
         const rtEvents = document.getElementById('rtEvents');
         const rtStatus = document.getElementById('rtStatus');
+        const rtVerboseEl = document.getElementById('rtVerbose');
+        const rtTokensIn = document.getElementById('rtTokensIn');
+        const rtTokensOut = document.getElementById('rtTokensOut');
+        const rtTokensTotal = document.getElementById('rtTokensTotal');
+        const rtTokensExtra = document.getElementById('rtTokensExtra');
+        const rtUsageModel = document.getElementById('rtUsageModel');
 
         /** type: {role:'user'|'assistant', content:string}[] */
         let messages = [];
@@ -167,12 +202,111 @@
           scrollToBottom();
         };
 
-        const rtLog = (text) => {
-          const row = document.createElement('div');
-          row.textContent = text;
-          rtEvents.appendChild(row);
-          // keep last 80
-          while (rtEvents.children.length > 80) rtEvents.removeChild(rtEvents.firstChild);
+        // Event log: compact entries + optional raw JSON, with aggregation of repeated events
+        let rtVerbose = localStorage.getItem('simple.rtVerbose') === 'true';
+        if (rtVerboseEl) {
+          rtVerboseEl.checked = rtVerbose;
+          rtVerboseEl.addEventListener('change', () => {
+            rtVerbose = !!rtVerboseEl.checked;
+            localStorage.setItem('simple.rtVerbose', rtVerbose ? 'true' : 'false');
+          });
+        }
+
+        let lastEventKey = null;
+        let lastEventCount = 0;
+        let lastEventSummaryEl = null;
+        const maxEventItems = 120;
+
+        // IMPORTANT: keep UI realtime. Pretty-printing large JSON synchronously blocks the main thread.
+        // So we render raw/pretty JSON lazily only when the user expands an event (and only in verbose mode).
+        const safeJsonPretty = (raw) => {
+          const s = String(raw || '');
+          if (!s) return '';
+          // Fast path: just return raw. (Pretty-print would require JSON.parse which can be expensive.)
+          return s;
+        };
+
+        const mkSummaryText = (key, preview, count) => {
+          const c = count > 1 ? ` ×${count}` : '';
+          if (preview && Object.keys(preview).length) {
+            const small = {};
+            for (const k of ['type','id','name','status','query']) {
+              if (preview[k] != null && preview[k] !== '') small[k] = preview[k];
+            }
+            const p = Object.keys(small).length ? ` ${JSON.stringify(small)}` : '';
+            return `${key}${c}${p}`;
+          }
+          return `${key}${c}`;
+        };
+
+        let skippedDeltaCount = 0;
+        let lastDeltaTs = 0;
+
+        const rtEvent = ({ key, preview = null, raw = null }) => {
+          if (!key) return;
+          // Don't spam deltas: assistant text is already visible in rtAssistant
+          if (key === 'response.output_text.delta') {
+            skippedDeltaCount++;
+            const now = Date.now();
+            // Update status at most every 250ms
+            if (now - lastDeltaTs > 250) {
+              lastDeltaTs = now;
+              if (rtStatus?.textContent?.includes('streaming')) {
+                rtStatus.textContent = `streaming… (deltas: ${skippedDeltaCount})`;
+              }
+            }
+            return;
+          }
+
+          // Aggregate consecutive identical events
+          if (lastEventKey === key && lastEventSummaryEl) {
+            lastEventCount++;
+            lastEventSummaryEl.textContent = mkSummaryText(key, preview, lastEventCount);
+            return;
+          }
+
+          lastEventKey = key;
+          lastEventCount = 1;
+
+          // Non-verbose: render only a single compact line (fast).
+          if (!rtVerbose) {
+            const row = document.createElement('div');
+            row.className = 'px-2 py-1 border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] text-[11px]';
+            row.textContent = mkSummaryText(key, preview, 1);
+            rtEvents.appendChild(row);
+            lastEventSummaryEl = row;
+          } else {
+            // Verbose: details with lazy body render on first open.
+            const wrap = document.createElement('details');
+            wrap.className = 'border border-[var(--ui-border)] rounded bg-[var(--ui-bg)]';
+            wrap.open = false;
+
+            const summary = document.createElement('summary');
+            summary.className = 'cursor-pointer px-2 py-1 text-[11px]';
+            summary.textContent = mkSummaryText(key, preview, 1);
+            wrap.appendChild(summary);
+            lastEventSummaryEl = summary;
+
+            const pre = document.createElement('pre');
+            pre.className = 'px-2 pb-2 text-[10px] whitespace-pre-wrap overflow-x-hidden';
+            pre.textContent = ''; // lazy
+            wrap.appendChild(pre);
+
+            let hydrated = false;
+            wrap.addEventListener('toggle', () => {
+              if (!wrap.open || hydrated) return;
+              hydrated = true;
+              // Render raw first (fast). If it's JSON, we keep it raw to avoid blocking.
+              if (raw) pre.textContent = safeJsonPretty(raw);
+              else if (preview) pre.textContent = JSON.stringify(preview, null, 2);
+              else pre.textContent = '';
+            });
+
+            rtEvents.appendChild(wrap);
+          }
+
+          while (rtEvents.children.length > maxEventItems) rtEvents.removeChild(rtEvents.firstChild);
+          rtEvents.scrollTop = rtEvents.scrollHeight;
         };
 
         const rtClear = () => {
@@ -182,6 +316,16 @@
           rtEvents.innerHTML = '';
           rtStatus.textContent = 'idle';
           realtimeModel.textContent = selectedModel || '—';
+          if (rtTokensIn) rtTokensIn.textContent = '—';
+          if (rtTokensOut) rtTokensOut.textContent = '—';
+          if (rtTokensTotal) rtTokensTotal.textContent = '—';
+          if (rtTokensExtra) rtTokensExtra.textContent = '—';
+          if (rtUsageModel) rtUsageModel.textContent = '';
+          lastEventKey = null;
+          lastEventCount = 0;
+          lastEventSummaryEl = null;
+          skippedDeltaCount = 0;
+          lastDeltaTs = 0;
         };
 
         realtimeClear.addEventListener('click', rtClear);
@@ -264,12 +408,13 @@
           rtClear();
           rtStatus.textContent = 'streaming…';
           realtimeModel.textContent = selectedModel || '—';
-          rtLog('start');
+          rtEvent({ key: 'client.start' });
 
           // Request payload = full conversation history + new message already included
           const payload = { message: text, chat_history: messages.slice(0, -1), model: selectedModel || null };
 
           try {
+            rtEvent({ key: 'client.fetch.start', preview: { url } });
             const res = await fetch(url, {
               method: 'POST',
                         credentials: 'same-origin',
@@ -308,12 +453,24 @@
                   case 'thinking.delta':
                     if (data?.delta) rtThinking.textContent += data.delta;
                     break;
+                  case 'usage': {
+                    const usage = data?.usage || {};
+                    const inTok = usage?.input_tokens ?? usage?.input ?? null;
+                    const outTok = usage?.output_tokens ?? usage?.output ?? null;
+                    const totalTok = usage?.total_tokens ?? usage?.total ?? null;
+                    const cached = usage?.input_tokens_details?.cached_tokens ?? null;
+                    const reasoning = usage?.output_tokens_details?.reasoning_tokens ?? null;
+                    if (rtTokensIn) rtTokensIn.textContent = (inTok ?? '—');
+                    if (rtTokensOut) rtTokensOut.textContent = (outTok ?? '—');
+                    if (rtTokensTotal) rtTokensTotal.textContent = (totalTok ?? '—');
+                    if (rtTokensExtra) rtTokensExtra.textContent =
+                      `${cached != null ? cached : '—'} / ${reasoning != null ? reasoning : '—'}`;
+                    if (rtUsageModel) rtUsageModel.textContent = data?.model ? `Model: ${data.model}` : '';
+                    break;
+                  }
                   case 'openai.event': {
                     const ev = data?.event || 'openai.event';
-                    const p = data?.preview ? JSON.stringify(data.preview) : '';
-                    const raw = data?.raw ? String(data.raw) : '';
-                    rtLog(p ? `${ev} ${p}` : ev);
-                    if (raw) rtLog(raw);
+                    rtEvent({ key: ev, preview: data?.preview || null, raw: data?.raw || null });
                     break;
                   }
                   case 'complete': {
@@ -321,7 +478,7 @@
                     messages.push({ role: 'assistant', content: assistant });
                     renderMessage('assistant', assistant);
                     rtStatus.textContent = 'done';
-                    rtLog('complete');
+                    rtEvent({ key: 'client.complete' });
                     break;
                   }
                   case 'error': {
@@ -329,12 +486,11 @@
                     messages.push({ role: 'assistant', content: `❌ Fehler: ${msg}` });
                     renderMessage('assistant', `❌ Fehler: ${msg}`);
                     rtStatus.textContent = 'error';
-                    rtLog('error: ' + msg);
+                    rtEvent({ key: 'client.error', preview: { error: msg } });
                     break;
                   }
                   default:
-                    // optional: show debug/request events
-                    if (currentEvent) rtLog(currentEvent);
+                    if (rtVerbose && currentEvent) rtEvent({ key: `sse.${currentEvent}`, raw: data?.raw || null, preview: data || null });
                 }
                 scrollToBottom();
               }
@@ -344,7 +500,7 @@
             messages.push({ role: 'assistant', content: `❌ Fehler: ${msg}` });
             renderMessage('assistant', `❌ Fehler: ${msg}`);
             rtStatus.textContent = 'error';
-            rtLog('error: ' + msg);
+            rtEvent({ key: 'client.error', preview: { error: msg } });
           } finally {
             inFlight = false;
             sendBtn.disabled = false;
