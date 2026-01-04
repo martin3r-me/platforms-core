@@ -865,7 +865,8 @@ class OpenAiService
             ->retry(
                 $retryAttempts,
                 random_int($retryMinMs, $retryMaxMs),
-                function ($exception, $request) { return $exception instanceof ConnectionException; }
+                function ($exception, $request) { return $exception instanceof ConnectionException; },
+                false // WICHTIG: nicht automatisch auf 4xx/5xx throwen – wir wollen Body/JSON sauber auswerten
             );
         if ($withStream) { $request = $request->withOptions(['stream' => true]); }
         return $request;
