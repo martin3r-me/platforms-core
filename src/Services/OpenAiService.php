@@ -524,6 +524,9 @@ class OpenAiService
         $currentMcpServer = null; // MCP: Server-Name für aktuellen Tool-Call
         $onToolStart = $options['on_tool_start'] ?? null; $toolExecutor = $options['tool_executor'] ?? null;
         $onDebug = $options['on_debug'] ?? null; // Optional: Debug-Callback für detailliertes Logging
+        // Optional: Separate Streams für reasoning/thinking (gpt-5.2-thinking)
+        $onReasoningDelta = $options['on_reasoning_delta'] ?? null;
+        $onThinkingDelta = $options['on_thinking_delta'] ?? null;
         $eventCount = 0;
         $deltaCount = 0;
         while (!$body->eof()) {
@@ -570,6 +573,47 @@ class OpenAiService
                 }
                 
                 switch ($currentEvent) {
+                    // Reasoning / Thinking Streaming (wenn vom Model/Provider unterstützt)
+                    case 'response.reasoning.delta':
+                    case 'reasoning.delta':
+                    case 'response.reasoning_text.delta':
+                    case 'reasoning_text.delta':
+                        if (is_callable($onReasoningDelta)) {
+                            $rDelta = '';
+                            if (isset($decoded['delta']) && is_string($decoded['delta'])) {
+                                $rDelta = $decoded['delta'];
+                            } elseif (isset($decoded['text']) && is_string($decoded['text'])) {
+                                $rDelta = $decoded['text'];
+                            } elseif (isset($decoded['content']) && is_string($decoded['content'])) {
+                                $rDelta = $decoded['content'];
+                            } elseif (isset($decoded['delta']['text']) && is_string($decoded['delta']['text'])) {
+                                $rDelta = $decoded['delta']['text'];
+                            }
+                            if ($rDelta !== '') {
+                                try { $onReasoningDelta($rDelta); } catch (\Throwable $e) {}
+                            }
+                        }
+                        break;
+                    case 'response.thinking.delta':
+                    case 'thinking.delta':
+                    case 'response.thinking_text.delta':
+                    case 'thinking_text.delta':
+                        if (is_callable($onThinkingDelta)) {
+                            $tDelta = '';
+                            if (isset($decoded['delta']) && is_string($decoded['delta'])) {
+                                $tDelta = $decoded['delta'];
+                            } elseif (isset($decoded['text']) && is_string($decoded['text'])) {
+                                $tDelta = $decoded['text'];
+                            } elseif (isset($decoded['content']) && is_string($decoded['content'])) {
+                                $tDelta = $decoded['content'];
+                            } elseif (isset($decoded['delta']['text']) && is_string($decoded['delta']['text'])) {
+                                $tDelta = $decoded['delta']['text'];
+                            }
+                            if ($tDelta !== '') {
+                                try { $onThinkingDelta($tDelta); } catch (\Throwable $e) {}
+                            }
+                        }
+                        break;
                     case 'response.output_text.delta':
                     case 'response.output.delta':
                     case 'output_text.delta':
