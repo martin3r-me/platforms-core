@@ -594,30 +594,8 @@ class IntentionVerificationService
                 // Prüfe ob ein ähnliches Tool aufgerufen wurde (z.B. core.teams.GET statt planner.projects.GET)
                 $similarTool = $this->findSimilarTool($expectedTool, $toolsCalled);
                 
-                if ($similarTool) {
-                    $similarToolCount = $toolCounts[$similarTool] ?? 0;
-                    
-                    // Nur warnen wenn:
-                    // - Es bereits mehr als 2 Iterationen gibt
-                    // - UND das falsche Tool mehr als 2 mal aufgerufen wurde
-                    // - ODER es bereits mehr als 5 Iterationen gibt (dann ist es definitiv ein Loop)
-                    if ($totalCalls > 2 && ($similarToolCount > 2 || $totalCalls > 5)) {
-                        // Extrahiere Modul aus erwartetem Tool (z.B. "planner.projects.GET" -> "planner")
-                        $module = explode('.', $expectedTool)[0] ?? null;
-                        $issueText = "Falsches Tool aufgerufen: '{$similarTool}' wurde bereits {$similarToolCount} mal aufgerufen, aber '{$expectedTool}' noch nicht! Der User wollte '{$intention->target}' sehen.\n\n";
-                        $issueText .= "⚠️ **KRITISCH:** Das Tool '{$expectedTool}' ist möglicherweise NICHT in deiner Tool-Liste verfügbar!\n";
-                        $issueText .= "📋 **LÖSUNG:** Rufe ZUERST 'tools.GET' auf mit: {\"module\": \"{$module}\", \"read_only\": true}\n";
-                        $issueText .= "✅ RICHTIG (Schritt 1): Rufe 'tools.GET' auf um '{$expectedTool}' zu laden\n";
-                        $issueText .= "✅ RICHTIG (Schritt 2): Nach dem Nachladen rufe '{$expectedTool}' auf!\n";
-                        $issueText .= "❌ FALSCH: Rufe '{$similarTool}' nochmal auf!";
-                        $issues[] = $issueText;
-                    }
-                } else {
-                    // Wenn das erwartete Tool noch nicht aufgerufen wurde und es bereits mehrere Iterationen gibt
-                    if ($totalCalls > 3) {
-                        $issues[] = "Das erwartete Tool '{$expectedTool}' wurde noch nicht aufgerufen (bereits {$totalCalls} Tool-Calls). Der User wollte '{$intention->target}' sehen.";
-                    }
-                }
+                // Preskriptive Konsistenz-Warnungen entfernt - LLM entscheidet selbst
+                // Keine Anweisungen mehr, die die LLM in eine bestimmte Richtung lenken
             }
         }
         
