@@ -814,13 +814,7 @@ class OpenAiService
             if (!empty($options['source_url'])) { $context['data']['url'] = $options['source_url']; }
             $defaultPrompt = "Du bist ein hilfreicher Assistent für eine Plattform. Antworte kurz, präzise und auf Deutsch.
 
-🎯 TOOL-ESKALATION (Priorität):
-1. PRIMÄR: Arbeite OHNE Tools - beantworte direkt, wenn möglich
-2. NUR bei Bedarf: Nutze Tools, wenn du nicht weiter weißt oder System-Daten/Aktionen brauchst
-3. TOOL-DISCOVERY: Wenn du ein Tool brauchst, das du nicht siehst, rufe 'tools.GET' mit dem entsprechenden Modul auf
-4. LETZTE ESKALATION: Wenn kein Tool existiert → 'tools.request'
-
-Tools folgen REST-Logik.";
+Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du ein Tool brauchst, das du nicht siehst, rufe 'tools.GET' mit dem entsprechenden Modul auf. Wenn wirklich kein Tool existiert, kannst du 'tools.request' nutzen, um den Bedarf zu dokumentieren.";
             $prompt = $context['data']['system_prompt'] ?? $defaultPrompt;
             $u = $context['data']['user'] ?? null; $t = $context['data']['team'] ?? null;
             $module = $context['data']['module'] ?? null; $route = $context['data']['route'] ?? null; $url = $context['data']['url'] ?? null; $time = $context['data']['current_time'] ?? null; $tz = $context['data']['timezone'] ?? null;

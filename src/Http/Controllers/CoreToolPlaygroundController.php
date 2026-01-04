@@ -425,8 +425,7 @@ class CoreToolPlaygroundController extends Controller
                                 'role' => 'system',
                                 'content' =>
                                     "{$objectiveMarker} {$objective}\n" .
-                                    "Bitte halte dieses Ziel im Blick und arbeite selbstständig mit Tools, bis es erledigt ist oder du blockiert bist.\n" .
-                                    "LOOSE: Du entscheidest selbst, welche Tools du nutzt. 'tools.request' nur, wenn wirklich kein Tool existiert.",
+                                    "Bitte halte dieses Ziel im Blick und arbeite selbstständig mit Tools, bis es erledigt ist oder du blockiert bist.",
                             ];
                         }
                     }
@@ -498,24 +497,6 @@ class CoreToolPlaygroundController extends Controller
                     while ($iteration < $maxIterations) {
                         $iteration++;
                         
-                        // Prüfe auf frühe Stoppbedingung: 3x gleiches Tool mit gleichem Fehler
-                        if ($iteration >= 3) {
-                            foreach ($failedToolCalls as $tool => $errors) {
-                                foreach ($errors as $error => $count) {
-                                    if ($count >= 3) {
-                                        // LLM ruft 3x das gleiche Tool mit dem gleichen Fehler auf → früher stoppen
-                                        $simulation['final_response'] = [
-                                            'type' => 'warning',
-                                            'message' => "Früher Stopp: Tool '{$tool}' wurde 3x mit Fehler '{$error}' aufgerufen",
-                                            'content' => $response['content'] ?? 'Keine finale Antwort',
-                                            'iterations' => $iteration,
-                                            'tool_results' => $allToolResults,
-                                        ];
-                                        break 2; // Breche aus beiden Loops
-                                    }
-                                }
-                            }
-                        }
                         
                         $simulation['steps'][] = [
                             'step' => 3 + $iteration,
@@ -728,17 +709,6 @@ class CoreToolPlaygroundController extends Controller
                                 $toolCallHistory[$internalToolName]['count']++;
                                 $toolCallHistory[$internalToolName]['last_iteration'] = $iteration;
                                 
-                                // Loop-Detection: Markiere für spätere Integration ins Tool-Result
-                                // Warnungen werden NICHT als separate system-Messages hinzugefügt,
-                                // sondern direkt in das Tool-Result integriert (siehe formatToolResultForLLM)
-                                if ($toolCallHistory[$internalToolName]['count'] >= 2) {
-                                    $simulation['steps'][] = [
-                                        'step' => 4 + $iteration,
-                                        'name' => 'Loop-Detection Warning',
-                                        'description' => "Tool '{$internalToolName}' wurde bereits {$toolCallHistory[$internalToolName]['count']} mal aufgerufen",
-                                        'timestamp' => now()->toIso8601String(),
-                                    ];
-                                }
                                 
                                 $simulation['steps'][] = [
                                     'step' => 4 + $iteration,
@@ -841,9 +811,7 @@ class CoreToolPlaygroundController extends Controller
                                             // Statt tools.request auszuführen: gib der LLM einen Hinweis (loose) und weiter
                                             $messages[] = [
                                                 'role' => 'system',
-                                                'content' =>
-                                                    "✅ **Hinweis (loose Guardrail):** Das Tool '{$candidate}' existiert und wurde soeben nachgeladen.\n" .
-                                                    "Bitte nutze jetzt dieses Tool, um die User-Anfrage zu erfüllen. 'tools.request' nur, wenn wirklich kein passendes Tool existiert.",
+                                                'content' => "Das Tool '{$candidate}' existiert und wurde soeben nachgeladen.",
                                             ];
 
                                             // Schreibe einen neutralen Tool-Result-Eintrag, damit die LLM den Schritt erkennt
@@ -1138,17 +1106,6 @@ class CoreToolPlaygroundController extends Controller
                                         }
                                         $failedToolCalls[$internalToolName][$errorKey]++;
                                         
-                                        // Frühe Stoppbedingung: 3x gleiches Tool mit gleichem Fehler
-                                        if ($failedToolCalls[$internalToolName][$errorKey] >= 3) {
-                                            $simulation['final_response'] = [
-                                                'type' => 'warning',
-                                                'message' => "Früher Stopp: Tool '{$internalToolName}' wurde 3x mit Fehler '{$errorKey}' aufgerufen",
-                                                'content' => $response['content'] ?? 'Keine finale Antwort',
-                                                'iterations' => $iteration,
-                                                'tool_results' => $allToolResults,
-                                            ];
-                                            break 2; // Breche aus beiden Loops
-                                        }
                                     }
                                     
                                     $allToolResults[] = [
@@ -1162,34 +1119,6 @@ class CoreToolPlaygroundController extends Controller
                                         'execution_time_ms' => round($executionTime, 2),
                                     ];
                                     
-                                    // Loop-Detection: Prüfe auch bei erfolgreichen Calls, ob Tool mit ähnlichen Argumenten mehrfach aufgerufen wurde
-                                    if ($toolResult->success && $iteration >= 3) {
-                                        $successfulCalls = array_filter($allToolResults, function($r) use ($internalToolName) {
-                                            return ($r['tool'] ?? '') === $internalToolName && ($r['success'] ?? false);
-                                        });
-                                        
-                                        if (count($successfulCalls) >= 3) {
-                                            // Prüfe ob alle erfolgreichen Calls ähnliche Argumente haben
-                                            $similarCount = 0;
-                                            foreach ($successfulCalls as $call) {
-                                                if ($this->areArgumentsSimilar($toolArguments, $call['arguments'] ?? [])) {
-                                                    $similarCount++;
-                                                }
-                                            }
-                                            
-                                            // Wenn 3x+ erfolgreich mit ähnlichen Argumenten → Loop erkannt
-                                            if ($similarCount >= 3) {
-                                                $simulation['final_response'] = [
-                                                    'type' => 'warning',
-                                                    'message' => "Früher Stopp: Tool '{$internalToolName}' wurde {$similarCount}x erfolgreich mit ähnlichen Argumenten aufgerufen (Loop erkannt)",
-                                                    'content' => $response['content'] ?? 'Keine finale Antwort',
-                                                    'iterations' => $iteration,
-                                                    'tool_results' => $allToolResults,
-                                                ];
-                                                break 2; // Breche aus beiden Loops
-                                            }
-                                        }
-                                    }
                                     
                                     $simulation['execution_flow'][] = [
                                         'iteration' => $iteration,
@@ -1279,9 +1208,7 @@ class CoreToolPlaygroundController extends Controller
                                     );
                                     
                                     if ($verification->hasIssues()) {
-                                        $verificationText = "\n\n⚠️ **Verifikation (Zwischenprüfung):**\n";
-                                        $verificationText .= $verification->getIssuesText();
-                                        $verificationText .= "\n\nPrüfe die Tool-Results und rufe das RICHTIGE Tool auf!";
+                                        $verificationText = $verification->getIssuesText();
                                         
                                         // Füge Verifikations-Hinweis zu Messages hinzu (für LLM-Korrektur)
                                         $messages[] = [
@@ -1492,12 +1419,10 @@ class CoreToolPlaygroundController extends Controller
                                 // Mache SOFORT neue OpenAI-Anfrage - Tools sind jetzt verfügbar!
                                 // WICHTIG: Füge System-Message hinzu, damit LLM weiß, dass Tools jetzt verfügbar sind
                                 $toolsAvailableMessage = "\n\n✅ **TOOLS NACHGELADEN:**\n";
-                                $toolsAvailableMessage .= "Die folgenden Tools wurden soeben nachgeladen und sind JETZT verfügbar:\n";
+                                $toolsAvailableMessage .= "Die folgenden Tools wurden soeben nachgeladen:\n";
                                 foreach ($injectedTools as $tool) {
                                     $toolsAvailableMessage .= "- {$tool}\n";
                                 }
-                                $toolsAvailableMessage .= "\n💡 **WICHTIG:** Du kannst diese Tools JETZT verwenden! ";
-                                $toolsAvailableMessage .= "Rufe das passende Tool auf, um die User-Anfrage zu erfüllen.\n";
                                 
                                 // Füge System-Message hinzu (vor der sofortigen Anfrage)
                                 $messagesForImmediateRequest = $messages;
@@ -1629,9 +1554,7 @@ class CoreToolPlaygroundController extends Controller
                                                 );
                                                 
                                                 if ($preFlightResult->hasIssues()) {
-                                                    $preFlightWarning = "\n\n🚨 **PRE-FLIGHT VERIFICATION:**\n";
-                                                    $preFlightWarning .= $preFlightResult->getIssuesText();
-                                                    $preFlightWarning .= "\n\n⚠️ WICHTIG: Prüfe nochmal, ob das Tool wirklich das richtige ist!";
+                                                    $preFlightWarning = $preFlightResult->getIssuesText();
                                                     
                                                     $messages[] = [
                                                         'role' => 'system',
@@ -1650,15 +1573,6 @@ class CoreToolPlaygroundController extends Controller
                                         $toolCallHistory[$internalToolName]['count']++;
                                         $toolCallHistory[$internalToolName]['last_iteration'] = $iteration;
                                         
-                                        // Loop-Detection Warning
-                                        if ($toolCallHistory[$internalToolName]['count'] >= 2) {
-                                            $simulation['steps'][] = [
-                                                'step' => 4 + $iteration,
-                                                'name' => 'Loop-Detection Warning',
-                                                'description' => "Tool '{$internalToolName}' wurde bereits {$toolCallHistory[$internalToolName]['count']} mal aufgerufen",
-                                                'timestamp' => now()->toIso8601String(),
-                                            ];
-                                        }
                                         
                                         // Tool Execution
                                         $context = ToolContext::fromAuth();
@@ -1769,11 +1683,8 @@ class CoreToolPlaygroundController extends Controller
                                                 $messages[] = [
                                                     'role' => 'system',
                                                     'content' =>
-                                                        "⚠️ **Hinweis (loose Completion-Gate):**\n" .
-                                                        $verification->getIssuesText() .
-                                                        "\n\nBitte prüfe die bisherigen Tool-Results und entscheide selbst, welche nächsten Tools sinnvoll sind. " .
-                                                        "Wenn du etwas erstellen/ändern/löschen musst, stelle sicher, dass du die passenden Tools via 'tools.GET' nachlädst und dann direkt ausführst. " .
-                                                        "Nutze 'tools.request' nur, wenn wirklich kein passendes Tool existiert.",
+                                                        $verification->getIssuesText() . "\n" .
+                                                        "Wenn du etwas erstellen/ändern/löschen musst, stelle sicher, dass du die passenden Tools via 'tools.GET' nachlädst und dann direkt ausführst.",
                                                 ];
                                                 continue; // Recovery-Runde
                                             }
@@ -1844,11 +1755,7 @@ class CoreToolPlaygroundController extends Controller
                                         ];
                                         $messages[] = [
                                             'role' => 'system',
-                                            'content' =>
-                                                "⚠️ **Hinweis (loose Completion-Gate):**\n" .
-                                                $verification->getIssuesText() .
-                                                "\n\nBitte prüfe die bisherigen Tool-Results und entscheide selbst, welche nächsten Tools sinnvoll sind. " .
-                                                "Wenn du Tools benötigst, nutze 'tools.GET' um sie gezielt nachzuladen und führe sie dann direkt aus.",
+                                            'content' => $verification->getIssuesText(),
                                         ];
                                         continue; // Recovery-Runde
                                     }
@@ -1938,9 +1845,7 @@ class CoreToolPlaygroundController extends Controller
                                     );
                                     
                                     if ($verification->hasIssues()) {
-                                        $verificationText = "\n\n⚠️ **Verifikation:**\n";
-                                        $verificationText .= $verification->getIssuesText();
-                                        $verificationText .= "\n\nBitte prüfe die Ergebnisse und korrigiere falls nötig.";
+                                        $verificationText = $verification->getIssuesText();
                                         
                                         // Füge Verifikations-Hinweis zu Messages hinzu (für LLM-Korrektur)
                                         // Aber nur wenn wir noch nicht zu viele Iterationen haben
@@ -1966,7 +1871,7 @@ class CoreToolPlaygroundController extends Controller
                                             continue; // Weiter mit nächster Iteration
                                         } else {
                                             // Zu viele Iterationen - füge Verifikations-Hinweis zur finalen Antwort hinzu
-                                            $verificationText = "\n\n⚠️ **Hinweis:** " . $verification->getIssuesText();
+                                            $verificationText = $verification->getIssuesText();
                                         }
                                     }
                                     
@@ -3238,36 +3143,23 @@ class CoreToolPlaygroundController extends Controller
         if ($toolCallId) {
             $text .= "Call-ID: {$toolCallId}\n";
         }
-        $text .= "Status: " . ($success ? "✅ Erfolgreich" : "❌ Fehler") . "\n\n";
+        $text .= "Status: " . ($success ? "Erfolgreich" : "Fehler") . "\n\n";
         
         // Systematische Duplikat-Erkennung: Informiere LLM wenn ähnliche Aktion bereits erfolgreich war
         if ($duplicateInfo && $success) {
-            // Für GET-Operationen: Daten sind bereits vorhanden
-            if ($duplicateInfo['type'] === 'duplicate_read') {
-                $text .= "⚠️ **HINWEIS - Duplikat erkannt:**\n";
-                $text .= $duplicateInfo['message'] . "\n";
-                if (isset($duplicateInfo['previous_iteration'])) {
-                    $text .= "Die Abfrage wurde bereits in Iteration {$duplicateInfo['previous_iteration']} erfolgreich ausgeführt.\n";
-                }
-                $text .= "\n💡 **Empfehlung:** Nutze die bereits vorhandenen Daten aus den vorherigen Tool-Results. ";
-                $text .= "Du musst dieses Tool NICHT nochmal aufrufen - die Daten sind bereits verfügbar.\n\n";
-            } else {
-                // Für WRITE-Operationen: Aktion wurde bereits ausgeführt
-                $text .= "⚠️ **HINWEIS - Duplikat erkannt:**\n";
-                $text .= $duplicateInfo['message'] . "\n";
-                if (isset($duplicateInfo['previous_iteration'])) {
-                    $text .= "Die Aktion wurde bereits in Iteration {$duplicateInfo['previous_iteration']} erfolgreich ausgeführt.\n";
-                }
-                if (!empty($duplicateInfo['previous_result'])) {
-                    $prevData = $duplicateInfo['previous_result'];
-                    if (isset($prevData['id']) || isset($prevData['uuid'])) {
-                        $id = $prevData['id'] ?? $prevData['uuid'] ?? 'N/A';
-                        $name = $prevData['name'] ?? $prevData['title'] ?? '';
-                        $text .= "Vorheriges Ergebnis: ID {$id}" . ($name ? " ({$name})" : '') . "\n";
-                    }
-                }
-                $text .= "\n💡 **Empfehlung:** Prüfe ob diese Aktion wirklich nochmal ausgeführt werden muss, oder ob das vorherige Ergebnis bereits ausreicht.\n\n";
+            $text .= "Duplikat erkannt: " . $duplicateInfo['message'] . "\n";
+            if (isset($duplicateInfo['previous_iteration'])) {
+                $text .= "Bereits in Iteration {$duplicateInfo['previous_iteration']} ausgeführt.\n";
             }
+            if (!empty($duplicateInfo['previous_result'])) {
+                $prevData = $duplicateInfo['previous_result'];
+                if (isset($prevData['id']) || isset($prevData['uuid'])) {
+                    $id = $prevData['id'] ?? $prevData['uuid'] ?? 'N/A';
+                    $name = $prevData['name'] ?? $prevData['title'] ?? '';
+                    $text .= "Vorheriges Ergebnis: ID {$id}" . ($name ? " ({$name})" : '') . "\n";
+                }
+            }
+            $text .= "\n";
         }
         
         // Bei Fehler: Zeige Fehler-Informationen
@@ -3293,24 +3185,6 @@ class CoreToolPlaygroundController extends Controller
                     }
                 }
                 
-                // WICHTIG: Wenn der User nach Projekten/Companies/Contacts fragt, rufe direkt das entsprechende Tool auf
-                // Die Team-ID ist bereits bekannt - du musst core.teams.GET NICHT nochmal aufrufen!
-                if ($loopCount === 0) {
-                    // Erstes Mal: Normale Info
-                    $text .= "\n\n💡 HINWEIS: Wenn der User nach Projekten, Companies oder Contacts fragt, rufe DIREKT 'planner.projects.GET', 'crm.companies.GET' oder 'crm.contacts.GET' auf. ";
-                    $text .= "Diese Tools verwenden automatisch das aktuelle Team (ID {$data['current_team_id']}) wenn du team_id weglässt.";
-                } else {
-                    // Loop erkannt: Stärkere Warnung
-                    $text .= "\n\n🚨 WICHTIG - LOOP ERKANNT: Du hast 'core.teams.GET' bereits {$loopCount} mal aufgerufen! ";
-                    $text .= "Du hast die Team-Informationen bereits - rufe JETZT das nächste Tool auf!\n\n";
-                    $text .= "⚠️ **KRITISCH:** Das Tool 'planner.projects.GET' ist möglicherweise NICHT in deiner Tool-Liste verfügbar!\n";
-                    $text .= "📋 **LÖSUNG:** Rufe ZUERST 'tools.GET' mit module='planner' auf, um die benötigten Tools zu laden!\n\n";
-                    $text .= "✅ RICHTIG (Schritt 1): Rufe 'tools.GET' auf mit: {\"module\": \"planner\", \"read_only\": true}\n";
-                    $text .= "✅ RICHTIG (Schritt 2): Nach dem Nachladen rufe 'planner.projects.GET' auf (ohne team_id Parameter - verwendet automatisch Team ID {$data['current_team_id']})\n";
-                    $text .= "❌ FALSCH: Rufe 'core.teams.GET' nochmal auf\n\n";
-                    $text .= "Die benötigten Informationen sind bereits in den vorherigen Tool-Results vorhanden. ";
-                    $text .= "Prüfe die Tool-Results und rufe das RICHTIGE Tool auf!";
-                }
             } elseif ($toolName === 'planner.projects.GET' && isset($data['projects'])) {
                 $text .= "Projekte gefunden: " . ($data['count'] ?? count($data['projects'])) . "\n";
                 if (isset($data['team_id'])) {
@@ -3638,8 +3512,7 @@ class CoreToolPlaygroundController extends Controller
                                     'role' => 'system',
                                     'content' =>
                                         "{$objectiveMarker} {$objective}\n" .
-                                        "Bitte halte dieses Ziel im Blick und arbeite selbstständig mit Tools, bis es erledigt ist oder du blockiert bist.\n" .
-                                        "LOOSE: Du entscheidest selbst, welche Tools du nutzt. 'tools.request' nur, wenn wirklich kein Tool existiert.",
+                                        "Bitte halte dieses Ziel im Blick und arbeite selbstständig mit Tools, bis es erledigt ist oder du blockiert bist.",
                                 ];
                             }
                         }
@@ -3700,26 +3573,6 @@ class CoreToolPlaygroundController extends Controller
                         while ($iteration < $maxIterations) {
                             $iteration++;
                             
-                            if ($iteration >= 3) {
-                                foreach ($failedToolCalls as $tool => $errors) {
-                                    foreach ($errors as $error => $count) {
-                                        if ($count >= 3) {
-                                            $simulation['final_response'] = [
-                                                'type' => 'warning',
-                                                'message' => "Früher Stopp: Tool '{$tool}' wurde 3x mit Fehler '{$error}' aufgerufen",
-                                                'content' => $response['content'] ?? 'Keine finale Antwort',
-                                                'iterations' => $iteration,
-                                                'tool_results' => $allToolResults,
-                                            ];
-                                            $sendEvent('iteration.early_stop', [
-                                                'iteration' => $iteration,
-                                                'reason' => "Tool '{$tool}' wurde 3x mit Fehler '{$error}' aufgerufen",
-                                            ]);
-                                            break 2;
-                                        }
-                                    }
-                                }
-                            }
                             
                             $sendEvent('iteration.start', [
                                 'iteration' => $iteration,
@@ -4038,13 +3891,6 @@ class CoreToolPlaygroundController extends Controller
                                     $toolCallHistory[$internalToolName]['count']++;
                                     $toolCallHistory[$internalToolName]['last_iteration'] = $iteration;
                                     
-                                    if ($toolCallHistory[$internalToolName]['count'] >= 2) {
-                                        $sendEvent('tool.loop_warning', [
-                                            'iteration' => $iteration,
-                                            'tool' => $internalToolName,
-                                            'count' => $toolCallHistory[$internalToolName]['count'],
-                                        ]);
-                                    }
                                     
                                     $sendEvent('tool.execution.start', [
                                         'iteration' => $iteration,
@@ -4180,9 +4026,7 @@ class CoreToolPlaygroundController extends Controller
                                                 
                                                 $messages[] = [
                                                     'role' => 'system',
-                                                    'content' =>
-                                                        "✅ **Hinweis (loose Guardrail):** Das Tool '{$candidate}' existiert und wurde soeben nachgeladen.\n" .
-                                                        "Bitte nutze jetzt dieses Tool, um die User-Anfrage zu erfüllen. 'tools.request' nur, wenn wirklich kein passendes Tool existiert.",
+                                                    'content' => "Das Tool '{$candidate}' existiert und wurde soeben nachgeladen.",
                                                 ];
                                                 
                                                 $allToolResults[] = [
@@ -4279,20 +4123,6 @@ class CoreToolPlaygroundController extends Controller
                                             }
                                             $failedToolCalls[$internalToolName][$errorKey]++;
                                             
-                                            if ($failedToolCalls[$internalToolName][$errorKey] >= 3) {
-                                                $simulation['final_response'] = [
-                                                    'type' => 'warning',
-                                                    'message' => "Früher Stopp: Tool '{$internalToolName}' wurde 3x mit Fehler '{$errorKey}' aufgerufen",
-                                                    'content' => $response['content'] ?? 'Keine finale Antwort',
-                                                    'iterations' => $iteration,
-                                                    'tool_results' => $allToolResults,
-                                                ];
-                                                $sendEvent('iteration.early_stop', [
-                                                    'iteration' => $iteration,
-                                                    'reason' => "Tool '{$internalToolName}' wurde 3x mit Fehler '{$errorKey}' aufgerufen",
-                                                ]);
-                                                break 2;
-                                            }
                                         }
                                         
                                         $allToolResults[] = [
@@ -4314,38 +4144,6 @@ class CoreToolPlaygroundController extends Controller
                                             'has_data' => !empty($toolResult->data),
                                         ]);
                                         
-                                        // Loop-Detection: Prüfe auch bei erfolgreichen Calls, ob Tool mit ähnlichen Argumenten mehrfach aufgerufen wurde
-                                        if ($toolResult->success && $iteration >= 3) {
-                                            $successfulCalls = array_filter($allToolResults, function($r) use ($internalToolName) {
-                                                return ($r['tool'] ?? '') === $internalToolName && ($r['success'] ?? false);
-                                            });
-                                            
-                                            if (count($successfulCalls) >= 3) {
-                                                // Prüfe ob alle erfolgreichen Calls ähnliche Argumente haben
-                                                $similarCount = 0;
-                                                foreach ($successfulCalls as $call) {
-                                                    if ($this->areArgumentsSimilar($toolArguments, $call['arguments'] ?? [])) {
-                                                        $similarCount++;
-                                                    }
-                                                }
-                                                
-                                                // Wenn 3x+ erfolgreich mit ähnlichen Argumenten → Loop erkannt
-                                                if ($similarCount >= 3) {
-                                                    $simulation['final_response'] = [
-                                                        'type' => 'warning',
-                                                        'message' => "Früher Stopp: Tool '{$internalToolName}' wurde {$similarCount}x erfolgreich mit ähnlichen Argumenten aufgerufen (Loop erkannt)",
-                                                        'content' => $response['content'] ?? 'Keine finale Antwort',
-                                                        'iterations' => $iteration,
-                                                        'tool_results' => $allToolResults,
-                                                    ];
-                                                    $sendEvent('iteration.early_stop', [
-                                                        'iteration' => $iteration,
-                                                        'reason' => "Tool '{$internalToolName}' wurde {$similarCount}x erfolgreich mit ähnlichen Argumenten aufgerufen (Loop erkannt)",
-                                                    ]);
-                                                    break 2; // Breche aus beiden Loops
-                                                }
-                                            }
-                                        }
                                         
                                     } catch (\Throwable $e) {
                                         $executionTime = (microtime(true) - $startTime) * 1000;
@@ -4416,9 +4214,7 @@ class CoreToolPlaygroundController extends Controller
                                         );
                                         
                                         if ($verification->hasIssues()) {
-                                            $verificationText = "\n\n⚠️ **Verifikation (Zwischenprüfung):**\n";
-                                            $verificationText .= $verification->getIssuesText();
-                                            $verificationText .= "\n\nPrüfe die Tool-Results und rufe das RICHTIGE Tool auf!";
+                                            $verificationText = $verification->getIssuesText();
                                             
                                             $messages[] = [
                                                 'role' => 'system',
@@ -4537,9 +4333,7 @@ class CoreToolPlaygroundController extends Controller
                                     );
                                     
                                     if ($verification->hasIssues()) {
-                                        $verificationText = "\n\n⚠️ **Verifikation:**\n";
-                                        $verificationText .= $verification->getIssuesText();
-                                        $verificationText .= "\n\nBitte prüfe die Ergebnisse und korrigiere falls nötig.";
+                                        $verificationText = $verification->getIssuesText();
                                         
                                         $maxIterationsForCorrection = $maxIterations - $maxCorrectionIterations;
                                         if ($iteration < $maxIterationsForCorrection) {
@@ -4558,7 +4352,7 @@ class CoreToolPlaygroundController extends Controller
                                             
                                             continue;
                                         } else {
-                                            $verificationText = "\n\n⚠️ **Hinweis:** " . $verification->getIssuesText();
+                                            $verificationText = $verification->getIssuesText();
                                         }
                                     }
                                     
