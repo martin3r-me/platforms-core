@@ -331,7 +331,6 @@ class SimpleToolController extends Controller
                         // This should trigger reasoning_summary_text / reasoning_text stream events (model-dependent).
                         'reasoning' => [
                             'effort' => 'medium',
-                            'summary' => 'auto',
                         ],
                         // Optional: forward selected OpenAI stream events to the client for debugging/observability
                         'on_debug' => function(?string $event, array $decoded) use ($sendEvent, &$debugEventCount, &$usageSent) {
