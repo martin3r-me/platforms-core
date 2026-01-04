@@ -1340,10 +1340,12 @@ Tools folgen REST-Logik.";
                 
                 $compressedProperties[$key] = $compressedProperty;
             }
-            // Nur properties hinzufügen, wenn es nicht leer ist (OpenAI akzeptiert kein leeres properties Array)
-            if (!empty($compressedProperties)) {
-                $compressed['properties'] = $compressedProperties;
-            }
+            // WICHTIG: OpenAI erwartet immer ein 'properties' Objekt bei type: "object"
+            // Auch wenn leer, muss es vorhanden sein (als leeres Objekt {}, nicht Array [])
+            $compressed['properties'] = $compressedProperties;
+        } elseif (($schema['type'] ?? 'object') === 'object') {
+            // Wenn kein properties im Schema, aber type ist "object", füge leeres Objekt hinzu
+            $compressed['properties'] = [];
         }
         
         // Required fields behalten (nur wenn nicht leer)
