@@ -261,7 +261,7 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/core/tools/simple', \Platform\Core\Livewire\SimpleToolPlayground::class)->name('core.tools.simple');
     Route::middleware(['force.json'])->group(function () {
         // Minimaler Tool Controller (neu, einfach)
-        Route::post('/core/tools/simple', [SimpleToolController::class, 'handle'])->name('core.tools.simple');
+        Route::post('/core/tools/simple', [SimpleToolController::class, 'handle'])->name('core.tools.simple.handle');
         Route::get('/core/tools/simple/models', [SimpleToolController::class, 'models'])->name('core.tools.simple.models');
         
         Route::post('/core/tools/playground/simulate', [CoreToolPlaygroundController::class, 'simulate'])->name('core.tools.playground.simulate');

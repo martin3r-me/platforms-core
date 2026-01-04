@@ -89,6 +89,7 @@
         const url = '{{ route("core.tools.simple.stream") }}';
         const modelsUrl = '{{ route("core.tools.simple.models") }}';
         const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const serverDefaultModel = @json(config('tools.openai.model', 'gpt-5'));
 
         const modelsList = document.getElementById('modelsList');
         const modelSelect = document.getElementById('modelSelect');
@@ -114,6 +115,27 @@
         let messages = [];
         let inFlight = false;
         let selectedModel = localStorage.getItem('simple.selectedModel') || '';
+
+        // Ensure sidebars are visible on this debug playground even if the user previously closed them
+        // (x-ui-page persists sidebarOpen/activityOpen in localStorage: page.sidebarOpen / page.activityOpen)
+        const forceSidebarsOpen = () => {
+          try {
+            if (window.Alpine?.store && window.Alpine.store('page')) {
+              window.Alpine.store('page').sidebarOpen = true;
+              window.Alpine.store('page').activityOpen = true;
+            }
+          } catch (_) {}
+        };
+        forceSidebarsOpen();
+        // In case Alpine initializes after this script, retry briefly.
+        (() => {
+          let tries = 0;
+          const t = setInterval(() => {
+            tries++;
+            forceSidebarsOpen();
+            if ((window.Alpine?.store && window.Alpine.store('page')) || tries > 40) clearInterval(t);
+          }, 50);
+        })();
 
         const scrollToBottom = () => { chatScroll.scrollTop = chatScroll.scrollHeight; };
 
@@ -199,14 +221,35 @@
           try {
             const res = await fetch(modelsUrl, {
               method: 'GET',
+              credentials: 'same-origin',
               headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
             });
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok || !json?.success) throw new Error(json?.error || `HTTP ${res.status}`);
+            const raw = await res.text();
+            let json = {};
+            try { json = JSON.parse(raw || '{}'); } catch (_) { json = {}; }
+
+            // Debug visibility: show status in Realtime events
+            try { rtLog(`models: HTTP ${res.status}`); } catch (_) {}
+
+            if (!res.ok || !json?.success) {
+              const msg = json?.error || raw || `HTTP ${res.status}`;
+              // Show full error in the models box (so we don't debug blind)
+              modelsList.innerHTML =
+                `<div class="text-xs text-[var(--ui-warning)]">Models konnten nicht geladen werden (HTTP ${res.status}).</div>` +
+                `<pre class="mt-2 text-[10px] whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] max-h-48 overflow-y-auto"></pre>`;
+              modelsList.querySelector('pre').textContent = String(msg).slice(0, 4000);
+              // fallback to at least one option so the UI stays usable
+              renderModels([serverDefaultModel]);
+              return;
+            }
+
             const ids = Array.isArray(json.models) ? json.models : [];
             renderModels(ids);
           } catch (e) {
-            modelsList.innerHTML = `<div class="text-xs text-[var(--ui-warning)]">Models konnten nicht geladen werden: ${e.message}</div>`;
+            try { rtLog(`models: error ${e.message}`); } catch (_) {}
+            modelsList.innerHTML =
+              `<div class="text-xs text-[var(--ui-warning)]">Models konnten nicht geladen werden: ${e.message}</div>`;
+            renderModels([serverDefaultModel]);
           }
         };
 
@@ -246,7 +289,8 @@
           try {
             const res = await fetch(url, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream', 'X-CSRF-TOKEN': csrf },
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream', 'X-CSRF-TOKEN': csrf },
               body: JSON.stringify(payload),
             });
             if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
