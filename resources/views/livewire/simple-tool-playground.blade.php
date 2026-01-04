@@ -113,7 +113,7 @@
         const rtEvents = document.getElementById('rtEvents');
         const rtStatus = document.getElementById('rtStatus');
 
-        /** @type {{role:'user'|'assistant', content:string}[]} */
+        /** type: {role:'user'|'assistant', content:string}[] */
         let messages = [];
         let inFlight = false;
         let selectedModel = localStorage.getItem('simple.selectedModel') || '';
