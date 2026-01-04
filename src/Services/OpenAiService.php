@@ -1342,10 +1342,15 @@ Tools folgen REST-Logik.";
             }
             // WICHTIG: OpenAI erwartet immer ein 'properties' Objekt bei type: "object"
             // Auch wenn leer, muss es vorhanden sein (als leeres Objekt {}, nicht Array [])
-            $compressed['properties'] = $compressedProperties;
+            // Wenn leer, konvertiere zu Objekt, damit es zu {} in JSON wird, nicht []
+            if (empty($compressedProperties)) {
+                $compressed['properties'] = new \stdClass();
+            } else {
+                $compressed['properties'] = $compressedProperties;
+            }
         } elseif (($schema['type'] ?? 'object') === 'object') {
             // Wenn kein properties im Schema, aber type ist "object", füge leeres Objekt hinzu
-            $compressed['properties'] = [];
+            $compressed['properties'] = new \stdClass();
         }
         
         // Required fields behalten (nur wenn nicht leer)
