@@ -525,8 +525,9 @@ class OpenAiService
         $onToolStart = $options['on_tool_start'] ?? null; $toolExecutor = $options['tool_executor'] ?? null;
         $onDebug = $options['on_debug'] ?? null; // Optional: Debug-Callback für detailliertes Logging
         // Optional: Separate Streams für reasoning/thinking (gpt-5.2-thinking)
-        $onReasoningDelta = $options['on_reasoning_delta'] ?? null;
-        $onThinkingDelta = $options['on_thinking_delta'] ?? null;
+        // Doku: response.reasoning_text.delta + response.reasoning_summary_text.delta
+        $onReasoningDelta = $options['on_reasoning_delta'] ?? null; // z.B. reasoning_summary_text
+        $onThinkingDelta = $options['on_thinking_delta'] ?? null;   // z.B. reasoning_text
         $eventCount = 0;
         $deltaCount = 0;
         while (!$body->eof()) {
@@ -573,44 +574,42 @@ class OpenAiService
                 }
                 
                 switch ($currentEvent) {
-                    // Reasoning / Thinking Streaming (wenn vom Model/Provider unterstützt)
-                    case 'response.reasoning.delta':
-                    case 'reasoning.delta':
-                    case 'response.reasoning_text.delta':
-                    case 'reasoning_text.delta':
+                    // Reasoning / Thinking Streaming (Responses API Doku)
+                    // - response.reasoning_summary_text.delta: "safe" summary stream (wir nennen das reasoning)
+                    // - response.reasoning_text.delta: detailed reasoning stream (wir nennen das thinking)
+                    case 'response.reasoning_summary_text.delta':
+                    case 'reasoning_summary_text.delta':
                         if (is_callable($onReasoningDelta)) {
-                            $rDelta = '';
-                            if (isset($decoded['delta']) && is_string($decoded['delta'])) {
-                                $rDelta = $decoded['delta'];
-                            } elseif (isset($decoded['text']) && is_string($decoded['text'])) {
-                                $rDelta = $decoded['text'];
-                            } elseif (isset($decoded['content']) && is_string($decoded['content'])) {
-                                $rDelta = $decoded['content'];
-                            } elseif (isset($decoded['delta']['text']) && is_string($decoded['delta']['text'])) {
-                                $rDelta = $decoded['delta']['text'];
-                            }
-                            if ($rDelta !== '') {
+                            $rDelta = $decoded['delta'] ?? ($decoded['text'] ?? ($decoded['content'] ?? ''));
+                            if (is_string($rDelta) && $rDelta !== '') {
                                 try { $onReasoningDelta($rDelta); } catch (\Throwable $e) {}
                             }
                         }
                         break;
-                    case 'response.thinking.delta':
-                    case 'thinking.delta':
-                    case 'response.thinking_text.delta':
-                    case 'thinking_text.delta':
-                        if (is_callable($onThinkingDelta)) {
-                            $tDelta = '';
-                            if (isset($decoded['delta']) && is_string($decoded['delta'])) {
-                                $tDelta = $decoded['delta'];
-                            } elseif (isset($decoded['text']) && is_string($decoded['text'])) {
-                                $tDelta = $decoded['text'];
-                            } elseif (isset($decoded['content']) && is_string($decoded['content'])) {
-                                $tDelta = $decoded['content'];
-                            } elseif (isset($decoded['delta']['text']) && is_string($decoded['delta']['text'])) {
-                                $tDelta = $decoded['delta']['text'];
+                    case 'response.reasoning_summary_text.done':
+                    case 'reasoning_summary_text.done':
+                        if (is_callable($onReasoningDelta)) {
+                            $rText = $decoded['text'] ?? ($decoded['content'] ?? '');
+                            if (is_string($rText) && $rText !== '') {
+                                try { $onReasoningDelta($rText); } catch (\Throwable $e) {}
                             }
-                            if ($tDelta !== '') {
+                        }
+                        break;
+                    case 'response.reasoning_text.delta':
+                    case 'reasoning_text.delta':
+                        if (is_callable($onThinkingDelta)) {
+                            $tDelta = $decoded['delta'] ?? ($decoded['text'] ?? ($decoded['content'] ?? ''));
+                            if (is_string($tDelta) && $tDelta !== '') {
                                 try { $onThinkingDelta($tDelta); } catch (\Throwable $e) {}
+                            }
+                        }
+                        break;
+                    case 'response.reasoning_text.done':
+                    case 'reasoning_text.done':
+                        if (is_callable($onThinkingDelta)) {
+                            $tText = $decoded['text'] ?? ($decoded['content'] ?? '');
+                            if (is_string($tText) && $tText !== '') {
+                                try { $onThinkingDelta($tText); } catch (\Throwable $e) {}
                             }
                         }
                         break;
@@ -1512,3 +1511,4 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
         return $toolName;
     }
 }
+
