@@ -89,7 +89,8 @@
         const url = '{{ route("core.tools.simple.stream") }}';
         const modelsUrl = '{{ route("core.tools.simple.models") }}';
         const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
-        const serverDefaultModel = @json(config('tools.openai.model', 'gpt-5'));
+        // Simple Playground: fixed model for now (explicit user request)
+        const serverDefaultModel = 'gpt-5.2';
 
         const modelsList = document.getElementById('modelsList');
         const modelSelect = document.getElementById('modelSelect');
@@ -217,40 +218,9 @@
         };
 
         const loadModels = async () => {
-          modelsList.innerHTML = '<div class="text-xs text-[var(--ui-muted)]">Lade…</div>';
-          try {
-            const res = await fetch(modelsUrl, {
-              method: 'GET',
-              credentials: 'same-origin',
-              headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
-            });
-            const raw = await res.text();
-            let json = {};
-            try { json = JSON.parse(raw || '{}'); } catch (_) { json = {}; }
-
-            // Debug visibility: show status in Realtime events
-            try { rtLog(`models: HTTP ${res.status}`); } catch (_) {}
-
-            if (!res.ok || !json?.success) {
-              const msg = json?.error || raw || `HTTP ${res.status}`;
-              // Show full error in the models box (so we don't debug blind)
-              modelsList.innerHTML =
-                `<div class="text-xs text-[var(--ui-warning)]">Models konnten nicht geladen werden (HTTP ${res.status}).</div>` +
-                `<pre class="mt-2 text-[10px] whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] max-h-48 overflow-y-auto"></pre>`;
-              modelsList.querySelector('pre').textContent = String(msg).slice(0, 4000);
-              // fallback to at least one option so the UI stays usable
-              renderModels([serverDefaultModel]);
-              return;
-            }
-
-            const ids = Array.isArray(json.models) ? json.models : [];
-            renderModels(ids);
-          } catch (e) {
-            try { rtLog(`models: error ${e.message}`); } catch (_) {}
-            modelsList.innerHTML =
-              `<div class="text-xs text-[var(--ui-warning)]">Models konnten nicht geladen werden: ${e.message}</div>`;
-            renderModels([serverDefaultModel]);
-          }
+          // fixed model: no API call
+          modelsList.innerHTML = '<div class="text-xs text-[var(--ui-muted)]">Fix: gpt-5.2</div>';
+          renderModels([serverDefaultModel]);
         };
 
         // drag & drop dropzone

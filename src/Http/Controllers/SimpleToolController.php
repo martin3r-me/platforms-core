@@ -80,7 +80,8 @@ class SimpleToolController extends Controller
 
             try {
                 // LLM aufrufen
-                $response = $openAiService->chat($messages, config('tools.openai.model', 'gpt-5'), [
+                // Simple Playground: fixed model for now (explicit user request)
+                $response = $openAiService->chat($messages, 'gpt-5.2', [
                     'max_tokens' => 2000,
                     'temperature' => 0.7,
                     'tools' => false, // Tools komplett aus
@@ -148,29 +149,14 @@ class SimpleToolController extends Controller
      */
     public function models(Request $request): JsonResponse
     {
-        $openAiService = app(OpenAiService::class);
-        $models = $openAiService->getModels();
-
-        // Normalize to a simple list of ids
-        $ids = [];
-        foreach ($models as $m) {
-            if (is_array($m) && isset($m['id']) && is_string($m['id'])) {
-                $ids[] = $m['id'];
-            }
-        }
-        sort($ids);
-
-        // Fallback: ensure UI isn't empty even if /models is blocked/empty
-        if (count($ids) === 0) {
-            $fallback = config('tools.openai.model', 'gpt-5');
-            $ids = array_values(array_filter([is_string($fallback) ? $fallback : null]));
-        }
+        // Simple Playground: fixed model for now (explicit user request)
+        $ids = ['gpt-5.2'];
 
         return response()->json([
             'success' => true,
             'models' => $ids,
             'count' => count($ids),
-            'fallback' => count($models) === 0,
+            'fallback' => true,
         ]);
     }
 
@@ -287,19 +273,10 @@ class SimpleToolController extends Controller
 
                 $userMessage = $request->input('message');
                 $chatHistory = $request->input('chat_history', []);
-                $model = $request->input('model');
+                // Simple Playground: fixed model for now (explicit user request)
+                $model = 'gpt-5.2';
 
-                // Basic guard: allow only typical model id characters
-                if (is_string($model) && $model !== '') {
-                    if (!preg_match('/^[a-zA-Z0-9._:-]+$/', $model)) {
-                        $sendEvent('error', [
-                            'error' => "Invalid model format: {$model}",
-                        ]);
-                        return;
-                    }
-                } else {
-                    $model = null;
-                }
+                // (Request model is ignored)
                 
                 // Services
                 $openAiService = app(OpenAiService::class);
@@ -340,7 +317,7 @@ class SimpleToolController extends Controller
                         $assistant .= $delta;
                         $sendEvent('assistant.delta', ['delta' => $delta, 'content' => $assistant]);
                     },
-                        $model ?: config('tools.openai.model', 'gpt-5'),
+                        $model,
                     [
                         // OpenAI built-in tool (no internal tool execution)
                         'tools' => [
