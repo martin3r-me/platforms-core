@@ -435,7 +435,9 @@ class CoreToolPlaygroundController extends Controller
                 session()->put("playground_chat_history_{$sessionId}", $messages);
                 
                 // Multi-Step-Chat: Führe so lange aus, bis LLM keine Tools mehr aufruft
-                $maxIterations = 5; // Verhindere Endlosschleifen (reduziert von 10 auf 5)
+                // Checkpoint-basiert statt harter Grenze: Bei bestimmten Iterationen Self-Reflection
+                $maxIterations = 15; // Höhere Grenze, aber mit Checkpoints
+                $checkpointIterations = [5, 8, 12]; // Checkpoints für Self-Reflection
                 $iteration = 0;
                 $allToolResults = [];
                 $allResponses = [];
@@ -567,6 +569,34 @@ class CoreToolPlaygroundController extends Controller
                         }
                         
                         $simulation['debug']['messages_sent_to_openai_' . $iteration] = $messagesDebug;
+                        
+                        // Checkpoint: Self-Reflection bei bestimmten Iterationen
+                        if (in_array($iteration, $checkpointIterations, true)) {
+                            $checkpointMessage = "🤔 **CHECKPOINT (Iteration {$iteration}):**\n\n";
+                            $checkpointMessage .= "Du hast bereits {$iteration} Iterationen durchgeführt. Bitte reflektiere kurz:\n\n";
+                            $checkpointMessage .= "1. **Bist du noch auf dem richtigen Weg?**\n";
+                            $checkpointMessage .= "   - Machst du Fortschritt bei der Anfrage?\n";
+                            $checkpointMessage .= "   - Oder wiederholst du dich?\n\n";
+                            $checkpointMessage .= "2. **Was ist dein nächster Schritt?**\n";
+                            $checkpointMessage .= "   - Welches Tool brauchst du noch?\n";
+                            $checkpointMessage .= "   - Oder kannst du bereits antworten?\n\n";
+                            $checkpointMessage .= "3. **Brauchst du Hilfe?**\n";
+                            $checkpointMessage .= "   - Wenn du blockiert bist, nutze 'tools.GET' um nach Tools zu suchen\n";
+                            $checkpointMessage .= "   - Oder teile dem User mit, was noch benötigt wird\n\n";
+                            $checkpointMessage .= "⚠️ **WICHTIG:** Du entscheidest selbst. Wenn du auf dem richtigen Weg bist, mache weiter. Wenn nicht, teile dem User mit, was das Problem ist.";
+                            
+                            $messages[] = [
+                                'role' => 'system',
+                                'content' => $checkpointMessage,
+                            ];
+                            
+                            $simulation['steps'][] = [
+                                'step' => 3 + $iteration,
+                                'name' => "Checkpoint (Iteration {$iteration})",
+                                'description' => 'Self-Reflection: LLM prüft selbst, ob sie noch auf dem richtigen Weg ist',
+                                'timestamp' => now()->toIso8601String(),
+                            ];
+                        }
                         
                         // Rufe echten OpenAiService auf (zeigt automatisch alle Tools)
                         // WICHTIG: Robustheit bei transienten OpenAI Netzwerkfehlern (cURL 28/52)
@@ -3035,10 +3065,7 @@ class CoreToolPlaygroundController extends Controller
             // Spezielle Formatierung für bekannte Tools
             if ($toolName === 'core.teams.GET' && isset($data['teams'])) {
                 $text .= "Teams gefunden: " . ($data['count'] ?? count($data['teams'])) . "\n";
-                if (isset($data['current_team_id'])) {
-                    $teamName = $data['current_team_name'] ?? 'Unbekannt';
-                    $text .= "Aktuelles Team: ID {$data['current_team_id']} ({$teamName})\n";
-                }
+                // "Aktuelles Team" Hinweis entfernt - LLM soll selbst entscheiden, welches Team gemeint ist
                 if (!empty($data['teams']) && is_array($data['teams'])) {
                     $text .= "\nTeams:\n";
                     foreach (array_slice($data['teams'], 0, 10) as $team) {
@@ -3381,7 +3408,9 @@ class CoreToolPlaygroundController extends Controller
                     
                     session()->put("playground_chat_history_{$sessionId}", $messages);
                     
-                    $maxIterations = 5;
+                    // Checkpoint-basiert statt harter Grenze: Bei bestimmten Iterationen Self-Reflection
+                    $maxIterations = 15; // Höhere Grenze, aber mit Checkpoints
+                    $checkpointIterations = [5, 8, 12]; // Checkpoints für Self-Reflection
                     $iteration = 0;
                     $allToolResults = [];
                     $allResponses = [];
@@ -3500,6 +3529,32 @@ class CoreToolPlaygroundController extends Controller
                             }
                             
                             $simulation['debug']['messages_sent_to_openai_' . $iteration] = $messagesDebug;
+                            
+                            // Checkpoint: Self-Reflection bei bestimmten Iterationen
+                            if (in_array($iteration, $checkpointIterations, true)) {
+                                $checkpointMessage = "🤔 **CHECKPOINT (Iteration {$iteration}):**\n\n";
+                                $checkpointMessage .= "Du hast bereits {$iteration} Iterationen durchgeführt. Bitte reflektiere kurz:\n\n";
+                                $checkpointMessage .= "1. **Bist du noch auf dem richtigen Weg?**\n";
+                                $checkpointMessage .= "   - Machst du Fortschritt bei der Anfrage?\n";
+                                $checkpointMessage .= "   - Oder wiederholst du dich?\n\n";
+                                $checkpointMessage .= "2. **Was ist dein nächster Schritt?**\n";
+                                $checkpointMessage .= "   - Welches Tool brauchst du noch?\n";
+                                $checkpointMessage .= "   - Oder kannst du bereits antworten?\n\n";
+                                $checkpointMessage .= "3. **Brauchst du Hilfe?**\n";
+                                $checkpointMessage .= "   - Wenn du blockiert bist, nutze 'tools.GET' um nach Tools zu suchen\n";
+                                $checkpointMessage .= "   - Oder teile dem User mit, was noch benötigt wird\n\n";
+                                $checkpointMessage .= "⚠️ **WICHTIG:** Du entscheidest selbst. Wenn du auf dem richtigen Weg bist, mache weiter. Wenn nicht, teile dem User mit, was das Problem ist.";
+                                
+                                $messages[] = [
+                                    'role' => 'system',
+                                    'content' => $checkpointMessage,
+                                ];
+                                
+                                $sendEvent('iteration.checkpoint', [
+                                    'iteration' => $iteration,
+                                    'message' => 'Self-Reflection: LLM prüft selbst, ob sie noch auf dem richtigen Weg ist',
+                                ]);
+                            }
                             
                             // Rufe OpenAI auf mit Streaming
                             $responseContent = '';
