@@ -1340,11 +1340,14 @@ Tools folgen REST-Logik.";
                 
                 $compressedProperties[$key] = $compressedProperty;
             }
-            $compressed['properties'] = $compressedProperties;
+            // Nur properties hinzufügen, wenn es nicht leer ist (OpenAI akzeptiert kein leeres properties Array)
+            if (!empty($compressedProperties)) {
+                $compressed['properties'] = $compressedProperties;
+            }
         }
         
-        // Required fields behalten
-        if (isset($schema['required']) && is_array($schema['required'])) {
+        // Required fields behalten (nur wenn nicht leer)
+        if (isset($schema['required']) && is_array($schema['required']) && !empty($schema['required'])) {
             $compressed['required'] = $schema['required'];
         }
         
