@@ -80,10 +80,11 @@ class SimpleToolController extends Controller
 
             try {
                 // LLM aufrufen
-                $response = $openAiService->chat($messages, 'gpt-5.2-thinking', [
+                $response = $openAiService->chat($messages, config('tools.openai.model', 'gpt-5'), [
                     'max_tokens' => 2000,
                     'temperature' => 0.7,
                     'tools' => false, // Tools komplett aus
+                    'with_context' => false,
                 ]);
 
                 $content = $response['content'] ?? '';
@@ -336,6 +337,7 @@ class SimpleToolController extends Controller
                         'tools' => false,
                         'temperature' => 0.7,
                         'max_tokens' => 2000,
+                        'with_context' => false,
                         'on_reasoning_delta' => function(string $delta) use ($sendEvent, &$reasoning) {
                             $reasoning .= $delta;
                             $sendEvent('reasoning.delta', ['delta' => $delta, 'content' => $reasoning]);

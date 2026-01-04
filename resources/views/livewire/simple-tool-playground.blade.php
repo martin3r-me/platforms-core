@@ -34,28 +34,9 @@
       </div>
 
       <!-- Chat -->
-      <div class="col-span-12 lg:col-span-9 flex flex-col">
+      <div class="col-span-12 lg:col-span-6 flex flex-col">
         <div class="flex-1 overflow-y-auto p-4 space-y-4 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)]" id="chatScroll">
           <div id="chatList" class="space-y-4"></div>
-
-          <!-- Active streaming assistant bubble -->
-          <div id="streamBubble" class="hidden">
-            <div class="flex justify-start">
-              <div class="max-w-3xl rounded-lg p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]">
-                <div class="text-sm font-semibold mb-1">Assistant</div>
-                <div class="whitespace-pre-wrap" id="streamAssistant"></div>
-                <details class="mt-3">
-                  <summary class="cursor-pointer text-xs text-[var(--ui-muted)]">Reasoning (live)</summary>
-                  <pre class="mt-2 text-xs whitespace-pre-wrap" id="streamReasoning"></pre>
-                </details>
-                <details class="mt-2">
-                  <summary class="cursor-pointer text-xs text-[var(--ui-muted)]">Thinking (live)</summary>
-                  <pre class="mt-2 text-xs whitespace-pre-wrap" id="streamThinking"></pre>
-                </details>
-                <div class="mt-2 text-xs text-[var(--ui-muted)] animate-pulse">● streaming…</div>
-              </div>
-            </div>
-          </div>
         </div>
 
         <form id="chatForm" class="mt-4 flex gap-2">
@@ -70,6 +51,40 @@
             Senden
           </button>
         </form>
+      </div>
+
+      <!-- Realtime panel -->
+      <div class="col-span-12 lg:col-span-3">
+        <div class="border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] p-4 h-full flex flex-col">
+          <div class="flex items-center justify-between">
+            <div class="text-sm font-semibold text-[var(--ui-secondary)]">Realtime</div>
+            <button id="realtimeClear" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Clear</button>
+          </div>
+          <div class="mt-2 text-xs text-[var(--ui-muted)]">
+            Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
+          </div>
+
+          <div class="mt-4 flex-1 overflow-y-auto space-y-4">
+            <div>
+              <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Assistant (live)</div>
+              <pre id="rtAssistant" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[80px]"></pre>
+            </div>
+            <div>
+              <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Reasoning (summary, live)</div>
+              <pre id="rtReasoning" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px]"></pre>
+            </div>
+            <div>
+              <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Thinking (detailed, live)</div>
+              <pre id="rtThinking" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px]"></pre>
+            </div>
+            <div>
+              <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Events</div>
+              <div id="rtEvents" class="text-xs space-y-1 text-[var(--ui-muted)]"></div>
+            </div>
+          </div>
+
+          <div id="rtStatus" class="mt-3 text-xs text-[var(--ui-muted)]">idle</div>
+        </div>
       </div>
     </div>
 
@@ -91,10 +106,13 @@
         const input = document.getElementById('chatInput');
         const sendBtn = document.getElementById('chatSend');
 
-        const streamBubble = document.getElementById('streamBubble');
-        const streamAssistant = document.getElementById('streamAssistant');
-        const streamReasoning = document.getElementById('streamReasoning');
-        const streamThinking = document.getElementById('streamThinking');
+        const realtimeClear = document.getElementById('realtimeClear');
+        const realtimeModel = document.getElementById('realtimeModel');
+        const rtAssistant = document.getElementById('rtAssistant');
+        const rtReasoning = document.getElementById('rtReasoning');
+        const rtThinking = document.getElementById('rtThinking');
+        const rtEvents = document.getElementById('rtEvents');
+        const rtStatus = document.getElementById('rtStatus');
 
         /** @type {{role:'user'|'assistant', content:string}[]} */
         let messages = [];
@@ -117,20 +135,31 @@
           scrollToBottom();
         };
 
-        const setStreamingVisible = (visible) => {
-          streamBubble.classList.toggle('hidden', !visible);
-          if (!visible) {
-            streamAssistant.textContent = '';
-            streamReasoning.textContent = '';
-            streamThinking.textContent = '';
-          }
+        const rtLog = (text) => {
+          const row = document.createElement('div');
+          row.textContent = text;
+          rtEvents.appendChild(row);
+          // keep last 80
+          while (rtEvents.children.length > 80) rtEvents.removeChild(rtEvents.firstChild);
         };
+
+        const rtClear = () => {
+          rtAssistant.textContent = '';
+          rtReasoning.textContent = '';
+          rtThinking.textContent = '';
+          rtEvents.innerHTML = '';
+          rtStatus.textContent = 'idle';
+          realtimeModel.textContent = selectedModel || '—';
+        };
+
+        realtimeClear.addEventListener('click', rtClear);
 
         const setSelectedModel = (modelId) => {
           selectedModel = modelId || '';
           selectedModelLabel.textContent = selectedModel || '—';
           localStorage.setItem('simple.selectedModel', selectedModel);
           if (modelSelect) modelSelect.value = selectedModel;
+          realtimeModel.textContent = selectedModel || '—';
         };
 
         const renderModels = (ids) => {
@@ -208,7 +237,11 @@
           inFlight = true;
           sendBtn.disabled = true;
           input.disabled = true;
-          setStreamingVisible(true);
+          // Realtime panel: reset + start
+          rtClear();
+          rtStatus.textContent = 'streaming…';
+          realtimeModel.textContent = selectedModel || '—';
+          rtLog('start');
 
           // Request payload = full conversation history + new message already included
           const payload = { message: text, chat_history: messages.slice(0, -1), model: selectedModel || null };
@@ -243,28 +276,33 @@
 
                 switch (currentEvent) {
                   case 'assistant.delta':
-                    if (data?.delta) streamAssistant.textContent += data.delta;
+                    if (data?.delta) rtAssistant.textContent += data.delta;
                     break;
                   case 'reasoning.delta':
-                    if (data?.delta) streamReasoning.textContent += data.delta;
+                    if (data?.delta) rtReasoning.textContent += data.delta;
                     break;
                   case 'thinking.delta':
-                    if (data?.delta) streamThinking.textContent += data.delta;
+                    if (data?.delta) rtThinking.textContent += data.delta;
                     break;
                   case 'complete': {
-                    const assistant = data?.assistant || streamAssistant.textContent;
+                    const assistant = data?.assistant || rtAssistant.textContent;
                     messages.push({ role: 'assistant', content: assistant });
                     renderMessage('assistant', assistant);
-                    setStreamingVisible(false);
+                    rtStatus.textContent = 'done';
+                    rtLog('complete');
                     break;
                   }
                   case 'error': {
                     const msg = data?.error || 'Unbekannter Fehler';
                     messages.push({ role: 'assistant', content: `❌ Fehler: ${msg}` });
                     renderMessage('assistant', `❌ Fehler: ${msg}`);
-                    setStreamingVisible(false);
+                    rtStatus.textContent = 'error';
+                    rtLog('error: ' + msg);
                     break;
                   }
+                  default:
+                    // optional: show debug/request events
+                    if (currentEvent) rtLog(currentEvent);
                 }
                 scrollToBottom();
               }
@@ -273,7 +311,8 @@
             const msg = err?.message || String(err);
             messages.push({ role: 'assistant', content: `❌ Fehler: ${msg}` });
             renderMessage('assistant', `❌ Fehler: ${msg}`);
-            setStreamingVisible(false);
+            rtStatus.textContent = 'error';
+            rtLog('error: ' + msg);
           } finally {
             inFlight = false;
             sendBtn.disabled = false;
