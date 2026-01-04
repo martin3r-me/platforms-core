@@ -70,7 +70,7 @@
         <div id="chatList" class="space-y-4"></div>
       </div>
 
-      <form id="chatForm" class="mt-4 flex gap-2">
+      <form id="chatForm" class="mt-4 flex gap-2" method="post" action="javascript:void(0)" onsubmit="return false;">
         <input
           id="chatInput"
           type="text"
@@ -185,12 +185,13 @@
             modelsList.appendChild(item);
           }
 
-          // keep selection if still valid
-          if (selectedModel && ids.includes(selectedModel)) {
-            setSelectedModel(selectedModel);
-          } else {
-            setSelectedModel('');
-          }
+          // Selection strategy:
+          // - keep existing selection if valid
+          // - else auto-pick first model (keeps UI non-empty)
+          // - else empty
+          if (selectedModel && ids.includes(selectedModel)) setSelectedModel(selectedModel);
+          else if (ids.length > 0) setSelectedModel(ids[0]);
+          else setSelectedModel('');
         };
 
         const loadModels = async () => {

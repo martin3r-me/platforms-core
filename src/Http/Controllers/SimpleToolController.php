@@ -160,10 +160,17 @@ class SimpleToolController extends Controller
         }
         sort($ids);
 
+        // Fallback: ensure UI isn't empty even if /models is blocked/empty
+        if (count($ids) === 0) {
+            $fallback = config('tools.openai.model', 'gpt-5');
+            $ids = array_values(array_filter([is_string($fallback) ? $fallback : null]));
+        }
+
         return response()->json([
             'success' => true,
             'models' => $ids,
             'count' => count($ids),
+            'fallback' => count($models) === 0,
         ]);
     }
 
