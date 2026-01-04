@@ -84,11 +84,17 @@
       </form>
     </div>
 
+    @php
+      $simpleStreamUrl = route('core.tools.simple.stream');
+      $simpleModelsUrl = route('core.tools.simple.models');
+    @endphp
+
+    @verbatim
     <script>
       (() => {
         const boot = () => {
-        const url = '{{ route("core.tools.simple.stream") }}';
-        const modelsUrl = '{{ route("core.tools.simple.models") }}';
+        const url = '__SIMPLE_STREAM_URL__';
+        const modelsUrl = '__SIMPLE_MODELS_URL__';
         const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
         // Simple Playground: fixed model for now (explicit user request)
         const serverDefaultModel = 'gpt-5.2';
@@ -351,6 +357,18 @@
         } else {
           boot();
         }
+      })();
+    </script>
+    @endverbatim
+
+    <script>
+      // Replace placeholders injected inside @verbatim script
+      (function(){
+        const s = document.currentScript?.previousElementSibling;
+        if (!s || s.tagName !== 'SCRIPT') return;
+        s.text = s.text
+          .replaceAll('__SIMPLE_STREAM_URL__', @json($simpleStreamUrl))
+          .replaceAll('__SIMPLE_MODELS_URL__', @json($simpleModelsUrl));
       })();
     </script>
   </x-ui-page-container>
