@@ -327,6 +327,12 @@ class SimpleToolController extends Controller
                         'temperature' => 0.7,
                         'max_tokens' => 2000,
                         'with_context' => false,
+                        // Tools-ready: actually let the model "think"
+                        // This should trigger reasoning_summary_text / reasoning_text stream events (model-dependent).
+                        'reasoning' => [
+                            'effort' => 'medium',
+                            'summary' => 'auto',
+                        ],
                         // Optional: forward selected OpenAI stream events to the client for debugging/observability
                         'on_debug' => function(?string $event, array $decoded) use ($sendEvent, &$debugEventCount, &$usageSent) {
                             $event = $event ?? '';

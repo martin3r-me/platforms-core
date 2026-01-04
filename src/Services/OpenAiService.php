@@ -383,6 +383,12 @@ class OpenAiService
             'max_output_tokens' => $options['max_tokens'] ?? 1000,
             'temperature' => $options['temperature'] ?? 0.7,
         ];
+
+        // Optional: enable reasoning signals in the Responses API (model-dependent)
+        // Example: ['effort' => 'medium', 'summary' => 'auto']
+        if (isset($options['reasoning']) && is_array($options['reasoning'])) {
+            $payload['reasoning'] = $options['reasoning'];
+        }
         if (isset($options['tools']) && $options['tools'] === false) {
             // Tools explizit deaktiviert - nichts hinzufügen
         } else {
