@@ -324,7 +324,6 @@ class SimpleToolController extends Controller
                         'tools' => [
                             ['type' => 'web_search'],
                         ],
-                        'temperature' => 0.7,
                         'max_tokens' => 2000,
                         'with_context' => false,
                         // Tools-ready: actually let the model "think"

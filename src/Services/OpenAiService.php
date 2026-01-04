@@ -89,8 +89,13 @@ class OpenAiService
                 'input' => $responsesInput,
                 'stream' => false,
                 'max_output_tokens' => $options['max_tokens'] ?? 1000,
-                'temperature' => $options['temperature'] ?? 0.7,
             ];
+            // Some models (e.g. gpt-5.2*) do not support temperature in the Responses API.
+            if (!str_starts_with($model, 'gpt-5.2') && array_key_exists('temperature', $options)) {
+                $payload['temperature'] = $options['temperature'];
+            } elseif (!str_starts_with($model, 'gpt-5.2') && !array_key_exists('temperature', $options)) {
+                $payload['temperature'] = 0.7;
+            }
             if (isset($options['tools']) && $options['tools'] === false) {
                 // Tools explizit deaktiviert - nichts hinzufügen
             } else {
@@ -381,8 +386,13 @@ class OpenAiService
             'input' => $this->buildResponsesInput($messagesWithContext),
             'stream' => true,
             'max_output_tokens' => $options['max_tokens'] ?? 1000,
-            'temperature' => $options['temperature'] ?? 0.7,
         ];
+        // Some models (e.g. gpt-5.2*) do not support temperature in the Responses API.
+        if (!str_starts_with($model, 'gpt-5.2') && array_key_exists('temperature', $options)) {
+            $payload['temperature'] = $options['temperature'];
+        } elseif (!str_starts_with($model, 'gpt-5.2') && !array_key_exists('temperature', $options)) {
+            $payload['temperature'] = 0.7;
+        }
 
         // Optional: enable reasoning signals in the Responses API (model-dependent)
         // Example: ['effort' => 'medium', 'summary' => 'auto']
