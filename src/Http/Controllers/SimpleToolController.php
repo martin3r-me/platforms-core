@@ -29,9 +29,11 @@ class SimpleToolController extends Controller
     {
         $request->validate([
             'message' => 'required|string',
+            'chat_history' => 'nullable|array', // Conversation-Historie
         ]);
 
         $userMessage = $request->input('message');
+        $chatHistory = $request->input('chat_history', []);
         
         // Services
         $registry = app(ToolRegistry::class);
@@ -39,9 +41,25 @@ class SimpleToolController extends Controller
         $openAiService = app(OpenAiService::class);
         $context = ToolContext::fromAuth();
 
-        // Initialisiere Messages
-        $messages = [
-            ['role' => 'user', 'content' => $userMessage]
+        // Initialisiere Messages mit Historie
+        $messages = [];
+        
+        // Füge Chat-Historie hinzu (falls vorhanden)
+        if (!empty($chatHistory) && is_array($chatHistory)) {
+            foreach ($chatHistory as $msg) {
+                if (isset($msg['role']) && isset($msg['content'])) {
+                    $messages[] = [
+                        'role' => $msg['role'],
+                        'content' => $msg['content'],
+                    ];
+                }
+            }
+        }
+        
+        // Füge neue User-Message hinzu
+        $messages[] = [
+            'role' => 'user',
+            'content' => $userMessage,
         ];
 
         // Lade alle Tools
@@ -68,11 +86,18 @@ class SimpleToolController extends Controller
 
                 // Wenn keine Tool-Calls: Fertig
                 if (empty($toolCalls)) {
+                    // Füge Assistant-Response zu Messages hinzu
+                    $messages[] = [
+                        'role' => 'assistant',
+                        'content' => $content,
+                    ];
+                    
                     return response()->json([
                         'success' => true,
                         'message' => $content,
                         'iterations' => $iteration,
                         'tool_results' => $toolResults,
+                        'chat_history' => $messages, // Sende aktualisierte Historie zurück
                     ]);
                 }
 
@@ -157,6 +182,7 @@ class SimpleToolController extends Controller
             'iterations' => $iteration,
             'tool_results' => $toolResults,
             'last_message' => $messages[count($messages) - 1]['content'] ?? null,
+            'chat_history' => $messages, // Sende aktualisierte Historie zurück
         ]);
     }
 
@@ -254,9 +280,11 @@ class SimpleToolController extends Controller
             try {
                 $request->validate([
                     'message' => 'required|string',
+                    'chat_history' => 'nullable|array', // Conversation-Historie
                 ]);
 
                 $userMessage = $request->input('message');
+                $chatHistory = $request->input('chat_history', []);
                 
                 // Services
                 $registry = app(ToolRegistry::class);
@@ -264,9 +292,25 @@ class SimpleToolController extends Controller
                 $openAiService = app(OpenAiService::class);
                 $context = ToolContext::fromAuth();
 
-                // Initialisiere Messages
-                $messages = [
-                    ['role' => 'user', 'content' => $userMessage]
+                // Initialisiere Messages mit Historie
+                $messages = [];
+                
+                // Füge Chat-Historie hinzu (falls vorhanden)
+                if (!empty($chatHistory) && is_array($chatHistory)) {
+                    foreach ($chatHistory as $msg) {
+                        if (isset($msg['role']) && isset($msg['content'])) {
+                            $messages[] = [
+                                'role' => $msg['role'],
+                                'content' => $msg['content'],
+                            ];
+                        }
+                    }
+                }
+                
+                // Füge neue User-Message hinzu
+                $messages[] = [
+                    'role' => 'user',
+                    'content' => $userMessage,
                 ];
 
                 $sendEvent('start', ['message' => '🚀 Starte...']);
@@ -281,20 +325,74 @@ class SimpleToolController extends Controller
                     $sendEvent('iteration.start', ['iteration' => $iteration]);
 
                     try {
-                        // LLM aufrufen (erstmal ohne Streaming für Tool-Calls)
-                        $response = $openAiService->chat($messages, 'gpt-4o-mini', [
+                        // LLM aufrufen mit ECHTEM Streaming
+                        $assistantContent = '';
+                        $toolCalls = [];
+                        $currentToolCall = null;
+                        $toolArguments = '';
+                        $toolCallId = null;
+                        
+                        // Sammle Tool-Calls während des Streams über Debug-Callback
+                        $onDebug = function($event, $data) use (&$toolCalls, &$currentToolCall, &$toolArguments, &$toolCallId, $sendEvent) {
+                            // Tool-Call erkannt
+                            if ($event === 'response.output_item.added' && isset($data['item']['type']) && $data['item']['type'] === 'function_call') {
+                                $currentToolCall = $data['item']['name'] ?? null;
+                                $toolCallId = $data['item']['id'] ?? ($data['item']['call_id'] ?? bin2hex(random_bytes(8)));
+                                $toolArguments = '';
+                                
+                                if ($currentToolCall) {
+                                    $internalName = $this->denormalizeToolName($currentToolCall);
+                                    $sendEvent('tool.start', ['tool' => $internalName, 'call_id' => $toolCallId]);
+                                }
+                            }
+                            
+                            // Tool-Argumente werden gestreamt
+                            if ($event === 'response.function_call_arguments.delta' && isset($data['delta'])) {
+                                $toolArguments .= $data['delta'];
+                            }
+                            
+                            // Tool-Argumente vollständig → Tool-Call sammeln
+                            if ($event === 'response.function_call_arguments.done' && $currentToolCall) {
+                                $arguments = $data['arguments'] ?? $toolArguments;
+                                
+                                $toolCall = [
+                                    'id' => $toolCallId ?? bin2hex(random_bytes(8)),
+                                    'type' => 'function',
+                                    'function' => [
+                                        'name' => $currentToolCall,
+                                        'arguments' => is_string($arguments) ? $arguments : json_encode($arguments),
+                                    ],
+                                ];
+                                
+                                $toolCalls[] = $toolCall;
+                                
+                                $internalName = $this->denormalizeToolName($currentToolCall);
+                                $sendEvent('tool.complete', [
+                                    'tool' => $internalName,
+                                    'call_id' => $toolCallId,
+                                ]);
+                                
+                                // Reset für nächsten Tool-Call
+                                $currentToolCall = null;
+                                $toolArguments = '';
+                                $toolCallId = null;
+                            }
+                        };
+                        
+                        $openAiService->streamChat($messages, function($delta) use ($sendEvent, &$assistantContent) {
+                            $assistantContent .= $delta;
+                            $sendEvent('llm.delta', ['delta' => $delta, 'content' => $assistantContent]);
+                        }, 'gpt-4o-mini', [
                             'max_tokens' => 2000,
                             'temperature' => 0.7,
                             'tools' => null,
+                            'on_tool_start' => function($toolName) use ($sendEvent) {
+                                $internalName = $this->denormalizeToolName($toolName);
+                                $sendEvent('tool.detected', ['tool' => $internalName]);
+                            },
+                            'on_debug' => $onDebug,
+                            'tool_executor' => null, // Wir führen Tools selbst aus
                         ]);
-
-                        $assistantContent = $response['content'] ?? '';
-                        $toolCalls = $response['tool_calls'] ?? [];
-
-                        // Sende Content
-                        if ($assistantContent) {
-                            $sendEvent('llm.content', ['content' => $assistantContent]);
-                        }
 
                         // Wenn keine Tool-Calls: Fertig
                         if (empty($toolCalls)) {
@@ -302,6 +400,7 @@ class SimpleToolController extends Controller
                                 'message' => $assistantContent,
                                 'iterations' => $iteration,
                                 'tool_results' => $toolResults,
+                                'chat_history' => $messages, // Sende aktualisierte Historie zurück
                             ]);
                             return;
                         }
@@ -355,12 +454,17 @@ class SimpleToolController extends Controller
                             }
                         }
 
-                        // Füge Assistant-Message hinzu
-                        $messages[] = [
+                        // Füge Assistant-Message hinzu (mit Tool-Calls, falls vorhanden)
+                        $assistantMessage = [
                             'role' => 'assistant',
                             'content' => $assistantContent,
-                            'tool_calls' => $toolCalls,
                         ];
+                        
+                        if (!empty($toolCalls)) {
+                            $assistantMessage['tool_calls'] = $toolCalls;
+                        }
+                        
+                        $messages[] = $assistantMessage;
 
                         $sendEvent('iteration.complete', ['iteration' => $iteration]);
 
@@ -379,6 +483,7 @@ class SimpleToolController extends Controller
                     'iterations' => $iteration,
                     'tool_results' => $toolResults,
                     'max_iterations' => true,
+                    'chat_history' => $messages, // Sende aktualisierte Historie zurück
                 ]);
 
             } catch (\Throwable $e) {

@@ -84,6 +84,20 @@ function simpleToolPlayground() {
             this.startStream(userMessage);
         },
 
+        // Bereite Chat-Historie für Request vor (ohne die letzte User-Message, die wird separat gesendet)
+        getChatHistory() {
+            // Entferne letzte User-Message (wird separat als 'message' gesendet)
+            const history = [...this.messages];
+            if (history.length > 0 && history[history.length - 1].role === 'user') {
+                history.pop();
+            }
+            
+            return history.map(msg => ({
+                role: msg.role,
+                content: msg.content,
+            }));
+        },
+
         startStream(userMessage) {
             // Alte Verbindung schließen
             if (this.eventSource) {
@@ -101,7 +115,10 @@ function simpleToolPlayground() {
                     'Accept': 'text/event-stream',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
                 },
-                body: JSON.stringify({ message: userMessage }),
+                body: JSON.stringify({ 
+                    message: userMessage,
+                    chat_history: this.getChatHistory(), // Sende Chat-Historie mit
+                }),
             }).then(response => {
                 if (!response.ok) {
                     throw new Error('Stream failed');
@@ -124,6 +141,8 @@ function simpleToolPlayground() {
                         buffer = lines.pop() || '';
 
                         for (const line of lines) {
+                            if (line.trim() === '') continue;
+                            
                             if (line.startsWith('event: ')) {
                                 currentEvent = line.substring(7).trim();
                                 continue;
@@ -132,9 +151,9 @@ function simpleToolPlayground() {
                             if (line.startsWith('data: ')) {
                                 try {
                                     const data = JSON.parse(line.substring(6));
-                                    this.handleEvent(currentEvent, data);
+                                    this.handleEvent(currentEvent || 'message', data);
                                 } catch (e) {
-                                    console.warn('Failed to parse SSE data:', line);
+                                    console.warn('Failed to parse SSE data:', line, e);
                                 }
                             }
                         }
@@ -154,42 +173,79 @@ function simpleToolPlayground() {
         },
 
         handleEvent(eventType, data) {
-            // Content Updates
-            if (eventType === 'llm.content' && data.content) {
-                this.streamingContent = data.content;
-                this.scrollToBottom();
-            }
-
+            console.log('[SSE Event]', eventType, data);
+            
+            // Content Updates (Streaming)
             if (eventType === 'llm.delta' && data.delta) {
                 this.streamingContent = (this.streamingContent || '') + data.delta;
                 this.scrollToBottom();
             }
 
+            if (eventType === 'llm.content' && data.content) {
+                this.streamingContent = data.content;
+                this.scrollToBottom();
+            }
+
             // Tool Events
+            if (eventType === 'tool.detected' && data.tool) {
+                console.log(`[Tool] Detected: ${data.tool}`);
+            }
+
             if (eventType === 'tool.start' && data.tool) {
                 console.log(`[Tool] Start: ${data.tool}`);
+                this.streamingContent += `\n\n🔧 Führe Tool aus: ${data.tool}...\n`;
+                this.scrollToBottom();
             }
 
             if (eventType === 'tool.complete' && data.tool) {
                 console.log(`[Tool] Complete: ${data.tool}`);
+                this.streamingContent += ` ✅\n`;
+                this.scrollToBottom();
+            }
+
+            if (eventType === 'tool.error' && data.tool) {
+                this.streamingContent += `\n❌ Fehler: ${data.error || 'Unbekannter Fehler'}\n`;
+                this.scrollToBottom();
+            }
+
+            // Iteration Events
+            if (eventType === 'iteration.start') {
+                console.log(`[Iteration] Start: ${data.iteration}`);
             }
 
             // Completion
             if (eventType === 'complete') {
-                if (data.message) {
-                    this.messages.push({
-                        role: 'assistant',
-                        content: data.message,
-                    });
+                // Füge Assistant-Response hinzu (falls noch nicht vorhanden)
+                const finalContent = data.message || this.streamingContent;
+                if (finalContent) {
+                    // Prüfe ob letzte Message bereits Assistant ist (könnte durch Streaming schon da sein)
+                    const lastMsg = this.messages[this.messages.length - 1];
+                    if (lastMsg && lastMsg.role === 'assistant') {
+                        // Update bestehende Message
+                        lastMsg.content = finalContent;
+                    } else {
+                        // Neue Message hinzufügen
+                        this.messages.push({
+                            role: 'assistant',
+                            content: finalContent,
+                        });
+                    }
                 }
+                
+                // Update Chat-Historie falls vom Server zurückgegeben
+                if (data.chat_history && Array.isArray(data.chat_history)) {
+                    this.messages = data.chat_history;
+                }
+                
                 this.finishStream();
             }
 
             // Errors
             if (eventType === 'error') {
+                const errorMsg = data.error || 'Unbekannter Fehler';
                 this.messages.push({
                     role: 'assistant',
-                    content: `❌ Fehler: ${data.error || 'Unbekannter Fehler'}`,
+                    content: `❌ Fehler: ${errorMsg}`,
                 });
                 this.finishStream();
             }
