@@ -296,7 +296,8 @@ class SimpleToolController extends Controller
                         . "Antworte immer auf Deutsch.\n"
                         . "Wenn der Nutzer Daten aus der Plattform will, nutze Tools statt zu sagen, du hättest keinen Zugriff.\n"
                         . "Du siehst anfangs nur Discovery-Tools (z.B. tools.GET, core.teams.GET). Nutze tools.GET mit module/search, um weitere Tools zu entdecken.\n"
-                        . "Wenn es um Teams geht, nutze core.teams.GET. Wenn es um Kontext geht, nutze core.context.GET.\n",
+                        . "Wenn es um Teams in der Plattform geht, nutze core.teams.GET.\n"
+                        . "Wenn Kontext nötig ist, rufe core.context.GET auf.\n",
                 ];
                 
                 // Füge Chat-Historie hinzu (falls vorhanden)
@@ -341,6 +342,45 @@ class SimpleToolController extends Controller
                         'preview' => ['iteration' => $iteration],
                         'raw' => null,
                     ]);
+
+                    // Debug: show which tools the model can see in THIS iteration
+                    try {
+                        $reflection = new \ReflectionClass($openAiService);
+                        $getToolsMethod = $reflection->getMethod('getAvailableTools');
+                        $getToolsMethod->setAccessible(true);
+                        $availableTools = $getToolsMethod->invoke($openAiService); // internal tool defs
+
+                        $normalizeMethod = $reflection->getMethod('normalizeToolsForResponses');
+                        $normalizeMethod->setAccessible(true);
+                        $normalized = $normalizeMethod->invoke($openAiService, $availableTools); // responses tool format
+
+                        $names = [];
+                        foreach ($normalized as $t) {
+                            $type = $t['type'] ?? null;
+                            $name = $t['name'] ?? null;
+                            if ($type && $name) {
+                                $names[] = $type . ':' . $name;
+                            } elseif ($name) {
+                                $names[] = (string)$name;
+                            } elseif ($type) {
+                                $names[] = (string)$type;
+                            }
+                        }
+                        sort($names);
+
+                        $sendEvent('debug.tools', [
+                            'iteration' => $iteration,
+                            'include_web_search' => true,
+                            'tools_count' => count($names) + 1, // +web_search
+                            'tools' => array_merge(['web_search'], $names),
+                            'dynamically_loaded' => $openAiService->getDynamicallyLoadedTools(),
+                        ]);
+                    } catch (\Throwable $e) {
+                        $sendEvent('debug.tools', [
+                            'iteration' => $iteration,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
 
                     try {
                         $openAiService->streamChat(

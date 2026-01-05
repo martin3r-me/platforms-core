@@ -242,6 +242,7 @@
           events: [],
           lastAssistant: '',
           toolCalls: [],
+          toolsVisible: null,
         };
 
         const updateDebugDump = () => {
@@ -254,6 +255,7 @@
             lastAssistant: debugState.lastAssistant,
             events: debugState.events.slice(-120),
             toolCalls: debugState.toolCalls.slice(-20),
+            toolsVisible: debugState.toolsVisible,
           };
           rtDebugDump.value = JSON.stringify(out, null, 2);
         };
@@ -386,6 +388,7 @@
           debugState.events = [];
           debugState.lastAssistant = '';
           debugState.toolCalls = [];
+          debugState.toolsVisible = null;
           if (rtToolCalls) rtToolCalls.innerHTML = '';
           updateDebugDump();
         };
@@ -554,6 +557,12 @@
                   case 'thinking.delta':
                     if (data?.delta) rtThinking.textContent += data.delta;
                     break;
+                  case 'debug.tools': {
+                    // Tools that the model can see in this iteration (server-calculated)
+                    debugState.toolsVisible = data || null;
+                    updateDebugDump();
+                    break;
+                  }
                   case 'usage': {
                     const usage = data?.usage || {};
                     const inTok = usage?.input_tokens ?? usage?.input ?? null;
