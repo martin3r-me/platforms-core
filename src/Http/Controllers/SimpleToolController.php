@@ -345,6 +345,20 @@ class SimpleToolController extends Controller
 
                     // Debug: show which tools the model can see in THIS iteration
                     try {
+                        $container = app();
+                        $isBound = $container->bound(\Platform\Core\Tools\ToolRegistry::class);
+                        $registryCount = null;
+                        $registryNamesSample = [];
+                        try {
+                            if ($isBound) {
+                                $reg = $container->make(\Platform\Core\Tools\ToolRegistry::class);
+                                $registryCount = count($reg->all());
+                                $registryNamesSample = array_slice($reg->names(), 0, 30);
+                            }
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+
                         $reflection = new \ReflectionClass($openAiService);
                         $getToolsMethod = $reflection->getMethod('getAvailableTools');
                         $getToolsMethod->setAccessible(true);
@@ -371,6 +385,9 @@ class SimpleToolController extends Controller
                         $sendEvent('debug.tools', [
                             'iteration' => $iteration,
                             'include_web_search' => true,
+                            'registry_bound' => $isBound,
+                            'registry_count' => $registryCount,
+                            'registry_names_sample' => $registryNamesSample,
                             'tools_count' => count($names) + 1, // +web_search
                             'tools' => array_merge(['web_search'], $names),
                             'dynamically_loaded' => $openAiService->getDynamicallyLoadedTools(),
