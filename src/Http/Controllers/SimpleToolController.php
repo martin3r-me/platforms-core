@@ -324,6 +324,8 @@ class SimpleToolController extends Controller
                 $maxIterations = 6;
                 $usageSent = false;
                 $debugEventCount = 0;
+                $previousResponseId = null;
+                $messagesForApi = $messages; // iteration 1: full conversation input
 
                 for ($iteration = 1; $iteration <= $maxIterations; $iteration++) {
                     $assistant = '';
@@ -333,6 +335,7 @@ class SimpleToolController extends Controller
                     $currentStreamingToolCall = null; // openai tool name
                     $currentStreamingToolId = null;   // item.id
                     $currentStreamingCallId = null;   // item.call_id
+                    $currentResponseId = null;
 
                     $sendEvent('assistant.reset', []);
                     $sendEvent('reasoning.reset', []);
@@ -401,7 +404,7 @@ class SimpleToolController extends Controller
 
                     try {
                         $openAiService->streamChat(
-                            $messages,
+                            $messagesForApi,
                             function(string $delta) use ($sendEvent, &$assistant) {
                                 $assistant .= $delta;
                                 $sendEvent('assistant.delta', ['delta' => $delta, 'content' => $assistant]);
@@ -411,6 +414,7 @@ class SimpleToolController extends Controller
                                 'include_web_search' => true,
                                 'max_tokens' => 2000,
                                 'with_context' => false,
+                                'previous_response_id' => $previousResponseId,
                                 'reasoning' => [
                                     'effort' => 'medium',
                                 ],
@@ -421,7 +425,8 @@ class SimpleToolController extends Controller
                                     &$toolCallsCollector,
                                     &$currentStreamingToolCall,
                                     &$currentStreamingToolId,
-                                    &$currentStreamingCallId
+                                    &$currentStreamingCallId,
+                                    &$currentResponseId
                                 ) {
                                     $event = $event ?? '';
                                     if ($debugEventCount < 2000) {
@@ -443,6 +448,14 @@ class SimpleToolController extends Controller
                                             'preview' => array_filter($preview, fn($v) => $v !== null && $v !== ''),
                                             'raw' => $raw,
                                         ]);
+                                    }
+
+                                    // Capture response id so we can continue via previous_response_id (best practice)
+                                    if ($event === 'response.created') {
+                                        $rid = $decoded['response']['id'] ?? null;
+                                        if (is_string($rid) && $rid !== '') {
+                                            $currentResponseId = $rid;
+                                        }
                                     }
 
                                     // Emit token usage once it appears (usually on response.completed)
@@ -518,21 +531,13 @@ class SimpleToolController extends Controller
                     }
 
                     // Execute tool calls
+                    $toolOutputsForNextIteration = [];
                     foreach ($toolCallsCollector as $callId => $call) {
                         $openAiToolName = $call['name'] ?? '';
                         $canonical = $nameMapper->toCanonical($openAiToolName);
                         $argsJson = $call['arguments'] ?? '';
                         $args = json_decode($argsJson, true);
                         if (!is_array($args)) { $args = []; }
-
-                        // Add the tool call item back into the input (best practice for Responses API)
-                        $messages[] = [
-                            'type' => 'function_call',
-                            'id' => $call['id'] ?? null,
-                            'call_id' => $callId,
-                            'name' => $openAiToolName,
-                            'arguments' => $argsJson,
-                        ];
 
                         $sendEvent('openai.event', [
                             'event' => 'server.tool.execute',
@@ -551,6 +556,7 @@ class SimpleToolController extends Controller
                                 'call_id' => $callId,
                                 'success' => (bool) ($toolArray['success'] ?? false),
                                 'ms' => $ms,
+                                'error' => $toolArray['error'] ?? null,
                             ]);
 
                             // Special case: tools.GET with explicit filters → load tools dynamically for next iteration
@@ -578,13 +584,17 @@ class SimpleToolController extends Controller
                                 }
                             }
 
-                            $messages[] = [
+                            $outputItem = [
                                 'type' => 'function_call_output',
                                 'call_id' => $callId,
                                 'output' => json_encode($toolArray, JSON_UNESCAPED_UNICODE),
                             ];
+                            // Keep for debug/history
+                            $messages[] = $outputItem;
+                            // Next iteration input: ONLY tool outputs (no synthetic function_call items)
+                            $toolOutputsForNextIteration[] = $outputItem;
                         } catch (\Throwable $e) {
-                            $messages[] = [
+                            $outputItem = [
                                 'type' => 'function_call_output',
                                 'call_id' => $callId,
                                 'output' => json_encode([
@@ -592,6 +602,8 @@ class SimpleToolController extends Controller
                                     'error' => $e->getMessage(),
                                 ], JSON_UNESCAPED_UNICODE),
                             ];
+                            $messages[] = $outputItem;
+                            $toolOutputsForNextIteration[] = $outputItem;
                             $sendEvent('tool.executed', [
                                 'tool' => $canonical,
                                 'call_id' => $callId,
@@ -601,6 +613,11 @@ class SimpleToolController extends Controller
                             ]);
                         }
                     }
+
+                    // Continue the tool loop using Responses API best practice:
+                    // Provide tool outputs as the ONLY next input, and chain via previous_response_id.
+                    $previousResponseId = $currentResponseId;
+                    $messagesForApi = $toolOutputsForNextIteration;
                 }
 
                 $sendEvent('error', [

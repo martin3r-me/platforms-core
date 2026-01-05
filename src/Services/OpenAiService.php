@@ -387,6 +387,10 @@ class OpenAiService
             'stream' => true,
             'max_output_tokens' => $options['max_tokens'] ?? 1000,
         ];
+        // Responses API: continue from previous response (best practice for tool calling loops)
+        if (isset($options['previous_response_id']) && is_string($options['previous_response_id']) && $options['previous_response_id'] !== '') {
+            $payload['previous_response_id'] = $options['previous_response_id'];
+        }
         // Some models (e.g. gpt-5.2*) do not support temperature in the Responses API.
         if (!str_starts_with($model, 'gpt-5.2') && array_key_exists('temperature', $options)) {
             $payload['temperature'] = $options['temperature'];
