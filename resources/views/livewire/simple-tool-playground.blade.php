@@ -75,6 +75,11 @@
           </div>
           <div id="rtUsageModel" class="mt-1 text-[10px] text-[var(--ui-muted)]"></div>
         </div>
+
+        <div>
+          <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Tool Calls (letzte 5)</div>
+          <div id="rtToolCalls" class="space-y-1"></div>
+        </div>
         <div>
           <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Reasoning (summary, live)</div>
           <pre id="rtReasoning" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px] max-h-[20vh] overflow-y-auto"></pre>
@@ -86,6 +91,15 @@
         <div class="pt-2 border-t border-[var(--ui-border)]">
           <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Events</div>
           <div id="rtEvents" class="text-xs space-y-2 text-[var(--ui-muted)] max-h-[18vh] overflow-y-auto pr-1"></div>
+        </div>
+
+        <div class="pt-2 border-t border-[var(--ui-border)]">
+          <div class="flex items-center justify-between mb-1">
+            <div class="text-xs font-semibold text-[var(--ui-secondary)]">Debug Dump</div>
+            <button id="rtCopyDebug" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Copy</button>
+          </div>
+          <textarea id="rtDebugDump" class="w-full text-[10px] leading-snug whitespace-pre border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[90px] max-h-[22vh] overflow-y-auto" readonly></textarea>
+          <div id="rtCopyStatus" class="mt-1 text-[10px] text-[var(--ui-muted)]"></div>
         </div>
 
         <div id="rtStatus" class="text-xs text-[var(--ui-muted)]">idle</div>
@@ -154,11 +168,15 @@
         const rtEvents = document.getElementById('rtEvents');
         const rtStatus = document.getElementById('rtStatus');
         const rtVerboseEl = document.getElementById('rtVerbose');
+        const rtDebugDump = document.getElementById('rtDebugDump');
+        const rtCopyDebug = document.getElementById('rtCopyDebug');
+        const rtCopyStatus = document.getElementById('rtCopyStatus');
         const rtTokensIn = document.getElementById('rtTokensIn');
         const rtTokensOut = document.getElementById('rtTokensOut');
         const rtTokensTotal = document.getElementById('rtTokensTotal');
         const rtTokensExtra = document.getElementById('rtTokensExtra');
         const rtUsageModel = document.getElementById('rtUsageModel');
+        const rtToolCalls = document.getElementById('rtToolCalls');
 
         /** type: {role:'user'|'assistant', content:string}[] */
         let messages = [];
@@ -216,6 +234,41 @@
         let lastEventCount = 0;
         let lastEventSummaryEl = null;
         const maxEventItems = 120;
+        const debugState = {
+          startedAt: null,
+          payload: null,
+          usage: null,
+          model: null,
+          events: [],
+          lastAssistant: '',
+          toolCalls: [],
+        };
+
+        const updateDebugDump = () => {
+          if (!rtDebugDump) return;
+          const out = {
+            startedAt: debugState.startedAt,
+            payload: debugState.payload,
+            usage: debugState.usage,
+            model: debugState.model,
+            lastAssistant: debugState.lastAssistant,
+            events: debugState.events.slice(-120),
+            toolCalls: debugState.toolCalls.slice(-20),
+          };
+          rtDebugDump.value = JSON.stringify(out, null, 2);
+        };
+
+        if (rtCopyDebug) {
+          rtCopyDebug.addEventListener('click', async () => {
+            try {
+              await navigator.clipboard.writeText(rtDebugDump?.value || '');
+              if (rtCopyStatus) rtCopyStatus.textContent = 'kopiert';
+              setTimeout(() => { if (rtCopyStatus) rtCopyStatus.textContent = ''; }, 1500);
+            } catch (e) {
+              if (rtCopyStatus) rtCopyStatus.textContent = 'copy fehlgeschlagen';
+            }
+          });
+        }
 
         // IMPORTANT: keep UI realtime. Pretty-printing large JSON synchronously blocks the main thread.
         // So we render raw/pretty JSON lazily only when the user expands an event (and only in verbose mode).
@@ -326,6 +379,41 @@
           lastEventSummaryEl = null;
           skippedDeltaCount = 0;
           lastDeltaTs = 0;
+          debugState.startedAt = null;
+          debugState.payload = null;
+          debugState.usage = null;
+          debugState.model = null;
+          debugState.events = [];
+          debugState.lastAssistant = '';
+          debugState.toolCalls = [];
+          if (rtToolCalls) rtToolCalls.innerHTML = '';
+          updateDebugDump();
+        };
+
+        const renderToolCalls = () => {
+          if (!rtToolCalls) return;
+          rtToolCalls.innerHTML = '';
+          const list = debugState.toolCalls.slice(-5).reverse();
+          for (const tc of list) {
+            const row = document.createElement('div');
+            row.className = 'flex items-center justify-between gap-2 text-[11px] border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] px-2 py-1';
+            const left = document.createElement('div');
+            left.className = 'truncate';
+            left.textContent = tc.tool || '—';
+            const right = document.createElement('div');
+            right.className = 'flex items-center gap-2 flex-shrink-0';
+            const badge = document.createElement('span');
+            badge.className = `text-[10px] px-1.5 py-0.5 rounded ${tc.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`;
+            badge.textContent = tc.success ? 'ok' : 'fail';
+            const ms = document.createElement('span');
+            ms.className = 'text-[10px] text-[var(--ui-muted)]';
+            ms.textContent = (tc.ms != null ? `${tc.ms}ms` : '—');
+            right.appendChild(badge);
+            right.appendChild(ms);
+            row.appendChild(left);
+            row.appendChild(right);
+            rtToolCalls.appendChild(row);
+          }
         };
 
         realtimeClear.addEventListener('click', rtClear);
@@ -409,9 +497,12 @@
           rtStatus.textContent = 'streaming…';
           realtimeModel.textContent = selectedModel || '—';
           rtEvent({ key: 'client.start' });
+          debugState.startedAt = new Date().toISOString();
 
           // Request payload = full conversation history + new message already included
           const payload = { message: text, chat_history: messages.slice(0, -1), model: selectedModel || null };
+          debugState.payload = payload;
+          updateDebugDump();
 
           try {
             rtEvent({ key: 'client.fetch.start', preview: { url } });
@@ -455,6 +546,7 @@
                     break;
                   case 'assistant.delta':
                     if (data?.delta) rtAssistant.textContent += data.delta;
+                    debugState.lastAssistant = rtAssistant.textContent;
                     break;
                   case 'reasoning.delta':
                     if (data?.delta) rtReasoning.textContent += data.delta;
@@ -475,11 +567,32 @@
                     if (rtTokensExtra) rtTokensExtra.textContent =
                       `${cached != null ? cached : '—'} / ${reasoning != null ? reasoning : '—'}`;
                     if (rtUsageModel) rtUsageModel.textContent = data?.model ? `Model: ${data.model}` : '';
+                    debugState.model = data?.model || debugState.model;
+                    debugState.usage = usage;
+                    updateDebugDump();
+                    break;
+                  }
+                  case 'tool.executed': {
+                    const tc = {
+                      t: Date.now(),
+                      tool: data?.tool || null,
+                      call_id: data?.call_id || null,
+                      success: !!data?.success,
+                      ms: (data?.ms ?? null),
+                      error: data?.error || null,
+                    };
+                    debugState.toolCalls.push(tc);
+                    if (debugState.toolCalls.length > 100) debugState.toolCalls = debugState.toolCalls.slice(-100);
+                    renderToolCalls();
+                    updateDebugDump();
                     break;
                   }
                   case 'openai.event': {
                     const ev = data?.event || 'openai.event';
                     rtEvent({ key: ev, preview: data?.preview || null, raw: data?.raw || null });
+                    debugState.events.push({ t: Date.now(), event: ev, preview: data?.preview || null });
+                    if (debugState.events.length > 400) debugState.events = debugState.events.slice(-400);
+                    updateDebugDump();
                     break;
                   }
                   case 'complete': {
@@ -488,6 +601,7 @@
                     renderMessage('assistant', assistant);
                     rtStatus.textContent = 'done';
                     rtEvent({ key: 'client.complete' });
+                    updateDebugDump();
                     break;
                   }
                   case 'error': {
@@ -496,6 +610,8 @@
                     renderMessage('assistant', `❌ Fehler: ${msg}`);
                     rtStatus.textContent = 'error';
                     rtEvent({ key: 'client.error', preview: { error: msg } });
+                    debugState.events.push({ t: Date.now(), event: 'client.error', preview: { error: msg } });
+                    updateDebugDump();
                     break;
                   }
                   default:

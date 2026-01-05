@@ -967,6 +967,30 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
         $lastAssistantIndex = null;
         
         foreach ($messages as $m) {
+            // Advanced: allow passing raw Responses API input items through (best practice for tool calling)
+            // Examples: ['type' => 'function_call', ...], ['type' => 'function_call_output', ...]
+            if (isset($m['type']) && is_string($m['type'])) {
+                $type = $m['type'];
+                if ($type === 'function_call') {
+                    $input[] = [
+                        'type' => 'function_call',
+                        'id' => $m['id'] ?? null,
+                        'call_id' => $m['call_id'] ?? null,
+                        'name' => $m['name'] ?? null,
+                        'arguments' => $m['arguments'] ?? '',
+                    ];
+                    continue;
+                }
+                if ($type === 'function_call_output') {
+                    $input[] = [
+                        'type' => 'function_call_output',
+                        'call_id' => $m['call_id'] ?? null,
+                        'output' => $m['output'] ?? '',
+                    ];
+                    continue;
+                }
+            }
+
             $role = $m['role'] ?? 'user';
             
             // WICHTIG: Responses API unterstützt 'tool' role nicht!
