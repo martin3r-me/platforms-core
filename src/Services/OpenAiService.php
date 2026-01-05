@@ -1304,9 +1304,9 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
                 $permissionService = app(\Platform\Core\Services\ToolPermissionService::class);
                 $allTools = $permissionService->filterToolsByPermission($allTools);
                 
-                // DISCOVERY-LAYER: Standardmäßig NUR Discovery-Tools senden
-                // LLM kann dann tools.GET aufrufen, um weitere Tools bei Bedarf zu sehen
-                // Das ist MCP Best Practice und skaliert auch bei 100+ Tools
+                // DISCOVERY-LAYER (skalierbar):
+                // Standardmäßig senden wir nur Entry-Point/Discovery-Tools.
+                // Das LLM nutzt tools.GET, um gezielt weitere Tools zu entdecken und anzufordern.
                 $discovery = app(\Platform\Core\Tools\ToolDiscoveryService::class);
                 $readOnlyCount = 0;
                 $writeCount = 0;
@@ -1323,8 +1323,9 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
                         $writeCount++;
                     }
                     
-                    // NUR Discovery-Tools (standardmäßig)
-                    // LLM kann tools.GET aufrufen, um weitere Tools zu sehen
+                    // Entry-Points/Discovery:
+                    // - Core discovery tools (tools.GET, core.*)
+                    // - Module overview tools (z.B. planner.overview.GET) damit das LLM Entitäten/Beziehungen versteht
                     $isDiscoveryTool = in_array($toolName, [
                         'tools.GET',           // Tool-Liste anfordern (wichtigste Discovery-Tool)
                         'tools.request',       // Fehlende Tools anmelden
@@ -1332,10 +1333,11 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
                         'core.context.GET',    // Aktuellen Kontext sehen
                         'core.user.GET',       // Aktuellen User sehen
                         'core.teams.GET',      // Verfügbare Teams sehen
-                    ]);
+                    ]) || str_ends_with($toolName, '.overview.GET')
+                      || (($metadata['category'] ?? null) === 'overview')
+                      || (is_array($metadata['tags'] ?? null) && in_array('overview', $metadata['tags'], true));
                     
-                    // NUR Discovery-Tools senden (nicht read-only!)
-                    // LLM muss aktiv tools.GET aufrufen, um weitere Tools zu sehen
+                    // NUR Discovery-Tools senden.
                     if ($isDiscoveryTool) {
                         try {
                             $toolDef = $this->convertToolToOpenAiFormat($tool);

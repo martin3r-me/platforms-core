@@ -139,7 +139,7 @@ trait HasStandardGetOperations
      * 
      * @param \Illuminate\Database\Eloquent\Builder $query
      * @param array $arguments Tool-Argumente
-     * @param array $defaultSearchFields Standard-Felder, die durchsucht werden sollen
+     * @param array $defaultSearchFields Standard-Felder, die durchsucht werden sollen (und zugleich Whitelist)
      */
     protected function applyStandardSearch($query, array $arguments, array $defaultSearchFields = []): void
     {
@@ -149,6 +149,12 @@ trait HasStandardGetOperations
         
         $search = $arguments['search'];
         $searchFields = $arguments['search_fields'] ?? $defaultSearchFields;
+
+        // Security/Robustness: wenn defaultSearchFields gesetzt ist, ist das gleichzeitig die Whitelist.
+        // Verhindert SQL-Fehler durch nicht existente Spalten (z.B. "slug") und reduziert Tool-Missbrauch.
+        if (!empty($defaultSearchFields) && is_array($searchFields)) {
+            $searchFields = array_values(array_intersect($searchFields, $defaultSearchFields));
+        }
         
         if (empty($searchFields)) {
             return;

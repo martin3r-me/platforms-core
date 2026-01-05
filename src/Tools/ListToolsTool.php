@@ -123,13 +123,61 @@ class ListToolsTool implements ToolContract
             $allToolsCount = count($this->registry->all());
             $hasFilters = !empty($module) || isset($arguments['read_only']) || !empty($searchTerm);
             
+            // --- Modul/Entitäten-Übersicht (kompakt) ---
+            // Ziel: Das LLM versteht schnell "welche Entitäten gibt es in Modul X und welche Operationen",
+            // ohne immer die komplette Tool-Liste zu brauchen.
+            $modulesIndex = [];
+            foreach ($allTools as $tool) {
+                $toolName = $tool->getName();
+                if (!str_contains($toolName, '.')) { continue; }
+                $parts = explode('.', $toolName);
+                if (count($parts) < 2) { continue; }
+                $mod = $parts[0] ?? null;
+                if (!is_string($mod) || $mod === '') { continue; }
+                $method = $parts[count($parts) - 1] ?? null; // GET/POST/PUT/DELETE
+                $entity = implode('.', array_slice($parts, 1, -1));
+                if ($entity === '') { $entity = null; }
+                if (!isset($modulesIndex[$mod])) {
+                    $modulesIndex[$mod] = [
+                        'module' => $mod,
+                        'tool_count' => 0,
+                        'overview_tool' => null,
+                        'entities' => [],
+                    ];
+                }
+                $modulesIndex[$mod]['tool_count']++;
+                if ($toolName === ($mod . '.overview.GET')) {
+                    $modulesIndex[$mod]['overview_tool'] = $toolName;
+                }
+                if (is_string($entity) && $entity !== '' && is_string($method) && $method !== '') {
+                    if (!isset($modulesIndex[$mod]['entities'][$entity])) {
+                        $modulesIndex[$mod]['entities'][$entity] = [
+                            'operations' => [],
+                        ];
+                    }
+                    if (!in_array($method, $modulesIndex[$mod]['entities'][$entity]['operations'], true)) {
+                        $modulesIndex[$mod]['entities'][$entity]['operations'][] = $method;
+                    }
+                }
+            }
+            ksort($modulesIndex);
+            foreach ($modulesIndex as &$m) {
+                // Sortiere Entitäten und Operationen deterministisch
+                ksort($m['entities']);
+                foreach ($m['entities'] as &$e) {
+                    sort($e['operations']);
+                }
+            }
+            unset($m, $e);
+
             $result = [
-                'tools' => [],
                 'summary' => [
                     'total_tools' => $allToolsCount,
                     'filtered_tools' => count($filteredTools),
                     'filters_applied' => $hasFilters,
                 ],
+                'modules' => array_values($modulesIndex),
+                'tools' => [],
             ];
             
             // 4. Fuzzy Fallback: Wenn Modul-Filter keine Ergebnisse liefert, aber Suche vorhanden ist
@@ -185,14 +233,23 @@ class ListToolsTool implements ToolContract
                 ], fn($v) => $v !== null && $v !== '');
             }
             
+            // Skalierung: wenn keine Filter gesetzt sind, kann die Tool-Liste sehr groß werden.
+            // In diesem Fall liefern wir trotzdem die Modul-/Entitäten-Übersicht + eine kleine Sample-Liste.
+            $unfilteredLimit = (int) config('openai.tools_get_unfiltered_limit', 120);
+            $shouldTruncateToolsList = (!$hasFilters && count($filteredTools) > $unfilteredLimit);
+            $toolsToReturn = $shouldTruncateToolsList ? array_slice($filteredTools, 0, $unfilteredLimit) : $filteredTools;
+
             // Tools-Informationen sammeln
-            foreach ($filteredTools as $tool) {
+            foreach ($toolsToReturn as $tool) {
                 $toolName = $tool->getName();
                 $metadata = $this->discovery->getToolMetadata($tool);
+
+                $desc = (string) $tool->getDescription();
+                if (mb_strlen($desc) > 220) { $desc = mb_substr($desc, 0, 217) . '...'; }
                 
                 $toolData = [
                     'name' => $toolName,
-                    'description' => $tool->getDescription(),
+                    'description' => $desc,
                     'module' => $this->extractModuleFromToolName($toolName),
                 ];
                 
@@ -206,6 +263,12 @@ class ListToolsTool implements ToolContract
                 }
                 
                 $result['tools'][] = $toolData;
+            }
+
+            if ($shouldTruncateToolsList) {
+                $result['summary']['tools_truncated'] = true;
+                $result['summary']['tools_limit'] = $unfilteredLimit;
+                $result['note'] = 'Viele Tools verfügbar. Nutze tools.GET mit module="..." oder search="..." für eine kleinere, relevante Liste.';
             }
             
             return \Platform\Core\Contracts\ToolResult::success($result);
