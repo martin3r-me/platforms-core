@@ -326,6 +326,7 @@ class SimpleToolController extends Controller
                 $debugEventCount = 0;
                 $previousResponseId = null;
                 $messagesForApi = $messages; // iteration 1: full conversation input
+                $toolResultCache = []; // per-request cache: canonical+args -> ToolResult payload
 
                 for ($iteration = 1; $iteration <= $maxIterations; $iteration++) {
                     $assistant = '';
@@ -546,18 +547,47 @@ class SimpleToolController extends Controller
                         ]);
 
                         try {
-                            $t0 = microtime(true);
-                            $toolResult = $executor->execute($canonical, $args, $context);
-                            $ms = (int) round((microtime(true) - $t0) * 1000);
-                            $toolArray = $toolResult->toArray();
+                            // Dedup/cache: if the model calls the same tool with the same args repeatedly
+                            // (common in early iterations), reuse the previous result to avoid cost.
+                            $isGet = (bool) preg_match('/\.GET$/', $canonical);
+                            $isWrite = (bool) preg_match('/\.(POST|PUT|DELETE)$/', $canonical);
+                            $isCacheable = $isGet; // cache only reads (GET)
+
+                            $cacheKey = $canonical . '|' . md5(trim((string) $argsJson));
+                            $cached = $isCacheable && array_key_exists($cacheKey, $toolResultCache);
+
+                            if ($cached) {
+                                $cachedEntry = $toolResultCache[$cacheKey];
+                                $toolResult = $cachedEntry['toolResult'];
+                                $ms = 0;
+                                $toolArray = $cachedEntry['toolArray'];
+                            } else {
+                                $t0 = microtime(true);
+                                $toolResult = $executor->execute($canonical, $args, $context);
+                                $ms = (int) round((microtime(true) - $t0) * 1000);
+                                $toolArray = $toolResult->toArray();
+                                if ($isCacheable) {
+                                    $toolResultCache[$cacheKey] = [
+                                        'toolResult' => $toolResult,
+                                        'toolArray' => $toolArray,
+                                    ];
+                                }
+                            }
                             
                             $sendEvent('tool.executed', [
                                 'tool' => $canonical,
                                 'call_id' => $callId,
-                                'success' => (bool) ($toolArray['success'] ?? false),
+                                // ToolResult->toArray uses 'ok' not 'success' – use the canonical truth.
+                                'success' => (bool) $toolResult->success,
                                 'ms' => $ms,
-                                'error' => $toolArray['error'] ?? null,
+                                'error' => $toolResult->success ? null : ($toolResult->error ?? ($toolArray['error']['message'] ?? null)),
+                                'cached' => $cached,
                             ]);
+
+                            // After successful writes, invalidate cached GETs so follow-up reads are fresh.
+                            if ($isWrite && $toolResult->success) {
+                                $toolResultCache = [];
+                            }
 
                             // Special case: tools.GET with explicit filters → load tools dynamically for next iteration
                             if ($canonical === 'tools.GET') {
@@ -610,6 +640,7 @@ class SimpleToolController extends Controller
                                 'success' => false,
                                 'ms' => null,
                                 'error' => $e->getMessage(),
+                                'cached' => false,
                             ]);
                         }
                     }

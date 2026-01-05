@@ -441,14 +441,25 @@
             const badge = document.createElement('span');
             badge.className = `text-[10px] px-1.5 py-0.5 rounded ${tc.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`;
             badge.textContent = tc.success ? 'ok' : 'fail';
+            const cacheBadge = document.createElement('span');
+            cacheBadge.className = `text-[10px] px-1.5 py-0.5 rounded ${tc.cached ? 'bg-slate-100 text-slate-700' : 'bg-transparent text-transparent'}`;
+            cacheBadge.textContent = tc.cached ? 'cached' : '';
             const ms = document.createElement('span');
             ms.className = 'text-[10px] text-[var(--ui-muted)]';
             ms.textContent = (tc.ms != null ? `${tc.ms}ms` : '—');
             right.appendChild(badge);
+            right.appendChild(cacheBadge);
             right.appendChild(ms);
             row.appendChild(left);
             row.appendChild(right);
             rtToolCalls.appendChild(row);
+
+            if (!tc.success && tc.error) {
+              const err = document.createElement('div');
+              err.className = 'mt-1 text-[10px] text-red-700 truncate';
+              err.textContent = tc.error;
+              rtToolCalls.appendChild(err);
+            }
           }
         };
 
@@ -646,6 +657,7 @@
                       success: !!data?.success,
                       ms: (data?.ms ?? null),
                       error: data?.error || null,
+                      cached: !!data?.cached,
                     };
                     debugState.toolCalls.push(tc);
                     if (debugState.toolCalls.length > 100) debugState.toolCalls = debugState.toolCalls.slice(-100);
