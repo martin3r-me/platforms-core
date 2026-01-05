@@ -619,7 +619,11 @@
                     if (rtTokensTotal) rtTokensTotal.textContent = (totalTok ?? '—');
                     if (rtTokensExtra) rtTokensExtra.textContent =
                       `${cached != null ? cached : '—'} / ${reasoning != null ? reasoning : '—'}`;
-                    if (rtUsageModel) rtUsageModel.textContent = data?.model ? `Model: ${data.model}` : '';
+                    if (rtUsageModel) {
+                      const modelLabel = data?.model ? `Model: ${data.model}` : '';
+                      const scope = data?.cumulative ? ' · Request total' : '';
+                      rtUsageModel.textContent = modelLabel ? `${modelLabel}${scope}` : (data?.cumulative ? 'Request total' : '');
+                    }
 
                     // Costs (explicit pricing for gpt-5.2, per 1M tokens)
                     const RATE_IN = 1.75;

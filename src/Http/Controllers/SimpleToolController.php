@@ -326,11 +326,31 @@ class SimpleToolController extends Controller
                 $maxIterations = 12;
                 $maxToolExecutions = 60;
                 $toolExecutionCount = 0;
-                $usageSent = false;
                 $debugEventCount = 0;
                 $previousResponseId = null;
                 $messagesForApi = $messages; // iteration 1: full conversation input
                 $toolResultCache = []; // per-request cache: canonical+args -> ToolResult payload
+                $stableNormalize = function($v) use (&$stableNormalize) {
+                    if (is_array($v)) {
+                        // Sort associative keys for stable hashing (preserve list order)
+                        $isAssoc = array_keys($v) !== range(0, count($v) - 1);
+                        if ($isAssoc) { ksort($v); }
+                        foreach ($v as $k => $vv) {
+                            $v[$k] = $stableNormalize($vv);
+                        }
+                    }
+                    return $v;
+                };
+                
+                // Aggregate token usage across the whole request (multiple Responses API calls/iterations).
+                $usageAggregate = [
+                    'input_tokens' => 0,
+                    'output_tokens' => 0,
+                    'total_tokens' => 0,
+                    'input_tokens_details' => ['cached_tokens' => 0],
+                    'output_tokens_details' => ['reasoning_tokens' => 0],
+                ];
+                $seenUsageResponseIds = [];
 
                 for ($iteration = 1; $iteration <= $maxIterations; $iteration++) {
                     $assistant = '';
@@ -426,7 +446,9 @@ class SimpleToolController extends Controller
                                 'on_debug' => function(?string $event, array $decoded) use (
                                     $sendEvent,
                                     &$debugEventCount,
-                                    &$usageSent,
+                                    &$usageAggregate,
+                                    &$seenUsageResponseIds,
+                                    &$iteration,
                                     &$toolCallsCollector,
                                     &$currentStreamingToolCall,
                                     &$currentStreamingToolId,
@@ -463,14 +485,41 @@ class SimpleToolController extends Controller
                                         }
                                     }
 
-                                    // Emit token usage once it appears (usually on response.completed)
-                                    if (!$usageSent) {
-                                        $usage = $decoded['response']['usage'] ?? null;
-                                        if (is_array($usage) && !empty($usage)) {
-                                            $usageSent = true;
+                                    // Aggregate token usage across the whole request.
+                                    // Usage usually appears on response.completed (but we handle any event carrying it).
+                                    $usage = $decoded['response']['usage'] ?? null;
+                                    if (is_array($usage) && !empty($usage)) {
+                                        $rid = $decoded['response']['id'] ?? $currentResponseId;
+                                        if (!is_string($rid) || $rid === '') {
+                                            $rid = 'unknown';
+                                        }
+                                        if (!isset($seenUsageResponseIds[$rid])) {
+                                            $seenUsageResponseIds[$rid] = true;
+
+                                            $in = (int) ($usage['input_tokens'] ?? 0);
+                                            $out = (int) ($usage['output_tokens'] ?? 0);
+                                            $tot = (int) ($usage['total_tokens'] ?? 0);
+                                            $cached = (int) ($usage['input_tokens_details']['cached_tokens'] ?? 0);
+                                            $reasonTok = (int) ($usage['output_tokens_details']['reasoning_tokens'] ?? 0);
+
+                                            $usageAggregate['input_tokens'] += $in;
+                                            $usageAggregate['output_tokens'] += $out;
+                                            $usageAggregate['total_tokens'] += $tot;
+                                            $usageAggregate['input_tokens_details']['cached_tokens'] += $cached;
+                                            $usageAggregate['output_tokens_details']['reasoning_tokens'] += $reasonTok;
+
                                             $sendEvent('usage', [
                                                 'model' => $decoded['response']['model'] ?? null,
-                                                'usage' => $usage,
+                                                'iteration' => $iteration,
+                                                'cumulative' => true,
+                                                'usage' => $usageAggregate,
+                                                'last_increment' => [
+                                                    'input_tokens' => $in,
+                                                    'output_tokens' => $out,
+                                                    'total_tokens' => $tot,
+                                                    'cached_tokens' => $cached,
+                                                    'reasoning_tokens' => $reasonTok,
+                                                ],
                                             ]);
                                         }
                                     }
@@ -569,7 +618,12 @@ class SimpleToolController extends Controller
                             $isWrite = (bool) preg_match('/\.(POST|PUT|DELETE)$/', $canonical);
                             $isCacheable = $isGet; // cache only reads (GET)
 
-                            $cacheKey = $canonical . '|' . md5(trim((string) $argsJson));
+                            // Stable cache key: normalize args (sort object keys recursively) so equivalent JSON
+                            // with different key order/whitespace still hits the cache.
+                            $normalizedArgs = $stableNormalize($args);
+                            $normalizedArgsJson = json_encode($normalizedArgs, JSON_UNESCAPED_UNICODE);
+                            if (!is_string($normalizedArgsJson)) { $normalizedArgsJson = ''; }
+                            $cacheKey = $canonical . '|' . md5($normalizedArgsJson);
                             $cached = $isCacheable && array_key_exists($cacheKey, $toolResultCache);
 
                             if ($cached) {
