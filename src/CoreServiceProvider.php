@@ -201,40 +201,52 @@ class CoreServiceProvider extends ServiceProvider
                 return;
             }
             
-            // Prüfe ob Tools bereits geladen wurden (verhindert doppelte Registrierung)
-            if (count($registry->all()) > 0) {
-                return;
-            }
+            // Wenn bereits Modul-Tools registriert wurden, dürfen wir NICHT sofort returnen,
+            // sonst fehlen die Core/Discovery-Tools (tools.GET, core.teams.GET, ...).
+            // Wir skippen nur, wenn die Discovery-Tools bereits vorhanden sind.
+            $hasDiscoveryTools =
+                $registry->has('tools.GET') &&
+                $registry->has('tools.request') &&
+                $registry->has('core.modules.GET') &&
+                $registry->has('core.context.GET') &&
+                $registry->has('core.user.GET') &&
+                $registry->has('core.teams.GET');
             
-            // 1. Auto-Discovery: Lade Tools automatisch aus Core UND Modulen
+            // 1. Auto-Discovery: Lade Tools automatisch aus Core (und Module nur, wenn Registry leer ist)
             try {
                 // 1.1: Core-Tools laden (LOOSE COUPLED - automatisch aus Verzeichnis)
-                $coreTools = \Platform\Core\Tools\ToolLoader::loadCoreTools();
-                foreach ($coreTools as $tool) {
-                    try {
-                        $registry->register($tool);
-                        // \Log::debug("[ToolRegistry] Core-Tool via Auto-Discovery registriert: " . $tool->getName());
-                    } catch (\Throwable $e) {
-                        \Log::warning("[ToolRegistry] Core-Tool konnte nicht registriert werden", [
-                            'tool' => get_class($tool),
-                            'error' => $e->getMessage()
-                        ]);
+                if (!$hasDiscoveryTools) {
+                    $coreTools = \Platform\Core\Tools\ToolLoader::loadCoreTools();
+                    foreach ($coreTools as $tool) {
+                        try {
+                            if (!$registry->has($tool->getName())) {
+                                $registry->register($tool);
+                            }
+                        } catch (\Throwable $e) {
+                            \Log::warning("[ToolRegistry] Core-Tool konnte nicht registriert werden", [
+                                'tool' => get_class($tool),
+                                'error' => $e->getMessage()
+                            ]);
+                        }
                     }
                 }
                 
                 // 1.2: Module-Tools laden
-                $modulesPath = realpath(__DIR__ . '/../../modules');
-                if ($modulesPath && is_dir($modulesPath)) {
-                    $moduleTools = \Platform\Core\Tools\ToolLoader::loadFromAllModules($modulesPath);
-                    foreach ($moduleTools as $tool) {
-                        try {
-                            $registry->register($tool);
-                            // \Log::debug("[ToolRegistry] Module-Tool via Auto-Discovery registriert: " . $tool->getName());
-                        } catch (\Throwable $e) {
-                            \Log::warning("[ToolRegistry] Auto-Discovery Tool konnte nicht registriert werden", [
-                                'tool' => get_class($tool),
-                                'error' => $e->getMessage()
-                            ]);
+                if (count($registry->all()) === 0) {
+                    $modulesPath = realpath(__DIR__ . '/../../modules');
+                    if ($modulesPath && is_dir($modulesPath)) {
+                        $moduleTools = \Platform\Core\Tools\ToolLoader::loadFromAllModules($modulesPath);
+                        foreach ($moduleTools as $tool) {
+                            try {
+                                if (!$registry->has($tool->getName())) {
+                                    $registry->register($tool);
+                                }
+                            } catch (\Throwable $e) {
+                                \Log::warning("[ToolRegistry] Auto-Discovery Tool konnte nicht registriert werden", [
+                                    'tool' => get_class($tool),
+                                    'error' => $e->getMessage()
+                                ]);
+                            }
                         }
                     }
                 }
@@ -247,7 +259,8 @@ class CoreServiceProvider extends ServiceProvider
             // WICHTIG: Diese Tools haben möglicherweise Dependencies, daher Fallback
             
             // ListToolsTool (wichtig für AI - zeigt verfügbare Tools)
-            if (!$registry->has('tools.list')) {
+            // (Legacy name tools.list will map to tools.GET once registered, but we ensure tools.GET exists)
+            if (!$registry->has('tools.GET')) {
                 try {
                     $registry->register($this->app->make(\Platform\Core\Tools\ListToolsTool::class));
                     // \Log::debug("[ToolRegistry] ListToolsTool manuell registriert (Fallback)");
@@ -267,7 +280,7 @@ class CoreServiceProvider extends ServiceProvider
             }
             
             // ListTeamsTool (wichtig für AI - zeigt verfügbare Teams)
-            if (!$registry->has('core.teams.list')) {
+            if (!$registry->has('core.teams.GET')) {
                 try {
                     $registry->register($this->app->make(\Platform\Core\Tools\ListTeamsTool::class));
                     // \Log::debug("[ToolRegistry] ListTeamsTool manuell registriert (Fallback)");

@@ -130,9 +130,11 @@ class ToolLoader
      */
     public static function loadCoreTools(): array
     {
-        $corePath = __DIR__;
-        $coreNamespace = 'Platform\\Core\\Tools';
-        
+        // loadFromDirectory() expects a base "src" path and then appends "/Tools".
+        // For core tools that live in platform/core/src/Tools/*.php, the correct base path is platform/core/src.
+        $corePath = dirname(__DIR__); // .../core/src
+        $coreNamespace = 'Platform\\Core';
+
         return self::loadFromDirectory($corePath, $coreNamespace, 'core');
     }
 }
