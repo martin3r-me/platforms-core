@@ -74,6 +74,29 @@
             </div>
           </div>
           <div id="rtUsageModel" class="mt-1 text-[10px] text-[var(--ui-muted)]"></div>
+
+          <div class="mt-2">
+            <div class="text-[10px] text-[var(--ui-muted)] mb-1">Kosten (gpt-5.2)</div>
+            <div class="grid grid-cols-2 gap-2">
+              <div class="border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] p-2">
+                <div class="text-[10px] text-[var(--ui-muted)]">Input $</div>
+                <div id="rtCostIn" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
+              </div>
+              <div class="border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] p-2">
+                <div class="text-[10px] text-[var(--ui-muted)]">Cached input $</div>
+                <div id="rtCostCached" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
+              </div>
+              <div class="border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] p-2">
+                <div class="text-[10px] text-[var(--ui-muted)]">Output $</div>
+                <div id="rtCostOut" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
+              </div>
+              <div class="border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] p-2">
+                <div class="text-[10px] text-[var(--ui-muted)]">Total $</div>
+                <div id="rtCostTotal" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
+              </div>
+            </div>
+            <div id="rtCostNote" class="mt-1 text-[10px] text-[var(--ui-muted)]"></div>
+          </div>
         </div>
 
         <div>
@@ -176,6 +199,11 @@
         const rtTokensTotal = document.getElementById('rtTokensTotal');
         const rtTokensExtra = document.getElementById('rtTokensExtra');
         const rtUsageModel = document.getElementById('rtUsageModel');
+        const rtCostIn = document.getElementById('rtCostIn');
+        const rtCostCached = document.getElementById('rtCostCached');
+        const rtCostOut = document.getElementById('rtCostOut');
+        const rtCostTotal = document.getElementById('rtCostTotal');
+        const rtCostNote = document.getElementById('rtCostNote');
         const rtToolCalls = document.getElementById('rtToolCalls');
 
         /** type: {role:'user'|'assistant', content:string}[] */
@@ -376,6 +404,11 @@
           if (rtTokensTotal) rtTokensTotal.textContent = '—';
           if (rtTokensExtra) rtTokensExtra.textContent = '—';
           if (rtUsageModel) rtUsageModel.textContent = '';
+          if (rtCostIn) rtCostIn.textContent = '—';
+          if (rtCostCached) rtCostCached.textContent = '—';
+          if (rtCostOut) rtCostOut.textContent = '—';
+          if (rtCostTotal) rtCostTotal.textContent = '—';
+          if (rtCostNote) rtCostNote.textContent = '';
           lastEventKey = null;
           lastEventCount = 0;
           lastEventSummaryEl = null;
@@ -576,6 +609,30 @@
                     if (rtTokensExtra) rtTokensExtra.textContent =
                       `${cached != null ? cached : '—'} / ${reasoning != null ? reasoning : '—'}`;
                     if (rtUsageModel) rtUsageModel.textContent = data?.model ? `Model: ${data.model}` : '';
+
+                    // Costs (explicit pricing for gpt-5.2, per 1M tokens)
+                    const RATE_IN = 1.75;
+                    const RATE_CACHED = 0.175;
+                    const RATE_OUT = 14.00;
+                    const toMoney = (x) => {
+                      if (x == null || Number.isNaN(x)) return '—';
+                      return `$${Number(x).toFixed(6)}`;
+                    };
+                    const inputTokens = (typeof inTok === 'number') ? inTok : null;
+                    const outputTokens = (typeof outTok === 'number') ? outTok : null;
+                    const cachedTokens = (typeof cached === 'number') ? cached : 0;
+                    const nonCachedInput = (inputTokens != null) ? Math.max(0, inputTokens - cachedTokens) : null;
+                    const costIn = (nonCachedInput != null) ? (nonCachedInput / 1_000_000) * RATE_IN : null;
+                    const costCached = (cachedTokens != null) ? (cachedTokens / 1_000_000) * RATE_CACHED : null;
+                    const costOut = (outputTokens != null) ? (outputTokens / 1_000_000) * RATE_OUT : null;
+                    const costTotal = (costIn != null && costCached != null && costOut != null) ? (costIn + costCached + costOut) : null;
+                    if (rtCostIn) rtCostIn.textContent = toMoney(costIn);
+                    if (rtCostCached) rtCostCached.textContent = toMoney(costCached);
+                    if (rtCostOut) rtCostOut.textContent = toMoney(costOut);
+                    if (rtCostTotal) rtCostTotal.textContent = toMoney(costTotal);
+                    if (rtCostNote) rtCostNote.textContent =
+                      `Rates/1M: input $${RATE_IN}, cached $${RATE_CACHED}, output $${RATE_OUT}`;
+
                     debugState.model = data?.model || debugState.model;
                     debugState.usage = usage;
                     updateDebugDump();

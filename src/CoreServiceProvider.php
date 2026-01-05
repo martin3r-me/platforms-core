@@ -196,8 +196,18 @@ class CoreServiceProvider extends ServiceProvider
                 }
             }
             
-            // Prüfe ob App gebootet ist
+            // Wenn ToolRegistry sehr früh resolved wurde (z.B. während register()),
+            // ist die App hier ggf. noch nicht "booted" – dann müssen wir die
+            // eigentliche Tool-Registrierung nach boot verschieben.
             if (!$this->app->isBooted()) {
+                $this->app->booted(function () use ($registry) {
+                    try {
+                        // Core/Discovery Tools nachziehen (müssen immer verfügbar sein)
+                        $this->ensureDiscoveryToolsRegistered($registry);
+                    } catch (\Throwable $e) {
+                        // Silent fail
+                    }
+                });
                 return;
             }
             
@@ -254,50 +264,10 @@ class CoreServiceProvider extends ServiceProvider
                 \Log::warning("[ToolRegistry] Auto-Discovery fehlgeschlagen", ['error' => $e->getMessage()]);
             }
             
-            // 2. Fallback: Manuelle Registrierung nur wenn Auto-Discovery fehlgeschlagen ist
+            // 2. Fallback: Discovery-Tools sicherstellen (auch wenn Module bereits Tools registriert haben)
             // (Sollte normalerweise nicht nötig sein, da Auto-Discovery Core-Tools lädt)
             // WICHTIG: Diese Tools haben möglicherweise Dependencies, daher Fallback
-            
-            // ListToolsTool (wichtig für AI - zeigt verfügbare Tools)
-            // (Legacy name tools.list will map to tools.GET once registered, but we ensure tools.GET exists)
-            if (!$registry->has('tools.GET')) {
-                try {
-                    $registry->register($this->app->make(\Platform\Core\Tools\ListToolsTool::class));
-                    // \Log::debug("[ToolRegistry] ListToolsTool manuell registriert (Fallback)");
-                } catch (\Throwable $e) {
-                    // Silent fail
-                }
-            }
-            
-            // RequestToolTool (wichtig für AI - kann fehlende Tools anfordern)
-            if (!$registry->has('tools.request')) {
-                try {
-                    $registry->register($this->app->make(\Platform\Core\Tools\RequestToolTool::class));
-                    // \Log::debug("[ToolRegistry] RequestToolTool manuell registriert (Fallback)");
-                } catch (\Throwable $e) {
-                    // Silent fail
-                }
-            }
-            
-            // ListTeamsTool (wichtig für AI - zeigt verfügbare Teams)
-            if (!$registry->has('core.teams.GET')) {
-                try {
-                    $registry->register($this->app->make(\Platform\Core\Tools\ListTeamsTool::class));
-                    // \Log::debug("[ToolRegistry] ListTeamsTool manuell registriert (Fallback)");
-                } catch (\Throwable $e) {
-                    // Silent fail
-                }
-            }
-            
-            // ListTeamUsersTool (wichtig für AI - zeigt Team-Mitglieder)
-            if (!$registry->has('core.teams.users.list')) {
-                try {
-                    $registry->register($this->app->make(\Platform\Core\Tools\ListTeamUsersTool::class));
-                    // \Log::debug("[ToolRegistry] ListTeamUsersTool manuell registriert (Fallback)");
-                } catch (\Throwable $e) {
-                    // Silent fail
-                }
-            }
+            $this->ensureDiscoveryToolsRegistered($registry);
             
             // Context-Tools (werden normalerweise via Auto-Discovery geladen)
             // GetContextTool, GetUserTool, GetModulesTool werden automatisch geladen
@@ -319,6 +289,42 @@ class CoreServiceProvider extends ServiceProvider
                 }
             }
         });
+    }
+
+    /**
+     * Stellt sicher, dass die Core/Discovery-Tools immer registriert sind.
+     * Diese Tools sind die Grundlage für "loose" Tool-Discovery (tools.GET → nachladen).
+     */
+    private function ensureDiscoveryToolsRegistered(\Platform\Core\Tools\ToolRegistry $registry): void
+    {
+        // tools.GET (ListToolsTool)
+        if (!$registry->has('tools.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\ListToolsTool::class)); } catch (\Throwable $e) {}
+        }
+
+        // tools.request
+        if (!$registry->has('tools.request')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\RequestToolTool::class)); } catch (\Throwable $e) {}
+        }
+
+        // core context/user/modules/teams
+        if (!$registry->has('core.context.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\GetContextTool::class)); } catch (\Throwable $e) {}
+        }
+        if (!$registry->has('core.user.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\GetUserTool::class)); } catch (\Throwable $e) {}
+        }
+        if (!$registry->has('core.modules.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\GetModulesTool::class)); } catch (\Throwable $e) {}
+        }
+        if (!$registry->has('core.teams.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\ListTeamsTool::class)); } catch (\Throwable $e) {}
+        }
+
+        // Optional (nice-to-have): team members
+        if (class_exists(\Platform\Core\Tools\ListTeamUsersTool::class) && !$registry->has('core.teams.users.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\ListTeamUsersTool::class)); } catch (\Throwable $e) {}
+        }
     }
 
 
