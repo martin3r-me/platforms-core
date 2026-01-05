@@ -30,6 +30,23 @@ class ToolResult
      */
     public static function error(string $error, ?string $code = null, array $metadata = []): self
     {
+        // Backwards-/Usage-Kompatibilität:
+        // In vielen Tools wird (fälschlich) die Reihenfolge (code, message) verwendet.
+        // Erkenne diesen Fall heuristisch und swap, damit error=message und errorCode=code stimmt.
+        $looksLikeCode = static function (?string $s): bool {
+            return is_string($s) && $s !== '' && (bool) preg_match('/^[A-Z0-9_.-]+$/', $s);
+        };
+        $looksLikeMessage = static function (?string $s): bool {
+            if (!is_string($s) || $s === '') return false;
+            // Message enthält typischerweise Leerzeichen/Zeichen und ist länger als ein Code
+            return strlen($s) > 12 || str_contains($s, ' ') || str_contains($s, ':');
+        };
+
+        if ($code !== null && $looksLikeCode($error) && $looksLikeMessage($code)) {
+            // swap: ($error=code, $code=message) -> ($message, $code)
+            return new self(false, null, $code, $error, $metadata);
+        }
+
         return new self(false, null, $error, $code, $metadata);
     }
 

@@ -623,7 +623,8 @@ class SimpleToolController extends Controller
                             $normalizedArgs = $stableNormalize($args);
                             $normalizedArgsJson = json_encode($normalizedArgs, JSON_UNESCAPED_UNICODE);
                             if (!is_string($normalizedArgsJson)) { $normalizedArgsJson = ''; }
-                            $cacheKey = $canonical . '|' . md5($normalizedArgsJson);
+                            $argsHash = md5($normalizedArgsJson);
+                            $cacheKey = $canonical . '|' . $argsHash;
                             $cached = $isCacheable && array_key_exists($cacheKey, $toolResultCache);
 
                             if ($cached) {
@@ -631,12 +632,25 @@ class SimpleToolController extends Controller
                                 $toolResult = $cachedEntry['toolResult'];
                                 $ms = 0;
                                 $toolArray = $cachedEntry['toolArray'];
+                                $retriesUsed = 0;
                             } else {
+                                $retriesUsed = 0;
+                                $attempts = ($isGet ? 3 : 1); // GET: up to 2 retries on transient EXECUTION_ERROR
                                 $t0 = microtime(true);
-                                $toolResult = $executor->execute($canonical, $args, $context);
+                                do {
+                                    $toolResult = $executor->execute($canonical, $args, $context);
+                                    if ($toolResult->success) { break; }
+                                    if (!$isGet) { break; }
+                                    // Retry only on transient execution errors
+                                    if (($toolResult->errorCode ?? null) !== 'EXECUTION_ERROR') { break; }
+                                    $retriesUsed++;
+                                    usleep(150_000 * $retriesUsed); // 150ms, 300ms
+                                } while ($retriesUsed < ($attempts - 1));
                                 $ms = (int) round((microtime(true) - $t0) * 1000);
                                 $toolArray = $toolResult->toArray();
-                                if ($isCacheable) {
+
+                                // Cache only successful GET results (never cache failures)
+                                if ($isCacheable && $toolResult->success) {
                                     $toolResultCache[$cacheKey] = [
                                         'toolResult' => $toolResult,
                                         'toolArray' => $toolArray,
@@ -644,14 +658,23 @@ class SimpleToolController extends Controller
                                 }
                             }
                             
+                            $argsPreview = $normalizedArgsJson;
+                            if (is_string($argsPreview) && strlen($argsPreview) > 180) {
+                                $argsPreview = substr($argsPreview, 0, 180) . '…';
+                            }
+
                             $sendEvent('tool.executed', [
                                 'tool' => $canonical,
                                 'call_id' => $callId,
                                 // ToolResult->toArray uses 'ok' not 'success' – use the canonical truth.
                                 'success' => (bool) $toolResult->success,
                                 'ms' => $ms,
+                                'error_code' => $toolResult->success ? null : ($toolResult->errorCode ?? null),
                                 'error' => $toolResult->success ? null : ($toolResult->error ?? ($toolArray['error']['message'] ?? null)),
                                 'cached' => $cached,
+                                'retries' => $retriesUsed,
+                                'args_hash' => $argsHash,
+                                'args_preview' => $argsPreview,
                             ]);
 
                             // After successful writes, invalidate cached GETs so follow-up reads are fresh.

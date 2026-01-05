@@ -444,20 +444,37 @@
             const cacheBadge = document.createElement('span');
             cacheBadge.className = `text-[10px] px-1.5 py-0.5 rounded ${tc.cached ? 'bg-slate-100 text-slate-700' : 'bg-transparent text-transparent'}`;
             cacheBadge.textContent = tc.cached ? 'cached' : '';
+            const retryBadge = document.createElement('span');
+            const r = Number(tc.retries || 0);
+            retryBadge.className = `text-[10px] px-1.5 py-0.5 rounded ${r > 0 ? 'bg-amber-100 text-amber-700' : 'bg-transparent text-transparent'}`;
+            retryBadge.textContent = r > 0 ? `retry:${r}` : '';
             const ms = document.createElement('span');
             ms.className = 'text-[10px] text-[var(--ui-muted)]';
             ms.textContent = (tc.ms != null ? `${tc.ms}ms` : '—');
             right.appendChild(badge);
             right.appendChild(cacheBadge);
+            right.appendChild(retryBadge);
             right.appendChild(ms);
             row.appendChild(left);
             row.appendChild(right);
             rtToolCalls.appendChild(row);
 
+            if (tc.args_hash) {
+              const meta = document.createElement('div');
+              meta.className = 'mt-1 text-[10px] text-[var(--ui-muted)] truncate';
+              meta.textContent = `args: ${String(tc.args_hash).slice(0, 10)}…`;
+              rtToolCalls.appendChild(meta);
+            }
+            if (tc.args_preview) {
+              const prev = document.createElement('div');
+              prev.className = 'mt-1 text-[10px] text-[var(--ui-muted)] truncate';
+              prev.textContent = String(tc.args_preview);
+              rtToolCalls.appendChild(prev);
+            }
             if (!tc.success && tc.error) {
               const err = document.createElement('div');
               err.className = 'mt-1 text-[10px] text-red-700 truncate';
-              err.textContent = tc.error;
+              err.textContent = tc.error_code ? `${tc.error_code}: ${tc.error}` : tc.error;
               rtToolCalls.appendChild(err);
             }
           }
@@ -661,7 +678,11 @@
                       success: !!data?.success,
                       ms: (data?.ms ?? null),
                       error: data?.error || null,
+                      error_code: data?.error_code || null,
                       cached: !!data?.cached,
+                      retries: (data?.retries ?? 0),
+                      args_hash: data?.args_hash || null,
+                      args_preview: data?.args_preview || null,
                     };
                     debugState.toolCalls.push(tc);
                     if (debugState.toolCalls.length > 100) debugState.toolCalls = debugState.toolCalls.slice(-100);
