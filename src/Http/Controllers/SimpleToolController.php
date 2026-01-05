@@ -296,6 +296,7 @@ class SimpleToolController extends Controller
                         . "Antworte immer auf Deutsch.\n"
                         . "Wenn der Nutzer Daten aus der Plattform will, nutze Tools statt zu sagen, du hättest keinen Zugriff.\n"
                         . "Du siehst anfangs nur Discovery-Tools (z.B. tools.GET, core.teams.GET). Nutze tools.GET mit module/search, um weitere Tools zu entdecken.\n"
+                        . "Für Tool-Discovery nutze tools.GET (nicht core.modules.GET mit include_tools=true – das ist sehr groß und kostet viele Tokens).\n"
                         . "Wenn es um Teams in der Plattform geht, nutze core.teams.GET.\n"
                         . "Wenn Kontext nötig ist, rufe core.context.GET auf.\n",
                 ];

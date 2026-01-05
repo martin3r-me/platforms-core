@@ -64,13 +64,25 @@ class GetModulesTool implements ToolContract
                     $moduleTools = array_filter($allTools, function($tool) use ($moduleKey) {
                         return str_starts_with($tool->getName(), $moduleKey . '.');
                     });
-                    $moduleData['tools'] = array_map(function($tool) {
-                        return [
+                    // IMPORTANT: Keep this payload compact to avoid huge token usage in tool loops.
+                    // We only include tool names and a truncated description.
+                    $toolsOut = [];
+                    $limit = 40; // safety limit per module
+                    foreach (array_values($moduleTools) as $idx => $tool) {
+                        if ($idx >= $limit) { break; }
+                        $desc = (string) $tool->getDescription();
+                        if (mb_strlen($desc) > 160) { $desc = mb_substr($desc, 0, 157) . '...'; }
+                        $toolsOut[] = [
                             'name' => $tool->getName(),
-                            'description' => $tool->getDescription(),
+                            'description' => $desc,
                         ];
-                    }, $moduleTools);
+                    }
+                    $moduleData['tools'] = $toolsOut;
                     $moduleData['tool_count'] = count($moduleTools);
+                    if (count($moduleTools) > $limit) {
+                        $moduleData['tools_truncated'] = true;
+                        $moduleData['tools_limit'] = $limit;
+                    }
                 }
 
                 $result['modules'][] = $moduleData;
