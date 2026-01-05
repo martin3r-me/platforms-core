@@ -49,6 +49,14 @@ class ListToolsTool implements ToolContract
                     'type' => 'string',
                     'description' => 'Optional: Suche in Tool-Namen und Beschreibungen. Beispiel: "project" findet alle Tools mit "project" im Namen oder in der Beschreibung.',
                 ],
+                'limit' => [
+                    'type' => 'integer',
+                    'description' => 'Pagination (optional): Maximale Anzahl Tools pro Seite. Standard: 50. Maximum: 200.',
+                ],
+                'offset' => [
+                    'type' => 'integer',
+                    'description' => 'Pagination (optional): Anzahl Tools, die übersprungen werden. Standard: 0.',
+                ],
             ],
             'required' => []
         ];
@@ -233,11 +241,22 @@ class ListToolsTool implements ToolContract
                 ], fn($v) => $v !== null && $v !== '');
             }
             
-            // Skalierung: wenn keine Filter gesetzt sind, kann die Tool-Liste sehr groß werden.
-            // In diesem Fall liefern wir trotzdem die Modul-/Entitäten-Übersicht + eine kleine Sample-Liste.
-            $unfilteredLimit = (int) config('openai.tools_get_unfiltered_limit', 120);
-            $shouldTruncateToolsList = (!$hasFilters && count($filteredTools) > $unfilteredLimit);
-            $toolsToReturn = $shouldTruncateToolsList ? array_slice($filteredTools, 0, $unfilteredLimit) : $filteredTools;
+            // Pagination (skalierbar): niemals "wegstreichen" – stattdessen paginieren.
+            $limit = (int)($arguments['limit'] ?? 50);
+            if ($limit <= 0) { $limit = 50; }
+            $limit = min($limit, 200);
+            $offset = (int)($arguments['offset'] ?? 0);
+            if ($offset < 0) { $offset = 0; }
+
+            $filteredTools = array_values($filteredTools); // reindex
+            $toolsToReturn = array_slice($filteredTools, $offset, $limit);
+            $result['summary']['pagination'] = [
+                'limit' => $limit,
+                'offset' => $offset,
+                'returned' => count($toolsToReturn),
+                'total' => count($filteredTools),
+                'next_offset' => ($offset + $limit < count($filteredTools)) ? ($offset + $limit) : null,
+            ];
 
             // Tools-Informationen sammeln
             foreach ($toolsToReturn as $tool) {
@@ -263,12 +282,6 @@ class ListToolsTool implements ToolContract
                 }
                 
                 $result['tools'][] = $toolData;
-            }
-
-            if ($shouldTruncateToolsList) {
-                $result['summary']['tools_truncated'] = true;
-                $result['summary']['tools_limit'] = $unfilteredLimit;
-                $result['note'] = 'Viele Tools verfügbar. Nutze tools.GET mit module="..." oder search="..." für eine kleinere, relevante Liste.';
             }
             
             return \Platform\Core\Contracts\ToolResult::success($result);

@@ -4,6 +4,7 @@ namespace Platform\Core\Services;
 
 use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\Module;
+use Platform\Core\Registry\ModuleRegistry;
 
 /**
  * Service für Tool-Berechtigungen
@@ -68,8 +69,21 @@ class ToolPermissionService
         // Modul finden und Zugriff prüfen (wie CheckModulePermission Middleware)
         $module = Module::where('key', $moduleKey)->first();
         if (!$module) {
-            // Modul nicht gefunden - könnte ein neues Modul sein, das noch nicht registriert ist
-            // Für Sicherheit: kein Zugriff
+            // Architektur-Fallback:
+            // Tools sind im Code registriert (ModuleRegistry/ToolRegistry). Wenn das Modul dort existiert,
+            // aber noch kein DB-Eintrag vorhanden ist, würden sonst ALLE Tools dieses Moduls unsichtbar werden
+            // und Discovery wäre "dead-end". Daher: Wenn das Modul im Code registriert ist → erlauben
+            // (und loggen), damit Tool-Discovery weiterhin funktioniert.
+            if (ModuleRegistry::get($moduleKey) !== null) {
+                \Log::warning('[Tools Permission] Modul nicht in DB gefunden, aber im Code registriert – erlaube Tool-Zugriff (Fallback)', [
+                    'module_key' => $moduleKey,
+                    'tool' => $toolName,
+                    'user_id' => $user->id ?? null,
+                ]);
+                return true;
+            }
+
+            // Modul weder in DB noch im Code registriert → kein Zugriff
             return false;
         }
         

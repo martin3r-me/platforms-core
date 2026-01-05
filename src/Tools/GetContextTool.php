@@ -5,6 +5,8 @@ namespace Platform\Core\Tools;
 use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
+use Platform\Core\Registry\ModuleRegistry;
+use Platform\Core\Models\Module;
 
 /**
  * Tool zum Abrufen des aktuellen Kontexts
@@ -33,7 +35,11 @@ class GetContextTool implements ToolContract
                 'include_metadata' => [
                     'type' => 'boolean',
                     'description' => 'Optional: Soll auch erweiterte Metadaten (Zeit, Zeitzone, etc.) enthalten sein? Standard: true'
-                ]
+                ],
+                'include_modules' => [
+                    'type' => 'boolean',
+                    'description' => 'Optional: Soll eine kompakte Modul-Übersicht (allowed_modules/denied_modules) enthalten sein? Standard: true'
+                ],
             ],
             'required' => []
         ];
@@ -43,6 +49,7 @@ class GetContextTool implements ToolContract
     {
         try {
             $includeMetadata = $arguments['include_metadata'] ?? true;
+            $includeModules = $arguments['include_modules'] ?? true;
 
             $result = [
                 'user' => $context->user ? [
@@ -55,6 +62,63 @@ class GetContextTool implements ToolContract
                     'name' => $context->team->name ?? null,
                 ] : null,
             ];
+
+            // Modul-Berechtigungen (kompakt)
+            if ($includeModules) {
+                $allowed = [];
+                $denied = [];
+
+                $user = $context->user;
+                // best-effort: aktueller Team-Scope für hasAccess
+                $baseTeam = $context->team
+                    ?? ($user?->currentTeamRelation ?? null)
+                    ?? ($user?->currentTeam ?? null);
+
+                $registered = ModuleRegistry::all(); // key => config
+                foreach ($registered as $key => $cfg) {
+                    if (!is_string($key) || $key === '' || $key === 'core' || $key === 'tools') {
+                        continue;
+                    }
+                    $title = is_array($cfg) ? ($cfg['title'] ?? null) : null;
+
+                    $hasAccess = false;
+                    try {
+                        if ($user && $baseTeam) {
+                            $module = Module::where('key', $key)->first();
+                            if ($module) {
+                                $hasAccess = (bool) $module->hasAccess($user, $baseTeam);
+                            } else {
+                                // Wenn Modul nicht in DB vorhanden ist, können wir hier keine belastbare Entscheidung treffen.
+                                // Für Transparenz markieren wir es als "denied" (nicht sichtbar), statt es fälschlich zu erlauben.
+                                $hasAccess = false;
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        $hasAccess = false;
+                    }
+
+                    $entry = ['key' => $key];
+                    if (is_string($title) && $title !== '') {
+                        $entry['title'] = $title;
+                    }
+
+                    if ($hasAccess) {
+                        $allowed[] = $entry;
+                    } else {
+                        $denied[] = $entry;
+                    }
+                }
+
+                $result['modules'] = [
+                    'allowed_modules' => $allowed,
+                    'denied_modules' => $denied,
+                    'counts' => [
+                        'allowed' => count($allowed),
+                        'denied' => count($denied),
+                        'registered_total' => count($registered),
+                    ],
+                ];
+            }
 
             // Erweiterte Metadaten (wenn verfügbar)
             if ($includeMetadata) {
