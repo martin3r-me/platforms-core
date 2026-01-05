@@ -321,7 +321,11 @@ class SimpleToolController extends Controller
                 $sendEvent('start', ['message' => '🚀 Starte...']);
 
                 // Best-practice tool loop (stream per iteration; execute tools server-side; continue until no tool calls)
-                $maxIterations = 6;
+                // Keep a hard safety cap, but allow enough room for "batch" operations
+                // like renaming/updating multiple tasks.
+                $maxIterations = 12;
+                $maxToolExecutions = 60;
+                $toolExecutionCount = 0;
                 $usageSent = false;
                 $debugEventCount = 0;
                 $previousResponseId = null;
@@ -534,6 +538,18 @@ class SimpleToolController extends Controller
                     // Execute tool calls
                     $toolOutputsForNextIteration = [];
                     foreach ($toolCallsCollector as $callId => $call) {
+                        $toolExecutionCount++;
+                        if ($toolExecutionCount > $maxToolExecutions) {
+                            $sendEvent('complete', [
+                                'assistant' => "⚠️ Abbruch: Zu viele Tool-Ausführungen in einem Request (>{$maxToolExecutions}). "
+                                    . "Bitte die Aktion in kleinere Schritte teilen oder das Tool um Batch-Operationen erweitern.",
+                                'reasoning' => $reasoning,
+                                'thinking' => $thinking,
+                                'chat_history' => $messages,
+                            ]);
+                            return;
+                        }
+
                         $openAiToolName = $call['name'] ?? '';
                         $canonical = $nameMapper->toCanonical($openAiToolName);
                         $argsJson = $call['arguments'] ?? '';
@@ -651,8 +667,14 @@ class SimpleToolController extends Controller
                     $messagesForApi = $toolOutputsForNextIteration;
                 }
 
-                $sendEvent('error', [
-                    'error' => 'Max iterations reached while executing tools.',
+                // Safety: do not end with a hard error in the chat UI; provide a graceful completion.
+                $sendEvent('complete', [
+                    'assistant' => "⚠️ Abbruch: Maximale Iterationen erreicht ({$maxIterations}). "
+                        . "Ich habe bereits einige Schritte ausgeführt, aber brauche einen weiteren Send, um fortzufahren "
+                        . "(oder wir erhöhen/optimieren die Limits/Batches).",
+                    'reasoning' => null,
+                    'thinking' => null,
+                    'chat_history' => $messages,
                 ]);
                 return;
 
