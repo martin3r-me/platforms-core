@@ -660,6 +660,51 @@ class SimpleToolController extends Controller
                         $args = json_decode($argsJson, true);
                         if (!is_array($args)) { $args = []; }
 
+                        // Robustness: Some models occasionally emit "[]" for bulk tools.
+                        // If we can detect a list payload, wrap it into the expected object shape.
+                        $isList = (array_keys($args) === range(0, count($args) - 1));
+                        if ($canonical === 'planner.tasks.bulk.POST' && !array_key_exists('tasks', $args) && $isList && !empty($args)) {
+                            $args = ['tasks' => $args];
+                        }
+
+                        // Guard: If bulk create is called without tasks, return a precise hint (prevents repeated empty calls).
+                        if ($canonical === 'planner.tasks.bulk.POST' && (!isset($args['tasks']) || !is_array($args['tasks']) || empty($args['tasks']))) {
+                            $toolResult = ToolResult::error(
+                                'VALIDATION_ERROR',
+                                "Feld 'tasks' ist erforderlich. Beispiel: {\"defaults\":{\"project_id\":111,\"project_slot_id\":317},\"tasks\":[{\"title\":\"…\",\"description\":\"Rezept…\",\"dod\":\"DoD…\"}]}",
+                            );
+                            $toolArray = $toolResult->toArray();
+                            $ms = 0;
+                            $retriesUsed = 0;
+                            $cached = false;
+
+                            $argsHash = md5(json_encode($args, JSON_UNESCAPED_UNICODE) ?: '');
+                            $argsPreview = json_encode($args, JSON_UNESCAPED_UNICODE);
+                            if (is_string($argsPreview) && strlen($argsPreview) > 180) {
+                                $argsPreview = substr($argsPreview, 0, 180) . '…';
+                            }
+
+                            $sendEvent('tool.executed', [
+                                'tool' => $canonical,
+                                'call_id' => $callId,
+                                'success' => false,
+                                'ms' => $ms,
+                                'error_code' => $toolResult->errorCode ?? 'VALIDATION_ERROR',
+                                'error' => $toolResult->error,
+                                'cached' => $cached,
+                                'retries' => $retriesUsed,
+                                'args_hash' => $argsHash,
+                                'args_preview' => $argsPreview,
+                            ]);
+
+                            $toolOutputsForNextIteration[] = [
+                                'type' => 'function_call_output',
+                                'call_id' => $callId,
+                                'output' => json_encode($toolArray, JSON_UNESCAPED_UNICODE),
+                            ];
+                            continue;
+                        }
+
                         $sendEvent('openai.event', [
                             'event' => 'server.tool.execute',
                             'preview' => ['tool' => $canonical],
