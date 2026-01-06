@@ -241,6 +241,37 @@ class SimpleToolController extends Controller
     public function stream(Request $request): StreamedResponse
     {
         return new StreamedResponse(function() use ($request) {
+            // SSE hardening: prevent timeouts and buffering issues that surface as browser "Load failed".
+            try { @ignore_user_abort(true); } catch (\Throwable $e) {}
+            try { @set_time_limit(0); } catch (\Throwable $e) {}
+            try { @ini_set('max_execution_time', '0'); } catch (\Throwable $e) {}
+            try { @ini_set('zlib.output_compression', '0'); } catch (\Throwable $e) {}
+            try { @ini_set('output_buffering', '0'); } catch (\Throwable $e) {}
+
+            // If a fatal error happens mid-stream, the browser will just see a network error.
+            // So we log shutdown info to make root cause visible in server logs.
+            try {
+                $rid = bin2hex(random_bytes(6));
+            } catch (\Throwable $e) {
+                $rid = (string) (microtime(true));
+            }
+            Log::info('[SimpleToolController] SSE stream start', [
+                'rid' => $rid,
+                'path' => $request->path(),
+                'user_id' => optional($request->user())->id,
+            ]);
+            register_shutdown_function(function() use ($rid) {
+                $err = error_get_last();
+                if ($err) {
+                    Log::error('[SimpleToolController] SSE stream shutdown (fatal?)', [
+                        'rid' => $rid,
+                        'error' => $err,
+                    ]);
+                } else {
+                    Log::info('[SimpleToolController] SSE stream shutdown', ['rid' => $rid]);
+                }
+            });
+
             // Output Buffering deaktivieren
             while (ob_get_level() > 0) {
                 @ob_end_flush();
@@ -251,6 +282,10 @@ class SimpleToolController extends Controller
                 echo "data: " . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
             };
+
+            // Send an initial SSE comment to open the stream early (helps with proxies/buffering).
+            echo ": connected\n\n";
+            @flush();
 
             try {
                 // Debug: Eingehende Header/Body (hilft bei 400)
@@ -786,7 +821,10 @@ class SimpleToolController extends Controller
             }
         }, 200, [
             'Content-Type' => 'text/event-stream',
-            'Cache-Control' => 'no-cache',
+            'Cache-Control' => 'no-cache, no-transform',
+            'Connection' => 'keep-alive',
+            // Prevent intermediary buffering/compression.
+            'Content-Encoding' => 'none',
             'X-Accel-Buffering' => 'no',
         ]);
     }
