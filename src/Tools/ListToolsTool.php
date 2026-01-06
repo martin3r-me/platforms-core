@@ -6,6 +6,7 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Tools\ToolRegistry;
 use Platform\Core\Tools\ToolDiscoveryService;
 use Platform\Core\Registry\ModuleRegistry;
+use Platform\Core\Models\Module;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 
@@ -167,6 +168,9 @@ class ListToolsTool implements ToolContract
                 if (!isset($modulesIndex[$mod])) {
                     $modulesIndex[$mod] = [
                         'module' => $mod,
+                        'title' => null,
+                        'scope_type' => null,
+                        'scope_note' => null,
                         'tool_count' => 0,
                         'overview_tool' => null,
                         'entities' => [],
@@ -188,6 +192,34 @@ class ListToolsTool implements ToolContract
                 }
             }
             ksort($modulesIndex);
+
+            // Enrich module metadata (title + scope_type) if available in DB.
+            // This helps the LLM understand parent/root-scoped modules (e.g. OKR) during discovery.
+            try {
+                $keys = array_keys($modulesIndex);
+                if (!empty($keys)) {
+                    $modules = Module::query()
+                        ->whereIn('key', $keys)
+                        ->get(['key', 'title', 'scope_type'])
+                        ->keyBy('key');
+                    foreach ($modulesIndex as $k => &$m) {
+                        $row = $modules->get($k);
+                        if ($row) {
+                            $m['title'] = $row->title;
+                            $m['scope_type'] = $row->scope_type;
+                            if ($row->scope_type === 'parent') {
+                                $m['scope_note'] = 'root-scoped: nutzt Root/Parent-Team (unabhängig vom aktuellen Unterteam).';
+                            } elseif ($row->scope_type === 'single') {
+                                $m['scope_note'] = 'team-scoped: nutzt aktuelles Team.';
+                            }
+                        }
+                    }
+                    unset($m);
+                }
+            } catch (\Throwable $e) {
+                // Ignore: modules table might not be available in some contexts.
+            }
+
             foreach ($modulesIndex as &$m) {
                 // Sortiere Entitäten und Operationen deterministisch
                 ksort($m['entities']);
