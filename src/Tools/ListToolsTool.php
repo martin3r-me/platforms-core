@@ -30,7 +30,7 @@ class ListToolsTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'GET /tools - Listet verfügbare Tools auf. WICHTIG: Standardmäßig werden ALLE Tools angezeigt (GET, POST, PUT, DELETE). Tools folgen REST-Pattern: module.entity.GET (Lesen), module.entity.POST (Erstellen), module.entity.PUT (Aktualisieren), module.entity.DELETE (Löschen). REST-Parameter: module (optional, string) - Filter nach Modul (z.B. "planner" zeigt alle planner.* Tools). read_only (optional, boolean) - Wenn true: nur Lese-Tools (GET). Wenn false oder nicht gesetzt: keine Einschränkung (alle Tools). write_only (optional, boolean) - Wenn true: nur Schreib-Tools (POST, PUT, DELETE). search (optional, string) - Suchbegriff.';
+        return 'GET /tools - Listet Tools eines Moduls auf. WICHTIG: module ist required. Nutze zuerst core.modules.GET, dann tools.GET(module="..."). Optional: read_only/write_only/search/limit/offset.';
     }
 
     public function getSchema(): array
@@ -40,7 +40,7 @@ class ListToolsTool implements ToolContract
             'properties' => [
                 'module' => [
                     'type' => 'string',
-                    'description' => 'Optional: Nur Tools eines bestimmten Moduls anzeigen. Beispiel: "planner" → zeigt alle Planner-Tools (planner.projects.GET, planner.projects.POST, planner.projects.PUT, planner.projects.DELETE, etc.). Wenn nicht angegeben, werden alle Tools aller Module angezeigt.',
+                    'description' => 'Required: Modul-Key. Beispiel: "planner" → zeigt alle planner.* Tools. Nutze core.modules.GET, um gültige Module zu sehen.',
                 ],
                 'read_only' => [
                     'type' => 'boolean',
@@ -63,13 +63,23 @@ class ListToolsTool implements ToolContract
                     'description' => 'Pagination (optional): Anzahl Tools, die übersprungen werden. Standard: 0.',
                 ],
             ],
-            'required' => []
+            'required' => ['module']
         ];
     }
 
     public function execute(array $arguments, \Platform\Core\Contracts\ToolContext $context): \Platform\Core\Contracts\ToolResult
     {
         try {
+            // module ist bewusst required, um "search raten" zu vermeiden.
+            $module = $arguments['module'] ?? null;
+            if (!is_string($module) || trim($module) === '') {
+                return \Platform\Core\Contracts\ToolResult::error(
+                    'VALIDATION_ERROR',
+                    'Parameter "module" ist erforderlich. Nutze zuerst core.modules.GET, dann tools.GET(module="...").'
+                );
+            }
+            $module = trim($module);
+
             // Alle Tools holen
             $allTools = array_values($this->registry->all());
             
@@ -80,7 +90,6 @@ class ListToolsTool implements ToolContract
             $filteredTools = $allTools;
             
             // 1. Modul-Filter (einfach: nur Tools, die mit "module." beginnen)
-            $module = $arguments['module'] ?? null;
             $moduleFilterApplied = false;
             if ($module) {
                 $beforeModuleFilter = count($filteredTools);
@@ -239,49 +248,8 @@ class ListToolsTool implements ToolContract
                 'tools' => [],
             ];
             
-            // 4. Fuzzy Fallback: Wenn Modul-Filter keine Ergebnisse liefert, aber Suche vorhanden ist
-            // → Versuche auch ohne Modul-Filter zu suchen (für Fälle wie "project.get" → "planner.project.GET")
-            if ($moduleFilterApplied && count($filteredTools) === 0 && !empty($searchTerm)) {
-                $allToolsForFuzzy = array_values($this->registry->all());
-                $permissionService = app(\Platform\Core\Services\ToolPermissionService::class);
-                $allToolsForFuzzy = $permissionService->filterToolsByPermission($allToolsForFuzzy);
-                
-                $term = strtolower($searchTerm);
-                $normalizedTerm = str_replace(['.', '_', '-'], '', $term);
-                
-                $fuzzyMatches = array_filter($allToolsForFuzzy, function($tool) use ($term, $normalizedTerm, $arguments) {
-                    $name = strtolower($tool->getName());
-                    $description = strtolower($tool->getDescription());
-                    
-                    // Normalisierte Suche
-                    $normalizedName = str_replace(['.', '_', '-'], '', $name);
-                    $matchesSearch = str_contains($normalizedName, $normalizedTerm) || str_contains($description, $term);
-                    
-                    // Read/Write Filter anwenden (nur wenn explizit true gesetzt)
-                    $readOnlyRequested = array_key_exists('read_only', $arguments) ? $arguments['read_only'] : null;
-                    $writeOnlyRequested = array_key_exists('write_only', $arguments) ? $arguments['write_only'] : null;
-                    $isReadOnly = str_ends_with($tool->getName(), '.GET');
-
-                    if ($readOnlyRequested === true && !$isReadOnly) {
-                        return false;
-                    }
-                    if ($writeOnlyRequested === true && $isReadOnly) {
-                        return false;
-                    }
-                    
-                    return $matchesSearch;
-                });
-                
-                if (count($fuzzyMatches) > 0) {
-                    $filteredTools = array_values($fuzzyMatches);
-                    usort($filteredTools, function($a, $b) {
-                        return strcmp($a->getName(), $b->getName());
-                    });
-                    $result['fuzzy_match'] = true;
-                    $result['fuzzy_match_note'] = "Modul '{$module}' nicht gefunden, aber ähnliche Tools gefunden (ohne Modul-Filter)";
-                    $result['summary']['filtered_tools'] = count($filteredTools);
-                }
-            }
+            // NOTE: Kein Cross-Module-Fuzzy-Fallback.
+            // Das führt zu "raten" über Module hinweg. Stattdessen: module bewusst required + core.modules.GET als Einstieg.
             
             // Wenn Filter angewendet wurden, zeige sie an
             if ($hasFilters) {

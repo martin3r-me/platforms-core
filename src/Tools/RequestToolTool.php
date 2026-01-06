@@ -84,6 +84,61 @@ class RequestToolTool implements ToolContract
                     'Beschreibung der benötigten Funktionalität ist erforderlich'
                 );
             }
+
+            // IMPORTANT (loose & systematic):
+            // Dieses Tool soll NUR dann einen "ToolRequest" (Ticket) anlegen, wenn es wirklich kein passendes Tool gibt.
+            // Wenn Tools bereits existieren (aber die LLM sie ggf. gerade nicht "sieht"), geben wir eine hilfreiche
+            // Antwort zurück, die zur Nutzung von tools.GET anleitet – ohne Preloading/Pattern-Magic.
+            $descLower = mb_strtolower($description);
+            $wantsRead = str_contains($descLower, 'read')
+                || str_contains($descLower, 'lesen')
+                || str_contains($descLower, 'list')
+                || str_contains($descLower, 'listen')
+                || str_contains($descLower, 'auflist')
+                || str_contains($descLower, 'get ')
+                || str_contains($descLower, '.get')
+                || str_contains($descLower, 'cycle_id')
+                || str_contains($descLower, 'objective_id');
+
+            $wantsWrite = str_contains($descLower, 'write')
+                || str_contains($descLower, 'schreib')
+                || str_contains($descLower, 'create')
+                || str_contains($descLower, 'erstel')
+                || str_contains($descLower, 'update')
+                || str_contains($descLower, 'aktualis')
+                || str_contains($descLower, 'delete')
+                || str_contains($descLower, 'lösch');
+
+            // Minimaler Suchvorschlag (kein Preloading): nur als Hilfe, welche Begriffe sich für tools.GET lohnen könnten
+            $searchHints = [];
+            foreach (['cycle', 'objective', 'key', 'okr', 'template', 'project', 'task'] as $kw) {
+                if (str_contains($descLower, $kw)) {
+                    $searchHints[] = $kw;
+                }
+            }
+            $searchHint = !empty($searchHints) ? implode(' ', array_values(array_unique($searchHints))) : null;
+
+            // 0) Exakter Match über suggested_name (falls angegeben)
+            if (is_string($suggestedName) && $suggestedName !== '') {
+                foreach ($this->registry->all() as $tool) {
+                    if ($tool->getName() === $suggestedName) {
+                        return ToolResult::success([
+                            'request_received' => false,
+                            'already_available' => true,
+                            'message' => "Das Tool '{$suggestedName}' ist bereits verfügbar. Nutze es direkt oder rufe tools.GET auf, um es zu sehen.",
+                            'next_step' => [
+                                'tool' => 'tools.GET',
+                                'example_args' => array_filter([
+                                    'module' => $module,
+                                    'read_only' => $wantsRead ? true : null,
+                                    'write_only' => $wantsWrite ? true : null,
+                                    'search' => $searchHint ?? ($module ? '' : null),
+                                ], fn($v) => $v !== null),
+                            ],
+                        ]);
+                    }
+                }
+            }
             
             // 1. Generiere Deduplication-Key
             $dedupKey = $this->generateDedupKey($description, $useCase, $suggestedName, $module);
@@ -93,6 +148,60 @@ class RequestToolTool implements ToolContract
             
             // 3. Suche nach ähnlichen Tools
             $similarTools = $this->findSimilarTools($description, $module);
+
+            // 3b) Wenn es plausible Tools gibt (oder die "READ-Tools" eines Moduls existieren), kein Ticket anlegen.
+            $hasSimilar = count($similarTools) > 0;
+            $moduleReadTools = [];
+            $moduleWriteTools = [];
+            if (is_string($module) && $module !== '') {
+                foreach ($this->registry->all() as $tool) {
+                    $name = $tool->getName();
+                    if (!str_starts_with($name, $module . '.')) {
+                        continue;
+                    }
+                    if (str_ends_with($name, '.GET')) {
+                        $moduleReadTools[] = $name;
+                    } else {
+                        $moduleWriteTools[] = $name;
+                    }
+                }
+            }
+
+            $moduleHasReadTools = count($moduleReadTools) > 0;
+            $moduleHasWriteTools = count($moduleWriteTools) > 0;
+
+            if (
+                $hasSimilar ||
+                ($module && (($wantsRead && $moduleHasReadTools) || ($wantsWrite && $moduleHasWriteTools)))
+            ) {
+                // kein Ticket – liefere stattdessen konkrete Discovery-Hilfe
+                $top = array_slice($similarTools, 0, 5);
+                return ToolResult::success([
+                    'request_received' => false,
+                    'already_available' => true,
+                    'message' => 'Passende Tools scheinen bereits vorhanden zu sein. Bitte nutze tools.GET, um sie im aktuellen Toolset sichtbar zu machen (statt tools.request).',
+                    'hint' => [
+                        'module' => $module,
+                        'recommended_search' => $searchHint,
+                        'available_read_tools_count' => $module ? count($moduleReadTools) : null,
+                        'available_write_tools_count' => $module ? count($moduleWriteTools) : null,
+                        'available_tools_sample' => $module ? array_slice(array_values(array_unique(array_merge($moduleReadTools, $moduleWriteTools))), 0, 10) : null,
+                    ],
+                    'similar_tools' => $top,
+                    'next_step' => [
+                        'tool' => 'tools.GET',
+                        'example_args' => array_filter([
+                            'module' => $module,
+                            'read_only' => $wantsRead ? true : null,
+                            'write_only' => $wantsWrite ? true : null,
+                            // Wenn keine explizite Richtung erkennbar ist, lieber alles zeigen.
+                            'search' => $searchHint ?? (is_string($module) ? '' : null),
+                            'limit' => 50,
+                            'offset' => 0,
+                        ], fn($v) => $v !== null),
+                    ],
+                ]);
+            }
             
             // 4. Speichere den Bedarf in der Datenbank (für Entwickler)
             $requestId = $this->logToolRequest([
