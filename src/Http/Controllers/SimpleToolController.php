@@ -450,6 +450,24 @@ class SimpleToolController extends Controller
                         $normalizeMethod->setAccessible(true);
                         $normalized = $normalizeMethod->invoke($openAiService, $availableTools); // responses tool format
 
+                        // Build a mapping so debug output does not look like "two different languages":
+                        // internal tool names use dots (okr.cycles.GET), OpenAI function names use underscores (okr_cycles_GET).
+                        $toolNameMap = [];
+                        try {
+                            $nameNormalize = $reflection->getMethod('normalizeToolNameForOpenAi');
+                            $nameNormalize->setAccessible(true);
+                            foreach ($availableTools as $t) {
+                                $fn = $t['function'] ?? null;
+                                $internalName = is_array($fn) ? ($fn['name'] ?? null) : null;
+                                if (is_string($internalName) && $internalName !== '') {
+                                    $toolNameMap[$internalName] = $nameNormalize->invoke($openAiService, $internalName);
+                                }
+                            }
+                            ksort($toolNameMap);
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+
                         $names = [];
                         foreach ($normalized as $t) {
                             $type = $t['type'] ?? null;
@@ -472,6 +490,7 @@ class SimpleToolController extends Controller
                             'registry_names_sample' => $registryNamesSample,
                             'tools_count' => count($names) + 1, // +web_search
                             'tools' => array_merge(['web_search'], $names),
+                            'tool_name_map_sample' => array_slice($toolNameMap, 0, 40, true),
                             'dynamically_loaded' => $openAiService->getDynamicallyLoadedTools(),
                         ]);
                     } catch (\Throwable $e) {
@@ -788,20 +807,57 @@ class SimpleToolController extends Controller
                                 $search = $args['search'] ?? null;
                                 $hasExplicitRequest = !empty($module) || !empty($search);
                                 if ($hasExplicitRequest) {
-                                    $toolsData = $toolArray['data']['tools'] ?? $toolArray['tools'] ?? [];
                                     $requestedTools = [];
-                                    if (is_array($toolsData)) {
-                                        foreach ($toolsData as $t) {
-                                            $n = $t['name'] ?? null;
-                                            if (is_string($n) && $n !== '') { $requestedTools[] = $n; }
+
+                                    // If module is explicitly provided, treat it as an explicit request to load the module's tools.
+                                    // This avoids "search raten" issues where the model only loads a subset (e.g. objectives) and
+                                    // then misses critical entry tools (e.g. okr.cycles.GET).
+                                    if (is_string($module) && trim($module) !== '') {
+                                        try {
+                                            $moduleKey = trim($module);
+                                            $reg = app(\Platform\Core\Tools\ToolRegistry::class);
+                                            $tools = array_values($reg->all());
+                                            $permissionService = app(\Platform\Core\Services\ToolPermissionService::class);
+                                            $tools = $permissionService->filterToolsByPermission($tools);
+
+                                            foreach ($tools as $t) {
+                                                $n = $t->getName();
+                                                if (is_string($n) && str_starts_with($n, $moduleKey . '.')) {
+                                                    $requestedTools[] = $n;
+                                                }
+                                            }
+                                        } catch (\Throwable $e) {
+                                            // Fallback to response-based loading below.
                                         }
                                     }
+
+                                    // Fallback: load exactly the tools that were returned by tools.GET (current page),
+                                    // useful if module isn't present (legacy) or registry isn't available.
+                                    if (empty($requestedTools)) {
+                                        $toolsData = $toolArray['data']['tools'] ?? $toolArray['tools'] ?? [];
+                                        if (is_array($toolsData)) {
+                                            foreach ($toolsData as $t) {
+                                                $n = $t['name'] ?? null;
+                                                if (is_string($n) && $n !== '') { $requestedTools[] = $n; }
+                                            }
+                                        }
+                                    }
+
+                                    $requestedTools = array_values(array_unique($requestedTools));
                                     if (!empty($requestedTools)) {
                                         $openAiService->loadToolsDynamically($requestedTools);
                                         $sendEvent('openai.event', [
                                             'event' => 'server.tools.loaded',
-                                            'preview' => ['count' => count($requestedTools)],
-                                            'raw' => json_encode(['tools' => $requestedTools], JSON_UNESCAPED_UNICODE),
+                                            'preview' => [
+                                                'count' => count($requestedTools),
+                                                'mode' => (!empty($module) ? 'module' : 'page'),
+                                                'module' => is_string($module) ? $module : null,
+                                            ],
+                                            'raw' => json_encode([
+                                                'mode' => (!empty($module) ? 'module' : 'page'),
+                                                'module' => is_string($module) ? $module : null,
+                                                'tools' => $requestedTools,
+                                            ], JSON_UNESCAPED_UNICODE),
                                         ]);
                                     }
                                 }
