@@ -111,6 +111,12 @@ trait HasStandardGetOperations
             $field = $filter['field'];
             $op = $filter['op'];
             $value = $filter['value'] ?? null;
+
+            // Robustness: is_null / is_not_null should never depend on 'value'.
+            // Models sometimes send value=1 accidentally; ignore it to avoid confusion.
+            if (in_array($op, ['is_null', 'is_not_null'], true)) {
+                $value = null;
+            }
             
             // Security: Nur erlaubte Felder (wenn angegeben)
             if (!empty($allowedFields) && !in_array($field, $allowedFields)) {

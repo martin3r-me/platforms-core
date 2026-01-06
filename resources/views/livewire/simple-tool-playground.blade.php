@@ -208,6 +208,8 @@
 
         /** type: {role:'user'|'assistant', content:string}[] */
         let messages = [];
+        /** continuation state for interrupted tool-loops */
+        let continuation = null;
         let inFlight = false;
         let selectedModel = localStorage.getItem('simple.selectedModel') || '';
 
@@ -547,12 +549,24 @@
         form.addEventListener('submit', async (e) => {
           e.preventDefault();
           const text = (input.value || '').trim();
-          if (!text || inFlight) return;
+          if (inFlight) return;
+
+          const canContinue = !!(continuation && continuation.pending);
+          const isContinue = (!text && canContinue);
+          if (!text && !isContinue) return;
+          if (text && canContinue) {
+            // Avoid mixing "continue tool-loop" with a new user instruction.
+            messages.push({ role: 'assistant', content: '⚠️ Es gibt noch einen laufenden Prozess. Bitte zuerst einmal mit leerer Eingabe fortsetzen (Enter), danach kannst du die nächste Frage senden.' });
+            renderMessage('assistant', '⚠️ Es gibt noch einen laufenden Prozess. Bitte zuerst einmal mit leerer Eingabe fortsetzen (Enter), danach kannst du die nächste Frage senden.');
+            return;
+          }
 
           // UI + local state
-          messages.push({ role: 'user', content: text });
-          renderMessage('user', text);
-          input.value = '';
+          if (!isContinue) {
+            messages.push({ role: 'user', content: text });
+            renderMessage('user', text);
+            input.value = '';
+          }
           inFlight = true;
           sendBtn.disabled = true;
           input.disabled = true;
@@ -564,7 +578,7 @@
           debugState.startedAt = new Date().toISOString();
 
           // Request payload = full conversation history + new message already included
-          const payload = { message: text, chat_history: messages.slice(0, -1), model: selectedModel || null };
+          const payload = { message: (isContinue ? '' : text), chat_history: messages.slice(0, -1), model: selectedModel || null, continuation: (isContinue ? continuation : null) };
           debugState.payload = payload;
           updateDebugDump();
 
@@ -702,6 +716,8 @@
                     const assistant = data?.assistant || rtAssistant.textContent;
                     messages.push({ role: 'assistant', content: assistant });
                     renderMessage('assistant', assistant);
+                    // Save continuation state (if the server ended mid tool-loop)
+                    continuation = data?.continuation || null;
                     rtStatus.textContent = 'done';
                     rtEvent({ key: 'client.complete' });
                     updateDebugDump();

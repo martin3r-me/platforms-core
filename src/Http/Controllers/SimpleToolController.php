@@ -261,9 +261,13 @@ class SimpleToolController extends Controller
 
                 try {
                     $request->validate([
-                        'message' => 'required|string',
+                        // message can be empty when continuing an interrupted tool-loop
+                        'message' => 'nullable|string',
                         'chat_history' => 'nullable|array', // Conversation-Historie
                         'model' => 'nullable|string',
+                        'continuation' => 'nullable|array',
+                        'continuation.previous_response_id' => 'nullable|string',
+                        'continuation.next_input' => 'nullable|array',
                     ]);
                 } catch (\Throwable $e) {
                     $sendEvent('error', [
@@ -272,12 +276,13 @@ class SimpleToolController extends Controller
                     return;
                 }
 
-                $userMessage = $request->input('message');
+                $userMessage = (string) ($request->input('message') ?? '');
                 $chatHistory = $request->input('chat_history', []);
                 // Simple Playground: fixed model for now (explicit user request)
                 $model = 'gpt-5.2';
 
                 // (Request model is ignored)
+                $continuation = $request->input('continuation', null);
                 
                 // Services
                 $openAiService = app(OpenAiService::class);
@@ -314,10 +319,12 @@ class SimpleToolController extends Controller
                 }
                 
                 // Füge neue User-Message hinzu
-                $messages[] = [
-                    'role' => 'user',
-                    'content' => $userMessage,
-                ];
+                if (trim($userMessage) !== '') {
+                    $messages[] = [
+                        'role' => 'user',
+                        'content' => $userMessage,
+                    ];
+                }
 
                 $sendEvent('start', ['message' => '🚀 Starte...']);
 
@@ -328,8 +335,19 @@ class SimpleToolController extends Controller
                 $maxToolExecutions = 60;
                 $toolExecutionCount = 0;
                 $debugEventCount = 0;
+                // Continuation support (for "max iterations reached" recovery):
+                // If the previous request ended mid tool-loop, we can continue from the last response id
+                // and the prepared next input (tool outputs).
                 $previousResponseId = null;
-                $messagesForApi = $messages; // iteration 1: full conversation input
+                $messagesForApi = $messages; // iteration 1 default: full conversation input
+                $continuationPrev = is_array($continuation) ? ($continuation['previous_response_id'] ?? null) : null;
+                $continuationNext = is_array($continuation) ? ($continuation['next_input'] ?? null) : null;
+                if (is_string($continuationPrev) && $continuationPrev !== '') {
+                    $previousResponseId = $continuationPrev;
+                    if (is_array($continuationNext) && !empty($continuationNext)) {
+                        $messagesForApi = $continuationNext;
+                    }
+                }
                 $toolResultCache = []; // per-request cache: canonical+args -> ToolResult payload
                 $stableNormalize = function($v) use (&$stableNormalize) {
                     if (is_array($v)) {
@@ -581,6 +599,7 @@ class SimpleToolController extends Controller
                             'reasoning' => $reasoning,
                             'thinking' => $thinking,
                             'chat_history' => $messages,
+                            'continuation' => null,
                         ]);
                         return;
                     }
@@ -753,6 +772,12 @@ class SimpleToolController extends Controller
                     'reasoning' => null,
                     'thinking' => null,
                     'chat_history' => $messages,
+                    // Allow the client to continue seamlessly (no restart) using previous_response_id + next_input.
+                    'continuation' => [
+                        'pending' => true,
+                        'previous_response_id' => $previousResponseId,
+                        'next_input' => $messagesForApi,
+                    ],
                 ]);
                 return;
 
