@@ -590,7 +590,14 @@
                         headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream', 'X-CSRF-TOKEN': csrf },
               body: JSON.stringify(payload),
             });
-            if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+            rtEvent({ key: 'client.fetch.response', preview: { status: res.status, ok: res.ok } });
+            if (!res.ok || !res.body) {
+              const ct = res.headers?.get?.('content-type') || '';
+              let bodyText = '';
+              try { bodyText = await res.text(); } catch { bodyText = ''; }
+              const snippet = (bodyText || '').slice(0, 800);
+              throw new Error(`HTTP ${res.status} ${res.statusText || ''} ${ct ? `(${ct})` : ''}${snippet ? `\n\n${snippet}` : ''}`.trim());
+            }
 
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
@@ -740,11 +747,19 @@
               }
             }
           } catch (err) {
+            const name = err?.name || '';
             const msg = err?.message || String(err);
-            messages.push({ role: 'assistant', content: `❌ Fehler: ${msg}` });
-            renderMessage('assistant', `❌ Fehler: ${msg}`);
+            const online = (typeof navigator !== 'undefined' && 'onLine' in navigator) ? navigator.onLine : null;
+            const hint =
+              (name === 'TypeError' && msg && msg.toLowerCase().includes('load failed'))
+                ? `\n\nHinweis: Das ist ein Browser/Netzwerk-Fehler (Fetch hat keine HTTP-Response bekommen). Prüfe DevTools → Network/Console. URL: ${url}${online === false ? '\nBrowser ist offline.' : ''}`
+                : '';
+
+            const full = `${name ? `${name}: ` : ''}${msg}${hint}`;
+            messages.push({ role: 'assistant', content: `❌ Fehler: ${full}` });
+            renderMessage('assistant', `❌ Fehler: ${full}`);
             rtStatus.textContent = 'error';
-            rtEvent({ key: 'client.error', preview: { error: msg } });
+            rtEvent({ key: 'client.error', preview: { error: full } });
           } finally {
             inFlight = false;
             sendBtn.disabled = false;
