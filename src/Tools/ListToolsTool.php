@@ -29,7 +29,7 @@ class ListToolsTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'GET /tools - Listet verfügbare Tools auf. WICHTIG: Standardmäßig werden ALLE Tools angezeigt (GET, POST, PUT, DELETE). Tools folgen REST-Pattern: module.entity.GET (Lesen), module.entity.POST (Erstellen), module.entity.PUT (Aktualisieren), module.entity.DELETE (Löschen). REST-Parameter: module (optional, string) - Filter nach Modul (z.B. "planner" zeigt alle planner.* Tools). read_only (optional, boolean) - Nur für Exploration: true = nur GET-Tools, false = nur POST/PUT/DELETE. Wenn nicht angegeben, werden ALLE Tools angezeigt. search (optional, string) - Suchbegriff.';
+        return 'GET /tools - Listet verfügbare Tools auf. WICHTIG: Standardmäßig werden ALLE Tools angezeigt (GET, POST, PUT, DELETE). Tools folgen REST-Pattern: module.entity.GET (Lesen), module.entity.POST (Erstellen), module.entity.PUT (Aktualisieren), module.entity.DELETE (Löschen). REST-Parameter: module (optional, string) - Filter nach Modul (z.B. "planner" zeigt alle planner.* Tools). read_only (optional, boolean) - Wenn true: nur Lese-Tools (GET). Wenn false oder nicht gesetzt: keine Einschränkung (alle Tools). write_only (optional, boolean) - Wenn true: nur Schreib-Tools (POST, PUT, DELETE). search (optional, string) - Suchbegriff.';
     }
 
     public function getSchema(): array
@@ -43,7 +43,11 @@ class ListToolsTool implements ToolContract
                 ],
                 'read_only' => [
                     'type' => 'boolean',
-                    'description' => 'Optional: Nur für Exploration. true = nur Lese-Tools (GET), false = nur Schreib-Tools (POST, PUT, DELETE). WICHTIG: Wenn nicht angegeben, werden standardmäßig ALLE Tools angezeigt (GET, POST, PUT, DELETE). Nutze diesen Filter nur, wenn du explizit nur lesen oder nur schreiben willst.',
+                    'description' => 'Optional: Wenn true, werden nur Lese-Tools (GET) gelistet. Wenn false oder nicht gesetzt, erfolgt KEIN read_only-Filter (alle Tools). Für „nur schreiben“ nutze write_only=true.',
+                ],
+                'write_only' => [
+                    'type' => 'boolean',
+                    'description' => 'Optional: Wenn true, werden nur Schreib-Tools (POST, PUT, DELETE) gelistet. Nicht zusammen mit read_only=true verwenden.',
                 ],
                 'search' => [
                     'type' => 'string',
@@ -86,13 +90,28 @@ class ListToolsTool implements ToolContract
                 $moduleFilterApplied = true;
             }
             
-            // 2. Read-Only Filter (GET = read-only, POST/PUT/DELETE = write)
-            if (isset($arguments['read_only'])) {
-                $readOnly = (bool)$arguments['read_only'];
-                $filteredTools = array_filter($filteredTools, function($tool) use ($readOnly) {
-                    $toolName = $tool->getName();
-                    $isReadOnly = str_ends_with($toolName, '.GET');
-                    return $readOnly ? $isReadOnly : !$isReadOnly;
+            // 2. Read/Write Filter (explizit, "false" sollte NICHT versehentlich alles herausfiltern)
+            $readOnlyRequested = array_key_exists('read_only', $arguments) ? $arguments['read_only'] : null;
+            $writeOnlyRequested = array_key_exists('write_only', $arguments) ? $arguments['write_only'] : null;
+
+            if ($readOnlyRequested === true && $writeOnlyRequested === true) {
+                return \Platform\Core\Contracts\ToolResult::error(
+                    'INVALID_ARGUMENT',
+                    'Ungültige Filter: read_only=true und write_only=true schließen sich aus.'
+                );
+            }
+
+            // read_only=true => nur GET. read_only=false => kein Filter (wie "nicht gesetzt").
+            if ($readOnlyRequested === true) {
+                $filteredTools = array_filter($filteredTools, function($tool) {
+                    return str_ends_with($tool->getName(), '.GET');
+                });
+            }
+
+            // write_only=true => nur POST/PUT/DELETE
+            if ($writeOnlyRequested === true) {
+                $filteredTools = array_filter($filteredTools, function($tool) {
+                    return !str_ends_with($tool->getName(), '.GET');
                 });
             }
             
@@ -129,7 +148,7 @@ class ListToolsTool implements ToolContract
             
             // Ergebnis zusammenstellen
             $allToolsCount = count($this->registry->all());
-            $hasFilters = !empty($module) || isset($arguments['read_only']) || !empty($searchTerm);
+            $hasFilters = !empty($module) || ($readOnlyRequested !== null) || ($writeOnlyRequested !== null) || !empty($searchTerm);
             
             // --- Modul/Entitäten-Übersicht (kompakt) ---
             // Ziel: Das LLM versteht schnell "welche Entitäten gibt es in Modul X und welche Operationen",
@@ -206,16 +225,16 @@ class ListToolsTool implements ToolContract
                     $normalizedName = str_replace(['.', '_', '-'], '', $name);
                     $matchesSearch = str_contains($normalizedName, $normalizedTerm) || str_contains($description, $term);
                     
-                    // Read-Only Filter anwenden, falls vorhanden
-                    if (isset($arguments['read_only'])) {
-                        $readOnly = (bool)$arguments['read_only'];
-                        $isReadOnly = str_ends_with($tool->getName(), '.GET');
-                        if ($readOnly && !$isReadOnly) {
-                            return false;
-                        }
-                        if (!$readOnly && $isReadOnly) {
-                            return false;
-                        }
+                    // Read/Write Filter anwenden (nur wenn explizit true gesetzt)
+                    $readOnlyRequested = array_key_exists('read_only', $arguments) ? $arguments['read_only'] : null;
+                    $writeOnlyRequested = array_key_exists('write_only', $arguments) ? $arguments['write_only'] : null;
+                    $isReadOnly = str_ends_with($tool->getName(), '.GET');
+
+                    if ($readOnlyRequested === true && !$isReadOnly) {
+                        return false;
+                    }
+                    if ($writeOnlyRequested === true && $isReadOnly) {
+                        return false;
                     }
                     
                     return $matchesSearch;
@@ -236,7 +255,8 @@ class ListToolsTool implements ToolContract
             if ($hasFilters) {
                 $result['filters'] = array_filter([
                     'module' => $module,
-                    'read_only' => $arguments['read_only'] ?? null,
+                    'read_only' => $readOnlyRequested,
+                    'write_only' => $writeOnlyRequested,
                     'search' => $searchTerm,
                 ], fn($v) => $v !== null && $v !== '');
             }
