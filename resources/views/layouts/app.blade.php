@@ -38,6 +38,7 @@
     @livewire('core.modal-pricing')
     @livewire('comms.comms-modal')
     @livewire('core.modal-modules')
+    @livewire('core.modal-simple-tool-playground')
     @livewire('organization.modal-organization')
     @livewire('core.modal-tagging')
     @livewire('core.modal-files')

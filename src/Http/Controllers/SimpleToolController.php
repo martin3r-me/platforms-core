@@ -300,6 +300,10 @@ class SimpleToolController extends Controller
                         'message' => 'nullable|string',
                         'chat_history' => 'nullable|array', // Conversation-Historie
                         'model' => 'nullable|string',
+                        'context' => 'nullable|array',
+                        'context.source_route' => 'nullable|string',
+                        'context.source_module' => 'nullable|string',
+                        'context.source_url' => 'nullable|string',
                         'continuation' => 'nullable|array',
                         'continuation.previous_response_id' => 'nullable|string',
                         'continuation.next_input' => 'nullable|array',
@@ -318,6 +322,21 @@ class SimpleToolController extends Controller
 
                 // (Request model is ignored)
                 $continuation = $request->input('continuation', null);
+
+                // Terminal-Kontext (wird vom UI mitgeschickt, z.B. source_route/source_module/source_url)
+                $clientContext = $request->input('context', null);
+                $clientContext = is_array($clientContext) ? $clientContext : null;
+
+                $routeName = $request->route()?->getName();
+                $routeModule = (is_string($routeName) && str_contains($routeName, '.')) ? strstr($routeName, '.', true) : null;
+                $sourceRoute = is_string($clientContext['source_route'] ?? null) ? $clientContext['source_route'] : $routeName;
+                $sourceModule = is_string($clientContext['source_module'] ?? null) ? $clientContext['source_module'] : $routeModule;
+                $sourceUrl = is_string($clientContext['source_url'] ?? null) ? $clientContext['source_url'] : $request->fullUrl();
+                $sendEvent('debug.context', [
+                    'source_route' => $sourceRoute,
+                    'source_module' => $sourceModule,
+                    'source_url' => $sourceUrl,
+                ]);
                 
                 // Services
                 $openAiService = app(OpenAiService::class);
@@ -512,6 +531,9 @@ class SimpleToolController extends Controller
                                 'include_web_search' => true,
                                 'max_tokens' => 2000,
                                 'with_context' => false,
+                                    // Parität zum Terminal: Kontext wird mitgeführt (ohne Auto-Injection).
+                                    'source_route' => $sourceRoute,
+                                    'source_module' => $sourceModule,
                                 'previous_response_id' => $previousResponseId,
                                 'reasoning' => [
                                     'effort' => 'medium',
