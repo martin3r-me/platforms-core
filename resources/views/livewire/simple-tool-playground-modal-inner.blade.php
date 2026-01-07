@@ -1,4 +1,4 @@
-<div class="h-full flex gap-4">
+<div class="h-[calc(100vh-6rem)] flex gap-4">
     {{-- Left: Model selection --}}
     <div class="w-80 flex-shrink-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden">
         <div class="p-4 space-y-4 h-full overflow-y-auto">
@@ -343,6 +343,19 @@
           if (modelSelect && selectedModel) modelSelect.value = selectedModel;
         };
 
+        // DropZone: accept drag&drop model selection (same behavior as the page playground)
+        if (modelDropZone) {
+          modelDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            try { e.dataTransfer.dropEffect = 'copy'; } catch (_) {}
+          });
+          modelDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const id = (e.dataTransfer && e.dataTransfer.getData) ? e.dataTransfer.getData('text/plain') : '';
+            if (id) setSelectedModel(id);
+          });
+        }
+
         const renderModels = (models) => {
           if (!Array.isArray(models)) models = [];
           if (modelSelect) {
@@ -365,7 +378,10 @@
               row.addEventListener('dblclick', () => setSelectedModel(m));
               row.querySelector('button')?.addEventListener('click', () => setSelectedModel(m));
               row.addEventListener('dragstart', (e) => {
-                try { e.dataTransfer.setData('text/plain', m); } catch (_) {}
+                try {
+                  e.dataTransfer.setData('text/plain', m);
+                  e.dataTransfer.effectAllowed = 'copy';
+                } catch (_) {}
               });
               modelsList.appendChild(row);
             }
