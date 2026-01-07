@@ -1,12 +1,11 @@
-<div class="h-[calc(100vh-6rem)] flex gap-4">
-    {{-- Left: Model selection --}}
-    <div class="w-80 flex-shrink-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden">
-        <div class="p-4 space-y-4 h-full overflow-y-auto">
-            <div class="flex items-center justify-between">
-                <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model</div>
-                <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
-            </div>
-
+<div class="h-full min-h-0 overflow-hidden grid grid-cols-[20rem_1fr_20rem] gap-4">
+    {{-- Left: Model selection (independent scroll) --}}
+    <div class="min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+        <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
+            <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model</div>
+            <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
+        </div>
+        <div class="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto">
             <div>
                 <div class="text-xs text-[var(--ui-muted)] mb-1">Ausgewählt (Drop Zone)</div>
                 <div id="modelDropZone" class="min-h-[44px] px-3 py-2 rounded border border-dashed border-[var(--ui-border)] bg-[var(--ui-bg)] text-sm">
@@ -22,14 +21,14 @@
 
             <div class="pt-2 border-t border-[var(--ui-border)]">
                 <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] mb-2">Verfügbare Models</div>
-                <div id="modelsList" class="space-y-2 max-h-[calc(80vh-22rem)] overflow-y-auto pr-1"></div>
+                <div id="modelsList" class="space-y-2 overflow-y-auto pr-1"></div>
             </div>
         </div>
     </div>
 
-    {{-- Center: Chat --}}
-    <div class="flex-1 min-w-0 flex flex-col">
-        <div class="flex items-center justify-between mb-2">
+    {{-- Center: Chat (independent scroll + input pinned to bottom) --}}
+    <div class="min-h-0 flex flex-col">
+        <div class="px-4 py-3 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] flex items-center justify-between flex-shrink-0">
             <div class="text-xs text-[var(--ui-muted)]">
                 Kontext: <span id="pgContextLabel" class="text-[var(--ui-secondary)]">—</span>
             </div>
@@ -38,40 +37,43 @@
             </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-4 space-y-4 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)]" id="chatScroll">
-            <div id="chatList" class="space-y-4"></div>
+        <div class="mt-3 flex-1 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+            <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
+                <div id="chatList" class="space-y-4"></div>
+            </div>
+            <div class="border-t border-[var(--ui-border)]/60 p-3 flex-shrink-0 bg-[var(--ui-surface)]">
+                <form id="chatForm" class="flex gap-2" method="post" action="javascript:void(0)" onsubmit="return false;">
+                    <input
+                        id="chatInput"
+                        type="text"
+                        class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                        placeholder="Nachricht eingeben…"
+                        autocomplete="off"
+                    />
+                    <button id="chatSend" type="submit" class="px-6 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90">
+                        Senden
+                    </button>
+                </form>
+            </div>
         </div>
-
-        <form id="chatForm" class="mt-4 flex gap-2" method="post" action="javascript:void(0)" onsubmit="return false;">
-            <input
-                id="chatInput"
-                type="text"
-                class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                placeholder="Nachricht eingeben…"
-                autocomplete="off"
-            />
-            <button id="chatSend" type="submit" class="px-6 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90">
-                Senden
-            </button>
-        </form>
     </div>
 
-    {{-- Right: Realtime / Debug --}}
-    <div class="w-80 flex-shrink-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden">
-        <div class="p-4 space-y-4 h-full overflow-y-auto">
-            <div class="flex items-center justify-between">
-                <div class="text-xs text-[var(--ui-muted)]">
-                    Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <label class="text-xs text-[var(--ui-muted)] inline-flex items-center gap-2 select-none">
-                        <input id="rtVerbose" type="checkbox" class="accent-[var(--ui-primary)]" />
-                        verbose
-                    </label>
-                    <button id="realtimeClear" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Clear</button>
-                </div>
+    {{-- Right: Realtime / Debug (independent scroll) --}}
+    <div class="min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+        <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
+            <div class="text-xs text-[var(--ui-muted)]">
+                Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
             </div>
+            <div class="flex items-center gap-2">
+                <label class="text-xs text-[var(--ui-muted)] inline-flex items-center gap-2 select-none">
+                    <input id="rtVerbose" type="checkbox" class="accent-[var(--ui-primary)]" />
+                    verbose
+                </label>
+                <button id="realtimeClear" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Clear</button>
+            </div>
+        </div>
 
+        <div class="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto">
             <div>
                 <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Assistant (live)</div>
                 <pre id="rtAssistant" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[80px] max-h-[22vh] overflow-y-auto"></pre>
@@ -155,6 +157,8 @@
     <script>
       (() => {
         const boot = () => {
+        if (window.__simplePlaygroundModalBooted) return;
+        window.__simplePlaygroundModalBooted = true;
         const url = window.__simpleStreamUrl;
         const modelsUrl = window.__simpleModelsUrl;
         const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
