@@ -1,5 +1,7 @@
 <div>
-    <x-ui-modal size="2xl" :hideFooter="true" wire:model="open" :closeButton="true">
+    {{-- "full" gives us near-fullscreen space (outer container still has p-4 margin).
+         We explicitly hide the footer so no "Abbrechen" button appears. --}}
+    <x-ui-modal size="full" hideFooter="1" wire:model="open" :closeButton="true">
         <x-slot name="header">
             <div class="flex items-center gap-3">
                 <div class="flex-shrink-0">

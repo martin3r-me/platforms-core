@@ -24,7 +24,7 @@
     <div class="flex-1 min-h-0 overflow-hidden p-4">
     <div x-show="tab==='chat'" class="h-full min-h-0 grid grid-cols-12 gap-4" x-cloak>
     {{-- Left: Model selection (independent scroll) --}}
-        <div class="col-span-3 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+        <div class="col-span-12 lg:col-span-2 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
             <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                 <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model</div>
                 <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
@@ -46,7 +46,7 @@
         </div>
 
     {{-- Center: Chat (independent scroll + input pinned to bottom) --}}
-    <div x-show="tab==='chat'" class="col-span-6 min-h-0 flex flex-col" x-cloak>
+    <div x-show="tab==='chat'" class="col-span-12 lg:col-span-8 min-h-0 flex flex-col" x-cloak>
         <div class="flex-1 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
             <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
                 <div id="chatList" class="space-y-4"></div>
@@ -70,7 +70,7 @@
     </div>
 
     {{-- Right: Realtime / Debug (independent scroll) --}}
-    <div class="col-span-3 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+    <div class="col-span-12 lg:col-span-2 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
             <div class="text-xs text-[var(--ui-muted)]">
                 Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
@@ -251,7 +251,7 @@
           const wrap = document.createElement('div');
           wrap.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
           wrap.innerHTML = `
-            <div class="max-w-3xl rounded-lg p-3 ${role === 'user' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-surface)] border border-[var(--ui-border)]'}">
+            <div class="max-w-4xl rounded-lg p-3 ${role === 'user' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-surface)] border border-[var(--ui-border)]'}">
               <div class="text-sm font-semibold mb-1">${role === 'user' ? 'Du' : 'Assistant'}</div>
               <div class="whitespace-pre-wrap"></div>
             </div>
