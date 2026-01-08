@@ -22,9 +22,9 @@
     </div>
 
     <div class="flex-1 min-h-0 overflow-hidden p-4">
-    <div x-show="tab==='chat'" class="h-full min-h-0 grid grid-cols-12 gap-4" x-cloak>
+    <div x-show="tab==='chat'" class="h-full min-h-0 grid grid-cols-12 gap-5" x-cloak>
     {{-- Left: Model selection (independent scroll) --}}
-        <div class="col-span-12 lg:col-span-2 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+        <div class="col-span-12 lg:col-span-3 min-h-0 min-w-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
             <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                 <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model</div>
                 <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
@@ -46,10 +46,17 @@
         </div>
 
     {{-- Center: Chat (independent scroll + input pinned to bottom) --}}
-    <div x-show="tab==='chat'" class="col-span-12 lg:col-span-8 min-h-0 flex flex-col" x-cloak>
+    <div x-show="tab==='chat'" class="col-span-12 lg:col-span-6 min-h-0 min-w-0 flex flex-col" x-cloak>
         <div class="flex-1 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
             <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
                 <div id="chatList" class="space-y-4"></div>
+                <div id="chatEmpty" class="text-sm text-[var(--ui-muted)]">
+                    <div class="font-semibold text-[var(--ui-secondary)]">Start</div>
+                    <div class="mt-1">Schreib eine Nachricht (z. B. „Liste meine Teams“ oder „Welche Tools kann ich im OKR-Modul nutzen?“).</div>
+                    <div class="mt-3 text-xs">
+                        Tipp: Links kannst du Models per Drag&Drop wählen, und direkt neben dem Input pro Request wechseln.
+                    </div>
+                </div>
             </div>
             <div class="border-t border-[var(--ui-border)]/60 p-3 flex-shrink-0 bg-[var(--ui-surface)]">
                 <form id="chatForm" class="flex gap-2 items-center" method="post" action="javascript:void(0)" onsubmit="return false;">
@@ -70,7 +77,7 @@
     </div>
 
     {{-- Right: Realtime / Debug (independent scroll) --}}
-    <div class="col-span-12 lg:col-span-2 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+    <div class="col-span-12 lg:col-span-3 min-h-0 min-w-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
             <div class="text-xs text-[var(--ui-muted)]">
                 Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
@@ -258,6 +265,8 @@
           `;
           wrap.querySelector('.whitespace-pre-wrap').textContent = content;
           chatList.appendChild(wrap);
+          const empty = document.getElementById('chatEmpty');
+          if (empty) empty.style.display = 'none';
           scrollToBottom();
         };
 
