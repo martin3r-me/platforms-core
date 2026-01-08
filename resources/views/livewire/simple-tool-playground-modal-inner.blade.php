@@ -21,9 +21,10 @@
         </div>
     </div>
 
-    <div class="flex-1 min-h-0 overflow-hidden grid grid-cols-12 gap-4 p-4">
+    <div class="flex-1 min-h-0 overflow-hidden p-4">
+    <div x-show="tab==='chat'" class="h-full min-h-0 grid grid-cols-12 gap-4" x-cloak>
     {{-- Left: Model selection (independent scroll) --}}
-    <div x-show="tab==='settings'" class="col-span-3 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col" x-cloak>
+    <div x-show="tab==='settings'" class="hidden" x-cloak></div>
         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
             <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model</div>
             <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
@@ -45,7 +46,7 @@
     </div>
 
     {{-- Center: Chat (independent scroll + input pinned to bottom) --}}
-    <div x-show="tab==='chat'" class="col-span-6 min-h-0 flex flex-col" x-cloak>
+    <div x-show="tab==='chat'" class="col-span-8 min-h-0 flex flex-col" x-cloak>
         <div class="flex-1 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
             <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
                 <div id="chatList" class="space-y-4"></div>
@@ -69,7 +70,7 @@
     </div>
 
     {{-- Right: Realtime / Debug (independent scroll) --}}
-    <div class="col-span-3 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+    <div class="col-span-4 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
             <div class="text-xs text-[var(--ui-muted)]">
                 Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
@@ -159,8 +160,43 @@
                 </div>
                 <textarea id="rtDebugDump" class="w-full text-[10px] leading-snug whitespace-pre border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[90px] max-h-[18vh] overflow-y-auto" readonly></textarea>
                 <div id="rtCopyStatus" class="mt-1 text-[10px] text-[var(--ui-muted)]"></div>
+    </div>
+    </div>
+
+    <div x-show="tab==='settings'" class="h-full min-h-0 grid grid-cols-12 gap-4" x-cloak>
+        <div class="col-span-5 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+            <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
+                <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model</div>
+                <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
+            </div>
+            <div class="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto">
+                <div>
+                    <div class="text-xs text-[var(--ui-muted)] mb-1">Ausgewählt (Drop Zone)</div>
+                    <div id="modelDropZone" class="min-h-[44px] px-3 py-2 rounded border border-dashed border-[var(--ui-border)] bg-[var(--ui-bg)] text-sm">
+                        <span id="selectedModelLabel" class="text-[var(--ui-secondary)]">—</span>
+                    </div>
+                    <div class="mt-2 text-xs text-[var(--ui-muted)]">Drag ein Model aus der Liste hier rein (oder Doppelklick).</div>
+                </div>
+
+                <div class="pt-2 border-t border-[var(--ui-border)]">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] mb-2">Verfügbare Models</div>
+                    <div id="modelsList" class="space-y-2 overflow-y-auto pr-1"></div>
+                </div>
             </div>
         </div>
+
+        <div class="col-span-7 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+            <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
+                <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Settings</div>
+            </div>
+            <div class="p-4 flex-1 min-h-0 overflow-y-auto text-sm text-[var(--ui-muted)] space-y-3">
+                <div><span class="font-semibold text-[var(--ui-secondary)]">Pro Request Model:</span> im Chat links neben dem Input.</div>
+                <div><span class="font-semibold text-[var(--ui-secondary)]">SSE/Debug:</span> bleibt rechts im Chat-Tab sichtbar.</div>
+                <div class="text-xs">Hinweis: Wenn du willst, kann ich Debug/Events auch in den Settings-Tab verschieben und den Chat-Tab „cleaner“ machen.</div>
+            </div>
+        </div>
+    </div>
+    </div>
     </div>
     </div>
 
@@ -605,6 +641,25 @@
           if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
         });
       };
+
+      // Expose boot for modal-open refresh (Livewire opens modal after initial page load)
+      window.__simplePlaygroundBoot = boot;
+
+      if (!window.__simplePlaygroundModalOpenBound) {
+        window.__simplePlaygroundModalOpenBound = true;
+        window.addEventListener('simple-playground-modal-opened', () => {
+          try {
+            // Re-run boot to bind if the DOM was not present during initial boot
+            if (typeof window.__simplePlaygroundBoot === 'function') window.__simplePlaygroundBoot();
+          } catch (_) {}
+
+          // Ensure models are visible immediately without user clicking reload
+          try {
+            const reloadBtn = document.getElementById('modelsReload');
+            if (reloadBtn) reloadBtn.click();
+          } catch (_) {}
+        });
+      }
 
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', boot);

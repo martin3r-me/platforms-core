@@ -18,6 +18,10 @@ class ModalSimpleToolPlayground extends Component
         $ctx = $payload['context'] ?? $payload['terminal_context'] ?? null;
         $this->context = is_array($ctx) ? $ctx : null;
         $this->open = true;
+
+        // Ensure the client-side playground initializes AFTER the modal is open and context is rendered.
+        // (DOMContentLoaded might have happened long before; modal is opened later.)
+        $this->dispatch('simple-playground-modal-opened');
     }
 
     public function render()

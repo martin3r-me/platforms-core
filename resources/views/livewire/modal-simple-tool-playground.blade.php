@@ -1,5 +1,5 @@
 <div>
-    <x-ui-modal size="full" :hideFooter="true" wire:model="open" :closeButton="true">
+    <x-ui-modal size="2xl" :hideFooter="true" wire:model="open" :closeButton="true">
         <x-slot name="header">
             <div class="flex items-center gap-3">
                 <div class="flex-shrink-0">
@@ -26,7 +26,7 @@
             window.__simplePlaygroundContext = @json($context);
         </script>
 
-        <div class="h-full min-h-0 overflow-hidden">
+        <div class="h-[90vh] min-h-0 overflow-hidden">
             @include('platform::livewire.simple-tool-playground-modal-inner')
         </div>
     </x-ui-modal>
