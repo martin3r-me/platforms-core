@@ -1,6 +1,29 @@
-<div class="h-full min-h-0 overflow-hidden grid grid-cols-12 gap-4">
+<div x-data="{ tab: 'chat' }" class="h-full min-h-0 overflow-hidden flex flex-col">
+    <div class="flex items-center gap-2 px-4 py-3 border-b border-[var(--ui-border)]/60 bg-[var(--ui-surface)] flex-shrink-0">
+        <button type="button"
+            @click="tab='chat'"
+            class="px-3 py-1.5 rounded-md text-sm border transition"
+            :class="tab==='chat' ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)] border-[var(--ui-primary)]/30' : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'">
+            Chat
+        </button>
+        <button type="button"
+            @click="tab='settings'"
+            class="px-3 py-1.5 rounded-md text-sm border transition"
+            :class="tab==='settings' ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)] border-[var(--ui-primary)]/30' : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'">
+            Settings
+        </button>
+        <div class="flex-1"></div>
+        <div class="text-xs text-[var(--ui-muted)] truncate">
+            Kontext: <span id="pgContextLabel" class="text-[var(--ui-secondary)]">—</span>
+        </div>
+        <div class="text-xs text-[var(--ui-muted)] ml-3">
+            Stream: <span id="rtStatus" class="text-[var(--ui-secondary)]">idle</span>
+        </div>
+    </div>
+
+    <div class="flex-1 min-h-0 overflow-hidden grid grid-cols-12 gap-4 p-4">
     {{-- Left: Model selection (independent scroll) --}}
-    <div class="col-span-3 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+    <div x-show="tab==='settings'" class="col-span-3 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col" x-cloak>
         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
             <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model</div>
             <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
@@ -14,11 +37,6 @@
                 <div class="mt-2 text-xs text-[var(--ui-muted)]">Drag ein Model aus der Liste hier rein (oder Doppelklick).</div>
             </div>
 
-            <div>
-                <div class="text-xs text-[var(--ui-muted)] mb-1">Fallback Dropdown</div>
-                <select id="modelSelect" class="w-full px-3 py-2 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-sm"></select>
-            </div>
-
             <div class="pt-2 border-t border-[var(--ui-border)]">
                 <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] mb-2">Verfügbare Models</div>
                 <div id="modelsList" class="space-y-2 overflow-y-auto pr-1"></div>
@@ -27,22 +45,14 @@
     </div>
 
     {{-- Center: Chat (independent scroll + input pinned to bottom) --}}
-    <div class="col-span-6 min-h-0 flex flex-col">
-        <div class="px-4 py-3 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] flex items-center justify-between flex-shrink-0">
-            <div class="text-xs text-[var(--ui-muted)]">
-                Kontext: <span id="pgContextLabel" class="text-[var(--ui-secondary)]">—</span>
-            </div>
-            <div class="text-xs text-[var(--ui-muted)]">
-                Stream: <span id="rtStatus" class="text-[var(--ui-secondary)]">idle</span>
-            </div>
-        </div>
-
-        <div class="mt-3 flex-1 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+    <div x-show="tab==='chat'" class="col-span-6 min-h-0 flex flex-col" x-cloak>
+        <div class="flex-1 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
             <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
                 <div id="chatList" class="space-y-4"></div>
             </div>
             <div class="border-t border-[var(--ui-border)]/60 p-3 flex-shrink-0 bg-[var(--ui-surface)]">
-                <form id="chatForm" class="flex gap-2" method="post" action="javascript:void(0)" onsubmit="return false;">
+                <form id="chatForm" class="flex gap-2 items-center" method="post" action="javascript:void(0)" onsubmit="return false;">
+                    <select id="modelSelect" class="w-48 px-3 py-2 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-sm"></select>
                     <input
                         id="chatInput"
                         type="text"
@@ -151,6 +161,7 @@
                 <div id="rtCopyStatus" class="mt-1 text-[10px] text-[var(--ui-muted)]"></div>
             </div>
         </div>
+    </div>
     </div>
 
     @verbatim
