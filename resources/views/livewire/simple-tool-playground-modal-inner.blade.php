@@ -1,4 +1,4 @@
-<div x-data="{ tab: 'chat' }" class="h-full min-h-0 overflow-hidden flex flex-col">
+<div x-data="{ tab: 'chat' }" class="w-full h-full min-h-0 overflow-hidden flex flex-col">
     <div class="flex items-center gap-2 px-4 py-3 border-b border-[var(--ui-border)]/60 bg-[var(--ui-surface)] flex-shrink-0">
         <button type="button"
             @click="tab='chat'"
@@ -21,7 +21,7 @@
         </div>
     </div>
 
-    <div class="flex-1 min-h-0 overflow-hidden p-4 bg-[var(--ui-bg)]">
+    <div class="w-full flex-1 min-h-0 overflow-hidden p-4 bg-[var(--ui-bg)]">
     <div x-show="tab==='chat'" class="w-full h-full min-h-0 grid grid-cols-12 gap-5" x-cloak>
     {{-- Left: Model selection (independent scroll) --}}
         <div class="col-span-12 lg:col-span-3 min-h-0 min-w-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
