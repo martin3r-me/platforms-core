@@ -21,10 +21,10 @@
         </div>
     </div>
 
-    <div class="flex-1 min-h-0 overflow-hidden p-4">
-    <div x-show="tab==='chat'" class="h-full min-h-0 grid grid-cols-12 gap-5" x-cloak>
+    <div class="flex-1 min-h-0 overflow-hidden p-4 bg-[var(--ui-bg)]">
+    <div x-show="tab==='chat'" class="w-full h-full min-h-0 grid grid-cols-12 gap-5" x-cloak>
     {{-- Left: Model selection (independent scroll) --}}
-        <div class="col-span-12 lg:col-span-3 min-h-0 min-w-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+        <div class="col-span-12 lg:col-span-3 min-h-0 min-w-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
             <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                 <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model</div>
                 <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
@@ -47,7 +47,7 @@
 
     {{-- Center: Chat (independent scroll + input pinned to bottom) --}}
     <div x-show="tab==='chat'" class="col-span-12 lg:col-span-6 min-h-0 min-w-0 flex flex-col" x-cloak>
-        <div class="flex-1 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+        <div class="flex-1 min-h-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
             <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
                 <div id="chatList" class="space-y-4"></div>
                 <div id="chatEmpty" class="text-sm text-[var(--ui-muted)]">
@@ -77,7 +77,7 @@
     </div>
 
     {{-- Right: Realtime / Debug (independent scroll) --}}
-    <div class="col-span-12 lg:col-span-3 min-h-0 min-w-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+    <div class="col-span-12 lg:col-span-3 min-h-0 min-w-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
             <div class="text-xs text-[var(--ui-muted)]">
                 Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
