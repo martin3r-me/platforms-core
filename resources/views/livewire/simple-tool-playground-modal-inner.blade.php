@@ -1,6 +1,6 @@
-<div class="h-full min-h-0 overflow-hidden grid grid-cols-[20rem_1fr_20rem] gap-4">
+<div class="h-full min-h-0 overflow-hidden grid grid-cols-12 gap-4">
     {{-- Left: Model selection (independent scroll) --}}
-    <div class="min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+    <div class="col-span-3 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
             <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model</div>
             <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
@@ -27,7 +27,7 @@
     </div>
 
     {{-- Center: Chat (independent scroll + input pinned to bottom) --}}
-    <div class="min-h-0 flex flex-col">
+    <div class="col-span-6 min-h-0 flex flex-col">
         <div class="px-4 py-3 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] flex items-center justify-between flex-shrink-0">
             <div class="text-xs text-[var(--ui-muted)]">
                 Kontext: <span id="pgContextLabel" class="text-[var(--ui-secondary)]">—</span>
@@ -59,7 +59,7 @@
     </div>
 
     {{-- Right: Realtime / Debug (independent scroll) --}}
-    <div class="min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+    <div class="col-span-3 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
             <div class="text-xs text-[var(--ui-muted)]">
                 Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
@@ -157,8 +157,6 @@
     <script>
       (() => {
         const boot = () => {
-        if (window.__simplePlaygroundModalBooted) return;
-        window.__simplePlaygroundModalBooted = true;
         const url = window.__simpleStreamUrl;
         const modelsUrl = window.__simpleModelsUrl;
         const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
@@ -184,6 +182,10 @@
         const form = document.getElementById('chatForm');
         const input = document.getElementById('chatInput');
         const sendBtn = document.getElementById('chatSend');
+
+        // Idempotent binding (modal exists globally; avoid duplicate listeners)
+        if (form?.dataset?.simplePlaygroundBound === '1') return;
+        if (form) form.dataset.simplePlaygroundBound = '1';
 
         const realtimeClear = document.getElementById('realtimeClear');
         const realtimeModel = document.getElementById('realtimeModel');
@@ -394,25 +396,26 @@
         };
 
         const loadModels = async () => {
-          try {
-            const res = await fetch(modelsUrl, { headers: { 'Accept': 'application/json' }});
-            const json = await res.json();
-            const models = json?.models || [];
-            renderModels(models);
-          } catch (_) {
-            renderModels([serverDefaultModel]);
-          }
+          // parity with page playground: fixed model, no API call
+          if (modelsList) modelsList.innerHTML = '<div class="text-xs text-[var(--ui-muted)]">Fix: gpt-5.2</div>';
+          renderModels([serverDefaultModel]);
         };
-        if (modelsReload) modelsReload.addEventListener('click', loadModels);
+        if (modelsReload) modelsReload.addEventListener('click', () => loadModels());
         loadModels();
 
-        // Send
-        const send = async ({ isContinue = false } = {}) => {
-          if (inFlight) return;
+        // Send (parity with page playground: chat updates only on complete)
+        const send = async () => {
           const text = (input?.value || '').trim();
-          if (!isContinue && !text) return;
-          inFlight = true;
-          sendBtn.disabled = true;
+          if (inFlight) return;
+
+          const canContinue = !!(continuation && continuation.pending);
+          const isContinue = (!text && canContinue);
+          if (!text && !isContinue) return;
+          if (text && canContinue) {
+            messages.push({ role: 'assistant', content: '⚠️ Es gibt noch einen laufenden Prozess. Bitte zuerst einmal mit leerer Eingabe fortsetzen (Enter), danach kannst du die nächste Frage senden.' });
+            renderMessage('assistant', '⚠️ Es gibt noch einen laufenden Prozess. Bitte zuerst einmal mit leerer Eingabe fortsetzen (Enter), danach kannst du die nächste Frage senden.');
+            return;
+          }
 
           if (!isContinue) {
             messages.push({ role: 'user', content: text });
@@ -420,18 +423,17 @@
             input.value = '';
           }
 
-          // optimistic assistant placeholder
-          messages.push({ role: 'assistant', content: '' });
-          renderMessage('assistant', '');
-          const lastAssistantEl = chatList.lastElementChild?.querySelector('.whitespace-pre-wrap');
-
+          inFlight = true;
+          sendBtn.disabled = true;
+          input.disabled = true;
           resetRealtime();
-          debugState.startedAt = new Date().toISOString();
           if (rtStatus) rtStatus.textContent = 'streaming…';
+          if (realtimeModel) realtimeModel.textContent = selectedModel || '—';
+          debugState.startedAt = new Date().toISOString();
 
           const payload = {
             message: (isContinue ? '' : text),
-            chat_history: messages.slice(0, -1),
+            chat_history: messages,
             model: selectedModel || null,
             continuation: (isContinue ? continuation : null),
             context: ctx || null,
@@ -442,102 +444,148 @@
           try {
             const res = await fetch(url, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'text/event-stream',
-                'X-CSRF-TOKEN': csrf,
-              },
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream', 'X-CSRF-TOKEN': csrf },
               body: JSON.stringify(payload),
             });
 
-            if (!res.ok) {
-              const text = await res.text();
-              throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);
+            if (!res.ok || !res.body) {
+              const ct = res.headers?.get?.('content-type') || '';
+              let bodyText = '';
+              try { bodyText = await res.text(); } catch { bodyText = ''; }
+              const snippet = (bodyText || '').slice(0, 800);
+              throw new Error(`HTTP ${res.status} ${res.statusText || ''} ${ct ? `(${ct})` : ''}${snippet ? `\n\n${snippet}` : ''}`.trim());
             }
 
             const reader = res.body.getReader();
-            const decoder = new TextDecoder('utf-8');
+            const decoder = new TextDecoder();
             let buffer = '';
-            let assistantText = '';
-
-            const parseSse = (chunk) => {
-              buffer += chunk;
-              let idx;
-              while ((idx = buffer.indexOf('\n\n')) !== -1) {
-                const rawEvent = buffer.slice(0, idx);
-                buffer = buffer.slice(idx + 2);
-                const lines = rawEvent.split('\n').filter(Boolean);
-                let eventName = 'message';
-                let data = '';
-                for (const line of lines) {
-                  if (line.startsWith('event:')) eventName = line.slice(6).trim();
-                  if (line.startsWith('data:')) data += line.slice(5).trim();
-                }
-                if (!data) continue;
-                let decoded;
-                try { decoded = JSON.parse(data); } catch { decoded = { raw: data }; }
-
-                if (eventName === 'assistant.delta') {
-                  assistantText = decoded?.content || assistantText + (decoded?.delta || '');
-                  if (lastAssistantEl) lastAssistantEl.textContent = assistantText;
-                  if (rtAssistant) rtAssistant.textContent = assistantText;
-                  debugState.lastAssistant = assistantText;
-                  updateDebugDump();
-                } else if (eventName === 'openai.event') {
-                  rtEvent({ key: decoded?.event, preview: decoded?.preview || null, raw: decoded?.raw || null });
-                  debugState.events.push({ t: Date.now(), event: decoded?.event, preview: decoded?.preview || null });
-                  updateDebugDump();
-                } else if (eventName === 'usage') {
-                  debugState.usage = decoded;
-                  if (rtTokensIn) rtTokensIn.textContent = String(decoded?.input_tokens ?? '—');
-                  if (rtTokensOut) rtTokensOut.textContent = String(decoded?.output_tokens ?? '—');
-                  if (rtTokensTotal) rtTokensTotal.textContent = String(decoded?.total_tokens ?? '—');
-                  const cached = decoded?.cached_tokens != null ? `cached:${decoded.cached_tokens}` : '';
-                  const reasoning = decoded?.reasoning_tokens != null ? `reasoning:${decoded.reasoning_tokens}` : '';
-                  if (rtTokensExtra) rtTokensExtra.textContent = [cached, reasoning].filter(Boolean).join(' / ') || '—';
-                  updateDebugDump();
-                } else if (eventName === 'tool.executed') {
-                  debugState.toolCalls.push(decoded);
-                  // render last 5
-                  if (rtToolCalls) {
-                    const items = debugState.toolCalls.slice(-5).reverse();
-                    rtToolCalls.innerHTML = '';
-                    for (const it of items) {
-                      const row = document.createElement('div');
-                      row.className = 'text-[10px] font-mono flex items-center justify-between gap-2 border border-[var(--ui-border)] rounded px-2 py-1 bg-[var(--ui-bg)]';
-                      row.innerHTML = `<span class="truncate">${it.tool}</span><span>${it.success ? 'ok' : 'fail'} ${it.ms != null ? `${it.ms}ms` : ''}</span>`;
-                      rtToolCalls.appendChild(row);
-                    }
-                  }
-                  updateDebugDump();
-                } else if (eventName === 'debug.tools') {
-                  debugState.toolsVisible = decoded;
-                  updateDebugDump();
-                } else if (eventName === 'complete') {
-                  // finalize
-                  continuation = decoded?.continuation || null;
-                  messages[messages.length - 1].content = decoded?.assistant || assistantText || '';
-                  if (rtStatus) rtStatus.textContent = continuation?.pending ? 'paused (continue möglich)' : 'done';
-                  updateDebugDump();
-                } else if (eventName === 'error') {
-                  if (rtStatus) rtStatus.textContent = 'error';
-                  rtEvent({ key: 'error', preview: { message: decoded?.error }, raw: JSON.stringify(decoded) });
-                  updateDebugDump();
-                }
-              }
-            };
+            let currentEvent = null;
 
             while (true) {
-              const { value, done } = await reader.read();
+              const { done, value } = await reader.read();
               if (done) break;
-              parseSse(decoder.decode(value, { stream: true }));
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
+
+              for (const line of lines) {
+                if (!line.trim()) continue;
+                if (line.startsWith('event:')) { currentEvent = line.slice(6).trim(); continue; }
+                if (!line.startsWith('data:')) continue;
+                const raw = line.slice(5).trim();
+                let data;
+                try { data = JSON.parse(raw); } catch { data = { raw }; }
+
+                switch (currentEvent) {
+                  case 'assistant.delta':
+                    if (data?.delta) rtAssistant.textContent += data.delta;
+                    debugState.lastAssistant = rtAssistant.textContent;
+                    break;
+                  case 'reasoning.delta':
+                    if (data?.delta) rtReasoning.textContent += data.delta;
+                    break;
+                  case 'thinking.delta':
+                    if (data?.delta) rtThinking.textContent += data.delta;
+                    break;
+                  case 'debug.tools':
+                    debugState.toolsVisible = data || null;
+                    updateDebugDump();
+                    break;
+                  case 'tool.executed':
+                    debugState.toolCalls.push(data);
+                    if (rtToolCalls) {
+                      const items = debugState.toolCalls.slice(-5).reverse();
+                      rtToolCalls.innerHTML = '';
+                      for (const it of items) {
+                        const row = document.createElement('div');
+                        row.className = 'text-[11px] font-mono flex items-center justify-between gap-2 border border-[var(--ui-border)] rounded px-2 py-1 bg-[var(--ui-bg)]';
+                        row.innerHTML = `<span class="truncate">${it.tool}</span><span>${it.success ? 'ok' : 'fail'} ${it.ms != null ? `${it.ms}ms` : ''}</span>`;
+                        rtToolCalls.appendChild(row);
+                      }
+                    }
+                    updateDebugDump();
+                    break;
+                  case 'openai.event': {
+                    const ev = data?.event || 'openai.event';
+                    rtEvent({ key: ev, preview: data?.preview || null, raw: data?.raw || null });
+                    debugState.events.push({ t: Date.now(), event: ev, preview: data?.preview || null });
+                    updateDebugDump();
+                    break;
+                  }
+                  case 'usage': {
+                    const usage = data?.usage || {};
+                    const inTok = usage?.input_tokens ?? null;
+                    const outTok = usage?.output_tokens ?? null;
+                    const totalTok = usage?.total_tokens ?? null;
+                    const cached = usage?.input_tokens_details?.cached_tokens ?? null;
+                    const reasoning = usage?.output_tokens_details?.reasoning_tokens ?? null;
+
+                    if (rtTokensIn) rtTokensIn.textContent = (inTok ?? '—');
+                    if (rtTokensOut) rtTokensOut.textContent = (outTok ?? '—');
+                    if (rtTokensTotal) rtTokensTotal.textContent = (totalTok ?? '—');
+                    if (rtTokensExtra) rtTokensExtra.textContent = `${cached != null ? cached : '—'} / ${reasoning != null ? reasoning : '—'}`;
+                    if (rtUsageModel) {
+                      const modelLabel = data?.model ? `Model: ${data.model}` : '';
+                      const scope = data?.cumulative ? ' · Request total' : '';
+                      rtUsageModel.textContent = modelLabel ? `${modelLabel}${scope}` : (data?.cumulative ? 'Request total' : '');
+                    }
+
+                    // Costs (explicit pricing for gpt-5.2, per 1M tokens)
+                    const RATE_IN = 1.75;
+                    const RATE_CACHED = 0.175;
+                    const RATE_OUT = 14.00;
+                    const toMoney = (x) => {
+                      if (x == null || Number.isNaN(x)) return '—';
+                      return `$${Number(x).toFixed(6)}`;
+                    };
+                    const inputTokens = (typeof inTok === 'number') ? inTok : null;
+                    const outputTokens = (typeof outTok === 'number') ? outTok : null;
+                    const cachedTokens = (typeof cached === 'number') ? cached : 0;
+                    const nonCachedInput = (inputTokens != null) ? Math.max(0, inputTokens - cachedTokens) : null;
+                    const costIn = (nonCachedInput != null) ? (nonCachedInput / 1_000_000) * RATE_IN : null;
+                    const costCached = (cachedTokens != null) ? (cachedTokens / 1_000_000) * RATE_CACHED : null;
+                    const costOut = (outputTokens != null) ? (outputTokens / 1_000_000) * RATE_OUT : null;
+                    const costTotal = (costIn != null && costCached != null && costOut != null) ? (costIn + costCached + costOut) : null;
+                    if (rtCostIn) rtCostIn.textContent = toMoney(costIn);
+                    if (rtCostCached) rtCostCached.textContent = toMoney(costCached);
+                    if (rtCostOut) rtCostOut.textContent = toMoney(costOut);
+                    if (rtCostTotal) rtCostTotal.textContent = toMoney(costTotal);
+                    if (rtCostNote) rtCostNote.textContent = `Rates/1M: input $${RATE_IN}, cached $${RATE_CACHED}, output $${RATE_OUT}`;
+
+                    debugState.model = data?.model || debugState.model;
+                    debugState.usage = usage;
+                    updateDebugDump();
+                    break;
+                  }
+                  case 'complete': {
+                    const assistant = data?.assistant || rtAssistant.textContent;
+                    messages.push({ role: 'assistant', content: assistant });
+                    renderMessage('assistant', assistant);
+                    continuation = data?.continuation || null;
+                    if (rtStatus) rtStatus.textContent = 'done';
+                    updateDebugDump();
+                    break;
+                  }
+                  case 'error': {
+                    const msg = data?.error || 'Unbekannter Fehler';
+                    messages.push({ role: 'assistant', content: `❌ Fehler: ${msg}` });
+                    renderMessage('assistant', `❌ Fehler: ${msg}`);
+                    if (rtStatus) rtStatus.textContent = 'error';
+                    updateDebugDump();
+                    break;
+                  }
+                  default:
+                    // ignore
+                }
+                scrollToBottom();
+              }
             }
-          } catch (e) {
-            if (rtStatus) rtStatus.textContent = 'error';
-            rtEvent({ key: 'fetch.error', preview: { message: String(e?.message || e) }, raw: String(e?.stack || '') });
           } finally {
             inFlight = false;
             sendBtn.disabled = false;
+            input.disabled = false;
+            input.focus();
           }
         };
 
