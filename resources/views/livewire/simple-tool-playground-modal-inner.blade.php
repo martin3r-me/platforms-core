@@ -24,29 +24,29 @@
     <div class="flex-1 min-h-0 overflow-hidden p-4">
     <div x-show="tab==='chat'" class="h-full min-h-0 grid grid-cols-12 gap-4" x-cloak>
     {{-- Left: Model selection (independent scroll) --}}
-    <div x-show="tab==='settings'" class="hidden" x-cloak></div>
-        <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
-            <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model</div>
-            <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
-        </div>
-        <div class="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto">
-            <div>
-                <div class="text-xs text-[var(--ui-muted)] mb-1">Ausgewählt (Drop Zone)</div>
-                <div id="modelDropZone" class="min-h-[44px] px-3 py-2 rounded border border-dashed border-[var(--ui-border)] bg-[var(--ui-bg)] text-sm">
-                    <span id="selectedModelLabel" class="text-[var(--ui-secondary)]">—</span>
+        <div class="col-span-3 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+            <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
+                <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model</div>
+                <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
+            </div>
+            <div class="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto">
+                <div>
+                    <div class="text-xs text-[var(--ui-muted)] mb-1">Ausgewählt (Drop Zone)</div>
+                    <div id="modelDropZone" class="min-h-[44px] px-3 py-2 rounded border border-dashed border-[var(--ui-border)] bg-[var(--ui-bg)] text-sm">
+                        <span id="selectedModelLabel" class="text-[var(--ui-secondary)]">—</span>
+                    </div>
+                    <div class="mt-2 text-xs text-[var(--ui-muted)]">Drag ein Model aus der Liste hier rein (oder Doppelklick).</div>
                 </div>
-                <div class="mt-2 text-xs text-[var(--ui-muted)]">Drag ein Model aus der Liste hier rein (oder Doppelklick).</div>
-            </div>
 
-            <div class="pt-2 border-t border-[var(--ui-border)]">
-                <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] mb-2">Verfügbare Models</div>
-                <div id="modelsList" class="space-y-2 overflow-y-auto pr-1"></div>
+                <div class="pt-2 border-t border-[var(--ui-border)]">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] mb-2">Verfügbare Models</div>
+                    <div id="modelsList" class="space-y-2 overflow-y-auto pr-1"></div>
+                </div>
             </div>
         </div>
-    </div>
 
     {{-- Center: Chat (independent scroll + input pinned to bottom) --}}
-    <div x-show="tab==='chat'" class="col-span-8 min-h-0 flex flex-col" x-cloak>
+    <div x-show="tab==='chat'" class="col-span-6 min-h-0 flex flex-col" x-cloak>
         <div class="flex-1 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
             <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
                 <div id="chatList" class="space-y-4"></div>
@@ -70,7 +70,7 @@
     </div>
 
     {{-- Right: Realtime / Debug (independent scroll) --}}
-    <div class="col-span-4 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+    <div class="col-span-3 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
             <div class="text-xs text-[var(--ui-muted)]">
                 Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
@@ -163,36 +163,15 @@
     </div>
     </div>
 
-    <div x-show="tab==='settings'" class="h-full min-h-0 grid grid-cols-12 gap-4" x-cloak>
-        <div class="col-span-5 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
-            <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
-                <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model</div>
-                <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
-            </div>
-            <div class="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto">
-                <div>
-                    <div class="text-xs text-[var(--ui-muted)] mb-1">Ausgewählt (Drop Zone)</div>
-                    <div id="modelDropZone" class="min-h-[44px] px-3 py-2 rounded border border-dashed border-[var(--ui-border)] bg-[var(--ui-bg)] text-sm">
-                        <span id="selectedModelLabel" class="text-[var(--ui-secondary)]">—</span>
-                    </div>
-                    <div class="mt-2 text-xs text-[var(--ui-muted)]">Drag ein Model aus der Liste hier rein (oder Doppelklick).</div>
-                </div>
-
-                <div class="pt-2 border-t border-[var(--ui-border)]">
-                    <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] mb-2">Verfügbare Models</div>
-                    <div id="modelsList" class="space-y-2 overflow-y-auto pr-1"></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-span-7 min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+    <div x-show="tab==='settings'" class="h-full min-h-0" x-cloak>
+        <div class="h-full min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
             <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                 <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Settings</div>
             </div>
             <div class="p-4 flex-1 min-h-0 overflow-y-auto text-sm text-[var(--ui-muted)] space-y-3">
-                <div><span class="font-semibold text-[var(--ui-secondary)]">Pro Request Model:</span> im Chat links neben dem Input.</div>
-                <div><span class="font-semibold text-[var(--ui-secondary)]">SSE/Debug:</span> bleibt rechts im Chat-Tab sichtbar.</div>
-                <div class="text-xs">Hinweis: Wenn du willst, kann ich Debug/Events auch in den Settings-Tab verschieben und den Chat-Tab „cleaner“ machen.</div>
+                <div><span class="font-semibold text-[var(--ui-secondary)]">Model:</span> links (Drag&Drop) oder direkt neben dem Chat-Input auswählen.</div>
+                <div><span class="font-semibold text-[var(--ui-secondary)]">Debug:</span> rechts bleibt immer sichtbar (Assistant/Reasoning/Thinking/Tool Calls).</div>
+                <div class="text-xs">Wenn du willst, kann ich Debug/Events auch in den Settings-Tab verschieben und den Chat-Tab noch „cleaner“ machen.</div>
             </div>
         </div>
     </div>
@@ -230,9 +209,11 @@
         const input = document.getElementById('chatInput');
         const sendBtn = document.getElementById('chatSend');
 
-        // Idempotent binding (modal exists globally; avoid duplicate listeners)
-        if (form?.dataset?.simplePlaygroundBound === '1') return;
-        if (form) form.dataset.simplePlaygroundBound = '1';
+        // Idempotent binding (modal exists globally; avoid duplicate listeners).
+        // IMPORTANT: even when already bound, we still refresh models so the UI is usable right after opening.
+        const alreadyBound = (form?.dataset?.simplePlaygroundBound === '1');
+        if (!form) return;
+        if (!alreadyBound) form.dataset.simplePlaygroundBound = '1';
 
         const realtimeClear = document.getElementById('realtimeClear');
         const realtimeModel = document.getElementById('realtimeModel');
@@ -447,7 +428,8 @@
           if (modelsList) modelsList.innerHTML = '<div class="text-xs text-[var(--ui-muted)]">Fix: gpt-5.2</div>';
           renderModels([serverDefaultModel]);
         };
-        if (modelsReload) modelsReload.addEventListener('click', () => loadModels());
+        // Always refresh models (so gpt-5.2 is visible immediately after opening).
+        if (!alreadyBound && modelsReload) modelsReload.addEventListener('click', () => loadModels());
         loadModels();
 
         // Send (parity with page playground: chat updates only on complete)
@@ -636,28 +618,38 @@
           }
         };
 
-        form?.addEventListener('submit', (e) => { e.preventDefault(); send(); });
-        input?.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-        });
+        if (!alreadyBound) {
+          form?.addEventListener('submit', (e) => { e.preventDefault(); send(); });
+          input?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+          });
+        }
       };
 
       // Expose boot for modal-open refresh (Livewire opens modal after initial page load)
       window.__simplePlaygroundBoot = boot;
 
+      const ensureBootSoon = () => {
+        // Livewire opens the modal after a roundtrip; ensure boot runs once the DOM is actually there.
+        let tries = 0;
+        const t = setInterval(() => {
+          tries++;
+          if (document.getElementById('chatForm')) {
+            try { if (typeof window.__simplePlaygroundBoot === 'function') window.__simplePlaygroundBoot(); } catch (_) {}
+            clearInterval(t);
+          }
+          if (tries > 80) clearInterval(t);
+        }, 50);
+      };
+
       if (!window.__simplePlaygroundModalOpenBound) {
         window.__simplePlaygroundModalOpenBound = true;
         window.addEventListener('simple-playground-modal-opened', () => {
-          try {
-            // Re-run boot to bind if the DOM was not present during initial boot
-            if (typeof window.__simplePlaygroundBoot === 'function') window.__simplePlaygroundBoot();
-          } catch (_) {}
-
-          // Ensure models are visible immediately without user clicking reload
-          try {
-            const reloadBtn = document.getElementById('modelsReload');
-            if (reloadBtn) reloadBtn.click();
-          } catch (_) {}
+          ensureBootSoon();
+        });
+        // Also listen to the user action that triggers the modal (always bubbles from the navbar button).
+        window.addEventListener('playground:open', () => {
+          ensureBootSoon();
         });
       }
 

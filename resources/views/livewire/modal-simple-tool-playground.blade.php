@@ -26,7 +26,9 @@
             window.__simplePlaygroundContext = @json($context);
         </script>
 
-        <div class="h-[90vh] min-h-0 overflow-hidden">
+        {{-- x-ui-modal (non-full) has a padded, scrollable body already.
+           We want the playground to use the full available height/width, so we cancel padding here. --}}
+        <div class="-m-6 h-full min-h-0 overflow-hidden">
             @include('platform::livewire.simple-tool-playground-modal-inner')
         </div>
     </x-ui-modal>
