@@ -41,11 +41,12 @@
                         </button>
                     </div>
                 </div>
-                {{-- Usage stats: compact, right-aligned --}}
+                {{-- Usage stats: compact, right-aligned - Thread totals + Request totals --}}
                 <div class="flex items-center gap-1.5 flex-shrink-0">
+                    {{-- Thread totals (Gesamt) --}}
                     <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
                         <span class="text-[9px] text-[var(--ui-muted)]">In:</span>
-                        <span id="rtTokensIn" class="text-[10px] font-semibold text-[var(--ui-secondary)]">
+                        <span id="rtTokensInTotal" class="text-[10px] font-semibold text-[var(--ui-secondary)]">
                             @if(isset($activeThread) && $activeThread)
                                 {{ number_format($activeThread->total_tokens_in ?? 0) }}
                             @else
@@ -55,7 +56,7 @@
                     </div>
                     <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
                         <span class="text-[9px] text-[var(--ui-muted)]">C/R:</span>
-                        <span id="rtTokensExtra" class="text-[10px] font-semibold text-[var(--ui-secondary)]">
+                        <span id="rtTokensExtraTotal" class="text-[10px] font-semibold text-[var(--ui-secondary)]">
                             @if(isset($activeThread) && $activeThread)
                                 {{ number_format(($activeThread->total_tokens_cached ?? 0) + ($activeThread->total_tokens_reasoning ?? 0)) }}
                             @else
@@ -65,7 +66,7 @@
                     </div>
                     <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
                         <span class="text-[9px] text-[var(--ui-muted)]">Out:</span>
-                        <span id="rtTokensOut" class="text-[10px] font-semibold text-[var(--ui-secondary)]">
+                        <span id="rtTokensOutTotal" class="text-[10px] font-semibold text-[var(--ui-secondary)]">
                             @if(isset($activeThread) && $activeThread)
                                 {{ number_format($activeThread->total_tokens_out ?? 0) }}
                             @else
@@ -82,6 +83,21 @@
                                 —
                             @endif
                         </span>
+                    </div>
+                    {{-- Separator --}}
+                    <div class="w-px h-4 bg-[var(--ui-border)]/60"></div>
+                    {{-- Request totals (aktueller Request) --}}
+                    <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/40 bg-[var(--ui-bg)]/50">
+                        <span class="text-[9px] text-[var(--ui-muted)]">Req In:</span>
+                        <span id="rtTokensIn" class="text-[10px] font-semibold text-[var(--ui-secondary)]">—</span>
+                    </div>
+                    <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/40 bg-[var(--ui-bg)]/50">
+                        <span class="text-[9px] text-[var(--ui-muted)]">Req C/R:</span>
+                        <span id="rtTokensExtra" class="text-[10px] font-semibold text-[var(--ui-secondary)]">—</span>
+                    </div>
+                    <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/40 bg-[var(--ui-bg)]/50">
+                        <span class="text-[9px] text-[var(--ui-muted)]">Req Out:</span>
+                        <span id="rtTokensOut" class="text-[10px] font-semibold text-[var(--ui-secondary)]">—</span>
                     </div>
                 </div>
             </div>
@@ -948,58 +964,27 @@
                     const cached = usage?.input_tokens_details?.cached_tokens ?? null;
                     const reasoning = usage?.output_tokens_details?.reasoning_tokens ?? null;
 
-                    // Use thread totals if available (cumulative), otherwise show request values
+                    // Show both thread totals (Gesamt) and request values (aktueller Request)
                     const threadTotals = data?.thread_totals;
+                    
+                    // Update thread totals (Gesamt) - left side (always update if available)
                     if (threadTotals) {
-                      // Show thread totals (cumulative across all requests in this thread)
-                      if (rtTokensIn) rtTokensIn.textContent = formatNumber(threadTotals.total_tokens_in || 0);
-                      if (rtTokensOut) rtTokensOut.textContent = formatNumber(threadTotals.total_tokens_out || 0);
-                      if (rtTokensTotal) rtTokensTotal.textContent = formatNumber((threadTotals.total_tokens_in || 0) + (threadTotals.total_tokens_out || 0));
+                      if (rtTokensInTotal) rtTokensInTotal.textContent = formatNumber(threadTotals.total_tokens_in || 0);
+                      if (rtTokensOutTotal) rtTokensOutTotal.textContent = formatNumber(threadTotals.total_tokens_out || 0);
                       const cachedTotal = (threadTotals.total_tokens_cached || 0) + (threadTotals.total_tokens_reasoning || 0);
-                      if (rtTokensExtra) rtTokensExtra.textContent = formatNumber(cachedTotal);
+                      if (rtTokensExtraTotal) rtTokensExtraTotal.textContent = formatNumber(cachedTotal);
                       if (rtCostTotal) {
                         const cost = parseFloat(threadTotals.total_cost || 0);
                         const currency = threadTotals.pricing_currency || 'USD';
                         rtCostTotal.textContent = `$${cost.toFixed(4)} ${currency}`;
                       }
-                      if (rtUsageModel) {
-                        const modelLabel = data?.model ? `Model: ${data.model}` : '';
-                        rtUsageModel.textContent = modelLabel ? `${modelLabel} · Thread total` : 'Thread total';
-                      }
-                    } else {
-                      // Fallback: show request values (for backwards compatibility)
-                      if (rtTokensIn) rtTokensIn.textContent = (inTok ?? '—');
-                      if (rtTokensOut) rtTokensOut.textContent = (outTok ?? '—');
-                      if (rtTokensTotal) rtTokensTotal.textContent = (totalTok ?? '—');
-                      if (rtTokensExtra) rtTokensExtra.textContent = `${cached != null ? cached : '—'} / ${reasoning != null ? reasoning : '—'}`;
-                      if (rtUsageModel) {
-                        const modelLabel = data?.model ? `Model: ${data.model}` : '';
-                        const scope = data?.cumulative ? ' · Request total' : '';
-                        rtUsageModel.textContent = modelLabel ? `${modelLabel}${scope}` : (data?.cumulative ? 'Request total' : '');
-                      }
-
-                      // Costs (explicit pricing for gpt-5.2, per 1M tokens)
-                      const RATE_IN = 1.75;
-                      const RATE_CACHED = 0.175;
-                      const RATE_OUT = 14.00;
-                      const toMoney = (x) => {
-                        if (x == null || Number.isNaN(x)) return '—';
-                        return `$${Number(x).toFixed(6)}`;
-                      };
-                      const inputTokens = (typeof inTok === 'number') ? inTok : null;
-                      const outputTokens = (typeof outTok === 'number') ? outTok : null;
-                      const cachedTokens = (typeof cached === 'number') ? cached : 0;
-                      const nonCachedInput = (inputTokens != null) ? Math.max(0, inputTokens - cachedTokens) : null;
-                      const costIn = (nonCachedInput != null) ? (nonCachedInput / 1_000_000) * RATE_IN : null;
-                      const costCached = (cachedTokens != null) ? (cachedTokens / 1_000_000) * RATE_CACHED : null;
-                      const costOut = (outputTokens != null) ? (outputTokens / 1_000_000) * RATE_OUT : null;
-                      const costTotal = (costIn != null && costCached != null && costOut != null) ? (costIn + costCached + costOut) : null;
-                      if (rtCostIn) rtCostIn.textContent = toMoney(costIn);
-                      if (rtCostCached) rtCostCached.textContent = toMoney(costCached);
-                      if (rtCostOut) rtCostOut.textContent = toMoney(costOut);
-                      if (rtCostTotal) rtCostTotal.textContent = toMoney(costTotal);
-                      if (rtCostNote) rtCostNote.textContent = `Rates/1M: input $${RATE_IN}, cached $${RATE_CACHED}, output $${RATE_OUT}`;
                     }
+                    
+                    // Update request values (aktueller Request) - right side (always update during stream)
+                    if (rtTokensIn) rtTokensIn.textContent = (inTok != null ? formatNumber(inTok) : '—');
+                    if (rtTokensOut) rtTokensOut.textContent = (outTok != null ? formatNumber(outTok) : '—');
+                    const cachedReq = (cached != null ? cached : 0) + (reasoning != null ? reasoning : 0);
+                    if (rtTokensExtra) rtTokensExtra.textContent = cachedReq > 0 ? formatNumber(cachedReq) : '—';
 
                     debugState.model = data?.model || debugState.model;
                     debugState.usage = usage;
@@ -1037,12 +1022,49 @@
           }
         };
 
-        if (!alreadyBound) {
-          form?.addEventListener('submit', (e) => { e.preventDefault(); send(); });
-          input?.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-          });
-        }
+        // Always bind submit handlers (ensure they work even after Livewire updates)
+        // Use a wrapper function to ensure send() is accessible
+        const bindSubmitHandlers = () => {
+          const currentForm = document.getElementById('chatForm');
+          const currentInput = document.getElementById('chatInput');
+          const currentSendBtn = document.getElementById('chatSend');
+          
+          if (currentForm && !currentForm.dataset.submitBound) {
+            currentForm.addEventListener('submit', (e) => { 
+              e.preventDefault(); 
+              e.stopPropagation();
+              send(); 
+            });
+            currentForm.dataset.submitBound = '1';
+          }
+          
+          if (currentInput && !currentInput.dataset.keydownBound) {
+            currentInput.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter' && !e.shiftKey) { 
+                e.preventDefault(); 
+                e.stopPropagation();
+                send(); 
+              }
+            });
+            currentInput.dataset.keydownBound = '1';
+          }
+          
+          if (currentSendBtn && !currentSendBtn.dataset.clickBound) {
+            currentSendBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              send();
+            });
+            currentSendBtn.dataset.clickBound = '1';
+          }
+        };
+        
+        bindSubmitHandlers();
+        
+        // Re-bind after Livewire updates
+        document.addEventListener('livewire:update', () => {
+          setTimeout(bindSubmitHandlers, 50);
+        });
       };
 
       // Expose boot for modal-open refresh (Livewire opens modal after initial page load)
