@@ -785,17 +785,24 @@ class SimpleToolController extends Controller
                                         }
                                     }
 
-                                    // Collect function calls (best practice: execute after stream, then re-call model with tool results)
+                                    // Collect function calls robustly (tool args can be interleaved across multiple calls).
+                                    // We key tool calls by call_id, but argument deltas reference item_id -> map item_id => call_id.
+                                    if (!isset($toolCallIdByItemId) || !is_array($toolCallIdByItemId)) {
+                                        $toolCallIdByItemId = [];
+                                    }
+
                                     if ($event === 'response.output_item.added' && isset($decoded['item']['type']) && $decoded['item']['type'] === 'function_call') {
                                         $openAiToolName = $decoded['item']['name'] ?? null;
                                         $itemId = $decoded['item']['id'] ?? null;
                                         $callId = $decoded['item']['call_id'] ?? null;
+
+                                        if (is_string($itemId) && $itemId !== '' && is_string($callId) && $callId !== '') {
+                                            $toolCallIdByItemId[$itemId] = $callId;
+                                        }
+
                                         if (is_string($openAiToolName) && $openAiToolName !== '' && is_string($callId) && $callId !== '') {
-                                            $currentStreamingToolCall = $openAiToolName;
-                                            $currentStreamingToolId = is_string($itemId) ? $itemId : null;
-                                            $currentStreamingCallId = $callId;
                                             $toolCallsCollector[$callId] = [
-                                                'id' => $currentStreamingToolId,
+                                                'id' => is_string($itemId) ? $itemId : null,
                                                 'call_id' => $callId,
                                                 'name' => $openAiToolName,
                                                 'arguments' => '',
@@ -803,17 +810,20 @@ class SimpleToolController extends Controller
                                         }
                                     } elseif ($event === 'response.function_call_arguments.delta') {
                                         $delta = $decoded['delta'] ?? '';
-                                        if ($currentStreamingCallId && is_string($delta) && isset($toolCallsCollector[$currentStreamingCallId])) {
-                                            $toolCallsCollector[$currentStreamingCallId]['arguments'] .= $delta;
+                                        $itemId = $decoded['item_id'] ?? null;
+                                        $callId = (is_string($itemId) && isset($toolCallIdByItemId[$itemId])) ? $toolCallIdByItemId[$itemId] : null;
+
+                                        if (is_string($callId) && $callId !== '' && is_string($delta) && isset($toolCallsCollector[$callId])) {
+                                            $toolCallsCollector[$callId]['arguments'] .= $delta;
                                         }
                                     } elseif ($event === 'response.function_call_arguments.done') {
                                         $args = $decoded['arguments'] ?? '';
-                                        if ($currentStreamingCallId && is_string($args) && isset($toolCallsCollector[$currentStreamingCallId])) {
-                                            $toolCallsCollector[$currentStreamingCallId]['arguments'] = $args;
+                                        $itemId = $decoded['item_id'] ?? null;
+                                        $callId = (is_string($itemId) && isset($toolCallIdByItemId[$itemId])) ? $toolCallIdByItemId[$itemId] : null;
+
+                                        if (is_string($callId) && $callId !== '' && is_string($args) && isset($toolCallsCollector[$callId])) {
+                                            $toolCallsCollector[$callId]['arguments'] = $args;
                                         }
-                                        $currentStreamingToolCall = null;
-                                        $currentStreamingToolId = null;
-                                        $currentStreamingCallId = null;
                                     }
                                 },
                                 'on_reasoning_delta' => function(string $delta) use ($sendEvent, &$reasoning) {

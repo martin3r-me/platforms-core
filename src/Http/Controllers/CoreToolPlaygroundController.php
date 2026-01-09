@@ -3448,8 +3448,9 @@ class CoreToolPlaygroundController extends Controller
                             $streamError = null;
                             
                             try {
-                                // Sammle Tool-Calls während des Streams
+                                // Sammle Tool-Calls während des Streams (robust, da Tool-Argumente interleaved sein können)
                                 $toolCallsCollector = [];
+                                $toolCallIdByItemId = [];
                                 $currentStreamingToolCall = null;
                                 $currentStreamingToolArguments = '';
                                 
@@ -3474,34 +3475,39 @@ class CoreToolPlaygroundController extends Controller
                                             'tool' => $toolName,
                                         ]);
                                     },
-                                    'on_debug' => function($eventType, $data) use (&$toolCallsCollector, &$currentStreamingToolCall, &$currentStreamingToolArguments) {
+                                    'on_debug' => function($eventType, $data) use (&$toolCallsCollector, &$toolCallIdByItemId, &$currentStreamingToolCall, &$currentStreamingToolArguments) {
                                         // Sammle Tool-Calls direkt aus den Streaming-Events (vor Denormalisierung)
-                                        if ($eventType === 'response.output_item.added' && isset($data['item']['type'])) {
-                                            if ($data['item']['type'] === 'function_call') {
-                                                $openAiToolName = $data['item']['name'] ?? ($data['item']['function_name'] ?? null);
-                                                if ($openAiToolName) {
-                                                    $currentStreamingToolCall = $openAiToolName; // OpenAI-Format
-                                                    $toolCallsCollector[$openAiToolName] = [
-                                                        'name' => $openAiToolName,
-                                                        'arguments' => '',
-                                                    ];
-                                                }
+                                        if ($eventType === 'response.output_item.added' && isset($data['item']['type']) && $data['item']['type'] === 'function_call') {
+                                            $openAiToolName = $data['item']['name'] ?? ($data['item']['function_name'] ?? null);
+                                            $itemId = $data['item']['id'] ?? null;
+                                            $callId = $data['item']['call_id'] ?? null;
+                                            if (is_string($itemId) && $itemId !== '' && is_string($callId) && $callId !== '') {
+                                                $toolCallIdByItemId[$itemId] = $callId;
+                                            }
+                                            if (is_string($openAiToolName) && $openAiToolName !== '' && is_string($callId) && $callId !== '') {
+                                                $currentStreamingToolCall = $openAiToolName; // OpenAI-Format (nur für fallback)
+                                                $toolCallsCollector[$callId] = [
+                                                    'id' => is_string($itemId) ? $itemId : null,
+                                                    'call_id' => $callId,
+                                                    'name' => $openAiToolName,
+                                                    'arguments' => '',
+                                                ];
                                             }
                                         } elseif ($eventType === 'response.function_call_arguments.delta') {
-                                            if ($currentStreamingToolCall && isset($data['delta'])) {
-                                                if (!isset($toolCallsCollector[$currentStreamingToolCall])) {
-                                                    $toolCallsCollector[$currentStreamingToolCall] = [
-                                                        'name' => $currentStreamingToolCall,
-                                                        'arguments' => '',
-                                                    ];
-                                                }
-                                                $toolCallsCollector[$currentStreamingToolCall]['arguments'] .= $data['delta'];
-                                                $currentStreamingToolArguments = $toolCallsCollector[$currentStreamingToolCall]['arguments'];
+                                            $delta = $data['delta'] ?? '';
+                                            $itemId = $data['item_id'] ?? null;
+                                            $callId = (is_string($itemId) && isset($toolCallIdByItemId[$itemId])) ? $toolCallIdByItemId[$itemId] : null;
+                                            if (is_string($callId) && $callId !== '' && is_string($delta) && isset($toolCallsCollector[$callId])) {
+                                                $toolCallsCollector[$callId]['arguments'] .= $delta;
+                                                $currentStreamingToolArguments = $toolCallsCollector[$callId]['arguments'];
                                             }
                                         } elseif ($eventType === 'response.function_call_arguments.done') {
-                                            if ($currentStreamingToolCall && isset($data['arguments'])) {
-                                                $toolCallsCollector[$currentStreamingToolCall]['arguments'] = $data['arguments'];
-                                                $currentStreamingToolArguments = $data['arguments'];
+                                            $args = $data['arguments'] ?? '';
+                                            $itemId = $data['item_id'] ?? null;
+                                            $callId = (is_string($itemId) && isset($toolCallIdByItemId[$itemId])) ? $toolCallIdByItemId[$itemId] : null;
+                                            if (is_string($callId) && $callId !== '' && is_string($args) && isset($toolCallsCollector[$callId])) {
+                                                $toolCallsCollector[$callId]['arguments'] = $args;
+                                                $currentStreamingToolArguments = $args;
                                             }
                                         }
                                     },
