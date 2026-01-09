@@ -156,19 +156,33 @@ class SimpleToolController extends Controller
         // We default to provider=openai for now; later this can be extended to other providers.
         $providerKey = (string) ($request->query('provider') ?? 'openai');
 
+        // Prefer models for the requested provider. If the provider doesn't exist yet, fall back to all active models.
         $models = CoreAiModel::query()
             ->with(['provider', 'provider.defaultModel'])
-            ->whereHas('provider', function ($q) use ($providerKey) {
-                $q->where('key', $providerKey)->where('is_active', true);
-            })
             ->where('is_active', true)
             ->where('is_deprecated', false)
+            ->when($providerKey !== '', function ($q) use ($providerKey) {
+                $q->whereHas('provider', function ($qq) use ($providerKey) {
+                    $qq->where('key', $providerKey)->where('is_active', true);
+                });
+            })
+            ->orderBy('provider_id')
             ->orderBy('model_id')
             ->get();
 
+        if ($models->count() === 0) {
+            $models = CoreAiModel::query()
+                ->with(['provider', 'provider.defaultModel'])
+                ->where('is_active', true)
+                ->where('is_deprecated', false)
+                ->orderBy('provider_id')
+                ->orderBy('model_id')
+                ->get();
+        }
+
         $ids = $models->pluck('model_id')->values()->all();
         $provider = $models->first()?->provider;
-        $defaultModel = $provider?->defaultModel?->model_id ?? null;
+        $defaultModel = $provider?->defaultModel?->model_id ?? ($ids[0] ?? null);
 
         return response()->json([
             'success' => true,

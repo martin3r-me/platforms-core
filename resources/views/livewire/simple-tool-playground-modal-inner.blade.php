@@ -169,8 +169,25 @@
                             </div>
 
                             <div class="pt-2 border-t border-[var(--ui-border)]">
-                                <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] mb-2">Verfügbare Models</div>
-                                <div id="modelsList" class="space-y-2 max-h-[40vh] overflow-y-auto pr-1"></div>
+                                <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] mb-2">
+                                    Verfügbare Models
+                                    <span class="ml-2 text-[10px] font-normal text-[var(--ui-muted)]">
+                                        (DB: {{ ($coreAiModels ?? collect())->count() }})
+                                    </span>
+                                </div>
+                                <div id="modelsList" class="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
+                                    {{-- Server-side fallback (JS will replace on loadModels()) --}}
+                                    @if(($coreAiModels ?? collect())->count() > 0)
+                                        @foreach(($coreAiModels ?? collect())->unique('model_id') as $mm)
+                                            <div class="flex items-center justify-between gap-2 px-3 py-2 rounded border border-[var(--ui-border)] bg-[var(--ui-surface)] text-sm">
+                                                <span class="truncate">{{ $mm->model_id }}</span>
+                                                <span class="text-[10px] text-[var(--ui-muted)]">{{ $mm->provider?->key ?? '—' }}</span>
+                                            </div>
+                                        @endforeach
+                                    @else
+                                        <div class="text-xs text-[var(--ui-muted)]">Keine Models in DB – bitte zuerst syncen.</div>
+                                    @endif
+                                </div>
                             </div>
                         </div>
                     </div>
