@@ -684,13 +684,19 @@ class SimpleToolController extends Controller
                                             'keys' => array_keys($decoded),
                                             'type' => $decoded['type'] ?? ($decoded['item']['type'] ?? null),
                                             'id' => $decoded['id'] ?? ($decoded['item']['id'] ?? ($decoded['item_id'] ?? null)),
+                                            'item_id' => $decoded['item_id'] ?? null,
+                                            'call_id' => $decoded['call_id'] ?? ($decoded['item']['call_id'] ?? null),
                                             'name' => $decoded['name'] ?? ($decoded['item']['name'] ?? null),
                                             'status' => $decoded['status'] ?? null,
+                                            'sequence_number' => $decoded['sequence_number'] ?? null,
+                                            'output_index' => $decoded['output_index'] ?? null,
+                                            'response_id' => $decoded['response']['id'] ?? null,
+                                            'model' => $decoded['response']['model'] ?? ($decoded['model'] ?? null),
                                             'query' => $decoded['query'] ?? ($decoded['input']['query'] ?? ($decoded['item']['query'] ?? null)),
                                         ];
                                         $raw = json_encode($decoded, JSON_UNESCAPED_UNICODE);
-                                        if (is_string($raw) && strlen($raw) > 2000) {
-                                            $raw = substr($raw, 0, 2000) . '…';
+                                        if (is_string($raw) && strlen($raw) > 4000) {
+                                            $raw = substr($raw, 0, 4000) . '…';
                                         }
                                         $sendEvent('openai.event', [
                                             'event' => $event,

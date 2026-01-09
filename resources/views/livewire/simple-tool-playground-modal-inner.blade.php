@@ -233,10 +233,17 @@
                                 <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Thinking (live)</div>
                                 <pre id="rtThinking" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px] max-h-[16vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
                             </div>
-                            {{-- Events list is not very helpful in UI; we show the latest event in the chat footer. --}}
-                            <div class="pt-2 border-t border-[var(--ui-border)] hidden">
-                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Events</div>
-                                <div id="rtEvents" class="text-xs space-y-2 text-[var(--ui-muted)] max-h-[16vh] overflow-y-auto pr-1"></div>
+                            {{-- Events: show raw upstream/server event stream to debug what actually arrives --}}
+                            <div class="pt-2 border-t border-[var(--ui-border)]">
+                                <div class="flex items-center justify-between mb-1 gap-3">
+                                    <div class="text-xs font-semibold text-[var(--ui-secondary)]">Events (live)</div>
+                                    <div class="text-[10px] text-[var(--ui-muted)] font-mono whitespace-nowrap">
+                                        all: <span id="rtEventCount">0</span>
+                                        · reasoning: <span id="rtEventReasonCount">0</span>
+                                        · thinking: <span id="rtEventThinkingCount">0</span>
+                                    </div>
+                                </div>
+                                <div id="rtEvents" class="text-xs space-y-2 text-[var(--ui-muted)] max-h-[18vh] overflow-y-auto pr-1"></div>
                             </div>
 
                             <div class="pt-2 border-t border-[var(--ui-border)] min-w-0">
@@ -561,6 +568,9 @@
         const rtCostRequest = document.getElementById('rtCostRequest');
         const rtCostNote = document.getElementById('rtCostNote');
         const rtToolCalls = document.getElementById('rtToolCalls');
+        const rtEventCountEl = document.getElementById('rtEventCount');
+        const rtEventReasonCountEl = document.getElementById('rtEventReasonCount');
+        const rtEventThinkingCountEl = document.getElementById('rtEventThinkingCount');
 
         // Global per-thread state so modal close/open and thread switching does not reset anything.
         window.__simplePlaygroundThreadStore = window.__simplePlaygroundThreadStore || {};
@@ -644,14 +654,20 @@
         };
 
         const updateFooterBusy = () => {
+          // Der Footer soll sich am *aktuellen Thread* orientieren. threadState kann kurzfristig "stale" sein,
+          // daher lesen wir den aktiven Thread-ID aus dem DOM und holen den State aus dem globalen Store.
           const el = document.getElementById('pgFooterBusy');
           const stopBtn = document.getElementById('pgStopBtn');
+          const tid = refreshThreadIdFromDom();
+          const st = getThreadState(tid || 'none');
+          const busy = !!(st && st.inFlight);
           if (el) {
-            if (threadState && threadState.inFlight) el.classList.remove('hidden');
+            if (busy) el.classList.remove('hidden');
             else el.classList.add('hidden');
           }
           if (stopBtn) {
-            stopBtn.disabled = !(threadState && threadState.inFlight);
+            // Enable Stop if this thread is in-flight OR we have an abortController (safety net)
+            stopBtn.disabled = !(busy || !!st?.abortController);
           }
         };
 
@@ -679,6 +695,7 @@
           toolCalls: [],
           toolsVisible: null,
         };
+        const eventCounters = { all: 0, reasoning: 0, thinking: 0 };
 
         const updateDebugDump = () => {
           if (!rtDebugDump) return;
@@ -707,6 +724,29 @@
           });
         }
 
+        const rtEventLabel = (key, preview) => {
+          try {
+            const bits = [String(key || '')];
+            if (preview && typeof preview === 'object') {
+              if (preview.sequence_number != null) bits.push(`seq:${preview.sequence_number}`);
+              if (preview.output_index != null) bits.push(`out:${preview.output_index}`);
+              if (preview.call_id) bits.push(`call:${String(preview.call_id).slice(0, 18)}…`);
+              if (preview.id && !preview.call_id) bits.push(`id:${String(preview.id).slice(0, 18)}…`);
+              if (preview.name) bits.push(`name:${String(preview.name)}`);
+              if (preview.status) bits.push(`status:${String(preview.status)}`);
+            }
+            return bits.filter(Boolean).join(' · ').slice(0, 220);
+          } catch (_) {
+            return String(key || '');
+          }
+        };
+
+        const updateEventCountersUi = () => {
+          if (rtEventCountEl) rtEventCountEl.textContent = String(eventCounters.all || 0);
+          if (rtEventReasonCountEl) rtEventReasonCountEl.textContent = String(eventCounters.reasoning || 0);
+          if (rtEventThinkingCountEl) rtEventThinkingCountEl.textContent = String(eventCounters.thinking || 0);
+        };
+
         const rtEvent = ({ key, preview = null, raw = null }) => {
           if (!key) return;
           // Also show last event in the chat footer (compact, no list needed)
@@ -723,10 +763,10 @@
             }
           } catch (_) {}
 
-          const eventKey = `${key}:${preview?.type || ''}:${preview?.id || ''}:${preview?.name || ''}`;
+          const eventKey = `${key}:${preview?.type || ''}:${preview?.id || ''}:${preview?.call_id || ''}:${preview?.name || ''}`;
           if (eventKey === lastEventKey && lastEventSummaryEl) {
             lastEventCount++;
-            lastEventSummaryEl.textContent = `${key} ×${lastEventCount}`;
+            lastEventSummaryEl.textContent = `${rtEventLabel(key, preview)} ×${lastEventCount}`;
           } else {
             lastEventKey = eventKey;
             lastEventCount = 1;
@@ -734,7 +774,7 @@
             row.className = 'border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)]';
             const summary = document.createElement('div');
             summary.className = 'font-mono text-[10px] text-[var(--ui-secondary)]';
-            summary.textContent = key;
+            summary.textContent = rtEventLabel(key, preview);
             row.appendChild(summary);
             if (rtVerbose && raw) {
               const pre = document.createElement('pre');
@@ -766,6 +806,10 @@
           if (rtCostOut) rtCostOut.textContent = '—';
           if (rtCostTotal) rtCostTotal.textContent = '—';
           if (rtStatus) rtStatus.textContent = 'idle';
+          eventCounters.all = 0;
+          eventCounters.reasoning = 0;
+          eventCounters.thinking = 0;
+          updateEventCountersUi();
           debugState.startedAt = null;
           debugState.payload = null;
           debugState.usage = null;
@@ -980,12 +1024,27 @@
 
         const stopCurrentRequest = () => {
           try {
-            if (!threadState || !threadState.inFlight) return;
-            threadState.userAborted = true;
-            if (rtStatus) rtStatus.textContent = 'abgebrochen';
-            if (threadState.abortController) {
-              try { threadState.abortController.abort(); } catch (_) {}
+            // Ensure we target the latest active thread (threadState may be stale after DOM updates).
+            const tid = refreshThreadIdFromDom();
+            const st = getThreadState(tid || 'none');
+
+            // If nothing is running in the active thread, try any in-flight thread (rare edge case).
+            let target = st;
+            if (!(target && (target.inFlight || target.abortController))) {
+              const store = window.__simplePlaygroundThreadStore || {};
+              const any = Object.values(store).find((x) => x && (x.inFlight || x.abortController));
+              if (any) target = any;
             }
+
+            if (!target || !(target.inFlight || target.abortController)) return;
+            target.userAborted = true;
+            if (rtStatus) rtStatus.textContent = 'abgebrochen';
+            if (target.abortController) {
+              try { target.abortController.abort(); } catch (_) {}
+            }
+            // Optimistically update footer state immediately
+            updateThreadBusyIndicators();
+            updateFooterBusy();
           } catch (_) {}
         };
 
@@ -1191,8 +1250,18 @@
                     break;
                   case 'openai.event': {
                     const ev = data?.event || 'openai.event';
+                    // Keep counters so we can quickly verify whether reasoning/thinking streams exist.
+                    eventCounters.all++;
+                    if (typeof ev === 'string') {
+                      if (ev.includes('reasoning_summary_text') || ev.includes('reasoning_text')) {
+                        // OpenAI Responses events: response.reasoning_* (we display as Reasoning/Thinking)
+                        if (ev.includes('reasoning_summary_text')) eventCounters.reasoning++;
+                        if (ev.includes('reasoning_text')) eventCounters.thinking++;
+                      }
+                    }
+                    updateEventCountersUi();
                     rtEvent({ key: ev, preview: data?.preview || null, raw: data?.raw || null });
-                    debugState.events.push({ t: Date.now(), event: ev, preview: data?.preview || null });
+                    debugState.events.push({ t: Date.now(), event: ev, preview: data?.preview || null, raw: data?.raw || null });
                     updateDebugDump();
                     break;
                   }
