@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Platform\Core\Models\CoreAiModel;
 use Platform\Core\Models\CoreAiProvider;
+use Platform\Core\Models\CoreChat;
+use Platform\Core\Models\CoreChatThread;
+use Platform\Core\Models\CoreChatMessage;
 
 /**
  * Minimaler Tool Controller
@@ -349,6 +352,7 @@ class SimpleToolController extends Controller
                         // message can be empty when continuing an interrupted tool-loop
                         'message' => 'nullable|string',
                         'chat_history' => 'nullable|array', // Conversation-Historie
+                        'thread_id' => 'nullable|integer|exists:core_chat_threads,id',
                         'model' => 'nullable|string',
                         'context' => 'nullable|array',
                         'context.source_route' => 'nullable|string',
@@ -366,7 +370,29 @@ class SimpleToolController extends Controller
                 }
 
                 $userMessage = (string) ($request->input('message') ?? '');
+                $threadId = $request->input('thread_id');
                 $chatHistory = $request->input('chat_history', []);
+
+                // Load thread and messages from DB if thread_id provided
+                $thread = null;
+                if ($threadId) {
+                    $thread = CoreChatThread::with('chat')->find($threadId);
+                    if ($thread && $thread->chat && $thread->chat->user_id === $request->user()?->id) {
+                        // Load messages from DB
+                        $dbMessages = $thread->messages()->orderBy('created_at')->get();
+                        $chatHistory = [];
+                        foreach ($dbMessages as $msg) {
+                            if ($msg->role !== 'system') { // Skip system messages from DB
+                                $chatHistory[] = [
+                                    'role' => $msg->role,
+                                    'content' => $msg->content,
+                                ];
+                            }
+                        }
+                    } else {
+                        $thread = null; // Invalid thread, ignore
+                    }
+                }
 
                 // Model selection: accept client-selected model, but validate against core_ai_models (provider=openai).
                 $model = (string) ($request->input('model') ?? '');
@@ -445,6 +471,18 @@ class SimpleToolController extends Controller
                         'role' => 'user',
                         'content' => $userMessage,
                     ];
+                    
+                    // Save user message to DB if thread exists
+                    if ($thread) {
+                        CoreChatMessage::create([
+                            'core_chat_id' => $thread->core_chat_id,
+                            'thread_id' => $thread->id,
+                            'role' => 'user',
+                            'content' => $userMessage,
+                            'tokens_in' => 0, // Will be updated after usage calculation
+                            'tokens_out' => 0,
+                        ]);
+                    }
                 }
 
                 $sendEvent('start', ['message' => '🚀 Starte...']);
@@ -737,6 +775,33 @@ class SimpleToolController extends Controller
                     // No tool calls → final answer
                     if (empty($toolCallsCollector)) {
                         $messages[] = ['role' => 'assistant', 'content' => $assistant];
+                        
+                        // Save assistant message to DB if thread exists
+                        if ($thread && trim($assistant) !== '') {
+                            $usageAggregate = $usageAggregate ?? [];
+                            $tokensIn = (int)($usageAggregate['input_tokens'] ?? 0);
+                            $tokensOut = (int)($usageAggregate['output_tokens'] ?? 0);
+                            
+                            CoreChatMessage::create([
+                                'core_chat_id' => $thread->core_chat_id,
+                                'thread_id' => $thread->id,
+                                'role' => 'assistant',
+                                'content' => $assistant,
+                                'meta' => [
+                                    'reasoning' => $reasoning,
+                                    'thinking' => $thinking,
+                                ],
+                                'tokens_in' => 0, // Input tokens are counted per request, not per message
+                                'tokens_out' => $tokensOut,
+                            ]);
+                            
+                            // Update thread and chat token counts
+                            $thread->chat->increment('total_tokens_out', $tokensOut);
+                            if (isset($usageAggregate['input_tokens'])) {
+                                $thread->chat->increment('total_tokens_in', $tokensIn);
+                            }
+                        }
+                        
                         $sendEvent('complete', [
                             'assistant' => $assistant,
                             'reasoning' => $reasoning,

@@ -6,6 +6,10 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Platform\Core\Models\CoreAiModel;
 use Platform\Core\Models\CoreAiProvider;
+use Platform\Core\Models\CoreChat;
+use Platform\Core\Models\CoreChatThread;
+use Platform\Core\Models\CoreChatMessage;
+use Illuminate\Support\Facades\Auth;
 
 class ModalSimpleToolPlayground extends Component
 {
@@ -18,6 +22,9 @@ class ModalSimpleToolPlayground extends Component
     public array $pricingEdits = [];
 
     public ?string $pricingSaveMessage = null;
+
+    public ?int $activeThreadId = null;
+    public ?CoreChat $chat = null;
 
     #[On('playground:open')]
     public function openModal(array $payload = []): void
@@ -39,9 +46,82 @@ class ModalSimpleToolPlayground extends Component
         }
         $this->pricingSaveMessage = null;
 
+        // Load or create chat for this user
+        $this->loadOrCreateChat();
+
         // Ensure the client-side playground initializes AFTER the modal is open and context is rendered.
         // (DOMContentLoaded might have happened long before; modal is opened later.)
         $this->dispatch('simple-playground-modal-opened');
+    }
+
+    private function loadOrCreateChat(): void
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return;
+        }
+
+        $this->chat = CoreChat::firstOrCreate(
+            [
+                'user_id' => $user->id,
+                'title' => 'Simple Playground',
+            ],
+            [
+                'status' => 'active',
+                'total_tokens_in' => 0,
+                'total_tokens_out' => 0,
+            ]
+        );
+
+        // Load most recent open thread or create one
+        $thread = $this->chat->threads()
+            ->where('status', 'open')
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if (!$thread) {
+            $thread = $this->chat->threads()->create([
+                'title' => 'Thread ' . ($this->chat->threads()->count() + 1),
+                'status' => 'open',
+                'started_at' => now(),
+            ]);
+        }
+
+        $this->activeThreadId = $thread->id;
+    }
+
+    public function createThread(): void
+    {
+        if (!$this->chat) {
+            $this->loadOrCreateChat();
+        }
+        if (!$this->chat) {
+            return;
+        }
+
+        $thread = $this->chat->threads()->create([
+            'title' => 'Thread ' . ($this->chat->threads()->count() + 1),
+            'status' => 'open',
+            'started_at' => now(),
+        ]);
+
+        $this->activeThreadId = $thread->id;
+        $this->dispatch('simple-playground:thread-changed', ['thread_id' => $thread->id]);
+    }
+
+    public function switchThread(int $threadId): void
+    {
+        if (!$this->chat) {
+            return;
+        }
+
+        $thread = $this->chat->threads()->find($threadId);
+        if (!$thread) {
+            return;
+        }
+
+        $this->activeThreadId = $threadId;
+        $this->dispatch('simple-playground:thread-changed', ['thread_id' => $threadId]);
     }
 
     public function saveModelPricing(int $coreAiModelId): void
@@ -87,8 +167,14 @@ class ModalSimpleToolPlayground extends Component
             ->orderBy('model_id')
             ->get();
 
+        $threads = $this->chat
+            ? $this->chat->threads()->orderBy('created_at', 'desc')->get()
+            : collect();
+
         return view('platform::livewire.modal-simple-tool-playground', [
             'coreAiModels' => $models,
+            'threads' => $threads,
+            'activeThreadId' => $this->activeThreadId,
         ]);
     }
 }

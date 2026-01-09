@@ -36,7 +36,7 @@ class CoreChat extends Model
 
     public function messages(): HasMany
     {
-        return $this->hasMany(CoreChatMessage::class, 'chat_id');
+        return $this->hasMany(CoreChatMessage::class, 'core_chat_id');
     }
 
     public function threads(): HasMany

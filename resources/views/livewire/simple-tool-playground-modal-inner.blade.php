@@ -45,7 +45,31 @@
     <div x-show="tab==='chat'" class="w-full h-full min-h-0" x-cloak>
         <div class="h-full min-h-0 border border-[var(--ui-border)] rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
             <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
-                <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Chat</div>
+                <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] flex-shrink-0">Chat</div>
+                    {{-- Thread Tabs --}}
+                    <div class="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
+                        @if(isset($threads) && $threads->count() > 0)
+                            @foreach($threads as $t)
+                                <button
+                                    type="button"
+                                    wire:click="switchThread({{ $t->id }})"
+                                    class="px-2 py-1 rounded text-[11px] border transition flex-shrink-0 whitespace-nowrap {{ ($activeThreadId ?? null) == $t->id ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]' : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]' }}"
+                                >
+                                    {{ $t->title }}
+                                </button>
+                            @endforeach
+                        @endif
+                        <button
+                            type="button"
+                            wire:click="createThread"
+                            class="px-2 py-1 rounded text-[11px] border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] flex-shrink-0"
+                            title="Neuen Thread anlegen"
+                        >
+                            +
+                        </button>
+                    </div>
+                </div>
             </div>
             <div class="flex-1 min-h-0 overflow-auto">
                 <div class="w-full h-full min-h-0 flex gap-5 px-4" style="width:100%; max-width:100%;">
@@ -393,6 +417,7 @@
 
         /** type: {role:'user'|'assistant', content:string}[] */
         let messages = [];
+        let currentThreadId = @json($activeThreadId ?? null);
         /** continuation state for interrupted tool-loops */
         let continuation = null;
         let inFlight = false;
@@ -607,6 +632,38 @@
         if (!alreadyBound && modelsReload) modelsReload.addEventListener('click', () => loadModels());
         loadModels();
 
+        // Thread change handler: load messages from DB
+        const loadThreadMessages = async (threadId) => {
+          if (!threadId) {
+            messages = [];
+            chatList.innerHTML = '';
+            const empty = document.getElementById('chatEmpty');
+            if (empty) empty.style.display = '';
+            return;
+          }
+
+          try {
+            // Load messages via Livewire (thread_id is already set in component)
+            // We'll use a simple approach: reload the component or fetch via API
+            // For now, we clear and let the next request load from DB
+            messages = [];
+            chatList.innerHTML = '';
+            const empty = document.getElementById('chatEmpty');
+            if (empty) empty.style.display = '';
+            currentThreadId = threadId;
+          } catch (e) {
+            console.error('Failed to load thread messages:', e);
+          }
+        };
+
+        // Listen for thread changes from Livewire
+        window.addEventListener('simple-playground:thread-changed', (e) => {
+          const threadId = e.detail?.thread_id;
+          if (threadId !== currentThreadId) {
+            loadThreadMessages(threadId);
+          }
+        });
+
         // Send (parity with page playground: chat updates only on complete)
         const send = async () => {
           const text = (input?.value || '').trim();
@@ -638,6 +695,7 @@
           const payload = {
             message: (isContinue ? '' : text),
             chat_history: messages,
+            thread_id: currentThreadId,
             model: selectedModel || null,
             continuation: (isContinue ? continuation : null),
             context: ctx || null,
