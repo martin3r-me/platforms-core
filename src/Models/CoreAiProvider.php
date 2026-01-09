@@ -3,6 +3,7 @@
 namespace Platform\Core\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Symfony\Component\Uid\UuidV7;
 
@@ -17,6 +18,7 @@ class CoreAiProvider extends Model
         'is_active',
         'base_url',
         'catalog_url',
+        'default_model_id',
         'metadata',
     ];
 
@@ -28,6 +30,11 @@ class CoreAiProvider extends Model
     public function models(): HasMany
     {
         return $this->hasMany(CoreAiModel::class, 'provider_id');
+    }
+
+    public function defaultModel(): BelongsTo
+    {
+        return $this->belongsTo(CoreAiModel::class, 'default_model_id');
     }
 
     protected static function booted(): void

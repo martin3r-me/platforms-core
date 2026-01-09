@@ -180,6 +180,19 @@ class SyncAiModelsCommand extends Command
                     'is_deprecated' => true,
                     'deprecated_at' => now(),
                 ]);
+
+            // Default model bootstrap: if none set yet, use gpt-5.2 when available.
+            $provider->refresh();
+            if (empty($provider->default_model_id)) {
+                $default = CoreAiModel::where('provider_id', $provider->id)
+                    ->where('model_id', 'gpt-5.2')
+                    ->where('is_active', true)
+                    ->where('is_deprecated', false)
+                    ->first();
+                if ($default) {
+                    $provider->update(['default_model_id' => $default->id]);
+                }
+            }
         }
 
         $this->info("Done. synced={$synced} created={$created} updated={$updated}" . ($dryRun ? ' (dry-run)' : ''));

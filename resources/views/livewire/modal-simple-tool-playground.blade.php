@@ -12,6 +12,30 @@
                     <h3 class="text-xl font-bold text-[var(--ui-secondary)]">Simple Playground</h3>
                     <p class="text-sm text-[var(--ui-muted)]">Streaming, Reasoning/Thinking, Tools (Debug) – im Modal.</p>
                 </div>
+                {{-- Tabs in the modal header (requested) --}}
+                <div class="flex items-center gap-2">
+                    <button type="button"
+                        x-data
+                        @click="window.dispatchEvent(new CustomEvent('simple-playground:set-tab', { detail: { tab: 'chat' } }))"
+                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
+                    >
+                        Chat
+                    </button>
+                    <button type="button"
+                        x-data
+                        @click="window.dispatchEvent(new CustomEvent('simple-playground:set-tab', { detail: { tab: 'models' } }))"
+                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
+                    >
+                        Model settings
+                    </button>
+                    <button type="button"
+                        x-data
+                        @click="window.dispatchEvent(new CustomEvent('simple-playground:set-tab', { detail: { tab: 'settings' } }))"
+                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
+                    >
+                        Settings
+                    </button>
+                </div>
             </div>
         </x-slot>
 

@@ -5,7 +5,7 @@ namespace Platform\Core\Livewire;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Platform\Core\Models\CoreAiModel;
-use Illuminate\Validation\Rule;
+use Platform\Core\Models\CoreAiProvider;
 
 class ModalSimpleToolPlayground extends Component
 {
@@ -68,10 +68,21 @@ class ModalSimpleToolPlayground extends Component
         $this->pricingSaveMessage = "✅ Preise gespeichert: {$m->model_id}";
     }
 
+    public function setDefaultModel(int $coreAiModelId): void
+    {
+        $m = CoreAiModel::with('provider')->findOrFail($coreAiModelId);
+        if (!$m->provider) {
+            return;
+        }
+
+        $m->provider->update(['default_model_id' => $m->id]);
+        $this->pricingSaveMessage = "✅ Default Model gesetzt: {$m->provider->key} → {$m->model_id}";
+    }
+
     public function render()
     {
         $models = CoreAiModel::query()
-            ->with('provider')
+            ->with(['provider', 'provider.defaultModel'])
             ->orderBy('provider_id')
             ->orderBy('model_id')
             ->get();

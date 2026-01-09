@@ -12,6 +12,8 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Platform\Core\Models\CoreAiModel;
+use Platform\Core\Models\CoreAiProvider;
 
 /**
  * Minimaler Tool Controller
@@ -150,14 +152,48 @@ class SimpleToolController extends Controller
      */
     public function models(Request $request): JsonResponse
     {
-        // Simple Playground: fixed model for now (explicit user request)
-        $ids = ['gpt-5.2'];
+        // Source of truth: core_ai_models (manually editable in the Playground "Model settings" tab).
+        // We default to provider=openai for now; later this can be extended to other providers.
+        $providerKey = (string) ($request->query('provider') ?? 'openai');
+
+        $models = CoreAiModel::query()
+            ->with(['provider', 'provider.defaultModel'])
+            ->whereHas('provider', function ($q) use ($providerKey) {
+                $q->where('key', $providerKey)->where('is_active', true);
+            })
+            ->where('is_active', true)
+            ->where('is_deprecated', false)
+            ->orderBy('model_id')
+            ->get();
+
+        $ids = $models->pluck('model_id')->values()->all();
+        $provider = $models->first()?->provider;
+        $defaultModel = $provider?->defaultModel?->model_id ?? null;
 
         return response()->json([
             'success' => true,
             'models' => $ids,
             'count' => count($ids),
-            'fallback' => true,
+            'default_model' => $defaultModel,
+            // Detailed info for future UI (prices, limits, etc.).
+            'models_detailed' => $models->map(function (CoreAiModel $m) {
+                return [
+                    'provider' => $m->provider?->key,
+                    'model_id' => $m->model_id,
+                    'name' => $m->name,
+                    'category' => $m->category,
+                    'context_window' => $m->context_window,
+                    'max_output_tokens' => $m->max_output_tokens,
+                    'knowledge_cutoff_date' => $m->knowledge_cutoff_date?->format('Y-m-d'),
+                    'pricing_currency' => $m->pricing_currency,
+                    'price_input_per_1m' => $m->price_input_per_1m,
+                    'price_cached_input_per_1m' => $m->price_cached_input_per_1m,
+                    'price_output_per_1m' => $m->price_output_per_1m,
+                    'is_active' => (bool) $m->is_active,
+                    'is_deprecated' => (bool) $m->is_deprecated,
+                ];
+            })->values()->all(),
+            'source' => 'core_ai_models',
         ]);
     }
 
@@ -317,10 +353,27 @@ class SimpleToolController extends Controller
 
                 $userMessage = (string) ($request->input('message') ?? '');
                 $chatHistory = $request->input('chat_history', []);
-                // Simple Playground: fixed model for now (explicit user request)
-                $model = 'gpt-5.2';
 
-                // (Request model is ignored)
+                // Model selection: accept client-selected model, but validate against core_ai_models (provider=openai).
+                $model = (string) ($request->input('model') ?? '');
+                $providerKey = 'openai';
+                $provider = CoreAiProvider::where('key', $providerKey)->where('is_active', true)->with('defaultModel')->first();
+                $fallback = $provider?->defaultModel?->model_id ?: 'gpt-5.2';
+
+                if ($model === '') {
+                    $model = $fallback;
+                } else {
+                    $ok = CoreAiModel::query()
+                        ->whereHas('provider', fn($q) => $q->where('key', $providerKey)->where('is_active', true))
+                        ->where('model_id', $model)
+                        ->where('is_active', true)
+                        ->where('is_deprecated', false)
+                        ->exists();
+                    if (!$ok) {
+                        $model = $fallback;
+                    }
+                }
+
                 $continuation = $request->input('continuation', null);
 
                 // Terminal-Kontext (wird vom UI mitgeschickt, z.B. source_route/source_module/source_url)

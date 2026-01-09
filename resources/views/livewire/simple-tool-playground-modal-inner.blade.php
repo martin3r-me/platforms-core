@@ -1,29 +1,42 @@
-<div x-data="{ tab: 'chat' }" class="w-full h-full min-h-0 overflow-hidden flex flex-col" style="width:100%;">
-    <div class="flex items-center gap-2 px-4 py-3 border-b border-[var(--ui-border)]/60 bg-[var(--ui-surface)] flex-shrink-0">
-        <button type="button"
-            @click="tab='chat'"
-            class="px-3 py-1.5 rounded-md text-sm border transition"
-            :class="tab==='chat' ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)] border-[var(--ui-primary)]/30' : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'">
-            Chat
-        </button>
-        <button type="button"
-            @click="tab='settings'"
-            class="px-3 py-1.5 rounded-md text-sm border transition"
-            :class="tab==='settings' ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)] border-[var(--ui-primary)]/30' : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'">
-            Settings
-        </button>
-        <button type="button"
-            @click="tab='models'"
-            class="px-3 py-1.5 rounded-md text-sm border transition"
-            :class="tab==='models' ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)] border-[var(--ui-primary)]/30' : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'">
-            Model settings
-        </button>
-        <div class="flex-1"></div>
-        <div class="text-xs text-[var(--ui-muted)] truncate">
-            Kontext: <span id="pgContextLabel" class="text-[var(--ui-secondary)]">—</span>
+<div x-data="{ tab: 'chat' }"
+     @window.simple-playground:set-tab="tab = ($event.detail && $event.detail.tab) ? $event.detail.tab : tab"
+     class="w-full h-full min-h-0 overflow-hidden flex flex-col" style="width:100%;">
+    {{-- Top bar: usage tiles (tabs moved to modal header) --}}
+    <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 bg-[var(--ui-surface)] flex items-center justify-between gap-4 flex-shrink-0">
+        <div class="flex items-center gap-2">
+            <div class="grid grid-cols-4 gap-2">
+                <div class="border border-[var(--ui-border)]/60 rounded-lg bg-[var(--ui-bg)] px-3 py-2 min-w-[110px]">
+                    <div class="text-[10px] text-[var(--ui-muted)]">Input tokens</div>
+                    <div id="rtTokensIn" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
+                </div>
+                <div class="border border-[var(--ui-border)]/60 rounded-lg bg-[var(--ui-bg)] px-3 py-2 min-w-[110px]">
+                    <div class="text-[10px] text-[var(--ui-muted)]">Cached / Reason</div>
+                    <div id="rtTokensExtra" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
+                </div>
+                <div class="border border-[var(--ui-border)]/60 rounded-lg bg-[var(--ui-bg)] px-3 py-2 min-w-[110px]">
+                    <div class="text-[10px] text-[var(--ui-muted)]">Output tokens</div>
+                    <div id="rtTokensOut" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
+                </div>
+                <div class="border border-[var(--ui-border)]/60 rounded-lg bg-[var(--ui-bg)] px-3 py-2 min-w-[140px]">
+                    <div class="text-[10px] text-[var(--ui-muted)]">Total $</div>
+                    <div id="rtCostTotal" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
+                </div>
+            </div>
+            <div id="rtUsageModel" class="ml-3 text-[10px] text-[var(--ui-muted)]"></div>
+            <div id="rtCostNote" class="ml-3 text-[10px] text-[var(--ui-muted)]"></div>
+            {{-- keep ids for JS compatibility --}}
+            <div id="rtTokensTotal" class="hidden">—</div>
+            <div id="rtCostIn" class="hidden">—</div>
+            <div id="rtCostCached" class="hidden">—</div>
+            <div id="rtCostOut" class="hidden">—</div>
         </div>
-        <div class="text-xs text-[var(--ui-muted)] ml-3">
-            Stream: <span id="rtStatus" class="text-[var(--ui-secondary)]">idle</span>
+        <div class="flex items-center gap-4">
+            <div class="text-xs text-[var(--ui-muted)] truncate">
+                Kontext: <span id="pgContextLabel" class="text-[var(--ui-secondary)]">—</span>
+            </div>
+            <div class="text-xs text-[var(--ui-muted)]">
+                Stream: <span id="rtStatus" class="text-[var(--ui-secondary)]">idle</span>
+            </div>
         </div>
     </div>
 
@@ -103,51 +116,7 @@
                 <pre id="rtAssistant" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[80px] max-h-[22vh] overflow-y-auto"></pre>
             </div>
 
-            <div>
-                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Tokens</div>
-                <div id="rtUsage" class="grid grid-cols-2 gap-2">
-                    <div class="border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] p-2">
-                        <div class="text-[10px] text-[var(--ui-muted)]">Input</div>
-                        <div id="rtTokensIn" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
-                    </div>
-                    <div class="border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] p-2">
-                        <div class="text-[10px] text-[var(--ui-muted)]">Output</div>
-                        <div id="rtTokensOut" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
-                    </div>
-                    <div class="border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] p-2">
-                        <div class="text-[10px] text-[var(--ui-muted)]">Total</div>
-                        <div id="rtTokensTotal" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
-                    </div>
-                    <div class="border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] p-2">
-                        <div class="text-[10px] text-[var(--ui-muted)]">Cached / Reasoning</div>
-                        <div id="rtTokensExtra" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
-                    </div>
-                </div>
-                <div id="rtUsageModel" class="mt-1 text-[10px] text-[var(--ui-muted)]"></div>
-
-                <div class="mt-2">
-                    <div class="text-[10px] text-[var(--ui-muted)] mb-1">Kosten (gpt-5.2)</div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div class="border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] p-2">
-                            <div class="text-[10px] text-[var(--ui-muted)]">Input $</div>
-                            <div id="rtCostIn" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
-                        </div>
-                        <div class="border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] p-2">
-                            <div class="text-[10px] text-[var(--ui-muted)]">Cached input $</div>
-                            <div id="rtCostCached" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
-                        </div>
-                        <div class="border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] p-2">
-                            <div class="text-[10px] text-[var(--ui-muted)]">Output $</div>
-                            <div id="rtCostOut" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
-                        </div>
-                        <div class="border border-[var(--ui-border)] rounded bg-[var(--ui-bg)] p-2">
-                            <div class="text-[10px] text-[var(--ui-muted)]">Total $</div>
-                            <div id="rtCostTotal" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
-                        </div>
-                    </div>
-                    <div id="rtCostNote" class="mt-1 text-[10px] text-[var(--ui-muted)]"></div>
-                </div>
-            </div>
+            {{-- Tokens & costs moved to the top bar --}}
 
             <div>
                 <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Tool Calls (letzte 5)</div>
@@ -222,6 +191,7 @@
                                     <th class="text-left py-2 pr-4 font-semibold">Cutoff</th>
                                     <th class="text-left py-2 pr-4 font-semibold">Pricing (manuell)</th>
                                     <th class="text-left py-2 pr-4 font-semibold">Features</th>
+                                    <th class="text-left py-2 pr-4 font-semibold">Default</th>
                                     <th class="text-left py-2 pr-0 font-semibold">Status</th>
                                 </tr>
                             </thead>
@@ -229,6 +199,7 @@
                                 @foreach(($coreAiModels ?? collect()) as $m)
                                     @php
                                         $p = $m->provider?->key ?? '—';
+                                        $isDefault = (int)($m->provider?->default_model_id ?? 0) === (int)$m->id;
                                         $features = [];
                                         if ($m->supports_reasoning_tokens) $features[] = 'reasoning';
                                         if ($m->supports_streaming) $features[] = 'stream';
@@ -291,6 +262,16 @@
                                         </td>
                                         <td class="py-2 pr-4 text-[10px] text-[var(--ui-muted)]">
                                             {{ count($features) ? implode(', ', $features) : '—' }}
+                                        </td>
+                                        <td class="py-2 pr-4">
+                                            <button
+                                                type="button"
+                                                class="text-[10px] px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] hover:bg-[var(--ui-muted-5)]"
+                                                wire:click="setDefaultModel({{ $m->id }})"
+                                                title="Als Default setzen"
+                                            >
+                                                {{ $isDefault ? '✅ default' : 'set default' }}
+                                            </button>
                                         </td>
                                         <td class="py-2 pr-0">
                                             @if($m->is_deprecated)
@@ -527,7 +508,7 @@
           });
         }
 
-        const renderModels = (models) => {
+        const renderModels = (models, defaultFromServer = null) => {
           if (!Array.isArray(models)) models = [];
           if (modelSelect) {
             modelSelect.innerHTML = '';
@@ -557,13 +538,33 @@
               modelsList.appendChild(row);
             }
           }
-          if (!selectedModel) setSelectedModel(models[0] || serverDefaultModel);
+          if (!selectedModel) {
+            const pick = (defaultFromServer && models.includes(defaultFromServer))
+              ? defaultFromServer
+              : (models[0] || serverDefaultModel);
+            setSelectedModel(pick);
+          }
         };
 
         const loadModels = async () => {
-          // parity with page playground: fixed model, no API call
-          if (modelsList) modelsList.innerHTML = '<div class="text-xs text-[var(--ui-muted)]">Fix: gpt-5.2</div>';
-          renderModels([serverDefaultModel]);
+          try {
+            if (modelsList) modelsList.innerHTML = '<div class="text-xs text-[var(--ui-muted)]">Lade Models…</div>';
+            const res = await fetch(modelsUrl, {
+              method: 'GET',
+              credentials: 'same-origin',
+              headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+            });
+            const data = await res.json().catch(() => ({}));
+            const ids = Array.isArray(data?.models) ? data.models : [];
+            const def = (typeof data?.default_model === 'string') ? data.default_model : null;
+            if (ids.length > 0) {
+              renderModels(ids, def);
+              return;
+            }
+          } catch (_) {}
+          // Fallback
+          if (modelsList) modelsList.innerHTML = '<div class="text-xs text-[var(--ui-muted)]">Fallback: gpt-5.2</div>';
+          renderModels([serverDefaultModel], serverDefaultModel);
         };
         // Always refresh models (so gpt-5.2 is visible immediately after opening).
         if (!alreadyBound && modelsReload) modelsReload.addEventListener('click', () => loadModels());
