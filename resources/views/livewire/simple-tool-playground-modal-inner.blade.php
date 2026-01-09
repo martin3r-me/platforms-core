@@ -134,32 +134,6 @@
                     </div>
                 </div>
             </div>
-            {{-- Footer (same style as header) --}}
-            <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0 bg-[var(--ui-surface)]">
-                <div class="flex items-center gap-2">
-                    <button
-                        type="button"
-                        id="pgStopBtn"
-                        class="px-3 py-1.5 rounded-md text-sm border transition bg-red-600 text-white border-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                        disabled
-                        title="Stoppt den aktuellen Stream sofort"
-                    >
-                        Stop
-                    </button>
-                    <button
-                        type="button"
-                        wire:click="deleteActiveThread"
-                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-danger)] border-[var(--ui-danger)]/50 hover:bg-[var(--ui-danger-5)]"
-                        title="Aktiven Thread löschen"
-                    >
-                        Thread löschen
-                    </button>
-                </div>
-                <div id="pgFooterBusy" class="hidden items-center gap-2 text-xs text-[var(--ui-muted)]">
-                    <span class="w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
-                    <span>Läuft…</span>
-                </div>
-            </div>
             <div class="flex-1 min-h-0 overflow-auto">
                 <div class="w-full h-full min-h-0 flex gap-5 px-4" style="width:100%; max-width:100%;">
 
@@ -222,6 +196,34 @@
                 </form>
             </div>
         </div>
+
+            {{-- Footer (same style as header): pinned to the bottom of the Chat frame --}}
+            <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0 bg-[var(--ui-surface)]">
+                <div class="flex items-center gap-2">
+                    <button
+                        type="button"
+                        id="pgStopBtn"
+                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-red-600 border-red-200 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        disabled
+                        title="Stoppt den aktuellen Stream sofort"
+                    >
+                        Stop
+                    </button>
+                    <button
+                        type="button"
+                        x-data
+                        @click.prevent="if (confirm('Aktiven Thread wirklich löschen?')) { $wire.deleteActiveThread() }"
+                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-danger)] border-[var(--ui-border)] hover:bg-[var(--ui-danger-5)]"
+                        title="Aktiven Thread löschen"
+                    >
+                        Thread löschen
+                    </button>
+                </div>
+                <div id="pgFooterBusy" class="hidden flex items-center gap-2 text-xs text-[var(--ui-muted)]">
+                    <span class="w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
+                    <span>Läuft…</span>
+                </div>
+            </div>
     </div>
 
     {{-- Right: Realtime / Debug (1/4 width) --}}
@@ -948,19 +950,10 @@
         const setSendButtonBusy = (busy) => {
           refreshDomRefs();
           if (!sendBtn) return;
-          if (busy) {
-            sendBtn.disabled = false;
-            sendBtn.textContent = 'Stop';
-            sendBtn.classList.remove('bg-[var(--ui-primary)]');
-            sendBtn.classList.add('bg-red-600', 'hover:bg-red-700');
-          } else {
-            sendBtn.disabled = false;
-            sendBtn.textContent = 'Senden';
-            sendBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
-            if (!sendBtn.classList.contains('bg-[var(--ui-primary)]')) {
-              sendBtn.classList.add('bg-[var(--ui-primary)]');
-            }
-          }
+          // Keep the send button stable (aesthetics): Stop lives in the footer.
+          sendBtn.disabled = !!busy;
+          if (busy) sendBtn.classList.add('opacity-60', 'cursor-not-allowed');
+          else sendBtn.classList.remove('opacity-60', 'cursor-not-allowed');
         };
 
         const stopCurrentRequest = () => {
@@ -1332,8 +1325,7 @@
             currentSendBtn.addEventListener('click', (e) => {
               e.preventDefault();
               e.stopPropagation();
-              if (threadState && threadState.inFlight) stopCurrentRequest();
-              else send();
+              send();
             });
             currentSendBtn.dataset.clickBound = '1';
           }
