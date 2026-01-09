@@ -23,18 +23,27 @@
                         @if(isset($threads) && $threads->count() > 0)
                             @foreach($threads as $t)
                                 <div
-                                    class="relative flex-shrink-0"
+                                    class="relative flex-shrink-0 flex items-center"
                                     x-data="{ editing: false, title: '{{ addslashes($t->title) }}' }"
                                     x-init="@if(($activeThreadId ?? null) == $t->id && $t->title === 'Thread ' . ($threads->count() - $loop->index)) editing = true; $nextTick(() => $refs.input?.focus()) @endif"
                                 >
                                     <button
                                         type="button"
                                         wire:click="switchThread({{ $t->id }})"
-                                        @dblclick.stop="editing = true; $nextTick(() => $refs.input?.focus())"
                                         x-show="!editing"
-                                        class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap {{ ($activeThreadId ?? null) == $t->id ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]' : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]' }}"
+                                        class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1 {{ ($activeThreadId ?? null) == $t->id ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]' : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]' }}"
                                     >
                                         <span x-text="title"></span>
+                                        <svg 
+                                            @click.stop="editing = true; $nextTick(() => $refs.input?.focus())"
+                                            class="w-3 h-3 {{ ($activeThreadId ?? null) == $t->id ? 'text-white/70 hover:text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }} cursor-pointer"
+                                            fill="none" 
+                                            stroke="currentColor" 
+                                            viewBox="0 0 24 24"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                        >
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
                                     </button>
                                     <input
                                         x-ref="input"
