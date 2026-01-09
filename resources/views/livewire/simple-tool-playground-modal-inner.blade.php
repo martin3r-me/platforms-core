@@ -1,5 +1,5 @@
 <div x-data="{ tab: 'chat' }"
-     @window.simple-playground:set-tab="tab = ($event.detail && $event.detail.tab) ? $event.detail.tab : tab"
+     @simple-playground:set-tab.window="tab = ($event.detail && $event.detail.tab) ? $event.detail.tab : tab"
      class="w-full h-full min-h-0 overflow-hidden flex flex-col" style="width:100%;">
     {{-- Top bar: usage tiles (tabs moved to modal header) --}}
     <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 bg-[var(--ui-surface)] flex items-center justify-between gap-4 flex-shrink-0">
@@ -42,30 +42,9 @@
 
     <div class="w-full flex-1 min-h-0 overflow-hidden p-4 bg-[var(--ui-bg)]" style="width:100%;">
     <div x-show="tab==='chat'" class="w-full h-full min-h-0 grid grid-cols-12 gap-5" style="width:100%;" x-cloak>
-    {{-- Left: Model selection (independent scroll) --}}
-        <div class="col-span-12 lg:col-span-3 min-h-0 min-w-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
-            <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
-                <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model</div>
-                <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
-            </div>
-            <div class="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto">
-                <div>
-                    <div class="text-xs text-[var(--ui-muted)] mb-1">Ausgewählt (Drop Zone)</div>
-                    <div id="modelDropZone" class="min-h-[44px] px-3 py-2 rounded border border-dashed border-[var(--ui-border)] bg-[var(--ui-bg)] text-sm">
-                        <span id="selectedModelLabel" class="text-[var(--ui-secondary)]">—</span>
-                    </div>
-                    <div class="mt-2 text-xs text-[var(--ui-muted)]">Drag ein Model aus der Liste hier rein (oder Doppelklick).</div>
-                </div>
-
-                <div class="pt-2 border-t border-[var(--ui-border)]">
-                    <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] mb-2">Verfügbare Models</div>
-                    <div id="modelsList" class="space-y-2 overflow-y-auto pr-1"></div>
-                </div>
-            </div>
-        </div>
 
     {{-- Center: Chat (independent scroll + input pinned to bottom) --}}
-    <div x-show="tab==='chat'" class="col-span-12 lg:col-span-6 min-h-0 min-w-0 flex flex-col" x-cloak>
+    <div x-show="tab==='chat'" class="col-span-12 lg:col-span-8 min-h-0 min-w-0 flex flex-col" x-cloak>
         <div class="flex-1 min-h-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
             <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
                 <div id="chatList" class="space-y-4"></div>
@@ -96,7 +75,7 @@
     </div>
 
     {{-- Right: Realtime / Debug (independent scroll) --}}
-    <div class="col-span-12 lg:col-span-3 min-h-0 min-w-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
+    <div class="col-span-12 lg:col-span-4 min-h-0 min-w-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
             <div class="text-xs text-[var(--ui-muted)]">
                 Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
@@ -172,6 +151,34 @@
                         {{ $pricingSaveMessage }}
                     </div>
                 @endif
+
+                {{-- Model selection moved here (left column removed from Chat tab) --}}
+                <div class="grid grid-cols-12 gap-4 mb-4">
+                    <div class="col-span-12 lg:col-span-4 min-h-0 border border-[var(--ui-border)] rounded-xl bg-[var(--ui-bg)] overflow-hidden">
+                        <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between">
+                            <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model Auswahl</div>
+                            <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
+                        </div>
+                        <div class="p-4 space-y-4">
+                            <div>
+                                <div class="text-xs text-[var(--ui-muted)] mb-1">Ausgewählt (Drop Zone)</div>
+                                <div id="modelDropZone" class="min-h-[44px] px-3 py-2 rounded border border-dashed border-[var(--ui-border)] bg-[var(--ui-surface)] text-sm">
+                                    <span id="selectedModelLabel" class="text-[var(--ui-secondary)]">—</span>
+                                </div>
+                                <div class="mt-2 text-xs text-[var(--ui-muted)]">Drag ein Model aus der Liste hier rein (oder Doppelklick).</div>
+                            </div>
+
+                            <div class="pt-2 border-t border-[var(--ui-border)]">
+                                <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] mb-2">Verfügbare Models</div>
+                                <div id="modelsList" class="space-y-2 max-h-[40vh] overflow-y-auto pr-1"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-span-12 lg:col-span-8 text-xs text-[var(--ui-muted)]">
+                        Hier pflegst du Preise/Default-Model. Die Auswahl wirkt sich direkt auf den Chat (Dropdown neben Input) und den Default aus.
+                    </div>
+                </div>
+
                 @if(($coreAiModels ?? collect())->count() === 0)
                     <div class="text-sm text-[var(--ui-muted)]">
                         Noch keine Modelle in <code class="px-1 py-0.5 rounded bg-[var(--ui-muted-5)]">core_ai_models</code>.
