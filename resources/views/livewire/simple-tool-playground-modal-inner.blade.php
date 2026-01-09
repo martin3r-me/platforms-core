@@ -42,7 +42,13 @@
 
     <div class="w-full flex-1 min-h-0 overflow-hidden p-4 bg-[var(--ui-bg)]" style="width:100%;">
     {{-- Chat Tab --}}
-    <div x-show="tab==='chat'" class="w-full h-full min-h-0 grid grid-cols-12 gap-5" style="width:100%;" x-cloak>
+    <div x-show="tab==='chat'" class="w-full h-full min-h-0" x-cloak>
+        <div class="h-full min-h-0 border border-[var(--ui-border)] rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
+            <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
+                <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Chat</div>
+            </div>
+            <div class="p-4 flex-1 min-h-0 overflow-auto">
+                <div class="w-full h-full min-h-0 grid grid-cols-12 gap-5" style="width:100%;">
 
     {{-- Center: Chat (independent scroll + input pinned to bottom) --}}
     <div class="col-span-12 lg:col-span-8 min-h-0 min-w-0 flex flex-col">
@@ -122,13 +128,17 @@
                 </div>
                 <textarea id="rtDebugDump" class="w-full text-[10px] leading-snug whitespace-pre border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[90px] max-h-[18vh] overflow-y-auto" readonly></textarea>
                 <div id="rtCopyStatus" class="mt-1 text-[10px] text-[var(--ui-muted)]"></div>
+            </div>
+        </div>
     </div>
-    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     {{-- Settings Tab --}}
     <div x-show="tab==='settings'" class="w-full h-full min-h-0" x-cloak>
-        <div class="h-full min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
+        <div class="h-full min-h-0 border border-[var(--ui-border)] rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
             <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                 <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Settings</div>
             </div>
