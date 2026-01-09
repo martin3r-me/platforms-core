@@ -23,7 +23,7 @@
                         @if(isset($threads) && $threads->count() > 0)
                             @foreach($threads as $t)
                                 <div
-                                    class="group relative flex-shrink-0"
+                                    class="relative flex-shrink-0"
                                     x-data="{ editing: false, title: '{{ addslashes($t->title) }}' }"
                                     x-init="@if(($activeThreadId ?? null) == $t->id && $t->title === 'Thread ' . ($threads->count() - $loop->index)) editing = true; $nextTick(() => $refs.input?.focus()) @endif"
                                 >
@@ -31,9 +31,10 @@
                                         type="button"
                                         wire:click="switchThread({{ $t->id }})"
                                         @dblclick.stop="editing = true; $nextTick(() => $refs.input?.focus())"
+                                        x-show="!editing"
                                         class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap {{ ($activeThreadId ?? null) == $t->id ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]' : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]' }}"
                                     >
-                                        <span x-show="!editing" x-text="title"></span>
+                                        <span x-text="title"></span>
                                     </button>
                                     <input
                                         x-ref="input"
@@ -42,7 +43,7 @@
                                         @keydown.enter.stop="$wire.updateThreadTitle({{ $t->id }}, title); editing = false"
                                         @keydown.escape.stop="editing = false; title = '{{ addslashes($t->title) }}'"
                                         @blur="$wire.updateThreadTitle({{ $t->id }}, title); editing = false"
-                                        class="absolute inset-0 px-2 py-1 rounded text-[11px] border border-[var(--ui-primary)] bg-[var(--ui-bg)] text-[var(--ui-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--ui-primary)]"
+                                        class="px-2 py-1 rounded text-[11px] border border-[var(--ui-primary)] bg-[var(--ui-bg)] text-[var(--ui-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--ui-primary)]"
                                         style="display: none; min-width: 80px; max-width: 200px;"
                                     />
                                 </div>
