@@ -29,8 +29,10 @@
 
         {{-- x-ui-modal (non-full) has a padded, scrollable body already.
            We want the playground to use the full available height/width, so we cancel padding here. --}}
-        <div class="-m-6 w-full h-full min-h-0 min-w-0 overflow-hidden flex">
-            @include('platform::livewire.simple-tool-playground-modal-inner')
+        {{-- Keep this wrapper as a block-level full-width container.
+             (Some browsers/layouts can shrink flex children unexpectedly; the inner grid must stretch.) --}}
+        <div class="-m-6 w-full h-full min-h-0 min-w-0 overflow-hidden" style="width:100%;">
+            @include('platform::livewire.simple-tool-playground-modal-inner', ['coreAiModels' => $coreAiModels ?? collect()])
         </div>
     </x-ui-modal>
 </div>

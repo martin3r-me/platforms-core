@@ -4,6 +4,7 @@ namespace Platform\Core\Livewire;
 
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Platform\Core\Models\CoreAiModel;
 
 class ModalSimpleToolPlayground extends Component
 {
@@ -26,7 +27,15 @@ class ModalSimpleToolPlayground extends Component
 
     public function render()
     {
-        return view('platform::livewire.modal-simple-tool-playground');
+        $models = CoreAiModel::query()
+            ->with('provider')
+            ->orderBy('provider_id')
+            ->orderBy('model_id')
+            ->get();
+
+        return view('platform::livewire.modal-simple-tool-playground', [
+            'coreAiModels' => $models,
+        ]);
     }
 }
 

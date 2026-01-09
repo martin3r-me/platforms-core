@@ -105,6 +105,7 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Console\Commands\EncryptCheckinTodos::class,
                 \Platform\Core\Console\Commands\DebugToolsCommand::class,
                 \Platform\Core\Console\Commands\TestOpenAiCommand::class,
+                \Platform\Core\Console\Commands\SyncAiModelsCommand::class,
                 \Platform\Core\Console\Commands\ListToolsCommand::class,
                 \Platform\Core\Console\Commands\TestToolOrchestrationCommand::class,
                 \Platform\Core\Console\Commands\MakeToolCommand::class,

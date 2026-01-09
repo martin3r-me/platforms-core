@@ -1,4 +1,4 @@
-<div x-data="{ tab: 'chat' }" class="w-full h-full min-h-0 overflow-hidden flex flex-col">
+<div x-data="{ tab: 'chat' }" class="w-full h-full min-h-0 overflow-hidden flex flex-col" style="width:100%;">
     <div class="flex items-center gap-2 px-4 py-3 border-b border-[var(--ui-border)]/60 bg-[var(--ui-surface)] flex-shrink-0">
         <button type="button"
             @click="tab='chat'"
@@ -12,6 +12,12 @@
             :class="tab==='settings' ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)] border-[var(--ui-primary)]/30' : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'">
             Settings
         </button>
+        <button type="button"
+            @click="tab='models'"
+            class="px-3 py-1.5 rounded-md text-sm border transition"
+            :class="tab==='models' ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)] border-[var(--ui-primary)]/30' : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'">
+            Model settings
+        </button>
         <div class="flex-1"></div>
         <div class="text-xs text-[var(--ui-muted)] truncate">
             Kontext: <span id="pgContextLabel" class="text-[var(--ui-secondary)]">—</span>
@@ -21,8 +27,8 @@
         </div>
     </div>
 
-    <div class="w-full flex-1 min-h-0 overflow-hidden p-4 bg-[var(--ui-bg)]">
-    <div x-show="tab==='chat'" class="w-full h-full min-h-0 grid grid-cols-12 gap-5" x-cloak>
+    <div class="w-full flex-1 min-h-0 overflow-hidden p-4 bg-[var(--ui-bg)]" style="width:100%;">
+    <div x-show="tab==='chat'" class="w-full h-full min-h-0 grid grid-cols-12 gap-5" style="width:100%;" x-cloak>
     {{-- Left: Model selection (independent scroll) --}}
         <div class="col-span-12 lg:col-span-3 min-h-0 min-w-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
             <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
@@ -179,6 +185,87 @@
                 <div><span class="font-semibold text-[var(--ui-secondary)]">Model:</span> links (Drag&Drop) oder direkt neben dem Chat-Input auswählen.</div>
                 <div><span class="font-semibold text-[var(--ui-secondary)]">Debug:</span> rechts bleibt immer sichtbar (Assistant/Reasoning/Thinking/Tool Calls).</div>
                 <div class="text-xs">Wenn du willst, kann ich Debug/Events auch in den Settings-Tab verschieben und den Chat-Tab noch „cleaner“ machen.</div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="tab==='models'" class="h-full min-h-0" x-cloak>
+        <div class="h-full min-h-0 border border-[var(--ui-border)] rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
+            <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
+                <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model settings</div>
+                <div class="text-xs text-[var(--ui-muted)]">
+                    Quelle: <span class="text-[var(--ui-secondary)]">core_ai_models</span>
+                </div>
+            </div>
+            <div class="p-4 flex-1 min-h-0 overflow-auto">
+                @if(($coreAiModels ?? collect())->count() === 0)
+                    <div class="text-sm text-[var(--ui-muted)]">
+                        Noch keine Modelle in <code class="px-1 py-0.5 rounded bg-[var(--ui-muted-5)]">core_ai_models</code>.
+                        <div class="mt-2 text-xs">
+                            Nächster Schritt: <code class="px-1 py-0.5 rounded bg-[var(--ui-muted-5)]">php artisan core:ai-models:sync</code>
+                        </div>
+                    </div>
+                @else
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-xs">
+                            <thead class="text-[var(--ui-muted)]">
+                                <tr class="border-b border-[var(--ui-border)]/60">
+                                    <th class="text-left py-2 pr-4 font-semibold">Provider</th>
+                                    <th class="text-left py-2 pr-4 font-semibold">Model</th>
+                                    <th class="text-left py-2 pr-4 font-semibold">Context</th>
+                                    <th class="text-left py-2 pr-4 font-semibold">Max output</th>
+                                    <th class="text-left py-2 pr-4 font-semibold">Cutoff</th>
+                                    <th class="text-left py-2 pr-4 font-semibold">Pricing / 1M</th>
+                                    <th class="text-left py-2 pr-4 font-semibold">Features</th>
+                                    <th class="text-left py-2 pr-0 font-semibold">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-[var(--ui-secondary)]">
+                                @foreach(($coreAiModels ?? collect()) as $m)
+                                    @php
+                                        $p = $m->provider?->key ?? '—';
+                                        $cur = $m->pricing_currency ?? 'USD';
+                                        $pricing = trim(
+                                            ($m->price_input_per_1m !== null ? "in {$cur} {$m->price_input_per_1m}" : '') .
+                                            ($m->price_cached_input_per_1m !== null ? " · cached {$cur} {$m->price_cached_input_per_1m}" : '') .
+                                            ($m->price_output_per_1m !== null ? " · out {$cur} {$m->price_output_per_1m}" : '')
+                                        );
+                                        $features = [];
+                                        if ($m->supports_reasoning_tokens) $features[] = 'reasoning';
+                                        if ($m->supports_streaming) $features[] = 'stream';
+                                        if ($m->supports_function_calling) $features[] = 'tools';
+                                        if ($m->supports_structured_outputs) $features[] = 'json';
+                                    @endphp
+                                    <tr class="border-b border-[var(--ui-border)]/40">
+                                        <td class="py-2 pr-4">{{ $p }}</td>
+                                        <td class="py-2 pr-4">
+                                            <div class="font-semibold">{{ $m->name }}</div>
+                                            <div class="text-[10px] text-[var(--ui-muted)]">{{ $m->model_id }}</div>
+                                        </td>
+                                        <td class="py-2 pr-4">{{ $m->context_window ? number_format($m->context_window) : '—' }}</td>
+                                        <td class="py-2 pr-4">{{ $m->max_output_tokens ? number_format($m->max_output_tokens) : '—' }}</td>
+                                        <td class="py-2 pr-4">{{ $m->knowledge_cutoff_date ? $m->knowledge_cutoff_date->format('Y-m-d') : '—' }}</td>
+                                        <td class="py-2 pr-4">
+                                            <div class="text-[var(--ui-secondary)]">{{ $pricing !== '' ? $pricing : '—' }}</div>
+                                        </td>
+                                        <td class="py-2 pr-4 text-[10px] text-[var(--ui-muted)]">
+                                            {{ count($features) ? implode(', ', $features) : '—' }}
+                                        </td>
+                                        <td class="py-2 pr-0">
+                                            @if($m->is_deprecated)
+                                                <span class="text-[10px] px-2 py-1 rounded bg-[var(--ui-danger-5)] text-[var(--ui-danger)]">deprecated</span>
+                                            @elseif(!$m->is_active)
+                                                <span class="text-[10px] px-2 py-1 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">inactive</span>
+                                            @else
+                                                <span class="text-[10px] px-2 py-1 rounded bg-[var(--ui-primary-10)] text-[var(--ui-primary)]">active</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
