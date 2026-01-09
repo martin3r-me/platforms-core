@@ -584,8 +584,37 @@
           selectedModel = m || '';
           localStorage.setItem('simple.selectedModel', selectedModel);
           if (selectedModelLabel) selectedModelLabel.textContent = selectedModel || '—';
-          if (modelSelect && selectedModel) modelSelect.value = selectedModel;
+          if (modelSelect) {
+            modelSelect.value = selectedModel || '';
+            // Also save to thread if thread exists
+            if (currentThreadId && selectedModel) {
+              // Save model to thread via Livewire
+              @this.call('updateThreadModel', currentThreadId, selectedModel).catch(() => {});
+            }
+          }
         };
+        
+        // Load model from active thread on page load or after Livewire update
+        const loadModelFromThread = () => {
+          @if(isset($activeThreadModel) && $activeThreadModel)
+            const threadModel = '{{ $activeThreadModel }}';
+            if (threadModel && threadModel !== selectedModel) {
+              setSelectedModel(threadModel);
+              // Update dropdown after models are loaded
+              setTimeout(() => {
+                if (modelSelect) modelSelect.value = threadModel;
+              }, 100);
+            }
+          @endif
+        };
+        
+        // Load on initial page load
+        loadModelFromThread();
+        
+        // Also listen for Livewire updates (when thread is switched)
+        document.addEventListener('livewire:update', () => {
+          setTimeout(loadModelFromThread, 50);
+        });
 
         // DropZone: accept drag&drop model selection (same behavior as the page playground)
         if (modelDropZone) {
@@ -602,6 +631,8 @@
 
         const renderModels = (models, defaultFromServer = null) => {
           if (!Array.isArray(models)) models = [];
+          
+          // Fill both dropdowns: modelSelect (Chat tab) and modelsList (Model settings tab)
           if (modelSelect) {
             modelSelect.innerHTML = '';
             for (const m of models) {
@@ -610,7 +641,15 @@
               opt.textContent = m;
               modelSelect.appendChild(opt);
             }
-            modelSelect.addEventListener('change', () => setSelectedModel(modelSelect.value));
+            // Remove old listener to avoid duplicates
+            const newSelect = modelSelect.cloneNode(true);
+            modelSelect.parentNode.replaceChild(newSelect, modelSelect);
+            const updatedModelSelect = document.getElementById('modelSelect');
+            if (updatedModelSelect) {
+              updatedModelSelect.addEventListener('change', () => setSelectedModel(updatedModelSelect.value));
+              // Set current selected model
+              if (selectedModel) updatedModelSelect.value = selectedModel;
+            }
           }
           if (modelsList) {
             modelsList.innerHTML = '';
@@ -675,11 +714,12 @@
             chatList.innerHTML = '';
             const empty = document.getElementById('chatEmpty');
             if (empty) empty.style.display = '';
-            // Reset totals
+            // Reset totals and model
             if (rtTokensIn) rtTokensIn.textContent = '—';
             if (rtTokensOut) rtTokensOut.textContent = '—';
             if (rtTokensExtra) rtTokensExtra.textContent = '—';
             if (rtCostTotal) rtCostTotal.textContent = '—';
+            setSelectedModel(''); // Clear model selection
             return;
           }
 
@@ -693,8 +733,9 @@
             if (empty) empty.style.display = '';
             currentThreadId = threadId;
             
-            // Reload component to get updated thread totals
-            // The totals will be set from server-side rendering
+            // Reload component to get updated thread totals and model
+            // The totals and model will be set from server-side rendering
+            // Livewire will re-render the component, and activeThreadModel will be updated
             @this.call('switchThread', threadId);
           } catch (e) {
             console.error('Failed to load thread messages:', e);

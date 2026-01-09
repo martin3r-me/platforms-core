@@ -124,6 +124,20 @@ class ModalSimpleToolPlayground extends Component
         $this->dispatch('simple-playground:thread-changed', ['thread_id' => $threadId]);
     }
 
+    public function updateThreadModel(int $threadId, string $modelId): void
+    {
+        if (!$this->chat) {
+            return;
+        }
+
+        $thread = $this->chat->threads()->find($threadId);
+        if (!$thread) {
+            return;
+        }
+
+        $thread->update(['model_id' => $modelId]);
+    }
+
     public function saveModelPricing(int $coreAiModelId): void
     {
         $this->pricingSaveMessage = null;
@@ -175,11 +189,15 @@ class ModalSimpleToolPlayground extends Component
             ? CoreChatThread::find($this->activeThreadId)
             : null;
 
+        // Get active thread's model for initial selection
+        $activeThreadModel = $activeThread?->model_id;
+
         return view('platform::livewire.modal-simple-tool-playground', [
             'coreAiModels' => $models,
             'threads' => $threads,
             'activeThreadId' => $this->activeThreadId,
             'activeThread' => $activeThread,
+            'activeThreadModel' => $activeThreadModel,
         ]);
     }
 }

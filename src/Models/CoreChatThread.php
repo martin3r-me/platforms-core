@@ -23,6 +23,7 @@ class CoreChatThread extends Model
         'total_tokens_reasoning',
         'total_cost',
         'pricing_currency',
+        'model_id',
     ];
 
     protected $casts = [

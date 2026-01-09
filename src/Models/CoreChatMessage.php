@@ -17,12 +17,20 @@ class CoreChatMessage extends Model
         'meta',
         'tokens_in',
         'tokens_out',
+        'tokens_cached',
+        'tokens_reasoning',
+        'cost',
+        'pricing_currency',
+        'model_id',
     ];
 
     protected $casts = [
         'meta' => 'array',
         'tokens_in' => 'integer',
         'tokens_out' => 'integer',
+        'tokens_cached' => 'integer',
+        'tokens_reasoning' => 'integer',
+        'cost' => 'decimal:4',
     ];
 
     public function chat(): BelongsTo

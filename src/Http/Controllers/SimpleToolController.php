@@ -473,14 +473,20 @@ class SimpleToolController extends Controller
                     ];
                     
                     // Save user message to DB if thread exists
+                    // Note: User messages don't have token costs (they're input), but we store the structure for consistency
                     if ($thread) {
                         CoreChatMessage::create([
                             'core_chat_id' => $thread->core_chat_id,
                             'thread_id' => $thread->id,
                             'role' => 'user',
                             'content' => $userMessage,
-                            'tokens_in' => 0, // Will be updated after usage calculation
+                            'tokens_in' => 0, // User messages are part of input, counted in assistant response
                             'tokens_out' => 0,
+                            'tokens_cached' => 0,
+                            'tokens_reasoning' => 0,
+                            'cost' => 0.0,
+                            'pricing_currency' => 'USD',
+                            'model_id' => $model ?? null,
                         ]);
                     }
                 }
@@ -799,19 +805,6 @@ class SimpleToolController extends Controller
                             $tokensCached = (int)($usageAggregate['input_tokens_details']['cached_tokens'] ?? 0);
                             $tokensReasoning = (int)($usageAggregate['output_tokens_details']['reasoning_tokens'] ?? 0);
                             
-                            CoreChatMessage::create([
-                                'core_chat_id' => $thread->core_chat_id,
-                                'thread_id' => $thread->id,
-                                'role' => 'assistant',
-                                'content' => $assistant,
-                                'meta' => [
-                                    'reasoning' => $reasoning,
-                                    'thinking' => $thinking,
-                                ],
-                                'tokens_in' => 0, // Input tokens are counted per request, not per message
-                                'tokens_out' => $tokensOut,
-                            ]);
-                            
                             // Calculate cost based on model pricing
                             $cost = 0.0;
                             $currency = 'USD';
@@ -828,14 +821,41 @@ class SimpleToolController extends Controller
                                     + ($tokensOut / 1_000_000 * $priceOutput);
                             }
                             
-                            // Update thread token counts and cost
+                            // Save assistant message with all token details
+                            CoreChatMessage::create([
+                                'core_chat_id' => $thread->core_chat_id,
+                                'thread_id' => $thread->id,
+                                'role' => 'assistant',
+                                'content' => $assistant,
+                                'meta' => [
+                                    'reasoning' => $reasoning,
+                                    'thinking' => $thinking,
+                                ],
+                                'tokens_in' => $tokensIn, // Total input tokens for this request
+                                'tokens_out' => $tokensOut,
+                                'tokens_cached' => $tokensCached,
+                                'tokens_reasoning' => $tokensReasoning,
+                                'cost' => $cost,
+                                'pricing_currency' => $currency,
+                                'model_id' => $model,
+                            ]);
+                            
+                            // Update thread token counts, cost, and model
                             $thread->increment('total_tokens_in', $tokensIn);
                             $thread->increment('total_tokens_out', $tokensOut);
                             $thread->increment('total_tokens_cached', $tokensCached);
                             $thread->increment('total_tokens_reasoning', $tokensReasoning);
                             $thread->increment('total_cost', $cost);
+                            $updates = [];
                             if ($thread->pricing_currency !== $currency) {
-                                $thread->update(['pricing_currency' => $currency]);
+                                $updates['pricing_currency'] = $currency;
+                            }
+                            // Save model in thread if not already set or if changed
+                            if ($thread->model_id !== $model) {
+                                $updates['model_id'] = $model;
+                            }
+                            if (!empty($updates)) {
+                                $thread->update($updates);
                             }
                             
                             // Also update chat totals (aggregate)
