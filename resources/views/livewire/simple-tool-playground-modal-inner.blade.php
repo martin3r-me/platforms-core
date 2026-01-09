@@ -139,18 +139,18 @@
     <div class="flex-[3_1_0%] min-h-0 min-w-0 flex flex-col flex-shrink" style="max-width:75%;">
         <div class="flex-1 min-h-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
             <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
+                @php
+                    $msgs = collect($activeThreadMessages ?? [])
+                        ->filter(fn($m) => in_array($m->role, ['user', 'assistant'], true))
+                        ->values();
+                    $initialMessages = $msgs
+                        ->map(fn($m) => ['role' => $m->role, 'content' => $m->content])
+                        ->values();
+                @endphp
                 <script>
-                  window.__simpleInitialMessages = @json(
-                    collect($activeThreadMessages ?? [])
-                      ->filter(fn($m) => in_array($m->role, ['user','assistant'], true))
-                      ->map(fn($m) => ['role' => $m->role, 'content' => $m->content])
-                      ->values()
-                  );
+                  window.__simpleInitialMessages = @json($initialMessages);
                 </script>
                 <div id="chatList" class="space-y-4">
-                    @php
-                        $msgs = collect($activeThreadMessages ?? [])->filter(fn($m) => in_array($m->role, ['user','assistant'], true));
-                    @endphp
                     @foreach($msgs as $m)
                         <div class="flex {{ $m->role === 'user' ? 'justify-end' : 'justify-start' }}">
                             <div class="max-w-4xl rounded-lg p-3 {{ $m->role === 'user' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-surface)] border border-[var(--ui-border)]' }}">
