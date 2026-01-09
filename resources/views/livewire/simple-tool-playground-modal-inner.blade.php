@@ -410,10 +410,49 @@
         }
 
         const modelsList = document.getElementById('modelsList');
-        const modelSelect = document.getElementById('modelSelect');
+        let modelSelect = document.getElementById('modelSelect');
         const modelDropZone = document.getElementById('modelDropZone');
         const selectedModelLabel = document.getElementById('selectedModelLabel');
         const modelsReload = document.getElementById('modelsReload');
+
+        // Models: keep existing behavior (safe fallback)
+        const setSelectedModel = (m) => {
+          selectedModel = m || '';
+          localStorage.setItem('simple.selectedModel', selectedModel);
+          if (selectedModelLabel) selectedModelLabel.textContent = selectedModel || '—';
+          if (modelSelect) {
+            modelSelect.value = selectedModel || '';
+            // Also save to thread if thread exists
+            if (currentThreadId && selectedModel) {
+              // Save model to thread via Livewire
+              @this.call('updateThreadModel', currentThreadId, selectedModel).catch(() => {});
+            }
+          }
+        };
+
+        // Ensure modelSelect is available and has change listener
+        const initModelSelect = () => {
+          modelSelect = document.getElementById('modelSelect');
+          if (modelSelect && !modelSelect.dataset.listenerAttached) {
+            modelSelect.addEventListener('change', (e) => {
+              const newModel = e.target.value;
+              if (newModel) {
+                setSelectedModel(newModel);
+              }
+            });
+            modelSelect.dataset.listenerAttached = 'true';
+            // Set initial value if available
+            if (selectedModel) {
+              modelSelect.value = selectedModel;
+            }
+          }
+        };
+        
+        // Initialize immediately and also after Livewire updates
+        initModelSelect();
+        document.addEventListener('livewire:update', () => {
+          setTimeout(initModelSelect, 50);
+        });
 
         const chatList = document.getElementById('chatList');
         const chatScroll = document.getElementById('chatScroll');
@@ -782,6 +821,13 @@
           if (rtStatus) rtStatus.textContent = 'streaming…';
           if (realtimeModel) realtimeModel.textContent = selectedModel || '—';
           debugState.startedAt = new Date().toISOString();
+
+          // Get model from select field (in case it was changed)
+          const currentModel = modelSelect ? modelSelect.value : selectedModel;
+          if (currentModel) {
+            selectedModel = currentModel;
+            localStorage.setItem('simple.selectedModel', selectedModel);
+          }
 
           const payload = {
             message: (isContinue ? '' : text),
