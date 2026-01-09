@@ -195,8 +195,12 @@ class ModalSimpleToolPlayground extends Component
             ? CoreChatThread::find($this->activeThreadId)
             : null;
 
-        // Get active thread's model for initial selection
-        $activeThreadModel = $activeThread?->model_id;
+        // Get default model from OpenAI provider
+        $openaiProvider = CoreAiProvider::where('key', 'openai')->where('is_active', true)->with('defaultModel')->first();
+        $defaultModelId = $openaiProvider?->defaultModel?->model_id ?? 'gpt-5.2';
+
+        // Get active thread's model for initial selection, fallback to default
+        $activeThreadModel = $activeThread?->model_id ?? $defaultModelId;
 
         return view('platform::livewire.modal-simple-tool-playground', [
             'coreAiModels' => $models,
@@ -205,6 +209,7 @@ class ModalSimpleToolPlayground extends Component
             'activeThreadId' => $this->activeThreadId,
             'activeThread' => $activeThread,
             'activeThreadModel' => $activeThreadModel,
+            'defaultModelId' => $defaultModelId,
         ]);
     }
 }

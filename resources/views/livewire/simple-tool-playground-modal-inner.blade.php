@@ -118,10 +118,9 @@
                             name="modelSelect"
                             id="modelSelect"
                             :options="$modelOptions ?? []"
-                            :nullable="true"
-                            nullLabel="Model wählen"
+                            :nullable="false"
                             size="sm"
-                            :value="$activeThreadModel ?? null"
+                            :value="$activeThreadModel ?? $defaultModelId ?? 'gpt-5.2'"
                             class="w-full"
                         />
                     </div>
@@ -495,7 +494,16 @@
         /** continuation state for interrupted tool-loops */
         let continuation = null;
         let inFlight = false;
-        let selectedModel = localStorage.getItem('simple.selectedModel') || '';
+        
+        // Initialize with default model or thread model
+        let selectedModel = @json($activeThreadModel ?? $defaultModelId ?? 'gpt-5.2');
+        if (!selectedModel) {
+          selectedModel = localStorage.getItem('simple.selectedModel') || '';
+        }
+        if (!selectedModel) {
+          selectedModel = @json($defaultModelId ?? 'gpt-5.2');
+        }
+        localStorage.setItem('simple.selectedModel', selectedModel);
 
         const scrollToBottom = () => { chatScroll.scrollTop = chatScroll.scrollHeight; };
         
@@ -823,17 +831,27 @@
           debugState.startedAt = new Date().toISOString();
 
           // Get model from select field (in case it was changed)
-          const currentModel = modelSelect ? modelSelect.value : selectedModel;
+          // Re-fetch modelSelect in case it was re-rendered by Livewire
+          const currentModelSelect = document.getElementById('modelSelect');
+          const currentModel = currentModelSelect ? currentModelSelect.value : (modelSelect ? modelSelect.value : selectedModel);
           if (currentModel) {
             selectedModel = currentModel;
             localStorage.setItem('simple.selectedModel', selectedModel);
+            
+            // Save model to thread if thread exists
+            if (currentThreadId && selectedModel) {
+              @this.call('updateThreadModel', currentThreadId, selectedModel).catch(() => {});
+            }
           }
+
+          // Fallback to default if no model selected
+          const modelToUse = selectedModel || @json($defaultModelId ?? 'gpt-5.2');
 
           const payload = {
             message: (isContinue ? '' : text),
             chat_history: messages,
             thread_id: currentThreadId,
-            model: selectedModel || null,
+            model: modelToUse,
             continuation: (isContinue ? continuation : null),
             context: ctx || null,
           };
