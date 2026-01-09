@@ -134,6 +134,32 @@
                     </div>
                 </div>
             </div>
+            {{-- Footer (same style as header) --}}
+            <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0 bg-[var(--ui-surface)]">
+                <div class="flex items-center gap-2">
+                    <button
+                        type="button"
+                        id="pgStopBtn"
+                        class="px-3 py-1.5 rounded-md text-sm border transition bg-red-600 text-white border-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                        disabled
+                        title="Stoppt den aktuellen Stream sofort"
+                    >
+                        Stop
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="deleteActiveThread"
+                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-danger)] border-[var(--ui-danger)]/50 hover:bg-[var(--ui-danger-5)]"
+                        title="Aktiven Thread löschen"
+                    >
+                        Thread löschen
+                    </button>
+                </div>
+                <div id="pgFooterBusy" class="hidden items-center gap-2 text-xs text-[var(--ui-muted)]">
+                    <span class="w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
+                    <span>Läuft…</span>
+                </div>
+            </div>
             <div class="flex-1 min-h-0 overflow-auto">
                 <div class="w-full h-full min-h-0 flex gap-5 px-4" style="width:100%; max-width:100%;">
 
@@ -537,6 +563,8 @@
               messages: [],
               continuation: null,
               inFlight: false,
+              abortController: null,
+              userAborted: false,
               live: { assistant: '', reasoning: '', thinking: '', status: 'idle' },
             };
           }
@@ -605,6 +633,18 @@
             if (st && st.inFlight) el.classList.remove('hidden');
             else el.classList.add('hidden');
           });
+        };
+
+        const updateFooterBusy = () => {
+          const el = document.getElementById('pgFooterBusy');
+          const stopBtn = document.getElementById('pgStopBtn');
+          if (el) {
+            if (threadState && threadState.inFlight) el.classList.remove('hidden');
+            else el.classList.add('hidden');
+          }
+          if (stopBtn) {
+            stopBtn.disabled = !(threadState && threadState.inFlight);
+          }
         };
 
         // Event log (same logic, but keep it lightweight)
@@ -883,17 +923,68 @@
         refreshMessagesFromServerRender();
         renderChatFromState();
         updateThreadBusyIndicators();
+        updateFooterBusy();
         let lastThreadId = currentThreadId;
         document.addEventListener('livewire:update', () => {
           refreshThreadIdFromDom();
           refreshMessagesFromServerRender();
           renderChatFromState();
           updateThreadBusyIndicators();
+          updateFooterBusy();
           if (currentThreadId !== lastThreadId) {
             // Do NOT reset: keep per-thread state alive.
             lastThreadId = currentThreadId;
           }
         });
+
+        // Iterations: keep high defaults; allow user override via localStorage.
+        const getMaxIterations = () => {
+          const raw = (localStorage.getItem('simple.playground.maxIterations') || '').trim();
+          const n = parseInt(raw || '50', 10);
+          if (!Number.isFinite(n) || n < 1) return 50;
+          return Math.min(200, n);
+        };
+
+        const setSendButtonBusy = (busy) => {
+          refreshDomRefs();
+          if (!sendBtn) return;
+          if (busy) {
+            sendBtn.disabled = false;
+            sendBtn.textContent = 'Stop';
+            sendBtn.classList.remove('bg-[var(--ui-primary)]');
+            sendBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+          } else {
+            sendBtn.disabled = false;
+            sendBtn.textContent = 'Senden';
+            sendBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+            if (!sendBtn.classList.contains('bg-[var(--ui-primary)]')) {
+              sendBtn.classList.add('bg-[var(--ui-primary)]');
+            }
+          }
+        };
+
+        const stopCurrentRequest = () => {
+          try {
+            if (!threadState || !threadState.inFlight) return;
+            threadState.userAborted = true;
+            if (rtStatus) rtStatus.textContent = 'abgebrochen';
+            if (threadState.abortController) {
+              try { threadState.abortController.abort(); } catch (_) {}
+            }
+          } catch (_) {}
+        };
+
+        const bindFooterHandlers = () => {
+          const stopBtn = document.getElementById('pgStopBtn');
+          if (stopBtn && !stopBtn.dataset.clickBound) {
+            stopBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              stopCurrentRequest();
+            });
+            stopBtn.dataset.clickBound = '1';
+          }
+        };
 
         // Send (parity with page playground: chat updates only on complete)
         const send = async () => {
@@ -917,13 +1008,14 @@
           }
 
           threadState.inFlight = true;
-          sendBtn.disabled = true;
+          setSendButtonBusy(true);
           input.disabled = true;
           resetRealtime();
           if (rtStatus) rtStatus.textContent = 'streaming…';
           if (realtimeModel) realtimeModel.textContent = selectedModel || '—';
           debugState.startedAt = new Date().toISOString();
           updateThreadBusyIndicators();
+          updateFooterBusy();
 
           // Get model from select field (in case it was changed)
           // Re-fetch modelSelect in case it was re-rendered by Livewire
@@ -964,9 +1056,14 @@
             model: modelToUse,
             continuation: (isContinue ? threadState.continuation : null),
             context: ctx || null,
+            max_iterations: getMaxIterations(),
           };
           debugState.payload = payload;
           updateDebugDump();
+
+          const abortController = new AbortController();
+          threadState.abortController = abortController;
+          threadState.userAborted = false;
 
           try {
             const res = await fetch(url, {
@@ -974,6 +1071,7 @@
               credentials: 'same-origin',
               headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream', 'X-CSRF-TOKEN': csrf },
               body: JSON.stringify(payload),
+              signal: abortController.signal,
             });
 
             if (!res.ok || !res.body) {
@@ -1174,12 +1272,26 @@
                 scrollToBottom();
               }
             }
+          } catch (e) {
+            // Abort is expected (Stop button)
+            if (e && (e.name === 'AbortError' || threadState.userAborted)) {
+              threadState.messages.push({ role: 'assistant', content: '⛔️ Abgebrochen.' });
+              renderMessage('assistant', '⛔️ Abgebrochen.');
+              if (rtStatus) rtStatus.textContent = 'abgebrochen';
+            } else {
+              threadState.messages.push({ role: 'assistant', content: `❌ Fehler: ${e?.message || 'Unbekannter Fehler'}` });
+              renderMessage('assistant', `❌ Fehler: ${e?.message || 'Unbekannter Fehler'}`);
+              if (rtStatus) rtStatus.textContent = 'error';
+            }
           } finally {
             threadState.inFlight = false;
-            sendBtn.disabled = false;
+            setSendButtonBusy(false);
             input.disabled = false;
             input.focus();
             updateThreadBusyIndicators();
+            updateFooterBusy();
+            threadState.abortController = null;
+            threadState.userAborted = false;
           }
         };
 
@@ -1220,17 +1332,22 @@
             currentSendBtn.addEventListener('click', (e) => {
               e.preventDefault();
               e.stopPropagation();
-              send();
+              if (threadState && threadState.inFlight) stopCurrentRequest();
+              else send();
             });
             currentSendBtn.dataset.clickBound = '1';
           }
         };
         
         bindSubmitHandlers();
+        bindFooterHandlers();
         
         // Re-bind after Livewire updates
         document.addEventListener('livewire:update', () => {
-          setTimeout(bindSubmitHandlers, 50);
+          setTimeout(() => {
+            bindSubmitHandlers();
+            bindFooterHandlers();
+          }, 50);
         });
       };
 

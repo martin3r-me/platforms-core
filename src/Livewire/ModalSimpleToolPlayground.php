@@ -11,6 +11,7 @@ use Platform\Core\Models\CoreChat;
 use Platform\Core\Models\CoreChatThread;
 use Platform\Core\Models\CoreChatMessage;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class ModalSimpleToolPlayground extends Component
 {
@@ -183,6 +184,43 @@ class ModalSimpleToolPlayground extends Component
         }
 
         $thread->update(['title' => $title]);
+    }
+
+    public function deleteActiveThread(): void
+    {
+        if (!$this->chat || !$this->activeThreadId) {
+            return;
+        }
+
+        $threadId = (int) $this->activeThreadId;
+
+        // Ensure we never delete across chats/users
+        $thread = $this->chat->threads()->find($threadId);
+        if (!$thread) {
+            return;
+        }
+
+        DB::transaction(function () use ($threadId, $thread) {
+            // Delete messages explicitly (safer than relying on FK cascade)
+            CoreChatMessage::query()->where('thread_id', $threadId)->delete();
+            $thread->delete();
+        });
+
+        // Pick newest open thread or create a new one
+        $next = $this->chat->threads()
+            ->where('status', 'open')
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if (!$next) {
+            $next = $this->chat->threads()->create([
+                'title' => 'Thread ' . ($this->chat->threads()->count() + 1),
+                'status' => 'open',
+                'started_at' => now(),
+            ]);
+        }
+
+        $this->activeThreadId = $next->id;
     }
 
     public function saveModelPricing(int $coreAiModelId): void

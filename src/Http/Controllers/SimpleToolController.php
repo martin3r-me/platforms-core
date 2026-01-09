@@ -295,7 +295,8 @@ class SimpleToolController extends Controller
     {
         return new StreamedResponse(function() use ($request) {
             // SSE hardening: prevent timeouts and buffering issues that surface as browser "Load failed".
-            try { @ignore_user_abort(true); } catch (\Throwable $e) {}
+            // For SSE: if the browser aborts (Stop button), we want to stop server-side work too.
+            try { @ignore_user_abort(false); } catch (\Throwable $e) {}
             try { @set_time_limit(0); } catch (\Throwable $e) {}
             try { @ini_set('max_execution_time', '0'); } catch (\Throwable $e) {}
             try { @ini_set('zlib.output_compression', '0'); } catch (\Throwable $e) {}
@@ -331,9 +332,15 @@ class SimpleToolController extends Controller
             }
 
             $sendEvent = function(string $event, array $data) {
+                if (connection_aborted()) {
+                    throw new \RuntimeException('__CLIENT_ABORTED__');
+                }
                 echo "event: {$event}\n";
                 echo "data: " . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
                 @flush();
+                if (connection_aborted()) {
+                    throw new \RuntimeException('__CLIENT_ABORTED__');
+                }
             };
 
             // Send an initial SSE comment to open the stream early (helps with proxies/buffering).
@@ -354,6 +361,8 @@ class SimpleToolController extends Controller
                         'chat_history' => 'nullable|array', // Conversation-Historie
                         'thread_id' => 'nullable|integer|exists:core_chat_threads,id',
                         'model' => 'nullable|string',
+                        // Allow higher iteration counts, but keep a safety cap server-side.
+                        'max_iterations' => 'nullable|integer|min:1|max:200',
                         'context' => 'nullable|array',
                         'context.source_route' => 'nullable|string',
                         'context.source_module' => 'nullable|string',
@@ -496,8 +505,12 @@ class SimpleToolController extends Controller
                 // Best-practice tool loop (stream per iteration; execute tools server-side; continue until no tool calls)
                 // Keep a hard safety cap, but allow enough room for "batch" operations
                 // like renaming/updating multiple tasks.
-                $maxIterations = 12;
-                $maxToolExecutions = 60;
+                $maxIterations = (int) ($request->input('max_iterations') ?? 50);
+                if ($maxIterations < 1) { $maxIterations = 1; }
+                if ($maxIterations > 200) { $maxIterations = 200; }
+
+                // Safety cap for tool executions across all iterations (prevents infinite loops).
+                $maxToolExecutions = max(60, min(2000, $maxIterations * 50));
                 $toolExecutionCount = 0;
                 $debugEventCount = 0;
                 // Continuation support (for "max iterations reached" recovery):
@@ -1208,7 +1221,19 @@ class SimpleToolController extends Controller
                 return;
 
             } catch (\Throwable $e) {
-                $sendEvent('error', ['error' => $e->getMessage()]);
+                if ($e->getMessage() === '__CLIENT_ABORTED__') {
+                    Log::info('[SimpleToolController] SSE stream aborted by client', [
+                        'rid' => $rid ?? null,
+                        'path' => $request->path(),
+                        'user_id' => optional($request->user())->id,
+                    ]);
+                    return;
+                }
+                try {
+                    $sendEvent('error', ['error' => $e->getMessage()]);
+                } catch (\Throwable $e2) {
+                    // client likely aborted; nothing to do
+                }
             }
         }, 200, [
             'Content-Type' => 'text/event-stream',
