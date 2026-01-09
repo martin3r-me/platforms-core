@@ -25,7 +25,6 @@
                                 <div
                                     class="relative flex-shrink-0 flex items-center"
                                     x-data="{ editing: false, title: '{{ addslashes($t->title) }}' }"
-                                    x-init="@if(($activeThreadId ?? null) == $t->id && $t->title === 'Thread ' . ($threads->count() - $loop->index)) editing = true; $nextTick(() => $refs.input?.focus()) @endif"
                                 >
                                     <button
                                         type="button"
