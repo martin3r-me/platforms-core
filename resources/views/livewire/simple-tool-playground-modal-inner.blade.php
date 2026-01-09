@@ -15,7 +15,7 @@
     <div class="w-full flex-1 min-h-0 overflow-hidden p-4 bg-[var(--ui-bg)]" style="width:100%;">
     {{-- Chat Tab --}}
     <div x-show="tab==='chat'" class="w-full h-full min-h-0" x-cloak>
-        <div class="h-full min-h-0 border border-[var(--ui-border)] rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
+        <div class="h-full min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/30">
             <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                 <div class="flex items-center gap-3 flex-1 min-w-0">
                     <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] flex-shrink-0">Chat</div>
@@ -134,12 +134,12 @@
                     </div>
                 </div>
             </div>
-            <div class="flex-1 min-h-0 overflow-auto">
+            <div class="flex-1 min-h-0 overflow-auto w-full">
                 <div class="w-full h-full min-h-0 flex gap-5 px-4" style="width:100%; max-width:100%;">
 
     {{-- Left: Chat (3/4 width) --}}
-    <div class="flex-[3_1_0%] min-h-0 min-w-0 flex flex-col flex-shrink" style="max-width:75%;">
-        <div class="flex-1 min-h-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
+    <div class="basis-3/4 grow-0 shrink-0 min-h-0 min-w-0 flex flex-col">
+        <div class="flex-1 min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/20">
             <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
                 @php
                     $msgs = collect($activeThreadMessages ?? [])
@@ -172,21 +172,21 @@
             </div>
             <div class="border-t border-[var(--ui-border)]/60 p-3 flex-shrink-0 bg-[var(--ui-surface)]">
                 <form id="chatForm" class="flex gap-2 items-center" method="post" action="javascript:void(0)" onsubmit="return false;">
-                    <div class="w-48">
+                    <div class="w-56">
                         <x-ui-input-select
                             name="modelSelect"
                             id="modelSelect"
                             :options="$modelOptions ?? []"
                             :nullable="false"
-                            size="sm"
+                            size="md"
                             :value="$activeThreadModel ?? $defaultModelId ?? 'gpt-5.2'"
-                            class="w-full"
+                            class="w-full h-10"
                         />
                     </div>
                     <input
                         id="chatInput"
                         type="text"
-                        class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                        class="flex-1 px-4 h-10 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
                         placeholder="Nachricht eingeben…"
                         autocomplete="off"
                     />
@@ -197,43 +197,10 @@
             </div>
         </div>
 
-            {{-- Footer (same style as header): pinned to the bottom of the Chat frame --}}
-            <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0 bg-[var(--ui-surface)]">
-                <div class="flex items-center gap-2">
-                    <button
-                        type="button"
-                        id="pgStopBtn"
-                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-red-600 border-red-200 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                        disabled
-                        title="Stoppt den aktuellen Stream sofort"
-                    >
-                        Stop
-                    </button>
-                    <button
-                        type="button"
-                        x-data
-                        @click.prevent="if (confirm('Aktiven Thread wirklich löschen?')) { $wire.deleteActiveThread() }"
-                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-danger)] border-[var(--ui-border)] hover:bg-[var(--ui-danger-5)]"
-                        title="Aktiven Thread löschen"
-                    >
-                        Thread löschen
-                    </button>
-                </div>
-                <div class="flex items-center gap-3 min-w-0">
-                    <div id="pgFooterBusy" class="hidden flex items-center gap-2 text-xs text-[var(--ui-muted)] flex-shrink-0">
-                        <span class="w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
-                        <span>Läuft…</span>
-                    </div>
-                    <div class="min-w-0 flex items-center gap-2">
-                        <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0">Event:</span>
-                        <span id="pgFooterEventText" class="text-[10px] font-mono text-[var(--ui-secondary)] truncate">—</span>
-                    </div>
-                </div>
-            </div>
     </div>
 
     {{-- Right: Realtime / Debug (1/4 width) --}}
-    <div class="flex-[1_1_0%] min-h-0 min-w-0 flex-shrink border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm" style="max-width:25%;">
+    <div class="basis-1/4 grow-0 shrink-0 min-h-0 min-w-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/20">
         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
             <div class="text-xs text-[var(--ui-muted)]">
                 Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
@@ -280,8 +247,44 @@
                 </div>
                 <textarea id="rtDebugDump" class="w-full text-[10px] leading-snug whitespace-pre border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[90px] max-h-[18vh] overflow-y-auto" readonly></textarea>
                 <div id="rtCopyStatus" class="mt-1 text-[10px] text-[var(--ui-muted)]"></div>
-            </div>
         </div>
+    </div>
+                </div>
+            </div>
+
+            {{-- Footer: same look/spacing as header, full width of the Chat tab (spans Chat + Debug) --}}
+            <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-2">
+                    <button
+                        type="button"
+                        id="pgStopBtn"
+                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-red-600 border-red-200 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        disabled
+                        title="Stoppt den aktuellen Stream sofort"
+                    >
+                        Stop
+                    </button>
+                    <button
+                        type="button"
+                        x-data
+                        @click.prevent="if (confirm('Aktiven Thread wirklich löschen?')) { $wire.deleteActiveThread() }"
+                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-danger)] border-[var(--ui-border)] hover:bg-[var(--ui-danger-5)]"
+                        title="Aktiven Thread löschen"
+                    >
+                        Thread löschen
+                    </button>
+                </div>
+                <div class="flex items-center gap-3 min-w-0">
+                    <div id="pgFooterBusy" class="hidden flex items-center gap-2 text-xs text-[var(--ui-muted)] flex-shrink-0">
+                        <span class="w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
+                        <span>Läuft…</span>
+                    </div>
+                    <div class="min-w-0 flex items-center gap-2">
+                        <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0">Event:</span>
+                        <span id="pgFooterEventText" class="text-[10px] font-mono text-[var(--ui-secondary)] truncate">—</span>
+                    </div>
+                </div>
+            </div>
     </div>
                 </div>
             </div>
