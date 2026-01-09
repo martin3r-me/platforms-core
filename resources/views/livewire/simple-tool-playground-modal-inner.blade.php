@@ -48,10 +48,10 @@
                 <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Chat</div>
             </div>
             <div class="p-4 flex-1 min-h-0 overflow-auto">
-                <div class="w-full h-full min-h-0 grid grid-cols-12 gap-5" style="width:100%;">
+                <div class="w-full h-full min-h-0 flex gap-5" style="width:100%;">
 
-    {{-- Center: Chat (independent scroll + input pinned to bottom) --}}
-    <div class="col-span-12 lg:col-span-8 min-h-0 min-w-0 flex flex-col">
+    {{-- Left: Chat (3/4 width) --}}
+    <div class="flex-[3] min-h-0 min-w-0 flex flex-col">
         <div class="flex-1 min-h-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
             <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
                 <div id="chatList" class="space-y-4"></div>
@@ -81,8 +81,8 @@
         </div>
     </div>
 
-    {{-- Right: Realtime / Debug (independent scroll) --}}
-    <div class="col-span-12 lg:col-span-4 min-h-0 min-w-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
+    {{-- Right: Realtime / Debug (1/4 width) --}}
+    <div class="flex-[1] min-h-0 min-w-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
             <div class="text-xs text-[var(--ui-muted)]">
                 Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
