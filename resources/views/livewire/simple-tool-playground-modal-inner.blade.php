@@ -135,10 +135,10 @@
                 </div>
             </div>
             <div class="flex-1 min-h-0 overflow-hidden w-full">
-                <div class="w-full h-full min-h-0 flex gap-5 px-4 py-4" style="width:100%; max-width:100%;">
+                <div class="w-full h-full min-h-0 flex flex-nowrap gap-5 px-4 py-4 overflow-hidden min-w-0" style="width:100%; max-width:100%;">
 
                     {{-- Left: Chat (3/4 width) --}}
-                    <div class="basis-3/4 flex-none min-h-0 min-w-0 flex flex-col">
+                    <div class="w-3/4 flex-none min-h-0 min-w-0 flex flex-col overflow-hidden">
                         <div class="flex-1 min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/20">
                             <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
                                 @php
@@ -152,12 +152,12 @@
                                 <script>
                                   window.__simpleInitialMessages = @json($initialMessages);
                                 </script>
-                                <div id="chatList" class="space-y-4" wire:key="chat-list-{{ $activeThreadId ?? 'none' }}">
+                                <div id="chatList" class="space-y-4 min-w-0" wire:key="chat-list-{{ $activeThreadId ?? 'none' }}">
                                     @foreach($msgs as $m)
                                         <div wire:key="chat-msg-{{ $m->id }}" class="flex {{ $m->role === 'user' ? 'justify-end' : 'justify-start' }}">
-                                            <div class="max-w-4xl rounded-lg p-3 {{ $m->role === 'user' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-surface)] border border-[var(--ui-border)]' }}">
+                                            <div class="max-w-4xl rounded-lg p-3 break-words overflow-hidden {{ $m->role === 'user' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-surface)] border border-[var(--ui-border)]' }}">
                                                 <div class="text-sm font-semibold mb-1">{{ $m->role === 'user' ? 'Du' : 'Assistant' }}</div>
-                                                <div class="whitespace-pre-wrap">{{ $m->content }}</div>
+                                                <div class="whitespace-pre-wrap break-words">{{ $m->content }}</div>
                                             </div>
                                         </div>
                                     @endforeach
@@ -199,7 +199,7 @@
                     </div>
 
                     {{-- Right: Realtime / Debug (1/4 width) --}}
-                    <div class="basis-1/4 flex-none min-h-0 min-w-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/20 overflow-x-hidden">
+                    <div class="w-1/4 flex-none min-h-0 min-w-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/20 overflow-x-hidden">
                         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                             <div class="text-xs text-[var(--ui-muted)]">
                                 Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
@@ -216,7 +216,7 @@
                         <div class="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto min-w-0">
                             <div class="min-w-0">
                                 <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Assistant (live)</div>
-                                <pre id="rtAssistant" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[80px] max-h-[22vh] overflow-y-auto max-w-full"></pre>
+                                <pre id="rtAssistant" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[80px] max-h-[22vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
                             </div>
 
                             {{-- Tokens & costs moved to the top bar --}}
@@ -227,11 +227,11 @@
                             </div>
                             <div class="min-w-0">
                                 <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Reasoning (live)</div>
-                                <pre id="rtReasoning" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px] max-h-[16vh] overflow-y-auto max-w-full"></pre>
+                                <pre id="rtReasoning" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px] max-h-[16vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
                             </div>
                             <div class="min-w-0">
                                 <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Thinking (live)</div>
-                                <pre id="rtThinking" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px] max-h-[16vh] overflow-y-auto max-w-full"></pre>
+                                <pre id="rtThinking" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px] max-h-[16vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
                             </div>
                             {{-- Events list is not very helpful in UI; we show the latest event in the chat footer. --}}
                             <div class="pt-2 border-t border-[var(--ui-border)] hidden">
