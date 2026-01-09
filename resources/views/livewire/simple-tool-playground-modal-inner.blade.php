@@ -29,7 +29,7 @@
                                 >
                                     <button
                                         type="button"
-                                        wire:click="switchThread({{ $t->id }})"
+                                        wire:click="$set('activeThreadId', {{ $t->id }})"
                                         x-show="!editing"
                                         class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1 {{ ($activeThreadId ?? null) == $t->id ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]' : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]' }}"
                                     >
@@ -139,8 +139,28 @@
     <div class="flex-[3_1_0%] min-h-0 min-w-0 flex flex-col flex-shrink" style="max-width:75%;">
         <div class="flex-1 min-h-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
             <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
-                <div id="chatList" class="space-y-4"></div>
-                <div id="chatEmpty" class="text-sm text-[var(--ui-muted)]">
+                <script>
+                  window.__simpleInitialMessages = @json(
+                    collect($activeThreadMessages ?? [])
+                      ->filter(fn($m) => in_array($m->role, ['user','assistant'], true))
+                      ->map(fn($m) => ['role' => $m->role, 'content' => $m->content])
+                      ->values()
+                  );
+                </script>
+                <div id="chatList" class="space-y-4">
+                    @php
+                        $msgs = collect($activeThreadMessages ?? [])->filter(fn($m) => in_array($m->role, ['user','assistant'], true));
+                    @endphp
+                    @foreach($msgs as $m)
+                        <div class="flex {{ $m->role === 'user' ? 'justify-end' : 'justify-start' }}">
+                            <div class="max-w-4xl rounded-lg p-3 {{ $m->role === 'user' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-surface)] border border-[var(--ui-border)]' }}">
+                                <div class="text-sm font-semibold mb-1">{{ $m->role === 'user' ? 'Du' : 'Assistant' }}</div>
+                                <div class="whitespace-pre-wrap">{{ $m->content }}</div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+                <div id="chatEmpty" class="text-sm text-[var(--ui-muted)]" style="{{ $msgs->count() ? 'display:none;' : '' }}">
                     <div class="font-semibold text-[var(--ui-secondary)]">Start</div>
                     <div class="mt-1">Schreib eine Nachricht (z. B. „Liste meine Teams“ oder „Welche Tools kann ich im OKR-Modul nutzen?“).</div>
                     <div class="mt-3 text-xs">
@@ -791,88 +811,28 @@
         if (!alreadyBound && modelsReload) modelsReload.addEventListener('click', () => loadModels());
         loadModels();
 
-        // Thread change handler: load messages from DB and update totals
-        const loadThreadMessages = async (threadId) => {
-          if (!threadId) {
-            messages = [];
-            chatList.innerHTML = '';
-            const empty = document.getElementById('chatEmpty');
-            if (empty) empty.style.display = '';
-            // Reset totals and model
-            if (rtTokensInTotal) rtTokensInTotal.textContent = '—';
-            if (rtTokensOutTotal) rtTokensOutTotal.textContent = '—';
-            if (rtTokensExtraTotal) rtTokensExtraTotal.textContent = '—';
-            if (rtCostTotal) rtCostTotal.textContent = '—';
-            if (rtTokensIn) rtTokensIn.textContent = '—';
-            if (rtTokensOut) rtTokensOut.textContent = '—';
-            if (rtTokensExtra) rtTokensExtra.textContent = '—';
-            if (rtCostRequest) rtCostRequest.textContent = '—';
-            setSelectedModel(''); // Clear model selection
-            currentThreadId = null;
-            return;
-          }
-
-          try {
-            currentThreadId = threadId;
-            
-            // Load messages from Livewire
-            let threadMessages = [];
-            if (window.Livewire) {
-              const result = await window.Livewire.find(livewireComponentId).call('getThreadMessages', threadId);
-              if (result && Array.isArray(result)) {
-                threadMessages = result;
-              }
-            }
-            
-            // Clear and reload messages
-            messages = threadMessages;
-            chatList.innerHTML = '';
-            const empty = document.getElementById('chatEmpty');
-            if (messages.length === 0) {
-              if (empty) empty.style.display = '';
-            } else {
-              if (empty) empty.style.display = 'none';
-              // Render all messages
-              messages.forEach(msg => {
-                renderMessage(msg.role, msg.content);
-              });
-              scrollToBottom();
-            }
-            
-            // Update totals from server-side rendered values (they will be updated by Livewire re-render)
-            // The totals are already set in the HTML from server-side rendering
-          } catch (e) {
-            console.error('Failed to load thread messages:', e);
-            messages = [];
-            chatList.innerHTML = '';
-            const empty = document.getElementById('chatEmpty');
-            if (empty) empty.style.display = '';
+        // Livewire drives thread switching; the chat history is server-rendered.
+        // JS only needs the current thread id + an in-memory copy of the server-rendered history
+        // to send as chat_history for the next request.
+        const refreshMessagesFromServerRender = () => {
+          messages = Array.isArray(window.__simpleInitialMessages) ? window.__simpleInitialMessages : [];
+          const empty = document.getElementById('chatEmpty');
+          if (empty) {
+            empty.style.display = (messages.length > 0) ? 'none' : '';
           }
         };
 
-        // Listen for thread changes from Livewire
-        window.addEventListener('simple-playground:thread-changed', (e) => {
-          const threadIdRaw = e.detail?.thread_id;
-          const threadId = (typeof threadIdRaw === 'number') ? threadIdRaw : parseInt(String(threadIdRaw || ''), 10);
-          if (!Number.isFinite(threadId)) return;
-          // Livewire re-render updates hidden input; refresh from DOM to stay consistent
-          refreshThreadIdFromDom();
-          if (threadId !== currentThreadId) {
-            currentThreadId = threadId;
-          }
-          loadThreadMessages(threadId);
-        });
-
-        // When the modal is opened / Livewire re-renders, refresh the thread id from DOM and load its messages.
         refreshThreadIdFromDom();
-        if (currentThreadId) {
-          loadThreadMessages(currentThreadId);
-        }
+        refreshMessagesFromServerRender();
+        let lastThreadId = currentThreadId;
         document.addEventListener('livewire:update', () => {
-          const before = currentThreadId;
           refreshThreadIdFromDom();
-          if (currentThreadId && currentThreadId !== before) {
-            loadThreadMessages(currentThreadId);
+          refreshMessagesFromServerRender();
+          if (currentThreadId !== lastThreadId) {
+            // Reset continuation when switching threads (continuations are per-thread).
+            continuation = null;
+            resetRealtime();
+            lastThreadId = currentThreadId;
           }
         });
 

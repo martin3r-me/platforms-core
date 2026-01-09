@@ -3,6 +3,7 @@
 namespace Platform\Core\Livewire;
 
 use Livewire\Attributes\On;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Platform\Core\Models\CoreAiModel;
 use Platform\Core\Models\CoreAiProvider;
@@ -106,7 +107,6 @@ class ModalSimpleToolPlayground extends Component
         ]);
 
         $this->activeThreadId = $thread->id;
-        $this->dispatch('simple-playground:thread-changed', ['thread_id' => $thread->id]);
     }
 
     public function switchThread(int $threadId): void
@@ -121,27 +121,35 @@ class ModalSimpleToolPlayground extends Component
         }
 
         $this->activeThreadId = $threadId;
-        $this->dispatch('simple-playground:thread-changed', ['thread_id' => $threadId]);
     }
 
-    public function getThreadMessages(int $threadId): array
+    #[Computed]
+    public function threads()
     {
         if (!$this->chat) {
-            return [];
+            return collect();
         }
+        return $this->chat->threads()->orderBy('created_at', 'desc')->get();
+    }
 
-        $thread = $this->chat->threads()->find($threadId);
-        if (!$thread) {
-            return [];
+    #[Computed]
+    public function activeThread(): ?CoreChatThread
+    {
+        if (!$this->chat || !$this->activeThreadId) {
+            return null;
         }
+        // Ensure we never leak threads across users/chats
+        return $this->chat->threads()->with('messages')->find($this->activeThreadId);
+    }
 
-        $messages = $thread->messages()->orderBy('created_at')->get();
-        return $messages->map(function ($msg) {
-            return [
-                'role' => $msg->role,
-                'content' => $msg->content,
-            ];
-        })->toArray();
+    #[Computed]
+    public function activeThreadMessages()
+    {
+        $t = $this->activeThread;
+        if (!$t) {
+            return collect();
+        }
+        return $t->messages()->orderBy('created_at')->get();
     }
 
     public function updateThreadModel(int $threadId, string $modelId): void
@@ -226,13 +234,7 @@ class ModalSimpleToolPlayground extends Component
             return [$model->model_id => $model->model_id];
         })->toArray();
 
-        $threads = $this->chat
-            ? $this->chat->threads()->orderBy('created_at', 'desc')->get()
-            : collect();
-
-        $activeThread = $this->activeThreadId
-            ? CoreChatThread::find($this->activeThreadId)
-            : null;
+        $activeThread = $this->activeThread;
 
         // Get default model from OpenAI provider
         $openaiProvider = CoreAiProvider::where('key', 'openai')->where('is_active', true)->with('defaultModel')->first();
@@ -244,11 +246,12 @@ class ModalSimpleToolPlayground extends Component
         return view('platform::livewire.modal-simple-tool-playground', [
             'coreAiModels' => $models,
             'modelOptions' => $modelOptions,
-            'threads' => $threads,
+            'threads' => $this->threads,
             'activeThreadId' => $this->activeThreadId,
             'activeThread' => $activeThread,
             'activeThreadModel' => $activeThreadModel,
             'defaultModelId' => $defaultModelId,
+            'activeThreadMessages' => $this->activeThreadMessages,
         ]);
     }
 }
