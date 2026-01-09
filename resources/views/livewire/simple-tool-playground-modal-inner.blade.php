@@ -483,6 +483,9 @@
         const rtTokensOut = document.getElementById('rtTokensOut');
         const rtTokensTotal = document.getElementById('rtTokensTotal');
         const rtTokensExtra = document.getElementById('rtTokensExtra');
+        const rtTokensInTotal = document.getElementById('rtTokensInTotal');
+        const rtTokensOutTotal = document.getElementById('rtTokensOutTotal');
+        const rtTokensExtraTotal = document.getElementById('rtTokensExtraTotal');
         const rtUsageModel = document.getElementById('rtUsageModel');
         const rtCostIn = document.getElementById('rtCostIn');
         const rtCostCached = document.getElementById('rtCostCached');
