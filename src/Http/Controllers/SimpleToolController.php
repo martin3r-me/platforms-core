@@ -886,6 +886,43 @@ class SimpleToolController extends Controller
                             if (isset($usageAggregate['input_tokens'])) {
                                 $thread->chat->increment('total_tokens_in', $tokensIn);
                             }
+
+                            // Ensure UI always receives request usage (Req tokens + Req $) even when the
+                            // upstream stream doesn't emit response.usage events.
+                            $thread->refresh();
+                            $sendEvent('usage', [
+                                'model' => $model,
+                                'iteration' => $iteration,
+                                'cumulative' => true,
+                                'usage' => [
+                                    'input_tokens' => $tokensIn,
+                                    'output_tokens' => $tokensOut,
+                                    'total_tokens' => $tokensIn + $tokensOut,
+                                    'input_tokens_details' => [
+                                        'cached_tokens' => $tokensCached,
+                                    ],
+                                    'output_tokens_details' => [
+                                        'reasoning_tokens' => $tokensReasoning,
+                                    ],
+                                ],
+                                'last_increment' => [
+                                    'input_tokens' => $tokensIn,
+                                    'output_tokens' => $tokensOut,
+                                    'total_tokens' => $tokensIn + $tokensOut,
+                                    'cached_tokens' => $tokensCached,
+                                    'reasoning_tokens' => $tokensReasoning,
+                                    'cost' => $cost,
+                                    'currency' => $currency,
+                                ],
+                                'thread_totals' => [
+                                    'total_tokens_in' => $thread->total_tokens_in,
+                                    'total_tokens_out' => $thread->total_tokens_out,
+                                    'total_tokens_cached' => $thread->total_tokens_cached,
+                                    'total_tokens_reasoning' => $thread->total_tokens_reasoning,
+                                    'total_cost' => $thread->total_cost,
+                                    'pricing_currency' => $thread->pricing_currency,
+                                ],
+                            ]);
                         }
                         
                         $sendEvent('complete', [
@@ -954,6 +991,9 @@ class SimpleToolController extends Controller
                                 'retries' => $retriesUsed,
                                 'args_hash' => $argsHash,
                                 'args_preview' => $argsPreview,
+                                // Provide full args as the model called them (for debug UI)
+                                'args_json' => $argsJson,
+                                'args' => $args,
                             ]);
 
                             $toolOutputsForNextIteration[] = [
@@ -1034,6 +1074,9 @@ class SimpleToolController extends Controller
                                 'retries' => $retriesUsed,
                                 'args_hash' => $argsHash,
                                 'args_preview' => $argsPreview,
+                                // Provide full args as the model called them (for debug UI)
+                                'args_json' => $argsJson,
+                                'args' => $args,
                             ]);
 
                             // After successful writes, invalidate cached GETs so follow-up reads are fresh.
@@ -1130,6 +1173,9 @@ class SimpleToolController extends Controller
                                 'ms' => null,
                                 'error' => $e->getMessage(),
                                 'cached' => false,
+                                // Provide full args as the model called them (for debug UI)
+                                'args_json' => $argsJson,
+                                'args' => $args,
                             ]);
                         }
                     }

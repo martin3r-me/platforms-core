@@ -1009,7 +1009,20 @@
                         const statusIcon = it.success ? '✅' : '❌';
                         const statusText = it.success ? 'Erfolgreich' : 'Fehlgeschlagen';
                         const cachedBadge = it.cached ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)] ml-2">cached</span>' : '';
-                        const argsPreview = it.args ? (typeof it.args === 'string' ? (it.args.length > 100 ? it.args.substring(0, 100) + '...' : it.args) : JSON.stringify(it.args).substring(0, 100)) : '—';
+                        const argsRaw = (typeof it.args_json === 'string' && it.args_json.trim() !== '')
+                          ? it.args_json
+                          : (it.args != null ? JSON.stringify(it.args) : (it.args_preview || ''));
+                        const argsPretty = (() => {
+                          try {
+                            if (typeof argsRaw === 'string' && argsRaw.trim().startsWith('{')) {
+                              return JSON.stringify(JSON.parse(argsRaw), null, 2);
+                            }
+                          } catch (_) {}
+                          return String(argsRaw || '');
+                        })();
+                        const argsPreview = argsPretty
+                          ? (argsPretty.length > 140 ? (argsPretty.substring(0, 140) + '…') : argsPretty)
+                          : '—';
                         const errorInfo = it.error ? `<div class="mt-1 text-[10px] text-[var(--ui-danger)]">Error: ${it.error_code || 'UNKNOWN'}: ${typeof it.error === 'string' ? it.error.substring(0, 150) : JSON.stringify(it.error).substring(0, 150)}</div>` : '';
                         row.innerHTML = `
                           <div class="flex items-start justify-between gap-2 mb-1">
@@ -1023,7 +1036,7 @@
                               ${cachedBadge}
                             </div>
                           </div>
-                          ${it.args ? `<div class="mt-1 text-[10px] text-[var(--ui-muted)]"><span class="font-semibold">Args:</span> <code class="px-1 py-0.5 rounded bg-[var(--ui-muted-5)] font-mono">${argsPreview}</code></div>` : ''}
+                          ${argsPreview !== '—' ? `<div class="mt-1 text-[10px] text-[var(--ui-muted)]"><span class="font-semibold">Args:</span> <code class="block px-1 py-0.5 rounded bg-[var(--ui-muted-5)] font-mono whitespace-pre-wrap break-words">${argsPreview}</code></div>` : ''}
                           ${errorInfo}
                         `;
                         rtToolCalls.appendChild(row);
