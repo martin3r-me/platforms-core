@@ -134,121 +134,121 @@
                     </div>
                 </div>
             </div>
-            <div class="flex-1 min-h-0 overflow-auto w-full">
-                <div class="w-full h-full min-h-0 flex gap-5 px-4" style="width:100%; max-width:100%;">
+            <div class="flex-1 min-h-0 overflow-hidden w-full">
+                <div class="w-full h-full min-h-0 flex gap-5 px-4 py-4" style="width:100%; max-width:100%;">
 
-    {{-- Left: Chat (3/4 width) --}}
-    <div class="basis-3/4 grow-0 shrink-0 min-h-0 min-w-0 flex flex-col">
-        <div class="flex-1 min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/20">
-            <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
-                @php
-                    $msgs = collect($activeThreadMessages ?? [])
-                        ->filter(fn($m) => in_array($m->role, ['user', 'assistant'], true))
-                        ->values();
-                    $initialMessages = $msgs
-                        ->map(fn($m) => ['role' => $m->role, 'content' => $m->content])
-                        ->values();
-                @endphp
-                <script>
-                  window.__simpleInitialMessages = @json($initialMessages);
-                </script>
-                <div id="chatList" class="space-y-4" wire:key="chat-list-{{ $activeThreadId ?? 'none' }}">
-                    @foreach($msgs as $m)
-                        <div wire:key="chat-msg-{{ $m->id }}" class="flex {{ $m->role === 'user' ? 'justify-end' : 'justify-start' }}">
-                            <div class="max-w-4xl rounded-lg p-3 {{ $m->role === 'user' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-surface)] border border-[var(--ui-border)]' }}">
-                                <div class="text-sm font-semibold mb-1">{{ $m->role === 'user' ? 'Du' : 'Assistant' }}</div>
-                                <div class="whitespace-pre-wrap">{{ $m->content }}</div>
+                    {{-- Left: Chat (3/4 width) --}}
+                    <div class="basis-3/4 flex-none min-h-0 min-w-0 flex flex-col">
+                        <div class="flex-1 min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/20">
+                            <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
+                                @php
+                                    $msgs = collect($activeThreadMessages ?? [])
+                                        ->filter(fn($m) => in_array($m->role, ['user', 'assistant'], true))
+                                        ->values();
+                                    $initialMessages = $msgs
+                                        ->map(fn($m) => ['role' => $m->role, 'content' => $m->content])
+                                        ->values();
+                                @endphp
+                                <script>
+                                  window.__simpleInitialMessages = @json($initialMessages);
+                                </script>
+                                <div id="chatList" class="space-y-4" wire:key="chat-list-{{ $activeThreadId ?? 'none' }}">
+                                    @foreach($msgs as $m)
+                                        <div wire:key="chat-msg-{{ $m->id }}" class="flex {{ $m->role === 'user' ? 'justify-end' : 'justify-start' }}">
+                                            <div class="max-w-4xl rounded-lg p-3 {{ $m->role === 'user' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-surface)] border border-[var(--ui-border)]' }}">
+                                                <div class="text-sm font-semibold mb-1">{{ $m->role === 'user' ? 'Du' : 'Assistant' }}</div>
+                                                <div class="whitespace-pre-wrap">{{ $m->content }}</div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                                <div id="chatEmpty" class="text-sm text-[var(--ui-muted)]" style="{{ $msgs->count() ? 'display:none;' : '' }}">
+                                    <div class="font-semibold text-[var(--ui-secondary)]">Start</div>
+                                    <div class="mt-1">Schreib eine Nachricht (z. B. „Liste meine Teams“ oder „Welche Tools kann ich im OKR-Modul nutzen?“).</div>
+                                    <div class="mt-3 text-xs">
+                                        Tipp: Links kannst du Models per Drag&Drop wählen, und direkt neben dem Input pro Request wechseln.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="border-t border-[var(--ui-border)]/60 p-3 flex-shrink-0 bg-[var(--ui-surface)]">
+                                <form id="chatForm" class="flex gap-2 items-center" method="post" action="javascript:void(0)" onsubmit="return false;">
+                                    <div class="w-56">
+                                        <x-ui-input-select
+                                            name="modelSelect"
+                                            id="modelSelect"
+                                            :options="$modelOptions ?? []"
+                                            :nullable="false"
+                                            size="md"
+                                            :value="$activeThreadModel ?? $defaultModelId ?? 'gpt-5.2'"
+                                            class="w-full h-10"
+                                        />
+                                    </div>
+                                    <input
+                                        id="chatInput"
+                                        type="text"
+                                        class="flex-1 px-4 h-10 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                        placeholder="Nachricht eingeben…"
+                                        autocomplete="off"
+                                    />
+                                    <button id="chatSend" type="submit" class="px-6 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90">
+                                        Senden
+                                    </button>
+                                </form>
                             </div>
                         </div>
-                    @endforeach
-                </div>
-                <div id="chatEmpty" class="text-sm text-[var(--ui-muted)]" style="{{ $msgs->count() ? 'display:none;' : '' }}">
-                    <div class="font-semibold text-[var(--ui-secondary)]">Start</div>
-                    <div class="mt-1">Schreib eine Nachricht (z. B. „Liste meine Teams“ oder „Welche Tools kann ich im OKR-Modul nutzen?“).</div>
-                    <div class="mt-3 text-xs">
-                        Tipp: Links kannst du Models per Drag&Drop wählen, und direkt neben dem Input pro Request wechseln.
                     </div>
-                </div>
-            </div>
-            <div class="border-t border-[var(--ui-border)]/60 p-3 flex-shrink-0 bg-[var(--ui-surface)]">
-                <form id="chatForm" class="flex gap-2 items-center" method="post" action="javascript:void(0)" onsubmit="return false;">
-                    <div class="w-56">
-                        <x-ui-input-select
-                            name="modelSelect"
-                            id="modelSelect"
-                            :options="$modelOptions ?? []"
-                            :nullable="false"
-                            size="md"
-                            :value="$activeThreadModel ?? $defaultModelId ?? 'gpt-5.2'"
-                            class="w-full h-10"
-                        />
+
+                    {{-- Right: Realtime / Debug (1/4 width) --}}
+                    <div class="basis-1/4 flex-none min-h-0 min-w-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/20 overflow-x-hidden">
+                        <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
+                            <div class="text-xs text-[var(--ui-muted)]">
+                                Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-xs text-[var(--ui-muted)] inline-flex items-center gap-2 select-none">
+                                    <input id="rtVerbose" type="checkbox" class="accent-[var(--ui-primary)]" />
+                                    verbose
+                                </label>
+                                <button id="realtimeClear" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Clear</button>
+                            </div>
+                        </div>
+
+                        <div class="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto min-w-0">
+                            <div class="min-w-0">
+                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Assistant (live)</div>
+                                <pre id="rtAssistant" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[80px] max-h-[22vh] overflow-y-auto max-w-full"></pre>
+                            </div>
+
+                            {{-- Tokens & costs moved to the top bar --}}
+
+                            <div class="min-w-0">
+                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Tool Calls (letzte 10)</div>
+                                <div id="rtToolCalls" class="space-y-2 max-h-[30vh] overflow-y-auto"></div>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Reasoning (live)</div>
+                                <pre id="rtReasoning" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px] max-h-[16vh] overflow-y-auto max-w-full"></pre>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Thinking (live)</div>
+                                <pre id="rtThinking" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px] max-h-[16vh] overflow-y-auto max-w-full"></pre>
+                            </div>
+                            {{-- Events list is not very helpful in UI; we show the latest event in the chat footer. --}}
+                            <div class="pt-2 border-t border-[var(--ui-border)] hidden">
+                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Events</div>
+                                <div id="rtEvents" class="text-xs space-y-2 text-[var(--ui-muted)] max-h-[16vh] overflow-y-auto pr-1"></div>
+                            </div>
+
+                            <div class="pt-2 border-t border-[var(--ui-border)] min-w-0">
+                                <div class="flex items-center justify-between mb-1">
+                                    <div class="text-xs font-semibold text-[var(--ui-secondary)]">Debug Dump</div>
+                                    <button id="rtCopyDebug" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Copy</button>
+                                </div>
+                                <textarea id="rtDebugDump" class="w-full max-w-full text-[10px] leading-snug whitespace-pre border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[90px] max-h-[18vh] overflow-y-auto overflow-x-auto" readonly></textarea>
+                                <div id="rtCopyStatus" class="mt-1 text-[10px] text-[var(--ui-muted)]"></div>
+                            </div>
+                        </div>
                     </div>
-                    <input
-                        id="chatInput"
-                        type="text"
-                        class="flex-1 px-4 h-10 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                        placeholder="Nachricht eingeben…"
-                        autocomplete="off"
-                    />
-                    <button id="chatSend" type="submit" class="px-6 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90">
-                        Senden
-                    </button>
-                </form>
-            </div>
-        </div>
-
-    </div>
-
-    {{-- Right: Realtime / Debug (1/4 width) --}}
-    <div class="basis-1/4 grow-0 shrink-0 min-h-0 min-w-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/20">
-        <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
-            <div class="text-xs text-[var(--ui-muted)]">
-                Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
-            </div>
-            <div class="flex items-center gap-2">
-                <label class="text-xs text-[var(--ui-muted)] inline-flex items-center gap-2 select-none">
-                    <input id="rtVerbose" type="checkbox" class="accent-[var(--ui-primary)]" />
-                    verbose
-                </label>
-                <button id="realtimeClear" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Clear</button>
-            </div>
-        </div>
-
-        <div class="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto">
-            <div>
-                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Assistant (live)</div>
-                <pre id="rtAssistant" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[80px] max-h-[22vh] overflow-y-auto"></pre>
-            </div>
-
-            {{-- Tokens & costs moved to the top bar --}}
-
-            <div>
-                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Tool Calls (letzte 10)</div>
-                <div id="rtToolCalls" class="space-y-2 max-h-[30vh] overflow-y-auto"></div>
-            </div>
-            <div>
-                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Reasoning (live)</div>
-                <pre id="rtReasoning" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px] max-h-[16vh] overflow-y-auto"></pre>
-            </div>
-            <div>
-                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Thinking (live)</div>
-                <pre id="rtThinking" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px] max-h-[16vh] overflow-y-auto"></pre>
-            </div>
-            {{-- Events list is not very helpful in UI; we show the latest event in the chat footer. --}}
-            <div class="pt-2 border-t border-[var(--ui-border)] hidden">
-                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Events</div>
-                <div id="rtEvents" class="text-xs space-y-2 text-[var(--ui-muted)] max-h-[16vh] overflow-y-auto pr-1"></div>
-            </div>
-
-            <div class="pt-2 border-t border-[var(--ui-border)]">
-                <div class="flex items-center justify-between mb-1">
-                    <div class="text-xs font-semibold text-[var(--ui-secondary)]">Debug Dump</div>
-                    <button id="rtCopyDebug" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Copy</button>
-                </div>
-                <textarea id="rtDebugDump" class="w-full text-[10px] leading-snug whitespace-pre border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[90px] max-h-[18vh] overflow-y-auto" readonly></textarea>
-                <div id="rtCopyStatus" class="mt-1 text-[10px] text-[var(--ui-muted)]"></div>
-        </div>
-    </div>
                 </div>
             </div>
 
