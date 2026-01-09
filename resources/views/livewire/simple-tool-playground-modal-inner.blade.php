@@ -99,6 +99,10 @@
                         <span class="text-[9px] text-[var(--ui-muted)]">Req Out:</span>
                         <span id="rtTokensOut" class="text-[10px] font-semibold text-[var(--ui-secondary)]">—</span>
                     </div>
+                    <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/40 bg-[var(--ui-bg)]/50">
+                        <span class="text-[9px] text-[var(--ui-muted)]">Req $:</span>
+                        <span id="rtCostRequest" class="text-[10px] font-semibold text-[var(--ui-secondary)]">—</span>
+                    </div>
                 </div>
             </div>
             <div class="flex-1 min-h-0 overflow-auto">
@@ -396,9 +400,14 @@
     </div>
     </div>
 
-    @verbatim
     <script>
       (() => {
+        // Blade variables (set before script execution)
+        const defaultModelId = @json($defaultModelId ?? 'gpt-5.2');
+        const activeThreadId = @json($activeThreadId ?? null);
+        const activeThreadModel = @json($activeThreadModel ?? null);
+        const livewireComponentId = '{{ $this->getId() }}';
+        
         const boot = () => {
         const url = window.__simpleStreamUrl;
         const modelsUrl = window.__simpleModelsUrl;
@@ -491,23 +500,24 @@
         const rtCostCached = document.getElementById('rtCostCached');
         const rtCostOut = document.getElementById('rtCostOut');
         const rtCostTotal = document.getElementById('rtCostTotal');
+        const rtCostRequest = document.getElementById('rtCostRequest');
         const rtCostNote = document.getElementById('rtCostNote');
         const rtToolCalls = document.getElementById('rtToolCalls');
 
         /** type: {role:'user'|'assistant', content:string}[] */
         let messages = [];
-        let currentThreadId = @json($activeThreadId ?? null);
+        let currentThreadId = activeThreadId;
         /** continuation state for interrupted tool-loops */
         let continuation = null;
         let inFlight = false;
         
         // Initialize with default model or thread model
-        let selectedModel = @json($activeThreadModel ?? $defaultModelId ?? 'gpt-5.2');
+        let selectedModel = activeThreadModel || defaultModelId;
         if (!selectedModel) {
           selectedModel = localStorage.getItem('simple.selectedModel') || '';
         }
         if (!selectedModel) {
-          selectedModel = @json($defaultModelId ?? 'gpt-5.2');
+          selectedModel = defaultModelId;
         }
         localStorage.setItem('simple.selectedModel', selectedModel);
 
@@ -653,23 +663,22 @@
             // Also save to thread if thread exists
             if (currentThreadId && selectedModel) {
               // Save model to thread via Livewire
-              @this.call('updateThreadModel', currentThreadId, selectedModel).catch(() => {});
+              if (window.Livewire) {
+                window.Livewire.find(livewireComponentId).call('updateThreadModel', currentThreadId, selectedModel).catch(() => {});
+              }
             }
           }
         };
         
         // Load model from active thread on page load or after Livewire update
         const loadModelFromThread = () => {
-          @if(isset($activeThreadModel) && $activeThreadModel)
-            const threadModel = '{{ $activeThreadModel }}';
-            if (threadModel && threadModel !== selectedModel) {
-              setSelectedModel(threadModel);
-              // Update dropdown after models are loaded
-              setTimeout(() => {
-                if (modelSelect) modelSelect.value = threadModel;
-              }, 100);
-            }
-          @endif
+          if (activeThreadModel && activeThreadModel !== selectedModel) {
+            setSelectedModel(activeThreadModel);
+            // Update dropdown after models are loaded
+            setTimeout(() => {
+              if (modelSelect) modelSelect.value = activeThreadModel;
+            }, 100);
+          }
         };
         
         // Load on initial page load
@@ -794,7 +803,9 @@
             // Reload component to get updated thread totals and model
             // The totals and model will be set from server-side rendering
             // Livewire will re-render the component, and activeThreadModel will be updated
-            @this.call('switchThread', threadId);
+            if (window.Livewire) {
+              window.Livewire.find(livewireComponentId).call('switchThread', threadId);
+            }
           } catch (e) {
             console.error('Failed to load thread messages:', e);
           }
@@ -846,12 +857,14 @@
             
             // Save model to thread if thread exists
             if (currentThreadId && selectedModel) {
-              @this.call('updateThreadModel', currentThreadId, selectedModel).catch(() => {});
+              if (window.Livewire) {
+                window.Livewire.find(livewireComponentId).call('updateThreadModel', currentThreadId, selectedModel).catch(() => {});
+              }
             }
           }
 
           // Fallback to default if no model selected
-          const modelToUse = selectedModel || @json($defaultModelId ?? 'gpt-5.2');
+          const modelToUse = selectedModel || defaultModelId;
 
           const payload = {
             message: (isContinue ? '' : text),
@@ -985,6 +998,24 @@
                     if (rtTokensOut) rtTokensOut.textContent = (outTok != null ? formatNumber(outTok) : '—');
                     const cachedReq = (cached != null ? cached : 0) + (reasoning != null ? reasoning : 0);
                     if (rtTokensExtra) rtTokensExtra.textContent = cachedReq > 0 ? formatNumber(cachedReq) : '—';
+                    
+                    // Calculate and display request cost
+                    if (rtCostRequest && inTok != null && outTok != null) {
+                      const RATE_IN = 1.75;
+                      const RATE_CACHED = 0.175;
+                      const RATE_OUT = 14.00;
+                      const inputTokens = typeof inTok === 'number' ? inTok : 0;
+                      const outputTokens = typeof outTok === 'number' ? outTok : 0;
+                      const cachedTokens = typeof cached === 'number' ? cached : 0;
+                      const nonCachedInput = Math.max(0, inputTokens - cachedTokens);
+                      const costIn = (nonCachedInput / 1_000_000) * RATE_IN;
+                      const costCached = (cachedTokens / 1_000_000) * RATE_CACHED;
+                      const costOut = (outputTokens / 1_000_000) * RATE_OUT;
+                      const costTotal = costIn + costCached + costOut;
+                      rtCostRequest.textContent = `$${costTotal.toFixed(4)}`;
+                    } else if (rtCostRequest) {
+                      rtCostRequest.textContent = '—';
+                    }
 
                     debugState.model = data?.model || debugState.model;
                     debugState.usage = usage;
@@ -1101,7 +1132,6 @@
       }
     })();
     </script>
-    @endverbatim
 </div>
 
 
