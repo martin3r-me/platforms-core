@@ -24,6 +24,7 @@
                         @if(isset($threads) && $threads->count() > 0)
                             @foreach($threads as $t)
                                 <div
+                                    wire:key="thread-tab-{{ $t->id }}"
                                     class="relative flex-shrink-0 flex items-center"
                                     x-data="{ editing: false, title: '{{ addslashes($t->title) }}' }"
                                 >
@@ -150,9 +151,9 @@
                 <script>
                   window.__simpleInitialMessages = @json($initialMessages);
                 </script>
-                <div id="chatList" class="space-y-4">
+                <div id="chatList" class="space-y-4" wire:key="chat-list-{{ $activeThreadId ?? 'none' }}">
                     @foreach($msgs as $m)
-                        <div class="flex {{ $m->role === 'user' ? 'justify-end' : 'justify-start' }}">
+                        <div wire:key="chat-msg-{{ $m->id }}" class="flex {{ $m->role === 'user' ? 'justify-end' : 'justify-start' }}">
                             <div class="max-w-4xl rounded-lg p-3 {{ $m->role === 'user' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-surface)] border border-[var(--ui-border)]' }}">
                                 <div class="text-sm font-semibold mb-1">{{ $m->role === 'user' ? 'Du' : 'Assistant' }}</div>
                                 <div class="whitespace-pre-wrap">{{ $m->content }}</div>
@@ -476,14 +477,25 @@
         const selectedModelLabel = document.getElementById('selectedModelLabel');
         const modelsReload = document.getElementById('modelsReload');
 
-        const chatList = document.getElementById('chatList');
-        const chatScroll = document.getElementById('chatScroll');
-        const form = document.getElementById('chatForm');
-        const input = document.getElementById('chatInput');
-        const sendBtn = document.getElementById('chatSend');
+        // NOTE: Livewire re-renders these nodes. Keep them as "let" and refresh on demand,
+        // otherwise we end up with stale references after a thread switch.
+        let chatList = document.getElementById('chatList');
+        let chatScroll = document.getElementById('chatScroll');
+        let form = document.getElementById('chatForm');
+        let input = document.getElementById('chatInput');
+        let sendBtn = document.getElementById('chatSend');
+
+        const refreshDomRefs = () => {
+          chatList = document.getElementById('chatList');
+          chatScroll = document.getElementById('chatScroll');
+          form = document.getElementById('chatForm');
+          input = document.getElementById('chatInput');
+          sendBtn = document.getElementById('chatSend');
+        };
 
         // Idempotent binding (modal exists globally; avoid duplicate listeners).
         // IMPORTANT: even when already bound, we still refresh models so the UI is usable right after opening.
+        refreshDomRefs();
         const alreadyBound = (form?.dataset?.simplePlaygroundBound === '1');
         if (!form) return;
         if (!alreadyBound) form.dataset.simplePlaygroundBound = '1';
@@ -532,7 +544,11 @@
         }
         localStorage.setItem('simple.selectedModel', selectedModel);
 
-        const scrollToBottom = () => { chatScroll.scrollTop = chatScroll.scrollHeight; };
+        const scrollToBottom = () => {
+          refreshDomRefs();
+          if (!chatScroll) return;
+          chatScroll.scrollTop = chatScroll.scrollHeight;
+        };
         
         // Helper: format numbers
         const formatNumber = (n) => {
@@ -541,6 +557,8 @@
         };
 
         const renderMessage = (role, content) => {
+          refreshDomRefs();
+          if (!chatList) return;
           const wrap = document.createElement('div');
           wrap.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
           wrap.innerHTML = `
@@ -838,6 +856,7 @@
 
         // Send (parity with page playground: chat updates only on complete)
         const send = async () => {
+          refreshDomRefs();
           const text = (input?.value || '').trim();
           if (inFlight) return;
 
@@ -1116,6 +1135,12 @@
           const currentForm = document.getElementById('chatForm');
           const currentInput = document.getElementById('chatInput');
           const currentSendBtn = document.getElementById('chatSend');
+          // Keep outer refs in sync with the currently rendered DOM
+          form = currentForm;
+          input = currentInput;
+          sendBtn = currentSendBtn;
+          chatList = document.getElementById('chatList');
+          chatScroll = document.getElementById('chatScroll');
           
           if (currentForm && !currentForm.dataset.submitBound) {
             currentForm.addEventListener('submit', (e) => { 

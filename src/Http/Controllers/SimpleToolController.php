@@ -692,21 +692,25 @@ class SimpleToolController extends Controller
                                     }
 
                                     // Aggregate token usage across the whole request.
-                                    // Usage usually appears on response.completed (but we handle any event carrying it).
-                                    $usage = $decoded['response']['usage'] ?? null;
+                                    // Usage usually appears on response.completed, but we handle any event carrying it.
+                                    // NOTE: Depending on provider/event shape, usage might appear either under response.usage or top-level usage.
+                                    $usage = $decoded['response']['usage'] ?? ($decoded['usage'] ?? null);
                                     if (is_array($usage) && !empty($usage)) {
                                         $rid = $decoded['response']['id'] ?? $currentResponseId;
                                         if (!is_string($rid) || $rid === '') {
                                             $rid = 'unknown';
                                         }
-                                        if (!isset($seenUsageResponseIds[$rid])) {
-                                            $seenUsageResponseIds[$rid] = true;
+                                        // Some streams reuse the same response id; use sequence_number to dedupe instead.
+                                        $seq = $decoded['sequence_number'] ?? null;
+                                        $seenKey = $rid . '|' . (is_scalar($seq) ? (string)$seq : '');
+                                        if (!isset($seenUsageResponseIds[$seenKey])) {
+                                            $seenUsageResponseIds[$seenKey] = true;
 
                                             $in = (int) ($usage['input_tokens'] ?? 0);
                                             $out = (int) ($usage['output_tokens'] ?? 0);
                                             $tot = (int) ($usage['total_tokens'] ?? 0);
-                                            $cached = (int) ($usage['input_tokens_details']['cached_tokens'] ?? 0);
-                                            $reasonTok = (int) ($usage['output_tokens_details']['reasoning_tokens'] ?? 0);
+                                            $cached = (int) (($usage['input_tokens_details']['cached_tokens'] ?? null) ?? 0);
+                                            $reasonTok = (int) (($usage['output_tokens_details']['reasoning_tokens'] ?? null) ?? 0);
 
                                             $usageAggregate['input_tokens'] += $in;
                                             $usageAggregate['output_tokens'] += $out;
@@ -731,7 +735,7 @@ class SimpleToolController extends Controller
                                             // Calculate request-level cost for this increment
                                             $requestCost = 0.0;
                                             $requestCurrency = 'USD';
-                                            $modelForPricing = $decoded['response']['model'] ?? $model ?? null;
+                                            $modelForPricing = $decoded['response']['model'] ?? ($decoded['model'] ?? ($model ?? null));
                                             if ($modelForPricing) {
                                                 $modelRecord = CoreAiModel::where('model_id', $modelForPricing)
                                                     ->whereHas('provider', fn($q) => $q->where('key', 'openai'))
