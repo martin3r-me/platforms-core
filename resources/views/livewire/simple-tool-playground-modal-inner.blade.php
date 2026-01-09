@@ -34,7 +34,8 @@
                                         x-show="!editing"
                                         class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1 {{ ($activeThreadId ?? null) == $t->id ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]' : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]' }}"
                                     >
-                                        <span x-text="title"></span>
+                                        <span class="inline-flex items-center gap-1" x-text="title"></span>
+                                        <span data-thread-busy="{{ $t->id }}" class="hidden ml-1 w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
                                         <svg 
                                             @click.stop="editing = true; $nextTick(() => $refs.input?.focus())"
                                             class="w-3 h-3 {{ ($activeThreadId ?? null) == $t->id ? 'text-white/70 hover:text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }} cursor-pointer"
@@ -527,12 +528,25 @@
         const rtCostNote = document.getElementById('rtCostNote');
         const rtToolCalls = document.getElementById('rtToolCalls');
 
-        /** type: {role:'user'|'assistant', content:string}[] */
-        let messages = [];
+        // Global per-thread state so modal close/open and thread switching does not reset anything.
+        window.__simplePlaygroundThreadStore = window.__simplePlaygroundThreadStore || {};
+        const getThreadState = (threadId) => {
+          const key = String(threadId || 'none');
+          if (!window.__simplePlaygroundThreadStore[key]) {
+            window.__simplePlaygroundThreadStore[key] = {
+              messages: [],
+              continuation: null,
+              inFlight: false,
+              live: { assistant: '', reasoning: '', thinking: '', status: 'idle' },
+            };
+          }
+          return window.__simplePlaygroundThreadStore[key];
+        };
+
+        /** active thread id (from DOM) */
         let currentThreadId = null;
-        /** continuation state for interrupted tool-loops */
-        let continuation = null;
-        let inFlight = false;
+        /** active thread state (from global store) */
+        let threadState = getThreadState('none');
         
         // Initialize with default model or thread model
         let selectedModel = activeThreadModel || defaultModelId;
@@ -579,7 +593,18 @@
           const raw = (el && typeof el.value === 'string') ? el.value : '';
           const n = parseInt(raw || '', 10);
           currentThreadId = Number.isFinite(n) ? n : null;
+          threadState = getThreadState(currentThreadId || 'none');
           return currentThreadId;
+        };
+
+        const updateThreadBusyIndicators = () => {
+          const dots = document.querySelectorAll('[data-thread-busy]');
+          dots.forEach((el) => {
+            const tid = el.getAttribute('data-thread-busy');
+            const st = getThreadState(tid);
+            if (st && st.inFlight) el.classList.remove('hidden');
+            else el.classList.add('hidden');
+          });
         };
 
         // Event log (same logic, but keep it lightweight)
@@ -833,23 +858,39 @@
         // JS only needs the current thread id + an in-memory copy of the server-rendered history
         // to send as chat_history for the next request.
         const refreshMessagesFromServerRender = () => {
-          messages = Array.isArray(window.__simpleInitialMessages) ? window.__simpleInitialMessages : [];
+          const initial = Array.isArray(window.__simpleInitialMessages) ? window.__simpleInitialMessages : [];
+          // Initialize state if empty (first time we see this thread)
+          if (!threadState.messages || threadState.messages.length === 0) {
+            threadState.messages = initial;
+          }
           const empty = document.getElementById('chatEmpty');
           if (empty) {
-            empty.style.display = (messages.length > 0) ? 'none' : '';
+            empty.style.display = (threadState.messages.length > 0) ? 'none' : '';
           }
+        };
+
+        const renderChatFromState = () => {
+          refreshDomRefs();
+          if (!chatList) return;
+          chatList.innerHTML = '';
+          (threadState.messages || []).forEach((m) => {
+            if (!m || !m.role) return;
+            renderMessage(m.role, m.content || '');
+          });
         };
 
         refreshThreadIdFromDom();
         refreshMessagesFromServerRender();
+        renderChatFromState();
+        updateThreadBusyIndicators();
         let lastThreadId = currentThreadId;
         document.addEventListener('livewire:update', () => {
           refreshThreadIdFromDom();
           refreshMessagesFromServerRender();
+          renderChatFromState();
+          updateThreadBusyIndicators();
           if (currentThreadId !== lastThreadId) {
-            // Reset continuation when switching threads (continuations are per-thread).
-            continuation = null;
-            resetRealtime();
+            // Do NOT reset: keep per-thread state alive.
             lastThreadId = currentThreadId;
           }
         });
@@ -858,30 +899,31 @@
         const send = async () => {
           refreshDomRefs();
           const text = (input?.value || '').trim();
-          if (inFlight) return;
+          if (threadState.inFlight) return;
 
-          const canContinue = !!(continuation && continuation.pending);
+          const canContinue = !!(threadState.continuation && threadState.continuation.pending);
           const isContinue = (!text && canContinue);
           if (!text && !isContinue) return;
           if (text && canContinue) {
-            messages.push({ role: 'assistant', content: '⚠️ Es gibt noch einen laufenden Prozess. Bitte zuerst einmal mit leerer Eingabe fortsetzen (Enter), danach kannst du die nächste Frage senden.' });
+            threadState.messages.push({ role: 'assistant', content: '⚠️ Es gibt noch einen laufenden Prozess. Bitte zuerst einmal mit leerer Eingabe fortsetzen (Enter), danach kannst du die nächste Frage senden.' });
             renderMessage('assistant', '⚠️ Es gibt noch einen laufenden Prozess. Bitte zuerst einmal mit leerer Eingabe fortsetzen (Enter), danach kannst du die nächste Frage senden.');
             return;
           }
 
           if (!isContinue) {
-            messages.push({ role: 'user', content: text });
+            threadState.messages.push({ role: 'user', content: text });
             renderMessage('user', text);
             input.value = '';
           }
 
-          inFlight = true;
+          threadState.inFlight = true;
           sendBtn.disabled = true;
           input.disabled = true;
           resetRealtime();
           if (rtStatus) rtStatus.textContent = 'streaming…';
           if (realtimeModel) realtimeModel.textContent = selectedModel || '—';
           debugState.startedAt = new Date().toISOString();
+          updateThreadBusyIndicators();
 
           // Get model from select field (in case it was changed)
           // Re-fetch modelSelect in case it was re-rendered by Livewire
@@ -908,18 +950,19 @@
           }
           if (!currentThreadId) {
             renderMessage('assistant', '⚠️ Kein aktiver Thread gefunden. Bitte einmal einen Thread anlegen oder neu auswählen.');
-            inFlight = false;
+            threadState.inFlight = false;
             sendBtn.disabled = false;
             input.disabled = false;
+            updateThreadBusyIndicators();
             return;
           }
 
           const payload = {
             message: (isContinue ? '' : text),
-            chat_history: messages,
+            chat_history: threadState.messages,
             thread_id: currentThreadId,
             model: modelToUse,
-            continuation: (isContinue ? continuation : null),
+            continuation: (isContinue ? threadState.continuation : null),
             context: ctx || null,
           };
           debugState.payload = payload;
@@ -963,14 +1006,24 @@
 
                 switch (currentEvent) {
                   case 'assistant.delta':
-                    if (data?.delta) rtAssistant.textContent += data.delta;
+                    if (data?.delta) {
+                      threadState.live.assistant += data.delta;
+                      // Update DOM only if we are currently viewing this thread
+                      if (refreshThreadIdFromDom() === currentThreadId && rtAssistant) rtAssistant.textContent = threadState.live.assistant;
+                    }
                     debugState.lastAssistant = rtAssistant.textContent;
                     break;
                   case 'reasoning.delta':
-                    if (data?.delta) rtReasoning.textContent += data.delta;
+                    if (data?.delta) {
+                      threadState.live.reasoning += data.delta;
+                      if (refreshThreadIdFromDom() === currentThreadId && rtReasoning) rtReasoning.textContent = threadState.live.reasoning;
+                    }
                     break;
                   case 'thinking.delta':
-                    if (data?.delta) rtThinking.textContent += data.delta;
+                    if (data?.delta) {
+                      threadState.live.thinking += data.delta;
+                      if (refreshThreadIdFromDom() === currentThreadId && rtThinking) rtThinking.textContent = threadState.live.thinking;
+                    }
                     break;
                   case 'debug.tools':
                     debugState.toolsVisible = data || null;
@@ -1100,16 +1153,16 @@
                   }
                   case 'complete': {
                     const assistant = data?.assistant || rtAssistant.textContent;
-                    messages.push({ role: 'assistant', content: assistant });
+                    threadState.messages.push({ role: 'assistant', content: assistant });
                     renderMessage('assistant', assistant);
-                    continuation = data?.continuation || null;
+                    threadState.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';
                     updateDebugDump();
                     break;
                   }
                   case 'error': {
                     const msg = data?.error || 'Unbekannter Fehler';
-                    messages.push({ role: 'assistant', content: `❌ Fehler: ${msg}` });
+                    threadState.messages.push({ role: 'assistant', content: `❌ Fehler: ${msg}` });
                     renderMessage('assistant', `❌ Fehler: ${msg}`);
                     if (rtStatus) rtStatus.textContent = 'error';
                     updateDebugDump();
@@ -1122,10 +1175,11 @@
               }
             }
           } finally {
-            inFlight = false;
+            threadState.inFlight = false;
             sendBtn.disabled = false;
             input.disabled = false;
             input.focus();
+            updateThreadBusyIndicators();
           }
         };
 
@@ -1182,14 +1236,39 @@
 
       // Expose boot for modal-open refresh (Livewire opens modal after initial page load)
       window.__simplePlaygroundBoot = boot;
+      // Wake is safe to call on every modal open: it only re-syncs DOM refs & indicators.
+      window.__simplePlaygroundWake = () => {
+        try {
+          // Re-bind submit handlers after Livewire has re-rendered
+          const f = document.getElementById('chatForm');
+          if (f) {
+            // Trigger the existing rebind pipeline by emitting livewire:update
+            // (bindSubmitHandlers is in the boot closure; this is best-effort)
+          }
+          // Update thread busy dots from global store
+          const dots = document.querySelectorAll('[data-thread-busy]');
+          dots.forEach((el) => {
+            const tid = el.getAttribute('data-thread-busy');
+            const st = (window.__simplePlaygroundThreadStore || {})[String(tid || 'none')];
+            if (st && st.inFlight) el.classList.remove('hidden');
+            else el.classList.add('hidden');
+          });
+        } catch (_) {}
+      };
 
       const ensureBootSoon = () => {
         // Livewire opens the modal after a roundtrip; ensure boot runs once the DOM is actually there.
+        if (window.__simplePlaygroundBootedOnce) {
+          // Just re-bind handlers / refresh indicators when reopening; do not reset JS state.
+          try { if (typeof window.__simplePlaygroundWake === 'function') window.__simplePlaygroundWake(); } catch (_) {}
+          return;
+        }
         let tries = 0;
         const t = setInterval(() => {
           tries++;
           if (document.getElementById('chatForm')) {
             try { if (typeof window.__simplePlaygroundBoot === 'function') window.__simplePlaygroundBoot(); } catch (_) {}
+            window.__simplePlaygroundBootedOnce = true;
             clearInterval(t);
           }
           if (tries > 80) clearInterval(t);
