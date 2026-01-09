@@ -17,12 +17,23 @@ class CoreChatThread extends Model
         'meta',
         'started_at',
         'finished_at',
+        'total_tokens_in',
+        'total_tokens_out',
+        'total_tokens_cached',
+        'total_tokens_reasoning',
+        'total_cost',
+        'pricing_currency',
     ];
 
     protected $casts = [
         'meta' => 'array',
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
+        'total_tokens_in' => 'integer',
+        'total_tokens_out' => 'integer',
+        'total_tokens_cached' => 'integer',
+        'total_tokens_reasoning' => 'integer',
+        'total_cost' => 'decimal:4',
     ];
 
     public function chat(): BelongsTo

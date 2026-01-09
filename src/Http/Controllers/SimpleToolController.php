@@ -708,6 +708,20 @@ class SimpleToolController extends Controller
                                             $usageAggregate['input_tokens_details']['cached_tokens'] += $cached;
                                             $usageAggregate['output_tokens_details']['reasoning_tokens'] += $reasonTok;
 
+                                            // Include thread totals if thread exists
+                                            $threadTotals = null;
+                                            if ($thread) {
+                                                $thread->refresh(); // Reload from DB to get updated totals
+                                                $threadTotals = [
+                                                    'total_tokens_in' => $thread->total_tokens_in,
+                                                    'total_tokens_out' => $thread->total_tokens_out,
+                                                    'total_tokens_cached' => $thread->total_tokens_cached,
+                                                    'total_tokens_reasoning' => $thread->total_tokens_reasoning,
+                                                    'total_cost' => $thread->total_cost,
+                                                    'pricing_currency' => $thread->pricing_currency,
+                                                ];
+                                            }
+                                            
                                             $sendEvent('usage', [
                                                 'model' => $decoded['response']['model'] ?? null,
                                                 'iteration' => $iteration,
@@ -720,6 +734,7 @@ class SimpleToolController extends Controller
                                                     'cached_tokens' => $cached,
                                                     'reasoning_tokens' => $reasonTok,
                                                 ],
+                                                'thread_totals' => $threadTotals,
                                             ]);
                                         }
                                     }
@@ -781,6 +796,8 @@ class SimpleToolController extends Controller
                             $usageAggregate = $usageAggregate ?? [];
                             $tokensIn = (int)($usageAggregate['input_tokens'] ?? 0);
                             $tokensOut = (int)($usageAggregate['output_tokens'] ?? 0);
+                            $tokensCached = (int)($usageAggregate['input_tokens_details']['cached_tokens'] ?? 0);
+                            $tokensReasoning = (int)($usageAggregate['output_tokens_details']['reasoning_tokens'] ?? 0);
                             
                             CoreChatMessage::create([
                                 'core_chat_id' => $thread->core_chat_id,
@@ -795,7 +812,33 @@ class SimpleToolController extends Controller
                                 'tokens_out' => $tokensOut,
                             ]);
                             
-                            // Update thread and chat token counts
+                            // Calculate cost based on model pricing
+                            $cost = 0.0;
+                            $currency = 'USD';
+                            $modelRecord = CoreAiModel::where('model_id', $model)->whereHas('provider', fn($q) => $q->where('key', 'openai'))->first();
+                            if ($modelRecord) {
+                                $priceInput = (float)($modelRecord->price_input_per_1m ?? 0);
+                                $priceCached = (float)($modelRecord->price_cached_input_per_1m ?? 0);
+                                $priceOutput = (float)($modelRecord->price_output_per_1m ?? 0);
+                                $currency = (string)($modelRecord->pricing_currency ?? 'USD');
+                                
+                                $inputTokens = $tokensIn - $tokensCached; // Non-cached input tokens
+                                $cost = ($inputTokens / 1_000_000 * $priceInput)
+                                    + ($tokensCached / 1_000_000 * $priceCached)
+                                    + ($tokensOut / 1_000_000 * $priceOutput);
+                            }
+                            
+                            // Update thread token counts and cost
+                            $thread->increment('total_tokens_in', $tokensIn);
+                            $thread->increment('total_tokens_out', $tokensOut);
+                            $thread->increment('total_tokens_cached', $tokensCached);
+                            $thread->increment('total_tokens_reasoning', $tokensReasoning);
+                            $thread->increment('total_cost', $cost);
+                            if ($thread->pricing_currency !== $currency) {
+                                $thread->update(['pricing_currency' => $currency]);
+                            }
+                            
+                            // Also update chat totals (aggregate)
                             $thread->chat->increment('total_tokens_out', $tokensOut);
                             if (isset($usageAggregate['input_tokens'])) {
                                 $thread->chat->increment('total_tokens_in', $tokensIn);

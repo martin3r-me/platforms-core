@@ -171,10 +171,15 @@ class ModalSimpleToolPlayground extends Component
             ? $this->chat->threads()->orderBy('created_at', 'desc')->get()
             : collect();
 
+        $activeThread = $this->activeThreadId
+            ? CoreChatThread::find($this->activeThreadId)
+            : null;
+
         return view('platform::livewire.modal-simple-tool-playground', [
             'coreAiModels' => $models,
             'threads' => $threads,
             'activeThreadId' => $this->activeThreadId,
+            'activeThread' => $activeThread,
         ]);
     }
 }

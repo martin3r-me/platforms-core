@@ -7,19 +7,43 @@
             <div class="grid grid-cols-4 gap-2">
                 <div class="border border-[var(--ui-border)]/60 rounded-lg bg-[var(--ui-bg)] px-3 py-2 min-w-[110px]">
                     <div class="text-[10px] text-[var(--ui-muted)]">Input tokens</div>
-                    <div id="rtTokensIn" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
+                    <div id="rtTokensIn" class="text-sm font-semibold text-[var(--ui-secondary)]">
+                        @if(isset($activeThread) && $activeThread)
+                            {{ number_format($activeThread->total_tokens_in ?? 0) }}
+                        @else
+                            —
+                        @endif
+                    </div>
                 </div>
                 <div class="border border-[var(--ui-border)]/60 rounded-lg bg-[var(--ui-bg)] px-3 py-2 min-w-[110px]">
                     <div class="text-[10px] text-[var(--ui-muted)]">Cached / Reason</div>
-                    <div id="rtTokensExtra" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
+                    <div id="rtTokensExtra" class="text-sm font-semibold text-[var(--ui-secondary)]">
+                        @if(isset($activeThread) && $activeThread)
+                            {{ number_format(($activeThread->total_tokens_cached ?? 0) + ($activeThread->total_tokens_reasoning ?? 0)) }}
+                        @else
+                            —
+                        @endif
+                    </div>
                 </div>
                 <div class="border border-[var(--ui-border)]/60 rounded-lg bg-[var(--ui-bg)] px-3 py-2 min-w-[110px]">
                     <div class="text-[10px] text-[var(--ui-muted)]">Output tokens</div>
-                    <div id="rtTokensOut" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
+                    <div id="rtTokensOut" class="text-sm font-semibold text-[var(--ui-secondary)]">
+                        @if(isset($activeThread) && $activeThread)
+                            {{ number_format($activeThread->total_tokens_out ?? 0) }}
+                        @else
+                            —
+                        @endif
+                    </div>
                 </div>
                 <div class="border border-[var(--ui-border)]/60 rounded-lg bg-[var(--ui-bg)] px-3 py-2 min-w-[140px]">
                     <div class="text-[10px] text-[var(--ui-muted)]">Total $</div>
-                    <div id="rtCostTotal" class="text-sm font-semibold text-[var(--ui-secondary)]">—</div>
+                    <div id="rtCostTotal" class="text-sm font-semibold text-[var(--ui-secondary)]">
+                        @if(isset($activeThread) && $activeThread)
+                            {{ number_format((float)($activeThread->total_cost ?? 0), 4) }} {{ $activeThread->pricing_currency ?? 'USD' }}
+                        @else
+                            —
+                        @endif
+                    </div>
                 </div>
             </div>
             <div id="rtUsageModel" class="ml-3 text-[10px] text-[var(--ui-muted)]"></div>
@@ -424,6 +448,12 @@
         let selectedModel = localStorage.getItem('simple.selectedModel') || '';
 
         const scrollToBottom = () => { chatScroll.scrollTop = chatScroll.scrollHeight; };
+        
+        // Helper: format numbers
+        const formatNumber = (n) => {
+          if (n == null || n === '' || Number.isNaN(n)) return '—';
+          return new Intl.NumberFormat('de-DE').format(Number(n));
+        };
 
         const renderMessage = (role, content) => {
           const wrap = document.createElement('div');
@@ -632,13 +662,24 @@
         if (!alreadyBound && modelsReload) modelsReload.addEventListener('click', () => loadModels());
         loadModels();
 
-        // Thread change handler: load messages from DB
+        // Helper: format numbers
+        const formatNumber = (n) => {
+          if (n == null || n === '') return '—';
+          return new Intl.NumberFormat('de-DE').format(Number(n));
+        };
+
+        // Thread change handler: load messages from DB and update totals
         const loadThreadMessages = async (threadId) => {
           if (!threadId) {
             messages = [];
             chatList.innerHTML = '';
             const empty = document.getElementById('chatEmpty');
             if (empty) empty.style.display = '';
+            // Reset totals
+            if (rtTokensIn) rtTokensIn.textContent = '—';
+            if (rtTokensOut) rtTokensOut.textContent = '—';
+            if (rtTokensExtra) rtTokensExtra.textContent = '—';
+            if (rtCostTotal) rtCostTotal.textContent = '—';
             return;
           }
 
@@ -651,6 +692,10 @@
             const empty = document.getElementById('chatEmpty');
             if (empty) empty.style.display = '';
             currentThreadId = threadId;
+            
+            // Reload component to get updated thread totals
+            // The totals will be set from server-side rendering
+            @this.call('switchThread', threadId);
           } catch (e) {
             console.error('Failed to load thread messages:', e);
           }
@@ -803,37 +848,58 @@
                     const cached = usage?.input_tokens_details?.cached_tokens ?? null;
                     const reasoning = usage?.output_tokens_details?.reasoning_tokens ?? null;
 
-                    if (rtTokensIn) rtTokensIn.textContent = (inTok ?? '—');
-                    if (rtTokensOut) rtTokensOut.textContent = (outTok ?? '—');
-                    if (rtTokensTotal) rtTokensTotal.textContent = (totalTok ?? '—');
-                    if (rtTokensExtra) rtTokensExtra.textContent = `${cached != null ? cached : '—'} / ${reasoning != null ? reasoning : '—'}`;
-                    if (rtUsageModel) {
-                      const modelLabel = data?.model ? `Model: ${data.model}` : '';
-                      const scope = data?.cumulative ? ' · Request total' : '';
-                      rtUsageModel.textContent = modelLabel ? `${modelLabel}${scope}` : (data?.cumulative ? 'Request total' : '');
-                    }
+                    // Use thread totals if available (cumulative), otherwise show request values
+                    const threadTotals = data?.thread_totals;
+                    if (threadTotals) {
+                      // Show thread totals (cumulative across all requests in this thread)
+                      if (rtTokensIn) rtTokensIn.textContent = formatNumber(threadTotals.total_tokens_in || 0);
+                      if (rtTokensOut) rtTokensOut.textContent = formatNumber(threadTotals.total_tokens_out || 0);
+                      if (rtTokensTotal) rtTokensTotal.textContent = formatNumber((threadTotals.total_tokens_in || 0) + (threadTotals.total_tokens_out || 0));
+                      const cachedTotal = (threadTotals.total_tokens_cached || 0) + (threadTotals.total_tokens_reasoning || 0);
+                      if (rtTokensExtra) rtTokensExtra.textContent = formatNumber(cachedTotal);
+                      if (rtCostTotal) {
+                        const cost = parseFloat(threadTotals.total_cost || 0);
+                        const currency = threadTotals.pricing_currency || 'USD';
+                        rtCostTotal.textContent = `$${cost.toFixed(4)} ${currency}`;
+                      }
+                      if (rtUsageModel) {
+                        const modelLabel = data?.model ? `Model: ${data.model}` : '';
+                        rtUsageModel.textContent = modelLabel ? `${modelLabel} · Thread total` : 'Thread total';
+                      }
+                    } else {
+                      // Fallback: show request values (for backwards compatibility)
+                      if (rtTokensIn) rtTokensIn.textContent = (inTok ?? '—');
+                      if (rtTokensOut) rtTokensOut.textContent = (outTok ?? '—');
+                      if (rtTokensTotal) rtTokensTotal.textContent = (totalTok ?? '—');
+                      if (rtTokensExtra) rtTokensExtra.textContent = `${cached != null ? cached : '—'} / ${reasoning != null ? reasoning : '—'}`;
+                      if (rtUsageModel) {
+                        const modelLabel = data?.model ? `Model: ${data.model}` : '';
+                        const scope = data?.cumulative ? ' · Request total' : '';
+                        rtUsageModel.textContent = modelLabel ? `${modelLabel}${scope}` : (data?.cumulative ? 'Request total' : '');
+                      }
 
-                    // Costs (explicit pricing for gpt-5.2, per 1M tokens)
-                    const RATE_IN = 1.75;
-                    const RATE_CACHED = 0.175;
-                    const RATE_OUT = 14.00;
-                    const toMoney = (x) => {
-                      if (x == null || Number.isNaN(x)) return '—';
-                      return `$${Number(x).toFixed(6)}`;
-                    };
-                    const inputTokens = (typeof inTok === 'number') ? inTok : null;
-                    const outputTokens = (typeof outTok === 'number') ? outTok : null;
-                    const cachedTokens = (typeof cached === 'number') ? cached : 0;
-                    const nonCachedInput = (inputTokens != null) ? Math.max(0, inputTokens - cachedTokens) : null;
-                    const costIn = (nonCachedInput != null) ? (nonCachedInput / 1_000_000) * RATE_IN : null;
-                    const costCached = (cachedTokens != null) ? (cachedTokens / 1_000_000) * RATE_CACHED : null;
-                    const costOut = (outputTokens != null) ? (outputTokens / 1_000_000) * RATE_OUT : null;
-                    const costTotal = (costIn != null && costCached != null && costOut != null) ? (costIn + costCached + costOut) : null;
-                    if (rtCostIn) rtCostIn.textContent = toMoney(costIn);
-                    if (rtCostCached) rtCostCached.textContent = toMoney(costCached);
-                    if (rtCostOut) rtCostOut.textContent = toMoney(costOut);
-                    if (rtCostTotal) rtCostTotal.textContent = toMoney(costTotal);
-                    if (rtCostNote) rtCostNote.textContent = `Rates/1M: input $${RATE_IN}, cached $${RATE_CACHED}, output $${RATE_OUT}`;
+                      // Costs (explicit pricing for gpt-5.2, per 1M tokens)
+                      const RATE_IN = 1.75;
+                      const RATE_CACHED = 0.175;
+                      const RATE_OUT = 14.00;
+                      const toMoney = (x) => {
+                        if (x == null || Number.isNaN(x)) return '—';
+                        return `$${Number(x).toFixed(6)}`;
+                      };
+                      const inputTokens = (typeof inTok === 'number') ? inTok : null;
+                      const outputTokens = (typeof outTok === 'number') ? outTok : null;
+                      const cachedTokens = (typeof cached === 'number') ? cached : 0;
+                      const nonCachedInput = (inputTokens != null) ? Math.max(0, inputTokens - cachedTokens) : null;
+                      const costIn = (nonCachedInput != null) ? (nonCachedInput / 1_000_000) * RATE_IN : null;
+                      const costCached = (cachedTokens != null) ? (cachedTokens / 1_000_000) * RATE_CACHED : null;
+                      const costOut = (outputTokens != null) ? (outputTokens / 1_000_000) * RATE_OUT : null;
+                      const costTotal = (costIn != null && costCached != null && costOut != null) ? (costIn + costCached + costOut) : null;
+                      if (rtCostIn) rtCostIn.textContent = toMoney(costIn);
+                      if (rtCostCached) rtCostCached.textContent = toMoney(costCached);
+                      if (rtCostOut) rtCostOut.textContent = toMoney(costOut);
+                      if (rtCostTotal) rtCostTotal.textContent = toMoney(costTotal);
+                      if (rtCostNote) rtCostNote.textContent = `Rates/1M: input $${RATE_IN}, cached $${RATE_CACHED}, output $${RATE_OUT}`;
+                    }
 
                     debugState.model = data?.model || debugState.model;
                     debugState.usage = usage;
