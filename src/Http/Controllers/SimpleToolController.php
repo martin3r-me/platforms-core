@@ -728,8 +728,29 @@ class SimpleToolController extends Controller
                                                 ];
                                             }
                                             
+                                            // Calculate request-level cost for this increment
+                                            $requestCost = 0.0;
+                                            $requestCurrency = 'USD';
+                                            $modelForPricing = $decoded['response']['model'] ?? $model ?? null;
+                                            if ($modelForPricing) {
+                                                $modelRecord = CoreAiModel::where('model_id', $modelForPricing)
+                                                    ->whereHas('provider', fn($q) => $q->where('key', 'openai'))
+                                                    ->first();
+                                                if ($modelRecord) {
+                                                    $priceInput = (float)($modelRecord->price_input_per_1m ?? 0);
+                                                    $priceCached = (float)($modelRecord->price_cached_input_per_1m ?? 0);
+                                                    $priceOutput = (float)($modelRecord->price_output_per_1m ?? 0);
+                                                    $requestCurrency = (string)($modelRecord->pricing_currency ?? 'USD');
+                                                    
+                                                    $inputTokensForIncrement = $in - $cached; // Non-cached input tokens
+                                                    $requestCost = ($inputTokensForIncrement / 1_000_000 * $priceInput)
+                                                        + ($cached / 1_000_000 * $priceCached)
+                                                        + ($out / 1_000_000 * $priceOutput);
+                                                }
+                                            }
+                                            
                                             $sendEvent('usage', [
-                                                'model' => $decoded['response']['model'] ?? null,
+                                                'model' => $modelForPricing,
                                                 'iteration' => $iteration,
                                                 'cumulative' => true,
                                                 'usage' => $usageAggregate,
@@ -739,6 +760,8 @@ class SimpleToolController extends Controller
                                                     'total_tokens' => $tot,
                                                     'cached_tokens' => $cached,
                                                     'reasoning_tokens' => $reasonTok,
+                                                    'cost' => $requestCost,
+                                                    'currency' => $requestCurrency,
                                                 ],
                                                 'thread_totals' => $threadTotals,
                                             ]);

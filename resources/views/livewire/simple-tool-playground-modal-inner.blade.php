@@ -22,13 +22,30 @@
                     <div class="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
                         @if(isset($threads) && $threads->count() > 0)
                             @foreach($threads as $t)
-                                <button
-                                    type="button"
-                                    wire:click="switchThread({{ $t->id }})"
-                                    class="px-2 py-1 rounded text-[11px] border transition flex-shrink-0 whitespace-nowrap {{ ($activeThreadId ?? null) == $t->id ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]' : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]' }}"
+                                <div
+                                    class="group relative flex-shrink-0"
+                                    x-data="{ editing: false, title: '{{ addslashes($t->title) }}' }"
+                                    x-init="@if(($activeThreadId ?? null) == $t->id && $t->title === 'Thread ' . ($threads->count() - $loop->index)) editing = true; $nextTick(() => $refs.input?.focus()) @endif"
                                 >
-                                    {{ $t->title }}
-                                </button>
+                                    <button
+                                        type="button"
+                                        wire:click="switchThread({{ $t->id }})"
+                                        @dblclick.stop="editing = true; $nextTick(() => $refs.input?.focus())"
+                                        class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap {{ ($activeThreadId ?? null) == $t->id ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]' : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]' }}"
+                                    >
+                                        <span x-show="!editing" x-text="title"></span>
+                                    </button>
+                                    <input
+                                        x-ref="input"
+                                        x-show="editing"
+                                        x-model="title"
+                                        @keydown.enter.stop="$wire.updateThreadTitle({{ $t->id }}, title); editing = false"
+                                        @keydown.escape.stop="editing = false; title = '{{ addslashes($t->title) }}'"
+                                        @blur="$wire.updateThreadTitle({{ $t->id }}, title); editing = false"
+                                        class="absolute inset-0 px-2 py-1 rounded text-[11px] border border-[var(--ui-primary)] bg-[var(--ui-bg)] text-[var(--ui-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--ui-primary)]"
+                                        style="display: none; min-width: 80px; max-width: 200px;"
+                                    />
+                                </div>
                             @endforeach
                         @endif
                         <button
@@ -761,32 +778,59 @@
             const empty = document.getElementById('chatEmpty');
             if (empty) empty.style.display = '';
             // Reset totals and model
+            if (rtTokensInTotal) rtTokensInTotal.textContent = '—';
+            if (rtTokensOutTotal) rtTokensOutTotal.textContent = '—';
+            if (rtTokensExtraTotal) rtTokensExtraTotal.textContent = '—';
+            if (rtCostTotal) rtCostTotal.textContent = '—';
             if (rtTokensIn) rtTokensIn.textContent = '—';
             if (rtTokensOut) rtTokensOut.textContent = '—';
             if (rtTokensExtra) rtTokensExtra.textContent = '—';
-            if (rtCostTotal) rtCostTotal.textContent = '—';
+            if (rtCostRequest) rtCostRequest.textContent = '—';
             setSelectedModel(''); // Clear model selection
+            currentThreadId = null;
             return;
           }
 
           try {
-            // Load messages via Livewire (thread_id is already set in component)
-            // We'll use a simple approach: reload the component or fetch via API
-            // For now, we clear and let the next request load from DB
+            currentThreadId = threadId;
+            
+            // Switch thread in Livewire component first
+            if (window.Livewire) {
+              await window.Livewire.find(livewireComponentId).call('switchThread', threadId);
+            }
+            
+            // Load messages from Livewire
+            let threadMessages = [];
+            if (window.Livewire) {
+              const result = await window.Livewire.find(livewireComponentId).call('getThreadMessages', threadId);
+              if (result && Array.isArray(result)) {
+                threadMessages = result;
+              }
+            }
+            
+            // Clear and reload messages
+            messages = threadMessages;
+            chatList.innerHTML = '';
+            const empty = document.getElementById('chatEmpty');
+            if (messages.length === 0) {
+              if (empty) empty.style.display = '';
+            } else {
+              if (empty) empty.style.display = 'none';
+              // Render all messages
+              messages.forEach(msg => {
+                renderMessage(msg.role, msg.content);
+              });
+              scrollToBottom();
+            }
+            
+            // Update totals from server-side rendered values (they will be updated by Livewire re-render)
+            // The totals are already set in the HTML from server-side rendering
+          } catch (e) {
+            console.error('Failed to load thread messages:', e);
             messages = [];
             chatList.innerHTML = '';
             const empty = document.getElementById('chatEmpty');
             if (empty) empty.style.display = '';
-            currentThreadId = threadId;
-            
-            // Reload component to get updated thread totals and model
-            // The totals and model will be set from server-side rendering
-            // Livewire will re-render the component, and activeThreadModel will be updated
-            if (window.Livewire) {
-              window.Livewire.find(livewireComponentId).call('switchThread', threadId);
-            }
-          } catch (e) {
-            console.error('Failed to load thread messages:', e);
           }
         };
 
@@ -979,21 +1023,36 @@
                     if (rtTokensExtra) rtTokensExtra.textContent = cachedReq > 0 ? formatNumber(cachedReq) : '—';
                     
                     // Calculate and display request cost
-                    if (rtCostRequest && inTok != null && outTok != null) {
-                      const RATE_IN = 1.75;
-                      const RATE_CACHED = 0.175;
-                      const RATE_OUT = 14.00;
-                      const inputTokens = typeof inTok === 'number' ? inTok : 0;
-                      const outputTokens = typeof outTok === 'number' ? outTok : 0;
-                      const cachedTokens = typeof cached === 'number' ? cached : 0;
-                      const nonCachedInput = Math.max(0, inputTokens - cachedTokens);
-                      const costIn = (nonCachedInput / 1_000_000) * RATE_IN;
-                      const costCached = (cachedTokens / 1_000_000) * RATE_CACHED;
-                      const costOut = (outputTokens / 1_000_000) * RATE_OUT;
-                      const costTotal = costIn + costCached + costOut;
-                      rtCostRequest.textContent = `$${costTotal.toFixed(4)}`;
-                    } else if (rtCostRequest) {
-                      rtCostRequest.textContent = '—';
+                    // Use cost from last_increment if available (server-calculated), otherwise calculate client-side
+                    const lastIncrement = data?.last_increment || {};
+                    if (rtCostRequest) {
+                      let requestCost = null;
+                      let requestCurrency = 'USD';
+                      
+                      // Prefer server-calculated cost from last_increment
+                      if (lastIncrement.cost != null) {
+                        requestCost = parseFloat(lastIncrement.cost);
+                        requestCurrency = lastIncrement.currency || 'USD';
+                      } else if (inTok != null && outTok != null) {
+                        // Fallback: calculate client-side with default rates
+                        const RATE_IN = 1.75;
+                        const RATE_CACHED = 0.175;
+                        const RATE_OUT = 14.00;
+                        const inputTokens = typeof inTok === 'number' ? inTok : 0;
+                        const outputTokens = typeof outTok === 'number' ? outTok : 0;
+                        const cachedTokens = typeof cached === 'number' ? cached : 0;
+                        const nonCachedInput = Math.max(0, inputTokens - cachedTokens);
+                        const costIn = (nonCachedInput / 1_000_000) * RATE_IN;
+                        const costCached = (cachedTokens / 1_000_000) * RATE_CACHED;
+                        const costOut = (outputTokens / 1_000_000) * RATE_OUT;
+                        requestCost = costIn + costCached + costOut;
+                      }
+                      
+                      if (requestCost != null) {
+                        rtCostRequest.textContent = `$${requestCost.toFixed(4)}`;
+                      } else {
+                        rtCostRequest.textContent = '—';
+                      }
                     }
 
                     debugState.model = data?.model || debugState.model;

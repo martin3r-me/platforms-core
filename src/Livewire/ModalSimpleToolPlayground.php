@@ -124,6 +124,26 @@ class ModalSimpleToolPlayground extends Component
         $this->dispatch('simple-playground:thread-changed', ['thread_id' => $threadId]);
     }
 
+    public function getThreadMessages(int $threadId): array
+    {
+        if (!$this->chat) {
+            return [];
+        }
+
+        $thread = $this->chat->threads()->find($threadId);
+        if (!$thread) {
+            return [];
+        }
+
+        $messages = $thread->messages()->orderBy('created_at')->get();
+        return $messages->map(function ($msg) {
+            return [
+                'role' => $msg->role,
+                'content' => $msg->content,
+            ];
+        })->toArray();
+    }
+
     public function updateThreadModel(int $threadId, string $modelId): void
     {
         if (!$this->chat) {
@@ -136,6 +156,25 @@ class ModalSimpleToolPlayground extends Component
         }
 
         $thread->update(['model_id' => $modelId]);
+    }
+
+    public function updateThreadTitle(int $threadId, string $title): void
+    {
+        if (!$this->chat) {
+            return;
+        }
+
+        $thread = $this->chat->threads()->find($threadId);
+        if (!$thread) {
+            return;
+        }
+
+        $title = trim($title);
+        if (empty($title)) {
+            $title = 'Thread ' . $threadId;
+        }
+
+        $thread->update(['title' => $title]);
     }
 
     public function saveModelPricing(int $coreAiModelId): void
