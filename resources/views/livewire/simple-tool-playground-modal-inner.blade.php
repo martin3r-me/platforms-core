@@ -753,12 +753,6 @@
         if (!alreadyBound && modelsReload) modelsReload.addEventListener('click', () => loadModels());
         loadModels();
 
-        // Helper: format numbers
-        const formatNumber = (n) => {
-          if (n == null || n === '') return '—';
-          return new Intl.NumberFormat('de-DE').format(Number(n));
-        };
-
         // Thread change handler: load messages from DB and update totals
         const loadThreadMessages = async (threadId) => {
           if (!threadId) {
