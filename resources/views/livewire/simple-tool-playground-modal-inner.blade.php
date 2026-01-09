@@ -135,10 +135,10 @@
                 </div>
             </div>
             <div class="flex-1 min-h-0 overflow-hidden w-full">
-                <div class="w-full h-full min-h-0 flex flex-nowrap gap-5 px-4 py-4 overflow-hidden min-w-0" style="width:100%; max-width:100%;">
+                <div class="w-full h-full min-h-0 grid grid-cols-4 gap-5 px-4 py-4 overflow-hidden min-w-0" style="width:100%; max-width:100%;">
 
                     {{-- Left: Chat (3/4 width) --}}
-                    <div class="w-3/4 flex-none min-h-0 min-w-0 flex flex-col overflow-hidden">
+                    <div class="col-span-3 min-h-0 min-w-0 flex flex-col overflow-hidden">
                         <div class="flex-1 min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/20">
                             <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
                                 @php
@@ -199,7 +199,7 @@
                     </div>
 
                     {{-- Right: Realtime / Debug (1/4 width) --}}
-                    <div class="w-1/4 flex-none min-h-0 min-w-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/20 overflow-x-hidden">
+                    <div class="col-span-1 min-h-0 min-w-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/20 overflow-x-hidden">
                         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                             <div class="text-xs text-[var(--ui-muted)]">
                                 Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
