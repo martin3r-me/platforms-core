@@ -12,6 +12,8 @@ class SyncAiModelsCommand extends Command
 {
     protected $signature = 'core:ai-models:sync
         {--provider=openai : Provider key (openai)}
+        {--catalog-url= : Optional catalog JSON endpoint (overrides provider.catalog_url)}
+        {--no-catalog : Do not fetch catalog overlay (only /models)}
         {--dry-run : Show what would change without writing to DB}';
 
     protected $description = 'Synchronisiert AI-Provider-Modelle (z.B. OpenAI) in core_ai_models inkl. Pricing/Features Overlay';
@@ -20,6 +22,8 @@ class SyncAiModelsCommand extends Command
     {
         $providerKey = (string) $this->option('provider');
         $dryRun = (bool) $this->option('dry-run');
+        $catalogUrlOpt = $this->option('catalog-url');
+        $noCatalog = (bool) $this->option('no-catalog');
 
         if ($providerKey !== 'openai') {
             $this->error("Unbekannter provider: {$providerKey} (aktuell unterstützt: openai)");
@@ -59,9 +63,27 @@ class SyncAiModelsCommand extends Command
             }
         }
 
-        // Static overlay (source of truth for pricing/cutoff/limits/features).
-        // OpenAI /models does NOT expose these reliably.
-        $catalog = $this->openAiStaticCatalog();
+        // Provider catalog overlay (pricing/cutoff/limits/features) comes from a catalog API endpoint.
+        // OpenAI /models does NOT expose these reliably, so "per API" means: provider-specific catalog URL.
+        $catalog = [];
+        $catalogUrl = null;
+        if (!$noCatalog) {
+            if (is_string($catalogUrlOpt) && trim($catalogUrlOpt) !== '') {
+                $catalogUrl = trim($catalogUrlOpt);
+            } elseif (!empty($provider->catalog_url)) {
+                $catalogUrl = (string) $provider->catalog_url;
+            } elseif (is_array($provider->metadata) && !empty($provider->metadata['catalog_url'])) {
+                $catalogUrl = (string) $provider->metadata['catalog_url'];
+            }
+
+            if (is_string($catalogUrl) && $catalogUrl !== '') {
+                $catalog = $this->fetchCatalogOverlay($catalogUrl);
+                $this->info("Catalog overlay: " . (count($catalog) ? ("loaded " . count($catalog) . " models") : "empty") . " ({$catalogUrl})");
+            } else {
+                $this->warn("Catalog overlay: keine catalog_url gesetzt (Provider). Preise/Features bleiben leer. "
+                    . "Setze core_ai_providers.catalog_url oder nutze --catalog-url.");
+            }
+        }
 
         $this->info("Sync provider=openai base_url={$baseUrl}" . ($dryRun ? ' (DRY RUN)' : ''));
 
@@ -110,10 +132,7 @@ class SyncAiModelsCommand extends Command
                 'supports_streaming' => $overlay['supports_streaming'] ?? null,
                 'supports_function_calling' => $overlay['supports_function_calling'] ?? null,
                 'supports_structured_outputs' => $overlay['supports_structured_outputs'] ?? null,
-                'pricing_currency' => $overlay['pricing_currency'] ?? 'USD',
-                'price_input_per_1m' => $overlay['price_input_per_1m'] ?? null,
-                'price_cached_input_per_1m' => $overlay['price_cached_input_per_1m'] ?? null,
-                'price_output_per_1m' => $overlay['price_output_per_1m'] ?? null,
+                // Pricing: only set when overlay provides it; otherwise keep DB values (manual edits).
                 'modalities' => $overlay['modalities'] ?? null,
                 'endpoints' => $overlay['endpoints'] ?? null,
                 'features' => $overlay['features'] ?? null,
@@ -121,6 +140,17 @@ class SyncAiModelsCommand extends Command
                 'api_metadata' => $m,
                 'last_api_check' => now(),
             ];
+
+            $hasAnyPricing = array_key_exists('price_input_per_1m', $overlay)
+                || array_key_exists('price_cached_input_per_1m', $overlay)
+                || array_key_exists('price_output_per_1m', $overlay)
+                || array_key_exists('pricing_currency', $overlay);
+            if ($hasAnyPricing) {
+                $attrs['pricing_currency'] = $overlay['pricing_currency'] ?? 'USD';
+                $attrs['price_input_per_1m'] = $overlay['price_input_per_1m'] ?? null;
+                $attrs['price_cached_input_per_1m'] = $overlay['price_cached_input_per_1m'] ?? null;
+                $attrs['price_output_per_1m'] = $overlay['price_output_per_1m'] ?? null;
+            }
 
             $existing = CoreAiModel::where('provider_id', $provider->id)->where('model_id', $id)->first();
             if (!$existing) {
@@ -132,6 +162,10 @@ class SyncAiModelsCommand extends Command
                 $updated++;
                 $synced++;
                 if ($dryRun) continue;
+                // Don't wipe manual prices if overlay has no pricing.
+                if (!$hasAnyPricing) {
+                    unset($attrs['pricing_currency'], $attrs['price_input_per_1m'], $attrs['price_cached_input_per_1m'], $attrs['price_output_per_1m']);
+                }
                 $existing->update($attrs);
             }
         }
@@ -151,92 +185,61 @@ class SyncAiModelsCommand extends Command
         $this->info("Done. synced={$synced} created={$created} updated={$updated}" . ($dryRun ? ' (dry-run)' : ''));
 
         // Hint for pricing gaps
-        $missingPricing = CoreAiModel::where('provider_id', $provider->id)
-            ->whereNull('price_input_per_1m')
-            ->where('is_deprecated', false)
-            ->count();
-        if ($missingPricing > 0) {
-            $this->warn("Hinweis: {$missingPricing} aktive Modelle haben noch keine Pricing-Felder (nur Overlay füllt Preise).");
+        if (!$dryRun) {
+            $missingPricing = CoreAiModel::where('provider_id', $provider->id)
+                ->whereNull('price_input_per_1m')
+                ->where('is_deprecated', false)
+                ->count();
+            if ($missingPricing > 0) {
+                $this->warn("Hinweis: {$missingPricing} aktive Modelle haben noch keine Pricing-Felder. "
+                    . "Das ist erwartbar, wenn catalog_url nicht gesetzt ist oder der Catalog unvollständig ist.");
+            }
         }
 
         return 0;
     }
 
     /**
-     * Minimaler statischer Katalog (erweiterbar).
-     * Keys = provider model_id
+     * Fetch catalog overlay JSON from a URL.
+     *
+     * Expected formats (either is OK):
+     * 1) { "models": { "gpt-5.2": { ... }, "gpt-5": { ... } } }
+     * 2) [ { "model_id": "gpt-5.2", ... }, ... ]
+     *
+     * Returns: [model_id => overlayArray]
      */
-    private function openAiStaticCatalog(): array
+    private function fetchCatalogOverlay(string $url): array
     {
-        return [
-            'gpt-5.2' => [
-                'name' => 'GPT-5.2',
-                'category' => 'GPT-5',
-                'description' => 'Flagship model for coding and agentic tasks across industries.',
-                'context_window' => 400000,
-                'max_output_tokens' => 128000,
-                'knowledge_cutoff_date' => '2025-08-31',
-                'supports_reasoning_tokens' => true,
-                'supports_streaming' => true,
-                'supports_function_calling' => true,
-                'supports_structured_outputs' => true,
-                'pricing_currency' => 'USD',
-                'price_input_per_1m' => 1.75,
-                'price_cached_input_per_1m' => 0.175,
-                'price_output_per_1m' => 14.00,
-                'modalities' => [
-                    'text' => ['input' => true, 'output' => true],
-                    'image' => ['input' => true, 'output' => false],
-                    'audio' => ['input' => false, 'output' => false],
-                    'video' => ['input' => false, 'output' => false],
-                ],
-                'endpoints' => [
-                    'chat_completions' => '/v1/chat/completions',
-                    'responses' => '/v1/responses',
-                    'realtime' => '/v1/realtime',
-                    'assistants' => '/v1/assistants',
-                    'batch' => '/v1/batch',
-                    'fine_tuning' => '/v1/fine-tuning',
-                    'embeddings' => '/v1/embeddings',
-                    'image_generation' => '/v1/images/generations',
-                    'videos' => '/v1/videos',
-                    'image_edit' => '/v1/images/edits',
-                    'speech' => '/v1/audio/speech',
-                    'transcription' => '/v1/audio/transcriptions',
-                    'translation' => '/v1/audio/translations',
-                    'moderation' => '/v1/moderations',
-                    'completions_legacy' => '/v1/completions',
-                ],
-                'features' => [
-                    'streaming' => true,
-                    'function_calling' => true,
-                    'structured_outputs' => true,
-                    'fine_tuning' => false,
-                    'distillation' => true,
-                ],
-                'tools' => [
-                    'web_search' => true,
-                    'file_search' => true,
-                    'image_generation' => true,
-                    'code_interpreter' => true,
-                    'computer_use' => false,
-                    'mcp' => true,
-                ],
-            ],
-            // Pricing-only quick comparison (extend later)
-            'gpt-5' => [
-                'name' => 'GPT-5',
-                'category' => 'GPT-5',
-                'pricing_currency' => 'USD',
-                'price_input_per_1m' => 1.25,
-            ],
-            'gpt-5-mini' => [
-                'name' => 'GPT-5 mini',
-                'category' => 'GPT-5',
-                'pricing_currency' => 'USD',
-                'price_input_per_1m' => 0.25,
-            ],
-        ];
+        try {
+            $resp = Http::timeout(15)->get($url);
+            if (!$resp->successful()) {
+                $this->warn("Catalog fetch failed: HTTP {$resp->status()}");
+                return [];
+            }
+            $json = $resp->json();
+
+            if (is_array($json) && isset($json['models']) && is_array($json['models'])) {
+                return $json['models'];
+            }
+
+            // list format
+            if (is_array($json) && array_keys($json) === range(0, count($json) - 1)) {
+                $out = [];
+                foreach ($json as $row) {
+                    if (!is_array($row)) continue;
+                    $id = $row['model_id'] ?? $row['id'] ?? null;
+                    if (is_string($id) && $id !== '') {
+                        $out[$id] = $row;
+                    }
+                }
+                return $out;
+            }
+
+            return [];
+        } catch (\Throwable $e) {
+            $this->warn('Catalog fetch exception: ' . $e->getMessage());
+            return [];
+        }
     }
 }
 

@@ -198,6 +198,11 @@
                 </div>
             </div>
             <div class="p-4 flex-1 min-h-0 overflow-auto">
+                @if(!empty($pricingSaveMessage))
+                    <div class="mb-3 text-xs px-3 py-2 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-secondary)]">
+                        {{ $pricingSaveMessage }}
+                    </div>
+                @endif
                 @if(($coreAiModels ?? collect())->count() === 0)
                     <div class="text-sm text-[var(--ui-muted)]">
                         Noch keine Modelle in <code class="px-1 py-0.5 rounded bg-[var(--ui-muted-5)]">core_ai_models</code>.
@@ -215,7 +220,7 @@
                                     <th class="text-left py-2 pr-4 font-semibold">Context</th>
                                     <th class="text-left py-2 pr-4 font-semibold">Max output</th>
                                     <th class="text-left py-2 pr-4 font-semibold">Cutoff</th>
-                                    <th class="text-left py-2 pr-4 font-semibold">Pricing / 1M</th>
+                                    <th class="text-left py-2 pr-4 font-semibold">Pricing (manuell)</th>
                                     <th class="text-left py-2 pr-4 font-semibold">Features</th>
                                     <th class="text-left py-2 pr-0 font-semibold">Status</th>
                                 </tr>
@@ -224,12 +229,6 @@
                                 @foreach(($coreAiModels ?? collect()) as $m)
                                     @php
                                         $p = $m->provider?->key ?? '—';
-                                        $cur = $m->pricing_currency ?? 'USD';
-                                        $pricing = trim(
-                                            ($m->price_input_per_1m !== null ? "in {$cur} {$m->price_input_per_1m}" : '') .
-                                            ($m->price_cached_input_per_1m !== null ? " · cached {$cur} {$m->price_cached_input_per_1m}" : '') .
-                                            ($m->price_output_per_1m !== null ? " · out {$cur} {$m->price_output_per_1m}" : '')
-                                        );
                                         $features = [];
                                         if ($m->supports_reasoning_tokens) $features[] = 'reasoning';
                                         if ($m->supports_streaming) $features[] = 'stream';
@@ -245,8 +244,50 @@
                                         <td class="py-2 pr-4">{{ $m->context_window ? number_format($m->context_window) : '—' }}</td>
                                         <td class="py-2 pr-4">{{ $m->max_output_tokens ? number_format($m->max_output_tokens) : '—' }}</td>
                                         <td class="py-2 pr-4">{{ $m->knowledge_cutoff_date ? $m->knowledge_cutoff_date->format('Y-m-d') : '—' }}</td>
-                                        <td class="py-2 pr-4">
-                                            <div class="text-[var(--ui-secondary)]">{{ $pricing !== '' ? $pricing : '—' }}</div>
+                                        <td class="py-2 pr-4 align-top">
+                                            <div class="grid grid-cols-4 gap-2 items-end min-w-[420px]">
+                                                <div>
+                                                    <div class="text-[10px] text-[var(--ui-muted)] mb-1">Währung</div>
+                                                    <input
+                                                        class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs"
+                                                        wire:model.defer="pricingEdits.{{ $m->id }}.pricing_currency"
+                                                        maxlength="3"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <div class="text-[10px] text-[var(--ui-muted)] mb-1">Input / 1M</div>
+                                                    <input
+                                                        class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs"
+                                                        wire:model.defer="pricingEdits.{{ $m->id }}.price_input_per_1m"
+                                                        inputmode="decimal"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <div class="text-[10px] text-[var(--ui-muted)] mb-1">Cached / 1M</div>
+                                                    <input
+                                                        class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs"
+                                                        wire:model.defer="pricingEdits.{{ $m->id }}.price_cached_input_per_1m"
+                                                        inputmode="decimal"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <div class="text-[10px] text-[var(--ui-muted)] mb-1">Output / 1M</div>
+                                                    <input
+                                                        class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs"
+                                                        wire:model.defer="pricingEdits.{{ $m->id }}.price_output_per_1m"
+                                                        inputmode="decimal"
+                                                    />
+                                                </div>
+                                                <div class="col-span-4 flex items-center justify-end gap-2">
+                                                    <button
+                                                        type="button"
+                                                        class="px-3 py-1.5 rounded-md bg-[var(--ui-primary)] text-white text-xs hover:bg-opacity-90"
+                                                        wire:click="saveModelPricing({{ $m->id }})"
+                                                    >
+                                                        Speichern
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </td>
                                         <td class="py-2 pr-4 text-[10px] text-[var(--ui-muted)]">
                                             {{ count($features) ? implode(', ', $features) : '—' }}

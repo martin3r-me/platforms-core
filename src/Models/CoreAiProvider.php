@@ -16,6 +16,7 @@ class CoreAiProvider extends Model
         'name',
         'is_active',
         'base_url',
+        'catalog_url',
         'metadata',
     ];
 
