@@ -47,11 +47,11 @@
             <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                 <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Chat</div>
             </div>
-            <div class="p-4 flex-1 min-h-0 overflow-auto">
-                <div class="w-full h-full min-h-0 flex gap-5" style="width:100%;">
+            <div class="flex-1 min-h-0 overflow-auto">
+                <div class="w-full h-full min-h-0 flex gap-5 px-4" style="width:100%; max-width:100%;">
 
     {{-- Left: Chat (3/4 width) --}}
-    <div class="flex-[3] min-h-0 min-w-0 flex flex-col">
+    <div class="flex-[3_1_0%] min-h-0 min-w-0 flex flex-col flex-shrink" style="max-width:75%;">
         <div class="flex-1 min-h-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
             <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
                 <div id="chatList" class="space-y-4"></div>
@@ -82,7 +82,7 @@
     </div>
 
     {{-- Right: Realtime / Debug (1/4 width) --}}
-    <div class="flex-[1] min-h-0 min-w-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
+    <div class="flex-[1_1_0%] min-h-0 min-w-0 flex-shrink border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm" style="max-width:25%;">
         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
             <div class="text-xs text-[var(--ui-muted)]">
                 Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
@@ -105,8 +105,8 @@
             {{-- Tokens & costs moved to the top bar --}}
 
             <div>
-                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Tool Calls (letzte 5)</div>
-                <div id="rtToolCalls" class="space-y-1"></div>
+                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Tool Calls (letzte 10)</div>
+                <div id="rtToolCalls" class="space-y-2 max-h-[30vh] overflow-y-auto"></div>
             </div>
             <div>
                 <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Reasoning (live)</div>
@@ -699,12 +699,32 @@
                   case 'tool.executed':
                     debugState.toolCalls.push(data);
                     if (rtToolCalls) {
-                      const items = debugState.toolCalls.slice(-5).reverse();
+                      const items = debugState.toolCalls.slice(-10).reverse();
                       rtToolCalls.innerHTML = '';
                       for (const it of items) {
                         const row = document.createElement('div');
-                        row.className = 'text-[11px] font-mono flex items-center justify-between gap-2 border border-[var(--ui-border)] rounded px-2 py-1 bg-[var(--ui-bg)]';
-                        row.innerHTML = `<span class="truncate">${it.tool}</span><span>${it.success ? 'ok' : 'fail'} ${it.ms != null ? `${it.ms}ms` : ''}</span>`;
+                        row.className = 'border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)]';
+                        const statusClass = it.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]';
+                        const statusIcon = it.success ? '✅' : '❌';
+                        const statusText = it.success ? 'Erfolgreich' : 'Fehlgeschlagen';
+                        const cachedBadge = it.cached ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)] ml-2">cached</span>' : '';
+                        const argsPreview = it.args ? (typeof it.args === 'string' ? (it.args.length > 100 ? it.args.substring(0, 100) + '...' : it.args) : JSON.stringify(it.args).substring(0, 100)) : '—';
+                        const errorInfo = it.error ? `<div class="mt-1 text-[10px] text-[var(--ui-danger)]">Error: ${it.error_code || 'UNKNOWN'}: ${typeof it.error === 'string' ? it.error.substring(0, 150) : JSON.stringify(it.error).substring(0, 150)}</div>` : '';
+                        row.innerHTML = `
+                          <div class="flex items-start justify-between gap-2 mb-1">
+                            <div class="flex-1 min-w-0">
+                              <div class="text-[11px] font-mono font-semibold text-[var(--ui-secondary)] truncate">${it.tool || '—'}</div>
+                              ${it.call_id ? `<div class="text-[10px] text-[var(--ui-muted)] mt-0.5">Call-ID: ${it.call_id}</div>` : ''}
+                            </div>
+                            <div class="flex items-center gap-2 flex-shrink-0">
+                              <span class="text-[10px] ${statusClass}">${statusIcon} ${statusText}</span>
+                              ${it.ms != null ? `<span class="text-[10px] text-[var(--ui-muted)]">⏱️ ${it.ms}ms</span>` : ''}
+                              ${cachedBadge}
+                            </div>
+                          </div>
+                          ${it.args ? `<div class="mt-1 text-[10px] text-[var(--ui-muted)]"><span class="font-semibold">Args:</span> <code class="px-1 py-0.5 rounded bg-[var(--ui-muted-5)] font-mono">${argsPreview}</code></div>` : ''}
+                          ${errorInfo}
+                        `;
                         rtToolCalls.appendChild(row);
                       }
                     }
