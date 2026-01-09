@@ -41,10 +41,11 @@
     </div>
 
     <div class="w-full flex-1 min-h-0 overflow-hidden p-4 bg-[var(--ui-bg)]" style="width:100%;">
+    {{-- Chat Tab --}}
     <div x-show="tab==='chat'" class="w-full h-full min-h-0 grid grid-cols-12 gap-5" style="width:100%;" x-cloak>
 
     {{-- Center: Chat (independent scroll + input pinned to bottom) --}}
-    <div x-show="tab==='chat'" class="col-span-12 lg:col-span-8 min-h-0 min-w-0 flex flex-col" x-cloak>
+    <div class="col-span-12 lg:col-span-8 min-h-0 min-w-0 flex flex-col">
         <div class="flex-1 min-h-0 border border-[var(--ui-border)]/80 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
             <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
                 <div id="chatList" class="space-y-4"></div>
@@ -123,8 +124,10 @@
                 <div id="rtCopyStatus" class="mt-1 text-[10px] text-[var(--ui-muted)]"></div>
     </div>
     </div>
+    </div>
 
-    <div x-show="tab==='settings'" class="h-full min-h-0" x-cloak>
+    {{-- Settings Tab --}}
+    <div x-show="tab==='settings'" class="w-full h-full min-h-0" x-cloak>
         <div class="h-full min-h-0 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] overflow-hidden flex flex-col">
             <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                 <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Settings</div>
@@ -136,8 +139,10 @@
             </div>
         </div>
     </div>
+    </div>
 
-    <div x-show="tab==='models'" class="h-full min-h-0" x-cloak>
+    {{-- Models Tab --}}
+    <div x-show="tab==='models'" class="w-full h-full min-h-0" x-cloak>
         <div class="h-full min-h-0 border border-[var(--ui-border)] rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
             <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                 <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model settings</div>
@@ -314,8 +319,6 @@
                 @endif
             </div>
         </div>
-    </div>
-    </div>
     </div>
     </div>
 
