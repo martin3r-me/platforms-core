@@ -113,7 +113,18 @@
             </div>
             <div class="border-t border-[var(--ui-border)]/60 p-3 flex-shrink-0 bg-[var(--ui-surface)]">
                 <form id="chatForm" class="flex gap-2 items-center" method="post" action="javascript:void(0)" onsubmit="return false;">
-                    <select id="modelSelect" class="w-48 px-3 py-2 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-sm"></select>
+                    <div class="w-48">
+                        <x-ui-input-select
+                            name="modelSelect"
+                            id="modelSelect"
+                            :options="$modelOptions ?? []"
+                            :nullable="true"
+                            nullLabel="Model wählen"
+                            size="sm"
+                            :value="$activeThreadModel ?? null"
+                            class="w-full"
+                        />
+                    </div>
                     <input
                         id="chatInput"
                         type="text"
@@ -632,23 +643,17 @@
         const renderModels = (models, defaultFromServer = null) => {
           if (!Array.isArray(models)) models = [];
           
-          // Fill both dropdowns: modelSelect (Chat tab) and modelsList (Model settings tab)
+          // Fill modelSelect dropdown (Chat tab) - now using x-ui-input-select component
+          // The select is server-rendered, so we just need to update the value if needed
           if (modelSelect) {
-            modelSelect.innerHTML = '';
-            for (const m of models) {
-              const opt = document.createElement('option');
-              opt.value = m;
-              opt.textContent = m;
-              modelSelect.appendChild(opt);
+            // The select is already populated server-side, just set the value
+            if (selectedModel) {
+              modelSelect.value = selectedModel;
             }
-            // Remove old listener to avoid duplicates
-            const newSelect = modelSelect.cloneNode(true);
-            modelSelect.parentNode.replaceChild(newSelect, modelSelect);
-            const updatedModelSelect = document.getElementById('modelSelect');
-            if (updatedModelSelect) {
-              updatedModelSelect.addEventListener('change', () => setSelectedModel(updatedModelSelect.value));
-              // Set current selected model
-              if (selectedModel) updatedModelSelect.value = selectedModel;
+            // Ensure change listener is attached
+            if (!modelSelect.dataset.listenerAttached) {
+              modelSelect.addEventListener('change', () => setSelectedModel(modelSelect.value));
+              modelSelect.dataset.listenerAttached = 'true';
             }
           }
           if (modelsList) {

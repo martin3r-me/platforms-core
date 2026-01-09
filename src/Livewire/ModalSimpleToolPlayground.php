@@ -181,6 +181,12 @@ class ModalSimpleToolPlayground extends Component
             ->orderBy('model_id')
             ->get();
 
+        // Prepare model options for select component (only active models)
+        $activeModels = $models->filter(fn($m) => $m->is_active);
+        $modelOptions = $activeModels->mapWithKeys(function ($model) {
+            return [$model->model_id => $model->model_id];
+        })->toArray();
+
         $threads = $this->chat
             ? $this->chat->threads()->orderBy('created_at', 'desc')->get()
             : collect();
@@ -194,6 +200,7 @@ class ModalSimpleToolPlayground extends Component
 
         return view('platform::livewire.modal-simple-tool-playground', [
             'coreAiModels' => $models,
+            'modelOptions' => $modelOptions,
             'threads' => $threads,
             'activeThreadId' => $this->activeThreadId,
             'activeThread' => $activeThread,
