@@ -219,9 +219,15 @@
                         Thread löschen
                     </button>
                 </div>
-                <div id="pgFooterBusy" class="hidden flex items-center gap-2 text-xs text-[var(--ui-muted)]">
-                    <span class="w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
-                    <span>Läuft…</span>
+                <div class="flex items-center gap-3 min-w-0">
+                    <div id="pgFooterBusy" class="hidden flex items-center gap-2 text-xs text-[var(--ui-muted)] flex-shrink-0">
+                        <span class="w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
+                        <span>Läuft…</span>
+                    </div>
+                    <div class="min-w-0 flex items-center gap-2">
+                        <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0">Event:</span>
+                        <span id="pgFooterEventText" class="text-[10px] font-mono text-[var(--ui-secondary)] truncate">—</span>
+                    </div>
                 </div>
             </div>
     </div>
@@ -261,7 +267,8 @@
                 <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Thinking (live)</div>
                 <pre id="rtThinking" class="text-xs whitespace-pre-wrap border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px] max-h-[16vh] overflow-y-auto"></pre>
             </div>
-            <div class="pt-2 border-t border-[var(--ui-border)]">
+            {{-- Events list is not very helpful in UI; we show the latest event in the chat footer. --}}
+            <div class="pt-2 border-t border-[var(--ui-border)] hidden">
                 <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Events</div>
                 <div id="rtEvents" class="text-xs space-y-2 text-[var(--ui-muted)] max-h-[16vh] overflow-y-auto pr-1"></div>
             </div>
@@ -703,6 +710,20 @@
 
         const rtEvent = ({ key, preview = null, raw = null }) => {
           if (!key) return;
+          // Also show last event in the chat footer (compact, no list needed)
+          try {
+            const footerEl = document.getElementById('pgFooterEventText');
+            if (footerEl) {
+              let suffix = '';
+              if (preview && typeof preview === 'object') {
+                if (preview.iteration != null) suffix = ` #${preview.iteration}`;
+                else if (preview.tool) suffix = ` ${String(preview.tool)}`;
+                else if (preview.name) suffix = ` ${String(preview.name)}`;
+              }
+              footerEl.textContent = `${key}${suffix}`.slice(0, 160);
+            }
+          } catch (_) {}
+
           const eventKey = `${key}:${preview?.type || ''}:${preview?.id || ''}:${preview?.name || ''}`;
           if (eventKey === lastEventKey && lastEventSummaryEl) {
             lastEventCount++;
@@ -722,11 +743,13 @@
               pre.textContent = String(raw);
               row.appendChild(pre);
             }
-            rtEvents.appendChild(row);
+            if (rtEvents) rtEvents.appendChild(row);
             lastEventSummaryEl = summary;
           }
-          while (rtEvents.children.length > maxEventItems) rtEvents.removeChild(rtEvents.firstChild);
-          rtEvents.scrollTop = rtEvents.scrollHeight;
+          if (rtEvents) {
+            while (rtEvents.children.length > maxEventItems) rtEvents.removeChild(rtEvents.firstChild);
+            rtEvents.scrollTop = rtEvents.scrollHeight;
+          }
         };
 
         const resetRealtime = () => {
