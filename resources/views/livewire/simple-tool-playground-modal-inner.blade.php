@@ -1,68 +1,15 @@
 <div x-data="{ tab: 'chat' }"
      @simple-playground:set-tab.window="tab = ($event.detail && $event.detail.tab) ? $event.detail.tab : tab"
      class="w-full h-full min-h-0 overflow-hidden flex flex-col" style="width:100%;">
-    {{-- Top bar: usage tiles (tabs moved to modal header) --}}
-    <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 bg-[var(--ui-surface)] flex items-center justify-between gap-4 flex-shrink-0">
-        <div class="flex items-center gap-2">
-            <div class="grid grid-cols-4 gap-2">
-                <div class="border border-[var(--ui-border)]/60 rounded-lg bg-[var(--ui-bg)] px-3 py-2 min-w-[110px]">
-                    <div class="text-[10px] text-[var(--ui-muted)]">Input tokens</div>
-                    <div id="rtTokensIn" class="text-sm font-semibold text-[var(--ui-secondary)]">
-                        @if(isset($activeThread) && $activeThread)
-                            {{ number_format($activeThread->total_tokens_in ?? 0) }}
-                        @else
-                            —
-                        @endif
-                    </div>
-                </div>
-                <div class="border border-[var(--ui-border)]/60 rounded-lg bg-[var(--ui-bg)] px-3 py-2 min-w-[110px]">
-                    <div class="text-[10px] text-[var(--ui-muted)]">Cached / Reason</div>
-                    <div id="rtTokensExtra" class="text-sm font-semibold text-[var(--ui-secondary)]">
-                        @if(isset($activeThread) && $activeThread)
-                            {{ number_format(($activeThread->total_tokens_cached ?? 0) + ($activeThread->total_tokens_reasoning ?? 0)) }}
-                        @else
-                            —
-                        @endif
-                    </div>
-                </div>
-                <div class="border border-[var(--ui-border)]/60 rounded-lg bg-[var(--ui-bg)] px-3 py-2 min-w-[110px]">
-                    <div class="text-[10px] text-[var(--ui-muted)]">Output tokens</div>
-                    <div id="rtTokensOut" class="text-sm font-semibold text-[var(--ui-secondary)]">
-                        @if(isset($activeThread) && $activeThread)
-                            {{ number_format($activeThread->total_tokens_out ?? 0) }}
-                        @else
-                            —
-                        @endif
-                    </div>
-                </div>
-                <div class="border border-[var(--ui-border)]/60 rounded-lg bg-[var(--ui-bg)] px-3 py-2 min-w-[140px]">
-                    <div class="text-[10px] text-[var(--ui-muted)]">Total $</div>
-                    <div id="rtCostTotal" class="text-sm font-semibold text-[var(--ui-secondary)]">
-                        @if(isset($activeThread) && $activeThread)
-                            {{ number_format((float)($activeThread->total_cost ?? 0), 4) }} {{ $activeThread->pricing_currency ?? 'USD' }}
-                        @else
-                            —
-                        @endif
-                    </div>
-                </div>
-            </div>
-            <div id="rtUsageModel" class="ml-3 text-[10px] text-[var(--ui-muted)]"></div>
-            <div id="rtCostNote" class="ml-3 text-[10px] text-[var(--ui-muted)]"></div>
-            {{-- keep ids for JS compatibility --}}
-            <div id="rtTokensTotal" class="hidden">—</div>
-            <div id="rtCostIn" class="hidden">—</div>
-            <div id="rtCostCached" class="hidden">—</div>
-            <div id="rtCostOut" class="hidden">—</div>
-        </div>
-        <div class="flex items-center gap-4">
-            <div class="text-xs text-[var(--ui-muted)] truncate">
-                Kontext: <span id="pgContextLabel" class="text-[var(--ui-secondary)]">—</span>
-            </div>
-            <div class="text-xs text-[var(--ui-muted)]">
-                Stream: <span id="rtStatus" class="text-[var(--ui-secondary)]">idle</span>
-            </div>
-        </div>
-    </div>
+    {{-- keep ids for JS compatibility (hidden) --}}
+    <div id="rtTokensTotal" class="hidden">—</div>
+    <div id="rtCostIn" class="hidden">—</div>
+    <div id="rtCostCached" class="hidden">—</div>
+    <div id="rtCostOut" class="hidden">—</div>
+    <div id="rtUsageModel" class="hidden"></div>
+    <div id="rtCostNote" class="hidden"></div>
+    <div id="pgContextLabel" class="hidden">—</div>
+    <div id="rtStatus" class="hidden">idle</div>
 
     <div class="w-full flex-1 min-h-0 overflow-hidden p-4 bg-[var(--ui-bg)]" style="width:100%;">
     {{-- Chat Tab --}}
@@ -92,6 +39,49 @@
                         >
                             +
                         </button>
+                    </div>
+                </div>
+                {{-- Usage stats: compact, right-aligned --}}
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                    <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
+                        <span class="text-[9px] text-[var(--ui-muted)]">In:</span>
+                        <span id="rtTokensIn" class="text-[10px] font-semibold text-[var(--ui-secondary)]">
+                            @if(isset($activeThread) && $activeThread)
+                                {{ number_format($activeThread->total_tokens_in ?? 0) }}
+                            @else
+                                —
+                            @endif
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
+                        <span class="text-[9px] text-[var(--ui-muted)]">C/R:</span>
+                        <span id="rtTokensExtra" class="text-[10px] font-semibold text-[var(--ui-secondary)]">
+                            @if(isset($activeThread) && $activeThread)
+                                {{ number_format(($activeThread->total_tokens_cached ?? 0) + ($activeThread->total_tokens_reasoning ?? 0)) }}
+                            @else
+                                —
+                            @endif
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
+                        <span class="text-[9px] text-[var(--ui-muted)]">Out:</span>
+                        <span id="rtTokensOut" class="text-[10px] font-semibold text-[var(--ui-secondary)]">
+                            @if(isset($activeThread) && $activeThread)
+                                {{ number_format($activeThread->total_tokens_out ?? 0) }}
+                            @else
+                                —
+                            @endif
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
+                        <span class="text-[9px] text-[var(--ui-muted)]">$:</span>
+                        <span id="rtCostTotal" class="text-[10px] font-semibold text-[var(--ui-secondary)]">
+                            @if(isset($activeThread) && $activeThread)
+                                {{ number_format((float)($activeThread->total_cost ?? 0), 4) }} {{ $activeThread->pricing_currency ?? 'USD' }}
+                            @else
+                                —
+                            @endif
+                        </span>
                     </div>
                 </div>
             </div>
