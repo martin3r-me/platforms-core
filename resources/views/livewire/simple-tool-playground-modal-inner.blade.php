@@ -285,9 +285,6 @@
                     </div>
                 </div>
             </div>
-    </div>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -303,7 +300,6 @@
                 <div class="text-xs">Wenn du willst, kann ich Debug/Events auch in den Settings-Tab verschieben und den Chat-Tab noch „cleaner“ machen.</div>
             </div>
         </div>
-    </div>
     </div>
 
     {{-- Models Tab --}}
