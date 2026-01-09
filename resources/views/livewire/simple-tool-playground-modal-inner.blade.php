@@ -10,6 +10,7 @@
     <div id="rtCostNote" class="hidden"></div>
     <div id="pgContextLabel" class="hidden">—</div>
     <div id="rtStatus" class="hidden">idle</div>
+    <input id="pgActiveThreadId" type="hidden" value="{{ $activeThreadId ?? '' }}" />
 
     <div class="w-full flex-1 min-h-0 overflow-hidden p-4 bg-[var(--ui-bg)]" style="width:100%;">
     {{-- Chat Tab --}}
@@ -493,7 +494,7 @@
 
         /** type: {role:'user'|'assistant', content:string}[] */
         let messages = [];
-        let currentThreadId = activeThreadId;
+        let currentThreadId = null;
         /** continuation state for interrupted tool-loops */
         let continuation = null;
         let inFlight = false;
@@ -530,6 +531,14 @@
           const empty = document.getElementById('chatEmpty');
           if (empty) empty.style.display = 'none';
           scrollToBottom();
+        };
+
+        const refreshThreadIdFromDom = () => {
+          const el = document.getElementById('pgActiveThreadId');
+          const raw = (el && typeof el.value === 'string') ? el.value : '';
+          const n = parseInt(raw || '', 10);
+          currentThreadId = Number.isFinite(n) ? n : null;
+          return currentThreadId;
         };
 
         // Event log (same logic, but keep it lightweight)
@@ -803,11 +812,6 @@
           try {
             currentThreadId = threadId;
             
-            // Switch thread in Livewire component first
-            if (window.Livewire) {
-              await window.Livewire.find(livewireComponentId).call('switchThread', threadId);
-            }
-            
             // Load messages from Livewire
             let threadMessages = [];
             if (window.Livewire) {
@@ -845,9 +849,27 @@
 
         // Listen for thread changes from Livewire
         window.addEventListener('simple-playground:thread-changed', (e) => {
-          const threadId = e.detail?.thread_id;
+          const threadIdRaw = e.detail?.thread_id;
+          const threadId = (typeof threadIdRaw === 'number') ? threadIdRaw : parseInt(String(threadIdRaw || ''), 10);
+          if (!Number.isFinite(threadId)) return;
+          // Livewire re-render updates hidden input; refresh from DOM to stay consistent
+          refreshThreadIdFromDom();
           if (threadId !== currentThreadId) {
-            loadThreadMessages(threadId);
+            currentThreadId = threadId;
+          }
+          loadThreadMessages(threadId);
+        });
+
+        // When the modal is opened / Livewire re-renders, refresh the thread id from DOM and load its messages.
+        refreshThreadIdFromDom();
+        if (currentThreadId) {
+          loadThreadMessages(currentThreadId);
+        }
+        document.addEventListener('livewire:update', () => {
+          const before = currentThreadId;
+          refreshThreadIdFromDom();
+          if (currentThreadId && currentThreadId !== before) {
+            loadThreadMessages(currentThreadId);
           }
         });
 
@@ -897,6 +919,18 @@
 
           // Fallback to default if no model selected
           const modelToUse = selectedModel || defaultModelId;
+
+          // Ensure we always send a thread_id so DB persistence + usage totals work.
+          if (!currentThreadId) {
+            refreshThreadIdFromDom();
+          }
+          if (!currentThreadId) {
+            renderMessage('assistant', '⚠️ Kein aktiver Thread gefunden. Bitte einmal einen Thread anlegen oder neu auswählen.');
+            inFlight = false;
+            sendBtn.disabled = false;
+            input.disabled = false;
+            return;
+          }
 
           const payload = {
             message: (isContinue ? '' : text),
