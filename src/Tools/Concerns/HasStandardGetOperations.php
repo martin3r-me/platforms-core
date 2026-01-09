@@ -207,6 +207,17 @@ trait HasStandardGetOperations
             }
         }
     }
+
+    /**
+     * Backwards compatible alias used by some module tools.
+     *
+     * Historical signature (as used in CRM tools):
+     *   applyStandardSorting($query, $arguments, 'field', 'asc')
+     */
+    protected function applyStandardSorting($query, array $arguments, string $defaultSort = 'created_at', string $defaultDir = 'desc', array $allowedSortFields = []): void
+    {
+        $this->applyStandardSort($query, $arguments, $allowedSortFields, $defaultSort, $defaultDir);
+    }
     
     /**
      * Wendet Standard-Pagination auf Query an
@@ -220,6 +231,39 @@ trait HasStandardGetOperations
         $offset = max($arguments['offset'] ?? 0, 0);
         
         $query->limit($limit)->offset($offset);
+    }
+
+    /**
+     * Pagination helper that RETURNS a result payload (data + pagination meta).
+     * Use this when a tool wants to return pagination information to the client.
+     *
+     * @return array{data:\Illuminate\Support\Collection,pagination:array<string,int|bool>}
+     */
+    protected function applyStandardPaginationResult($query, array $arguments): array
+    {
+        $limit = min($arguments['limit'] ?? 50, 1000); // Max 1000
+        $offset = max($arguments['offset'] ?? 0, 0);
+
+        // Clone for total count before limit/offset.
+        $totalQuery = clone $query;
+        $total = (int) $totalQuery->toBase()->getCountForPagination();
+
+        $query->limit($limit)->offset($offset);
+        $data = $query->get();
+
+        $returned = (int) $data->count();
+        $hasMore = ($offset + $returned) < $total;
+
+        return [
+            'data' => $data,
+            'pagination' => [
+                'limit' => $limit,
+                'offset' => $offset,
+                'total' => $total,
+                'returned' => $returned,
+                'has_more' => $hasMore,
+            ],
+        ];
     }
     
     /**
