@@ -326,6 +326,14 @@ class CoreServiceProvider extends ServiceProvider
         if (class_exists(\Platform\Core\Tools\ListTeamUsersTool::class) && !$registry->has('core.teams.users.GET')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\ListTeamUsersTool::class)); } catch (\Throwable $e) {}
         }
+
+        // Team membership management
+        if (class_exists(\Platform\Core\Tools\AddTeamUserTool::class) && !$registry->has('core.teams.users.POST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\AddTeamUserTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\RemoveTeamUserTool::class) && !$registry->has('core.teams.users.DELETE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\RemoveTeamUserTool::class)); } catch (\Throwable $e) {}
+        }
     }
 
 
