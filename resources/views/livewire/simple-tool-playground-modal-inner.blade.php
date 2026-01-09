@@ -429,45 +429,6 @@
         const selectedModelLabel = document.getElementById('selectedModelLabel');
         const modelsReload = document.getElementById('modelsReload');
 
-        // Models: keep existing behavior (safe fallback)
-        const setSelectedModel = (m) => {
-          selectedModel = m || '';
-          localStorage.setItem('simple.selectedModel', selectedModel);
-          if (selectedModelLabel) selectedModelLabel.textContent = selectedModel || '—';
-          if (modelSelect) {
-            modelSelect.value = selectedModel || '';
-            // Also save to thread if thread exists
-            if (currentThreadId && selectedModel) {
-              // Save model to thread via Livewire
-              @this.call('updateThreadModel', currentThreadId, selectedModel).catch(() => {});
-            }
-          }
-        };
-
-        // Ensure modelSelect is available and has change listener
-        const initModelSelect = () => {
-          modelSelect = document.getElementById('modelSelect');
-          if (modelSelect && !modelSelect.dataset.listenerAttached) {
-            modelSelect.addEventListener('change', (e) => {
-              const newModel = e.target.value;
-              if (newModel) {
-                setSelectedModel(newModel);
-              }
-            });
-            modelSelect.dataset.listenerAttached = 'true';
-            // Set initial value if available
-            if (selectedModel) {
-              modelSelect.value = selectedModel;
-            }
-          }
-        };
-        
-        // Initialize immediately and also after Livewire updates
-        initModelSelect();
-        document.addEventListener('livewire:update', () => {
-          setTimeout(initModelSelect, 50);
-        });
-
         const chatList = document.getElementById('chatList');
         const chatScroll = document.getElementById('chatScroll');
         const form = document.getElementById('chatForm');
@@ -669,6 +630,30 @@
             }
           }
         };
+
+        // Ensure modelSelect is available and has change listener
+        const initModelSelect = () => {
+          modelSelect = document.getElementById('modelSelect');
+          if (modelSelect && !modelSelect.dataset.listenerAttached) {
+            modelSelect.addEventListener('change', (e) => {
+              const newModel = e.target.value;
+              if (newModel) {
+                setSelectedModel(newModel);
+              }
+            });
+            modelSelect.dataset.listenerAttached = 'true';
+            // Set initial value if available
+            if (selectedModel) {
+              modelSelect.value = selectedModel;
+            }
+          }
+        };
+        
+        // Initialize immediately and also after Livewire updates
+        initModelSelect();
+        document.addEventListener('livewire:update', () => {
+          setTimeout(initModelSelect, 50);
+        });
         
         // Load model from active thread on page load or after Livewire update
         const loadModelFromThread = () => {
