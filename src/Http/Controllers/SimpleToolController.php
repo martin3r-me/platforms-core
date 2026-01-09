@@ -644,6 +644,8 @@ class SimpleToolController extends Controller
                     }
 
                     try {
+                        // Tool-call args can be interleaved; we need a stable map item_id -> call_id across events.
+                        $toolCallIdByItemId = [];
                         $openAiService->streamChat(
                             $messagesForApi,
                             function(string $delta) use ($sendEvent, &$assistant) {
@@ -669,6 +671,7 @@ class SimpleToolController extends Controller
                                     &$seenUsageResponseIds,
                                     &$iteration,
                                     &$toolCallsCollector,
+                                    &$toolCallIdByItemId,
                                     &$currentStreamingToolCall,
                                     &$currentStreamingToolId,
                                     &$currentStreamingCallId,
@@ -787,10 +790,6 @@ class SimpleToolController extends Controller
 
                                     // Collect function calls robustly (tool args can be interleaved across multiple calls).
                                     // We key tool calls by call_id, but argument deltas reference item_id -> map item_id => call_id.
-                                    if (!isset($toolCallIdByItemId) || !is_array($toolCallIdByItemId)) {
-                                        $toolCallIdByItemId = [];
-                                    }
-
                                     if ($event === 'response.output_item.added' && isset($decoded['item']['type']) && $decoded['item']['type'] === 'function_call') {
                                         $openAiToolName = $decoded['item']['name'] ?? null;
                                         $itemId = $decoded['item']['id'] ?? null;
