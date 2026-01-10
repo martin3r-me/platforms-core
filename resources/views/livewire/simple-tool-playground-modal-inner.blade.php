@@ -162,6 +162,30 @@
                                         </div>
                                     @endforeach
                                 </div>
+
+                                {{-- Live streaming output (not persisted to DB; for realtime observability) --}}
+                                <div class="pt-3 border-t border-[var(--ui-border)]/60 space-y-3">
+                                    <div class="text-xs font-semibold text-[var(--ui-secondary)]">Live</div>
+                                    <div class="grid grid-cols-1 gap-3">
+                                        <div class="min-w-0">
+                                            <div class="text-[11px] font-semibold text-[var(--ui-muted)] mb-1">Assistant (stream)</div>
+                                            <pre id="rtAssistant" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[70px] max-h-[20vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-3 min-w-0">
+                                            <div class="min-w-0">
+                                                <div class="text-[11px] font-semibold text-[var(--ui-muted)] mb-1">Reasoning (stream)</div>
+                                                <pre id="rtReasoning" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[56px] max-h-[14vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
+                                            </div>
+                                            <div class="min-w-0">
+                                                <div class="text-[11px] font-semibold text-[var(--ui-muted)] mb-1">Thinking (stream)</div>
+                                                <pre id="rtThinking" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[56px] max-h-[14vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
+                                            </div>
+                                        </div>
+                                        <div class="text-[10px] text-[var(--ui-muted)]">
+                                            Hinweis: Das sind Streaming-Deltas zur Laufzeit (werden nicht in die Message-DB geschrieben).
+                                        </div>
+                                    </div>
+                                </div>
                                 <div id="chatEmpty" class="text-sm text-[var(--ui-muted)]" style="{{ $msgs->count() ? 'display:none;' : '' }}">
                                     <div class="font-semibold text-[var(--ui-secondary)]">Start</div>
                                     <div class="mt-1">Schreib eine Nachricht (z. B. „Liste meine Teams“ oder „Welche Tools kann ich im OKR-Modul nutzen?“).</div>
@@ -210,59 +234,19 @@
                     {{-- Right: Realtime / Debug (1/4 width) --}}
                     <div class="col-span-1 min-h-0 min-w-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/20 overflow-x-hidden">
                         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
-                            <div class="text-xs text-[var(--ui-muted)]">
-                                Model: <span id="realtimeModel" class="text-[var(--ui-secondary)]">—</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <label class="text-xs text-[var(--ui-muted)] inline-flex items-center gap-2 select-none">
-                                    <input id="rtVerbose" type="checkbox" class="accent-[var(--ui-primary)]" />
-                                    verbose
-                                </label>
+                            <div class="text-xs font-semibold text-[var(--ui-secondary)]">Tools</div>
+                            <div class="flex items-center gap-3">
+                                <button id="rtCopyDebug" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Copy Debug</button>
                                 <button id="realtimeClear" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Clear</button>
                             </div>
                         </div>
 
                         <div class="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto min-w-0">
                             <div class="min-w-0">
-                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Assistant (live)</div>
-                                <pre id="rtAssistant" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[80px] max-h-[22vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
-                            </div>
-
-                            {{-- Tokens & costs moved to the top bar --}}
-
-                            <div class="min-w-0">
                                 <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Tool Calls (letzte 10)</div>
                                 <div id="rtToolCalls" class="space-y-2 max-h-[30vh] overflow-y-auto"></div>
                             </div>
-                            <div class="min-w-0">
-                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Reasoning (live)</div>
-                                <pre id="rtReasoning" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px] max-h-[16vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
-                            </div>
-                            <div class="min-w-0">
-                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Thinking (live)</div>
-                                <pre id="rtThinking" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[60px] max-h-[16vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
-                            </div>
-                            {{-- Events: show raw upstream/server event stream to debug what actually arrives --}}
-                            <div class="pt-2 border-t border-[var(--ui-border)]">
-                                <div class="flex items-center justify-between mb-1 gap-3">
-                                    <div class="text-xs font-semibold text-[var(--ui-secondary)]">Events (live)</div>
-                                    <div class="text-[10px] text-[var(--ui-muted)] font-mono whitespace-nowrap">
-                                        all: <span id="rtEventCount">0</span>
-                                        · reasoning: <span id="rtEventReasonCount">0</span>
-                                        · thinking: <span id="rtEventThinkingCount">0</span>
-                                    </div>
-                                </div>
-                                <div id="rtEvents" class="text-xs space-y-2 text-[var(--ui-muted)] max-h-[18vh] overflow-y-auto pr-1"></div>
-                            </div>
-
-                            <div class="pt-2 border-t border-[var(--ui-border)] min-w-0">
-                                <div class="flex items-center justify-between mb-1">
-                                    <div class="text-xs font-semibold text-[var(--ui-secondary)]">Debug Dump</div>
-                                    <button id="rtCopyDebug" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Copy</button>
-                                </div>
-                                <textarea id="rtDebugDump" class="w-full max-w-full text-[10px] leading-snug whitespace-pre border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[90px] max-h-[18vh] overflow-y-auto overflow-x-auto" readonly></textarea>
-                                <div id="rtCopyStatus" class="mt-1 text-[10px] text-[var(--ui-muted)]"></div>
-                            </div>
+                            <div id="rtCopyStatus" class="text-[10px] text-[var(--ui-muted)]"></div>
                         </div>
                     </div>
                 </div>
@@ -312,8 +296,8 @@
             </div>
             <div class="p-4 flex-1 min-h-0 overflow-y-auto text-sm text-[var(--ui-muted)] space-y-3">
                 <div><span class="font-semibold text-[var(--ui-secondary)]">Model:</span> links (Drag&Drop) oder direkt neben dem Chat-Input auswählen.</div>
-                <div><span class="font-semibold text-[var(--ui-secondary)]">Debug:</span> rechts bleibt immer sichtbar (Assistant/Reasoning/Thinking/Tool Calls).</div>
-                <div class="text-xs">Wenn du willst, kann ich Debug/Events auch in den Settings-Tab verschieben und den Chat-Tab noch „cleaner“ machen.</div>
+                <div><span class="font-semibold text-[var(--ui-secondary)]">Live:</span> Streaming-Ausgabe + Thinking/Reasoning siehst du direkt im Chat.</div>
+                <div><span class="font-semibold text-[var(--ui-secondary)]">Tools:</span> rechts siehst du den Verlauf der Tool Calls; Events werden nur im Footer angezeigt.</div>
             </div>
         </div>
     </div>
@@ -578,14 +562,13 @@
         if (!alreadyBound) form.dataset.simplePlaygroundBound = '1';
 
         const realtimeClear = document.getElementById('realtimeClear');
-        const realtimeModel = document.getElementById('realtimeModel');
         const rtAssistant = document.getElementById('rtAssistant');
         const rtReasoning = document.getElementById('rtReasoning');
         const rtThinking = document.getElementById('rtThinking');
-        const rtEvents = document.getElementById('rtEvents');
+        const rtEvents = document.getElementById('rtEvents'); // optional (we don't render it in the modal anymore)
         const rtStatus = document.getElementById('rtStatus');
-        const rtVerboseEl = document.getElementById('rtVerbose');
-        const rtDebugDump = document.getElementById('rtDebugDump');
+        const rtVerboseEl = document.getElementById('rtVerbose'); // optional
+        const rtDebugDump = document.getElementById('rtDebugDump'); // optional (hidden/removed in modal)
         const rtCopyDebug = document.getElementById('rtCopyDebug');
         const rtCopyStatus = document.getElementById('rtCopyStatus');
         const rtTokensIn = document.getElementById('rtTokensIn');
@@ -732,8 +715,9 @@
         };
         const eventCounters = { all: 0, reasoning: 0, thinking: 0 };
 
+        // Keep a copyable debug blob, even if we don't render it in the UI.
+        window.__simplePlaygroundDebugDumpText = window.__simplePlaygroundDebugDumpText || '';
         const updateDebugDump = () => {
-          if (!rtDebugDump) return;
           const out = {
             startedAt: debugState.startedAt,
             payload: debugState.payload,
@@ -744,13 +728,16 @@
             toolCalls: debugState.toolCalls.slice(-20),
             toolsVisible: debugState.toolsVisible,
           };
-          rtDebugDump.value = JSON.stringify(out, null, 2);
+          const text = JSON.stringify(out, null, 2);
+          window.__simplePlaygroundDebugDumpText = text;
+          if (rtDebugDump) rtDebugDump.value = text;
         };
 
         if (rtCopyDebug) {
           rtCopyDebug.addEventListener('click', async () => {
             try {
-              await navigator.clipboard.writeText(rtDebugDump?.value || '');
+              const text = rtDebugDump?.value || window.__simplePlaygroundDebugDumpText || '';
+              await navigator.clipboard.writeText(text);
               if (rtCopyStatus) rtCopyStatus.textContent = 'kopiert';
               setTimeout(() => { if (rtCopyStatus) rtCopyStatus.textContent = ''; }, 1500);
             } catch (e) {
