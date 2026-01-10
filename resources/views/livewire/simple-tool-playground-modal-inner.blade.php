@@ -141,14 +141,6 @@
                                         placeholder="Nachricht eingeben…"
                                         autocomplete="off"
                                     />
-                                    {{-- Inline live status: makes it obvious when a stream is still running --}}
-                                    <div id="pgInlineBusy" class="hidden items-center gap-2 px-2.5 h-10 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] text-[var(--ui-muted)]">
-                                        <span class="w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
-                                        <span class="text-[11px] font-semibold text-[var(--ui-secondary)]">läuft</span>
-                                        <span class="text-[10px] font-mono" id="pgInlineSeconds">0s</span>
-                                        <span class="text-[10px] text-[var(--ui-muted)]">·</span>
-                                        <span class="text-[10px] font-mono text-[var(--ui-secondary)] truncate max-w-[160px]" id="pgInlineEventText">—</span>
-                                    </div>
                                     <button id="chatSend" type="submit" class="px-6 py-2 h-10 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90 flex items-center gap-2">
                                         <span>Senden</span>
                                     </button>
@@ -670,11 +662,12 @@
           const stopBtn = document.getElementById('pgStopBtn');
           const tid = refreshThreadIdFromDom();
           const st = getThreadState(tid || 'none');
-          const busy = !!(st && st.inFlight);
+          // Consider "running" if inFlight OR we still have an abortController OR we have a start timestamp.
+          // This prevents a short window where the button stays disabled even though the request is running.
+          const busy = !!(st && (st.inFlight || !!st.abortController || !!st.startedAtMs));
           // Footer stop button wrapper is always visible; we only toggle styling.
           if (stopBtn) {
-            // Enable Stop if this thread is in-flight OR we have an abortController (safety net)
-            stopBtn.disabled = !(busy || !!st?.abortController);
+            stopBtn.disabled = !busy;
             if (busy) {
               stopBtn.classList.add('animate-pulse', 'text-red-600', 'border-red-200');
               stopBtn.classList.remove('text-[var(--ui-muted)]', 'border-[var(--ui-border)]');
@@ -1183,10 +1176,12 @@
           resetRealtime();
           if (rtStatus) rtStatus.textContent = 'streaming…';
           // realtimeModel UI element no longer exists in the modal (kept from older layout)
+          // Make start visible in the footer event tile immediately.
+          try { setEventLabel('request.start'); } catch (_) {}
           debugState.startedAt = new Date().toISOString();
           updateThreadBusyIndicators();
           updateFooterBusy();
-          // Prime inline event label
+          // Prime inline event label (deprecated; kept as no-op if element doesn't exist)
           try {
             const inlineEv = document.getElementById('pgInlineEventText');
             if (inlineEv) inlineEv.textContent = 'request.start';
@@ -1239,6 +1234,7 @@
           const abortController = new AbortController();
           threadState.abortController = abortController;
           threadState.userAborted = false;
+          updateFooterBusy();
 
           try {
             const res = await fetch(url, {
@@ -1368,6 +1364,83 @@
                     }
                     updateEventCountersUi();
                     rtEvent({ key: ev, preview: data?.preview || null, raw: data?.raw || null });
+
+                    // Surface OpenAI built-in tool calls (e.g. web_search) in the Tool Calls panel.
+                    try {
+                      const p = data?.preview || {};
+                      const type = (p.type || '').toString();
+                      const callId = (p.call_id || p.id || '').toString();
+                      const isCallType = type.endsWith('_call');
+                      const isWebSearch = type.includes('web_search');
+                      const isDone = ev.endsWith('.done') || ev.includes('.done');
+                      if ((isCallType || isWebSearch) && isDone && callId) {
+                        window.__simpleBuiltinToolSeen = window.__simpleBuiltinToolSeen || {};
+                        const key = `${type}:${callId}`;
+                        if (!window.__simpleBuiltinToolSeen[key]) {
+                          window.__simpleBuiltinToolSeen[key] = true;
+                          const toolName = isWebSearch ? 'web_search' : type.replace(/_call$/, '');
+                          debugState.toolCalls.push({
+                            tool: `openai:${toolName}`,
+                            call_id: callId,
+                            success: true,
+                            ms: null,
+                            error_code: null,
+                            error: null,
+                            cached: false,
+                            retries: 0,
+                            args_preview: p.query ? JSON.stringify({ query: p.query }) : null,
+                            args_json: p.query ? JSON.stringify({ query: p.query }) : null,
+                            args: p.query ? { query: p.query } : null,
+                          });
+                          // Re-render immediately
+                          if (rtToolCalls) {
+                            const items = debugState.toolCalls.slice(0);
+                            rtToolCalls.innerHTML = '';
+                            for (const it of items) {
+                              const row = document.createElement('div');
+                              row.className = 'border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)]';
+                              const statusClass = it.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]';
+                              const statusIcon = it.success ? '✅' : '❌';
+                              const statusText = it.success ? 'Erfolgreich' : 'Fehlgeschlagen';
+                              const cachedBadge = it.cached ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)] ml-2">cached</span>' : '';
+                              const argsRaw = (typeof it.args_json === 'string' && it.args_json.trim() !== '')
+                                ? it.args_json
+                                : (it.args != null ? JSON.stringify(it.args) : (it.args_preview || ''));
+                              const argsPretty = (() => {
+                                try {
+                                  if (typeof argsRaw === 'string' && argsRaw.trim().startsWith('{')) {
+                                    return JSON.stringify(JSON.parse(argsRaw), null, 2);
+                                  }
+                                } catch (_) {}
+                                return String(argsRaw || '');
+                              })();
+                              const argsPreview = argsPretty
+                                ? (argsPretty.length > 140 ? (argsPretty.substring(0, 140) + '…') : argsPretty)
+                                : '—';
+                              const errorInfo = it.error ? `<div class="mt-1 text-[10px] text-[var(--ui-danger)]">Error: ${it.error_code || 'UNKNOWN'}: ${typeof it.error === 'string' ? it.error.substring(0, 150) : JSON.stringify(it.error).substring(0, 150)}</div>` : '';
+                              row.innerHTML = `
+                                <div class="flex items-start justify-between gap-2 mb-1">
+                                  <div class="flex-1 min-w-0">
+                                    <div class="text-[11px] font-mono font-semibold text-[var(--ui-secondary)] truncate">${it.tool || '—'}</div>
+                                    ${it.call_id ? `<div class="text-[10px] text-[var(--ui-muted)] mt-0.5">Call-ID: ${it.call_id}</div>` : ''}
+                                  </div>
+                                  <div class="flex items-center gap-2 flex-shrink-0">
+                                    <span class="text-[10px] ${statusClass}">${statusIcon} ${statusText}</span>
+                                    ${it.ms != null ? `<span class="text-[10px] text-[var(--ui-muted)]">⏱️ ${it.ms}ms</span>` : ''}
+                                    ${cachedBadge}
+                                  </div>
+                                </div>
+                                ${argsPreview !== '—' ? `<div class="mt-1 text-[10px] text-[var(--ui-muted)]"><span class="font-semibold">Args:</span> <code class="block px-1 py-0.5 rounded bg-[var(--ui-muted-5)] font-mono whitespace-pre-wrap break-words">${argsPreview}</code></div>` : ''}
+                                ${errorInfo}
+                              `;
+                              rtToolCalls.appendChild(row);
+                            }
+                          }
+                          updateDebugDump();
+                        }
+                      }
+                    } catch (_) {}
+
                     debugState.events.push({ t: Date.now(), event: ev, preview: data?.preview || null, raw: data?.raw || null });
                     updateDebugDump();
                     break;
