@@ -71,6 +71,17 @@
                     </div>
                 </div>
                 {{-- Usage moved to footer (Total + Request). Keep header clean. --}}
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <button
+                        type="button"
+                        x-data
+                        @click.prevent="if (confirm('Aktiven Thread wirklich löschen?')) { $wire.deleteActiveThread() }"
+                        class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:underline"
+                        title="Aktiven Thread löschen"
+                    >
+                        Thread löschen
+                    </button>
+                </div>
             </div>
             <div class="flex-1 min-h-0 overflow-hidden w-full">
                 <div class="w-full h-full min-h-0 grid grid-cols-4 gap-5 px-4 py-4 overflow-hidden min-w-0" style="width:100%; max-width:100%;">
@@ -156,8 +167,7 @@
                                         <span class="text-[10px] font-mono text-[var(--ui-secondary)] truncate max-w-[160px]" id="pgInlineEventText">—</span>
                                     </div>
                                     <button id="chatSend" type="submit" class="px-6 py-2 h-10 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90 flex items-center gap-2">
-                                        <span id="pgSendLabel">Senden</span>
-                                        <span id="pgSendSpinner" class="hidden w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+                                        <span>Senden</span>
                                     </button>
                                 </form>
                             </div>
@@ -187,26 +197,6 @@
 
             {{-- Footer: same look/spacing as header, full width of the Chat tab (spans Chat + Debug) --}}
             <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
-                <div class="flex items-center gap-2">
-                    <button
-                        type="button"
-                        id="pgStopBtn"
-                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-red-600 border-red-200 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                        disabled
-                        title="Stoppt den aktuellen Stream sofort"
-                    >
-                        Stop
-                    </button>
-                    <button
-                        type="button"
-                        x-data
-                        @click.prevent="if (confirm('Aktiven Thread wirklich löschen?')) { $wire.deleteActiveThread() }"
-                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-danger)] border-[var(--ui-border)] hover:bg-[var(--ui-danger-5)]"
-                        title="Aktiven Thread löschen"
-                    >
-                        Thread löschen
-                    </button>
-                </div>
                 <div class="flex items-center gap-3 min-w-0">
                     {{-- Usage (Total + Request): compact, next to Event --}}
                     <div class="hidden" id="rtTokensInTotal">—</div>
@@ -245,14 +235,24 @@
                         <span id="rtCostRequest" class="text-[10px] font-semibold text-[var(--ui-secondary)]">—</span>
                     </div>
 
-                    <div class="min-w-0 flex items-center gap-2">
-                        <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0">Event:</span>
-                        <span id="pgFooterEventText" class="text-[10px] font-mono text-[var(--ui-secondary)] truncate">—</span>
+                    {{-- Pulsing Stop button = running indicator + abort --}}
+                    <div id="pgFooterBusy" class="hidden flex items-center flex-shrink-0">
+                        <button
+                            type="button"
+                            id="pgStopBtn"
+                            class="px-2 py-1 rounded border border-red-200 bg-[var(--ui-bg)] text-red-600 text-[10px] font-semibold hover:bg-red-50 animate-pulse disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Stop"
+                            disabled
+                        >
+                            Stop
+                        </button>
                     </div>
 
-                    {{-- Busy indicator bottom-right in footer while request is running --}}
-                    <div id="pgFooterBusy" class="hidden flex items-center flex-shrink-0">
-                        <span class="w-3 h-3 border-2 border-[var(--ui-primary)]/30 border-t-[var(--ui-primary)] rounded-full animate-spin"></span>
+                    <div class="flex items-center gap-1 px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] min-w-0">
+                        <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0">Event:</span>
+                        <span id="pgFooterEventText" class="text-[10px] font-mono text-[var(--ui-secondary)] truncate">—</span>
+                        <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0">·</span>
+                        <span id="pgFooterSeconds" class="text-[10px] font-mono text-[var(--ui-secondary)] flex-shrink-0">0s</span>
                     </div>
                 </div>
             </div>
@@ -1066,15 +1066,6 @@
           if (busy) sendBtn.classList.add('opacity-60', 'cursor-not-allowed');
           else sendBtn.classList.remove('opacity-60', 'cursor-not-allowed');
 
-          // Make running state obvious (label + spinner)
-          const lbl = document.getElementById('pgSendLabel');
-          const sp = document.getElementById('pgSendSpinner');
-          if (lbl) lbl.textContent = busy ? 'Läuft…' : 'Senden';
-          if (sp) {
-            if (busy) sp.classList.remove('hidden');
-            else sp.classList.add('hidden');
-          }
-
           // Inline busy chip next to the input (more visible than the footer alone)
           const chip = document.getElementById('pgInlineBusy');
           if (chip) {
@@ -1103,6 +1094,9 @@
             if (target.abortController) {
               try { target.abortController.abort(); } catch (_) {}
             }
+            // Immediately reflect "stopped" in UI (abort will finish the fetch loop shortly).
+            target.inFlight = false;
+            target.abortController = null;
             // Optimistically update footer state immediately
             updateThreadBusyIndicators();
             updateFooterBusy();
@@ -1151,7 +1145,7 @@
           if (ms) ms.disabled = true;
           resetRealtime();
           if (rtStatus) rtStatus.textContent = 'streaming…';
-          if (realtimeModel) realtimeModel.textContent = selectedModel || '—';
+          // realtimeModel UI element no longer exists in the modal (kept from older layout)
           debugState.startedAt = new Date().toISOString();
           updateThreadBusyIndicators();
           updateFooterBusy();
@@ -1483,13 +1477,16 @@
               const tid = refreshThreadIdFromDom();
               const st = getThreadState(tid || 'none');
               const el = document.getElementById('pgInlineSeconds');
-              if (!el) return;
+              const elFooter = document.getElementById('pgFooterSeconds');
+              if (!el && !elFooter) return;
               if (!st || !st.inFlight || !st.startedAtMs) {
-                el.textContent = '0s';
+                if (el) el.textContent = '0s';
+                if (elFooter) elFooter.textContent = '0s';
                 return;
               }
               const s = Math.max(0, Math.floor((Date.now() - st.startedAtMs) / 1000));
-              el.textContent = `${s}s`;
+              if (el) el.textContent = `${s}s`;
+              if (elFooter) elFooter.textContent = `${s}s`;
             } catch (_) {}
           }, 250);
         }
