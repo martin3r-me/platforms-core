@@ -173,10 +173,11 @@
                 </div>
             </div>
 
-            {{-- Footer: same look/spacing as header, full width of the Chat tab (spans Chat + Debug) --}}
-            <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 flex items-center justify-end flex-shrink-0">
-                <div class="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 min-w-0">
-                    {{-- Usage (Total + Request): compact, next to Event --}}
+            {{-- Footer: full width (spans Chat + Debug) --}}
+            <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0 gap-3">
+                {{-- Left: Tokens + Prices (left-aligned) --}}
+                <div class="flex flex-wrap items-center justify-start gap-x-3 gap-y-2 min-w-0">
+                    {{-- Hidden token nodes (used by JS updates) --}}
                     <div class="hidden" id="rtTokensInTotal">—</div>
                     <div class="hidden" id="rtTokensOutTotal">—</div>
                     <div class="hidden" id="rtTokensExtraTotal">—</div>
@@ -212,9 +213,19 @@
                         <span class="text-[10px] text-[var(--ui-muted)]">Req €:</span>
                         <span id="rtCostRequest" class="text-[10px] font-semibold text-[var(--ui-secondary)]">—</span>
                     </div>
+                </div>
 
-                    {{-- Stop button = running indicator + abort (always visible, pulses when running) --}}
-                    <div id="pgFooterBusy" class="flex items-center flex-shrink-0 order-last">
+                {{-- Right: Event, Laufzeit, Stop (right-aligned, in that order) --}}
+                <div class="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 min-w-0">
+                    <div class="flex items-center gap-1 px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] min-w-0 max-w-64">
+                        <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0">Event:</span>
+                        <span id="pgFooterEventText" class="text-[10px] font-mono text-[var(--ui-secondary)] truncate">—</span>
+                    </div>
+                    <div id="pgFooterSecondsWrap" class="hidden flex items-center gap-1 px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
+                        <span class="text-[10px] text-[var(--ui-muted)]">t:</span>
+                        <span id="pgFooterSeconds" class="text-[10px] font-mono text-[var(--ui-secondary)]">0s</span>
+                    </div>
+                    <div id="pgFooterBusy" class="hidden flex items-center flex-shrink-0">
                         <button
                             type="button"
                             id="pgStopBtn"
@@ -224,15 +235,6 @@
                         >
                             Stop
                         </button>
-                    </div>
-
-                    <div class="flex items-center gap-1 px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
-                        <span class="text-[10px] text-[var(--ui-muted)]">t:</span>
-                        <span id="pgFooterSeconds" class="text-[10px] font-mono text-[var(--ui-secondary)]">0s</span>
-                    </div>
-                    <div class="flex items-center gap-1 px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] min-w-0 max-w-64">
-                        <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0">Event:</span>
-                        <span id="pgFooterEventText" class="text-[10px] font-mono text-[var(--ui-secondary)] truncate">—</span>
                     </div>
                 </div>
             </div>
@@ -586,6 +588,15 @@
           return new Intl.NumberFormat('de-DE').format(Number(n));
         };
 
+        // Helper: format elapsed seconds as "Xm Ys" (e.g. 2m 05s) once >= 60s.
+        const formatElapsed = (seconds) => {
+          const s = Math.max(0, Number(seconds) || 0);
+          if (s < 60) return `${Math.floor(s)}s`;
+          const m = Math.floor(s / 60);
+          const rs = Math.floor(s % 60);
+          return `${m}m ${String(rs).padStart(2, '0')}s`;
+        };
+
         const renderMessage = (role, content) => {
           refreshDomRefs();
           if (!chatList) return;
@@ -746,11 +757,20 @@
           // daher lesen wir den aktiven Thread-ID aus dem DOM und holen den State aus dem globalen Store.
           const el = document.getElementById('pgFooterBusy');
           const stopBtn = document.getElementById('pgStopBtn');
+          const secondsWrap = document.getElementById('pgFooterSecondsWrap');
           const tid = refreshThreadIdFromDom();
           const st = getThreadState(tid || 'none');
           // Only consider inFlight. abortController can linger briefly and should not keep Stop enabled.
           const busy = !!(st && st.inFlight);
           // Footer stop button wrapper is always visible; we only toggle styling.
+          if (el) {
+            if (busy) el.classList.remove('hidden');
+            else el.classList.add('hidden');
+          }
+          if (secondsWrap) {
+            if (busy) secondsWrap.classList.remove('hidden');
+            else secondsWrap.classList.add('hidden');
+          }
           if (stopBtn) {
             stopBtn.disabled = !busy;
             if (busy) {
@@ -1296,6 +1316,16 @@
             return;
           }
 
+          // Resolve active thread *before* mutating threadState/inFlight.
+          // Otherwise we may accidentally set inFlight on the "none" thread, breaking Stop/seconds/event.
+          refreshThreadIdFromDom();
+          if (!currentThreadId) {
+            renderMessage('assistant', '⚠️ Kein aktiver Thread gefunden. Bitte einmal einen Thread anlegen oder neu auswählen.');
+            return;
+          }
+          // Ensure threadState points to the real thread now.
+          threadState = getThreadState(currentThreadId);
+
           if (!isContinue) {
             threadState.messages.push({ role: 'user', content: text });
             renderMessage('user', text);
@@ -1352,19 +1382,6 @@
 
           // Fallback to default if no model selected
           const modelToUse = selectedModel || defaultModelId;
-
-          // Ensure we always send a thread_id so DB persistence + usage totals work.
-          if (!currentThreadId) {
-            refreshThreadIdFromDom();
-          }
-          if (!currentThreadId) {
-            renderMessage('assistant', '⚠️ Kein aktiver Thread gefunden. Bitte einmal einen Thread anlegen oder neu auswählen.');
-            threadState.inFlight = false;
-            sendBtn.disabled = false;
-            input.disabled = false;
-            updateThreadBusyIndicators();
-            return;
-          }
 
           const payload = {
             message: (isContinue ? '' : text),
@@ -1736,8 +1753,9 @@
                 return;
               }
               const s = Math.max(0, Math.floor((Date.now() - st.startedAtMs) / 1000));
-              if (el) el.textContent = `${s}s`;
-              if (elFooter) elFooter.textContent = `${s}s`;
+              const txt = formatElapsed(s);
+              if (el) el.textContent = txt;
+              if (elFooter) elFooter.textContent = txt;
             } catch (_) {}
           }, 250);
         }
