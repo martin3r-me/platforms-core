@@ -61,6 +61,10 @@ class UpdateAiModelTool implements ToolContract, ToolMetadataContract
                 'supports_streaming' => ['type' => 'boolean'],
                 'supports_function_calling' => ['type' => 'boolean'],
                 'supports_structured_outputs' => ['type' => 'boolean'],
+                'supports_temperature' => ['type' => 'boolean', 'description' => 'Ob das Modell temperature im Responses API akzeptiert. NULL = unbekannt.'],
+                'supports_top_p' => ['type' => 'boolean', 'description' => 'Ob das Modell top_p akzeptiert. NULL = unbekannt.'],
+                'supports_presence_penalty' => ['type' => 'boolean', 'description' => 'Ob das Modell presence_penalty akzeptiert. NULL = unbekannt.'],
+                'supports_frequency_penalty' => ['type' => 'boolean', 'description' => 'Ob das Modell frequency_penalty akzeptiert. NULL = unbekannt.'],
 
                 // Pricing
                 'pricing_currency' => ['type' => 'string', 'description' => 'z.B. USD, EUR'],
@@ -82,7 +86,7 @@ class UpdateAiModelTool implements ToolContract, ToolMetadataContract
     {
         try {
             if (!$this->canManageAiModels($context)) {
-                return ToolResult::error('ACCESS_DENIED', 'Du darfst AI-Models nicht bearbeiten (nur Team-Owner/Admin).');
+                return ToolResult::error('ACCESS_DENIED', 'Du darfst AI-Models nicht bearbeiten (nur Owner des Root/Eltern-Teams).');
             }
 
             $model = $this->findTargetModel($arguments);
@@ -107,6 +111,10 @@ class UpdateAiModelTool implements ToolContract, ToolMetadataContract
                 'supports_streaming',
                 'supports_function_calling',
                 'supports_structured_outputs',
+                'supports_temperature',
+                'supports_top_p',
+                'supports_presence_penalty',
+                'supports_frequency_penalty',
                 'pricing_currency',
                 'price_input_per_1m',
                 'price_cached_input_per_1m',
@@ -158,6 +166,10 @@ class UpdateAiModelTool implements ToolContract, ToolMetadataContract
                 'model_id' => $model->model_id,
                 'name' => $model->name,
                 'max_output_tokens' => $model->max_output_tokens,
+                'supports_temperature' => $model->supports_temperature,
+                'supports_top_p' => $model->supports_top_p,
+                'supports_presence_penalty' => $model->supports_presence_penalty,
+                'supports_frequency_penalty' => $model->supports_frequency_penalty,
                 'pricing_currency' => $model->pricing_currency,
                 'price_input_per_1m' => $model->price_input_per_1m,
                 'price_cached_input_per_1m' => $model->price_cached_input_per_1m,

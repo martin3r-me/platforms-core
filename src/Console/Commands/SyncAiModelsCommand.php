@@ -132,6 +132,10 @@ class SyncAiModelsCommand extends Command
                 'supports_streaming' => $overlay['supports_streaming'] ?? null,
                 'supports_function_calling' => $overlay['supports_function_calling'] ?? null,
                 'supports_structured_outputs' => $overlay['supports_structured_outputs'] ?? null,
+                'supports_temperature' => $overlay['supports_temperature'] ?? null,
+                'supports_top_p' => $overlay['supports_top_p'] ?? null,
+                'supports_presence_penalty' => $overlay['supports_presence_penalty'] ?? null,
+                'supports_frequency_penalty' => $overlay['supports_frequency_penalty'] ?? null,
                 // Pricing: only set when overlay provides it; otherwise keep DB values (manual edits).
                 'modalities' => $overlay['modalities'] ?? null,
                 'endpoints' => $overlay['endpoints'] ?? null,
@@ -140,6 +144,31 @@ class SyncAiModelsCommand extends Command
                 'api_metadata' => $m,
                 'last_api_check' => now(),
             ];
+
+            // Heuristics (only when catalog overlay doesn't provide flags):
+            // OpenAI /models doesn't expose supported request parameters. We therefore set conservative defaults:
+            // - gpt-5* (incl. gpt-5.2*) rejects temperature/top_p/presence_penalty/frequency_penalty in Responses API.
+            // Everything else remains NULL (= unknown) unless catalog overlay provides it.
+            if (!array_key_exists('supports_temperature', $overlay)) {
+                if (str_starts_with($id, 'gpt-5')) {
+                    $attrs['supports_temperature'] = false;
+                }
+            }
+            if (!array_key_exists('supports_top_p', $overlay)) {
+                if (str_starts_with($id, 'gpt-5')) {
+                    $attrs['supports_top_p'] = false;
+                }
+            }
+            if (!array_key_exists('supports_presence_penalty', $overlay)) {
+                if (str_starts_with($id, 'gpt-5')) {
+                    $attrs['supports_presence_penalty'] = false;
+                }
+            }
+            if (!array_key_exists('supports_frequency_penalty', $overlay)) {
+                if (str_starts_with($id, 'gpt-5')) {
+                    $attrs['supports_frequency_penalty'] = false;
+                }
+            }
 
             $hasAnyPricing = array_key_exists('price_input_per_1m', $overlay)
                 || array_key_exists('price_cached_input_per_1m', $overlay)

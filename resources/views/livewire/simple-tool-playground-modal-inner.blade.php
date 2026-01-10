@@ -325,48 +325,14 @@
                     </div>
                 @endif
 
-                {{-- Model selection moved here (left column removed from Chat tab) --}}
-                <div class="grid grid-cols-12 gap-4 mb-4">
-                    <div class="col-span-12 lg:col-span-4 min-h-0 border border-[var(--ui-border)] rounded-xl bg-[var(--ui-bg)] overflow-hidden">
-                        <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between">
-                            <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Model Auswahl</div>
-                            <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline">Reload</button>
-                        </div>
-                        <div class="p-4 space-y-4">
-                            <div>
-                                <div class="text-xs text-[var(--ui-muted)] mb-1">Ausgewählt (Drop Zone)</div>
-                                <div id="modelDropZone" class="min-h-[44px] px-3 py-2 rounded border border-dashed border-[var(--ui-border)] bg-[var(--ui-surface)] text-sm">
-                                    <span id="selectedModelLabel" class="text-[var(--ui-secondary)]">—</span>
-                                </div>
-                                <div class="mt-2 text-xs text-[var(--ui-muted)]">Drag ein Model aus der Liste hier rein (oder Doppelklick).</div>
-                            </div>
-
-                            <div class="pt-2 border-t border-[var(--ui-border)]">
-                                <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] mb-2">
-                                    Verfügbare Models
-                                    <span class="ml-2 text-[10px] font-normal text-[var(--ui-muted)]">
-                                        (DB: {{ ($coreAiModels ?? collect())->count() }})
-                                    </span>
-                                </div>
-                                <div id="modelsList" class="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
-                                    {{-- Server-side fallback (JS will replace on loadModels()) --}}
-                                    @if(($coreAiModels ?? collect())->count() > 0)
-                                        @foreach(($coreAiModels ?? collect())->unique('model_id') as $mm)
-                                            <div class="flex items-center justify-between gap-2 px-3 py-2 rounded border border-[var(--ui-border)] bg-[var(--ui-surface)] text-sm">
-                                                <span class="truncate">{{ $mm->model_id }}</span>
-                                                <span class="text-[10px] text-[var(--ui-muted)]">{{ $mm->provider?->key ?? '—' }}</span>
-                                            </div>
-                                        @endforeach
-                                    @else
-                                        <div class="text-xs text-[var(--ui-muted)]">Keine Models in DB – bitte zuerst syncen.</div>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
+                <div class="mb-4 text-xs text-[var(--ui-muted)] flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        Hier pflegst du Limits, Pricing und Param-Support (DB ist die Source of Truth).
+                        @if(!($canManageAiModels ?? false))
+                            <span class="ml-2 text-[var(--ui-danger)] font-semibold">Read-only (nur Root/Eltern-Team Owner darf speichern).</span>
+                        @endif
                     </div>
-                    <div class="col-span-12 lg:col-span-8 text-xs text-[var(--ui-muted)]">
-                        Hier pflegst du Preise/Default-Model. Die Auswahl wirkt sich direkt auf den Chat (Dropdown neben Input) und den Default aus.
-                    </div>
+                    <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline flex-shrink-0">Reload</button>
                 </div>
 
                 @if(($coreAiModels ?? collect())->count() === 0)
@@ -383,11 +349,9 @@
                                 <tr class="border-b border-[var(--ui-border)]/60">
                                     <th class="text-left py-2 pr-4 font-semibold">Provider</th>
                                     <th class="text-left py-2 pr-4 font-semibold">Model</th>
-                                    <th class="text-left py-2 pr-4 font-semibold">Context</th>
-                                    <th class="text-left py-2 pr-4 font-semibold">Max output</th>
-                                    <th class="text-left py-2 pr-4 font-semibold">Cutoff</th>
-                                    <th class="text-left py-2 pr-4 font-semibold">Pricing (manuell)</th>
-                                    <th class="text-left py-2 pr-4 font-semibold">Features</th>
+                                    <th class="text-left py-2 pr-4 font-semibold">Limits</th>
+                                    <th class="text-left py-2 pr-4 font-semibold">Pricing</th>
+                                    <th class="text-left py-2 pr-4 font-semibold">Param Support</th>
                                     <th class="text-left py-2 pr-4 font-semibold">Default</th>
                                     <th class="text-left py-2 pr-0 font-semibold">Status</th>
                                 </tr>
@@ -397,11 +361,7 @@
                                     @php
                                         $p = $m->provider?->key ?? '—';
                                         $isDefault = (int)($m->provider?->default_model_id ?? 0) === (int)$m->id;
-                                        $features = [];
-                                        if ($m->supports_reasoning_tokens) $features[] = 'reasoning';
-                                        if ($m->supports_streaming) $features[] = 'stream';
-                                        if ($m->supports_function_calling) $features[] = 'tools';
-                                        if ($m->supports_structured_outputs) $features[] = 'json';
+                                        $canEdit = (bool)($canManageAiModels ?? false);
                                     @endphp
                                     <tr class="border-b border-[var(--ui-border)]/40">
                                         <td class="py-2 pr-4">{{ $p }}</td>
@@ -409,56 +369,122 @@
                                             <div class="font-semibold">{{ $m->name }}</div>
                                             <div class="text-[10px] text-[var(--ui-muted)]">{{ $m->model_id }}</div>
                                         </td>
-                                        <td class="py-2 pr-4">{{ $m->context_window ? number_format($m->context_window) : '—' }}</td>
-                                        <td class="py-2 pr-4">{{ $m->max_output_tokens ? number_format($m->max_output_tokens) : '—' }}</td>
-                                        <td class="py-2 pr-4">{{ $m->knowledge_cutoff_date ? $m->knowledge_cutoff_date->format('Y-m-d') : '—' }}</td>
+                                        <td class="py-2 pr-4 align-top">
+                                            <div class="grid grid-cols-2 gap-2 min-w-[210px]">
+                                                <div>
+                                                    <div class="text-[10px] text-[var(--ui-muted)] mb-1">Context</div>
+                                                    <input
+                                                        class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs disabled:opacity-50"
+                                                        wire:model.defer="modelEdits.{{ $m->id }}.context_window"
+                                                        inputmode="numeric"
+                                                        @disabled(!$canEdit)
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <div class="text-[10px] text-[var(--ui-muted)] mb-1">Max out</div>
+                                                    <input
+                                                        class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs disabled:opacity-50"
+                                                        wire:model.defer="modelEdits.{{ $m->id }}.max_output_tokens"
+                                                        inputmode="numeric"
+                                                        @disabled(!$canEdit)
+                                                    />
+                                                </div>
+                                                <div class="col-span-2">
+                                                    <div class="text-[10px] text-[var(--ui-muted)] mb-1">Cutoff</div>
+                                                    <div class="text-[11px] text-[var(--ui-secondary)]">
+                                                        {{ $m->knowledge_cutoff_date ? $m->knowledge_cutoff_date->format('Y-m-d') : '—' }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
                                         <td class="py-2 pr-4 align-top">
                                             <div class="grid grid-cols-4 gap-2 items-end min-w-[420px]">
                                                 <div>
                                                     <div class="text-[10px] text-[var(--ui-muted)] mb-1">Währung</div>
                                                     <input
-                                                        class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs"
-                                                        wire:model.defer="pricingEdits.{{ $m->id }}.pricing_currency"
+                                                        class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs disabled:opacity-50"
+                                                        wire:model.defer="modelEdits.{{ $m->id }}.pricing_currency"
                                                         maxlength="3"
+                                                        @disabled(!$canEdit)
                                                     />
                                                 </div>
                                                 <div>
                                                     <div class="text-[10px] text-[var(--ui-muted)] mb-1">Input / 1M</div>
                                                     <input
-                                                        class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs"
-                                                        wire:model.defer="pricingEdits.{{ $m->id }}.price_input_per_1m"
+                                                        class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs disabled:opacity-50"
+                                                        wire:model.defer="modelEdits.{{ $m->id }}.price_input_per_1m"
                                                         inputmode="decimal"
+                                                        @disabled(!$canEdit)
                                                     />
                                                 </div>
                                                 <div>
                                                     <div class="text-[10px] text-[var(--ui-muted)] mb-1">Cached / 1M</div>
                                                     <input
-                                                        class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs"
-                                                        wire:model.defer="pricingEdits.{{ $m->id }}.price_cached_input_per_1m"
+                                                        class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs disabled:opacity-50"
+                                                        wire:model.defer="modelEdits.{{ $m->id }}.price_cached_input_per_1m"
                                                         inputmode="decimal"
+                                                        @disabled(!$canEdit)
                                                     />
                                                 </div>
                                                 <div>
                                                     <div class="text-[10px] text-[var(--ui-muted)] mb-1">Output / 1M</div>
                                                     <input
-                                                        class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs"
-                                                        wire:model.defer="pricingEdits.{{ $m->id }}.price_output_per_1m"
+                                                        class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs disabled:opacity-50"
+                                                        wire:model.defer="modelEdits.{{ $m->id }}.price_output_per_1m"
                                                         inputmode="decimal"
+                                                        @disabled(!$canEdit)
                                                     />
                                                 </div>
-                                                <div class="col-span-4 flex items-center justify-end gap-2">
+                                            </div>
+                                        </td>
+                                        <td class="py-2 pr-4 align-top">
+                                            <div class="grid grid-cols-2 gap-2 min-w-[240px]">
+                                                @php
+                                                    $tri = ['' => '—', '1' => 'ja', '0' => 'nein'];
+                                                @endphp
+                                                <div>
+                                                    <div class="text-[10px] text-[var(--ui-muted)] mb-1">temperature</div>
+                                                    <select class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs disabled:opacity-50" wire:model.defer="modelEdits.{{ $m->id }}.supports_temperature" @disabled(!$canEdit)>
+                                                        @foreach($tri as $k => $lbl)
+                                                            <option value="{{ $k }}">{{ $lbl }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <div class="text-[10px] text-[var(--ui-muted)] mb-1">top_p</div>
+                                                    <select class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs disabled:opacity-50" wire:model.defer="modelEdits.{{ $m->id }}.supports_top_p" @disabled(!$canEdit)>
+                                                        @foreach($tri as $k => $lbl)
+                                                            <option value="{{ $k }}">{{ $lbl }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <div class="text-[10px] text-[var(--ui-muted)] mb-1">presence_penalty</div>
+                                                    <select class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs disabled:opacity-50" wire:model.defer="modelEdits.{{ $m->id }}.supports_presence_penalty" @disabled(!$canEdit)>
+                                                        @foreach($tri as $k => $lbl)
+                                                            <option value="{{ $k }}">{{ $lbl }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <div class="text-[10px] text-[var(--ui-muted)] mb-1">frequency_penalty</div>
+                                                    <select class="w-full px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs disabled:opacity-50" wire:model.defer="modelEdits.{{ $m->id }}.supports_frequency_penalty" @disabled(!$canEdit)>
+                                                        @foreach($tri as $k => $lbl)
+                                                            <option value="{{ $k }}">{{ $lbl }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                <div class="col-span-2 flex items-center justify-end gap-2">
                                                     <button
                                                         type="button"
-                                                        class="px-3 py-1.5 rounded-md bg-[var(--ui-primary)] text-white text-xs hover:bg-opacity-90"
-                                                        wire:click="saveModelPricing({{ $m->id }})"
+                                                        class="px-3 py-1.5 rounded-md bg-[var(--ui-primary)] text-white text-xs hover:bg-opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                        wire:click="saveModelSettings({{ $m->id }})"
+                                                        @disabled(!$canEdit)
                                                     >
                                                         Speichern
                                                     </button>
                                                 </div>
                                             </div>
-                                        </td>
-                                        <td class="py-2 pr-4 text-[10px] text-[var(--ui-muted)]">
-                                            {{ count($features) ? implode(', ', $features) : '—' }}
                                         </td>
                                         <td class="py-2 pr-4">
                                             <button

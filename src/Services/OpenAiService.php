@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Tools\CoreContextTool;
 use Platform\Core\Tools\ToolRegistry;
+use Platform\Core\Models\CoreAiModel;
+use Platform\Core\Models\CoreAiProvider;
 
 class OpenAiService
 {
@@ -90,12 +92,8 @@ class OpenAiService
                 'stream' => false,
                 'max_output_tokens' => $options['max_tokens'] ?? 1000,
             ];
-            // Some models (e.g. gpt-5.2*) do not support temperature in the Responses API.
-            if (!str_starts_with($model, 'gpt-5.2') && array_key_exists('temperature', $options)) {
-                $payload['temperature'] = $options['temperature'];
-            } elseif (!str_starts_with($model, 'gpt-5.2') && !array_key_exists('temperature', $options)) {
-                $payload['temperature'] = 0.7;
-            }
+            // DB-driven parameter support (fallback: one retry stripping unsupported params).
+            $payload = $this->applySupportedSamplingParams($payload, $options);
             if (isset($options['tools']) && $options['tools'] === false) {
                 // Tools explizit deaktiviert - nichts hinzufügen
             } else {
@@ -131,6 +129,14 @@ class OpenAiService
             ]);
             
             $response = $this->http()->post($this->baseUrl . '/responses', $payload);
+
+            // Retry once without unsupported parameters (loose robustness).
+            if ($response->failed()) {
+                $retryPayload = $this->stripUnsupportedParamFromError($payload, $response->body());
+                if ($retryPayload !== null) {
+                    $response = $this->http()->post($this->baseUrl . '/responses', $retryPayload);
+                }
+            }
             
             // Debug: Log Response
             $rawBody = $response->body();
@@ -391,12 +397,8 @@ class OpenAiService
         if (isset($options['previous_response_id']) && is_string($options['previous_response_id']) && $options['previous_response_id'] !== '') {
             $payload['previous_response_id'] = $options['previous_response_id'];
         }
-        // Some models (e.g. gpt-5.2*) do not support temperature in the Responses API.
-        if (!str_starts_with($model, 'gpt-5.2') && array_key_exists('temperature', $options)) {
-            $payload['temperature'] = $options['temperature'];
-        } elseif (!str_starts_with($model, 'gpt-5.2') && !array_key_exists('temperature', $options)) {
-            $payload['temperature'] = 0.7;
-        }
+        // DB-driven parameter support (fallback: one retry stripping unsupported params).
+        $payload = $this->applySupportedSamplingParams($payload, $options);
 
         // Optional: enable reasoning signals in the Responses API (model-dependent)
         // Example: ['effort' => 'medium', 'summary' => 'auto']
@@ -459,6 +461,14 @@ class OpenAiService
         }
         
         $response = $this->http(withStream: true)->post($this->baseUrl . '/responses', $payload);
+
+        // Retry once without unsupported parameters (loose robustness).
+        if ($response->failed()) {
+            $retryPayload = $this->stripUnsupportedParamFromError($payload, $response->body());
+            if ($retryPayload !== null) {
+                $response = $this->http(withStream: true)->post($this->baseUrl . '/responses', $retryPayload);
+            }
+        }
         if ($response->failed()) {
             $errorBody = $response->body();
             $this->logApiError('OpenAI API Error (responses stream)', $response->status(), $errorBody);
@@ -520,6 +530,120 @@ class OpenAiService
             }
         }
         return $out;
+    }
+
+    /**
+     * Apply optional sampling params only if DB says they are supported for this model.
+     * If the DB field is NULL (unknown), we do NOT send that param automatically.
+     */
+    private function applySupportedSamplingParams(array $payload, array $options): array
+    {
+        $model = (string)($payload['model'] ?? '');
+        if ($model === '') {
+            return $payload;
+        }
+
+        // temperature
+        if (array_key_exists('temperature', $options)) {
+            if ($this->isParamSupportedByDb($model, 'temperature') === true) {
+                $payload['temperature'] = $options['temperature'];
+            } else {
+                unset($payload['temperature']);
+            }
+        }
+
+        // top_p
+        if (array_key_exists('top_p', $options)) {
+            if ($this->isParamSupportedByDb($model, 'top_p') === true) {
+                $payload['top_p'] = $options['top_p'];
+            } else {
+                unset($payload['top_p']);
+            }
+        }
+
+        // presence_penalty
+        if (array_key_exists('presence_penalty', $options)) {
+            if ($this->isParamSupportedByDb($model, 'presence_penalty') === true) {
+                $payload['presence_penalty'] = $options['presence_penalty'];
+            } else {
+                unset($payload['presence_penalty']);
+            }
+        }
+
+        // frequency_penalty
+        if (array_key_exists('frequency_penalty', $options)) {
+            if ($this->isParamSupportedByDb($model, 'frequency_penalty') === true) {
+                $payload['frequency_penalty'] = $options['frequency_penalty'];
+            } else {
+                unset($payload['frequency_penalty']);
+            }
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Map OpenAI error JSON { error: { param, message } } and return a payload with that param removed.
+     * Returns null if we cannot confidently strip.
+     */
+    private function stripUnsupportedParamFromError(array $payload, string $errorBody): ?array
+    {
+        try {
+            $err = json_decode($errorBody, true);
+            $param = $err['error']['param'] ?? null;
+            $msg = $err['error']['message'] ?? null;
+            if (!is_string($param) || $param === '') {
+                return null;
+            }
+            if (!is_string($msg) || !str_contains($msg, 'Unsupported parameter')) {
+                return null;
+            }
+            if (!array_key_exists($param, $payload)) {
+                return null;
+            }
+            $copy = $payload;
+            unset($copy[$param]);
+            return $copy;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * DB-driven parameter support flags (core_ai_models.*).
+     * Returns:
+     * - true: supported
+     * - false: not supported
+     * - null: unknown (do not send automatically)
+     */
+    private function isParamSupportedByDb(string $modelId, string $param): ?bool
+    {
+        $providerKey = 'openai';
+        $field = match ($param) {
+            'temperature' => 'supports_temperature',
+            'top_p' => 'supports_top_p',
+            'presence_penalty' => 'supports_presence_penalty',
+            'frequency_penalty' => 'supports_frequency_penalty',
+            default => null,
+        };
+        if ($field === null) {
+            return null;
+        }
+
+        try {
+            $row = CoreAiModel::query()
+                ->where('model_id', $modelId)
+                ->whereHas('provider', fn($q) => $q->where('key', $providerKey))
+                ->first([$field]);
+            if (!$row) {
+                return null;
+            }
+            // When column is NULL: unknown
+            $v = $row->{$field};
+            return is_bool($v) ? $v : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
     
     /**

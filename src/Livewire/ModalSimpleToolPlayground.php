@@ -23,6 +23,9 @@ class ModalSimpleToolPlayground extends Component
     /** @var array<int, array<string,mixed>> */
     public array $pricingEdits = [];
 
+    /** @var array<int, array<string,mixed>> */
+    public array $modelEdits = [];
+
     public ?string $pricingSaveMessage = null;
 
     public ?int $activeThreadId = null;
@@ -37,6 +40,7 @@ class ModalSimpleToolPlayground extends Component
 
         // Pre-fill pricing edits for the "Model settings" tab.
         $this->pricingEdits = [];
+        $this->modelEdits = [];
         $models = CoreAiModel::query()->orderBy('provider_id')->orderBy('model_id')->get();
         foreach ($models as $m) {
             $this->pricingEdits[(int)$m->id] = [
@@ -44,6 +48,20 @@ class ModalSimpleToolPlayground extends Component
                 'price_input_per_1m' => $m->price_input_per_1m,
                 'price_cached_input_per_1m' => $m->price_cached_input_per_1m,
                 'price_output_per_1m' => $m->price_output_per_1m,
+            ];
+            // Model settings edits (incl. param support flags)
+            $this->modelEdits[(int)$m->id] = [
+                'pricing_currency' => (string)($m->pricing_currency ?? 'USD'),
+                'price_input_per_1m' => $m->price_input_per_1m,
+                'price_cached_input_per_1m' => $m->price_cached_input_per_1m,
+                'price_output_per_1m' => $m->price_output_per_1m,
+                'context_window' => $m->context_window,
+                'max_output_tokens' => $m->max_output_tokens,
+                // tri-state select values: '' (unknown), '1' (true), '0' (false)
+                'supports_temperature' => $m->supports_temperature === null ? '' : ($m->supports_temperature ? '1' : '0'),
+                'supports_top_p' => $m->supports_top_p === null ? '' : ($m->supports_top_p ? '1' : '0'),
+                'supports_presence_penalty' => $m->supports_presence_penalty === null ? '' : ($m->supports_presence_penalty ? '1' : '0'),
+                'supports_frequency_penalty' => $m->supports_frequency_penalty === null ? '' : ($m->supports_frequency_penalty ? '1' : '0'),
             ];
         }
         $this->pricingSaveMessage = null;
@@ -225,6 +243,7 @@ class ModalSimpleToolPlayground extends Component
 
     public function saveModelPricing(int $coreAiModelId): void
     {
+        // Backwards-compatible: keep old method, but only update pricing fields.
         $this->pricingSaveMessage = null;
 
         $this->validate([
@@ -245,6 +264,67 @@ class ModalSimpleToolPlayground extends Component
         ]);
 
         $this->pricingSaveMessage = "✅ Preise gespeichert: {$m->model_id}";
+    }
+
+    public function saveModelSettings(int $coreAiModelId): void
+    {
+        $this->pricingSaveMessage = null;
+
+        if (!$this->canManageAiModels()) {
+            $this->pricingSaveMessage = '⛔️ Keine Berechtigung: nur Owner des Root/Eltern-Teams kann Model-Settings ändern.';
+            return;
+        }
+
+        $this->validate([
+            "modelEdits.{$coreAiModelId}.pricing_currency" => ['required', 'string', 'size:3'],
+            "modelEdits.{$coreAiModelId}.price_input_per_1m" => ['nullable', 'numeric', 'min:0'],
+            "modelEdits.{$coreAiModelId}.price_cached_input_per_1m" => ['nullable', 'numeric', 'min:0'],
+            "modelEdits.{$coreAiModelId}.price_output_per_1m" => ['nullable', 'numeric', 'min:0'],
+            "modelEdits.{$coreAiModelId}.context_window" => ['nullable', 'integer', 'min:1', 'max:2000000'],
+            "modelEdits.{$coreAiModelId}.max_output_tokens" => ['nullable', 'integer', 'min:1', 'max:200000'],
+            "modelEdits.{$coreAiModelId}.supports_temperature" => ['nullable', 'in:,0,1'],
+            "modelEdits.{$coreAiModelId}.supports_top_p" => ['nullable', 'in:,0,1'],
+            "modelEdits.{$coreAiModelId}.supports_presence_penalty" => ['nullable', 'in:,0,1'],
+            "modelEdits.{$coreAiModelId}.supports_frequency_penalty" => ['nullable', 'in:,0,1'],
+        ]);
+
+        $m = CoreAiModel::findOrFail($coreAiModelId);
+        $row = $this->modelEdits[$coreAiModelId] ?? [];
+
+        $toBoolOrNull = function ($v): ?bool {
+            if ($v === '' || $v === null) return null;
+            if ($v === true || $v === 1 || $v === '1') return true;
+            if ($v === false || $v === 0 || $v === '0') return false;
+            return null;
+        };
+
+        $m->update([
+            'pricing_currency' => strtoupper((string)($row['pricing_currency'] ?? 'USD')),
+            'price_input_per_1m' => ($row['price_input_per_1m'] ?? '') !== '' ? $row['price_input_per_1m'] : null,
+            'price_cached_input_per_1m' => ($row['price_cached_input_per_1m'] ?? '') !== '' ? $row['price_cached_input_per_1m'] : null,
+            'price_output_per_1m' => ($row['price_output_per_1m'] ?? '') !== '' ? $row['price_output_per_1m'] : null,
+            'context_window' => ($row['context_window'] ?? '') !== '' ? (int)$row['context_window'] : null,
+            'max_output_tokens' => ($row['max_output_tokens'] ?? '') !== '' ? (int)$row['max_output_tokens'] : null,
+            'supports_temperature' => $toBoolOrNull($row['supports_temperature'] ?? null),
+            'supports_top_p' => $toBoolOrNull($row['supports_top_p'] ?? null),
+            'supports_presence_penalty' => $toBoolOrNull($row['supports_presence_penalty'] ?? null),
+            'supports_frequency_penalty' => $toBoolOrNull($row['supports_frequency_penalty'] ?? null),
+        ]);
+
+        $this->pricingSaveMessage = "✅ Model settings gespeichert: {$m->model_id}";
+    }
+
+    public function canManageAiModels(): bool
+    {
+        $user = Auth::user();
+        if (!$user) return false;
+        $team = $user->currentTeam; // dynamic (root-scoped aware), but for core we want root owner anyway
+        if (!$team) return false;
+        $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+        return $rootTeam->users()
+            ->where('user_id', $user->id)
+            ->wherePivot('role', \Platform\Core\Enums\TeamRole::OWNER->value)
+            ->exists();
     }
 
     public function setDefaultModel(int $coreAiModelId): void
@@ -290,6 +370,7 @@ class ModalSimpleToolPlayground extends Component
             'activeThreadModel' => $activeThreadModel,
             'defaultModelId' => $defaultModelId,
             'activeThreadMessages' => $this->activeThreadMessages,
+            'canManageAiModels' => $this->canManageAiModels(),
         ]);
     }
 }
