@@ -215,6 +215,8 @@ class CoreServiceProvider extends ServiceProvider
             // Wenn bereits Modul-Tools registriert wurden, dürfen wir NICHT sofort returnen,
             // sonst fehlen die Core/Discovery-Tools (tools.GET, core.teams.GET, ...).
             // Wir skippen nur, wenn die Discovery-Tools bereits vorhanden sind.
+            // WICHTIG: Core-Tools werden trotzdem idempotent registriert, damit Core-Write-Tools
+            // (z.B. core.teams.POST) über tools.GET discoverbar bleiben.
             $hasDiscoveryTools =
                 $registry->has('tools.GET') &&
                 $registry->has('tools.request') &&
@@ -226,19 +228,18 @@ class CoreServiceProvider extends ServiceProvider
             // 1. Auto-Discovery: Lade Tools automatisch aus Core (und Module nur, wenn Registry leer ist)
             try {
                 // 1.1: Core-Tools laden (LOOSE COUPLED - automatisch aus Verzeichnis)
-                if (!$hasDiscoveryTools) {
-                    $coreTools = \Platform\Core\Tools\ToolLoader::loadCoreTools();
-                    foreach ($coreTools as $tool) {
-                        try {
-                            if (!$registry->has($tool->getName())) {
-                                $registry->register($tool);
-                            }
-                        } catch (\Throwable $e) {
-                            \Log::warning("[ToolRegistry] Core-Tool konnte nicht registriert werden", [
-                                'tool' => get_class($tool),
-                                'error' => $e->getMessage()
-                            ]);
+                // WICHTIG: immer laden (idempotent), auch wenn Discovery-Tools bereits vorhanden sind.
+                $coreTools = \Platform\Core\Tools\ToolLoader::loadCoreTools();
+                foreach ($coreTools as $tool) {
+                    try {
+                        if (!$registry->has($tool->getName())) {
+                            $registry->register($tool);
                         }
+                    } catch (\Throwable $e) {
+                        \Log::warning("[ToolRegistry] Core-Tool konnte nicht registriert werden", [
+                            'tool' => get_class($tool),
+                            'error' => $e->getMessage()
+                        ]);
                     }
                 }
                 
