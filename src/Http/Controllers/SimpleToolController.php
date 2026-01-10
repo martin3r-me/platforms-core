@@ -85,10 +85,33 @@ class SimpleToolController extends Controller
             $iteration++;
 
             try {
+                // max_output_tokens:
+                // - kann pro Request überschrieben werden (max_output_tokens oder max_tokens legacy)
+                // - Default kommt aus core_ai_models.max_output_tokens (Model Settings)
+                // - Fallback: 2000 (bisheriges Verhalten)
+                $requestedMax = $request->input('max_output_tokens', $request->input('max_tokens', null));
+                $requestedMax = is_numeric($requestedMax) ? (int) $requestedMax : null;
+
+                $modelRow = \Platform\Core\Models\CoreAiModel::query()
+                    ->where('model_id', 'gpt-5.2')
+                    ->where('is_active', true)
+                    ->where('is_deprecated', false)
+                    ->first();
+                $modelCap = $modelRow?->max_output_tokens ? (int) $modelRow->max_output_tokens : null;
+
+                $defaultMax = $modelCap ?: 2000;
+                $maxOutputTokens = $requestedMax ?: $defaultMax;
+                if ($modelCap) {
+                    $maxOutputTokens = min($maxOutputTokens, $modelCap);
+                }
+                // Guardrails against accidental extremes / invalid values
+                if ($maxOutputTokens < 64) { $maxOutputTokens = 64; }
+                if ($maxOutputTokens > 200000) { $maxOutputTokens = 200000; }
+
                 // LLM aufrufen
                 // Simple Playground: fixed model for now (explicit user request)
                 $response = $openAiService->chat($messages, 'gpt-5.2', [
-                    'max_tokens' => 2000,
+                    'max_tokens' => $maxOutputTokens,
                     'temperature' => 0.7,
                     'tools' => false, // Tools komplett aus
                     'with_context' => false,
@@ -558,6 +581,7 @@ class SimpleToolController extends Controller
                     $currentStreamingToolId = null;   // item.id
                     $currentStreamingCallId = null;   // item.call_id
                     $currentResponseId = null;
+                    $incompleteReason = null;
 
                     $sendEvent('assistant.reset', []);
                     $sendEvent('reasoning.reset', []);
@@ -644,74 +668,122 @@ class SimpleToolController extends Controller
                     }
 
                     try {
-                        // Tool-call args can be interleaved; we need a stable map item_id -> call_id across events.
-                        $toolCallIdByItemId = [];
-                        $openAiService->streamChat(
-                            $messagesForApi,
-                            function(string $delta) use ($sendEvent, &$assistant) {
-                                $assistant .= $delta;
-                                $sendEvent('assistant.delta', ['delta' => $delta, 'content' => $assistant]);
-                            },
-                            $model,
-                            [
-                                'include_web_search' => true,
-                                'max_tokens' => 2000,
-                                'with_context' => false,
-                                    // Parität zum Terminal: Kontext wird mitgeführt (ohne Auto-Injection).
-                                    'source_route' => $sourceRoute,
-                                    'source_module' => $sourceModule,
-                                'previous_response_id' => $previousResponseId,
-                                'reasoning' => [
-                                    'effort' => 'medium',
-                                ],
-                                'on_debug' => function(?string $event, array $decoded) use (
-                                    $sendEvent,
-                                    &$debugEventCount,
-                                    &$usageAggregate,
-                                    &$seenUsageResponseIds,
-                                    &$iteration,
-                                    &$toolCallsCollector,
-                                    &$toolCallIdByItemId,
-                                    &$currentStreamingToolCall,
-                                    &$currentStreamingToolId,
-                                    &$currentStreamingCallId,
-                                    &$currentResponseId
-                                ) {
-                                    $event = $event ?? '';
-                                    if ($debugEventCount < 2000) {
-                                        $debugEventCount++;
-                                        $preview = [
-                                            'keys' => array_keys($decoded),
-                                            'type' => $decoded['type'] ?? ($decoded['item']['type'] ?? null),
-                                            'id' => $decoded['id'] ?? ($decoded['item']['id'] ?? ($decoded['item_id'] ?? null)),
-                                            'item_id' => $decoded['item_id'] ?? null,
-                                            'call_id' => $decoded['call_id'] ?? ($decoded['item']['call_id'] ?? null),
-                                            'name' => $decoded['name'] ?? ($decoded['item']['name'] ?? null),
-                                            'status' => $decoded['status'] ?? null,
-                                            'sequence_number' => $decoded['sequence_number'] ?? null,
-                                            'output_index' => $decoded['output_index'] ?? null,
-                                            'response_id' => $decoded['response']['id'] ?? null,
-                                            'model' => $decoded['response']['model'] ?? ($decoded['model'] ?? null),
-                                            'query' => $decoded['query'] ?? ($decoded['input']['query'] ?? ($decoded['item']['query'] ?? null)),
-                                        ];
-                                        $raw = json_encode($decoded, JSON_UNESCAPED_UNICODE);
-                                        if (is_string($raw) && strlen($raw) > 4000) {
-                                            $raw = substr($raw, 0, 4000) . '…';
-                                        }
-                                        $sendEvent('openai.event', [
-                                            'event' => $event,
-                                            'preview' => array_filter($preview, fn($v) => $v !== null && $v !== ''),
-                                            'raw' => $raw,
-                                        ]);
-                                    }
+                        // Auto-Continuation (max_output_tokens):
+                        // Wenn ein Response wegen max_output_tokens abgeschnitten wird und keine Tool-Calls anstehen,
+                        // dann streamen wir automatisch weiter via previous_response_id, ohne UI-Reset.
+                        $maxOutputContinuations = 12;
+                        $continuationPass = 0;
+                        $passPreviousResponseId = $previousResponseId;
+                        $passMessagesForApi = $messagesForApi;
 
-                                    // Capture response id so we can continue via previous_response_id (best practice)
-                                    if ($event === 'response.created') {
-                                        $rid = $decoded['response']['id'] ?? null;
-                                        if (is_string($rid) && $rid !== '') {
-                                            $currentResponseId = $rid;
+                        while (true) {
+                            $continuationPass++;
+                            if ($continuationPass > $maxOutputContinuations) {
+                                break;
+                            }
+
+                            $incompleteReason = null;
+                            $currentResponseId = null;
+
+                            // Tool-call args can be interleaved; we need a stable map item_id -> call_id across events.
+                            $toolCallIdByItemId = [];
+
+                            $openAiService->streamChat(
+                                $passMessagesForApi,
+                                function(string $delta) use ($sendEvent, &$assistant) {
+                                    $assistant .= $delta;
+                                    $sendEvent('assistant.delta', ['delta' => $delta, 'content' => $assistant]);
+                                },
+                                $model,
+                                [
+                                    'include_web_search' => true,
+                                    // max_output_tokens kommt aus core_ai_models.max_output_tokens (Model Settings),
+                                    // kann aber pro Request via max_output_tokens überschrieben werden.
+                                    'max_tokens' => (function () use ($request, $model) {
+                                        $requestedMax = $request->input('max_output_tokens', $request->input('max_tokens', null));
+                                        $requestedMax = is_numeric($requestedMax) ? (int) $requestedMax : null;
+
+                                        $modelRow = \Platform\Core\Models\CoreAiModel::query()
+                                            ->where('model_id', $model)
+                                            ->where('is_active', true)
+                                            ->where('is_deprecated', false)
+                                            ->first();
+                                        $modelCap = $modelRow?->max_output_tokens ? (int) $modelRow->max_output_tokens : null;
+
+                                        $defaultMax = $modelCap ?: 2000;
+                                        $maxOutputTokens = $requestedMax ?: $defaultMax;
+                                        if ($modelCap) {
+                                            $maxOutputTokens = min($maxOutputTokens, $modelCap);
                                         }
-                                    }
+                                        if ($maxOutputTokens < 64) { $maxOutputTokens = 64; }
+                                        if ($maxOutputTokens > 200000) { $maxOutputTokens = 200000; }
+                                        return $maxOutputTokens;
+                                    })(),
+                                    'with_context' => false,
+                                        // Parität zum Terminal: Kontext wird mitgeführt (ohne Auto-Injection).
+                                        'source_route' => $sourceRoute,
+                                        'source_module' => $sourceModule,
+                                    'previous_response_id' => $passPreviousResponseId,
+                                    'reasoning' => [
+                                        'effort' => 'medium',
+                                    ],
+                                    'on_debug' => function(?string $event, array $decoded) use (
+                                        $sendEvent,
+                                        &$debugEventCount,
+                                        &$usageAggregate,
+                                        &$seenUsageResponseIds,
+                                        &$iteration,
+                                        &$toolCallsCollector,
+                                        &$toolCallIdByItemId,
+                                        &$currentStreamingToolCall,
+                                        &$currentStreamingToolId,
+                                        &$currentStreamingCallId,
+                                        &$currentResponseId,
+                                        &$incompleteReason
+                                    ) {
+                                        $event = $event ?? '';
+                                        if ($debugEventCount < 2000) {
+                                            $debugEventCount++;
+                                            $preview = [
+                                                'keys' => array_keys($decoded),
+                                                'type' => $decoded['type'] ?? ($decoded['item']['type'] ?? null),
+                                                'id' => $decoded['id'] ?? ($decoded['item']['id'] ?? ($decoded['item_id'] ?? null)),
+                                                'item_id' => $decoded['item_id'] ?? null,
+                                                'call_id' => $decoded['call_id'] ?? ($decoded['item']['call_id'] ?? null),
+                                                'name' => $decoded['name'] ?? ($decoded['item']['name'] ?? null),
+                                                'status' => $decoded['status'] ?? null,
+                                                'sequence_number' => $decoded['sequence_number'] ?? null,
+                                                'output_index' => $decoded['output_index'] ?? null,
+                                                'response_id' => $decoded['response']['id'] ?? null,
+                                                'model' => $decoded['response']['model'] ?? ($decoded['model'] ?? null),
+                                                'query' => $decoded['query'] ?? ($decoded['input']['query'] ?? ($decoded['item']['query'] ?? null)),
+                                            ];
+                                            $raw = json_encode($decoded, JSON_UNESCAPED_UNICODE);
+                                            if (is_string($raw) && strlen($raw) > 4000) {
+                                                $raw = substr($raw, 0, 4000) . '…';
+                                            }
+                                            $sendEvent('openai.event', [
+                                                'event' => $event,
+                                                'preview' => array_filter($preview, fn($v) => $v !== null && $v !== ''),
+                                                'raw' => $raw,
+                                            ]);
+                                        }
+
+                                        // Capture response id so we can continue via previous_response_id (best practice)
+                                        if ($event === 'response.created') {
+                                            $rid = $decoded['response']['id'] ?? null;
+                                            if (is_string($rid) && $rid !== '') {
+                                                $currentResponseId = $rid;
+                                            }
+                                        }
+
+                                        // Detect truncation (max_output_tokens) so we can auto-continue.
+                                        if ($event === 'response.incomplete') {
+                                            $reason = $decoded['response']['incomplete_details']['reason'] ?? null;
+                                            if (is_string($reason) && $reason !== '') {
+                                                $incompleteReason = $reason;
+                                            }
+                                        }
 
                                     // Aggregate token usage across the whole request.
                                     // Usage usually appears on response.completed, but we handle any event carrying it.
@@ -830,17 +902,37 @@ class SimpleToolController extends Controller
                                             $toolCallsCollector[$callId]['arguments'] = $args;
                                         }
                                     }
-                                },
-                                'on_reasoning_delta' => function(string $delta) use ($sendEvent, &$reasoning) {
-                                    $reasoning .= $delta;
-                                    $sendEvent('reasoning.delta', ['delta' => $delta, 'content' => $reasoning]);
-                                },
-                                'on_thinking_delta' => function(string $delta) use ($sendEvent, &$thinking) {
-                                    $thinking .= $delta;
-                                    $sendEvent('thinking.delta', ['delta' => $delta, 'content' => $thinking]);
-                                },
-                            ]
-                        );
+                                    },
+                                    'on_reasoning_delta' => function(string $delta) use ($sendEvent, &$reasoning) {
+                                        $reasoning .= $delta;
+                                        $sendEvent('reasoning.delta', ['delta' => $delta, 'content' => $reasoning]);
+                                    },
+                                    'on_thinking_delta' => function(string $delta) use ($sendEvent, &$thinking) {
+                                        $thinking .= $delta;
+                                        $sendEvent('thinking.delta', ['delta' => $delta, 'content' => $thinking]);
+                                    },
+                                ]
+                            );
+
+                            // Auto-continue only if we were truncated by max_output_tokens and there are no tool calls.
+                            if (empty($toolCallsCollector) && $incompleteReason === 'max_output_tokens' && is_string($currentResponseId) && $currentResponseId !== '') {
+                                $sendEvent('openai.event', [
+                                    'event' => 'server.output.continue',
+                                    'preview' => [
+                                        'iteration' => $iteration,
+                                        'pass' => $continuationPass,
+                                        'reason' => $incompleteReason,
+                                    ],
+                                    'raw' => null,
+                                ]);
+                                // Continue from the last response without re-sending the whole input.
+                                $passPreviousResponseId = $currentResponseId;
+                                $passMessagesForApi = [];
+                                continue;
+                            }
+
+                            break;
+                        }
                     } catch (\Throwable $e) {
                         $sendEvent('error', [
                             'error' => 'OpenAI stream failed: ' . $e->getMessage(),
