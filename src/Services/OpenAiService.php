@@ -470,7 +470,20 @@ class OpenAiService
             }
         }
         if ($response->failed()) {
+            // IMPORTANT: When using Laravel HTTP client with stream=true, body() can be empty on 4xx/5xx.
+            // Try to read from the PSR response body stream to capture the actual OpenAI error JSON.
             $errorBody = $response->body();
+            if (!is_string($errorBody)) { $errorBody = ''; }
+            if (trim($errorBody) === '') {
+                try {
+                    $psrBody = $response->toPsrResponse()->getBody();
+                    if (is_object($psrBody) && method_exists($psrBody, 'getContents')) {
+                        $errorBody = (string) $psrBody->getContents();
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+            }
             $this->logApiError('OpenAI API Error (responses stream)', $response->status(), $errorBody);
             
             // Debug: Zeige vollständige Fehlerantwort
