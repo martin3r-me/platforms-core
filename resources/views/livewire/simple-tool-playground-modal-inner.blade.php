@@ -112,24 +112,7 @@
                                     @endforeach
                                 </div>
 
-                                {{-- Live streaming output (only appears when data exists; not persisted to DB) --}}
-                                <div id="pgLiveBox" class="hidden pt-3 border-t border-[var(--ui-border)]/60 space-y-3">
-                                    <div class="text-xs font-semibold text-[var(--ui-secondary)]">Live</div>
-                                    <div id="pgLiveAssistantWrap" class="hidden min-w-0">
-                                        <div class="text-[11px] font-semibold text-[var(--ui-muted)] mb-1">Assistant (stream)</div>
-                                        <pre id="rtAssistant" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[70px] max-h-[20vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-3 min-w-0">
-                                        <div id="pgLiveReasoningWrap" class="hidden min-w-0">
-                                            <div class="text-[11px] font-semibold text-[var(--ui-muted)] mb-1">Reasoning (stream)</div>
-                                            <pre id="rtReasoning" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[56px] max-h-[14vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
-                                        </div>
-                                        <div id="pgLiveThinkingWrap" class="hidden min-w-0">
-                                            <div class="text-[11px] font-semibold text-[var(--ui-muted)] mb-1">Thinking (stream)</div>
-                                            <pre id="rtThinking" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[56px] max-h-[14vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
-                                        </div>
-                                    </div>
-                                </div>
+                                {{-- Streaming happens as a live assistant message in the chat (JS). --}}
                                 <div id="chatEmpty" class="text-sm text-[var(--ui-muted)]" style="{{ $msgs->count() ? 'display:none;' : '' }}">
                                     <div class="font-semibold text-[var(--ui-secondary)]">Start</div>
                                     <div class="mt-1">Schreib eine Nachricht (z. B. „Liste meine Teams“ oder „Welche Tools kann ich im OKR-Modul nutzen?“).</div>
@@ -196,8 +179,8 @@
             </div>
 
             {{-- Footer: same look/spacing as header, full width of the Chat tab (spans Chat + Debug) --}}
-            <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
-                <div class="flex items-center gap-3 min-w-0">
+            <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 flex items-center justify-end flex-shrink-0">
+                <div class="flex items-center gap-3 min-w-0 justify-end">
                     {{-- Usage (Total + Request): compact, next to Event --}}
                     <div class="hidden" id="rtTokensInTotal">—</div>
                     <div class="hidden" id="rtTokensOutTotal">—</div>
@@ -235,12 +218,12 @@
                         <span id="rtCostRequest" class="text-[10px] font-semibold text-[var(--ui-secondary)]">—</span>
                     </div>
 
-                    {{-- Pulsing Stop button = running indicator + abort --}}
-                    <div id="pgFooterBusy" class="hidden flex items-center flex-shrink-0">
+                    {{-- Stop button = running indicator + abort (always visible, pulses when running) --}}
+                    <div id="pgFooterBusy" class="flex items-center flex-shrink-0">
                         <button
                             type="button"
                             id="pgStopBtn"
-                            class="px-2 py-1 rounded border border-red-200 bg-[var(--ui-bg)] text-red-600 text-[10px] font-semibold hover:bg-red-50 animate-pulse disabled:opacity-40 disabled:cursor-not-allowed"
+                            class="px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] text-[10px] font-semibold hover:text-red-600 hover:border-red-200 hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed"
                             title="Stop"
                             disabled
                         >
@@ -248,11 +231,13 @@
                         </button>
                     </div>
 
+                    <div class="flex items-center gap-1 px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
+                        <span class="text-[10px] text-[var(--ui-muted)]">t:</span>
+                        <span id="pgFooterSeconds" class="text-[10px] font-mono text-[var(--ui-secondary)]">0s</span>
+                    </div>
                     <div class="flex items-center gap-1 px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] min-w-0">
                         <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0">Event:</span>
                         <span id="pgFooterEventText" class="text-[10px] font-mono text-[var(--ui-secondary)] truncate">—</span>
-                        <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0">·</span>
-                        <span id="pgFooterSeconds" class="text-[10px] font-mono text-[var(--ui-secondary)] flex-shrink-0">0s</span>
                     </div>
                 </div>
             </div>
@@ -533,6 +518,7 @@
         if (!alreadyBound) form.dataset.simplePlaygroundBound = '1';
 
         const realtimeClear = document.getElementById('realtimeClear');
+        // NOTE: assistant streaming is rendered as a live chat message; rtAssistant is legacy/optional.
         const rtAssistant = document.getElementById('rtAssistant');
         const rtReasoning = document.getElementById('rtReasoning');
         const rtThinking = document.getElementById('rtThinking');
@@ -623,6 +609,41 @@
           scrollToBottom();
         };
 
+        // Streaming assistant message in chat (ephemeral: not persisted to DB).
+        const ensureStreamingAssistantMessage = () => {
+          refreshDomRefs();
+          if (!chatList) return null;
+          let el = document.getElementById('pgStreamingAssistantMsg');
+          if (el) return el;
+          const wrap = document.createElement('div');
+          wrap.id = 'pgStreamingAssistantMsg';
+          wrap.className = 'flex justify-start';
+          wrap.innerHTML = `
+            <div class="max-w-4xl rounded-lg p-3 break-words overflow-hidden bg-[var(--ui-surface)] border border-[var(--ui-border)]">
+              <div class="text-sm font-semibold mb-1 flex items-center gap-2">
+                <span>Assistant</span>
+                <span class="text-[10px] text-[var(--ui-muted)]">(läuft)</span>
+              </div>
+              <div class="whitespace-pre-wrap break-words" data-stream-content></div>
+            </div>
+          `;
+          chatList.appendChild(wrap);
+          const empty = document.getElementById('chatEmpty');
+          if (empty) empty.style.display = 'none';
+          scrollToBottom();
+          return wrap;
+        };
+        const updateStreamingAssistantMessage = (text) => {
+          const el = ensureStreamingAssistantMessage();
+          if (!el) return;
+          const c = el.querySelector('[data-stream-content]');
+          if (c) c.textContent = text || '';
+        };
+        const removeStreamingAssistantMessage = () => {
+          const el = document.getElementById('pgStreamingAssistantMsg');
+          if (el && el.parentNode) el.parentNode.removeChild(el);
+        };
+
         const refreshThreadIdFromDom = () => {
           const el = document.getElementById('pgActiveThreadId');
           const raw = (el && typeof el.value === 'string') ? el.value : '';
@@ -650,13 +671,17 @@
           const tid = refreshThreadIdFromDom();
           const st = getThreadState(tid || 'none');
           const busy = !!(st && st.inFlight);
-          if (el) {
-            if (busy) el.classList.remove('hidden');
-            else el.classList.add('hidden');
-          }
+          // Footer stop button wrapper is always visible; we only toggle styling.
           if (stopBtn) {
             // Enable Stop if this thread is in-flight OR we have an abortController (safety net)
             stopBtn.disabled = !(busy || !!st?.abortController);
+            if (busy) {
+              stopBtn.classList.add('animate-pulse', 'text-red-600', 'border-red-200');
+              stopBtn.classList.remove('text-[var(--ui-muted)]', 'border-[var(--ui-border)]');
+            } else {
+              stopBtn.classList.remove('animate-pulse', 'text-red-600', 'border-red-200');
+              stopBtn.classList.add('text-[var(--ui-muted)]', 'border-[var(--ui-border)]');
+            }
           }
         };
 
@@ -824,6 +849,7 @@
         };
 
         const resetRealtime = () => {
+          removeStreamingAssistantMessage();
           if (rtAssistant) rtAssistant.textContent = '';
           if (rtReasoning) rtReasoning.textContent = '';
           if (rtThinking) rtThinking.textContent = '';
@@ -857,7 +883,6 @@
             threadState.live.reasoning = '';
             threadState.live.thinking = '';
           } catch (_) {}
-          updateLiveVisibility();
         };
 
         if (realtimeClear) realtimeClear.addEventListener('click', resetRealtime);
@@ -1038,11 +1063,16 @@
           renderChatFromState();
           updateThreadBusyIndicators();
           updateFooterBusy();
-          updateLiveVisibility();
           // Restore last event label after DOM re-render (prevents "Event: —" during active stream).
           try {
             const last = window.__simplePlaygroundLastEvent?.key;
             if (last) setEventLabel(last);
+          } catch (_) {}
+          // Repaint streaming assistant if still running
+          try {
+            const st = getThreadState(currentThreadId || 'none');
+            if (st?.inFlight) updateStreamingAssistantMessage(st.live?.assistant || '');
+            else removeStreamingAssistantMessage();
           } catch (_) {}
           if (currentThreadId !== lastThreadId) {
             // Do NOT reset: keep per-thread state alive.
@@ -1133,6 +1163,13 @@
           if (!isContinue) {
             threadState.messages.push({ role: 'user', content: text });
             renderMessage('user', text);
+            // Remember what we just added, so we can revert it on Abort (and avoid polluting DB/history).
+            try {
+              refreshDomRefs();
+              threadState._lastSentUserContent = text;
+              threadState._lastSentUserIndex = (threadState.messages?.length || 1) - 1;
+              threadState._lastSentUserEl = chatList?.lastElementChild || null;
+            } catch (_) {}
             input.value = '';
           }
 
@@ -1245,11 +1282,11 @@
                     setEventLabel('assistant.delta');
                     if (data?.delta) {
                       threadState.live.assistant += data.delta;
-                      // Update DOM only if we are currently viewing this thread
-                      if (refreshThreadIdFromDom() === currentThreadId && rtAssistant) rtAssistant.textContent = threadState.live.assistant;
+                      if (refreshThreadIdFromDom() === currentThreadId) {
+                        updateStreamingAssistantMessage(threadState.live.assistant);
+                      }
                     }
-                    debugState.lastAssistant = rtAssistant.textContent;
-                    updateLiveVisibility();
+                    debugState.lastAssistant = threadState.live.assistant;
                     break;
                   case 'reasoning.delta':
                     setEventLabel('reasoning.delta');
@@ -1257,7 +1294,6 @@
                       threadState.live.reasoning += data.delta;
                       if (refreshThreadIdFromDom() === currentThreadId && rtReasoning) rtReasoning.textContent = threadState.live.reasoning;
                     }
-                    updateLiveVisibility();
                     break;
                   case 'thinking.delta':
                     setEventLabel('thinking.delta');
@@ -1265,7 +1301,6 @@
                       threadState.live.thinking += data.delta;
                       if (refreshThreadIdFromDom() === currentThreadId && rtThinking) rtThinking.textContent = threadState.live.thinking;
                     }
-                    updateLiveVisibility();
                     break;
                   case 'debug.tools':
                     setEventLabel('debug.tools');
@@ -1418,13 +1453,14 @@
                   }
                   case 'complete': {
                     setEventLabel('complete');
-                    const assistant = data?.assistant || rtAssistant.textContent;
+                    const assistant = data?.assistant || threadState.live.assistant || '';
                     threadState.messages.push({ role: 'assistant', content: assistant });
+                    removeStreamingAssistantMessage();
                     renderMessage('assistant', assistant);
                     threadState.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';
                     updateDebugDump();
-                    updateLiveVisibility();
+                    try { threadState.live.assistant = ''; } catch (_) {}
                     break;
                   }
                   case 'error': {
@@ -1434,7 +1470,7 @@
                     renderMessage('assistant', `❌ Fehler: ${msg}`);
                     if (rtStatus) rtStatus.textContent = 'error';
                     updateDebugDump();
-                    updateLiveVisibility();
+                    removeStreamingAssistantMessage();
                     break;
                   }
                   default:
@@ -1446,9 +1482,35 @@
           } catch (e) {
             // Abort is expected (Stop button)
             if (e && (e.name === 'AbortError' || threadState.userAborted)) {
-              threadState.messages.push({ role: 'assistant', content: '⛔️ Abgebrochen.' });
-              renderMessage('assistant', '⛔️ Abgebrochen.');
+              // Revert last user message from UI+history (the server also deletes it for this request).
+              try {
+                const idx = threadState._lastSentUserIndex;
+                const last = (typeof idx === 'number' && idx >= 0) ? threadState.messages[idx] : null;
+                if (last && last.role === 'user' && last.content === threadState._lastSentUserContent) {
+                  threadState.messages.splice(idx, 1);
+                } else if (threadState.messages?.length && threadState.messages[threadState.messages.length - 1]?.role === 'user') {
+                  threadState.messages.pop();
+                }
+                if (threadState._lastSentUserEl && threadState._lastSentUserEl.parentNode) {
+                  threadState._lastSentUserEl.parentNode.removeChild(threadState._lastSentUserEl);
+                }
+                threadState._lastSentUserEl = null;
+                threadState._lastSentUserIndex = null;
+                threadState._lastSentUserContent = null;
+              } catch (_) {}
+
+              // Show status via footer/event (no persistence in chat_history)
+              try { setEventLabel('abgebrochen'); } catch (_) {}
               if (rtStatus) rtStatus.textContent = 'abgebrochen';
+              // Clear any partial live stream buffers
+              try {
+                threadState.live.assistant = '';
+                threadState.live.reasoning = '';
+                threadState.live.thinking = '';
+                if (rtAssistant) rtAssistant.textContent = '';
+                if (rtReasoning) rtReasoning.textContent = '';
+                if (rtThinking) rtThinking.textContent = '';
+              } catch (_) {}
             } else {
               threadState.messages.push({ role: 'assistant', content: `❌ Fehler: ${e?.message || 'Unbekannter Fehler'}` });
               renderMessage('assistant', `❌ Fehler: ${e?.message || 'Unbekannter Fehler'}`);

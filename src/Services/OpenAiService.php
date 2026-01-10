@@ -503,7 +503,20 @@ class OpenAiService
             }
             throw new \Exception($errorMessage);
         }
-        $this->parseResponsesStream($response->toPsrResponse()->getBody(), $onDelta, $messages, $options);
+        $body = $response->toPsrResponse()->getBody();
+        try {
+            $this->parseResponsesStream($body, $onDelta, $messages, $options);
+        } finally {
+            // Ensure we close the upstream stream when the client aborts (or any exception occurs).
+            // This gives OpenAI a chance to stop generating and releases resources immediately.
+            try {
+                if (is_object($body) && method_exists($body, 'close')) {
+                    $body->close();
+                }
+            } catch (\Throwable $e) {
+                // ignore
+            }
+        }
     }
 
     private function normalizeToolsForResponses(array $tools): array
@@ -707,12 +720,36 @@ class OpenAiService
         $onThinkingDelta = $options['on_thinking_delta'] ?? null;   // z.B. reasoning_text
         $eventCount = 0;
         $deltaCount = 0;
+        $shouldAbort = $options['should_abort'] ?? null;
         while (!$body->eof()) {
+            // Abort even if the OpenAI stream is currently silent (no events) – important for "Stop" UX.
+            if (is_callable($shouldAbort)) {
+                try {
+                    if ($shouldAbort()) {
+                        throw new \RuntimeException('__CLIENT_ABORTED__');
+                    }
+                } catch (\RuntimeException $e) {
+                    throw $e;
+                } catch (\Throwable $e) {
+                    // ignore abort callback errors
+                }
+            }
             $chunk = $body->read(8192); if ($chunk === '' || $chunk === false) { usleep(10000); continue; }
             $buffer .= str_replace(["\r\n","\r"], "\n", $chunk);
             while (($pos = strpos($buffer, "\n")) !== false) {
                 $line = substr($buffer, 0, $pos); $buffer = substr($buffer, $pos + 1);
                 if ($line === '') { continue; }
+                if (is_callable($shouldAbort)) {
+                    try {
+                        if ($shouldAbort()) {
+                            throw new \RuntimeException('__CLIENT_ABORTED__');
+                        }
+                    } catch (\RuntimeException $e) {
+                        throw $e;
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                }
                 
                 // SSE Format: event: <name> oder data: <json>
                 if (strncmp($line, 'event:', 6) === 0) { 

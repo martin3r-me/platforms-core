@@ -404,6 +404,8 @@ class SimpleToolController extends Controller
                 $userMessage = (string) ($request->input('message') ?? '');
                 $threadId = $request->input('thread_id');
                 $chatHistory = $request->input('chat_history', []);
+                $createdUserMessageId = null;
+                $assistantSavedToDb = false;
 
                 // Load thread and messages from DB if thread_id provided
                 $thread = null;
@@ -507,7 +509,7 @@ class SimpleToolController extends Controller
                     // Save user message to DB if thread exists
                     // Note: User messages don't have token costs (they're input), but we store the structure for consistency
                     if ($thread) {
-                        CoreChatMessage::create([
+                        $created = CoreChatMessage::create([
                             'core_chat_id' => $thread->core_chat_id,
                             'thread_id' => $thread->id,
                             'role' => 'user',
@@ -520,6 +522,7 @@ class SimpleToolController extends Controller
                             'pricing_currency' => 'USD',
                             'model_id' => $model ?? null,
                         ]);
+                        $createdUserMessageId = $created?->id;
                     }
                 }
 
@@ -697,6 +700,8 @@ class SimpleToolController extends Controller
                                 $model,
                                 [
                                     'include_web_search' => true,
+                                    // Allow OpenAiService to abort even when no deltas/events arrive.
+                                    'should_abort' => fn () => connection_aborted(),
                                     // max_output_tokens kommt aus core_ai_models.max_output_tokens (Model Settings),
                                     // kann aber pro Request via max_output_tokens überschrieben werden.
                                     'max_tokens' => (function () use ($request, $model) {
@@ -986,6 +991,7 @@ class SimpleToolController extends Controller
                                 'pricing_currency' => $currency,
                                 'model_id' => $model,
                             ]);
+                            $assistantSavedToDb = true;
                             
                             // Update thread token counts, cost, and model
                             $thread->increment('total_tokens_in', $tokensIn);
@@ -1334,6 +1340,22 @@ class SimpleToolController extends Controller
                         'path' => $request->path(),
                         'user_id' => optional($request->user())->id,
                     ]);
+                    // If the user aborted mid-request, we don't want to keep a dangling user message in the DB.
+                    // Only delete if we created it in THIS request and we did not persist an assistant answer.
+                    if ($thread && $createdUserMessageId && !$assistantSavedToDb) {
+                        try {
+                            CoreChatMessage::where('id', $createdUserMessageId)
+                                ->where('thread_id', $thread->id)
+                                ->where('role', 'user')
+                                ->delete();
+                        } catch (\Throwable $e2) {
+                            Log::warning('[SimpleToolController] Failed to delete aborted user message', [
+                                'thread_id' => $thread->id,
+                                'message_id' => $createdUserMessageId,
+                                'error' => $e2->getMessage(),
+                            ]);
+                        }
+                    }
                     return;
                 }
                 try {
