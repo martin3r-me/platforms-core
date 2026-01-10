@@ -44,6 +44,20 @@ class GetModulesTool implements ToolContract
         try {
             $includeTools = $arguments['include_tools'] ?? false;
             $modules = ModuleRegistry::all();
+
+            // Core ist kein "Business-Modul" wie CRM/Planner, aber für Tool-Discovery essenziell.
+            // In manchen Deployments ist ModuleRegistry nicht (voll) befüllt (z.B. wenn Module DB/Registrierung
+            // noch nicht gelaufen ist). Damit tools.GET(module="core") deterministisch discoverbar bleibt,
+            // fügen wir core hier immer als virtuelles Modul hinzu.
+            if (!isset($modules['core'])) {
+                $modules = array_merge([
+                    'core' => [
+                        'key' => 'core',
+                        'title' => 'Core',
+                        'description' => 'System-/Plattform-Tools (Discovery, Context, Teams, AI-Modelle, Chat).',
+                    ],
+                ], $modules);
+            }
             
             $result = [
                 'modules' => [],
