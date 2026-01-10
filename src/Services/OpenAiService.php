@@ -484,6 +484,21 @@ class OpenAiService
                     // ignore
                 }
             }
+            // Last resort: replay the same request once without streaming to capture error details.
+            // This is safe because OpenAI returns a 4xx without side effects, and it makes debugging deterministic.
+            if (trim($errorBody) === '') {
+                try {
+                    $diagPayload = $payload;
+                    $diagPayload['stream'] = false;
+                    $diag = $this->http(withStream: false)->post($this->baseUrl . '/responses', $diagPayload);
+                    $diagBody = $diag->body();
+                    if (is_string($diagBody) && trim($diagBody) !== '') {
+                        $errorBody = $diagBody;
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+            }
             $this->logApiError('OpenAI API Error (responses stream)', $response->status(), $errorBody);
             
             // Debug: Zeige vollständige Fehlerantwort
