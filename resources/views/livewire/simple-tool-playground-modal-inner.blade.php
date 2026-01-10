@@ -230,7 +230,7 @@
                         <span class="text-[10px] text-[var(--ui-muted)]">t:</span>
                         <span id="pgFooterSeconds" class="text-[10px] font-mono text-[var(--ui-secondary)]">0s</span>
                     </div>
-                    <div class="flex items-center gap-1 px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] min-w-0 max-w-[45vw]">
+                    <div class="flex items-center gap-1 px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] min-w-0 max-w-64">
                         <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0">Event:</span>
                         <span id="pgFooterEventText" class="text-[10px] font-mono text-[var(--ui-secondary)] truncate">—</span>
                     </div>
@@ -722,8 +722,12 @@
           const el = document.getElementById('pgActiveThreadId');
           const raw = (el && typeof el.value === 'string') ? el.value : '';
           const n = parseInt(raw || '', 10);
-          currentThreadId = Number.isFinite(n) ? n : null;
-          threadState = getThreadState(currentThreadId || 'none');
+          // Don't clobber currentThreadId if the DOM temporarily doesn't contain a valid value
+          // (Livewire re-renders can momentarily yield empty values).
+          if (Number.isFinite(n)) {
+            currentThreadId = n;
+            threadState = getThreadState(currentThreadId || 'none');
+          }
           return currentThreadId;
         };
 
@@ -744,9 +748,8 @@
           const stopBtn = document.getElementById('pgStopBtn');
           const tid = refreshThreadIdFromDom();
           const st = getThreadState(tid || 'none');
-          // Consider "running" if inFlight OR we still have an abortController.
-          // (startedAtMs alone is not enough and would keep Stop enabled after completion.)
-          const busy = !!(st && (st.inFlight || !!st.abortController));
+          // Only consider inFlight. abortController can linger briefly and should not keep Stop enabled.
+          const busy = !!(st && st.inFlight);
           // Footer stop button wrapper is always visible; we only toggle styling.
           if (stopBtn) {
             stopBtn.disabled = !busy;
@@ -875,31 +878,8 @@
 
             const footerEl = document.getElementById('pgFooterEventText');
             if (footerEl) {
-              // "Loose"/raw: always show the real event name, plus a tiny snippet of payload if available.
-              let snippet = '';
-              try {
-                if (payload && typeof payload === 'object') {
-                  // Prefer a concise error display
-                  if (payload.code && payload.message) {
-                    snippet = ` | ${String(payload.code)}: ${String(payload.message)}`;
-                  } else if (payload.error && typeof payload.error === 'object' && payload.error.code && payload.error.message) {
-                    snippet = ` | ${String(payload.error.code)}: ${String(payload.error.message)}`;
-                  } else if (payload.preview && typeof payload.preview === 'object') {
-                    // Preview is often small and stable.
-                    snippet = ` | ${JSON.stringify(payload.preview)}`;
-                  } else if (payload.tool) {
-                    snippet = ` | ${String(payload.tool)}`;
-                  } else if (payload.type) {
-                    snippet = ` | ${String(payload.type)}`;
-                  } else {
-                    snippet = ` | ${JSON.stringify(payload)}`;
-                  }
-                } else if (typeof payload === 'string' && payload.trim() !== '') {
-                  snippet = ` | ${payload}`;
-                }
-              } catch (_) {}
-              const txt = `${label}${snippet}`.replace(/\s+/g, ' ').slice(0, 180);
-              footerEl.textContent = txt || label;
+              // Footer should stay compact: show only the event name (no payload).
+              footerEl.textContent = label.slice(0, 160);
             }
           } catch (_) {}
 
@@ -1727,6 +1707,7 @@
             }
           } finally {
             threadState.inFlight = false;
+            threadState.abortController = null;
             setSendButtonBusy(false);
             input.disabled = false;
             const ms = document.getElementById('modelSelect');
@@ -1734,7 +1715,6 @@
             input.focus();
             updateThreadBusyIndicators();
             updateFooterBusy();
-            threadState.abortController = null;
             threadState.userAborted = false;
           }
         };
