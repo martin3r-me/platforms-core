@@ -782,10 +782,14 @@
           if (rtEventThinkingCountEl) rtEventThinkingCountEl.textContent = String(eventCounters.thinking || 0);
         };
 
-        const rtEvent = ({ key, preview = null, raw = null }) => {
-          if (!key) return;
-          // Also show last event in the chat footer (compact, no list needed)
+        // Persist last event label across Livewire re-renders (otherwise the footer often resets to "—").
+        window.__simplePlaygroundLastEvent = window.__simplePlaygroundLastEvent || { key: null, text: null };
+        const setEventLabel = (key, preview = null) => {
           try {
+            const label = String(key || '—');
+            window.__simplePlaygroundLastEvent.key = label;
+            window.__simplePlaygroundLastEvent.text = label;
+
             const footerEl = document.getElementById('pgFooterEventText');
             if (footerEl) {
               let suffix = '';
@@ -794,15 +798,21 @@
                 else if (preview.tool) suffix = ` ${String(preview.tool)}`;
                 else if (preview.name) suffix = ` ${String(preview.name)}`;
               }
-              footerEl.textContent = `${key}${suffix}`.slice(0, 160);
+              footerEl.textContent = `${label}${suffix}`.slice(0, 160);
             }
           } catch (_) {}
 
-          // Mirror the last event next to the input too (more visible than the footer when focused on input)
+          // Mirror next to the input too (if present in this app version)
           try {
             const inlineEl = document.getElementById('pgInlineEventText');
             if (inlineEl) inlineEl.textContent = String(key || '—').slice(0, 80);
           } catch (_) {}
+        };
+
+        const rtEvent = ({ key, preview = null, raw = null }) => {
+          if (!key) return;
+          // Also show last event in the chat footer + persist it.
+          setEventLabel(key, preview);
 
           const eventKey = `${key}:${preview?.type || ''}:${preview?.id || ''}:${preview?.call_id || ''}:${preview?.name || ''}`;
           if (eventKey === lastEventKey && lastEventSummaryEl) {
@@ -1040,6 +1050,11 @@
           renderChatFromState();
           updateThreadBusyIndicators();
           updateFooterBusy();
+          // Restore last event label after DOM re-render (prevents "Event: —" during active stream).
+          try {
+            const last = window.__simplePlaygroundLastEvent?.key;
+            if (last) setEventLabel(last);
+          } catch (_) {}
           if (currentThreadId !== lastThreadId) {
             // Do NOT reset: keep per-thread state alive.
             lastThreadId = currentThreadId;
@@ -1244,6 +1259,7 @@
 
                 switch (currentEvent) {
                   case 'assistant.delta':
+                    setEventLabel('assistant.delta');
                     if (data?.delta) {
                       threadState.live.assistant += data.delta;
                       // Update DOM only if we are currently viewing this thread
@@ -1252,22 +1268,26 @@
                     debugState.lastAssistant = rtAssistant.textContent;
                     break;
                   case 'reasoning.delta':
+                    setEventLabel('reasoning.delta');
                     if (data?.delta) {
                       threadState.live.reasoning += data.delta;
                       if (refreshThreadIdFromDom() === currentThreadId && rtReasoning) rtReasoning.textContent = threadState.live.reasoning;
                     }
                     break;
                   case 'thinking.delta':
+                    setEventLabel('thinking.delta');
                     if (data?.delta) {
                       threadState.live.thinking += data.delta;
                       if (refreshThreadIdFromDom() === currentThreadId && rtThinking) rtThinking.textContent = threadState.live.thinking;
                     }
                     break;
                   case 'debug.tools':
+                    setEventLabel('debug.tools');
                     debugState.toolsVisible = data || null;
                     updateDebugDump();
                     break;
                   case 'tool.executed':
+                    setEventLabel('tool.executed', { tool: data?.tool || null });
                     debugState.toolCalls.push(data);
                     if (rtToolCalls) {
                       const items = debugState.toolCalls.slice(-10).reverse();
@@ -1332,6 +1352,7 @@
                     break;
                   }
                   case 'usage': {
+                    setEventLabel('usage');
                     const usage = data?.usage || {};
                     const inTok = usage?.input_tokens ?? null;
                     const outTok = usage?.output_tokens ?? null;
@@ -1400,6 +1421,7 @@
                     break;
                   }
                   case 'complete': {
+                    setEventLabel('complete');
                     const assistant = data?.assistant || rtAssistant.textContent;
                     threadState.messages.push({ role: 'assistant', content: assistant });
                     renderMessage('assistant', assistant);
@@ -1409,6 +1431,7 @@
                     break;
                   }
                   case 'error': {
+                    setEventLabel('error');
                     const msg = data?.error || 'Unbekannter Fehler';
                     threadState.messages.push({ role: 'assistant', content: `❌ Fehler: ${msg}` });
                     renderMessage('assistant', `❌ Fehler: ${msg}`);

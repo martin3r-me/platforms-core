@@ -323,6 +323,11 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register($this->app->make(\Platform\Core\Tools\ListTeamsTool::class)); } catch (\Throwable $e) {}
         }
 
+        // Core: Team erstellen (wird von LLM häufig gebraucht, darf nicht "unsichtbar" sein)
+        if (class_exists(\Platform\Core\Tools\CreateTeamTool::class) && !$registry->has('core.teams.POST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\CreateTeamTool::class)); } catch (\Throwable $e) {}
+        }
+
         // Optional (nice-to-have): team members
         if (class_exists(\Platform\Core\Tools\ListTeamUsersTool::class) && !$registry->has('core.teams.users.GET')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\ListTeamUsersTool::class)); } catch (\Throwable $e) {}
@@ -334,6 +339,14 @@ class CoreServiceProvider extends ServiceProvider
         }
         if (class_exists(\Platform\Core\Tools\RemoveTeamUserTool::class) && !$registry->has('core.teams.users.DELETE')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\RemoveTeamUserTool::class)); } catch (\Throwable $e) {}
+        }
+
+        // Core AI Models (DB Source of Truth): tools for listing/updating models must be discoverable via module=core
+        if (class_exists(\Platform\Core\Tools\ListAiModelsTool::class) && !$registry->has('core.ai_models.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\ListAiModelsTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\UpdateAiModelTool::class) && !$registry->has('core.ai_models.PUT')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\UpdateAiModelTool::class)); } catch (\Throwable $e) {}
         }
     }
 
