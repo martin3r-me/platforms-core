@@ -484,9 +484,9 @@ class OpenAiService
                     // ignore
                 }
             }
-            // Last resort: replay the same request once without streaming to capture error details.
-            // This is safe because OpenAI returns a 4xx without side effects, and it makes debugging deterministic.
-            if (trim($errorBody) === '') {
+            // Last resort (debug/opt-in only): replay the same request once without streaming to capture error details.
+            // In production this can cause extra latency/cost, so keep it behind a flag.
+            if (trim($errorBody) === '' && (config('app.debug', false) || config('services.openai.diagnose_empty_stream_errors', false))) {
                 try {
                     $diagPayload = $payload;
                     $diagPayload['stream'] = false;
@@ -633,18 +633,38 @@ class OpenAiService
             $err = json_decode($errorBody, true);
             $param = $err['error']['param'] ?? null;
             $msg = $err['error']['message'] ?? null;
+            $code = $err['error']['code'] ?? null;
             if (!is_string($param) || $param === '') {
                 return null;
             }
-            if (!is_string($msg) || !str_contains($msg, 'Unsupported parameter')) {
-                return null;
+
+            // 1) Top-level unsupported parameters (classic case)
+            if (is_string($msg) && str_contains($msg, 'Unsupported parameter') && array_key_exists($param, $payload)) {
+                $copy = $payload;
+                unset($copy[$param]);
+                return $copy;
             }
-            if (!array_key_exists($param, $payload)) {
-                return null;
+
+            // 2) Nested param: reasoning.summary can require org verification (OpenAI returns code=unsupported_value).
+            if ($param === 'reasoning.summary' && isset($payload['reasoning']) && is_array($payload['reasoning'])) {
+                // Only strip summary; keep effort if present.
+                $copy = $payload;
+                unset($copy['reasoning']['summary']);
+                // If reasoning becomes empty after stripping, drop it entirely.
+                if (empty($copy['reasoning'])) {
+                    unset($copy['reasoning']);
+                }
+                return $copy;
             }
-            $copy = $payload;
-            unset($copy[$param]);
-            return $copy;
+
+            // 3) Generic: if OpenAI complains about reasoning.* and code indicates unsupported value, drop reasoning.
+            if (is_string($code) && $code === 'unsupported_value' && str_starts_with($param, 'reasoning.') && array_key_exists('reasoning', $payload)) {
+                $copy = $payload;
+                unset($copy['reasoning']);
+                return $copy;
+            }
+
+            return null;
         } catch (\Throwable $e) {
             return null;
         }

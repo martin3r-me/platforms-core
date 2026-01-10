@@ -731,9 +731,6 @@ class SimpleToolController extends Controller
                                     'previous_response_id' => $passPreviousResponseId,
                                     'reasoning' => [
                                         'effort' => 'medium',
-                                        // Hint for models that support it: stream a safe summary channel.
-                                        // If the provider/model ignores it, we still get normal output tokens.
-                                        'summary' => 'auto',
                                     ],
                                     'on_debug' => function(?string $event, array $decoded) use (
                                         $sendEvent,
