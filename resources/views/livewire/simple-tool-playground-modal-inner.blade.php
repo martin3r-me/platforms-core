@@ -70,76 +70,14 @@
                         </button>
                     </div>
                 </div>
-                {{-- Usage stats: compact, right-aligned - Thread totals + Request totals --}}
-                <div class="flex items-center gap-1.5 flex-shrink-0">
-                    {{-- Thread totals (Gesamt) --}}
-                    <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
-                        <span class="text-[9px] text-[var(--ui-muted)]">In:</span>
-                        <span id="rtTokensInTotal" class="text-[10px] font-semibold text-[var(--ui-secondary)]">
-                            @if(isset($activeThread) && $activeThread)
-                                {{ number_format($activeThread->total_tokens_in ?? 0) }}
-                            @else
-                                —
-                            @endif
-                        </span>
-                    </div>
-                    <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
-                        <span class="text-[9px] text-[var(--ui-muted)]">C/R:</span>
-                        <span id="rtTokensExtraTotal" class="text-[10px] font-semibold text-[var(--ui-secondary)]">
-                            @if(isset($activeThread) && $activeThread)
-                                {{ number_format(($activeThread->total_tokens_cached ?? 0) + ($activeThread->total_tokens_reasoning ?? 0)) }}
-                            @else
-                                —
-                            @endif
-                        </span>
-                    </div>
-                    <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
-                        <span class="text-[9px] text-[var(--ui-muted)]">Out:</span>
-                        <span id="rtTokensOutTotal" class="text-[10px] font-semibold text-[var(--ui-secondary)]">
-                            @if(isset($activeThread) && $activeThread)
-                                {{ number_format($activeThread->total_tokens_out ?? 0) }}
-                            @else
-                                —
-                            @endif
-                        </span>
-                    </div>
-                    <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
-                        <span class="text-[9px] text-[var(--ui-muted)]">$:</span>
-                        <span id="rtCostTotal" class="text-[10px] font-semibold text-[var(--ui-secondary)]">
-                            @if(isset($activeThread) && $activeThread)
-                                {{ number_format((float)($activeThread->total_cost ?? 0), 4) }} {{ $activeThread->pricing_currency ?? 'USD' }}
-                            @else
-                                —
-                            @endif
-                        </span>
-                    </div>
-                    {{-- Separator --}}
-                    <div class="w-px h-4 bg-[var(--ui-border)]/60"></div>
-                    {{-- Request totals (aktueller Request) --}}
-                    <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/40 bg-[var(--ui-bg)]/50">
-                        <span class="text-[9px] text-[var(--ui-muted)]">Req In:</span>
-                        <span id="rtTokensIn" class="text-[10px] font-semibold text-[var(--ui-secondary)]">—</span>
-                    </div>
-                    <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/40 bg-[var(--ui-bg)]/50">
-                        <span class="text-[9px] text-[var(--ui-muted)]">Req C/R:</span>
-                        <span id="rtTokensExtra" class="text-[10px] font-semibold text-[var(--ui-secondary)]">—</span>
-                    </div>
-                    <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/40 bg-[var(--ui-bg)]/50">
-                        <span class="text-[9px] text-[var(--ui-muted)]">Req Out:</span>
-                        <span id="rtTokensOut" class="text-[10px] font-semibold text-[var(--ui-secondary)]">—</span>
-                    </div>
-                    <div class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/40 bg-[var(--ui-bg)]/50">
-                        <span class="text-[9px] text-[var(--ui-muted)]">Req $:</span>
-                        <span id="rtCostRequest" class="text-[10px] font-semibold text-[var(--ui-secondary)]">—</span>
-                    </div>
-                </div>
+                {{-- Usage moved to footer (Total + Request). Keep header clean. --}}
             </div>
             <div class="flex-1 min-h-0 overflow-hidden w-full">
                 <div class="w-full h-full min-h-0 grid grid-cols-4 gap-5 px-4 py-4 overflow-hidden min-w-0" style="width:100%; max-width:100%;">
 
                     {{-- Left: Chat (3/4 width) --}}
                     <div class="col-span-3 min-h-0 min-w-0 flex flex-col overflow-hidden">
-                        <div class="flex-1 min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/20">
+                        <div class="flex-1 min-h-0 bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
                             <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
                                 @php
                                     $msgs = collect($activeThreadMessages ?? [])
@@ -163,26 +101,21 @@
                                     @endforeach
                                 </div>
 
-                                {{-- Live streaming output (not persisted to DB; for realtime observability) --}}
-                                <div class="pt-3 border-t border-[var(--ui-border)]/60 space-y-3">
+                                {{-- Live streaming output (only appears when data exists; not persisted to DB) --}}
+                                <div id="pgLiveBox" class="hidden pt-3 border-t border-[var(--ui-border)]/60 space-y-3">
                                     <div class="text-xs font-semibold text-[var(--ui-secondary)]">Live</div>
-                                    <div class="grid grid-cols-1 gap-3">
-                                        <div class="min-w-0">
-                                            <div class="text-[11px] font-semibold text-[var(--ui-muted)] mb-1">Assistant (stream)</div>
-                                            <pre id="rtAssistant" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[70px] max-h-[20vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
+                                    <div id="pgLiveAssistantWrap" class="hidden min-w-0">
+                                        <div class="text-[11px] font-semibold text-[var(--ui-muted)] mb-1">Assistant (stream)</div>
+                                        <pre id="rtAssistant" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[70px] max-h-[20vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-3 min-w-0">
+                                        <div id="pgLiveReasoningWrap" class="hidden min-w-0">
+                                            <div class="text-[11px] font-semibold text-[var(--ui-muted)] mb-1">Reasoning (stream)</div>
+                                            <pre id="rtReasoning" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[56px] max-h-[14vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
                                         </div>
-                                        <div class="grid grid-cols-2 gap-3 min-w-0">
-                                            <div class="min-w-0">
-                                                <div class="text-[11px] font-semibold text-[var(--ui-muted)] mb-1">Reasoning (stream)</div>
-                                                <pre id="rtReasoning" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[56px] max-h-[14vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
-                                            </div>
-                                            <div class="min-w-0">
-                                                <div class="text-[11px] font-semibold text-[var(--ui-muted)] mb-1">Thinking (stream)</div>
-                                                <pre id="rtThinking" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[56px] max-h-[14vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
-                                            </div>
-                                        </div>
-                                        <div class="text-[10px] text-[var(--ui-muted)]">
-                                            Hinweis: Das sind Streaming-Deltas zur Laufzeit (werden nicht in die Message-DB geschrieben).
+                                        <div id="pgLiveThinkingWrap" class="hidden min-w-0">
+                                            <div class="text-[11px] font-semibold text-[var(--ui-muted)] mb-1">Thinking (stream)</div>
+                                            <pre id="rtThinking" class="text-xs whitespace-pre-wrap break-words border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)] min-h-[56px] max-h-[14vh] overflow-y-auto overflow-x-auto max-w-full"></pre>
                                         </div>
                                     </div>
                                 </div>
@@ -232,7 +165,7 @@
                     </div>
 
                     {{-- Right: Realtime / Debug (1/4 width) --}}
-                    <div class="col-span-1 min-h-0 min-w-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/20 overflow-x-hidden">
+                    <div class="col-span-1 min-h-0 min-w-0 bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm overflow-x-hidden">
                         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                             <div class="text-xs font-semibold text-[var(--ui-secondary)]">Tools</div>
                             <div class="flex items-center gap-3">
@@ -243,8 +176,8 @@
 
                         <div class="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto min-w-0">
                             <div class="min-w-0">
-                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Tool Calls (letzte 10)</div>
-                                <div id="rtToolCalls" class="space-y-2 max-h-[30vh] overflow-y-auto"></div>
+                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Tool Calls (alle im Request)</div>
+                                <div id="rtToolCalls" class="space-y-2 max-h-[60vh] overflow-y-auto"></div>
                             </div>
                             <div id="rtCopyStatus" class="text-[10px] text-[var(--ui-muted)]"></div>
                         </div>
@@ -275,13 +208,51 @@
                     </button>
                 </div>
                 <div class="flex items-center gap-3 min-w-0">
-                    <div id="pgFooterBusy" class="hidden flex items-center gap-2 text-xs text-[var(--ui-muted)] flex-shrink-0">
-                        <span class="w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
-                        <span>Läuft…</span>
+                    {{-- Usage (Total + Request): compact, next to Event --}}
+                    <div class="hidden" id="rtTokensInTotal">—</div>
+                    <div class="hidden" id="rtTokensOutTotal">—</div>
+                    <div class="hidden" id="rtTokensExtraTotal">—</div>
+                    <div class="hidden" id="rtTokensIn">—</div>
+                    <div class="hidden" id="rtTokensOut">—</div>
+                    <div class="hidden" id="rtTokensExtra">—</div>
+
+                    <div class="flex items-center gap-1 px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
+                        <span class="text-[10px] text-[var(--ui-muted)]">Total tok:</span>
+                        <span id="rtTokensGrand" class="text-[10px] font-semibold text-[var(--ui-secondary)]">
+                            @if(isset($activeThread) && $activeThread)
+                                {{ number_format((int)($activeThread->total_tokens_in ?? 0) + (int)($activeThread->total_tokens_out ?? 0)) }}
+                            @else
+                                —
+                            @endif
+                        </span>
                     </div>
+                    <div class="flex items-center gap-1 px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
+                        <span class="text-[10px] text-[var(--ui-muted)]">Total €:</span>
+                        <span id="rtCostTotal" class="text-[10px] font-semibold text-[var(--ui-secondary)]">
+                            @if(isset($activeThread) && $activeThread)
+                                {{ number_format((float)($activeThread->total_cost ?? 0), 4) }} {{ $activeThread->pricing_currency ?? 'USD' }}
+                            @else
+                                —
+                            @endif
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-1 px-2 py-1 rounded border border-[var(--ui-border)]/40 bg-[var(--ui-bg)]/50">
+                        <span class="text-[10px] text-[var(--ui-muted)]">Req tok:</span>
+                        <span id="rtTokensReq" class="text-[10px] font-semibold text-[var(--ui-secondary)]">—</span>
+                    </div>
+                    <div class="flex items-center gap-1 px-2 py-1 rounded border border-[var(--ui-border)]/40 bg-[var(--ui-bg)]/50">
+                        <span class="text-[10px] text-[var(--ui-muted)]">Req €:</span>
+                        <span id="rtCostRequest" class="text-[10px] font-semibold text-[var(--ui-secondary)]">—</span>
+                    </div>
+
                     <div class="min-w-0 flex items-center gap-2">
                         <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0">Event:</span>
                         <span id="pgFooterEventText" class="text-[10px] font-mono text-[var(--ui-secondary)] truncate">—</span>
+                    </div>
+
+                    {{-- Busy indicator bottom-right in footer while request is running --}}
+                    <div id="pgFooterBusy" class="hidden flex items-center flex-shrink-0">
+                        <span class="w-3 h-3 border-2 border-[var(--ui-primary)]/30 border-t-[var(--ui-primary)] rounded-full animate-spin"></span>
                     </div>
                 </div>
             </div>
@@ -689,6 +660,29 @@
           }
         };
 
+        // Live boxes in chat: show each stream section only when something is actually there.
+        const updateLiveVisibility = () => {
+          try {
+            const liveBox = document.getElementById('pgLiveBox');
+            const aWrap = document.getElementById('pgLiveAssistantWrap');
+            const rWrap = document.getElementById('pgLiveReasoningWrap');
+            const tWrap = document.getElementById('pgLiveThinkingWrap');
+
+            const a = (threadState?.live?.assistant || '').trim();
+            const r = (threadState?.live?.reasoning || '').trim();
+            const t = (threadState?.live?.thinking || '').trim();
+            const any = !!(a || r || t);
+
+            if (liveBox) {
+              if (any) liveBox.classList.remove('hidden');
+              else liveBox.classList.add('hidden');
+            }
+            if (aWrap) { if (a) aWrap.classList.remove('hidden'); else aWrap.classList.add('hidden'); }
+            if (rWrap) { if (r) rWrap.classList.remove('hidden'); else rWrap.classList.add('hidden'); }
+            if (tWrap) { if (t) tWrap.classList.remove('hidden'); else tWrap.classList.add('hidden'); }
+          } catch (_) {}
+        };
+
         // Event log (same logic, but keep it lightweight)
         let rtVerbose = localStorage.getItem('simple.rtVerbose') === 'true';
         if (rtVerboseEl) {
@@ -857,6 +851,13 @@
           debugState.toolCalls = [];
           debugState.toolsVisible = null;
           updateDebugDump();
+
+          try {
+            threadState.live.assistant = '';
+            threadState.live.reasoning = '';
+            threadState.live.thinking = '';
+          } catch (_) {}
+          updateLiveVisibility();
         };
 
         if (realtimeClear) realtimeClear.addEventListener('click', resetRealtime);
@@ -1037,6 +1038,7 @@
           renderChatFromState();
           updateThreadBusyIndicators();
           updateFooterBusy();
+          updateLiveVisibility();
           // Restore last event label after DOM re-render (prevents "Event: —" during active stream).
           try {
             const last = window.__simplePlaygroundLastEvent?.key;
@@ -1253,6 +1255,7 @@
                       if (refreshThreadIdFromDom() === currentThreadId && rtAssistant) rtAssistant.textContent = threadState.live.assistant;
                     }
                     debugState.lastAssistant = rtAssistant.textContent;
+                    updateLiveVisibility();
                     break;
                   case 'reasoning.delta':
                     setEventLabel('reasoning.delta');
@@ -1260,6 +1263,7 @@
                       threadState.live.reasoning += data.delta;
                       if (refreshThreadIdFromDom() === currentThreadId && rtReasoning) rtReasoning.textContent = threadState.live.reasoning;
                     }
+                    updateLiveVisibility();
                     break;
                   case 'thinking.delta':
                     setEventLabel('thinking.delta');
@@ -1267,6 +1271,7 @@
                       threadState.live.thinking += data.delta;
                       if (refreshThreadIdFromDom() === currentThreadId && rtThinking) rtThinking.textContent = threadState.live.thinking;
                     }
+                    updateLiveVisibility();
                     break;
                   case 'debug.tools':
                     setEventLabel('debug.tools');
@@ -1277,7 +1282,7 @@
                     setEventLabel('tool.executed', { tool: data?.tool || null });
                     debugState.toolCalls.push(data);
                     if (rtToolCalls) {
-                      const items = debugState.toolCalls.slice(-10).reverse();
+                      const items = debugState.toolCalls.slice(0); // show ALL tool calls for this request
                       rtToolCalls.innerHTML = '';
                       for (const it of items) {
                         const row = document.createElement('div');
@@ -1359,7 +1364,12 @@
                       if (rtCostTotal) {
                         const cost = parseFloat(threadTotals.total_cost || 0);
                         const currency = threadTotals.pricing_currency || 'USD';
-                        rtCostTotal.textContent = `$${cost.toFixed(4)} ${currency}`;
+                        rtCostTotal.textContent = `${cost.toFixed(4)} ${currency}`;
+                      }
+                      const grandTokEl = document.getElementById('rtTokensGrand');
+                      if (grandTokEl) {
+                        const grand = (threadTotals.total_tokens_in || 0) + (threadTotals.total_tokens_out || 0);
+                        grandTokEl.textContent = formatNumber(grand);
                       }
                     }
                     
@@ -1368,6 +1378,11 @@
                     if (rtTokensOut) rtTokensOut.textContent = (outTok != null ? formatNumber(outTok) : '—');
                     const cachedReq = (cached != null ? cached : 0) + (reasoning != null ? reasoning : 0);
                     if (rtTokensExtra) rtTokensExtra.textContent = cachedReq > 0 ? formatNumber(cachedReq) : '—';
+                    const reqTokEl = document.getElementById('rtTokensReq');
+                    if (reqTokEl) {
+                      const reqTok = (totalTok != null) ? totalTok : ((inTok || 0) + (outTok || 0));
+                      reqTokEl.textContent = formatNumber(reqTok);
+                    }
                     
                     // Calculate and display request cost
                     // Use cost from last_increment if available (server-calculated), otherwise calculate client-side
@@ -1415,6 +1430,7 @@
                     threadState.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';
                     updateDebugDump();
+                    updateLiveVisibility();
                     break;
                   }
                   case 'error': {
@@ -1424,6 +1440,7 @@
                     renderMessage('assistant', `❌ Fehler: ${msg}`);
                     if (rtStatus) rtStatus.textContent = 'error';
                     updateDebugDump();
+                    updateLiveVisibility();
                     break;
                   }
                   default:
