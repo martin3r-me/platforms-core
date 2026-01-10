@@ -112,7 +112,10 @@
                                     @endforeach
                                 </div>
 
-                                {{-- Streaming happens as a live assistant message in the chat (JS). --}}
+                                {{-- Ephemeral (UI-only) notes + streaming meta (JS renders here; not persisted, not sent as chat_history). --}}
+                                <div id="pgEphemeralNotes" class="space-y-3"></div>
+
+                                {{-- Streaming happens as live chat messages (JS). --}}
                                 <div id="chatEmpty" class="text-sm text-[var(--ui-muted)]" style="{{ $msgs->count() ? 'display:none;' : '' }}">
                                     <div class="font-semibold text-[var(--ui-secondary)]">Start</div>
                                     <div class="mt-1">Schreib eine Nachricht (z. B. „Liste meine Teams“ oder „Welche Tools kann ich im OKR-Modul nutzen?“).</div>
@@ -510,7 +513,7 @@
         if (!alreadyBound) form.dataset.simplePlaygroundBound = '1';
 
         const realtimeClear = document.getElementById('realtimeClear');
-        // NOTE: assistant streaming is rendered as a live chat message; rtAssistant is legacy/optional.
+        // Streaming is rendered as ephemeral chat messages; these legacy nodes may not exist anymore.
         const rtAssistant = document.getElementById('rtAssistant');
         const rtReasoning = document.getElementById('rtReasoning');
         const rtThinking = document.getElementById('rtThinking');
@@ -601,6 +604,46 @@
           scrollToBottom();
         };
 
+        // Ephemeral UI notes (not stored, not sent to the model).
+        const ensureEphemeralNotesRoot = () => {
+          refreshDomRefs();
+          return document.getElementById('pgEphemeralNotes') || null;
+        };
+        const renderEphemeralNote = (title, content, kind = 'info') => {
+          const root = ensureEphemeralNotesRoot();
+          if (!root) return null;
+          const wrap = document.createElement('div');
+          const border = (kind === 'warn') ? 'border-yellow-200' : (kind === 'error' ? 'border-red-200' : 'border-[var(--ui-border)]/60');
+          const bg = (kind === 'warn') ? 'bg-yellow-50' : (kind === 'error' ? 'bg-red-50' : 'bg-[var(--ui-bg)]');
+          wrap.className = `rounded-lg border ${border} ${bg} p-3`;
+          wrap.innerHTML = `
+            <div class="text-[11px] font-semibold text-[var(--ui-secondary)] flex items-center justify-between gap-2">
+              <span>${String(title || 'Hinweis')}</span>
+              <button type="button" class="text-[10px] text-[var(--ui-muted)] hover:underline" data-ephemeral-close>schließen</button>
+            </div>
+            <div class="mt-1 text-[11px] text-[var(--ui-secondary)] whitespace-pre-wrap" data-ephemeral-content></div>
+          `;
+          const c = wrap.querySelector('[data-ephemeral-content]');
+          if (c) c.textContent = String(content || '');
+          const close = wrap.querySelector('[data-ephemeral-close]');
+          if (close) {
+            close.addEventListener('click', (e) => {
+              e.preventDefault();
+              if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+            });
+          }
+          root.appendChild(wrap);
+          // track per-thread so we can clean up on reset/complete
+          try {
+            threadState.ephemeralNoteEls = threadState.ephemeralNoteEls || [];
+            threadState.ephemeralNoteEls.push(wrap);
+          } catch (_) {}
+          scrollToBottom();
+          return wrap;
+        };
+        // Convenience for debugging from console
+        window.simplePlaygroundNote = (text, title = 'Debug', kind = 'info') => renderEphemeralNote(title, text, kind);
+
         // Streaming assistant message in chat (ephemeral: not persisted to DB).
         const ensureStreamingAssistantMessage = () => {
           refreshDomRefs();
@@ -634,6 +677,45 @@
         const removeStreamingAssistantMessage = () => {
           const el = document.getElementById('pgStreamingAssistantMsg');
           if (el && el.parentNode) el.parentNode.removeChild(el);
+        };
+
+        // Streaming reasoning/thinking as ephemeral chat messages (not persisted, not sent as chat_history).
+        const ensureStreamingMetaMessage = (kind) => {
+          refreshDomRefs();
+          if (!chatList) return null;
+          const id = kind === 'reasoning' ? 'pgStreamingReasoningMsg' : 'pgStreamingThinkingMsg';
+          const label = kind === 'reasoning' ? 'Reasoning' : 'Thinking';
+          let el = document.getElementById(id);
+          if (el) return el;
+          const wrap = document.createElement('div');
+          wrap.id = id;
+          wrap.className = 'flex justify-start';
+          wrap.innerHTML = `
+            <div class="max-w-4xl rounded-lg p-3 break-words overflow-hidden bg-[var(--ui-bg)] border border-[var(--ui-border)]/60">
+              <div class="text-[11px] font-semibold mb-1 flex items-center gap-2 text-[var(--ui-secondary)]">
+                <span>${label}</span>
+                <span class="text-[10px] text-[var(--ui-muted)]">(live)</span>
+              </div>
+              <div class="whitespace-pre-wrap break-words text-[11px] text-[var(--ui-secondary)]" data-stream-content></div>
+            </div>
+          `;
+          chatList.appendChild(wrap);
+          const empty = document.getElementById('chatEmpty');
+          if (empty) empty.style.display = 'none';
+          scrollToBottom();
+          return wrap;
+        };
+        const updateStreamingMetaMessage = (kind, text) => {
+          const el = ensureStreamingMetaMessage(kind);
+          if (!el) return;
+          const c = el.querySelector('[data-stream-content]');
+          if (c) c.textContent = text || '';
+        };
+        const removeStreamingMetaMessages = () => {
+          const a = document.getElementById('pgStreamingReasoningMsg');
+          const b = document.getElementById('pgStreamingThinkingMsg');
+          if (a && a.parentNode) a.parentNode.removeChild(a);
+          if (b && b.parentNode) b.parentNode.removeChild(b);
         };
 
         const refreshThreadIdFromDom = () => {
@@ -721,6 +803,7 @@
           usage: null,
           model: null,
           events: [],
+          sseEvents: [],
           lastAssistant: '',
           toolCalls: [],
           toolsVisible: null,
@@ -737,6 +820,7 @@
             model: debugState.model,
             lastAssistant: debugState.lastAssistant,
             events: debugState.events.slice(-120),
+            sse_events: debugState.sseEvents.slice(-250),
             toolCalls: debugState.toolCalls.slice(-20),
             toolsVisible: debugState.toolsVisible,
           };
@@ -914,6 +998,7 @@
 
         const resetRealtime = () => {
           removeStreamingAssistantMessage();
+          removeStreamingMetaMessages();
           if (rtAssistant) rtAssistant.textContent = '';
           if (rtReasoning) rtReasoning.textContent = '';
           if (rtThinking) rtThinking.textContent = '';
@@ -937,6 +1022,7 @@
           debugState.usage = null;
           debugState.model = null;
           debugState.events = [];
+          debugState.sseEvents = [];
           debugState.lastAssistant = '';
           debugState.toolCalls = [];
           debugState.toolsVisible = null;
@@ -946,6 +1032,12 @@
             threadState.live.assistant = '';
             threadState.live.reasoning = '';
             threadState.live.thinking = '';
+            if (threadState.ephemeralNoteEls && Array.isArray(threadState.ephemeralNoteEls)) {
+              for (const el of threadState.ephemeralNoteEls) {
+                try { if (el && el.parentNode) el.parentNode.removeChild(el); } catch (_) {}
+              }
+              threadState.ephemeralNoteEls = [];
+            }
           } catch (_) {}
         };
 
@@ -1249,6 +1341,10 @@
           // realtimeModel UI element no longer exists in the modal (kept from older layout)
           // Make start visible in the footer event tile immediately.
           try { setEventLabel('request.start'); } catch (_) {}
+          // Ephemeral note: show request start + current model, without persisting.
+          try {
+            renderEphemeralNote('Request', `Start · Model: ${String(modelToUse || selectedModel || defaultModelId || '—')}`, 'info');
+          } catch (_) {}
           debugState.startedAt = new Date().toISOString();
           updateThreadBusyIndicators();
           updateFooterBusy();
@@ -1330,6 +1426,7 @@
             let currentEvent = null;
           // Ensure we show at least the upstream start event types, even if no data arrives yet.
           try { setEventLabel('response.stream.open'); } catch (_) {}
+            let deltaDumpCounter = 0;
 
             while (true) {
               const { done, value } = await reader.read();
@@ -1351,6 +1448,24 @@
                 // Always reflect the raw incoming SSE event in the footer (no mapping/overwrites).
                 try { if (currentEvent) setEventLabel(currentEvent, data); } catch (_) {}
 
+                // Also persist every SSE event into the copyable debug dump (bounded + truncated).
+                try {
+                  const evt = String(currentEvent || '—');
+                  let rawStr = (typeof raw === 'string') ? raw : '';
+                  if (rawStr.length > 4000) rawStr = rawStr.slice(0, 4000) + '…';
+                  debugState.sseEvents.push({ t: Date.now(), event: evt, raw: rawStr });
+                  if (debugState.sseEvents.length > 350) {
+                    debugState.sseEvents.splice(0, debugState.sseEvents.length - 350);
+                  }
+                  // Avoid heavy stringify on every delta; update periodically.
+                  if (evt === 'assistant.delta' || evt === 'reasoning.delta' || evt === 'thinking.delta') {
+                    deltaDumpCounter++;
+                    if (deltaDumpCounter % 25 === 0) updateDebugDump();
+                  } else {
+                    updateDebugDump();
+                  }
+                } catch (_) {}
+
                 switch (currentEvent) {
                   case 'assistant.delta':
                     if (data?.delta) {
@@ -1364,13 +1479,17 @@
                   case 'reasoning.delta':
                     if (data?.delta) {
                       threadState.live.reasoning += data.delta;
-                      if (refreshThreadIdFromDom() === currentThreadId && rtReasoning) rtReasoning.textContent = threadState.live.reasoning;
+                      if (refreshThreadIdFromDom() === currentThreadId) {
+                        updateStreamingMetaMessage('reasoning', threadState.live.reasoning);
+                      }
                     }
                     break;
                   case 'thinking.delta':
                     if (data?.delta) {
                       threadState.live.thinking += data.delta;
-                      if (refreshThreadIdFromDom() === currentThreadId && rtThinking) rtThinking.textContent = threadState.live.thinking;
+                      if (refreshThreadIdFromDom() === currentThreadId) {
+                        updateStreamingMetaMessage('thinking', threadState.live.thinking);
+                      }
                     }
                     break;
                   case 'debug.tools':
@@ -1544,6 +1663,7 @@
                     const assistant = data?.assistant || threadState.live.assistant || '';
                     threadState.messages.push({ role: 'assistant', content: assistant });
                     removeStreamingAssistantMessage();
+                    removeStreamingMetaMessages();
                     renderMessage('assistant', assistant);
                     threadState.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';
@@ -1558,6 +1678,7 @@
                     if (rtStatus) rtStatus.textContent = 'error';
                     updateDebugDump();
                     removeStreamingAssistantMessage();
+                    removeStreamingMetaMessages();
                     break;
                   }
                   default:
@@ -1598,6 +1719,7 @@
                 if (rtReasoning) rtReasoning.textContent = '';
                 if (rtThinking) rtThinking.textContent = '';
               } catch (_) {}
+              try { removeStreamingMetaMessages(); } catch (_) {}
             } else {
               threadState.messages.push({ role: 'assistant', content: `❌ Fehler: ${e?.message || 'Unbekannter Fehler'}` });
               renderMessage('assistant', `❌ Fehler: ${e?.message || 'Unbekannter Fehler'}`);

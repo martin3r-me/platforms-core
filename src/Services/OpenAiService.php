@@ -1013,6 +1013,24 @@ class OpenAiService
                     case 'completed':
                         return;
                     default:
+                        // More tolerant parsing: OpenAI can emit additional reasoning event names.
+                        // We route any "*reasoning*.(delta|done)" events to the callbacks.
+                        if (
+                            is_string($currentEvent)
+                            && str_contains($currentEvent, 'reasoning')
+                            && (str_ends_with($currentEvent, '.delta') || str_ends_with($currentEvent, '.done'))
+                        ) {
+                            $txt = $decoded['delta'] ?? ($decoded['text'] ?? ($decoded['content'] ?? ''));
+                            if (is_string($txt) && $txt !== '') {
+                                $isSummary = str_contains($currentEvent, 'summary');
+                                if ($isSummary && is_callable($onReasoningDelta)) {
+                                    try { $onReasoningDelta($txt); } catch (\Throwable $e) {}
+                                } elseif (!$isSummary && is_callable($onThinkingDelta)) {
+                                    try { $onThinkingDelta($txt); } catch (\Throwable $e) {}
+                                }
+                            }
+                            break;
+                        }
                         break;
                 }
             }
