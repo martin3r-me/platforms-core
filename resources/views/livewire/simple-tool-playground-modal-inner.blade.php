@@ -172,7 +172,7 @@
 
             {{-- Footer: same look/spacing as header, full width of the Chat tab (spans Chat + Debug) --}}
             <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 flex items-center justify-end flex-shrink-0">
-                <div class="flex items-center gap-3 min-w-0 justify-end">
+                <div class="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 min-w-0">
                     {{-- Usage (Total + Request): compact, next to Event --}}
                     <div class="hidden" id="rtTokensInTotal">—</div>
                     <div class="hidden" id="rtTokensOutTotal">—</div>
@@ -211,7 +211,7 @@
                     </div>
 
                     {{-- Stop button = running indicator + abort (always visible, pulses when running) --}}
-                    <div id="pgFooterBusy" class="flex items-center flex-shrink-0">
+                    <div id="pgFooterBusy" class="flex items-center flex-shrink-0 order-last">
                         <button
                             type="button"
                             id="pgStopBtn"
@@ -662,9 +662,9 @@
           const stopBtn = document.getElementById('pgStopBtn');
           const tid = refreshThreadIdFromDom();
           const st = getThreadState(tid || 'none');
-          // Consider "running" if inFlight OR we still have an abortController OR we have a start timestamp.
-          // This prevents a short window where the button stays disabled even though the request is running.
-          const busy = !!(st && (st.inFlight || !!st.abortController || !!st.startedAtMs));
+          // Consider "running" if inFlight OR we still have an abortController.
+          // (startedAtMs alone is not enough and would keep Stop enabled after completion.)
+          const busy = !!(st && (st.inFlight || !!st.abortController));
           // Footer stop button wrapper is always visible; we only toggle styling.
           if (stopBtn) {
             stopBtn.disabled = !busy;
@@ -1257,6 +1257,8 @@
             const decoder = new TextDecoder();
             let buffer = '';
             let currentEvent = null;
+          // Ensure we show at least the upstream start event types, even if no data arrives yet.
+          try { setEventLabel('response.stream.open'); } catch (_) {}
 
             while (true) {
               const { done, value } = await reader.read();
@@ -1272,6 +1274,14 @@
                 const raw = line.slice(5).trim();
                 let data;
                 try { data = JSON.parse(raw); } catch { data = { raw }; }
+
+                // Always surface *every* SSE event in the footer (even if we don't have a special handler).
+                // For openai.event we still set the label inside its handler to show the upstream event name.
+                try {
+                  if (currentEvent && currentEvent !== 'openai.event') {
+                    setEventLabel(currentEvent, data);
+                  }
+                } catch (_) {}
 
                 switch (currentEvent) {
                   case 'assistant.delta':
@@ -1312,9 +1322,12 @@
                       for (const it of items) {
                         const row = document.createElement('div');
                         row.className = 'border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)]';
-                        const statusClass = it.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]';
-                        const statusIcon = it.success ? '✅' : '❌';
-                        const statusText = it.success ? 'Erfolgreich' : 'Fehlgeschlagen';
+                        const isRunning = (it.success === null) || (it.status === 'running');
+                        const statusClass = isRunning
+                          ? 'text-yellow-600'
+                          : (it.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]');
+                        const statusIcon = isRunning ? '⏳' : (it.success ? '✅' : '❌');
+                        const statusText = isRunning ? 'Läuft' : (it.success ? 'Erfolgreich' : 'Fehlgeschlagen');
                         const cachedBadge = it.cached ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)] ml-2">cached</span>' : '';
                         const argsRaw = (typeof it.args_json === 'string' && it.args_json.trim() !== '')
                           ? it.args_json
@@ -1365,24 +1378,44 @@
                     updateEventCountersUi();
                     rtEvent({ key: ev, preview: data?.preview || null, raw: data?.raw || null });
 
-                    // Surface OpenAI built-in tool calls (e.g. web_search) in the Tool Calls panel.
+                    // Surface OpenAI built-in tool calls (e.g. web_search) in the Tool Calls panel (start + done).
                     try {
                       const p = data?.preview || {};
                       const type = (p.type || '').toString();
                       const callId = (p.call_id || p.id || '').toString();
-                      const isCallType = type.endsWith('_call');
-                      const isWebSearch = type.includes('web_search');
-                      const isDone = ev.endsWith('.done') || ev.includes('.done');
-                      if ((isCallType || isWebSearch) && isDone && callId) {
-                        window.__simpleBuiltinToolSeen = window.__simpleBuiltinToolSeen || {};
-                        const key = `${type}:${callId}`;
-                        if (!window.__simpleBuiltinToolSeen[key]) {
-                          window.__simpleBuiltinToolSeen[key] = true;
-                          const toolName = isWebSearch ? 'web_search' : type.replace(/_call$/, '');
+                      // Prefer parsing the upstream event name (ev), because for Responses streaming the "type"
+                      // field is not always a stable "*_call" string.
+                      const evStr = (ev || '').toString();
+                      // Examples:
+                      // - response.web_search_call.in_progress
+                      // - response.file_search_call.completed
+                      // - response.image_generation_call.failed
+                      const responsePrefix = 'response.';
+                      const callMarker = '_call.';
+                      let parsedToolName = null;
+                      let phase = null;
+                      if (evStr.startsWith(responsePrefix)) {
+                        const callPos = evStr.indexOf(callMarker);
+                        if (callPos > responsePrefix.length) {
+                          parsedToolName = evStr.slice(responsePrefix.length, callPos) || null;
+                          phase = evStr.slice(callPos + callMarker.length) || null;
+                        }
+                      }
+                      const isStartLike = phase === 'in_progress';
+                      const isDone = phase === 'completed' || phase === 'done';
+                      const isFailed = phase === 'failed';
+                      const toolName = parsedToolName || (type.includes('web_search') ? 'web_search' : (type.endsWith('_call') ? type.replace(/_call$/, '') : null));
+                      if (toolName && callId) {
+                        window.__simpleBuiltinToolByCallId = window.__simpleBuiltinToolByCallId || {};
+                        const idx = window.__simpleBuiltinToolByCallId[callId];
+                        if (idx == null && isStartLike) {
+                          // Create "running" entry
+                          window.__simpleBuiltinToolByCallId[callId] = debugState.toolCalls.length;
                           debugState.toolCalls.push({
                             tool: `openai:${toolName}`,
                             call_id: callId,
-                            success: true,
+                            success: null,
+                            status: 'running',
                             ms: null,
                             error_code: null,
                             error: null,
@@ -1392,32 +1425,22 @@
                             args_json: p.query ? JSON.stringify({ query: p.query }) : null,
                             args: p.query ? { query: p.query } : null,
                           });
-                          // Re-render immediately
                           if (rtToolCalls) {
+                            // Re-render using the same code path as tool.executed
                             const items = debugState.toolCalls.slice(0);
                             rtToolCalls.innerHTML = '';
                             for (const it of items) {
                               const row = document.createElement('div');
                               row.className = 'border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)]';
-                              const statusClass = it.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]';
-                              const statusIcon = it.success ? '✅' : '❌';
-                              const statusText = it.success ? 'Erfolgreich' : 'Fehlgeschlagen';
+                              const isRunning = (it.success === null) || (it.status === 'running');
+                              const statusClass = isRunning ? 'text-yellow-600' : (it.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]');
+                              const statusIcon = isRunning ? '⏳' : (it.success ? '✅' : '❌');
+                              const statusText = isRunning ? 'Läuft' : (it.success ? 'Erfolgreich' : 'Fehlgeschlagen');
                               const cachedBadge = it.cached ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)] ml-2">cached</span>' : '';
                               const argsRaw = (typeof it.args_json === 'string' && it.args_json.trim() !== '')
                                 ? it.args_json
                                 : (it.args != null ? JSON.stringify(it.args) : (it.args_preview || ''));
-                              const argsPretty = (() => {
-                                try {
-                                  if (typeof argsRaw === 'string' && argsRaw.trim().startsWith('{')) {
-                                    return JSON.stringify(JSON.parse(argsRaw), null, 2);
-                                  }
-                                } catch (_) {}
-                                return String(argsRaw || '');
-                              })();
-                              const argsPreview = argsPretty
-                                ? (argsPretty.length > 140 ? (argsPretty.substring(0, 140) + '…') : argsPretty)
-                                : '—';
-                              const errorInfo = it.error ? `<div class="mt-1 text-[10px] text-[var(--ui-danger)]">Error: ${it.error_code || 'UNKNOWN'}: ${typeof it.error === 'string' ? it.error.substring(0, 150) : JSON.stringify(it.error).substring(0, 150)}</div>` : '';
+                              const argsPreview = String(argsRaw || '');
                               row.innerHTML = `
                                 <div class="flex items-start justify-between gap-2 mb-1">
                                   <div class="flex-1 min-w-0">
@@ -1426,16 +1449,53 @@
                                   </div>
                                   <div class="flex items-center gap-2 flex-shrink-0">
                                     <span class="text-[10px] ${statusClass}">${statusIcon} ${statusText}</span>
-                                    ${it.ms != null ? `<span class="text-[10px] text-[var(--ui-muted)]">⏱️ ${it.ms}ms</span>` : ''}
                                     ${cachedBadge}
                                   </div>
                                 </div>
-                                ${argsPreview !== '—' ? `<div class="mt-1 text-[10px] text-[var(--ui-muted)]"><span class="font-semibold">Args:</span> <code class="block px-1 py-0.5 rounded bg-[var(--ui-muted-5)] font-mono whitespace-pre-wrap break-words">${argsPreview}</code></div>` : ''}
-                                ${errorInfo}
+                                ${argsPreview ? `<div class="mt-1 text-[10px] text-[var(--ui-muted)]"><span class="font-semibold">Args:</span> <code class="block px-1 py-0.5 rounded bg-[var(--ui-muted-5)] font-mono whitespace-pre-wrap break-words">${argsPreview}</code></div>` : ''}
                               `;
                               rtToolCalls.appendChild(row);
                             }
                           }
+                          updateDebugDump();
+                        } else if (idx != null && (isDone || isFailed)) {
+                          // Mark as completed/failed and re-render
+                          try {
+                            debugState.toolCalls[idx].success = isFailed ? false : true;
+                            debugState.toolCalls[idx].status = isFailed ? 'failed' : 'completed';
+                            // Re-render so status changes are visible immediately
+                            if (rtToolCalls) {
+                              const items = debugState.toolCalls.slice(0);
+                              rtToolCalls.innerHTML = '';
+                              for (const it of items) {
+                                const row = document.createElement('div');
+                                row.className = 'border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)]';
+                                const isRunning = (it.success === null) || (it.status === 'running');
+                                const statusClass = isRunning ? 'text-yellow-600' : (it.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]');
+                                const statusIcon = isRunning ? '⏳' : (it.success ? '✅' : '❌');
+                                const statusText = isRunning ? 'Läuft' : (it.success ? 'Erfolgreich' : 'Fehlgeschlagen');
+                                const cachedBadge = it.cached ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)] ml-2">cached</span>' : '';
+                                const argsRaw = (typeof it.args_json === 'string' && it.args_json.trim() !== '')
+                                  ? it.args_json
+                                  : (it.args != null ? JSON.stringify(it.args) : (it.args_preview || ''));
+                                const argsPreview = String(argsRaw || '');
+                                row.innerHTML = `
+                                  <div class="flex items-start justify-between gap-2 mb-1">
+                                    <div class="flex-1 min-w-0">
+                                      <div class="text-[11px] font-mono font-semibold text-[var(--ui-secondary)] truncate">${it.tool || '—'}</div>
+                                      ${it.call_id ? `<div class="text-[10px] text-[var(--ui-muted)] mt-0.5">Call-ID: ${it.call_id}</div>` : ''}
+                                    </div>
+                                    <div class="flex items-center gap-2 flex-shrink-0">
+                                      <span class="text-[10px] ${statusClass}">${statusIcon} ${statusText}</span>
+                                      ${cachedBadge}
+                                    </div>
+                                  </div>
+                                  ${argsPreview ? `<div class="mt-1 text-[10px] text-[var(--ui-muted)]"><span class="font-semibold">Args:</span> <code class="block px-1 py-0.5 rounded bg-[var(--ui-muted-5)] font-mono whitespace-pre-wrap break-words">${argsPreview}</code></div>` : ''}
+                                `;
+                                rtToolCalls.appendChild(row);
+                              }
+                            }
+                          } catch (_) {}
                           updateDebugDump();
                         }
                       }
