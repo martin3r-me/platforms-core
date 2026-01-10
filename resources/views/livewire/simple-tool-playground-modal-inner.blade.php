@@ -1681,6 +1681,13 @@
                   default:
                     // ignore
                 }
+
+                // Keep footer Stop + timer stable during streaming, even if Livewire re-renders the footer
+                // (e.g. after the first tool call / model update). This is cheap and prevents "blinking".
+                try {
+                  updateThreadBusyIndicators();
+                  updateFooterBusy();
+                } catch (_) {}
                 scrollToBottom();
               }
             }
