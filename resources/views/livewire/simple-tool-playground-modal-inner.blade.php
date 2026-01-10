@@ -227,7 +227,7 @@
                         <span class="text-[10px] text-[var(--ui-muted)]">t:</span>
                         <span id="pgFooterSeconds" class="text-[10px] font-mono text-[var(--ui-secondary)]">0s</span>
                     </div>
-                    <div class="flex items-center gap-1 px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] min-w-0">
+                    <div class="flex items-center gap-1 px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] min-w-0 max-w-[45vw]">
                         <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0">Event:</span>
                         <span id="pgFooterEventText" class="text-[10px] font-mono text-[var(--ui-secondary)] truncate">—</span>
                     </div>
@@ -783,7 +783,7 @@
 
         // Persist last event label across Livewire re-renders (otherwise the footer often resets to "—").
         window.__simplePlaygroundLastEvent = window.__simplePlaygroundLastEvent || { key: null, text: null };
-        const setEventLabel = (key, preview = null) => {
+        const setEventLabel = (key, payload = null) => {
           try {
             const label = String(key || '—');
             window.__simplePlaygroundLastEvent.key = label;
@@ -791,13 +791,31 @@
 
             const footerEl = document.getElementById('pgFooterEventText');
             if (footerEl) {
-              let suffix = '';
-              if (preview && typeof preview === 'object') {
-                if (preview.iteration != null) suffix = ` #${preview.iteration}`;
-                else if (preview.tool) suffix = ` ${String(preview.tool)}`;
-                else if (preview.name) suffix = ` ${String(preview.name)}`;
-              }
-              footerEl.textContent = `${label}${suffix}`.slice(0, 160);
+              // "Loose"/raw: always show the real event name, plus a tiny snippet of payload if available.
+              let snippet = '';
+              try {
+                if (payload && typeof payload === 'object') {
+                  // Prefer a concise error display
+                  if (payload.code && payload.message) {
+                    snippet = ` | ${String(payload.code)}: ${String(payload.message)}`;
+                  } else if (payload.error && typeof payload.error === 'object' && payload.error.code && payload.error.message) {
+                    snippet = ` | ${String(payload.error.code)}: ${String(payload.error.message)}`;
+                  } else if (payload.preview && typeof payload.preview === 'object') {
+                    // Preview is often small and stable.
+                    snippet = ` | ${JSON.stringify(payload.preview)}`;
+                  } else if (payload.tool) {
+                    snippet = ` | ${String(payload.tool)}`;
+                  } else if (payload.type) {
+                    snippet = ` | ${String(payload.type)}`;
+                  } else {
+                    snippet = ` | ${JSON.stringify(payload)}`;
+                  }
+                } else if (typeof payload === 'string' && payload.trim() !== '') {
+                  snippet = ` | ${payload}`;
+                }
+              } catch (_) {}
+              const txt = `${label}${snippet}`.replace(/\s+/g, ' ').slice(0, 180);
+              footerEl.textContent = txt || label;
             }
           } catch (_) {}
 
@@ -811,7 +829,8 @@
         const rtEvent = ({ key, preview = null, raw = null }) => {
           if (!key) return;
           // Also show last event in the chat footer + persist it.
-          setEventLabel(key, preview);
+          // For OpenAI events we pass both preview+raw so the footer can show a small raw snippet.
+          setEventLabel(key, raw || preview || null);
 
           const eventKey = `${key}:${preview?.type || ''}:${preview?.id || ''}:${preview?.call_id || ''}:${preview?.name || ''}`;
           if (eventKey === lastEventKey && lastEventSummaryEl) {
@@ -839,6 +858,58 @@
             while (rtEvents.children.length > maxEventItems) rtEvents.removeChild(rtEvents.firstChild);
             rtEvents.scrollTop = rtEvents.scrollHeight;
           }
+        };
+
+        // Tool calls: render newest first (top = latest), used by both tool.executed and OpenAI built-in tools.
+        const renderToolCalls = () => {
+          try {
+            if (!rtToolCalls) return;
+            const items = (debugState.toolCalls || []).slice(0);
+            rtToolCalls.innerHTML = '';
+            for (let i = items.length - 1; i >= 0; i--) {
+              const it = items[i] || {};
+              const row = document.createElement('div');
+              row.className = 'border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)]';
+              const isRunning = (it.success === null) || (it.status === 'running');
+              const statusClass = isRunning
+                ? 'text-yellow-600'
+                : (it.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]');
+              const statusIcon = isRunning ? '⏳' : (it.success ? '✅' : '❌');
+              const statusText = isRunning ? 'Läuft' : (it.success ? 'Erfolgreich' : 'Fehlgeschlagen');
+              const cachedBadge = it.cached ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)] ml-2">cached</span>' : '';
+              const argsRaw = (typeof it.args_json === 'string' && it.args_json.trim() !== '')
+                ? it.args_json
+                : (it.args != null ? JSON.stringify(it.args) : (it.args_preview || ''));
+              const argsPretty = (() => {
+                try {
+                  if (typeof argsRaw === 'string' && argsRaw.trim().startsWith('{')) {
+                    return JSON.stringify(JSON.parse(argsRaw), null, 2);
+                  }
+                } catch (_) {}
+                return String(argsRaw || '');
+              })();
+              const argsPreview = argsPretty
+                ? (argsPretty.length > 140 ? (argsPretty.substring(0, 140) + '…') : argsPretty)
+                : '—';
+              const errorInfo = it.error ? `<div class="mt-1 text-[10px] text-[var(--ui-danger)]">Error: ${it.error_code || 'UNKNOWN'}: ${typeof it.error === 'string' ? it.error.substring(0, 150) : JSON.stringify(it.error).substring(0, 150)}</div>` : '';
+              row.innerHTML = `
+                <div class="flex items-start justify-between gap-2 mb-1">
+                  <div class="flex-1 min-w-0">
+                    <div class="text-[11px] font-mono font-semibold text-[var(--ui-secondary)] truncate">${it.tool || '—'}</div>
+                    ${it.call_id ? `<div class="text-[10px] text-[var(--ui-muted)] mt-0.5">Call-ID: ${it.call_id}</div>` : ''}
+                  </div>
+                  <div class="flex items-center gap-2 flex-shrink-0">
+                    <span class="text-[10px] ${statusClass}">${statusIcon} ${statusText}</span>
+                    ${it.ms != null ? `<span class="text-[10px] text-[var(--ui-muted)]">⏱️ ${it.ms}ms</span>` : ''}
+                    ${cachedBadge}
+                  </div>
+                </div>
+                ${argsPreview !== '—' ? `<div class="mt-1 text-[10px] text-[var(--ui-muted)]"><span class="font-semibold">Args:</span> <code class="block px-1 py-0.5 rounded bg-[var(--ui-muted-5)] font-mono whitespace-pre-wrap break-words">${argsPreview}</code></div>` : ''}
+                ${errorInfo}
+              `;
+              rtToolCalls.appendChild(row);
+            }
+          } catch (_) {}
         };
 
         const resetRealtime = () => {
@@ -1277,15 +1348,11 @@
 
                 // Always surface *every* SSE event in the footer (even if we don't have a special handler).
                 // For openai.event we still set the label inside its handler to show the upstream event name.
-                try {
-                  if (currentEvent && currentEvent !== 'openai.event') {
-                    setEventLabel(currentEvent, data);
-                  }
-                } catch (_) {}
+                // Always reflect the raw incoming SSE event in the footer (no mapping/overwrites).
+                try { if (currentEvent) setEventLabel(currentEvent, data); } catch (_) {}
 
                 switch (currentEvent) {
                   case 'assistant.delta':
-                    setEventLabel('assistant.delta');
                     if (data?.delta) {
                       threadState.live.assistant += data.delta;
                       if (refreshThreadIdFromDom() === currentThreadId) {
@@ -1295,73 +1362,25 @@
                     debugState.lastAssistant = threadState.live.assistant;
                     break;
                   case 'reasoning.delta':
-                    setEventLabel('reasoning.delta');
                     if (data?.delta) {
                       threadState.live.reasoning += data.delta;
                       if (refreshThreadIdFromDom() === currentThreadId && rtReasoning) rtReasoning.textContent = threadState.live.reasoning;
                     }
                     break;
                   case 'thinking.delta':
-                    setEventLabel('thinking.delta');
                     if (data?.delta) {
                       threadState.live.thinking += data.delta;
                       if (refreshThreadIdFromDom() === currentThreadId && rtThinking) rtThinking.textContent = threadState.live.thinking;
                     }
                     break;
                   case 'debug.tools':
-                    setEventLabel('debug.tools');
                     debugState.toolsVisible = data || null;
                     updateDebugDump();
                     break;
                   case 'tool.executed':
-                    setEventLabel('tool.executed', { tool: data?.tool || null });
                     debugState.toolCalls.push(data);
-                    if (rtToolCalls) {
-                      const items = debugState.toolCalls.slice(0); // show ALL tool calls for this request
-                      rtToolCalls.innerHTML = '';
-                      for (const it of items) {
-                        const row = document.createElement('div');
-                        row.className = 'border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)]';
-                        const isRunning = (it.success === null) || (it.status === 'running');
-                        const statusClass = isRunning
-                          ? 'text-yellow-600'
-                          : (it.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]');
-                        const statusIcon = isRunning ? '⏳' : (it.success ? '✅' : '❌');
-                        const statusText = isRunning ? 'Läuft' : (it.success ? 'Erfolgreich' : 'Fehlgeschlagen');
-                        const cachedBadge = it.cached ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)] ml-2">cached</span>' : '';
-                        const argsRaw = (typeof it.args_json === 'string' && it.args_json.trim() !== '')
-                          ? it.args_json
-                          : (it.args != null ? JSON.stringify(it.args) : (it.args_preview || ''));
-                        const argsPretty = (() => {
-                          try {
-                            if (typeof argsRaw === 'string' && argsRaw.trim().startsWith('{')) {
-                              return JSON.stringify(JSON.parse(argsRaw), null, 2);
-                            }
-                          } catch (_) {}
-                          return String(argsRaw || '');
-                        })();
-                        const argsPreview = argsPretty
-                          ? (argsPretty.length > 140 ? (argsPretty.substring(0, 140) + '…') : argsPretty)
-                          : '—';
-                        const errorInfo = it.error ? `<div class="mt-1 text-[10px] text-[var(--ui-danger)]">Error: ${it.error_code || 'UNKNOWN'}: ${typeof it.error === 'string' ? it.error.substring(0, 150) : JSON.stringify(it.error).substring(0, 150)}</div>` : '';
-                        row.innerHTML = `
-                          <div class="flex items-start justify-between gap-2 mb-1">
-                            <div class="flex-1 min-w-0">
-                              <div class="text-[11px] font-mono font-semibold text-[var(--ui-secondary)] truncate">${it.tool || '—'}</div>
-                              ${it.call_id ? `<div class="text-[10px] text-[var(--ui-muted)] mt-0.5">Call-ID: ${it.call_id}</div>` : ''}
-                            </div>
-                            <div class="flex items-center gap-2 flex-shrink-0">
-                              <span class="text-[10px] ${statusClass}">${statusIcon} ${statusText}</span>
-                              ${it.ms != null ? `<span class="text-[10px] text-[var(--ui-muted)]">⏱️ ${it.ms}ms</span>` : ''}
-                              ${cachedBadge}
-                            </div>
-                          </div>
-                          ${argsPreview !== '—' ? `<div class="mt-1 text-[10px] text-[var(--ui-muted)]"><span class="font-semibold">Args:</span> <code class="block px-1 py-0.5 rounded bg-[var(--ui-muted-5)] font-mono whitespace-pre-wrap break-words">${argsPreview}</code></div>` : ''}
-                          ${errorInfo}
-                        `;
-                        rtToolCalls.appendChild(row);
-                      }
-                    }
+                    // Render newest first (top = latest)
+                    renderToolCalls();
                     updateDebugDump();
                     break;
                   case 'openai.event': {
@@ -1425,76 +1444,14 @@
                             args_json: p.query ? JSON.stringify({ query: p.query }) : null,
                             args: p.query ? { query: p.query } : null,
                           });
-                          if (rtToolCalls) {
-                            // Re-render using the same code path as tool.executed
-                            const items = debugState.toolCalls.slice(0);
-                            rtToolCalls.innerHTML = '';
-                            for (const it of items) {
-                              const row = document.createElement('div');
-                              row.className = 'border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)]';
-                              const isRunning = (it.success === null) || (it.status === 'running');
-                              const statusClass = isRunning ? 'text-yellow-600' : (it.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]');
-                              const statusIcon = isRunning ? '⏳' : (it.success ? '✅' : '❌');
-                              const statusText = isRunning ? 'Läuft' : (it.success ? 'Erfolgreich' : 'Fehlgeschlagen');
-                              const cachedBadge = it.cached ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)] ml-2">cached</span>' : '';
-                              const argsRaw = (typeof it.args_json === 'string' && it.args_json.trim() !== '')
-                                ? it.args_json
-                                : (it.args != null ? JSON.stringify(it.args) : (it.args_preview || ''));
-                              const argsPreview = String(argsRaw || '');
-                              row.innerHTML = `
-                                <div class="flex items-start justify-between gap-2 mb-1">
-                                  <div class="flex-1 min-w-0">
-                                    <div class="text-[11px] font-mono font-semibold text-[var(--ui-secondary)] truncate">${it.tool || '—'}</div>
-                                    ${it.call_id ? `<div class="text-[10px] text-[var(--ui-muted)] mt-0.5">Call-ID: ${it.call_id}</div>` : ''}
-                                  </div>
-                                  <div class="flex items-center gap-2 flex-shrink-0">
-                                    <span class="text-[10px] ${statusClass}">${statusIcon} ${statusText}</span>
-                                    ${cachedBadge}
-                                  </div>
-                                </div>
-                                ${argsPreview ? `<div class="mt-1 text-[10px] text-[var(--ui-muted)]"><span class="font-semibold">Args:</span> <code class="block px-1 py-0.5 rounded bg-[var(--ui-muted-5)] font-mono whitespace-pre-wrap break-words">${argsPreview}</code></div>` : ''}
-                              `;
-                              rtToolCalls.appendChild(row);
-                            }
-                          }
+                          renderToolCalls();
                           updateDebugDump();
                         } else if (idx != null && (isDone || isFailed)) {
                           // Mark as completed/failed and re-render
                           try {
                             debugState.toolCalls[idx].success = isFailed ? false : true;
                             debugState.toolCalls[idx].status = isFailed ? 'failed' : 'completed';
-                            // Re-render so status changes are visible immediately
-                            if (rtToolCalls) {
-                              const items = debugState.toolCalls.slice(0);
-                              rtToolCalls.innerHTML = '';
-                              for (const it of items) {
-                                const row = document.createElement('div');
-                                row.className = 'border border-[var(--ui-border)] rounded p-2 bg-[var(--ui-bg)]';
-                                const isRunning = (it.success === null) || (it.status === 'running');
-                                const statusClass = isRunning ? 'text-yellow-600' : (it.success ? 'text-[var(--ui-success)]' : 'text-[var(--ui-danger)]');
-                                const statusIcon = isRunning ? '⏳' : (it.success ? '✅' : '❌');
-                                const statusText = isRunning ? 'Läuft' : (it.success ? 'Erfolgreich' : 'Fehlgeschlagen');
-                                const cachedBadge = it.cached ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)] ml-2">cached</span>' : '';
-                                const argsRaw = (typeof it.args_json === 'string' && it.args_json.trim() !== '')
-                                  ? it.args_json
-                                  : (it.args != null ? JSON.stringify(it.args) : (it.args_preview || ''));
-                                const argsPreview = String(argsRaw || '');
-                                row.innerHTML = `
-                                  <div class="flex items-start justify-between gap-2 mb-1">
-                                    <div class="flex-1 min-w-0">
-                                      <div class="text-[11px] font-mono font-semibold text-[var(--ui-secondary)] truncate">${it.tool || '—'}</div>
-                                      ${it.call_id ? `<div class="text-[10px] text-[var(--ui-muted)] mt-0.5">Call-ID: ${it.call_id}</div>` : ''}
-                                    </div>
-                                    <div class="flex items-center gap-2 flex-shrink-0">
-                                      <span class="text-[10px] ${statusClass}">${statusIcon} ${statusText}</span>
-                                      ${cachedBadge}
-                                    </div>
-                                  </div>
-                                  ${argsPreview ? `<div class="mt-1 text-[10px] text-[var(--ui-muted)]"><span class="font-semibold">Args:</span> <code class="block px-1 py-0.5 rounded bg-[var(--ui-muted-5)] font-mono whitespace-pre-wrap break-words">${argsPreview}</code></div>` : ''}
-                                `;
-                                rtToolCalls.appendChild(row);
-                              }
-                            }
+                            renderToolCalls();
                           } catch (_) {}
                           updateDebugDump();
                         }
@@ -1506,7 +1463,6 @@
                     break;
                   }
                   case 'usage': {
-                    setEventLabel('usage');
                     const usage = data?.usage || {};
                     const inTok = usage?.input_tokens ?? null;
                     const outTok = usage?.output_tokens ?? null;
@@ -1585,7 +1541,6 @@
                     break;
                   }
                   case 'complete': {
-                    setEventLabel('complete');
                     const assistant = data?.assistant || threadState.live.assistant || '';
                     threadState.messages.push({ role: 'assistant', content: assistant });
                     removeStreamingAssistantMessage();
@@ -1597,7 +1552,6 @@
                     break;
                   }
                   case 'error': {
-                    setEventLabel('error');
                     const msg = data?.error || 'Unbekannter Fehler';
                     threadState.messages.push({ role: 'assistant', content: `❌ Fehler: ${msg}` });
                     renderMessage('assistant', `❌ Fehler: ${msg}`);
@@ -1737,6 +1691,13 @@
           setTimeout(() => {
             bindSubmitHandlers();
             bindFooterHandlers();
+            // After DOM re-render, recompute busy state so Stop doesn't "disappear" (disabled) mid-stream.
+            updateThreadBusyIndicators();
+            updateFooterBusy();
+            try {
+              const last = window.__simplePlaygroundLastEvent?.key;
+              if (last) setEventLabel(last);
+            } catch (_) {}
           }, 50);
         });
       };
@@ -1760,6 +1721,12 @@
             if (st && st.inFlight) el.classList.remove('hidden');
             else el.classList.add('hidden');
           });
+          // Also ensure footer Stop reflects current in-flight state when reopening modal.
+          try { updateFooterBusy(); } catch (_) {}
+          try {
+            const last = window.__simplePlaygroundLastEvent?.key;
+            if (last) setEventLabel(last);
+          } catch (_) {}
         } catch (_) {}
       };
 
