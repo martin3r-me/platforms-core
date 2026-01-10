@@ -190,8 +190,17 @@
                                         placeholder="Nachricht eingeben…"
                                         autocomplete="off"
                                     />
-                                    <button id="chatSend" type="submit" class="px-6 py-2 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90">
-                                        Senden
+                                    {{-- Inline live status: makes it obvious when a stream is still running --}}
+                                    <div id="pgInlineBusy" class="hidden items-center gap-2 px-2.5 h-10 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] text-[var(--ui-muted)]">
+                                        <span class="w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
+                                        <span class="text-[11px] font-semibold text-[var(--ui-secondary)]">läuft</span>
+                                        <span class="text-[10px] font-mono" id="pgInlineSeconds">0s</span>
+                                        <span class="text-[10px] text-[var(--ui-muted)]">·</span>
+                                        <span class="text-[10px] font-mono text-[var(--ui-secondary)] truncate max-w-[160px]" id="pgInlineEventText">—</span>
+                                    </div>
+                                    <button id="chatSend" type="submit" class="px-6 py-2 h-10 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90 flex items-center gap-2">
+                                        <span id="pgSendLabel">Senden</span>
+                                        <span id="pgSendSpinner" class="hidden w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
                                     </button>
                                 </form>
                             </div>
@@ -789,6 +798,12 @@
             }
           } catch (_) {}
 
+          // Mirror the last event next to the input too (more visible than the footer when focused on input)
+          try {
+            const inlineEl = document.getElementById('pgInlineEventText');
+            if (inlineEl) inlineEl.textContent = String(key || '—').slice(0, 80);
+          } catch (_) {}
+
           const eventKey = `${key}:${preview?.type || ''}:${preview?.id || ''}:${preview?.call_id || ''}:${preview?.name || ''}`;
           if (eventKey === lastEventKey && lastEventSummaryEl) {
             lastEventCount++;
@@ -1046,6 +1061,22 @@
           sendBtn.disabled = !!busy;
           if (busy) sendBtn.classList.add('opacity-60', 'cursor-not-allowed');
           else sendBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+
+          // Make running state obvious (label + spinner)
+          const lbl = document.getElementById('pgSendLabel');
+          const sp = document.getElementById('pgSendSpinner');
+          if (lbl) lbl.textContent = busy ? 'Läuft…' : 'Senden';
+          if (sp) {
+            if (busy) sp.classList.remove('hidden');
+            else sp.classList.add('hidden');
+          }
+
+          // Inline busy chip next to the input (more visible than the footer alone)
+          const chip = document.getElementById('pgInlineBusy');
+          if (chip) {
+            if (busy) chip.classList.remove('hidden');
+            else chip.classList.add('hidden');
+          }
         };
 
         const stopCurrentRequest = () => {
@@ -1108,14 +1139,23 @@
           }
 
           threadState.inFlight = true;
+          threadState.startedAtMs = Date.now();
           setSendButtonBusy(true);
           input.disabled = true;
+          // Disable model switching during an active stream (reduces confusion)
+          const ms = document.getElementById('modelSelect');
+          if (ms) ms.disabled = true;
           resetRealtime();
           if (rtStatus) rtStatus.textContent = 'streaming…';
           if (realtimeModel) realtimeModel.textContent = selectedModel || '—';
           debugState.startedAt = new Date().toISOString();
           updateThreadBusyIndicators();
           updateFooterBusy();
+          // Prime inline event label
+          try {
+            const inlineEv = document.getElementById('pgInlineEventText');
+            if (inlineEv) inlineEv.textContent = 'request.start';
+          } catch (_) {}
 
           // Get model from select field (in case it was changed)
           // Re-fetch modelSelect in case it was re-rendered by Livewire
@@ -1397,6 +1437,8 @@
             threadState.inFlight = false;
             setSendButtonBusy(false);
             input.disabled = false;
+            const ms = document.getElementById('modelSelect');
+            if (ms) ms.disabled = false;
             input.focus();
             updateThreadBusyIndicators();
             updateFooterBusy();
@@ -1404,6 +1446,26 @@
             threadState.userAborted = false;
           }
         };
+
+        // Live elapsed timer for the inline busy chip (idempotent binding)
+        window.__simplePlaygroundTimers = window.__simplePlaygroundTimers || {};
+        if (!window.__simplePlaygroundTimers.inlineElapsedBound) {
+          window.__simplePlaygroundTimers.inlineElapsedBound = true;
+          setInterval(() => {
+            try {
+              const tid = refreshThreadIdFromDom();
+              const st = getThreadState(tid || 'none');
+              const el = document.getElementById('pgInlineSeconds');
+              if (!el) return;
+              if (!st || !st.inFlight || !st.startedAtMs) {
+                el.textContent = '0s';
+                return;
+              }
+              const s = Math.max(0, Math.floor((Date.now() - st.startedAtMs) / 1000));
+              el.textContent = `${s}s`;
+            } catch (_) {}
+          }, 250);
+        }
 
         // Always bind submit handlers (ensure they work even after Livewire updates)
         // Use a wrapper function to ensure send() is accessible
