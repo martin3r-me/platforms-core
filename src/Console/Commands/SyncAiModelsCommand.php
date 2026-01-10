@@ -90,6 +90,19 @@ class SyncAiModelsCommand extends Command
         $resp = Http::withHeaders([
             'Authorization' => 'Bearer ' . $apiKey,
             'Content-Type' => 'application/json',
+            // Optional scoping headers (can affect quota/billing)
+            ...(function () {
+                $h = [];
+                $org = config('services.openai.organization');
+                if (is_string($org) && trim($org) !== '') {
+                    $h['OpenAI-Organization'] = trim($org);
+                }
+                $project = config('services.openai.project');
+                if (is_string($project) && trim($project) !== '') {
+                    $h['OpenAI-Project'] = trim($project);
+                }
+                return $h;
+            })(),
         ])->get(rtrim($baseUrl, '/') . '/models');
 
         if (!$resp->successful()) {

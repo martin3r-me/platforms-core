@@ -1032,11 +1032,25 @@ class OpenAiService
         if ($retryMinMs < 0) { $retryMinMs = 0; }
         if ($retryMaxMs < $retryMinMs) { $retryMaxMs = $retryMinMs; }
 
-        $request = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->getApiKey(),
-                'Content-Type' => 'application/json',
-                'User-Agent' => 'Glowkit-Core/1.0 (+Laravel)'
-            ])
+        $headers = [
+            'Authorization' => 'Bearer ' . $this->getApiKey(),
+            'Content-Type' => 'application/json',
+            'User-Agent' => 'Glowkit-Core/1.0 (+Laravel)',
+        ];
+
+        // Optional scoping headers (can affect quota/billing):
+        // - OpenAI-Organization (legacy but still supported in some setups)
+        // - OpenAI-Project (projects are the modern billing boundary; missing/wrong project can yield insufficient_quota)
+        $org = config('services.openai.organization');
+        if (is_string($org) && trim($org) !== '') {
+            $headers['OpenAI-Organization'] = trim($org);
+        }
+        $project = config('services.openai.project');
+        if (is_string($project) && trim($project) !== '') {
+            $headers['OpenAI-Project'] = trim($project);
+        }
+
+        $request = Http::withHeaders($headers)
             ->timeout($timeoutSeconds)
             ->connectTimeout($connectTimeoutSeconds)
             ->retry(
