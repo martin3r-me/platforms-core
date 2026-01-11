@@ -187,6 +187,7 @@
 
     {{-- AI User Tab --}}
     <div class="mt-6" x-show="tab === 'ai-user'" x-cloak>
+        @if(isset($team) && !($team->personal_team ?? true))
         <div class="space-y-6" x-data="{ showCreateForm: false }" 
              x-init="
                 $watch('showCreateForm', value => {
@@ -201,17 +202,17 @@
                     showCreateForm = false;
                 });
              ">
-            @if(isset($team) && !($team->personal_team ?? true) && Gate::check('addTeamMember', $team))
             {{-- Create AI User Button --}}
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">AI-User in diesem Team</h3>
-                <x-ui-button 
-                    variant="primary" 
+                <button 
+                    type="button"
+                    class="px-4 py-2 bg-[var(--ui-primary)] text-[var(--ui-on-primary)] rounded-lg hover:opacity-90 transition-opacity font-medium"
                     @click="showCreateForm = !showCreateForm"
                     x-text="showCreateForm ? 'Abbrechen' : 'Neuen AI-User erstellen'"
                 >
                     Neuen AI-User erstellen
-                </x-ui-button>
+                </button>
             </div>
 
             {{-- Create AI User Form (inline) --}}
@@ -271,7 +272,6 @@
             @endif
 
             {{-- AI Users List --}}
-            @if(isset($team) && !($team->personal_team ?? true))
             <div>
                 @if(!empty($aiUsers) && count($aiUsers) > 0)
                     <div class="space-y-3">
@@ -311,8 +311,12 @@
                     </div>
                 @endif
             </div>
-            @endif
         </div>
+        @else
+        <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">
+            Kein Team ausgewählt oder Personal-Team. AI-User können nur in Teams erstellt werden.
+        </div>
+        @endif
     </div>
 
     {{-- Create Tab --}}
