@@ -20,7 +20,25 @@
     {{-- Team Tab --}}
     <div class="mt-6" x-show="tab === 'team'" x-cloak>
         <div class="space-y-6">
-            <p>Team Tab - Inhalt entfernt zum Debuggen</p>
+            {{-- Team Switch --}}
+            <div>
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Aktuelles Team wechseln !</h3>
+                @if(!empty($allTeams) && count($allTeams) > 1)
+                    <x-ui-input-select
+                        name="user.current_team_id"
+                        label="Team auswählen"
+                        :options="$allTeams"
+                        optionValue="id"
+                        optionLabel="name"
+                        :nullable="false"
+                        wire:model.live="user.current_team_id"
+                        x-data
+                        @change="$wire.changeCurrentTeam($event.target.value)"
+                    />
+                @else
+                    <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">Nur ein Team vorhanden. Lege unten ein neues Team an.</div>
+                @endif
+            </div>
         </div>
     </div>
 
