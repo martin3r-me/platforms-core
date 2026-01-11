@@ -269,7 +269,6 @@
                     </div>
                 </form>
             </div>
-            @endif
 
             {{-- AI Users List --}}
             <div>
