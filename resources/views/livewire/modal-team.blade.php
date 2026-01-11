@@ -39,6 +39,100 @@
                     <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">Nur ein Team vorhanden. Lege unten ein neues Team an.</div>
                 @endif
             </div>
+
+            {{-- Team Settings (nur für Owner) --}}
+            @isset($team)
+            @if(($team->user_id ?? null) === auth()->id())
+            <div>
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Team-Einstellungen</h3>
+                <div class="space-y-4 p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                    @if(!empty($availableParentTeams) && count($availableParentTeams) > 0)
+                        <div>
+                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">
+                                Parent-Team
+                            </label>
+                            <x-ui-input-select
+                                name="currentParentTeamId"
+                                :options="$availableParentTeams"
+                                :nullable="true"
+                                wire:model="currentParentTeamId"
+                                wire:change="updateParentTeam"
+                            />
+                            <p class="text-xs text-[var(--ui-muted)] mt-2">
+                                Optional: Wähle ein Root-Team als Parent-Team. Kind-Teams erben Zugriff auf root-scoped Module (z.B. CRM, Organization).
+                            </p>
+                        </div>
+                    @else
+                        <div class="text-sm text-[var(--ui-muted)]">
+                            Keine verfügbaren Parent-Teams. Erstelle zuerst ein Root-Team.
+                        </div>
+                    @endif
+                </div>
+            </div>
+            @endif
+
+            {{-- Team Members --}}
+            <div>
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Team-Mitglieder</h3>
+                <div class="space-y-3">
+                    @foreach($team->users ?? [] as $member)
+                        <div class="flex items-center justify-between p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                            <div class="flex items-center gap-3">
+                                @if(!empty($member->avatar))
+                                    <img src="{{ $member->avatar }}" alt="{{ $member->fullname ?? $member->name }}" class="w-10 h-10 rounded-full object-cover" />
+                                @else
+                                <div class="w-10 h-10 bg-[var(--ui-primary)] text-[var(--ui-on-primary)] rounded-full flex items-center justify-center">
+                                    <span class="text-sm font-semibold">{{ strtoupper(mb_substr(($member->fullname ?? $member->name), 0, 2)) }}</span>
+                                </div>
+                                @endif
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="font-semibold text-[var(--ui-secondary)]">{{ $member->fullname ?? $member->name }}</div>
+                                        @if($member->isAiUser())
+                                            <x-ui-badge variant="purple" size="sm">AI</x-ui-badge>
+                                        @endif
+                                    </div>
+                                    @if($member->email)
+                                        <div class="text-sm text-[var(--ui-muted)]">{{ $member->email }}</div>
+                                    @elseif($member->isAiUser())
+                                        <div class="text-sm text-[var(--ui-muted)]">AI-User</div>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                @if(($team->user_id ?? null) === auth()->id())
+                                    <x-ui-input-select
+                                        name="member_role_{{ $member->id }}"
+                                        :options="['owner' => 'Owner', 'admin' => 'Admin', 'member' => 'Member', 'viewer' => 'Viewer']"
+                                        :nullable="false"
+                                        x-data
+                                        @change="$wire.updateMemberRole({{ $member->id }}, $event.target.value)"
+                                        wire:model.defer="memberRoles.{{ $member->id }}"
+                                    />
+
+                                    @if(($member->id ?? null) !== auth()->id())
+                                        <x-ui-confirm-button 
+                                            action="removeMember"
+                                            :value="$member->id"
+                                            text="Entfernen"
+                                            confirmText="Mitglied wirklich entfernen?"
+                                            variant="danger"
+                                        />
+                                    @else
+                                        <x-ui-badge variant="success" size="sm">Du</x-ui-badge>
+                                    @endif
+                                @else
+                                    <x-ui-badge variant="primary" size="sm">{{ ucfirst($member->pivot->role ?? 'member') }}</x-ui-badge>
+                                    @if(($member->id ?? null) === auth()->id())
+                                        <x-ui-badge variant="success" size="sm">Du</x-ui-badge>
+                                    @endif
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+            @endisset
         </div>
     </div>
 
