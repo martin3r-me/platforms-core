@@ -313,8 +313,8 @@
 
             {{-- Add Existing AI Users to Team --}}
             @php
-                $userRole = $team->users()->where('user_id', auth()->id())->first()?->pivot->role;
-                $canAddUsers = in_array($userRole, [\Platform\Core\Enums\TeamRole::OWNER->value, \Platform\Core\Enums\TeamRole::ADMIN->value]);
+                $userRole = isset($team) ? ($team->users()->where('user_id', auth()->id())->first()?->pivot->role ?? null) : null;
+                $canAddUsers = $userRole && in_array($userRole, [\Platform\Core\Enums\TeamRole::OWNER->value, \Platform\Core\Enums\TeamRole::ADMIN->value]);
             @endphp
             @if($canAddUsers && !empty($availableAiUsersToAdd) && count($availableAiUsersToAdd) > 0)
             <div class="mt-6 pt-6 border-t border-[var(--ui-border)]/40">
