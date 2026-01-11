@@ -201,6 +201,61 @@
                     Neuen AI-User erstellen
                 </button>
             </div>
+
+            {{-- Create AI User Form (inline) --}}
+            <div x-show="showCreateForm" x-cloak class="mb-6 p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                <h4 class="text-md font-semibold text-[var(--ui-secondary)] mb-4">Neuen AI-User erstellen</h4>
+                <form wire:submit.prevent="createAiUser" class="space-y-4">
+                    <x-ui-input-text
+                        name="aiUserForm.name"
+                        label="Name"
+                        wire:model.live="aiUserForm.name"
+                        placeholder="Name des AI-Users"
+                        required
+                        :errorKey="'aiUserForm.name'"
+                    />
+
+                    @if(!empty($availableAiModels) && count($availableAiModels) > 0)
+                        <x-ui-input-select
+                            name="aiUserForm.core_ai_model_id"
+                            label="AI-Model (optional)"
+                            :options="$availableAiModels"
+                            :nullable="true"
+                            wire:model.live="aiUserForm.core_ai_model_id"
+                            :errorKey="'aiUserForm.core_ai_model_id'"
+                        />
+                    @endif
+
+                    <div>
+                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">
+                            Anweisung / Beschreibung (optional)
+                        </label>
+                        <textarea
+                            name="aiUserForm.instruction"
+                            class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-[var(--ui-primary)] bg-[var(--ui-surface)] text-[var(--ui-secondary)]"
+                            rows="4"
+                            wire:model.live="aiUserForm.instruction"
+                            placeholder="Beschreibe, wer dieser AI-User ist und welche Rolle er hat..."
+                        ></textarea>
+                        @error('aiUserForm.instruction')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="flex gap-2">
+                        <x-ui-button type="submit" variant="primary" wire:loading.attr="disabled">
+                            AI-User erstellen
+                        </x-ui-button>
+                        <x-ui-button 
+                            type="button" 
+                            variant="secondary-outline" 
+                            @click="showCreateForm = false"
+                        >
+                            Abbrechen
+                        </x-ui-button>
+                    </div>
+                </form>
+            </div>
         </div>
         @else
         <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">
