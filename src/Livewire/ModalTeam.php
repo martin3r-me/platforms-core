@@ -63,6 +63,7 @@ class ModalTeam extends Component
     ];
     public $aiUsers = [];
     public $availableAiModels = [];
+    public $availableAiUsersToAdd = [];
 
     protected $listeners = ['open-modal-team' => 'openModal'];
 
@@ -78,6 +79,7 @@ class ModalTeam extends Component
         $this->loadBillingTotals();
         $this->loadAiUsers();
         $this->loadAvailableAiModels();
+        $this->loadAvailableAiUsersToAdd();
     }
 
     public function openModal()
@@ -89,6 +91,9 @@ class ModalTeam extends Component
         $this->loadMemberRoles();
         $this->loadBillingData();
         $this->loadBillingTotals();
+        $this->loadAiUsers();
+        $this->loadAvailableAiModels();
+        $this->loadAvailableAiUsersToAdd();
     }
 
     public function loadTeams()
@@ -570,6 +575,31 @@ class ModalTeam extends Component
         }
     }
 
+    public function loadAvailableAiUsersToAdd()
+    {
+        $team = auth()->user()->currentTeamRelation;
+        if (!$team) {
+            $this->availableAiUsersToAdd = [];
+            return;
+        }
+
+        // Hole alle AI-User, die zu diesem Team hinzugefügt werden können
+        $allAiUsers = User::where('type', 'ai_user')->get();
+        $availableUsers = collect([]);
+
+        foreach ($allAiUsers as $aiUser) {
+            // Prüfe, ob der AI-User zu diesem Team hinzugefügt werden kann
+            if ($aiUser->canBeAssignedToTeam($team)) {
+                // Prüfe, ob der AI-User noch nicht im Team ist
+                if (!$team->users()->where('users.id', $aiUser->id)->exists()) {
+                    $availableUsers->push($aiUser);
+                }
+            }
+        }
+
+        $this->availableAiUsersToAdd = $availableUsers;
+    }
+
     public function createAiUser()
     {
         $team = auth()->user()->currentTeamRelation;
@@ -630,6 +660,7 @@ class ModalTeam extends Component
 
         // Liste neu laden
         $this->loadAiUsers();
+        $this->loadAvailableAiUsersToAdd();
         $this->team = $team->fresh();
 
         // Formular schließen (Alpine.js Event)
@@ -638,6 +669,68 @@ class ModalTeam extends Component
         $this->dispatch('notice', [
             'type' => 'success',
             'message' => 'AI-User erfolgreich erstellt und zum Team hinzugefügt.',
+        ]);
+    }
+
+    public function addAiUserToTeam(int $userId): void
+    {
+        $team = auth()->user()->currentTeamRelation;
+        if (!$team) {
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'Kein Team ausgewählt.',
+            ]);
+            return;
+        }
+
+        // Prüfe, ob User Owner oder Admin ist
+        $userRole = $team->users()->where('user_id', auth()->id())->first()?->pivot->role;
+        if (!in_array($userRole, [TeamRole::OWNER->value, TeamRole::ADMIN->value])) {
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'Nur Owner oder Admin können AI-User hinzufügen.',
+            ]);
+            return;
+        }
+
+        $aiUser = User::find($userId);
+        if (!$aiUser || !$aiUser->isAiUser()) {
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'AI-User nicht gefunden.',
+            ]);
+            return;
+        }
+
+        // Prüfe, ob der AI-User zu diesem Team hinzugefügt werden kann
+        if (!$aiUser->canBeAssignedToTeam($team)) {
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'Dieser AI-User kann diesem Team nicht zugewiesen werden (nur Home-Team oder Kind-Teams erlaubt).',
+            ]);
+            return;
+        }
+
+        // Prüfe, ob der AI-User bereits im Team ist
+        if ($team->users()->where('users.id', $aiUser->id)->exists()) {
+            $this->dispatch('notice', [
+                'type' => 'warning',
+                'message' => 'AI-User ist bereits im Team.',
+            ]);
+            return;
+        }
+
+        // Füge den AI-User zum Team hinzu
+        $team->users()->attach($aiUser, ['role' => TeamRole::MEMBER->value]);
+
+        // Listen neu laden
+        $this->loadAiUsers();
+        $this->loadAvailableAiUsersToAdd();
+        $this->team = $team->fresh();
+
+        $this->dispatch('notice', [
+            'type' => 'success',
+            'message' => 'AI-User erfolgreich zum Team hinzugefügt.',
         ]);
     }
 
@@ -660,6 +753,7 @@ class ModalTeam extends Component
 
         $team->users()->detach($userId);
         $this->loadAiUsers();
+        $this->loadAvailableAiUsersToAdd();
         $this->team = $team->fresh();
 
         $this->dispatch('notice', [

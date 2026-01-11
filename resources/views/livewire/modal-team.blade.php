@@ -306,10 +306,58 @@
                     </div>
                 @else
                     <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">
-                        Noch keine AI-User in diesem Team. Erstelle oben einen neuen AI-User.
+                        Noch keine AI-User in diesem Team.
                     </div>
                 @endif
             </div>
+
+            {{-- Add Existing AI Users to Team --}}
+            @if(isset($team) && !($team->personal_team ?? true))
+            @php
+                $userRole = $team->users()->where('user_id', auth()->id())->first()?->pivot->role;
+                $canAddUsers = in_array($userRole, [\Platform\Core\Enums\TeamRole::OWNER->value, \Platform\Core\Enums\TeamRole::ADMIN->value]);
+            @endphp
+            @if($canAddUsers && !empty($availableAiUsersToAdd) && count($availableAiUsersToAdd) > 0)
+            <div class="mt-6 pt-6 border-t border-[var(--ui-border)]/40">
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Verfügbare AI-User hinzufügen</h3>
+                <p class="text-sm text-[var(--ui-muted)] mb-4">
+                    Diese AI-User können zu diesem Team hinzugefügt werden (Home-Team oder Kind-Teams).
+                </p>
+                <div class="space-y-3">
+                    @foreach($availableAiUsersToAdd as $aiUser)
+                        <div class="flex items-center justify-between p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-purple-500 text-white rounded-full flex items-center justify-center">
+                                    <span class="text-sm font-semibold">AI</span>
+                                </div>
+                                <div>
+                                    <div class="font-semibold text-[var(--ui-secondary)]">{{ $aiUser->name }}</div>
+                                    @if($aiUser->instruction)
+                                        <div class="text-sm text-[var(--ui-muted)]">{{ \Illuminate\Support\Str::limit($aiUser->instruction, 60) }}</div>
+                                    @endif
+                                    @if($aiUser->team)
+                                        <div class="text-xs text-[var(--ui-muted)]">Home-Team: {{ $aiUser->team->name }}</div>
+                                    @endif
+                                    @if($aiUser->coreAiModel)
+                                        <div class="text-xs text-[var(--ui-muted)]">Model: {{ $aiUser->coreAiModel->name }}</div>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <x-ui-button 
+                                    variant="primary" 
+                                    wire:click="addAiUserToTeam({{ $aiUser->id }})"
+                                    wire:loading.attr="disabled"
+                                >
+                                    Zum Team hinzufügen
+                                </x-ui-button>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+            @endif
         </div>
         @else
         <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">
