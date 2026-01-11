@@ -8,6 +8,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Platform\Core\Models\Module;
+use Platform\Core\Models\CoreAiModel;
 
 class User extends Authenticatable
 {
@@ -17,6 +18,10 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'type',
+        'core_ai_model_id',
+        'instruction',
+        'team_id',
     ];
 
     protected $hidden = [
@@ -102,5 +107,163 @@ class User extends Authenticatable
         return $this->morphToMany(Module::class, 'modulable')
             ->withPivot(['role', 'enabled', 'guard', 'team_id'])
             ->withTimestamps();
+    }
+
+    /**
+     * Boot the model.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Stelle sicher, dass team_id nur für AI-User gesetzt ist
+        static::saving(function ($user) {
+            if ($user->type !== 'ai_user') {
+                $user->team_id = null;
+                // Normale User müssen email und password haben
+                if (!$user->email || !$user->password) {
+                    throw new \Illuminate\Validation\ValidationException(
+                        \Illuminate\Support\Facades\Validator::make([], [])->errors()
+                            ->add('email', 'Email ist für normale User erforderlich.')
+                            ->add('password', 'Passwort ist für normale User erforderlich.')
+                    );
+                }
+            } else {
+                // AI-User brauchen kein email/password, setze auf null falls leer
+                if (empty($user->email)) {
+                    $user->email = null;
+                }
+                if (empty($user->password)) {
+                    $user->password = null;
+                }
+            }
+        });
+
+        // Validiere, dass AI-User ein team_id haben sollten
+        static::saving(function ($user) {
+            if ($user->type === 'ai_user' && !$user->team_id) {
+                throw new \Illuminate\Validation\ValidationException(
+                    \Illuminate\Support\Facades\Validator::make([], [])->errors()->add(
+                        'team_id',
+                        'AI-User müssen einem Team zugeordnet sein (team_id ist erforderlich).'
+                    )
+                );
+            }
+        });
+
+        // Validiere, dass AI-User einen Namen haben
+        static::saving(function ($user) {
+            if ($user->type === 'ai_user' && empty($user->name)) {
+                throw new \Illuminate\Validation\ValidationException(
+                    \Illuminate\Support\Facades\Validator::make([], [])->errors()->add(
+                        'name',
+                        'Name ist für AI-User erforderlich.'
+                    )
+                );
+            }
+        });
+    }
+
+    /**
+     * Prüft, ob der User ein AI-User ist
+     */
+    public function isAiUser(): bool
+    {
+        return $this->type === 'ai_user';
+    }
+
+    /**
+     * Scope: Alle AI-User abrufen
+     */
+    public function scopeAiUsers($query)
+    {
+        return $query->where('type', 'ai_user');
+    }
+
+    /**
+     * Scope: Alle normalen User abrufen
+     */
+    public function scopeRegularUsers($query)
+    {
+        return $query->where('type', '!=', 'ai_user')->orWhereNull('type');
+    }
+
+    /**
+     * Beziehung zum Team (nur für AI-User relevant - das Home-Team)
+     */
+    public function team()
+    {
+        return $this->belongsTo(Team::class, 'team_id');
+    }
+
+    /**
+     * Beziehung zum AI-Model
+     */
+    public function coreAiModel()
+    {
+        return $this->belongsTo(CoreAiModel::class, 'core_ai_model_id');
+    }
+
+    /**
+     * Prüft, ob der AI-User einem bestimmten Team zugewiesen werden kann
+     * basierend auf der Team-Hierarchie
+     */
+    public function canBeAssignedToTeam(Team $team): bool
+    {
+        // Nur für AI-User relevant
+        if (!$this->isAiUser() || !$this->team_id) {
+            return true; // Normale User können immer zugewiesen werden
+        }
+
+        $homeTeam = $this->team;
+        if (!$homeTeam) {
+            return false;
+        }
+
+        // Wenn das Ziel-Team das Home-Team ist, ist es erlaubt
+        if ($team->id === $homeTeam->id) {
+            return true;
+        }
+
+        // Prüfe, ob das Ziel-Team ein Kind-Team des Home-Teams ist
+        return $homeTeam->isParentOf($team);
+    }
+
+    /**
+     * Gibt alle Teams zurück, denen dieser AI-User zugewiesen werden kann
+     */
+    public function getAssignableTeams()
+    {
+        if (!$this->isAiUser() || !$this->team_id) {
+            return Team::all(); // Normale User können allen Teams zugewiesen werden
+        }
+
+        $homeTeam = $this->team;
+        if (!$homeTeam) {
+            return collect([]);
+        }
+
+        // Sammle das Home-Team und alle Kind-Teams
+        $assignableTeams = collect([$homeTeam]);
+        $childTeams = $homeTeam->childTeams()->get();
+        foreach ($childTeams as $childTeam) {
+            $assignableTeams->push($childTeam);
+            // Rekursiv alle Kind-Teams sammeln
+            $this->collectAllChildTeams($childTeam, $assignableTeams);
+        }
+
+        return $assignableTeams;
+    }
+
+    /**
+     * Rekursiv alle Kind-Teams sammeln
+     */
+    protected function collectAllChildTeams(Team $team, $collection)
+    {
+        $childTeams = $team->childTeams()->get();
+        foreach ($childTeams as $childTeam) {
+            $collection->push($childTeam);
+            $this->collectAllChildTeams($childTeam, $collection);
+        }
     }
 }

@@ -181,4 +181,60 @@ class Team extends Model
             }
         }
     }
+
+    /**
+     * Prüft, ob dieses Team ein Vorfahre des gegebenen Teams ist
+     * (Alias für isParentOf, für Konsistenz mit customerCMS Code)
+     */
+    public function isAncestorOf(Team $team): bool
+    {
+        return $this->isParentOf($team);
+    }
+
+    /**
+     * Gibt alle Nachkommen-Teams zurück (rekursiv)
+     */
+    public function getAllDescendants()
+    {
+        $descendants = collect();
+        
+        foreach ($this->childTeams as $child) {
+            $descendants->push($child);
+            $descendants = $descendants->merge($child->getAllDescendants());
+        }
+        
+        return $descendants;
+    }
+
+    /**
+     * Gibt alle Vorfahren-Teams zurück
+     */
+    public function getAllAncestors()
+    {
+        $ancestors = collect();
+        $current = $this->parentTeam;
+        
+        while ($current) {
+            $ancestors->push($current);
+            $current = $current->parentTeam;
+        }
+        
+        return $ancestors;
+    }
+
+    /**
+     * Alias für parentTeam() für Konsistenz
+     */
+    public function parent()
+    {
+        return $this->parentTeam();
+    }
+
+    /**
+     * Alias für childTeams() für Konsistenz
+     */
+    public function children()
+    {
+        return $this->childTeams();
+    }
 }
