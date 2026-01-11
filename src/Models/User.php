@@ -120,12 +120,14 @@ class User extends Authenticatable
         static::saving(function ($user) {
             if ($user->type !== 'ai_user') {
                 $user->team_id = null;
-                // Normale User müssen email und password haben
-                if (!$user->email || !$user->password) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'email' => 'Email ist für normale User erforderlich.',
-                        'password' => 'Passwort ist für normale User erforderlich.',
-                    ]);
+                // Normale User müssen email und password haben - nur beim Erstellen validieren
+                if (!$user->exists) {
+                    if (!$user->email || !$user->password) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'email' => 'Email ist für normale User erforderlich.',
+                            'password' => 'Passwort ist für normale User erforderlich.',
+                        ]);
+                    }
                 }
             } else {
                 // AI-User brauchen kein email/password, setze auf null falls leer
@@ -138,18 +140,18 @@ class User extends Authenticatable
             }
         });
 
-        // Validiere, dass AI-User ein team_id haben sollten
+        // Validiere, dass AI-User ein team_id haben sollten - nur beim Erstellen
         static::saving(function ($user) {
-            if ($user->type === 'ai_user' && !$user->team_id) {
+            if ($user->type === 'ai_user' && !$user->exists && !$user->team_id) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'team_id' => 'AI-User müssen einem Team zugeordnet sein (team_id ist erforderlich).',
                 ]);
             }
         });
 
-        // Validiere, dass AI-User einen Namen haben
+        // Validiere, dass AI-User einen Namen haben - nur beim Erstellen
         static::saving(function ($user) {
-            if ($user->type === 'ai_user' && empty($user->name)) {
+            if ($user->type === 'ai_user' && !$user->exists && empty($user->name)) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'name' => 'Name ist für AI-User erforderlich.',
                 ]);
