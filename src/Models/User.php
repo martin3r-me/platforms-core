@@ -122,11 +122,10 @@ class User extends Authenticatable
                 $user->team_id = null;
                 // Normale User müssen email und password haben
                 if (!$user->email || !$user->password) {
-                    throw new \Illuminate\Validation\ValidationException(
-                        \Illuminate\Support\Facades\Validator::make([], [])->errors()
-                            ->add('email', 'Email ist für normale User erforderlich.')
-                            ->add('password', 'Passwort ist für normale User erforderlich.')
-                    );
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'email' => 'Email ist für normale User erforderlich.',
+                        'password' => 'Passwort ist für normale User erforderlich.',
+                    ]);
                 }
             } else {
                 // AI-User brauchen kein email/password, setze auf null falls leer
@@ -142,24 +141,18 @@ class User extends Authenticatable
         // Validiere, dass AI-User ein team_id haben sollten
         static::saving(function ($user) {
             if ($user->type === 'ai_user' && !$user->team_id) {
-                throw new \Illuminate\Validation\ValidationException(
-                    \Illuminate\Support\Facades\Validator::make([], [])->errors()->add(
-                        'team_id',
-                        'AI-User müssen einem Team zugeordnet sein (team_id ist erforderlich).'
-                    )
-                );
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'team_id' => 'AI-User müssen einem Team zugeordnet sein (team_id ist erforderlich).',
+                ]);
             }
         });
 
         // Validiere, dass AI-User einen Namen haben
         static::saving(function ($user) {
             if ($user->type === 'ai_user' && empty($user->name)) {
-                throw new \Illuminate\Validation\ValidationException(
-                    \Illuminate\Support\Facades\Validator::make([], [])->errors()->add(
-                        'name',
-                        'Name ist für AI-User erforderlich.'
-                    )
-                );
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'name' => 'Name ist für AI-User erforderlich.',
+                ]);
             }
         });
     }
