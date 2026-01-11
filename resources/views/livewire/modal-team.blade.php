@@ -187,13 +187,6 @@
 
     {{-- AI User Tab --}}
     <div class="mt-6" x-show="tab === 'ai-user'" x-cloak>
-        @php
-            $canAddUsers = false;
-            if (isset($team) && !($team->personal_team ?? true)) {
-                $userRole = $team->users()->where('user_id', auth()->id())->first()?->pivot->role ?? null;
-                $canAddUsers = $userRole && in_array($userRole, [\Platform\Core\Enums\TeamRole::OWNER->value, \Platform\Core\Enums\TeamRole::ADMIN->value]);
-            }
-        @endphp
         @if(isset($team) && !($team->personal_team ?? true))
         <div class="space-y-6" x-data="{ showCreateForm: false }">
             {{-- Create AI User Button --}}
@@ -262,47 +255,6 @@
                         </x-ui-button>
                     </div>
                 </form>
-            </div>
-
-            {{-- AI Users List --}}
-            <div>
-                @if(!empty($aiUsers) && count($aiUsers) > 0)
-                    <div class="space-y-3">
-                        @foreach($aiUsers as $aiUser)
-                            <div class="flex items-center justify-between p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 bg-purple-500 text-white rounded-full flex items-center justify-center">
-                                        <span class="text-sm font-semibold">AI</span>
-                                    </div>
-                                    <div>
-                                        <div class="font-semibold text-[var(--ui-secondary)]">{{ $aiUser->name }}</div>
-                                        @if($aiUser->instruction)
-                                            <div class="text-sm text-[var(--ui-muted)]">{{ \Illuminate\Support\Str::limit($aiUser->instruction, 60) }}</div>
-                                        @endif
-                                        @if($aiUser->coreAiModel)
-                                            <div class="text-xs text-[var(--ui-muted)]">Model: {{ $aiUser->coreAiModel->name }}</div>
-                                        @endif
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    @if(($team->user_id ?? null) === auth()->id())
-                                        <x-ui-confirm-button 
-                                            action="removeAiUser"
-                                            :value="$aiUser->id"
-                                            text="Entfernen"
-                                            confirmText="AI-User wirklich entfernen?"
-                                            variant="danger"
-                                        />
-                                    @endif
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                @else
-                    <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">
-                        Noch keine AI-User in diesem Team.
-                    </div>
-                @endif
             </div>
         </div>
         @else
