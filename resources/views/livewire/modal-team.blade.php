@@ -188,8 +188,19 @@
     {{-- AI User Tab --}}
     <div class="mt-6" x-show="tab === 'ai-user'" x-cloak>
         @if(isset($team) && !($team->personal_team ?? true))
-        <div class="space-y-6">
-            <p>AI User Tab - Inhalt entfernt zum Debuggen</p>
+        <div class="space-y-6" x-data="{ showCreateForm: false }">
+            {{-- Create AI User Button --}}
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">AI-User in diesem Team</h3>
+                <button 
+                    type="button"
+                    class="px-4 py-2 bg-[var(--ui-primary)] text-[var(--ui-on-primary)] rounded-lg hover:opacity-90 transition-opacity font-medium"
+                    @click="showCreateForm = !showCreateForm"
+                    x-text="showCreateForm ? 'Abbrechen' : 'Neuen AI-User erstellen'"
+                >
+                    Neuen AI-User erstellen
+                </button>
+            </div>
         </div>
         @else
         <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">
