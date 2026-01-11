@@ -312,7 +312,6 @@
             </div>
 
             {{-- Add Existing AI Users to Team --}}
-            @if(isset($team) && !($team->personal_team ?? true))
             @php
                 $userRole = $team->users()->where('user_id', auth()->id())->first()?->pivot->role;
                 $canAddUsers = in_array($userRole, [\Platform\Core\Enums\TeamRole::OWNER->value, \Platform\Core\Enums\TeamRole::ADMIN->value]);
@@ -356,7 +355,6 @@
                     @endforeach
                 </div>
             </div>
-            @endif
             @endif
         </div>
         @else
