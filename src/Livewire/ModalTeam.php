@@ -574,10 +574,22 @@ class ModalTeam extends Component
     {
         $team = auth()->user()->currentTeamRelation;
         if (!$team) {
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'Kein Team ausgewählt.',
+            ]);
             return;
         }
 
-        Gate::authorize('addTeamMember', $team);
+        // Prüfe, ob User Owner oder Admin ist
+        $userRole = $team->users()->where('user_id', auth()->id())->first()?->pivot->role;
+        if (!in_array($userRole, [TeamRole::OWNER->value, TeamRole::ADMIN->value])) {
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'Nur Owner oder Admin können AI-User erstellen.',
+            ]);
+            return;
+        }
 
         $rules = [
             'aiUserForm.name' => 'required|string|max:255',
