@@ -11,6 +11,7 @@
         </div>
         <div class="flex gap-1 mt-4 border-b border-gray-200">
             <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : tab === 'team', 'text-gray-500 hover:text-gray-700' : tab !== 'team' }" @click="tab = 'team'">Team</button>
+            <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : tab === 'ai-user', 'text-gray-500 hover:text-gray-700' : tab !== 'ai-user' }" @click="tab = 'ai-user'">AI User</button>
             <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : tab === 'create', 'text-gray-500 hover:text-gray-700' : tab !== 'create' }" @click="tab = 'create'">Anlegen</button>
             <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : tab === 'billing', 'text-gray-500 hover:text-gray-700' : tab !== 'billing' }" @click="tab = 'billing'">Abrechnung</button>
         </div>
@@ -85,8 +86,17 @@
                                 </div>
                                 @endif
                                 <div>
-                                    <div class="font-semibold text-[var(--ui-secondary)]">{{ $member->fullname ?? $member->name }}</div>
-                                    <div class="text-sm text-[var(--ui-muted)]">{{ $member->email }}</div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="font-semibold text-[var(--ui-secondary)]">{{ $member->fullname ?? $member->name }}</div>
+                                        @if($member->isAiUser())
+                                            <x-ui-badge variant="purple" size="sm">AI</x-ui-badge>
+                                        @endif
+                                    </div>
+                                    @if($member->email)
+                                        <div class="text-sm text-[var(--ui-muted)]">{{ $member->email }}</div>
+                                    @elseif($member->isAiUser())
+                                        <div class="text-sm text-[var(--ui-muted)]">AI-User</div>
+                                    @endif
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
@@ -123,14 +133,6 @@
                 </div>
             </div>
             @endisset
-
-            {{-- Create AI User --}}
-            @if(isset($team) && !($team->personal_team ?? true) && Gate::check('addTeamMember', $team))
-            <div>
-                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">AI-User erstellen</h3>
-                @livewire('core.create-ai-user', ['team' => $team])
-            </div>
-            @endif
 
             {{-- Invite Member --}}
             @if(isset($team) && !($team->personal_team ?? true))
@@ -178,6 +180,103 @@
                         <div class="text-sm text-[var(--ui-muted)]">Keine offenen Einladungen.</div>
                     @endif
                 </div>
+            </div>
+            @endif
+        </div>
+    </div>
+
+    {{-- AI User Tab --}}
+    <div class="mt-6" x-show="tab === 'ai-user'" x-cloak>
+        <div class="space-y-6">
+            @if(isset($team) && !($team->personal_team ?? true) && Gate::check('addTeamMember', $team))
+            {{-- Create AI User Form --}}
+            <div>
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Neuen AI-User erstellen</h3>
+                <form wire:submit.prevent="createAiUser" class="space-y-4">
+                    <x-ui-input-text
+                        name="aiUserForm.name"
+                        label="Name"
+                        wire:model.live="aiUserForm.name"
+                        placeholder="Name des AI-Users"
+                        required
+                        :errorKey="'aiUserForm.name'"
+                    />
+
+                    @if(!empty($availableAiModels) && count($availableAiModels) > 0)
+                        <x-ui-input-select
+                            name="aiUserForm.core_ai_model_id"
+                            label="AI-Model (optional)"
+                            :options="$availableAiModels"
+                            :nullable="true"
+                            wire:model.live="aiUserForm.core_ai_model_id"
+                            :errorKey="'aiUserForm.core_ai_model_id'"
+                        />
+                    @endif
+
+                    <div>
+                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">
+                            Anweisung / Beschreibung (optional)
+                        </label>
+                        <textarea
+                            name="aiUserForm.instruction"
+                            class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-[var(--ui-primary)] bg-[var(--ui-surface)] text-[var(--ui-secondary)]"
+                            rows="4"
+                            wire:model.live="aiUserForm.instruction"
+                            placeholder="Beschreibe, wer dieser AI-User ist und welche Rolle er hat..."
+                        ></textarea>
+                        @error('aiUserForm.instruction')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <x-ui-button type="submit" variant="primary" wire:loading.attr="disabled">
+                        AI-User erstellen
+                    </x-ui-button>
+                </form>
+            </div>
+            @endif
+
+            {{-- AI Users List --}}
+            @if(isset($team) && !($team->personal_team ?? true))
+            <div>
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">AI-User in diesem Team</h3>
+                @if(!empty($aiUsers) && count($aiUsers) > 0)
+                    <div class="space-y-3">
+                        @foreach($aiUsers as $aiUser)
+                            <div class="flex items-center justify-between p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 bg-purple-500 text-white rounded-full flex items-center justify-center">
+                                        <span class="text-sm font-semibold">AI</span>
+                                    </div>
+                                    <div>
+                                        <div class="font-semibold text-[var(--ui-secondary)]">{{ $aiUser->name }}</div>
+                                        @if($aiUser->instruction)
+                                            <div class="text-sm text-[var(--ui-muted)]">{{ \Illuminate\Support\Str::limit($aiUser->instruction, 60) }}</div>
+                                        @endif
+                                        @if($aiUser->coreAiModel)
+                                            <div class="text-xs text-[var(--ui-muted)]">Model: {{ $aiUser->coreAiModel->name }}</div>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    @if(($team->user_id ?? null) === auth()->id())
+                                        <x-ui-confirm-button 
+                                            action="removeAiUser"
+                                            :value="$aiUser->id"
+                                            text="Entfernen"
+                                            confirmText="AI-User wirklich entfernen?"
+                                            variant="danger"
+                                        />
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">
+                        Noch keine AI-User in diesem Team. Erstelle oben einen neuen AI-User.
+                    </div>
+                @endif
             </div>
             @endif
         </div>

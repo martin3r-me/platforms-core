@@ -9,8 +9,12 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Platform\Core\Models\Team;
 use Platform\Core\Models\TeamInvitation;
+use Platform\Core\Models\User;
+use Platform\Core\Models\CoreAiModel;
 use Platform\Core\Enums\TeamRole;
 use Platform\Core\Services\TeamInvitationService;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 
 class ModalTeam extends Component
 {
@@ -51,6 +55,15 @@ class ModalTeam extends Component
         'credit_card' => 'Kreditkarte',
     ];
 
+    // AI User properties
+    public $aiUserForm = [
+        'name' => '',
+        'core_ai_model_id' => null,
+        'instruction' => '',
+    ];
+    public $aiUsers = [];
+    public $availableAiModels = [];
+
     protected $listeners = ['open-modal-team' => 'openModal'];
 
     public function mount()
@@ -63,6 +76,8 @@ class ModalTeam extends Component
         $this->loadMemberRoles();
         $this->loadBillingData();
         $this->loadBillingTotals();
+        $this->loadAiUsers();
+        $this->loadAvailableAiModels();
     }
 
     public function openModal()
@@ -530,6 +545,112 @@ class ModalTeam extends Component
                 'message' => 'Rechnungsdaten erfolgreich gespeichert!'
             ]);
         }
+    }
+
+    public function loadAiUsers()
+    {
+        $team = auth()->user()->currentTeamRelation;
+        if ($team) {
+            $this->aiUsers = $team->users()->where('type', 'ai_user')->get();
+        } else {
+            $this->aiUsers = [];
+        }
+    }
+
+    public function loadAvailableAiModels()
+    {
+        $this->availableAiModels = collect([]);
+        
+        if (Schema::hasTable('core_ai_models') && class_exists(CoreAiModel::class)) {
+            try {
+                $this->availableAiModels = CoreAiModel::all()->pluck('name', 'id')->toArray();
+            } catch (\Exception $e) {
+                $this->availableAiModels = [];
+            }
+        }
+    }
+
+    public function createAiUser()
+    {
+        $team = auth()->user()->currentTeamRelation;
+        if (!$team) {
+            return;
+        }
+
+        Gate::authorize('addTeamMember', $team);
+
+        $rules = [
+            'aiUserForm.name' => 'required|string|max:255',
+            'aiUserForm.instruction' => 'nullable|string',
+        ];
+
+        if (Schema::hasTable('core_ai_models')) {
+            $rules['aiUserForm.core_ai_model_id'] = 'nullable|exists:core_ai_models,id';
+        } else {
+            $rules['aiUserForm.core_ai_model_id'] = 'nullable|integer';
+        }
+
+        $this->validate($rules, [
+            'aiUserForm.name.required' => 'Der Name ist erforderlich.',
+            'aiUserForm.core_ai_model_id.exists' => 'Das ausgewählte AI-Model existiert nicht.',
+        ]);
+
+        // Erstelle den AI-User
+        $aiUser = User::create([
+            'name' => $this->aiUserForm['name'],
+            'type' => 'ai_user',
+            'core_ai_model_id' => $this->aiUserForm['core_ai_model_id'],
+            'instruction' => $this->aiUserForm['instruction'] ?? null,
+            'team_id' => $team->id,
+            'email' => null,
+            'password' => null,
+        ]);
+
+        // Füge den AI-User direkt zum Team hinzu
+        $team->users()->attach($aiUser, ['role' => TeamRole::MEMBER->value]);
+
+        // Reset form
+        $this->aiUserForm = [
+            'name' => '',
+            'core_ai_model_id' => null,
+            'instruction' => '',
+        ];
+
+        // Liste neu laden
+        $this->loadAiUsers();
+        $this->team = $team->fresh();
+
+        $this->dispatch('notice', [
+            'type' => 'success',
+            'message' => 'AI-User erfolgreich erstellt und zum Team hinzugefügt.',
+        ]);
+    }
+
+    public function removeAiUser(int $userId): void
+    {
+        $team = auth()->user()->currentTeamRelation;
+        if (!$team) {
+            return;
+        }
+
+        // Nur Owner darf AI-User entfernen
+        if ($team->user_id !== auth()->id()) {
+            return;
+        }
+
+        $aiUser = User::find($userId);
+        if (!$aiUser || !$aiUser->isAiUser()) {
+            return;
+        }
+
+        $team->users()->detach($userId);
+        $this->loadAiUsers();
+        $this->team = $team->fresh();
+
+        $this->dispatch('notice', [
+            'type' => 'success',
+            'message' => 'AI-User erfolgreich entfernt.',
+        ]);
     }
 
     public function render()
