@@ -124,6 +124,14 @@
             </div>
             @endisset
 
+            {{-- Create AI User --}}
+            @if(isset($team) && !($team->personal_team ?? true) && Gate::check('addTeamMember', $team))
+            <div>
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">AI-User erstellen</h3>
+                @livewire('core.create-ai-user', ['team' => $team])
+            </div>
+            @endif
+
             {{-- Invite Member --}}
             @if(isset($team) && !($team->personal_team ?? true))
             <div>

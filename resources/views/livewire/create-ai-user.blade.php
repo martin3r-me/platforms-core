@@ -1,84 +1,70 @@
 <div>
-    @if (Gate::check('addTeamMember', $team))
-        <x-section-border />
-
-        <!-- Create AI User -->
-        <div class="mt-10 sm:mt-0">
-            <x-action-section>
-                <x-slot name="title">
-                    {{ __('AI-User erstellen') }}
-                </x-slot>
-
-                <x-slot name="description">
-                    {{ __('Erstelle einen neuen AI-User für dieses Team. AI-User können nur diesem Team und dessen Unter-Teams zugewiesen werden.') }}
-                </x-slot>
-
-                @if (!$showForm)
-                    <x-slot name="content">
-                        <x-button wire:click="$set('showForm', true)">
-                            {{ __('Neuen AI-User erstellen') }}
-                        </x-button>
-                    </x-slot>
-                @else
-                    <x-slot name="content">
-                        <x-form-section submit="createAiUser">
-                            <x-slot name="title">
-                                {{ __('AI-User Details') }}
-                            </x-slot>
-
-                            <x-slot name="description">
-                                {{ __('Gib die Details für den neuen AI-User ein.') }}
-                            </x-slot>
-
-                            <x-slot name="form">
-                                <!-- Name -->
-                                <div class="col-span-6 sm:col-span-4">
-                                    <x-label for="name" value="{{ __('Name') }}" />
-                                    <x-input id="name" type="text" class="mt-1 block w-full" wire:model="form.name" />
-                                    <x-input-error for="form.name" class="mt-2" />
-                                </div>
-
-                                <!-- AI Model -->
-                                @if ($aiModels->isNotEmpty())
-                                    <div class="col-span-6 sm:col-span-4">
-                                        <x-label for="core_ai_model_id" value="{{ __('AI-Model') }}" />
-                                        <select id="core_ai_model_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500" wire:model="form.core_ai_model_id">
-                                            <option value="">{{ __('Kein Model auswählen') }}</option>
-                                            @foreach ($aiModels as $model)
-                                                <option value="{{ $model->id }}">{{ $model->name }}</option>
-                                            @endforeach
-                                        </select>
-                                        <x-input-error for="form.core_ai_model_id" class="mt-2" />
-                                    </div>
-                                @endif
-
-                                <!-- Instruction -->
-                                <div class="col-span-6 sm:col-span-4">
-                                    <x-label for="instruction" value="{{ __('Anweisung / Beschreibung') }}" />
-                                    <textarea id="instruction" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500" rows="4" wire:model="form.instruction" placeholder="{{ __('Beschreibe, wer dieser AI-User ist und welche Rolle er hat...') }}"></textarea>
-                                    <x-input-error for="form.instruction" class="mt-2" />
-                                </div>
-                            </x-slot>
-
-                            <x-slot name="actions">
-                                <x-secondary-button wire:click="$set('showForm', false)" wire:loading.attr="disabled">
-                                    {{ __('Abbrechen') }}
-                                </x-secondary-button>
-
-                                <x-button class="ms-3" wire:loading.attr="disabled">
-                                    {{ __('AI-User erstellen') }}
-                                </x-button>
-                            </x-slot>
-                        </x-form-section>
-                    </x-slot>
-                @endif
-            </x-action-section>
+    @if (!$showForm)
+        <div class="space-y-4">
+            <p class="text-sm text-[var(--ui-muted)]">
+                Erstelle einen neuen AI-User für dieses Team. AI-User können nur diesem Team und dessen Unter-Teams zugewiesen werden.
+            </p>
+            <x-ui-button wire:click="$set('showForm', true)" variant="primary">
+                Neuen AI-User erstellen
+            </x-ui-button>
         </div>
+    @else
+        <form wire:submit.prevent="createAiUser" class="space-y-4">
+            <!-- Name -->
+            <x-ui-input-text
+                name="form.name"
+                label="Name"
+                wire:model.live="form.name"
+                placeholder="Name des AI-Users"
+                required
+                :errorKey="'form.name'"
+            />
 
-        @if (session()->has('message'))
-            <x-action-message class="mt-4" on="ai-user-created">
-                {{ session('message') }}
-            </x-action-message>
-        @endif
+            <!-- AI Model -->
+            @if ($aiModels->isNotEmpty())
+                <x-ui-input-select
+                    name="form.core_ai_model_id"
+                    label="AI-Model (optional)"
+                    :options="$aiModels"
+                    optionValue="id"
+                    optionLabel="name"
+                    :nullable="true"
+                    wire:model.live="form.core_ai_model_id"
+                    :errorKey="'form.core_ai_model_id'"
+                />
+            @endif
+
+            <!-- Instruction -->
+            <div>
+                <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">
+                    Anweisung / Beschreibung (optional)
+                </label>
+                <textarea
+                    name="form.instruction"
+                    class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-[var(--ui-primary)] bg-[var(--ui-surface)] text-[var(--ui-secondary)]"
+                    rows="4"
+                    wire:model.live="form.instruction"
+                    placeholder="Beschreibe, wer dieser AI-User ist und welche Rolle er hat..."
+                ></textarea>
+                @error('form.instruction')
+                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div class="flex gap-2">
+                <x-ui-button type="submit" variant="primary" wire:loading.attr="disabled">
+                    AI-User erstellen
+                </x-ui-button>
+                <x-ui-button type="button" variant="secondary-outline" wire:click="$set('showForm', false)" wire:loading.attr="disabled">
+                    Abbrechen
+                </x-ui-button>
+            </div>
+        </form>
+    @endif
+
+    @if (session()->has('message'))
+        <div class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
+            {{ session('message') }}
+        </div>
     @endif
 </div>
