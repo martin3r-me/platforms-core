@@ -620,6 +620,9 @@ class ModalTeam extends Component
         $this->loadAiUsers();
         $this->team = $team->fresh();
 
+        // Formular schließen (Alpine.js Event)
+        $this->dispatch('ai-user-created');
+
         $this->dispatch('notice', [
             'type' => 'success',
             'message' => 'AI-User erfolgreich erstellt und zum Team hinzugefügt.',

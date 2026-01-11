@@ -187,11 +187,36 @@
 
     {{-- AI User Tab --}}
     <div class="mt-6" x-show="tab === 'ai-user'" x-cloak>
-        <div class="space-y-6">
+        <div class="space-y-6" x-data="{ showCreateForm: false }" 
+             x-init="
+                $watch('showCreateForm', value => {
+                    if (!value) {
+                        // Formular zurücksetzen wenn geschlossen
+                        @this.set('aiUserForm.name', '');
+                        @this.set('aiUserForm.core_ai_model_id', null);
+                        @this.set('aiUserForm.instruction', '');
+                    }
+                });
+                window.addEventListener('ai-user-created', () => {
+                    showCreateForm = false;
+                });
+             ">
             @if(isset($team) && !($team->personal_team ?? true) && Gate::check('addTeamMember', $team))
-            {{-- Create AI User Form --}}
-            <div>
-                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Neuen AI-User erstellen</h3>
+            {{-- Create AI User Button --}}
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">AI-User in diesem Team</h3>
+                <x-ui-button 
+                    variant="primary" 
+                    @click="showCreateForm = !showCreateForm"
+                    x-text="showCreateForm ? 'Abbrechen' : 'Neuen AI-User erstellen'"
+                >
+                    Neuen AI-User erstellen
+                </x-ui-button>
+            </div>
+
+            {{-- Create AI User Form (inline) --}}
+            <div x-show="showCreateForm" x-cloak class="mb-6 p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                <h4 class="text-md font-semibold text-[var(--ui-secondary)] mb-4">Neuen AI-User erstellen</h4>
                 <form wire:submit.prevent="createAiUser" class="space-y-4">
                     <x-ui-input-text
                         name="aiUserForm.name"
@@ -229,9 +254,18 @@
                         @enderror
                     </div>
 
-                    <x-ui-button type="submit" variant="primary" wire:loading.attr="disabled">
-                        AI-User erstellen
-                    </x-ui-button>
+                    <div class="flex gap-2">
+                        <x-ui-button type="submit" variant="primary" wire:loading.attr="disabled">
+                            AI-User erstellen
+                        </x-ui-button>
+                        <x-ui-button 
+                            type="button" 
+                            variant="secondary-outline" 
+                            @click="showCreateForm = false"
+                        >
+                            Abbrechen
+                        </x-ui-button>
+                    </div>
                 </form>
             </div>
             @endif
@@ -239,7 +273,6 @@
             {{-- AI Users List --}}
             @if(isset($team) && !($team->personal_team ?? true))
             <div>
-                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">AI-User in diesem Team</h3>
                 @if(!empty($aiUsers) && count($aiUsers) > 0)
                     <div class="space-y-3">
                         @foreach($aiUsers as $aiUser)
