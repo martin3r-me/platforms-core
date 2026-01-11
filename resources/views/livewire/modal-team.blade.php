@@ -360,7 +360,8 @@
             </div>
             @endif
         </div>
-        @else
+        @endif
+        @if(!isset($team) || ($team->personal_team ?? true))
         <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">
             Kein Team ausgewählt oder Personal-Team. AI-User können nur in Teams erstellt werden.
         </div>
