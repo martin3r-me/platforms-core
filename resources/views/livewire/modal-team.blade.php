@@ -256,6 +256,19 @@
                     </div>
                 </form>
             </div>
+
+            {{-- AI Users List --}}
+            <div>
+                @if(!empty($aiUsers) && count($aiUsers) > 0)
+                    <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">
+                        AI-User vorhanden
+                    </div>
+                @else
+                    <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">
+                        Noch keine AI-User in diesem Team.
+                    </div>
+                @endif
+            </div>
         </div>
         @else
         <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">
