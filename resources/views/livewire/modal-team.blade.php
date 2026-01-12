@@ -260,8 +260,12 @@
             {{-- AI Users List --}}
             <div>
                 @if(!empty($aiUsers) && count($aiUsers) > 0)
-                    <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">
-                        AI-User vorhanden
+                    <div class="space-y-3">
+                        @foreach($aiUsers as $aiUser)
+                            <div class="p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                                <div class="font-semibold text-[var(--ui-secondary)]">{{ $aiUser->name }}</div>
+                            </div>
+                        @endforeach
                     </div>
                 @else
                     <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">
