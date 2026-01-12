@@ -262,8 +262,21 @@
                 @if(!empty($aiUsers) && count($aiUsers) > 0)
                     <div class="space-y-3">
                         @foreach($aiUsers as $aiUser)
-                            <div class="p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <div class="font-semibold text-[var(--ui-secondary)]">{{ $aiUser->name }}</div>
+                            <div class="flex items-center justify-between p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 bg-purple-500 text-white rounded-full flex items-center justify-center">
+                                        <span class="text-sm font-semibold">AI</span>
+                                    </div>
+                                    <div>
+                                        <div class="font-semibold text-[var(--ui-secondary)]">{{ $aiUser->name }}</div>
+                                        @if($aiUser->instruction)
+                                            <div class="text-sm text-[var(--ui-muted)]">{{ \Illuminate\Support\Str::limit($aiUser->instruction, 60) }}</div>
+                                        @endif
+                                        @if($aiUser->coreAiModel)
+                                            <div class="text-xs text-[var(--ui-muted)]">Model: {{ $aiUser->coreAiModel->name }}</div>
+                                        @endif
+                                    </div>
+                                </div>
                             </div>
                         @endforeach
                     </div>
