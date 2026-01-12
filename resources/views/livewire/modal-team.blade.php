@@ -277,6 +277,17 @@
                                         @endif
                                     </div>
                                 </div>
+                                <div class="flex items-center gap-2">
+                                    @if(($team->user_id ?? null) === auth()->id())
+                                        <x-ui-confirm-button 
+                                            action="removeAiUser"
+                                            :value="$aiUser->id"
+                                            text="Entfernen"
+                                            confirmText="AI-User wirklich entfernen?"
+                                            variant="danger"
+                                        />
+                                    @endif
+                                </div>
                             </div>
                         @endforeach
                     </div>

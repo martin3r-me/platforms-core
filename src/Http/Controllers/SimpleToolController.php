@@ -531,7 +531,7 @@ class SimpleToolController extends Controller
                 // Best-practice tool loop (stream per iteration; execute tools server-side; continue until no tool calls)
                 // Keep a hard safety cap, but allow enough room for "batch" operations
                 // like renaming/updating multiple tasks.
-                $maxIterations = (int) ($request->input('max_iterations') ?? 50);
+                $maxIterations = (int) ($request->input('max_iterations') ?? 200);
                 if ($maxIterations < 1) { $maxIterations = 1; }
                 if ($maxIterations > 200) { $maxIterations = 200; }
 

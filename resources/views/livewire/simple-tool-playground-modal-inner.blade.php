@@ -1239,8 +1239,8 @@
         // Iterations: keep high defaults; allow user override via localStorage.
         const getMaxIterations = () => {
           const raw = (localStorage.getItem('simple.playground.maxIterations') || '').trim();
-          const n = parseInt(raw || '50', 10);
-          if (!Number.isFinite(n) || n < 1) return 50;
+          const n = parseInt(raw || '200', 10);
+          if (!Number.isFinite(n) || n < 1) return 200;
           return Math.min(200, n);
         };
 
