@@ -297,6 +297,23 @@
                     </div>
                 @endif
             </div>
+
+            {{-- Add Existing AI Users to Team --}}
+            @php
+                $canAddUsers = false;
+                if (isset($team) && !($team->personal_team ?? true)) {
+                    $userRole = $team->users()->where('user_id', auth()->id())->first()?->pivot->role ?? null;
+                    $canAddUsers = $userRole && in_array($userRole, [\Platform\Core\Enums\TeamRole::OWNER->value, \Platform\Core\Enums\TeamRole::ADMIN->value]);
+                }
+            @endphp
+            @if($canAddUsers && !empty($availableAiUsersToAdd) && count($availableAiUsersToAdd) > 0)
+            <div class="mt-6 pt-6 border-t border-[var(--ui-border)]/40">
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Verfügbare AI-User hinzufügen</h3>
+                <p class="text-sm text-[var(--ui-muted)] mb-4">
+                    Diese AI-User können zu diesem Team hinzugefügt werden (Home-Team oder Kind-Teams).
+                </p>
+            </div>
+            @endif
         </div>
         @else
         <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">
