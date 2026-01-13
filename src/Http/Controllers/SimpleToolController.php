@@ -734,6 +734,8 @@ class SimpleToolController extends Controller
                                     ],
                                     'on_debug' => function(?string $event, array $decoded) use (
                                         $sendEvent,
+                                        $thread,
+                                        $model,
                                         &$debugEventCount,
                                         &$usageAggregate,
                                         &$seenUsageResponseIds,
