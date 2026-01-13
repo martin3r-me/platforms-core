@@ -64,6 +64,7 @@ class ModalTeam extends Component
     public $aiUsers = [];
     public $availableAiModels = [];
     public $availableAiUsersToAdd = [];
+    public bool $canAddUsers = false;
 
     protected $listeners = ['open-modal-team' => 'openModal'];
 
@@ -80,6 +81,7 @@ class ModalTeam extends Component
         $this->loadAiUsers();
         $this->loadAvailableAiModels();
         $this->loadAvailableAiUsersToAdd();
+        $this->loadCanAddUsers();
     }
 
     public function openModal()
@@ -94,6 +96,19 @@ class ModalTeam extends Component
         $this->loadAiUsers();
         $this->loadAvailableAiModels();
         $this->loadAvailableAiUsersToAdd();
+        $this->loadCanAddUsers();
+    }
+
+    protected function loadCanAddUsers(): void
+    {
+        $team = $this->team ?? auth()->user()?->currentTeamRelation;
+        if (!$team) {
+            $this->canAddUsers = false;
+            return;
+        }
+
+        $userRole = $team->users()->where('user_id', auth()->id())->first()?->pivot->role;
+        $this->canAddUsers = in_array($userRole, [TeamRole::OWNER->value, TeamRole::ADMIN->value], true);
     }
 
     public function loadTeams()
@@ -577,7 +592,7 @@ class ModalTeam extends Component
 
     public function loadAvailableAiUsersToAdd()
     {
-        $team = auth()->user()->currentTeamRelation;
+        $team = $this->team ?? auth()->user()?->currentTeamRelation;
         if (!$team) {
             $this->availableAiUsersToAdd = [];
             return;
@@ -602,7 +617,7 @@ class ModalTeam extends Component
 
     public function createAiUser()
     {
-        $team = auth()->user()->currentTeamRelation;
+        $team = $this->team ?? auth()->user()?->currentTeamRelation;
         if (!$team) {
             $this->dispatch('notice', [
                 'type' => 'error',
@@ -662,6 +677,7 @@ class ModalTeam extends Component
         $this->loadAiUsers();
         $this->loadAvailableAiUsersToAdd();
         $this->team = $team->fresh();
+        $this->loadCanAddUsers();
 
         // Formular schließen (Alpine.js Event)
         $this->dispatch('ai-user-created');
@@ -674,7 +690,7 @@ class ModalTeam extends Component
 
     public function addAiUserToTeam(int $userId): void
     {
-        $team = auth()->user()->currentTeamRelation;
+        $team = $this->team ?? auth()->user()?->currentTeamRelation;
         if (!$team) {
             $this->dispatch('notice', [
                 'type' => 'error',
@@ -727,6 +743,7 @@ class ModalTeam extends Component
         $this->loadAiUsers();
         $this->loadAvailableAiUsersToAdd();
         $this->team = $team->fresh();
+        $this->loadCanAddUsers();
 
         $this->dispatch('notice', [
             'type' => 'success',
@@ -736,7 +753,7 @@ class ModalTeam extends Component
 
     public function removeAiUser(int $userId): void
     {
-        $team = auth()->user()->currentTeamRelation;
+        $team = $this->team ?? auth()->user()?->currentTeamRelation;
         if (!$team) {
             return;
         }
@@ -755,6 +772,7 @@ class ModalTeam extends Component
         $this->loadAiUsers();
         $this->loadAvailableAiUsersToAdd();
         $this->team = $team->fresh();
+        $this->loadCanAddUsers();
 
         $this->dispatch('notice', [
             'type' => 'success',
