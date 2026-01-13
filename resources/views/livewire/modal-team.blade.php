@@ -187,6 +187,13 @@
 
     {{-- AI User Tab --}}
     <div class="mt-6" x-show="tab === 'ai-user'" x-cloak>
+        @php
+            $canAddUsers = false;
+            if (isset($team) && !($team->personal_team ?? true)) {
+                $userRole = $team->users()->where('user_id', auth()->id())->first()?->pivot->role ?? null;
+                $canAddUsers = $userRole && in_array($userRole, [\Platform\Core\Enums\TeamRole::OWNER->value, \Platform\Core\Enums\TeamRole::ADMIN->value]);
+            }
+        @endphp
         @if(isset($team) && !($team->personal_team ?? true))
         <div class="space-y-6" x-data="{ showCreateForm: false }">
             {{-- Create AI User Button --}}
@@ -299,13 +306,6 @@
             </div>
 
             {{-- Add Existing AI Users to Team --}}
-            @php
-                $canAddUsers = false;
-                if (isset($team) && !($team->personal_team ?? true)) {
-                    $userRole = $team->users()->where('user_id', auth()->id())->first()?->pivot->role ?? null;
-                    $canAddUsers = $userRole && in_array($userRole, [\Platform\Core\Enums\TeamRole::OWNER->value, \Platform\Core\Enums\TeamRole::ADMIN->value]);
-                }
-            @endphp
             @if($canAddUsers && !empty($availableAiUsersToAdd) && count($availableAiUsersToAdd) > 0)
             <div class="mt-6 pt-6 border-t border-[var(--ui-border)]/40">
                 <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Verfügbare AI-User hinzufügen</h3>
