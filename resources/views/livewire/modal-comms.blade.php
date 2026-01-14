@@ -250,15 +250,30 @@
                                                         @endif
 
                                                         @forelse($emailThreads as $t)
-                                                            <button
-                                                                type="button"
-                                                                wire:click="setActiveEmailThread({{ (int) $t['id'] }})"
-                                                                class="w-full text-left rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2 hover:bg-[var(--ui-muted-5)] transition"
+                                                            <div
+                                                                class="w-full rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2 hover:bg-[var(--ui-muted-5)] transition"
                                                                 @if((int) $activeEmailThreadId === (int) $t['id']) style="outline: 1px solid rgba(var(--ui-primary-rgb), 0.4);" @endif
                                                             >
-                                                                <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">{{ $t['subject'] }}</div>
-                                                                <div class="mt-0.5 text-[10px] text-[var(--ui-muted)] truncate">Thread: {{ $t['token'] }}</div>
-                                                            </button>
+                                                                <button
+                                                                    type="button"
+                                                                    wire:click="setActiveEmailThread({{ (int) $t['id'] }})"
+                                                                    class="w-full text-left"
+                                                                >
+                                                                    <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">{{ $t['subject'] }}</div>
+                                                                    <div class="mt-0.5 text-[10px] text-[var(--ui-muted)] truncate">Thread: {{ $t['token'] }}</div>
+                                                                </button>
+                                                                <div class="mt-2 flex items-center justify-end">
+                                                                    <x-ui-confirm-button
+                                                                        action="deleteEmailThread"
+                                                                        :value="(int) $t['id']"
+                                                                        text="Löschen"
+                                                                        confirmText="Thread löschen?"
+                                                                        variant="muted-outline"
+                                                                        size="sm"
+                                                                        class="!w-auto"
+                                                                    />
+                                                                </div>
+                                                            </div>
                                                         @empty
                                                             <div class="rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] p-3">
                                                                 <div class="text-xs font-semibold text-[var(--ui-secondary)]">Neuer Thread</div>
@@ -611,17 +626,20 @@
                                                             @endif
 
                                                             <div class="flex gap-2 items-end w-full">
-                                                                <div class="flex-1" wire:ignore x-data="{ body: @entangle('emailCompose.body').defer }">
+                                                                <div class="flex-1">
                                                                     <textarea
                                                                         x-ref="emailBody"
-                                                                        x-model="body"
                                                                         x-init="$nextTick(() => autoGrow($refs.emailBody))"
                                                                         @input="autoGrow($event.target)"
                                                                         @focus="autoGrow($event.target)"
                                                                         rows="1"
+                                                                        wire:model="emailCompose.body"
                                                                         class="w-full px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
                                                                         placeholder="Nachricht…"
                                                                     ></textarea>
+                                                                    @error('emailCompose.body')
+                                                                        <div class="mt-1 text-sm text-[color:var(--ui-danger)]">{{ $message }}</div>
+                                                                    @enderror
                                                                 </div>
                                                                 <x-ui-button
                                                                     variant="primary"

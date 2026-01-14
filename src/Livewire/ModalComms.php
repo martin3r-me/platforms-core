@@ -6,6 +6,7 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\QueryException;
+use Illuminate\Validation\ValidationException;
 use Platform\Core\Enums\TeamRole;
 use Platform\Core\Models\CommsChannel;
 use Platform\Core\Models\CommsEmailThread;
@@ -249,6 +250,66 @@ class ModalComms extends Component
         $this->dispatch('comms:scroll-bottom');
     }
 
+    public function deleteEmailThread(int $threadId): void
+    {
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+        if (!$user || !$team) {
+            $this->emailMessage = '⛔️ Kein Team-Kontext gefunden.';
+            return;
+        }
+
+        /** @var Team $rootTeam */
+        $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+
+        $thread = CommsEmailThread::query()
+            ->where('team_id', $rootTeam->id)
+            ->whereKey($threadId)
+            ->first();
+
+        if (!$thread) {
+            $this->emailMessage = '⛔️ Thread nicht gefunden.';
+            return;
+        }
+
+        $channel = CommsChannel::query()
+            ->where('team_id', $rootTeam->id)
+            ->whereKey($thread->comms_channel_id)
+            ->first();
+
+        if (!$channel) {
+            $this->emailMessage = '⛔️ Kanal zum Thread nicht gefunden.';
+            return;
+        }
+
+        // Permission:
+        // - team channels: only owner/admin
+        // - private channels: owner/admin or channel creator
+        if ($channel->visibility === 'team') {
+            if (!$this->canManageProviderConnections()) {
+                $this->emailMessage = '⛔️ Keine Berechtigung (teamweite Kanäle nur Owner/Admin).';
+                return;
+            }
+        } else {
+            if (!$this->canManageProviderConnections() && (int) $channel->created_by_user_id !== (int) $user->id) {
+                $this->emailMessage = '⛔️ Keine Berechtigung (privater Kanal gehört einem anderen User).';
+                return;
+            }
+        }
+
+        // Hard-delete to really keep DB clean (FK cascades delete mails/attachments).
+        $thread->forceDelete();
+
+        if ((int) $this->activeEmailThreadId === (int) $threadId) {
+            $this->activeEmailThreadId = null;
+            $this->emailTimeline = [];
+        }
+
+        $this->emailMessage = '✅ Thread gelöscht.';
+        $this->loadEmailThreads();
+        $this->dispatch('comms:scroll-bottom');
+    }
+
     private function extractEmailAddress(string $raw): ?string
     {
         if (preg_match('/<([^>]+)>/', $raw, $m)) {
@@ -291,11 +352,18 @@ class ModalComms extends Component
         }
 
         $this->emailDebug('Validiere Eingaben…');
-        $this->validate([
-            'emailCompose.to' => ['required', 'email', 'max:255'],
-            'emailCompose.body' => ['required', 'string', 'min:1'],
-            'emailCompose.subject' => [$this->activeEmailThreadId ? 'nullable' : 'required', 'string', 'max:255'],
-        ]);
+        try {
+            $this->validate([
+                'emailCompose.to' => ['required', 'email', 'max:255'],
+                'emailCompose.body' => ['required', 'string', 'min:1'],
+                'emailCompose.subject' => [$this->activeEmailThreadId ? 'nullable' : 'required', 'string', 'max:255'],
+            ]);
+        } catch (ValidationException $e) {
+            $this->emailMessage = '⛔️ Bitte Eingaben prüfen.';
+            $errors = $e->validator->errors()->all();
+            $this->emailDebug('Validation fehlgeschlagen: ' . implode(' | ', array_slice($errors, 0, 3)));
+            return;
+        }
 
         $this->emailDebug('Lade Kanal…');
         $channel = CommsChannel::query()
@@ -309,6 +377,7 @@ class ModalComms extends Component
             $this->emailDebug('Fehler: Kanal nicht gefunden.');
             return;
         }
+        $this->emailDebug("Kanal OK (id={$channel->id}, from={$channel->sender_identifier}).");
 
         $subject = (string) ($this->emailCompose['subject'] ?? '');
         $isReply = false;
