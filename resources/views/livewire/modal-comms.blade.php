@@ -20,14 +20,14 @@
                         @click="window.dispatchEvent(new CustomEvent('comms:set-tab', { detail: { tab: 'chat' } }))"
                         class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
                     >
-                        Chat
+                        Kanäle
                     </button>
                     <button type="button"
                         x-data
-                        @click="window.dispatchEvent(new CustomEvent('comms:set-tab', { detail: { tab: 'threads' } }))"
+                        @click="window.dispatchEvent(new CustomEvent('comms:set-tab', { detail: { tab: 'channels_manage' } }))"
                         class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
                     >
-                        Threads
+                        Kanäle verwalten
                     </button>
                     <button type="button"
                         x-data
@@ -43,7 +43,18 @@
         {{-- Match Playground body wrapper 1:1 (cancel modal padding) --}}
         <div class="-m-6 w-full h-full min-h-0 min-w-0 overflow-hidden" style="width:100%;">
             <div
-                x-data="{ tab: 'chat' }"
+                x-data="{
+                    tab: 'chat',
+                    activeChannel: 'email',
+                    get activeChannelLabel(){
+                        return this.activeChannel === 'email' ? 'E-Mail'
+                            : (this.activeChannel === 'phone' ? 'Telefon' : 'WhatsApp');
+                    },
+                    get activeChannelDetail(){
+                        return this.activeChannel === 'email' ? 'm.erren@bhgdigital.de'
+                            : '+49 172 123 12 14';
+                    }
+                }"
                 @comms:set-tab.window="tab = ($event.detail && $event.detail.tab) ? $event.detail.tab : tab"
                 class="w-full h-full min-h-0 overflow-hidden flex flex-col"
                 style="width:100%;"
@@ -60,6 +71,7 @@
                                         <div class="relative flex-shrink-0 flex items-center">
                                             <button
                                                 type="button"
+                                                @click="activeChannel = 'email'"
                                                 class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1 bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]"
                                                 title="Kanal: E-Mail"
                                             >
@@ -76,6 +88,7 @@
                                         <div class="relative flex-shrink-0 flex items-center">
                                             <button
                                                 type="button"
+                                                @click="activeChannel = 'phone'"
                                                 class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1 bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
                                                 title="Kanal: Telefon"
                                             >
@@ -83,6 +96,23 @@
                                                     <span class="inline-flex items-center gap-1">
                                                         @svg('heroicon-o-phone', 'w-4 h-4 text-[var(--ui-muted)]')
                                                         <span class="font-semibold text-[var(--ui-secondary)]">Telefon</span>
+                                                        <span class="text-[var(--ui-muted)] hidden sm:inline">· +49 172 123 12 14</span>
+                                                    </span>
+                                                </span>
+                                                <span class="hidden ml-1 w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
+                                            </button>
+                                        </div>
+                                        <div class="relative flex-shrink-0 flex items-center">
+                                            <button
+                                                type="button"
+                                                @click="activeChannel = 'whatsapp'"
+                                                class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1 bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
+                                                title="Kanal: WhatsApp"
+                                            >
+                                                <span class="inline-flex items-center gap-2">
+                                                    <span class="inline-flex items-center gap-1">
+                                                        @svg('heroicon-o-chat-bubble-left-right', 'w-4 h-4 text-[var(--ui-muted)]')
+                                                        <span class="font-semibold text-[var(--ui-secondary)]">WhatsApp</span>
                                                         <span class="text-[var(--ui-muted)] hidden sm:inline">· +49 172 123 12 14</span>
                                                     </span>
                                                 </span>
@@ -118,15 +148,17 @@
 
                                         <div class="p-4 space-y-3 flex-1 min-h-0 overflow-y-auto min-w-0">
                                             <div class="min-w-0">
-                                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Kanal: E-Mail (Demo)</div>
+                                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">
+                                                    Kanal: <span x-text="activeChannelLabel"></span> <span class="text-[var(--ui-muted)] font-normal">(Demo)</span>
+                                                </div>
                                                 <div class="space-y-2">
                                                     <div class="rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2">
-                                                        <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">Re: Angebot – Q1</div>
-                                                        <div class="text-[10px] text-[var(--ui-muted)] truncate">Letzte Nachricht: 10:41 · 2 ungelesen</div>
+                                                        <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate" x-text="activeChannel === 'email' ? 'Re: Angebot – Q1' : (activeChannel === 'phone' ? 'Anrufnotiz · Termin' : 'WhatsApp · Follow-up')"></div>
+                                                        <div class="text-[10px] text-[var(--ui-muted)] truncate" x-text="activeChannel === 'email' ? 'Letzte Nachricht: 10:41 · 2 ungelesen' : (activeChannel === 'phone' ? 'Letzte Nachricht: gestern · offen' : 'Letzte Nachricht: heute · 1 ungelesen')"></div>
                                                     </div>
                                                     <div class="rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2">
-                                                        <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">Follow-up · Termin</div>
-                                                        <div class="text-[10px] text-[var(--ui-muted)] truncate">Letzte Nachricht: gestern · gelesen</div>
+                                                        <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate" x-text="activeChannel === 'email' ? 'Follow-up · Termin' : (activeChannel === 'phone' ? 'Rückruf · Frage' : 'WhatsApp · Angebot')"></div>
+                                                        <div class="text-[10px] text-[var(--ui-muted)] truncate" x-text="activeChannel === 'email' ? 'Letzte Nachricht: gestern · gelesen' : (activeChannel === 'phone' ? 'Letzte Nachricht: letzte Woche · erledigt' : 'Letzte Nachricht: gestern · gelesen')"></div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -182,14 +214,56 @@
                     </div>
 
                     {{-- Placeholder Tabs (UI only) --}}
-                    <div x-show="tab==='threads'" class="w-full h-full min-h-0" x-cloak>
+                    <div x-show="tab==='channels_manage'" class="w-full h-full min-h-0" x-cloak>
                         <div class="h-full min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex items-center justify-center shadow-sm ring-1 ring-[var(--ui-border)]/30">
-                            <div class="text-sm text-[var(--ui-muted)]">Threads (kommt später)</div>
+                            <div class="text-sm text-[var(--ui-muted)]">Kanäle verwalten (kommt später)</div>
                         </div>
                     </div>
                     <div x-show="tab==='settings'" class="w-full h-full min-h-0" x-cloak>
-                        <div class="h-full min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex items-center justify-center shadow-sm ring-1 ring-[var(--ui-border)]/30">
-                            <div class="text-sm text-[var(--ui-muted)]">Settings (kommt später)</div>
+                        <div class="h-full min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/30">
+                            <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between">
+                                <div class="min-w-0">
+                                    <div class="text-sm font-semibold text-[var(--ui-secondary)]">Settings</div>
+                                    <div class="text-xs text-[var(--ui-muted)] truncate">
+                                        Kanal: <span class="font-medium text-[var(--ui-secondary)]" x-text="activeChannelLabel"></span>
+                                        <span class="text-[var(--ui-muted)]">·</span>
+                                        <span x-text="activeChannelDetail"></span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 justify-end">
+                                    <button type="button"
+                                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
+                                        title="(UI) Test"
+                                        disabled
+                                    >
+                                        Test
+                                    </button>
+                                    <button type="button"
+                                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-primary)] text-white border-[var(--ui-primary)] opacity-60 cursor-not-allowed"
+                                        title="(UI) Speichern"
+                                        disabled
+                                    >
+                                        Speichern
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="flex-1 min-h-0 overflow-y-auto p-4">
+                                <div class="text-sm text-[var(--ui-muted)]">
+                                    Settings-Inhalt ist kanal-abhängig (UI only).
+                                </div>
+                                <div class="mt-3 rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] p-3">
+                                    <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Beispiel</div>
+                                    <div class="text-xs text-[var(--ui-muted)]" x-show="activeChannel==='email'">
+                                        SMTP/Postmark, Reply-To, Signatur, Inbound Webhook …
+                                    </div>
+                                    <div class="text-xs text-[var(--ui-muted)]" x-show="activeChannel==='phone'" x-cloak>
+                                        Routing, Call notes, Zuständigkeit, SLA …
+                                    </div>
+                                    <div class="text-xs text-[var(--ui-muted)]" x-show="activeChannel==='whatsapp'" x-cloak>
+                                        Meta OAuth, Templates, Webhook, Business-Nummer …
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
