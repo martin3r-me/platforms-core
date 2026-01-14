@@ -234,6 +234,10 @@
                                                                                 <span class="mx-1">·</span>
                                                                                 <span class="font-semibold">An:</span> Team &lt;sales@company.de&gt;
                                                                             </div>
+                                                                            <div class="mt-1 flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
+                                                                                <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 text-[10px] font-semibold">ME</span>
+                                                                                <span>Extern</span>
+                                                                            </div>
                                                                         </div>
                                                                         <div class="text-xs text-[var(--ui-muted)] whitespace-nowrap">Heute 10:41</div>
                                                                     </div>
@@ -292,6 +296,10 @@ Marius
                                                                                 <span class="mx-1">·</span>
                                                                                 <span class="font-semibold">An:</span> m.erren@bhgdigital.de
                                                                             </div>
+                                                                            <div class="mt-1 flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
+                                                                                <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/60 border border-[var(--ui-border)]/60 text-[10px] font-semibold">MR</span>
+                                                                                <span>Gesendet von: Martin</span>
+                                                                            </div>
                                                                         </div>
                                                                         <div class="text-xs text-[var(--ui-muted)] whitespace-nowrap">Heute 11:02</div>
                                                                     </div>
@@ -337,6 +345,10 @@ Viele Grüße
                                                         <div class="space-y-2">
                                                             <div class="flex justify-start">
                                                                 <div class="max-w-[85%] rounded-2xl bg-white border border-[var(--ui-border)]/60 px-4 py-2">
+                                                                    <div class="flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
+                                                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 text-[10px] font-semibold">ME</span>
+                                                                        <span>Extern</span>
+                                                                    </div>
                                                                     <div class="text-sm text-[var(--ui-secondary)]">
                                                                         Hi, könnt ihr mir kurz den Status geben?
                                                                     </div>
@@ -345,6 +357,10 @@ Viele Grüße
                                                             </div>
                                                             <div class="flex justify-start">
                                                                 <div class="max-w-[85%] rounded-2xl bg-white border border-[var(--ui-border)]/60 px-4 py-2">
+                                                                    <div class="flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
+                                                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 text-[10px] font-semibold">ME</span>
+                                                                        <span>Extern</span>
+                                                                    </div>
                                                                     <div class="text-sm text-[var(--ui-secondary)]">
                                                                         Ich schicke euch mal das Dokument.
                                                                     </div>
@@ -353,6 +369,10 @@ Viele Grüße
                                                             </div>
                                                             <div class="flex justify-end">
                                                                 <div class="max-w-[85%] rounded-2xl bg-[#dcf8c6] border border-[var(--ui-border)]/60 px-4 py-2">
+                                                                    <div class="flex items-center justify-end gap-2 text-[10px] text-[var(--ui-muted)]">
+                                                                        <span>Martin</span>
+                                                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/60 border border-[var(--ui-border)]/60 text-[10px] font-semibold">MR</span>
+                                                                    </div>
                                                                     <div class="text-sm text-[var(--ui-secondary)]">
                                                                         Klar — ich schaue rein und melde mich gleich.
                                                                     </div>
@@ -380,6 +400,10 @@ Viele Grüße
                                                             {{-- WhatsApp "Bild"-Bubble --}}
                                                             <div class="flex justify-end">
                                                                 <div class="max-w-[85%] rounded-2xl bg-[#dcf8c6] border border-[var(--ui-border)]/60 p-2">
+                                                                    <div class="flex items-center justify-end gap-2 text-[10px] text-[var(--ui-muted)]">
+                                                                        <span>Kollege: Anna</span>
+                                                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/60 border border-[var(--ui-border)]/60 text-[10px] font-semibold">AK</span>
+                                                                    </div>
                                                                     <div class="w-64 h-36 rounded-xl bg-black/5 border border-[var(--ui-border)]/60 flex items-center justify-center">
                                                                         <div class="text-xs text-[var(--ui-muted)] flex items-center gap-2">
                                                                             @svg('heroicon-o-photo', 'w-4 h-4')
@@ -394,6 +418,10 @@ Viele Grüße
                                                             </div>
                                                             <div class="flex justify-end">
                                                                 <div class="max-w-[85%] rounded-2xl bg-[#dcf8c6] border border-[var(--ui-border)]/60 px-4 py-2">
+                                                                    <div class="flex items-center justify-end gap-2 text-[10px] text-[var(--ui-muted)]">
+                                                                        <span>Martin</span>
+                                                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/60 border border-[var(--ui-border)]/60 text-[10px] font-semibold">MR</span>
+                                                                    </div>
                                                                     <div class="text-sm text-[var(--ui-secondary)]">
                                                                         Dienstag 10:00 passt?
                                                                     </div>
@@ -405,6 +433,10 @@ Viele Grüße
                                                             </div>
                                                             <div class="flex justify-start">
                                                                 <div class="max-w-[85%] rounded-2xl bg-white border border-[var(--ui-border)]/60 px-4 py-2">
+                                                                    <div class="flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
+                                                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 text-[10px] font-semibold">ME</span>
+                                                                        <span>Extern</span>
+                                                                    </div>
                                                                     <div class="text-sm text-[var(--ui-secondary)]">
                                                                         Perfekt, danke!
                                                                     </div>
@@ -436,6 +468,10 @@ Viele Grüße
                                                                                 <div class="text-xs text-[var(--ui-muted)] truncate">Marius Erren · +49 172 123 12 14</div>
                                                                             </div>
                                                                         </div>
+                                                                        <div class="mt-2 flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
+                                                                            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white border border-[var(--ui-border)]/60 text-[10px] font-semibold">AK</span>
+                                                                            <span>Entgegengenommen von: Anna</span>
+                                                                        </div>
                                                                         <div class="mt-2 text-sm text-[var(--ui-secondary)]">
                                                                             Notiz: Terminwunsch nächste Woche, Angebot Q1.
                                                                         </div>
@@ -458,6 +494,10 @@ Viele Grüße
                                                                                 <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">Ausgehender Anruf</div>
                                                                                 <div class="text-xs text-[var(--ui-muted)] truncate">Keine Antwort</div>
                                                                             </div>
+                                                                        </div>
+                                                                        <div class="mt-2 flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
+                                                                            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--ui-primary)]/10 border border-[var(--ui-border)]/60 text-[10px] font-semibold">MR</span>
+                                                                            <span>Angerufen von: Martin</span>
                                                                         </div>
                                                                         <div class="mt-2 text-sm text-[var(--ui-secondary)]">
                                                                             Notiz: Rückruf geplant.
