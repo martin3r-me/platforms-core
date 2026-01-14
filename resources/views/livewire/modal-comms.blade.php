@@ -56,6 +56,7 @@
                 x-data="{
                     tab: 'chat',
                     activeChannel: 'email',
+                    activeEmailChannelId: @entangle('activeEmailChannelId').live,
                     activeThreadId: 1,
                     composeMode: false,
                     get activeChannelLabel(){
@@ -116,6 +117,7 @@
                     }
                 }"
                 @comms:set-tab.window="tab = ($event.detail && $event.detail.tab) ? $event.detail.tab : tab"
+                x-on:comms:scroll-bottom.window="scrollToBottom()"
                 class="w-full h-full min-h-0 overflow-hidden flex flex-col"
                 style="width:100%;"
             >
@@ -196,6 +198,29 @@
                                 <div class="flex items-center gap-2 flex-shrink-0"></div>
                             </div>
 
+                            {{-- E-Mail Absender (oben als Tabs/Badges) --}}
+                            <div class="px-4 pb-3 border-b border-[var(--ui-border)]/60" x-show="activeChannel === 'email'" x-cloak>
+                                <div class="flex items-center gap-2 overflow-x-auto">
+                                    <div class="text-[10px] font-semibold uppercase tracking-wide text-[var(--ui-muted)] flex-shrink-0">Absender</div>
+                                    @forelse($emailChannels as $c)
+                                        <button
+                                            type="button"
+                                            @click="activeEmailChannelId = {{ (int) $c['id'] }}"
+                                            class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap"
+                                            :class="activeEmailChannelId === {{ (int) $c['id'] }}
+                                                ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
+                                                : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'"
+                                        >
+                                            {{ $c['label'] }}
+                                        </button>
+                                    @empty
+                                        <span class="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+                                            Kein E‑Mail Kanal (bitte unter „Kanäle verwalten“ anlegen)
+                                        </span>
+                                    @endforelse
+                                </div>
+                            </div>
+
                             <div class="flex-1 min-h-0 overflow-hidden w-full">
                                 {{-- Same inner layout as Playground, but mirrored: left sidebar + right chat --}}
                                 <div class="w-full h-full min-h-0 grid grid-cols-4 gap-5 px-4 py-4 overflow-hidden min-w-0" style="width:100%; max-width:100%;">
@@ -218,20 +243,9 @@
                                                 <div class="space-y-2">
                                                     {{-- Email: echte Threads aus Core --}}
                                                     <div x-show="activeChannel === 'email'" x-cloak class="space-y-2">
-                                                        @if(!empty($emailChannels))
-                                                            <x-ui-input-select
-                                                                name="activeEmailChannelId"
-                                                                label="E‑Mail Kanal"
-                                                                :options="$emailChannels"
-                                                                optionValue="id"
-                                                                optionLabel="label"
-                                                                :nullable="false"
-                                                                displayMode="dropdown"
-                                                                wire:model.live="activeEmailChannelId"
-                                                            />
-                                                        @else
+                                                        @if(!$activeEmailChannelId)
                                                             <div class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                                                                Kein E‑Mail Kanal verfügbar. Bitte erst unter „Kanäle verwalten“ anlegen.
+                                                                Bitte oben einen E‑Mail Absender wählen.
                                                             </div>
                                                         @endif
 
@@ -246,7 +260,12 @@
                                                                 <div class="mt-0.5 text-[10px] text-[var(--ui-muted)] truncate">Thread: {{ $t['token'] }}</div>
                                                             </button>
                                                         @empty
-                                                            <div class="text-xs text-[var(--ui-muted)]">Noch keine Threads.</div>
+                                                            <div class="rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] p-3">
+                                                                <div class="text-xs font-semibold text-[var(--ui-secondary)]">Neuer Thread</div>
+                                                                <div class="mt-1 text-xs text-[var(--ui-muted)]">
+                                                                    Klick oben auf <span class="font-semibold">Neu</span> und sende die erste Nachricht.
+                                                                </div>
+                                                            </div>
                                                         @endforelse
                                                     </div>
 
@@ -550,40 +569,51 @@
                                                 <form class="flex gap-2 items-center" method="post" action="javascript:void(0)" onsubmit="return false;">
                                                     {{-- Footer UI je Kanal (nur Optik) --}}
                                                     <template x-if="activeChannel==='email'">
-                                                        <div class="flex gap-2 items-end w-full">
-                                                            <div class="flex-1 grid grid-cols-1 md:grid-cols-6 gap-2 items-end">
-                                                                <div class="md:col-span-2">
-                                                                    <x-ui-input-text
-                                                                        name="emailCompose.to"
-                                                                        label="An"
-                                                                        placeholder="empfaenger@firma.de"
-                                                                        wire:model.live="emailCompose.to"
-                                                                    />
+                                                        <div class="w-full space-y-2">
+                                                            {{-- New thread: show To + Subject above message field --}}
+                                                            @if(!$activeEmailThreadId)
+                                                                <div class="grid grid-cols-1 md:grid-cols-6 gap-2">
+                                                                    <div class="md:col-span-3">
+                                                                        <x-ui-input-text
+                                                                            name="emailCompose.to"
+                                                                            label="An"
+                                                                            placeholder="empfaenger@firma.de"
+                                                                            wire:model.live="emailCompose.to"
+                                                                        />
+                                                                    </div>
+                                                                    <div class="md:col-span-3">
+                                                                        <x-ui-input-text
+                                                                            name="emailCompose.subject"
+                                                                            label="Betreff"
+                                                                            placeholder="Betreff…"
+                                                                            wire:model.live="emailCompose.subject"
+                                                                        />
+                                                                    </div>
                                                                 </div>
-                                                                <div class="md:col-span-2" x-show="{{ $activeEmailThreadId ? 'false' : 'true' }}">
-                                                                    <x-ui-input-text
-                                                                        name="emailCompose.subject"
-                                                                        label="Betreff"
-                                                                        placeholder="Betreff…"
-                                                                        wire:model.live="emailCompose.subject"
-                                                                    />
+                                                            @else
+                                                                <div class="text-[11px] text-[var(--ui-muted)]">
+                                                                    Antwort an: <span class="font-semibold text-[var(--ui-secondary)]">{{ $emailCompose['to'] ?: '—' }}</span>
                                                                 </div>
-                                                                <div class="md:col-span-2">
-                                                                    <x-ui-input-textarea
-                                                                        name="emailCompose.body"
-                                                                        label="Nachricht"
-                                                                        rows="2"
-                                                                        placeholder="Nachricht…"
-                                                                        wire:model.live="emailCompose.body"
-                                                                    />
-                                                                </div>
+                                                            @endif
+
+                                                            <div class="flex gap-2 items-end w-full">
+                                                                <textarea
+                                                                    x-ref="emailBody"
+                                                                    x-init="$nextTick(() => autoGrow($refs.emailBody))"
+                                                                    @input="autoGrow($event.target)"
+                                                                    @focus="autoGrow($event.target)"
+                                                                    rows="1"
+                                                                    wire:model.live="emailCompose.body"
+                                                                    class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
+                                                                    placeholder="Nachricht…"
+                                                                ></textarea>
+                                                                <x-ui-button
+                                                                    variant="primary"
+                                                                    size="sm"
+                                                                    wire:click="sendEmail"
+                                                                    wire:loading.attr="disabled"
+                                                                >Senden</x-ui-button>
                                                             </div>
-                                                            <x-ui-button
-                                                                variant="primary"
-                                                                size="sm"
-                                                                wire:click="sendEmail"
-                                                                wire:loading.attr="disabled"
-                                                            >Senden</x-ui-button>
                                                         </div>
                                                     </template>
                                                     <template x-if="activeChannel==='whatsapp'">

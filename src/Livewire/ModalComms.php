@@ -175,6 +175,7 @@ class ModalComms extends Component
         $this->emailCompose['body'] = '';
         $this->emailCompose['to'] = '';
         $this->loadEmailThreads();
+        $this->dispatch('comms:scroll-bottom');
     }
 
     private function refreshActiveEmailChannelLabel(): void
@@ -231,6 +232,7 @@ class ModalComms extends Component
         if ($lastInbound?->from) {
             $this->emailCompose['to'] = $this->extractEmailAddress((string) $lastInbound->from) ?: (string) $lastInbound->from;
         }
+        $this->dispatch('comms:scroll-bottom');
     }
 
     private function extractEmailAddress(string $raw): ?string
@@ -251,6 +253,7 @@ class ModalComms extends Component
         $this->emailCompose['subject'] = '';
         $this->emailCompose['body'] = '';
         // keep "to" as-is
+        $this->dispatch('comms:scroll-bottom');
     }
 
     public function sendEmail(): void
@@ -340,6 +343,7 @@ class ModalComms extends Component
         }
 
         $this->emailMessage = '✅ E‑Mail gesendet.';
+        $this->dispatch('comms:scroll-bottom');
     }
 
     private function loadEmailTimeline(): void
@@ -380,6 +384,8 @@ class ModalComms extends Component
             ->sortBy(fn ($x) => $x['at'] ?? '')
             ->values()
             ->all();
+
+        $this->dispatch('comms:scroll-bottom');
     }
 
     public function canManageProviderConnections(): bool
