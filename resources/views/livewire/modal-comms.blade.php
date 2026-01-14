@@ -667,8 +667,164 @@ Viele Grüße
 
                     {{-- Placeholder Tabs (UI only) --}}
                     <div x-show="tab==='channels_manage'" class="w-full h-full min-h-0" x-cloak>
-                        <div class="h-full min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex items-center justify-center shadow-sm ring-1 ring-[var(--ui-border)]/30">
-                            <div class="text-sm text-[var(--ui-muted)]">Kanäle verwalten (kommt später)</div>
+                        <div class="h-full min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/30">
+                            <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between gap-3">
+                                <div class="min-w-0">
+                                    <div class="text-sm font-semibold text-[var(--ui-secondary)]">Kanäle verwalten</div>
+                                    <div class="text-xs text-[var(--ui-muted)] truncate">
+                                        Kanäle werden am Root-Team gespeichert:
+                                        <span class="font-medium text-[var(--ui-secondary)]">{{ $rootTeamName ?: '—' }}</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    <button
+                                        type="button"
+                                        wire:click="loadChannels"
+                                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
+                                    >
+                                        Aktualisieren
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="p-4 flex-1 min-h-0 overflow-y-auto space-y-4">
+                                @if($channelsMessage)
+                                    <div class="text-sm text-[var(--ui-secondary)]">
+                                        {{ $channelsMessage }}
+                                    </div>
+                                @endif
+
+                                <div class="rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] p-4">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <div class="text-sm font-semibold text-[var(--ui-secondary)]">Neuer Kanal</div>
+                                        <div class="text-xs text-[var(--ui-muted)]">aktuell: Email via Postmark</div>
+                                    </div>
+
+                                    <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Typ</label>
+                                            <select
+                                                wire:model.defer="newChannel.type"
+                                                class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                disabled
+                                            >
+                                                <option value="email">email</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Provider</label>
+                                            <select
+                                                wire:model.defer="newChannel.provider"
+                                                class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                disabled
+                                            >
+                                                <option value="postmark">postmark</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Sichtbarkeit</label>
+                                            <select
+                                                wire:model.defer="newChannel.visibility"
+                                                class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                            >
+                                                <option value="private">privat (nur ich)</option>
+                                                <option value="team">teamweit</option>
+                                            </select>
+                                            @if(!$this->canCreateTeamSharedChannel())
+                                                <div class="mt-1 text-[11px] text-[var(--ui-muted)]">
+                                                    Teamweit nur für Owner/Admin des Root-Teams.
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div class="md:col-span-2">
+                                            <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Absender (E‑Mail)</label>
+                                            <input
+                                                type="text"
+                                                wire:model.defer="newChannel.sender_identifier"
+                                                class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                placeholder="z.B. sales@company.de"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Name (optional)</label>
+                                            <input
+                                                type="text"
+                                                wire:model.defer="newChannel.name"
+                                                class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                placeholder="z.B. Sales"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-3 flex items-center justify-end">
+                                        <button
+                                            type="button"
+                                            wire:click="createChannel"
+                                            class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-primary)] text-white border-[var(--ui-primary)] disabled:opacity-60"
+                                            @if($newChannel['visibility'] === 'team' && !$this->canCreateTeamSharedChannel()) disabled @endif
+                                        >
+                                            Kanal anlegen
+                                        </button>
+                                    </div>
+
+                                    <div class="mt-2 text-xs text-[var(--ui-muted)]">
+                                        Hinweis: Der Kanal wird immer der Postmark-Connection zugeordnet (FK) und am Root-Team gespeichert.
+                                    </div>
+                                </div>
+
+                                <div class="rounded-lg border border-[var(--ui-border)]/60 bg-white overflow-hidden">
+                                    <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between">
+                                        <div class="text-sm font-semibold text-[var(--ui-secondary)]">Vorhandene Kanäle</div>
+                                        <div class="text-xs text-[var(--ui-muted)]">{{ count($channels) }} total</div>
+                                    </div>
+
+                                    <div class="divide-y divide-[var(--ui-border)]/60">
+                                        @forelse($channels as $c)
+                                            <div class="px-4 py-3 flex items-center justify-between gap-3">
+                                                <div class="min-w-0">
+                                                    <div class="flex items-center gap-2 min-w-0">
+                                                        <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">
+                                                            {{ $c['sender_identifier'] }}
+                                                        </div>
+                                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/60">
+                                                            {{ $c['provider'] }}
+                                                        </span>
+                                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/60">
+                                                            {{ $c['visibility'] === 'team' ? 'teamweit' : 'privat' }}
+                                                        </span>
+                                                        @if(!$c['is_active'])
+                                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/60">
+                                                                inaktiv
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                    @if(!empty($c['name']))
+                                                        <div class="mt-1 text-xs text-[var(--ui-muted)] truncate">
+                                                            {{ $c['name'] }}
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                                <div class="flex items-center gap-2 flex-shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        wire:click="removeChannel({{ (int) $c['id'] }})"
+                                                        class="text-xs px-2 py-1 rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] text-[var(--ui-muted)] hover:text-red-600 hover:border-red-200"
+                                                    >
+                                                        Löschen
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        @empty
+                                            <div class="px-4 py-6 text-sm text-[var(--ui-muted)]">
+                                                Noch keine Kanäle angelegt.
+                                            </div>
+                                        @endforelse
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div x-show="tab==='connections'" class="w-full h-full min-h-0" x-cloak>

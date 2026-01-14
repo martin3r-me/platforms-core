@@ -7,6 +7,7 @@ use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\QueryException;
 use Platform\Core\Enums\TeamRole;
+use Platform\Core\Models\CommsChannel;
 use Platform\Core\Models\CommsProviderConnection;
 use Platform\Core\Models\CommsProviderConnectionDomain;
 use Platform\Core\Models\Team;
@@ -56,11 +57,34 @@ class ModalComms extends Component
 
     public ?string $postmarkDomainMessage = null;
 
+    /**
+     * Channels (UI list) – stored at root team.
+     *
+     * @var array<int, array<string, mixed>>
+     */
+    public array $channels = [];
+
+    /**
+     * New channel form (UI).
+     *
+     * @var array<string, mixed>
+     */
+    public array $newChannel = [
+        'type' => 'email',
+        'provider' => 'postmark',
+        'sender_identifier' => '',
+        'name' => '',
+        'visibility' => 'private', // private|team
+    ];
+
+    public ?string $channelsMessage = null;
+
     #[On('open-modal-comms')]
     public function openModal(array $payload = []): void
     {
         $this->open = true;
         $this->loadPostmarkConnection();
+        $this->loadChannels();
     }
 
     public function closeModal(): void
@@ -135,6 +159,168 @@ class ModalComms extends Component
                 'last_error' => $d->last_error ? (string) $d->last_error : null,
             ])
             ->all();
+    }
+
+    public function canCreateTeamSharedChannel(): bool
+    {
+        return $this->canManageProviderConnections();
+    }
+
+    public function loadChannels(): void
+    {
+        $this->channelsMessage = null;
+        $this->channels = [];
+
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+        if (!$user || !$team) {
+            return;
+        }
+
+        /** @var Team $rootTeam */
+        $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+        $this->rootTeamId = (int) $rootTeam->id;
+        $this->rootTeamName = (string) ($rootTeam->name ?? '');
+
+        // For now, we list only email/postmark channels (we'll expand later).
+        $this->channels = CommsChannel::query()
+            ->where('team_id', $rootTeam->id)
+            ->where('type', 'email')
+            ->orderByDesc('is_active')
+            ->orderBy('visibility')
+            ->orderBy('sender_identifier')
+            ->get()
+            ->map(fn (CommsChannel $c) => [
+                'id' => (int) $c->id,
+                'type' => (string) $c->type,
+                'provider' => (string) $c->provider,
+                'sender_identifier' => (string) $c->sender_identifier,
+                'name' => $c->name ? (string) $c->name : null,
+                'visibility' => (string) $c->visibility,
+                'is_active' => (bool) $c->is_active,
+            ])
+            ->all();
+    }
+
+    public function createChannel(): void
+    {
+        $this->channelsMessage = null;
+
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+        if (!$user || !$team) {
+            $this->channelsMessage = '⛔️ Kein Team-Kontext gefunden.';
+            return;
+        }
+
+        /** @var Team $rootTeam */
+        $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+
+        $this->validate([
+            'newChannel.type' => ['required', 'string', 'max:32'],
+            'newChannel.provider' => ['required', 'string', 'max:64'],
+            'newChannel.sender_identifier' => ['required', 'string', 'max:255'],
+            'newChannel.name' => ['nullable', 'string', 'max:255'],
+            'newChannel.visibility' => ['required', 'in:private,team'],
+        ]);
+
+        $type = (string) $this->newChannel['type'];
+        $provider = (string) $this->newChannel['provider'];
+        $sender = trim((string) $this->newChannel['sender_identifier']);
+        $visibility = (string) $this->newChannel['visibility'];
+
+        if ($visibility === 'team' && !$this->canCreateTeamSharedChannel()) {
+            $this->channelsMessage = '⛔️ Teamweite Kanäle dürfen nur Owner/Admin des Root-Teams anlegen.';
+            return;
+        }
+
+        // For email, basic validation + (optional) enforce configured domains
+        if ($type === 'email') {
+            if (!filter_var($sender, FILTER_VALIDATE_EMAIL)) {
+                $this->channelsMessage = '⛔️ Bitte eine gültige E‑Mail-Adresse als Absender eintragen.';
+                return;
+            }
+        }
+
+        $connectionId = null;
+        if ($type === 'email' && $provider === 'postmark') {
+            $conn = CommsProviderConnection::forTeamProvider($rootTeam, 'postmark');
+            if (!$conn) {
+                $this->channelsMessage = '⛔️ Keine Postmark Connection gefunden. Bitte zuerst im Tab „Connections“ speichern.';
+                return;
+            }
+            $connectionId = $conn->id;
+
+            // Optional: Absender-Domain muss in hinterlegten Domains enthalten sein (wenn Domains existieren)
+            $domain = strtolower((string) substr(strrchr($sender, '@') ?: '', 1));
+            $configuredDomains = $conn->domains()->pluck('domain')->map(fn ($d) => strtolower((string) $d))->all();
+            if (!empty($configuredDomains) && $domain && !in_array($domain, $configuredDomains, true)) {
+                $this->channelsMessage = '⛔️ Domain ist nicht in den Postmark-Domains hinterlegt.';
+                return;
+            }
+        }
+
+        try {
+            CommsChannel::create([
+                'team_id' => $rootTeam->id,
+                'created_by_user_id' => $user->id,
+                'comms_provider_connection_id' => $connectionId,
+                'type' => $type,
+                'provider' => $provider,
+                'name' => trim((string) ($this->newChannel['name'] ?? '')) ?: null,
+                'sender_identifier' => $sender,
+                'visibility' => $visibility,
+                'is_active' => true,
+                'meta' => [],
+            ]);
+        } catch (QueryException $e) {
+            $this->channelsMessage = '⛔️ Dieser Kanal existiert bereits (Team/Typ/Absender).';
+            return;
+        }
+
+        $this->newChannel['sender_identifier'] = '';
+        $this->newChannel['name'] = '';
+        $this->newChannel['visibility'] = 'private';
+
+        $this->loadChannels();
+        $this->channelsMessage = '✅ Kanal angelegt.';
+    }
+
+    public function removeChannel(int $channelId): void
+    {
+        $this->channelsMessage = null;
+
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+        if (!$user || !$team) {
+            $this->channelsMessage = '⛔️ Kein Team-Kontext gefunden.';
+            return;
+        }
+
+        /** @var Team $rootTeam */
+        $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+
+        $channel = CommsChannel::query()
+            ->where('team_id', $rootTeam->id)
+            ->whereKey($channelId)
+            ->first();
+
+        if (!$channel) {
+            $this->channelsMessage = '⛔️ Kanal nicht gefunden.';
+            return;
+        }
+
+        // Owner/Admin can delete anything; otherwise only private channels created by the user
+        if (!$this->canManageProviderConnections()) {
+            if ($channel->visibility !== 'private' || (int) $channel->created_by_user_id !== (int) $user->id) {
+                $this->channelsMessage = '⛔️ Keine Berechtigung zum Löschen dieses Kanals.';
+                return;
+            }
+        }
+
+        $channel->delete();
+        $this->loadChannels();
+        $this->channelsMessage = '✅ Kanal entfernt.';
     }
 
     public function savePostmarkConnection(): void
