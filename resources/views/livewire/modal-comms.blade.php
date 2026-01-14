@@ -57,6 +57,7 @@
                     tab: 'chat',
                     activeChannel: 'email',
                     activeThreadId: 1,
+                    composeMode: false,
                     get activeChannelLabel(){
                         return this.activeChannel === 'email' ? 'E-Mail'
                             : (this.activeChannel === 'phone' ? 'Anrufen' : 'WhatsApp');
@@ -77,6 +78,29 @@
                             const el = this.$refs.chatScroll;
                             if (!el) return;
                             el.scrollTop = el.scrollHeight;
+                        });
+                    },
+                    startNewThread(){
+                        this.composeMode = true;
+                        this.activeThreadId = null;
+                        this.scrollToBottom();
+                        this.$nextTick(() => {
+                            // focus the most relevant textarea if present
+                            const el = this.activeChannel === 'email'
+                                ? this.$refs.emailBody
+                                : (this.activeChannel === 'whatsapp' ? this.$refs.waBody : this.$refs.callNote);
+                            try { el?.focus?.(); } catch (_) {}
+                        });
+                    },
+                    selectThread(id){
+                        this.composeMode = false;
+                        this.activeThreadId = id;
+                        this.scrollToBottom();
+                        this.$nextTick(() => {
+                            const el = this.activeChannel === 'email'
+                                ? this.$refs.emailBody
+                                : (this.activeChannel === 'whatsapp' ? this.$refs.waBody : this.$refs.callNote);
+                            try { el?.focus?.(); } catch (_) {}
                         });
                     },
                     init(){
@@ -172,7 +196,7 @@
                                         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                                             <div class="text-xs font-semibold text-[var(--ui-secondary)]">Threads</div>
                                             <div class="flex items-center gap-3">
-                                                <button type="button" class="text-xs text-[var(--ui-muted)] hover:underline" title="(UI) Neu">Neu</button>
+                                                <button type="button" @click="startNewThread()" class="text-xs text-[var(--ui-muted)] hover:underline" title="Neuen Thread starten">Neu</button>
                                                 <button type="button" class="text-xs text-[var(--ui-muted)] hover:underline" title="(UI) Clear">Clear</button>
                                             </div>
                                         </div>
@@ -184,9 +208,9 @@
                                                 </div>
                                                 <div class="space-y-2">
                                                     <button type="button"
-                                                        @click="activeThreadId = 1; scrollToBottom()"
+                                                        @click="selectThread(1)"
                                                         class="w-full text-left rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2 hover:bg-[var(--ui-muted-5)] transition"
-                                                        :class="activeThreadId === 1 ? 'ring-1 ring-[var(--ui-primary)]/40' : ''"
+                                                        :class="(!composeMode && activeThreadId === 1) ? 'ring-1 ring-[var(--ui-primary)]/40' : ''"
                                                     >
                                                         <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate" x-text="activeChannel === 'email' ? 'Re: Angebot – Q1' : (activeChannel === 'phone' ? 'Anrufnotiz · Termin' : 'WhatsApp · Follow-up')"></div>
                                                         <div class="mt-0.5 flex items-center justify-between gap-2">
@@ -201,9 +225,9 @@
                                                         </div>
                                                     </button>
                                                     <button type="button"
-                                                        @click="activeThreadId = 2; scrollToBottom()"
+                                                        @click="selectThread(2)"
                                                         class="w-full text-left rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2 hover:bg-[var(--ui-muted-5)] transition"
-                                                        :class="activeThreadId === 2 ? 'ring-1 ring-[var(--ui-primary)]/40' : ''"
+                                                        :class="(!composeMode && activeThreadId === 2) ? 'ring-1 ring-[var(--ui-primary)]/40' : ''"
                                                     >
                                                         <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate" x-text="activeChannel === 'email' ? 'Follow-up · Termin' : (activeChannel === 'phone' ? 'Rückruf · Frage' : 'WhatsApp · Angebot')"></div>
                                                         <div class="mt-0.5 flex items-center justify-between gap-2">
@@ -237,10 +261,11 @@
                                                                 Kanal: E-Mail
                                                             </span>
                                                             <span class="truncate">m.erren@bhgdigital.de</span>
+                                                            <span class="ml-auto text-[10px] text-[var(--ui-muted)]" x-show="composeMode">Neuer Thread</span>
                                                         </div>
 
                                                         {{-- inbound mail --}}
-                                                        <div class="flex justify-start">
+                                                        <div class="flex justify-start" x-show="!composeMode">
                                                             <div class="w-full max-w-4xl rounded-xl border border-[var(--ui-border)]/60 bg-white overflow-hidden">
                                                                 <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
                                                                     <div class="flex items-start justify-between gap-3">
@@ -302,7 +327,7 @@ Marius
                                                         </div>
 
                                                         {{-- outbound mail --}}
-                                                        <div class="flex justify-end">
+                                                        <div class="flex justify-end" x-show="!composeMode">
                                                             <div class="w-full max-w-4xl rounded-xl border border-[var(--ui-border)]/60 bg-[#dcf8c6] overflow-hidden">
                                                                 <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 bg-[var(--ui-bg)]/70">
                                                                     <div class="flex items-start justify-between gap-3">
@@ -353,6 +378,12 @@ Viele Grüße
                                                                 </div>
                                                             </div>
                                                         </div>
+
+                                                        {{-- New thread placeholder (UI only) --}}
+                                                        <div x-show="composeMode" x-cloak class="rounded-xl border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] p-4">
+                                                            <div class="text-sm font-semibold text-[var(--ui-secondary)]">Neuer E-Mail Thread</div>
+                                                            <div class="mt-1 text-sm text-[var(--ui-muted)]">Betreff + Nachricht verfassen (UI).</div>
+                                                        </div>
                                                     </div>
 
                                                     {{-- WhatsApp Verlauf (typische Bubbles) --}}
@@ -362,9 +393,10 @@ Viele Grüße
                                                                 Kanal: WhatsApp
                                                             </span>
                                                             <span class="truncate">+49 172 123 12 14</span>
+                                                            <span class="ml-auto text-[10px] text-[var(--ui-muted)]" x-show="composeMode">Neuer Thread</span>
                                                         </div>
 
-                                                        <div class="space-y-2">
+                                                        <div class="space-y-2" x-show="!composeMode">
                                                             <div class="flex justify-start">
                                                                 <div class="max-w-[85%] rounded-2xl bg-white border border-[var(--ui-border)]/60 px-4 py-2">
                                                                     <div class="flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
@@ -466,6 +498,11 @@ Viele Grüße
                                                                 </div>
                                                             </div>
                                                         </div>
+
+                                                        <div x-show="composeMode" x-cloak class="rounded-xl border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] p-4">
+                                                            <div class="text-sm font-semibold text-[var(--ui-secondary)]">Neuer WhatsApp Thread</div>
+                                                            <div class="mt-1 text-sm text-[var(--ui-muted)]">Nachricht verfassen (UI).</div>
+                                                        </div>
                                                     </div>
 
                                                     {{-- Anrufen Verlauf (Call Timeline) --}}
@@ -549,6 +586,8 @@ Viele Grüße
                                                                 @svg('heroicon-o-paper-clip', 'w-5 h-5')
                                                             </button>
                                                             <input
+                                                                x-show="composeMode"
+                                                                x-cloak
                                                                 type="text"
                                                                 class="w-64 px-4 h-10 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
                                                                 placeholder="Betreff…"
@@ -560,7 +599,7 @@ Viele Grüße
                                                                 @focus="autoGrow($event.target)"
                                                                 rows="1"
                                                                 class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
-                                                                placeholder="Antwort (Text)…"
+                                                                :placeholder="composeMode ? 'Nachricht…' : 'Antwort…'"
                                                             ></textarea>
                                                             <button type="button" class="px-6 py-2 h-10 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90 flex items-center gap-2 opacity-60 cursor-not-allowed" disabled>
                                                                 <span>Senden</span>
