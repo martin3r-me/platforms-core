@@ -299,9 +299,7 @@
                                                     </button>
                                                 </div>
                                             </div>
-                                            <div class="text-[10px] text-[var(--ui-muted)]">
-                                                (Später: echte Thread-Liste, Filter, Kontext)
-                                            </div>
+                                            {{-- intentionally blank --}}
                                         </div>
                                     </div>
 
@@ -312,16 +310,6 @@
                                                 <div id="chatList" class="space-y-4 min-w-0">
                                                     {{-- E-Mail Verlauf (scrollbar wie Chat, aber mail-typisch) --}}
                                                     <div x-show="activeChannel==='email'" class="space-y-3" x-cloak>
-                                                        <div class="text-xs text-[var(--ui-muted)] flex items-center gap-2">
-                                                            <span class="px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
-                                                                Kanal: E‑Mail
-                                                            </span>
-                                                            <span class="truncate">{{ $activeEmailChannelAddress ?: 'kein Kanal' }}</span>
-                                                            <span class="ml-auto text-[10px] text-[var(--ui-muted)]">
-                                                                @if(!$activeEmailThreadId) Neuer Thread @endif
-                                                            </span>
-                                                        </div>
-
                                                         @if(!$activeEmailChannelId)
                                                             <div class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
                                                                 Kein E‑Mail Kanal ausgewählt/verfügbar.
