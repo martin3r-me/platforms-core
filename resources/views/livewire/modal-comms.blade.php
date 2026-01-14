@@ -335,6 +335,20 @@
                                                                 Kein E‑Mail Kanal ausgewählt/verfügbar.
                                                             </div>
                                                         @else
+                                                            @if(!empty($emailDebug))
+                                                                <div class="rounded-xl border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-4 py-3">
+                                                                    <div class="text-xs font-semibold text-[var(--ui-secondary)]">Debug</div>
+                                                                    <div class="mt-2 space-y-1 text-[11px] text-[var(--ui-muted)]">
+                                                                        @foreach($emailDebug as $d)
+                                                                            <div class="flex items-center justify-between gap-3">
+                                                                                <span class="text-[10px]">{{ $d['at'] }}</span>
+                                                                                <span class="flex-1 text-right truncate">{{ $d['msg'] }}</span>
+                                                                            </div>
+                                                                        @endforeach
+                                                                    </div>
+                                                                </div>
+                                                            @endif
+
                                                             @forelse($emailTimeline as $m)
                                                                 @php
                                                                     $isInbound = ($m['direction'] ?? '') === 'inbound';
@@ -597,16 +611,18 @@
                                                             @endif
 
                                                             <div class="flex gap-2 items-end w-full">
-                                                                <textarea
-                                                                    x-ref="emailBody"
-                                                                    x-init="$nextTick(() => autoGrow($refs.emailBody))"
-                                                                    @input="autoGrow($event.target)"
-                                                                    @focus="autoGrow($event.target)"
-                                                                    rows="1"
-                                                                    wire:model.live="emailCompose.body"
-                                                                    class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
-                                                                    placeholder="Nachricht…"
-                                                                ></textarea>
+                                                                <div class="flex-1" wire:ignore x-data="{ body: @entangle('emailCompose.body').defer }">
+                                                                    <textarea
+                                                                        x-ref="emailBody"
+                                                                        x-model="body"
+                                                                        x-init="$nextTick(() => autoGrow($refs.emailBody))"
+                                                                        @input="autoGrow($event.target)"
+                                                                        @focus="autoGrow($event.target)"
+                                                                        rows="1"
+                                                                        class="w-full px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
+                                                                        placeholder="Nachricht…"
+                                                                    ></textarea>
+                                                                </div>
                                                                 <x-ui-button
                                                                     variant="primary"
                                                                     size="sm"

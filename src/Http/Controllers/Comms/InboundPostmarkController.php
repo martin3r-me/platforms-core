@@ -86,6 +86,7 @@ class InboundPostmarkController extends Controller
                 'spam_score' => $payload['SpamScore'] ?? null,
                 'received_at' => now(),
             ]);
+            $thread->touch();
 
             // 6) Persist attachments (UI/preview support later)
             foreach ($payload['Attachments'] ?? [] as $a) {

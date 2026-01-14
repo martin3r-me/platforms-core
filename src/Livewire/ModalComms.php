@@ -105,6 +105,20 @@ class ModalComms extends Component
     ];
 
     public ?string $emailMessage = null;
+    /** @var array<int, array{at:string,msg:string}> */
+    public array $emailDebug = [];
+
+    private function emailDebug(string $msg): void
+    {
+        $this->emailDebug[] = [
+            'at' => now()->format('H:i:s'),
+            'msg' => $msg,
+        ];
+        // Keep it short
+        if (count($this->emailDebug) > 12) {
+            $this->emailDebug = array_slice($this->emailDebug, -12);
+        }
+    }
 
     #[On('open-modal-comms')]
     public function openModal(array $payload = []): void
@@ -259,25 +273,31 @@ class ModalComms extends Component
     public function sendEmail(): void
     {
         $this->emailMessage = null;
+        $this->emailDebug = [];
+        $this->emailDebug('Senden gestartet…');
 
         $user = Auth::user();
         $team = $user?->currentTeam;
         if (!$user || !$team) {
             $this->emailMessage = '⛔️ Kein Team-Kontext gefunden.';
+            $this->emailDebug('Fehler: kein Team-Kontext.');
             return;
         }
 
         if (!$this->activeEmailChannelId) {
             $this->emailMessage = '⛔️ Kein E‑Mail Kanal ausgewählt.';
+            $this->emailDebug('Fehler: kein Kanal ausgewählt.');
             return;
         }
 
+        $this->emailDebug('Validiere Eingaben…');
         $this->validate([
             'emailCompose.to' => ['required', 'email', 'max:255'],
             'emailCompose.body' => ['required', 'string', 'min:1'],
             'emailCompose.subject' => [$this->activeEmailThreadId ? 'nullable' : 'required', 'string', 'max:255'],
         ]);
 
+        $this->emailDebug('Lade Kanal…');
         $channel = CommsChannel::query()
             ->whereKey($this->activeEmailChannelId)
             ->where('type', 'email')
@@ -286,6 +306,7 @@ class ModalComms extends Component
             ->first();
         if (!$channel) {
             $this->emailMessage = '⛔️ E‑Mail Kanal nicht gefunden.';
+            $this->emailDebug('Fehler: Kanal nicht gefunden.');
             return;
         }
 
@@ -303,6 +324,7 @@ class ModalComms extends Component
         }
 
         try {
+            $this->emailDebug('Sende via Postmark…');
             /** @var PostmarkEmailService $svc */
             $svc = app(PostmarkEmailService::class);
             $token = $svc->send(
@@ -318,8 +340,10 @@ class ModalComms extends Component
                     'is_reply' => $isReply,
                 ]
             );
+            $this->emailDebug('Postmark: OK.');
         } catch (\Throwable $e) {
             $this->emailMessage = '⛔️ Versand fehlgeschlagen: ' . $e->getMessage();
+            $this->emailDebug('Fehler: ' . $e->getMessage());
             return;
         }
 

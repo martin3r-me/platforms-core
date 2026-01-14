@@ -134,11 +134,11 @@ class PostmarkEmailService
             $opt['reply_to'] ?? null,
             $opt['cc'] ?? null,
             $opt['bcc'] ?? null,
-            $pmAttachments,
             $headersArray,
+            $pmAttachments,
             $opt['track_links'] ?? null,
             $opt['metadata'] ?? null,
-            null // message stream removed
+            null // message stream (optional)
         );
 
         // 6) Persist outbound mail
@@ -159,6 +159,7 @@ class PostmarkEmailService
             ],
             'sent_at' => now(),
         ]);
+        $thread->touch();
 
         foreach ($storedAttachments as $a) {
             $mail->attachments()->create([
