@@ -21,8 +21,7 @@
   <x-ui-styles />
 
   {{-- optional: eigenes JS / Livewire --}}
-  @php($viteBuildDirectory = 'build/' . (config('app.asset_version') ?? env('ASSET_VERSION') ?? 'v1'))
-  @vite(['resources/css/app.css', 'resources/js/app.js'], $viteBuildDirectory)
+  @vite(['resources/css/app.css', 'resources/js/app.js'])
   @livewireStyles
 
   <script src="https://unpkg.com/@wotz/livewire-sortablejs@1.0.0/dist/livewire-sortable.js"></script>
@@ -56,18 +55,8 @@
   <div class="flex h-screen w-full">
     <!-- Sidebar -->
     <x-ui-sidebar>
-        @php
-          // Defensive: in manchen Deploy-/View-Cache-Szenarien ist $class nicht gesetzt
-          $currentModuleKey = $currentModuleKey ?? (explode('.', request()->route()?->getName() ?? '')[0] ?? null);
-          $class = $class ?? (
-              $currentModuleKey
-                ? "\\Platform\\".str_replace('-', '', ucwords($currentModuleKey, '-'))."\\Livewire\\Sidebar"
-                : null
-          );
-        @endphp
-
         @if($class && class_exists($class))
-          @livewire($currentModuleKey.'.sidebar')
+            @livewire($currentModuleKey.'.sidebar')
         @endif
     </x-ui-sidebar>
 

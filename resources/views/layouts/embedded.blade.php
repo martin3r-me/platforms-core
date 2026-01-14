@@ -15,8 +15,7 @@
   <x-ui-styles />
 
   {{-- optional: eigenes JS / Livewire --}}
-  @php($viteBuildDirectory = 'build/' . (config('app.asset_version') ?? env('ASSET_VERSION') ?? 'v1'))
-  @vite(['resources/css/app.css', 'resources/js/app.js'], $viteBuildDirectory)
+  @vite(['resources/css/app.css', 'resources/js/app.js'])
   @livewireStyles
 
   <script src="https://unpkg.com/@wotz/livewire-sortablejs@1.0.0/dist/livewire-sortable.js"></script>
