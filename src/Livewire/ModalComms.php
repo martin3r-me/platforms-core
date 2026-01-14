@@ -342,6 +342,8 @@ class ModalComms extends Component
         $this->emailDebug = [];
         $this->emailDebug('Senden gestartet…');
 
+        $wasNewThread = !$this->activeEmailThreadId;
+
         $user = Auth::user();
         $team = $user?->currentTeam;
         if (!$user || !$team) {
@@ -445,8 +447,9 @@ class ModalComms extends Component
         }
 
         $this->emailCompose['body'] = '';
-        if (!$this->activeEmailThreadId) {
+        if ($wasNewThread) {
             $this->emailCompose['subject'] = '';
+            $this->emailCompose['to'] = '';
         }
 
         // Refresh threads & select the thread for the returned token
@@ -464,6 +467,8 @@ class ModalComms extends Component
         }
 
         $this->emailMessage = '✅ E‑Mail gesendet.';
+        // User asked to keep it clean after sending
+        $this->emailDebug = [];
         $this->dispatch('comms:scroll-bottom');
     }
 

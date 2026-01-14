@@ -619,10 +619,6 @@
                                                                         />
                                                                     </div>
                                                                 </div>
-                                                            @else
-                                                                <div class="text-[11px] text-[var(--ui-muted)]">
-                                                                    Antwort an: <span class="font-semibold text-[var(--ui-secondary)]">{{ $emailCompose['to'] ?: '—' }}</span>
-                                                                </div>
                                                             @endif
 
                                                             <div class="flex gap-2 items-end w-full">
@@ -646,7 +642,12 @@
                                                                     size="sm"
                                                                     wire:click="sendEmail"
                                                                     wire:loading.attr="disabled"
-                                                                >Senden</x-ui-button>
+                                                                    wire:loading.class="animate-pulse"
+                                                                    wire:target="sendEmail"
+                                                                >
+                                                                    <span wire:loading.remove wire:target="sendEmail">Senden</span>
+                                                                    <span wire:loading wire:target="sendEmail">Sende…</span>
+                                                                </x-ui-button>
                                                             </div>
                                                         </div>
                                                     </template>
