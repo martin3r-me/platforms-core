@@ -106,7 +106,12 @@
                     init(){
                         // Ensure scrolling works when switching threads/channels (even if content is swapped)
                         this.$watch('activeThreadId', () => this.scrollToBottom());
-                        this.$watch('activeChannel', () => this.scrollToBottom());
+                        this.$watch('activeChannel', () => {
+                            // On channel change, select the first thread and exit compose mode (UI default)
+                            this.composeMode = false;
+                            this.activeThreadId = 1;
+                            this.scrollToBottom();
+                        });
                         this.$watch('tab', () => this.scrollToBottom());
                     }
                 }"
@@ -667,8 +672,249 @@ Viele Grüße
                         </div>
                     </div>
                     <div x-show="tab==='connections'" class="w-full h-full min-h-0" x-cloak>
-                        <div class="h-full min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex items-center justify-center shadow-sm ring-1 ring-[var(--ui-border)]/30">
-                            <div class="text-sm text-[var(--ui-muted)]">Connections (kommt später)</div>
+                        <div class="h-full min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/30">
+                            <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between gap-3">
+                                <div class="min-w-0">
+                                    <div class="text-sm font-semibold text-[var(--ui-secondary)]">Connections</div>
+                                    <div class="text-xs text-[var(--ui-muted)] truncate">
+                                        Postmark wird am Root-Team gespeichert:
+                                        <span class="font-medium text-[var(--ui-secondary)]">{{ $rootTeamName ?: '—' }}</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    <button
+                                        type="button"
+                                        wire:click="loadPostmarkConnection"
+                                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
+                                    >
+                                        Aktualisieren
+                                    </button>
+                                    <button
+                                        type="button"
+                                        wire:click="savePostmarkConnection"
+                                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-primary)] text-white border-[var(--ui-primary)] disabled:opacity-60"
+                                        @if(!$this->canManageProviderConnections()) disabled @endif
+                                    >
+                                        Speichern
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="p-4 flex-1 min-h-0 overflow-y-auto">
+                                @if($postmarkMessage)
+                                    <div class="mb-3 text-sm text-[var(--ui-secondary)]">
+                                        {{ $postmarkMessage }}
+                                    </div>
+                                @endif
+
+                                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                    <div class="rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] p-4">
+                                        <div class="flex items-center justify-between gap-3">
+                                            <div class="flex items-center gap-2">
+                                                @svg('heroicon-o-envelope', 'w-5 h-5 text-[var(--ui-primary)]')
+                                                <div class="text-sm font-semibold text-[var(--ui-secondary)]">Postmark</div>
+                                            </div>
+                                            <div class="text-xs text-[var(--ui-muted)]">
+                                                Status:
+                                                <span class="font-medium text-[var(--ui-secondary)]">
+                                                    {{ $postmarkConfigured ? 'konfiguriert' : 'nicht konfiguriert' }}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div class="mt-4 space-y-3">
+                                            <div>
+                                                <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Server Token</label>
+                                                <input
+                                                    type="password"
+                                                    wire:model.defer="postmark.server_token"
+                                                    class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                    placeholder="{{ $postmarkConfigured ? '•••••••• (neu setzen)' : 'postmark server token' }}"
+                                                    @if(!$this->canManageProviderConnections()) disabled @endif
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Message Stream</label>
+                                                <input
+                                                    type="text"
+                                                    wire:model.defer="postmark.message_stream"
+                                                    class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                    placeholder="outbound"
+                                                    @if(!$this->canManageProviderConnections()) disabled @endif
+                                                />
+                                            </div>
+
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <div>
+                                                    <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Inbound User (Basic Auth)</label>
+                                                    <input
+                                                        type="text"
+                                                        wire:model.defer="postmark.inbound_user"
+                                                        class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                        placeholder="optional"
+                                                        @if(!$this->canManageProviderConnections()) disabled @endif
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Inbound Pass (Basic Auth)</label>
+                                                    <input
+                                                        type="password"
+                                                        wire:model.defer="postmark.inbound_pass"
+                                                        class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                        placeholder="{{ !empty($postmark['inbound_user'] ?? '') ? 'optional' : 'optional' }}"
+                                                        @if(!$this->canManageProviderConnections()) disabled @endif
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Signing Secret (optional)</label>
+                                                <input
+                                                    type="password"
+                                                    wire:model.defer="postmark.signing_secret"
+                                                    class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                    placeholder="optional"
+                                                    @if(!$this->canManageProviderConnections()) disabled @endif
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div class="mt-6 pt-5 border-t border-[var(--ui-border)]/60">
+                                            <div class="flex items-center justify-between gap-3">
+                                                <div class="text-sm font-semibold text-[var(--ui-secondary)]">Absender-Domains</div>
+                                                <div class="text-xs text-[var(--ui-muted)]">Purpose + Primary</div>
+                                            </div>
+
+                                            @if($postmarkDomainMessage)
+                                                <div class="mt-2 text-sm text-[var(--ui-secondary)]">
+                                                    {{ $postmarkDomainMessage }}
+                                                </div>
+                                            @endif
+
+                                            @if(!$postmarkConfigured)
+                                                <div class="mt-2 text-xs text-[var(--ui-muted)]">
+                                                    Bitte zuerst die Postmark Connection speichern, dann kannst du Domains anlegen.
+                                                </div>
+                                            @else
+                                                <div class="mt-3 space-y-2">
+                                                    @forelse($postmarkDomains as $d)
+                                                        <div class="flex items-center justify-between gap-3 rounded-lg border border-[var(--ui-border)]/60 bg-white px-3 py-2">
+                                                            <div class="min-w-0">
+                                                                <div class="flex items-center gap-2 min-w-0">
+                                                                    <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">{{ $d['domain'] }}</div>
+                                                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/60">
+                                                                        {{ $d['purpose'] }}
+                                                                    </span>
+                                                                    @if($d['is_primary'])
+                                                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] border border-[var(--ui-primary)]/20">
+                                                                            Primary
+                                                                        </span>
+                                                                    @endif
+                                                                    @if($d['is_verified'])
+                                                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                                            Verified
+                                                                        </span>
+                                                                    @endif
+                                                                </div>
+                                                                @if(!empty($d['last_error']))
+                                                                    <div class="mt-1 text-[11px] text-[var(--ui-muted)] truncate">
+                                                                        {{ $d['last_error'] }}
+                                                                    </div>
+                                                                @endif
+                                                            </div>
+                                                            <div class="flex items-center gap-2 flex-shrink-0">
+                                                                <button
+                                                                    type="button"
+                                                                    wire:click="setPostmarkPrimaryDomain({{ (int) $d['id'] }})"
+                                                                    class="text-xs px-2 py-1 rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] disabled:opacity-60"
+                                                                    @if(!$this->canManageProviderConnections() || $d['is_primary']) disabled @endif
+                                                                >
+                                                                    Primary
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    wire:click="removePostmarkDomain({{ (int) $d['id'] }})"
+                                                                    class="text-xs px-2 py-1 rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] text-[var(--ui-muted)] hover:text-red-600 hover:border-red-200 disabled:opacity-60"
+                                                                    @if(!$this->canManageProviderConnections()) disabled @endif
+                                                                >
+                                                                    Löschen
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    @empty
+                                                        <div class="text-xs text-[var(--ui-muted)]">
+                                                            Noch keine Domains hinterlegt.
+                                                        </div>
+                                                    @endforelse
+                                                </div>
+
+                                                <div class="mt-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] p-3">
+                                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                        <div class="md:col-span-2">
+                                                            <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Domain</label>
+                                                            <input
+                                                                type="text"
+                                                                wire:model.defer="postmarkNewDomain.domain"
+                                                                class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                                placeholder="z.B. company.de"
+                                                                @if(!$this->canManageProviderConnections()) disabled @endif
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Purpose</label>
+                                                            <select
+                                                                wire:model.defer="postmarkNewDomain.purpose"
+                                                                class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                                @if(!$this->canManageProviderConnections()) disabled @endif
+                                                            >
+                                                                <option value="sending">sending</option>
+                                                                <option value="inbound">inbound</option>
+                                                                <option value="tracking">tracking</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="mt-3 flex items-center justify-between gap-3">
+                                                        <label class="inline-flex items-center gap-2 text-sm text-[var(--ui-muted)]">
+                                                            <input
+                                                                type="checkbox"
+                                                                wire:model.defer="postmarkNewDomain.is_primary"
+                                                                class="rounded border-[var(--ui-border)]"
+                                                                @if(!$this->canManageProviderConnections()) disabled @endif
+                                                            />
+                                                            <span>Als Primary setzen</span>
+                                                        </label>
+                                                        <button
+                                                            type="button"
+                                                            wire:click="addPostmarkDomain"
+                                                            class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-primary)] text-white border-[var(--ui-primary)] disabled:opacity-60"
+                                                            @if(!$this->canManageProviderConnections()) disabled @endif
+                                                        >
+                                                            Domain hinzufügen
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            @endif
+                                        </div>
+
+                                        @if(!$this->canManageProviderConnections())
+                                            <div class="mt-4 text-xs text-[var(--ui-muted)]">
+                                                Hinweis: Nur Owner/Admin des Root-Teams kann Postmark konfigurieren.
+                                            </div>
+                                        @endif
+                                    </div>
+
+                                    <div class="rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] p-4">
+                                        <div class="text-sm font-semibold text-[var(--ui-secondary)]">Hinweise</div>
+                                        <ul class="mt-2 text-sm text-[var(--ui-muted)] space-y-2">
+                                            <li><span class="font-semibold text-[var(--ui-secondary)]">Scope:</span> Speicherung erfolgt immer am Root-Team (Parent-Team).</li>
+                                            <li><span class="font-semibold text-[var(--ui-secondary)]">Sicherheit:</span> Credentials werden verschlüsselt gespeichert. Nach dem Speichern werden Secret-Felder wieder geleert.</li>
+                                            <li><span class="font-semibold text-[var(--ui-secondary)]">Nächster Schritt:</span> Email-Inbound/Outbound liest diese Connection statt `.env`.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div x-show="tab==='settings'" class="w-full h-full min-h-0" x-cloak>
