@@ -51,7 +51,6 @@ class ModalComms extends Component
      */
     public array $postmarkNewDomain = [
         'domain' => '',
-        'purpose' => 'sending',
         'is_primary' => true,
     ];
 
@@ -126,13 +125,11 @@ class ModalComms extends Component
     {
         $this->postmarkDomains = $conn->domains()
             ->orderByDesc('is_primary')
-            ->orderBy('purpose')
             ->orderBy('domain')
             ->get()
             ->map(fn (CommsProviderConnectionDomain $d) => [
                 'id' => (int) $d->id,
                 'domain' => (string) $d->domain,
-                'purpose' => (string) $d->purpose,
                 'is_primary' => (bool) $d->is_primary,
                 'is_verified' => (bool) $d->is_verified,
                 'last_error' => $d->last_error ? (string) $d->last_error : null,
@@ -234,12 +231,11 @@ class ModalComms extends Component
                 // simple domain validation (subdomains allowed)
                 'regex:/^(?!-)(?:[a-z0-9-]{1,63}\\.)+[a-z]{2,63}$/i',
             ],
-            'postmarkNewDomain.purpose' => ['required', 'string', 'max:64'],
             'postmarkNewDomain.is_primary' => ['boolean'],
         ]);
 
         $domain = strtolower(trim((string) $this->postmarkNewDomain['domain']));
-        $purpose = trim((string) $this->postmarkNewDomain['purpose']);
+        $purpose = 'email';
         $isPrimary = (bool) ($this->postmarkNewDomain['is_primary'] ?? false);
 
         try {
@@ -263,7 +259,6 @@ class ModalComms extends Component
         }
 
         $this->postmarkNewDomain['domain'] = '';
-        $this->postmarkNewDomain['purpose'] = $purpose;
         $this->postmarkNewDomain['is_primary'] = true;
 
         $this->loadPostmarkDomains($conn);

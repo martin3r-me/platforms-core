@@ -772,7 +772,7 @@ Viele Grüße
                                         <div class="mt-6 pt-5 border-t border-[var(--ui-border)]/60">
                                             <div class="flex items-center justify-between gap-3">
                                                 <div class="text-sm font-semibold text-[var(--ui-secondary)]">Absender-Domains</div>
-                                                <div class="text-xs text-[var(--ui-muted)]">Purpose + Primary</div>
+                                                <div class="text-xs text-[var(--ui-muted)]">Gilt für Senden + Inbound</div>
                                             </div>
 
                                             @if($postmarkDomainMessage)
@@ -792,9 +792,6 @@ Viele Grüße
                                                             <div class="min-w-0">
                                                                 <div class="flex items-center gap-2 min-w-0">
                                                                     <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">{{ $d['domain'] }}</div>
-                                                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/60">
-                                                                        {{ $d['purpose'] }}
-                                                                    </span>
                                                                     @if($d['is_primary'])
                                                                         <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] border border-[var(--ui-primary)]/20">
                                                                             Primary
@@ -849,18 +846,6 @@ Viele Grüße
                                                                 placeholder="z.B. company.de"
                                                                 @if(!$this->canManageProviderConnections()) disabled @endif
                                                             />
-                                                        </div>
-                                                        <div>
-                                                            <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Purpose</label>
-                                                            <select
-                                                                wire:model.defer="postmarkNewDomain.purpose"
-                                                                class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                                                @if(!$this->canManageProviderConnections()) disabled @endif
-                                                            >
-                                                                <option value="sending">sending</option>
-                                                                <option value="inbound">inbound</option>
-                                                                <option value="tracking">tracking</option>
-                                                            </select>
                                                         </div>
                                                     </div>
 
