@@ -54,17 +54,21 @@
                         <div class="h-full min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/30">
                             <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                                 <div class="flex items-center gap-3 flex-1 min-w-0">
-                                    <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] flex-shrink-0">Chat</div>
-                                    {{-- Thread Tabs (hart codiert, nur UI) --}}
+                                    <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] flex-shrink-0">Kanäle</div>
+                                    {{-- Kanäle (hart codiert, nur UI) --}}
                                     <div class="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
                                         <div class="relative flex-shrink-0 flex items-center">
                                             <button
                                                 type="button"
                                                 class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1 bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]"
-                                                title="Thread (E-Mail)"
+                                                title="Kanal: E-Mail"
                                             >
-                                                <span class="inline-flex items-center gap-1">
-                                                    m.erren@bhgdigital.de
+                                                <span class="inline-flex items-center gap-2">
+                                                    <span class="inline-flex items-center gap-1">
+                                                        @svg('heroicon-o-envelope', 'w-4 h-4 text-white/90')
+                                                        <span class="font-semibold">E-Mail</span>
+                                                        <span class="text-white/70 hidden sm:inline">· m.erren@bhgdigital.de</span>
+                                                    </span>
                                                 </span>
                                                 <span class="hidden ml-1 w-2 h-2 rounded-full bg-white/90 animate-pulse"></span>
                                             </button>
@@ -73,10 +77,14 @@
                                             <button
                                                 type="button"
                                                 class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1 bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
-                                                title="Thread (Telefon)"
+                                                title="Kanal: Telefon"
                                             >
-                                                <span class="inline-flex items-center gap-1">
-                                                    + 0172 123 12 14
+                                                <span class="inline-flex items-center gap-2">
+                                                    <span class="inline-flex items-center gap-1">
+                                                        @svg('heroicon-o-phone', 'w-4 h-4 text-[var(--ui-muted)]')
+                                                        <span class="font-semibold text-[var(--ui-secondary)]">Telefon</span>
+                                                        <span class="text-[var(--ui-muted)] hidden sm:inline">· +49 172 123 12 14</span>
+                                                    </span>
                                                 </span>
                                                 <span class="hidden ml-1 w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
                                             </button>
@@ -85,7 +93,7 @@
                                         <button
                                             type="button"
                                             class="px-2 py-1 rounded text-[11px] border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] flex-shrink-0"
-                                            title="Neuen Thread anlegen"
+                                            title="Neuen Kanal anlegen"
                                         >
                                             +
                                         </button>
@@ -110,15 +118,15 @@
 
                                         <div class="p-4 space-y-3 flex-1 min-h-0 overflow-y-auto min-w-0">
                                             <div class="min-w-0">
-                                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Übersicht (Demo)</div>
+                                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Kanal: E-Mail (Demo)</div>
                                                 <div class="space-y-2">
                                                     <div class="rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2">
-                                                        <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">m.erren@bhgdigital.de</div>
-                                                        <div class="text-[10px] text-[var(--ui-muted)] truncate">Letzte Nachricht: 10:41</div>
+                                                        <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">Re: Angebot – Q1</div>
+                                                        <div class="text-[10px] text-[var(--ui-muted)] truncate">Letzte Nachricht: 10:41 · 2 ungelesen</div>
                                                     </div>
                                                     <div class="rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2">
-                                                        <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">+ 0172 123 12 14</div>
-                                                        <div class="text-[10px] text-[var(--ui-muted)] truncate">Letzte Nachricht: gestern</div>
+                                                        <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">Follow-up · Termin</div>
+                                                        <div class="text-[10px] text-[var(--ui-muted)] truncate">Letzte Nachricht: gestern · gelesen</div>
                                                     </div>
                                                 </div>
                                             </div>
