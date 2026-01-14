@@ -56,6 +56,7 @@
                 x-data="{
                     tab: 'chat',
                     activeChannel: 'email',
+                    activeThreadId: 1,
                     get activeChannelLabel(){
                         return this.activeChannel === 'email' ? 'E-Mail'
                             : (this.activeChannel === 'phone' ? 'Anrufen' : 'WhatsApp');
@@ -70,6 +71,13 @@
                         const next = Math.min(el.scrollHeight || 0, maxPx);
                         el.style.height = (next > 0 ? next : 44) + 'px';
                         el.style.overflowY = (el.scrollHeight > maxPx) ? 'auto' : 'hidden';
+                    },
+                    scrollToBottom(){
+                        this.$nextTick(() => {
+                            const el = this.$refs.chatScroll;
+                            if (!el) return;
+                            el.scrollTop = el.scrollHeight;
+                        });
                     }
                 }"
                 @comms:set-tab.window="tab = ($event.detail && $event.detail.tab) ? $event.detail.tab : tab"
@@ -169,7 +177,11 @@
                                                     Kanal: <span x-text="activeChannelLabel"></span> <span class="text-[var(--ui-muted)] font-normal">(Demo)</span>
                                                 </div>
                                                 <div class="space-y-2">
-                                                    <div class="rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2">
+                                                    <button type="button"
+                                                        @click="activeThreadId = 1; scrollToBottom()"
+                                                        class="w-full text-left rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2 hover:bg-[var(--ui-muted-5)] transition"
+                                                        :class="activeThreadId === 1 ? 'ring-1 ring-[var(--ui-primary)]/40' : ''"
+                                                    >
                                                         <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate" x-text="activeChannel === 'email' ? 'Re: Angebot – Q1' : (activeChannel === 'phone' ? 'Anrufnotiz · Termin' : 'WhatsApp · Follow-up')"></div>
                                                         <div class="mt-0.5 flex items-center justify-between gap-2">
                                                             <div class="text-[10px] text-[var(--ui-muted)] truncate"
@@ -181,8 +193,12 @@
                                                                 <span>2</span>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                    <div class="rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2">
+                                                    </button>
+                                                    <button type="button"
+                                                        @click="activeThreadId = 2; scrollToBottom()"
+                                                        class="w-full text-left rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2 hover:bg-[var(--ui-muted-5)] transition"
+                                                        :class="activeThreadId === 2 ? 'ring-1 ring-[var(--ui-primary)]/40' : ''"
+                                                    >
                                                         <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate" x-text="activeChannel === 'email' ? 'Follow-up · Termin' : (activeChannel === 'phone' ? 'Rückruf · Frage' : 'WhatsApp · Angebot')"></div>
                                                         <div class="mt-0.5 flex items-center justify-between gap-2">
                                                             <div class="text-[10px] text-[var(--ui-muted)] truncate"
@@ -194,7 +210,7 @@
                                                                 <span>1</span>
                                                             </div>
                                                         </div>
-                                                    </div>
+                                                    </button>
                                                 </div>
                                             </div>
                                             <div class="text-[10px] text-[var(--ui-muted)]">
@@ -206,7 +222,7 @@
                                     {{-- Right: Chat (3/4 width) --}}
                                     <div class="col-span-3 min-h-0 min-w-0 flex flex-col overflow-hidden">
                                         <div class="flex-1 min-h-0 bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
-                                            <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
+                                            <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll" x-ref="chatScroll">
                                                 <div id="chatList" class="space-y-4 min-w-0">
                                                     {{-- E-Mail Verlauf (scrollbar wie Chat, aber mail-typisch) --}}
                                                     <div x-show="activeChannel==='email'" class="space-y-3" x-cloak>
@@ -536,6 +552,7 @@ Viele Grüße
                                                                 x-ref="emailBody"
                                                                 x-init="$nextTick(() => autoGrow($refs.emailBody))"
                                                                 @input="autoGrow($event.target)"
+                                                                @focus="autoGrow($event.target)"
                                                                 rows="1"
                                                                 class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
                                                                 placeholder="Antwort (Text)…"
@@ -560,6 +577,7 @@ Viele Grüße
                                                                 x-ref="waBody"
                                                                 x-init="$nextTick(() => autoGrow($refs.waBody))"
                                                                 @input="autoGrow($event.target)"
+                                                                @focus="autoGrow($event.target)"
                                                                 rows="1"
                                                                 class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
                                                                 placeholder="Nachricht…"
@@ -577,6 +595,7 @@ Viele Grüße
                                                                     x-ref="callNote"
                                                                     x-init="$nextTick(() => autoGrow($refs.callNote))"
                                                                     @input="autoGrow($event.target)"
+                                                                    @focus="autoGrow($event.target)"
                                                                     rows="1"
                                                                     class="w-full px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
                                                                     placeholder="Notiz zum Anruf…"
