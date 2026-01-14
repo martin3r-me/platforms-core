@@ -72,7 +72,8 @@ class ModalComms extends Component
     public array $newChannel = [
         'type' => 'email',
         'provider' => 'postmark',
-        'sender_identifier' => '',
+        'sender_local_part' => '',
+        'sender_domain' => '',
         'name' => '',
         'visibility' => 'private', // private|team
     ];
@@ -219,14 +220,17 @@ class ModalComms extends Component
         $this->validate([
             'newChannel.type' => ['required', 'string', 'max:32'],
             'newChannel.provider' => ['required', 'string', 'max:64'],
-            'newChannel.sender_identifier' => ['required', 'string', 'max:255'],
+            'newChannel.sender_local_part' => ['required', 'string', 'max:64', 'regex:/^[a-z0-9._%+\\-]+$/i'],
+            'newChannel.sender_domain' => ['required', 'string', 'max:255'],
             'newChannel.name' => ['nullable', 'string', 'max:255'],
             'newChannel.visibility' => ['required', 'in:private,team'],
         ]);
 
         $type = (string) $this->newChannel['type'];
         $provider = (string) $this->newChannel['provider'];
-        $sender = trim((string) $this->newChannel['sender_identifier']);
+        $local = trim((string) $this->newChannel['sender_local_part']);
+        $selectedDomain = strtolower(trim((string) $this->newChannel['sender_domain']));
+        $sender = $local . '@' . $selectedDomain;
         $visibility = (string) $this->newChannel['visibility'];
 
         if ($visibility === 'team' && !$this->canCreateTeamSharedChannel()) {
@@ -252,13 +256,12 @@ class ModalComms extends Component
             $connectionId = $conn->id;
 
             // Absender-Domain MUSS in hinterlegten Domains enthalten sein.
-            $domain = strtolower((string) substr(strrchr($sender, '@') ?: '', 1));
             $configuredDomains = $conn->domains()->pluck('domain')->map(fn ($d) => strtolower((string) $d))->all();
             if (empty($configuredDomains)) {
                 $this->channelsMessage = '⛔️ Bitte zuerst mindestens eine Domain in „Connections“ hinterlegen (Postmark Domains).';
                 return;
             }
-            if (!$domain || !in_array($domain, $configuredDomains, true)) {
+            if (!$selectedDomain || !in_array($selectedDomain, $configuredDomains, true)) {
                 $this->channelsMessage = '⛔️ Absender-Domain ist nicht in den Postmark-Domains hinterlegt.';
                 return;
             }
@@ -282,7 +285,8 @@ class ModalComms extends Component
             return;
         }
 
-        $this->newChannel['sender_identifier'] = '';
+        $this->newChannel['sender_local_part'] = '';
+        $this->newChannel['sender_domain'] = '';
         $this->newChannel['name'] = '';
         $this->newChannel['visibility'] = 'private';
 

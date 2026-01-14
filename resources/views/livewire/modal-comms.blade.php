@@ -740,27 +740,39 @@ Viele Grüße
 
                                     <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
                                         <div class="md:col-span-2">
-                                            <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Absender (E‑Mail)</label>
-                                            <input
-                                                type="text"
-                                                wire:model.defer="newChannel.sender_identifier"
-                                                class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                                placeholder="z.B. sales@company.de"
-                                            />
-                                            <div class="mt-2 text-[11px] text-[var(--ui-muted)]">
-                                                Absender dürfen nur Domains nutzen, die unter „Connections“ hinterlegt sind.
+                                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                <div class="md:col-span-2">
+                                                    <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Absender (Local-Part)</label>
+                                                    <input
+                                                        type="text"
+                                                        wire:model.defer="newChannel.sender_local_part"
+                                                        class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                        placeholder="z.B. sales"
+                                                    />
+                                                    <div class="mt-2 text-[11px] text-[var(--ui-muted)]">
+                                                        Die Domain wird per Select gewählt (nur aus „Connections“).
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <x-ui-input-select
+                                                        name="newChannel.sender_domain"
+                                                        label="Domain"
+                                                        :options="$postmarkDomains"
+                                                        optionValue="domain"
+                                                        optionLabel="domain"
+                                                        :nullable="true"
+                                                        nullLabel="(Domain wählen)"
+                                                        displayMode="dropdown"
+                                                        wire:model.defer="newChannel.sender_domain"
+                                                        :disabled="empty($postmarkDomains)"
+                                                    />
+                                                </div>
                                             </div>
-                                            <div class="mt-2 flex flex-wrap gap-2">
-                                                @forelse($postmarkDomains as $d)
-                                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/60">
-                                                        {{ $d['domain'] }}
-                                                    </span>
-                                                @empty
-                                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
-                                                        Keine Domains hinterlegt (bitte erst in „Connections“ anlegen)
-                                                    </span>
-                                                @endforelse
-                                            </div>
+                                            @if(empty($postmarkDomains))
+                                                <div class="mt-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                                    Keine Domains hinterlegt (bitte erst in „Connections“ anlegen)
+                                                </div>
+                                            @endif
                                         </div>
                                         <div>
                                             <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Name (optional)</label>
@@ -778,7 +790,12 @@ Viele Grüße
                                             type="button"
                                             wire:click="createChannel"
                                             class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-primary)] text-white border-[var(--ui-primary)] disabled:opacity-60"
-                                            @if(($newChannel['visibility'] === 'team' && !$this->canCreateTeamSharedChannel()) || empty($postmarkDomains)) disabled @endif
+                                            @if(
+                                                ($newChannel['visibility'] === 'team' && !$this->canCreateTeamSharedChannel())
+                                                || empty($postmarkDomains)
+                                                || empty($newChannel['sender_domain'])
+                                                || empty($newChannel['sender_local_part'])
+                                            ) disabled @endif
                                         >
                                             Kanal anlegen
                                         </button>
