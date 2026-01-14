@@ -110,8 +110,9 @@ class PostmarkEmailService
         $pmAttachments = $pmAttachments ?: null;
 
         // 5) Send via Postmark (always send conversation token header)
+        // NOTE: postmark-php expects an associative array; it converts to [{Name,Value}, ...] internally.
         $headersArray = [
-            ['Name' => 'X-Conversation-Token', 'Value' => $token],
+            'X-Conversation-Token' => $token,
         ];
 
         $fromName = null;
