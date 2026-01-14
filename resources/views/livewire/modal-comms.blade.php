@@ -677,13 +677,11 @@ Viele Grüße
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-2 flex-shrink-0">
-                                    <button
-                                        type="button"
+                                    <x-ui-button
+                                        variant="muted-outline"
+                                        size="sm"
                                         wire:click="loadChannels"
-                                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
-                                    >
-                                        Aktualisieren
-                                    </button>
+                                    >Aktualisieren</x-ui-button>
                                 </div>
                             </div>
 
@@ -701,35 +699,33 @@ Viele Grüße
                                     </div>
 
                                     <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <x-ui-input-select
+                                            name="newChannel.type"
+                                            label="Typ"
+                                            :options="['email' => 'Email']"
+                                            :nullable="false"
+                                            displayMode="dropdown"
+                                            wire:model.defer="newChannel.type"
+                                            :disabled="true"
+                                        />
+                                        <x-ui-input-select
+                                            name="newChannel.provider"
+                                            label="Provider"
+                                            :options="['postmark' => 'Postmark']"
+                                            :nullable="false"
+                                            displayMode="dropdown"
+                                            wire:model.defer="newChannel.provider"
+                                            :disabled="true"
+                                        />
                                         <div>
-                                            <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Typ</label>
-                                            <select
-                                                wire:model.defer="newChannel.type"
-                                                class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                                disabled
-                                            >
-                                                <option value="email">email</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Provider</label>
-                                            <select
-                                                wire:model.defer="newChannel.provider"
-                                                class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                                disabled
-                                            >
-                                                <option value="postmark">postmark</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Sichtbarkeit</label>
-                                            <select
+                                            <x-ui-input-select
+                                                name="newChannel.visibility"
+                                                label="Sichtbarkeit"
+                                                :options="['private' => 'privat (nur ich)', 'team' => 'teamweit']"
+                                                :nullable="false"
+                                                displayMode="dropdown"
                                                 wire:model.defer="newChannel.visibility"
-                                                class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                            >
-                                                <option value="private">privat (nur ich)</option>
-                                                <option value="team">teamweit</option>
-                                            </select>
+                                            />
                                             @if(!$this->canCreateTeamSharedChannel())
                                                 <div class="mt-1 text-[11px] text-[var(--ui-muted)]">
                                                     Teamweit nur für Owner/Admin des Root-Teams.
@@ -742,12 +738,11 @@ Viele Grüße
                                         <div class="md:col-span-2">
                                             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                                                 <div class="md:col-span-2">
-                                                    <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Absender (Local-Part)</label>
-                                                    <input
-                                                        type="text"
-                                                        wire:model.defer="newChannel.sender_local_part"
-                                                        class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                    <x-ui-input-text
+                                                        name="newChannel.sender_local_part"
+                                                        label="Absender (Local-Part)"
                                                         placeholder="z.B. sales"
+                                                        wire:model.defer="newChannel.sender_local_part"
                                                     />
                                                     <div class="mt-2 text-[11px] text-[var(--ui-muted)]">
                                                         Die Domain wird per Select gewählt (nur aus „Connections“).
@@ -775,30 +770,23 @@ Viele Grüße
                                             @endif
                                         </div>
                                         <div>
-                                            <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Name (optional)</label>
-                                            <input
-                                                type="text"
-                                                wire:model.defer="newChannel.name"
-                                                class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                            <x-ui-input-text
+                                                name="newChannel.name"
+                                                label="Name (optional)"
                                                 placeholder="z.B. Sales"
+                                                wire:model.defer="newChannel.name"
                                             />
                                         </div>
                                     </div>
 
                                     <div class="mt-3 flex items-center justify-end">
-                                        <button
-                                            type="button"
+                                        <x-ui-button
+                                            variant="primary"
+                                            size="sm"
                                             wire:click="createChannel"
-                                            class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-primary)] text-white border-[var(--ui-primary)] disabled:opacity-60"
-                                            @if(
-                                                ($newChannel['visibility'] === 'team' && !$this->canCreateTeamSharedChannel())
-                                                || empty($postmarkDomains)
-                                                || empty($newChannel['sender_domain'])
-                                                || empty($newChannel['sender_local_part'])
-                                            ) disabled @endif
-                                        >
-                                            Kanal anlegen
-                                        </button>
+                                            :disabled="empty($postmarkDomains)"
+                                            wire:loading.attr="disabled"
+                                        >Kanal anlegen</x-ui-button>
                                     </div>
 
                                     <div class="mt-2 text-xs text-[var(--ui-muted)]">
@@ -869,21 +857,18 @@ Viele Grüße
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-2 flex-shrink-0">
-                                    <button
-                                        type="button"
+                                    <x-ui-button
+                                        variant="muted-outline"
+                                        size="sm"
                                         wire:click="loadPostmarkConnection"
-                                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
-                                    >
-                                        Aktualisieren
-                                    </button>
-                                    <button
-                                        type="button"
+                                    >Aktualisieren</x-ui-button>
+                                    <x-ui-button
+                                        variant="primary"
+                                        size="sm"
                                         wire:click="savePostmarkConnection"
-                                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-primary)] text-white border-[var(--ui-primary)] disabled:opacity-60"
-                                        @if(!$this->canManageProviderConnections()) disabled @endif
-                                    >
-                                        Speichern
-                                    </button>
+                                        :disabled="!$this->canManageProviderConnections()"
+                                        wire:loading.attr="disabled"
+                                    >Speichern</x-ui-button>
                                 </div>
                             </div>
 
@@ -910,50 +895,41 @@ Viele Grüße
                                         </div>
 
                                         <div class="mt-4 space-y-3">
-                                            <div>
-                                                <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Server Token</label>
-                                                <input
-                                                    type="password"
-                                                    wire:model.defer="postmark.server_token"
-                                                    class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                                    placeholder="{{ $postmarkConfigured ? '•••••••• (neu setzen)' : 'postmark server token' }}"
-                                                    @if(!$this->canManageProviderConnections()) disabled @endif
-                                                />
-                                            </div>
+                                            <x-ui-input-text
+                                                name="postmark.server_token"
+                                                label="Server Token"
+                                                type="password"
+                                                :placeholder="$postmarkConfigured ? '•••••••• (neu setzen)' : 'postmark server token'"
+                                                wire:model.defer="postmark.server_token"
+                                                :disabled="!$this->canManageProviderConnections()"
+                                            />
 
                                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                <div>
-                                                    <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Inbound User (Basic Auth)</label>
-                                                    <input
-                                                        type="text"
-                                                        wire:model.defer="postmark.inbound_user"
-                                                        class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                                        placeholder="optional"
-                                                        @if(!$this->canManageProviderConnections()) disabled @endif
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Inbound Pass (Basic Auth)</label>
-                                                    <input
-                                                        type="password"
-                                                        wire:model.defer="postmark.inbound_pass"
-                                                        class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                                        placeholder="{{ !empty($postmark['inbound_user'] ?? '') ? 'optional' : 'optional' }}"
-                                                        @if(!$this->canManageProviderConnections()) disabled @endif
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div>
-                                                <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Signing Secret (optional)</label>
-                                                <input
-                                                    type="password"
-                                                    wire:model.defer="postmark.signing_secret"
-                                                    class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                <x-ui-input-text
+                                                    name="postmark.inbound_user"
+                                                    label="Inbound User (Basic Auth)"
                                                     placeholder="optional"
-                                                    @if(!$this->canManageProviderConnections()) disabled @endif
+                                                    wire:model.defer="postmark.inbound_user"
+                                                    :disabled="!$this->canManageProviderConnections()"
+                                                />
+                                                <x-ui-input-text
+                                                    name="postmark.inbound_pass"
+                                                    label="Inbound Pass (Basic Auth)"
+                                                    type="password"
+                                                    placeholder="optional"
+                                                    wire:model.defer="postmark.inbound_pass"
+                                                    :disabled="!$this->canManageProviderConnections()"
                                                 />
                                             </div>
+
+                                            <x-ui-input-text
+                                                name="postmark.signing_secret"
+                                                label="Signing Secret (optional)"
+                                                type="password"
+                                                placeholder="optional"
+                                                wire:model.defer="postmark.signing_secret"
+                                                :disabled="!$this->canManageProviderConnections()"
+                                            />
                                         </div>
 
                                         <div class="mt-6 pt-5 border-t border-[var(--ui-border)]/60">
@@ -1025,13 +1001,12 @@ Viele Grüße
                                                 <div class="mt-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] p-3">
                                                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                                                         <div class="md:col-span-2">
-                                                            <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Domain</label>
-                                                            <input
-                                                                type="text"
-                                                                wire:model.defer="postmarkNewDomain.domain"
-                                                                class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                            <x-ui-input-text
+                                                                name="postmarkNewDomain.domain"
+                                                                label="Domain"
                                                                 placeholder="z.B. company.de"
-                                                                @if(!$this->canManageProviderConnections()) disabled @endif
+                                                                wire:model.defer="postmarkNewDomain.domain"
+                                                                :disabled="!$this->canManageProviderConnections()"
                                                             />
                                                         </div>
                                                     </div>
