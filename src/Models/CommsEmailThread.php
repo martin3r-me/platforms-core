@@ -18,6 +18,17 @@ class CommsEmailThread extends Model
         'comms_channel_id',
         'token',
         'subject',
+        'last_inbound_from',
+        'last_inbound_from_address',
+        'last_inbound_at',
+        'last_outbound_to',
+        'last_outbound_to_address',
+        'last_outbound_at',
+    ];
+
+    protected $casts = [
+        'last_inbound_at' => 'datetime',
+        'last_outbound_at' => 'datetime',
     ];
 
     public function channel(): BelongsTo

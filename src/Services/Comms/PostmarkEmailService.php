@@ -162,6 +162,15 @@ class PostmarkEmailService
         ]);
         $thread->touch();
 
+        // Thread rollups
+        $thread->last_outbound_to = $to;
+        $thread->last_outbound_to_address = $this->extractEmailAddress($to) ?: $to;
+        $thread->last_outbound_at = $mail->sent_at ?? now();
+        if (!$thread->subject) {
+            $thread->subject = $subject;
+        }
+        $thread->save();
+
         foreach ($storedAttachments as $a) {
             $mail->attachments()->create([
                 'filename' => $a['name'],
@@ -176,6 +185,17 @@ class PostmarkEmailService
         }
 
         return $token;
+    }
+
+    private function extractEmailAddress(string $raw): ?string
+    {
+        if (preg_match('/<([^>]+)>/', $raw, $m)) {
+            return trim((string) ($m[1] ?? '')) ?: null;
+        }
+        if (filter_var($raw, FILTER_VALIDATE_EMAIL)) {
+            return $raw;
+        }
+        return null;
     }
 }
 

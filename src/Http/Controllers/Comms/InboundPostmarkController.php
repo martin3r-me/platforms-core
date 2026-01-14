@@ -88,6 +88,17 @@ class InboundPostmarkController extends Controller
             ]);
             $thread->touch();
 
+            // Rollups for fast reply UI (no need to query last mail each time)
+            $fromRaw = (string) ($payload['From'] ?? '');
+            $fromAddr = $this->extractEmailAddress($fromRaw) ?: ($fromRaw ?: null);
+            $thread->last_inbound_from = $fromRaw ?: null;
+            $thread->last_inbound_from_address = $fromAddr ? (string) $fromAddr : null;
+            $thread->last_inbound_at = $mail->received_at ?? now();
+            if (!$thread->subject && !empty($payload['Subject'])) {
+                $thread->subject = (string) $payload['Subject'];
+            }
+            $thread->save();
+
             // 6) Persist attachments (UI/preview support later)
             foreach ($payload['Attachments'] ?? [] as $a) {
                 $name = (string) ($a['Name'] ?? 'attachment');
@@ -203,6 +214,17 @@ class InboundPostmarkController extends Controller
 
         $computed = base64_encode(hash_hmac('sha256', $rawBody, $secret, true));
         abort_unless(hash_equals($computed, $signature), 401, 'Invalid Postmark signature.');
+    }
+
+    private function extractEmailAddress(string $raw): ?string
+    {
+        if (preg_match('/<([^>]+)>/', $raw, $m)) {
+            return trim((string) ($m[1] ?? '')) ?: null;
+        }
+        if (filter_var($raw, FILTER_VALIDATE_EMAIL)) {
+            return $raw;
+        }
+        return null;
     }
 }
 

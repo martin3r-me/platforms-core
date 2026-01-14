@@ -239,13 +239,18 @@ class ModalComms extends Component
         $this->activeEmailThreadId = $threadId;
         $this->loadEmailTimeline();
 
-        // Pre-fill "to" for reply with last inbound sender (best-effort).
-        $lastInbound = CommsEmailInboundMail::query()
-            ->where('thread_id', $threadId)
-            ->orderByDesc('received_at')
-            ->first();
-        if ($lastInbound?->from) {
-            $this->emailCompose['to'] = $this->extractEmailAddress((string) $lastInbound->from) ?: (string) $lastInbound->from;
+        // Pre-fill "to" for reply from thread rollup (fallback: last inbound mail).
+        $thread = CommsEmailThread::query()->whereKey($threadId)->first();
+        if ($thread?->last_inbound_from_address) {
+            $this->emailCompose['to'] = (string) $thread->last_inbound_from_address;
+        } else {
+            $lastInbound = CommsEmailInboundMail::query()
+                ->where('thread_id', $threadId)
+                ->orderByDesc('received_at')
+                ->first();
+            if ($lastInbound?->from) {
+                $this->emailCompose['to'] = $this->extractEmailAddress((string) $lastInbound->from) ?: (string) $lastInbound->from;
+            }
         }
         $this->dispatch('comms:scroll-bottom');
     }
@@ -353,10 +358,11 @@ class ModalComms extends Component
 
         $this->emailDebug('Validiere Eingaben…');
         try {
+            $isReply = (bool) $this->activeEmailThreadId;
             $this->validate([
-                'emailCompose.to' => ['required', 'email', 'max:255'],
+                'emailCompose.to' => [$isReply ? 'nullable' : 'required', 'email', 'max:255'],
                 'emailCompose.body' => ['required', 'string', 'min:1'],
-                'emailCompose.subject' => [$this->activeEmailThreadId ? 'nullable' : 'required', 'string', 'max:255'],
+                'emailCompose.subject' => [$isReply ? 'nullable' : 'required', 'string', 'max:255'],
             ]);
         } catch (ValidationException $e) {
             $this->emailMessage = '⛔️ Bitte Eingaben prüfen.';
@@ -382,6 +388,7 @@ class ModalComms extends Component
         $subject = (string) ($this->emailCompose['subject'] ?? '');
         $isReply = false;
         $token = null;
+        $to = (string) ($this->emailCompose['to'] ?? '');
 
         if ($this->activeEmailThreadId) {
             $thread = CommsEmailThread::query()->whereKey($this->activeEmailThreadId)->first();
@@ -389,6 +396,27 @@ class ModalComms extends Component
                 $subject = (string) ($thread->subject ?: $subject);
                 $token = (string) $thread->token;
                 $isReply = true;
+            }
+
+            // For replies we normally don't ask for "to". Resolve best-effort.
+            if (trim($to) === '') {
+                if ($thread?->last_inbound_from_address) {
+                    $to = (string) $thread->last_inbound_from_address;
+                } else {
+                    $lastInbound = CommsEmailInboundMail::query()
+                        ->where('thread_id', $this->activeEmailThreadId)
+                        ->orderByDesc('received_at')
+                        ->first();
+                    if ($lastInbound?->from) {
+                        $to = $this->extractEmailAddress((string) $lastInbound->from) ?: (string) $lastInbound->from;
+                    }
+                }
+                $this->emailCompose['to'] = $to;
+            }
+            if (trim($to) === '') {
+                $this->emailMessage = '⛔️ Kein Empfänger für Antwort gefunden. Bitte neuen Thread starten und „An“ setzen.';
+                $this->emailDebug('Fehler: Reply ohne Empfänger (kein last inbound).');
+                return;
             }
         }
 
@@ -398,7 +426,7 @@ class ModalComms extends Component
             $svc = app(PostmarkEmailService::class);
             $token = $svc->send(
                 $channel,
-                (string) $this->emailCompose['to'],
+                $to,
                 $subject ?: '(Ohne Betreff)',
                 nl2br(e((string) $this->emailCompose['body'])),
                 null,
