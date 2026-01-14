@@ -8,6 +8,12 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Defensive: in some environments the table may already exist (partial deploy / manual create).
+        // Skip creation to keep deploys idempotent.
+        if (Schema::hasTable('comms_provider_connection_domains')) {
+            return;
+        }
+
         Schema::create('comms_provider_connection_domains', function (Blueprint $table) {
             $table->id();
 
