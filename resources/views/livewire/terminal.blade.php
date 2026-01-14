@@ -1,13 +1,7 @@
 <div
-  x-data="chatTerminal()"
+  x-data="terminalShell()"
   x-init="init()"
-  x-on:toggle-terminal.window="toggle(); $nextTick(() => { const c = $refs.body; if(c){ c.scrollTop = c.scrollHeight } })"
-  x-on:ai-stream-start.window="startStream($event.detail?.url)"
-  x-on:ai-stream-delta.window="$nextTick(() => { const c = $refs.body; if(c){ c.scrollTop = c.scrollHeight } })"
-  x-on:ai-stream-complete.window="onStreamComplete()"
-  x-on:ai-stream-error.window="onStreamError()"
-  x-on:ai-stream-drained.window="onStreamDrained()"
-  x-on:terminal-scroll.window="$nextTick(() => { const c = $refs.body; if(c){ c.scrollTop = c.scrollHeight } })"
+  x-on:toggle-terminal.window="toggle()"
   class="w-full"
   wire:key="terminal-root"
 >
@@ -35,471 +29,56 @@
       </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="flex items-center border-b border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)] opacity-100 transition-opacity duration-200"
-         :class="open ? 'opacity-100' : 'opacity-0'"
-         wire:key="terminal-tabs">
-      <div class="flex items-center overflow-x-auto">
-        @foreach($chats as $chat)
-          <div class="flex items-center border-r border-[var(--ui-border)]/60" wire:key="chat-tab-{{ $chat['id'] }}">
-            <button
-              type="button"
-              wire:click="setActiveChat({{ $chat['id'] }})"
-              class="flex items-center gap-2 px-3 py-2 text-xs transition-colors min-w-0"
-              :class="$wire.activeChatId == {{ $chat['id'] }}
-                ? 'text-[var(--ui-primary)] bg-[var(--ui-surface)]'
-                : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
-              aria-current="{{ $activeChatId == $chat['id'] ? 'true' : 'false' }}"
-            >
-              <span class="truncate max-w-20">{{ $chat['title'] ?: 'Chat ' . $chat['id'] }}</span>
-            </button>
-            <button
-              type="button"
-              @click.stop="$wire.deleteChat({{ $chat['id'] }})"
-              class="mx-1 inline-flex items-center justify-center w-4 h-4 rounded hover:bg-[var(--ui-danger-5)] hover:text-[var(--ui-danger)] transition-colors"
-              title="Chat löschen"
-              aria-label="Chat löschen"
-              wire:key="chat-tab-delete-{{ $chat['id'] }}"
-            >
-              @svg('heroicon-o-x-mark', 'w-3 h-3')
-            </button>
-          </div>
-        @endforeach
-
-        <!-- New Chat Button -->
-        <button
-          type="button"
-          wire:click="createNewChat"
-          class="flex items-center gap-2 px-3 py-2 text-xs text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)] transition-colors"
-          title="Neuen Chat erstellen"
-          aria-label="Neuen Chat erstellen"
-          wire:key="chat-tab-create"
-        >
-          @svg('heroicon-o-plus', 'w-4 h-4')
-        </button>
-      </div>
-    </div>
-
     <!-- Body -->
     <div
       class="flex-1 min-h-0 overflow-y-auto px-3 py-2 pb-6 text-xs font-mono text-[var(--ui-secondary)] opacity-100 transition-opacity duration-200"
       :class="open ? 'opacity-100' : 'opacity-0'"
-      data-terminal-body
       x-ref="body"
       wire:key="terminal-body"
     >
       <div class="space-y-2" wire:key="terminal-body-inner">
-        @if(empty($messages))
-          <div class="text-[var(--ui-muted)]" wire:key="terminal-help-hint">Tippe "help" für verfügbare Befehle…</div>
-          <div class="mt-2 space-y-1" wire:key="terminal-help-examples">
-            <div>$ help</div>
-            <div>- kpi            Zeigt Team-KPIs</div>
-            <div>- tasks --mine   Eigene Aufgaben</div>
-          </div>
-        @endif
-
-        @foreach($messages as $message)
-          @php($__emptyAssistant = (($message['role'] ?? null) === 'assistant') && trim($message['content'] ?? '') === '')
-          <div class="flex items-start gap-2 {{ $__emptyAssistant ? 'hidden' : '' }}"
-               wire:key="msg-{{ $message['id'] ?? (($message['thread_id'] ?? 't') . '-' . $loop->index) }}">
-            <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">
-              {{ $message['role'] === 'user' ? 'User' : 'AI' }}:
-            </span>
-            <span class="text-[var(--ui-secondary)] text-xs break-words">
-              {{ $message['content'] }}
-            </span>
-          </div>
-        @endforeach
-
-        <!-- Streaming-Block -->
-        <div class="flex items-start gap-2" x-cloak x-show="isStreamingLocal || streamText.length > 0" wire:ignore>
-          <span class="text-[var(--ui-muted)] text-xs font-bold min-w-0 flex-shrink-0">AI:</span>
-          <div class="flex flex-col gap-2 flex-1"
-               role="log"
-               aria-live="polite"
-               aria-atomic="false">
-            <!-- Tool-Status Badge -->
-            <template x-if="currentTool">
-              <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[var(--ui-primary)]/10 border border-[var(--ui-primary)]/20 text-[10px] text-[var(--ui-primary)]">
-                <div class="w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></div>
-                <span class="font-mono font-semibold" x-text="currentTool"></span>
-                <span class="text-[var(--ui-muted)]">wird ausgeführt...</span>
-              </div>
-            </template>
-            
-            <!-- Status-Updates (kompakt) -->
-            <div class="flex flex-wrap gap-1.5" x-show="statusUpdates.length > 0">
-              <template x-for="(status, idx) in statusUpdates" :key="idx">
-                <div class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono"
-                     :class="{
-                       'bg-green-500/10 text-green-600': status.type === 'success',
-                       'bg-blue-500/10 text-blue-600': status.type === 'info',
-                       'bg-yellow-500/10 text-yellow-600': status.type === 'warning',
-                       'bg-red-500/10 text-red-600': status.type === 'error',
-                       'bg-[var(--ui-muted-5)] text-[var(--ui-muted)]': !status.type
-                     }">
-                  <span x-text="status.icon || '•'"></span>
-                  <span x-text="status.text"></span>
-                </div>
-              </template>
-            </div>
-            
-            <!-- Antwort-Text -->
-            <div class="flex items-center gap-2">
-            <span class="text-[var(--ui-secondary)] text-xs break-words" x-text="streamText"></span>
-            <div class="w-3 h-3 border-2 border-[var(--ui-primary)] border-t-transparent rounded-full animate-spin"
-                 x-show="isStreamingLocal && !hasDelta"
-                 aria-hidden="true"></div>
-            </div>
-            
-            <!-- Debug-Info (kollabierbar) -->
-            <div class="text-[10px] text-[var(--ui-muted)] border-t border-[var(--ui-border)]/30 pt-2" x-show="debugInfo.length > 0">
-              <button 
-                @click="showDebug = !showDebug"
-                class="flex items-center justify-between w-full text-left hover:text-[var(--ui-primary)] transition-colors"
-              >
-                <span class="font-bold">🔍 Debug-Infos</span>
-                <span class="text-[9px]" x-text="showDebug ? '▼' : '▶'"></span>
-              </button>
-              <div class="max-h-32 overflow-y-auto font-mono space-y-0.5 mt-1" x-show="showDebug">
-                <template x-for="(info, idx) in debugInfo" :key="idx">
-                  <div x-text="info" class="pl-2 break-all text-[9px]"></div>
-            </template>
-                <button 
-                  @click="navigator.clipboard?.writeText(debugInfo.join('\\n')) || alert('Debug-Infos:\\n\\n' + debugInfo.join('\\n'))"
-                  class="mt-1 text-[var(--ui-primary)] hover:underline text-[9px]"
-                >
-                  📋 Alle kopieren
-                </button>
-              </div>
-            </div>
-          </div>
+        <div class="text-[var(--ui-muted)]">Terminal (UI) – Inhalt wird später wieder aufgebaut.</div>
+        <div class="mt-2 space-y-1 text-[var(--ui-secondary)]">
+          <div>$ …</div>
         </div>
       </div>
     </div>
 
-    <!-- Prompt -->
+    <!-- Prompt (UI only) -->
     <div class="h-10 px-3 flex items-center gap-2 border-t border-[var(--ui-border)]/60 opacity-100 transition-opacity duration-200 flex-shrink-0"
          :class="open ? 'opacity-100' : 'opacity-0'"
          wire:key="terminal-prompt">
       <span class="text-[var(--ui-muted)] text-xs font-mono">$</span>
       <input
         type="text"
-        wire:model="messageInput"
-        wire:keydown.enter="sendMessage"
         class="flex-1 bg-transparent outline-none text-sm text-[var(--ui-secondary)] placeholder-[var(--ui-muted)]"
-        :placeholder="$wire.isStreaming ? 'Verarbeite…' : 'Nachricht eingeben…'"
-        :disabled="$wire.isStreaming"
-        :aria-disabled="$wire.isStreaming ? 'true' : 'false'"
-        wire:key="terminal-input"
+        placeholder="(deaktiviert) …"
+        disabled
       />
-      @if($canCancel)
-        <button
-          type="button"
-          wire:click="cancelRequest"
-          @click="abortStream()"
-          class="inline-flex items-center justify-center h-8 px-3 rounded-md border border-[var(--ui-danger)]/60 text-[var(--ui-danger)] hover:bg-[var(--ui-danger-5)] transition"
-          wire:key="terminal-cancel"
-        >
-          Abbrechen
-        </button>
-      @else
-        <button
-          type="button"
-          wire:click="sendMessage"
-          class="inline-flex items-center justify-center h-8 px-3 rounded-md border border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)] transition"
-          :disabled="$wire.isProcessing"
-          :aria-disabled="$wire.isProcessing ? 'true' : 'false'"
-          wire:key="terminal-send"
-        >
-          Senden
-        </button>
-      @endif
+      <button
+        type="button"
+        class="inline-flex items-center justify-center h-8 px-3 rounded-md border border-[var(--ui-border)]/60 text-[var(--ui-muted)] opacity-60 cursor-not-allowed"
+        disabled
+      >
+        Senden
+      </button>
     </div>
   </div>
 
   <script>
-    // Flag für Dev-Logs
-    window.__DEV__ = window.__DEV__ ?? false;
-
-    function chatTerminal(){
+    function terminalShell(){
       return {
-        // UI open state via Alpine store
         get open(){ return Alpine?.store('page')?.terminalOpen ?? false; },
         toggle(){ if(Alpine?.store('page')) Alpine.store('page').terminalOpen = !Alpine.store('page').terminalOpen; },
-
-        // Streaming state
-        es: null,
-        streamText: '',
-        queue: '',
-        typingTimer: null,
-        typingDelay: 28,
-        fastTypingDelay: 12,
-        chunkSize: 16,         // adaptives Chunking
-        hasDelta: false,
-        finalizePending: false,
-        suppressStream: false,
-        isStreamingLocal: false,
-        currentTool: null,
-        debugInfo: [],
-        statusUpdates: [],
-        showDebug: false,
-        eventCount: 0,
-        deltaCount: 0,
-
-        // Retry/Backoff
-        retryCount: 0,
-        maxRetry: 3,
-        backoffBaseMs: 400,
-
-        // Cached ref
-        bodyEl: null,
-
-        // Livewire bindings (optional safety fallback)
         init(){
-          this.bodyEl = this.$refs.body;
-          // Bei Page unload: Stream schließen
-          window.addEventListener('beforeunload', () => this.closeStream());
-          // Falls Terminal beim Mount schon offen ist: ans Ende scrollen
-          this.$nextTick(() => { if(Alpine?.store('page')?.terminalOpen && this.bodyEl){ this.bodyEl.scrollTop = this.bodyEl.scrollHeight; }});
-        },
-
-        // Typing helpers
-        stopTyping(){ if(this.typingTimer){ clearInterval(this.typingTimer); this.typingTimer = null; } },
-        startTyping(){
-          if(this.typingTimer) return;
-          this.typingTimer = setInterval(() => {
-            if(this.queue.length === 0){ this.stopTyping(); return; }
-            // adaptives Chunking (größere Queues -> schneller abbauen)
-            const bigQueue = this.queue.length > 2000 ? 32 : (this.queue.length > 800 ? 24 : this.chunkSize);
-            const n = Math.min(bigQueue, this.queue.length);
-            this.streamText += this.queue.slice(0, n);
-            this.queue = this.queue.slice(n);
-            if(this.bodyEl){ requestAnimationFrame(() => { this.bodyEl.scrollTop = this.bodyEl.scrollHeight; }); }
-          }, this.typingDelay);
-        },
-        pushDelta(delta){ if(!delta) return; this.queue += delta; this.startTyping(); },
-
-        // Debug-Helper
-        addDebugInfo(msg){
-          this.debugInfo.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
-          // Max 20 Debug-Messages behalten
-          if(this.debugInfo.length > 20) this.debugInfo.shift();
-        },
-        
-        // Status-Updates (visuell schöner)
-        addStatusUpdate(text, type = 'info', icon = null){
-          const icons = {
-            success: '✅',
-            info: 'ℹ️',
-            warning: '⚠️',
-            error: '❌',
-            tool: '🔧',
-            chain: '🔗',
-          };
-          
-          this.statusUpdates.push({
-            text: text,
-            type: type,
-            icon: icon || icons[type] || '•',
-            timestamp: new Date().toLocaleTimeString()
+          // Keep behavior: when opened, scroll to bottom.
+          this.$nextTick(() => {
+            const c = this.$refs.body;
+            if (c && this.open) c.scrollTop = c.scrollHeight;
           });
-          
-          // Max 5 Status-Updates behalten
-          if(this.statusUpdates.length > 5) this.statusUpdates.shift();
-        },
-
-        // SSE Steuerung
-        startStream(url){
-          this.closeStream(); // alte Verbindung schließen
-          try {
-            // Reset UI-States
-            this.streamText = '';
-            this.queue = '';
-            this.stopTyping();
-            this.hasDelta = false;
-            this.finalizePending = false;
-            this.suppressStream = false;
-            this.isStreamingLocal = true;
-            this.currentTool = null;
-            this.debugInfo = [];
-            this.statusUpdates = [];
-            this.showDebug = false;
-            this.eventCount = 0;
-            this.deltaCount = 0;
-            
-            this.addDebugInfo(`🚀 Stream gestartet: ${url}`);
-            if(window.__DEV__) console.log('[Terminal SSE] startStream →', url);
-
-            this.es = new EventSource(url);
-            this.es.onopen = () => { 
-              this.addDebugInfo('✅ SSE-Verbindung geöffnet');
-              this.addStatusUpdate('Verbindung hergestellt', 'success');
-              if(window.__DEV__) console.log('[Terminal SSE] connection open'); 
-              this.retryCount = 0; 
-            };
-            this.es.onmessage = (e) => {
-              if(!e.data) return;
-              this.eventCount++;
-              
-              if(e.data === '[DONE]'){
-                this.addDebugInfo(`✅ Stream beendet (${this.eventCount} Events, ${this.deltaCount} Deltas)`);
-                if(window.__DEV__) console.log('[Terminal SSE] DONE');
-                this.closeStream();
-                window.dispatchEvent(new CustomEvent('ai-stream-complete'));
-                return;
-              }
-              
-              // Robust JSON-Parsing
-              try {
-                const data = JSON.parse(e.data);
-                
-                // Status-Updates vom Server anzeigen
-                if(data?.status) {
-                  this.addStatusUpdate(
-                    data.status.text || data.status,
-                    data.status.type || 'info',
-                    data.status.icon
-                  );
-                  if(data.status.debug) {
-                    this.addDebugInfo(data.status.debug);
-                  }
-                }
-                
-                // Debug-Nachrichten vom Server anzeigen
-                if(data?.debug) {
-                  this.addDebugInfo(data.debug);
-                }
-                
-                // Fehler-Nachrichten vom Server anzeigen
-                if(data?.error) {
-                  this.addDebugInfo(`❌ Server-Fehler: ${data.error}`);
-                  this.addStatusUpdate(`Fehler: ${data.error}`, 'error');
-                  if(data.debug) {
-                    this.addDebugInfo(data.debug);
-                  }
-                }
-                
-                // Debug: Erste 5 Events loggen
-                if(this.eventCount <= 5) {
-                  this.addDebugInfo(`📦 Event #${this.eventCount}: ${JSON.stringify(data).substring(0, 100)}`);
-                }
-                
-                if(data?.delta){
-                  this.deltaCount++;
-                  if(this.deltaCount <= 3) {
-                    this.addDebugInfo(`📝 Delta #${this.deltaCount}: "${data.delta.substring(0, 50)}${data.delta.length > 50 ? '...' : ''}"`);
-                  }
-                  if(window.__DEV__) console.log('[Terminal SSE] delta:', data.delta);
-                  if(!this.hasDelta) {
-                    this.hasDelta = true;
-                    this.addDebugInfo('✨ Erster Delta empfangen');
-                  }
-                  this.pushDelta(data.delta);
-                  window.dispatchEvent(new CustomEvent('ai-stream-delta', { detail: { delta: data.delta } }));
-                } else if(this.eventCount <= 5) {
-                  // Event ohne Delta - nur für erste Events loggen
-                  this.addDebugInfo(`⚠️ Event ohne Delta: ${Object.keys(data).join(', ')}`);
-                }
-                
-                // Tool-Indikator lokal setzen
-                if(data?.tool){ 
-                  this.currentTool = data.tool; 
-                  this.addDebugInfo(`🔧 Tool erkannt: ${data.tool}`);
-                  this.addStatusUpdate(`Tool: ${data.tool}`, 'tool');
-                  this.$wire && this.$wire.set && this.$wire.set('currentTool', data.tool); 
-                }
-                
-                // Tool-Ergebnis anzeigen
-                if(data?.tool && data?.result){
-                  const success = data.result?.ok !== false;
-                  this.addStatusUpdate(
-                    `${data.tool}: ${success ? 'Erfolg' : 'Fehler'}`,
-                    success ? 'success' : 'error'
-                  );
-                }
-              } catch(parseErr){
-                this.addDebugInfo(`❌ Parse-Fehler: ${parseErr.message}`);
-                if(window.__DEV__) console.warn('[Terminal SSE] parse skip (non-JSON line)', e.data);
-              }
-            };
-            this.es.onerror = (err) => {
-              // EventSource gibt nicht immer detaillierte Fehler
-              // Prüfe den readyState: 0=CONNECTING, 1=OPEN, 2=CLOSED
-              const state = this.es?.readyState ?? -1;
-              let errorMsg = 'Unbekannter Fehler';
-              
-              if(state === 2) {
-                errorMsg = 'Verbindung geschlossen (möglicherweise Server-Fehler oder Auth-Problem)';
-              } else if(state === 0) {
-                errorMsg = 'Verbindung konnte nicht hergestellt werden';
-              }
-              
-              this.addDebugInfo(`❌ SSE-Fehler (State: ${state}): ${errorMsg}`);
-              this.addDebugInfo(`🔍 URL: ${url}`);
-              if(window.__DEV__) console.error('[Terminal SSE] error:', err, 'readyState:', state);
-              
-              this.closeStream();
-              if(this.retryCount < this.maxRetry){
-                const delay = Math.min(4000, this.backoffBaseMs * Math.pow(2, this.retryCount++));
-                this.addDebugInfo(`🔄 Retry in ${delay}ms (${this.retryCount}/${this.maxRetry})`);
-                setTimeout(() => this.startStream(url), delay);
-              } else {
-                this.addDebugInfo('❌ Max Retries erreicht - Stream abgebrochen');
-                this.addDebugInfo('💡 Tipp: Prüfe die Browser-Konsole und Server-Logs');
-                window.dispatchEvent(new CustomEvent('ai-stream-error'));
-              }
-            };
-          } catch(e){ if(window.__DEV__) console.error('[Terminal SSE] start error', e); }
-        },
-        closeStream(){ if(this.es){ try { this.es.close(); } catch(_){} this.es = null; } },
-        abortStream(){
-          this.closeStream(); this.stopTyping(); this.queue = ''; this.finalizePending = false; this.hasDelta = false; this.isStreamingLocal = false; this.currentTool = null;
-          this.$wire?.set?.('isProcessing', false);
-          this.$wire?.set?.('isStreaming', false);
-          this.$wire?.set?.('canCancel', false);
-          this.$wire?.set?.('progressText', '');
-          this.$wire?.set?.('currentTool', null);
-          window.dispatchEvent(new CustomEvent('ai-stream-error'));
-        },
-
-        drainUntilEmpty(){ if(this.queue.length === 0){ window.dispatchEvent(new CustomEvent('ai-stream-drained')); return; } setTimeout(() => this.drainUntilEmpty(), 30); },
-
-        onStreamComplete(){
-          if(window.__DEV__) console.log('[Terminal SSE] ai-stream-complete');
-          this.finalizePending = true; this.$wire?.set?.('canCancel', false); this.typingDelay = this.fastTypingDelay; this.startTyping(); this.drainUntilEmpty();
-          if(this.bodyEl){ requestAnimationFrame(() => { this.bodyEl.scrollTop = this.bodyEl.scrollHeight; }); }
-        },
-        onStreamError(){
-          if(window.__DEV__) console.log('[Terminal SSE] ai-stream-error');
-          
-          // Fehler als Nachricht im Chat anzeigen
-          const errorMsg = '❌ Stream-Fehler aufgetreten!\n\n' +
-            '🔍 Debug-Infos:\n' +
-            this.debugInfo.join('\n') + '\n\n' +
-            '💡 Bitte die Debug-Infos oben kopieren und dem Entwickler geben.';
-          
-          // Versuche Fehler als Assistant-Message zu speichern
-          try {
-            this.$wire?.call?.('addErrorMessage', errorMsg);
-          } catch(e) {
-            console.error('Could not save error message:', e);
-          }
-          
-          this.stopTyping(); this.queue = ''; this.finalizePending = false; this.hasDelta = false; this.isStreamingLocal = false; this.currentTool = null;
-          this.$wire?.set?.('isProcessing', false);
-          this.$wire?.set?.('isStreaming', false);
-          this.$wire?.set?.('canCancel', false);
-          this.$wire?.set?.('progressText', '');
-          this.$wire?.set?.('currentTool', null);
-        },
-        async onStreamDrained(){
-          if(window.__DEV__) console.log('[Terminal SSE] ai-stream-drained');
-          this.stopTyping(); this.$wire?.set?.('isStreaming', false); this.$wire?.set?.('canCancel', false); this.hasDelta = false; this.finalizePending = false; this.$wire?.set?.('isProcessing', false); this.$wire?.set?.('progressText','');
-          try { await this.$wire?.call?.('refreshLastAssistant'); } catch(_) {}
-          setTimeout(() => { this.streamText = ''; this.$wire?.set?.('currentTool', null); this.currentTool = null; this.isStreamingLocal = false; window.dispatchEvent(new CustomEvent('terminal-scroll')); }, 60);
         },
       };
     }
   </script>
 </div>
+
