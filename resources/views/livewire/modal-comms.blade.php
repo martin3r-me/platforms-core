@@ -3,7 +3,7 @@
     <x-ui-modal size="wide" hideFooter="1" wire:model="open" :closeButton="true">
         <x-slot name="header">
             {{-- Match Playground header layout 1:1 --}}
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 w-full">
                 <div class="flex-shrink-0">
                     <div class="w-12 h-12 bg-gradient-to-br from-[var(--ui-primary-10)] to-[var(--ui-primary-5)] rounded-xl flex items-center justify-center shadow-sm">
                         @svg('heroicon-o-paper-airplane', 'w-6 h-6 text-[var(--ui-primary)]')
@@ -14,7 +14,7 @@
                     <p class="text-sm text-[var(--ui-muted)]">Chat, Threads, Kontext (Demo) – im Modal.</p>
                 </div>
                 {{-- Tabs in the modal header (requested) --}}
-                <div class="flex items-center gap-2 ml-auto justify-end">
+                <div class="flex items-center gap-2 ml-auto flex-shrink-0">
                     <button type="button"
                         x-data
                         @click="window.dispatchEvent(new CustomEvent('comms:set-tab', { detail: { tab: 'chat' } }))"
@@ -161,11 +161,29 @@
                                                 <div class="space-y-2">
                                                     <div class="rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2">
                                                         <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate" x-text="activeChannel === 'email' ? 'Re: Angebot – Q1' : (activeChannel === 'phone' ? 'Anrufnotiz · Termin' : 'WhatsApp · Follow-up')"></div>
-                                                        <div class="text-[10px] text-[var(--ui-muted)] truncate" x-text="activeChannel === 'email' ? 'Letzte Nachricht: 10:41 · 2 ungelesen' : (activeChannel === 'phone' ? 'Letzte Nachricht: gestern · offen' : 'Letzte Nachricht: heute · 1 ungelesen')"></div>
+                                                        <div class="mt-0.5 flex items-center justify-between gap-2">
+                                                            <div class="text-[10px] text-[var(--ui-muted)] truncate"
+                                                                 x-text="activeChannel === 'email' ? 'Letzte Nachricht: 10:41 · 2 ungelesen' : (activeChannel === 'phone' ? 'Letzte Nachricht: gestern · offen' : 'Letzte Nachricht: heute · 1 ungelesen')"></div>
+                                                            {{-- Attachments hint (UI only) --}}
+                                                            <div class="flex items-center gap-1 text-[10px] text-[var(--ui-muted)] flex-shrink-0"
+                                                                 x-show="activeChannel === 'email'">
+                                                                @svg('heroicon-o-paper-clip', 'w-3.5 h-3.5')
+                                                                <span>2</span>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                     <div class="rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2">
                                                         <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate" x-text="activeChannel === 'email' ? 'Follow-up · Termin' : (activeChannel === 'phone' ? 'Rückruf · Frage' : 'WhatsApp · Angebot')"></div>
-                                                        <div class="text-[10px] text-[var(--ui-muted)] truncate" x-text="activeChannel === 'email' ? 'Letzte Nachricht: gestern · gelesen' : (activeChannel === 'phone' ? 'Letzte Nachricht: letzte Woche · erledigt' : 'Letzte Nachricht: gestern · gelesen')"></div>
+                                                        <div class="mt-0.5 flex items-center justify-between gap-2">
+                                                            <div class="text-[10px] text-[var(--ui-muted)] truncate"
+                                                                 x-text="activeChannel === 'email' ? 'Letzte Nachricht: gestern · gelesen' : (activeChannel === 'phone' ? 'Letzte Nachricht: letzte Woche · erledigt' : 'Letzte Nachricht: gestern · gelesen')"></div>
+                                                            {{-- Attachments hint (UI only) --}}
+                                                            <div class="flex items-center gap-1 text-[10px] text-[var(--ui-muted)] flex-shrink-0"
+                                                                 x-show="activeChannel === 'email'">
+                                                                @svg('heroicon-o-paper-clip', 'w-3.5 h-3.5')
+                                                                <span>1</span>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -190,63 +208,108 @@
                                                         </div>
 
                                                         {{-- inbound mail --}}
-                                                        <div class="rounded-xl border border-[var(--ui-border)]/60 bg-white overflow-hidden">
-                                                            <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
-                                                                <div class="flex items-start justify-between gap-3">
-                                                                    <div class="min-w-0">
-                                                                        <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">Re: Angebot – Q1</div>
-                                                                        <div class="mt-1 text-xs text-[var(--ui-muted)] truncate">
-                                                                            <span class="font-semibold">Von:</span> Marius Erren &lt;m.erren@bhgdigital.de&gt;
-                                                                            <span class="mx-1">·</span>
-                                                                            <span class="font-semibold">An:</span> Team &lt;sales@company.de&gt;
+                                                        <div class="flex justify-start">
+                                                            <div class="w-full max-w-4xl rounded-xl border border-[var(--ui-border)]/60 bg-white overflow-hidden">
+                                                                <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
+                                                                    <div class="flex items-start justify-between gap-3">
+                                                                        <div class="min-w-0">
+                                                                            <div class="flex items-center gap-2 min-w-0">
+                                                                                <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">Re: Angebot – Q1</div>
+                                                                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/60">
+                                                                                    Inbound
+                                                                                </span>
+                                                                            </div>
+                                                                            <div class="mt-1 text-xs text-[var(--ui-muted)] truncate">
+                                                                                <span class="font-semibold">Von:</span> Marius Erren &lt;m.erren@bhgdigital.de&gt;
+                                                                                <span class="mx-1">·</span>
+                                                                                <span class="font-semibold">An:</span> Team &lt;sales@company.de&gt;
+                                                                            </div>
                                                                         </div>
+                                                                        <div class="text-xs text-[var(--ui-muted)] whitespace-nowrap">Heute 10:41</div>
                                                                     </div>
-                                                                    <div class="text-xs text-[var(--ui-muted)] whitespace-nowrap">Heute 10:41</div>
                                                                 </div>
-                                                            </div>
-                                                            <div class="px-4 py-4 text-sm text-[var(--ui-secondary)] whitespace-pre-wrap">
+                                                                <div class="px-4 py-4 text-sm text-[var(--ui-secondary)] whitespace-pre-wrap">
 Hallo,
 
 habt ihr schon Feedback zum Angebot? Ich hätte gern nächste Woche einen Termin.
 
 Viele Grüße
 Marius
-                                                            </div>
-                                                            <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 bg-[var(--ui-bg)] flex items-center justify-between">
-                                                                <div class="text-xs text-[var(--ui-muted)]">Inbound</div>
-                                                                <div class="flex items-center gap-2">
-                                                                    <button type="button" class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:underline" disabled title="(UI)">Antworten</button>
-                                                                    <button type="button" class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:underline" disabled title="(UI)">Weiterleiten</button>
+                                                                </div>
+                                                                {{-- Attachments (UI only) --}}
+                                                                <div class="px-4 pb-4">
+                                                                    <div class="mt-1 flex flex-wrap gap-2">
+                                                                        <div class="inline-flex items-center gap-2 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2">
+                                                                            @svg('heroicon-o-paper-clip', 'w-4 h-4 text-[var(--ui-muted)]')
+                                                                            <div class="min-w-0">
+                                                                                <div class="text-xs font-semibold text-[var(--ui-secondary)] truncate">Angebot_Q1.pdf</div>
+                                                                                <div class="text-[10px] text-[var(--ui-muted)]">PDF · 312 KB</div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div class="inline-flex items-center gap-2 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2">
+                                                                            @svg('heroicon-o-paper-clip', 'w-4 h-4 text-[var(--ui-muted)]')
+                                                                            <div class="min-w-0">
+                                                                                <div class="text-xs font-semibold text-[var(--ui-secondary)] truncate">Screenshots.zip</div>
+                                                                                <div class="text-[10px] text-[var(--ui-muted)]">ZIP · 1.2 MB</div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 bg-[var(--ui-bg)] flex items-center justify-between">
+                                                                    <div class="text-xs text-[var(--ui-muted)]">Inbound</div>
+                                                                    <div class="flex items-center gap-2">
+                                                                        <button type="button" class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:underline" disabled title="(UI)">Antworten</button>
+                                                                        <button type="button" class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:underline" disabled title="(UI)">Weiterleiten</button>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
 
                                                         {{-- outbound mail --}}
-                                                        <div class="rounded-xl border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] overflow-hidden">
-                                                            <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
-                                                                <div class="flex items-start justify-between gap-3">
-                                                                    <div class="min-w-0">
-                                                                        <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">Re: Angebot – Q1</div>
-                                                                        <div class="mt-1 text-xs text-[var(--ui-muted)] truncate">
-                                                                            <span class="font-semibold">Von:</span> Sales Team &lt;sales@company.de&gt;
-                                                                            <span class="mx-1">·</span>
-                                                                            <span class="font-semibold">An:</span> m.erren@bhgdigital.de
+                                                        <div class="flex justify-end">
+                                                            <div class="w-full max-w-4xl rounded-xl border border-[var(--ui-border)]/60 bg-[#dcf8c6] overflow-hidden">
+                                                                <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 bg-[var(--ui-bg)]/70">
+                                                                    <div class="flex items-start justify-between gap-3">
+                                                                        <div class="min-w-0">
+                                                                            <div class="flex items-center gap-2 min-w-0">
+                                                                                <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">Re: Angebot – Q1</div>
+                                                                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-white/60 text-[var(--ui-secondary)] border border-[var(--ui-border)]/60">
+                                                                                    Outbound
+                                                                                </span>
+                                                                            </div>
+                                                                            <div class="mt-1 text-xs text-[var(--ui-muted)] truncate">
+                                                                                <span class="font-semibold">Von:</span> Sales Team &lt;sales@company.de&gt;
+                                                                                <span class="mx-1">·</span>
+                                                                                <span class="font-semibold">An:</span> m.erren@bhgdigital.de
+                                                                            </div>
                                                                         </div>
+                                                                        <div class="text-xs text-[var(--ui-muted)] whitespace-nowrap">Heute 11:02</div>
                                                                     </div>
-                                                                    <div class="text-xs text-[var(--ui-muted)] whitespace-nowrap">Heute 11:02</div>
                                                                 </div>
-                                                            </div>
-                                                            <div class="px-4 py-4 text-sm text-[var(--ui-secondary)] whitespace-pre-wrap">
+                                                                <div class="px-4 py-4 text-sm text-[var(--ui-secondary)] whitespace-pre-wrap">
 Hi Marius,
 
 ja — lass uns nächste Woche Dienstag 10:00 vorschlagen. Passt das?
 
 Viele Grüße
-                                                            </div>
-                                                            <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 bg-[var(--ui-bg)] flex items-center justify-between">
-                                                                <div class="text-xs text-[var(--ui-muted)]">Outbound</div>
-                                                                <div class="flex items-center gap-2">
-                                                                    <button type="button" class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:underline" disabled title="(UI)">Erneut senden</button>
+                                                                </div>
+                                                                {{-- Attachments (UI only) --}}
+                                                                <div class="px-4 pb-4">
+                                                                    <div class="mt-1 flex flex-wrap gap-2">
+                                                                        <div class="inline-flex items-center gap-2 rounded-lg border border-[var(--ui-border)]/60 bg-white/60 px-3 py-2">
+                                                                            @svg('heroicon-o-paper-clip', 'w-4 h-4 text-[var(--ui-muted)]')
+                                                                            <div class="min-w-0">
+                                                                                <div class="text-xs font-semibold text-[var(--ui-secondary)] truncate">Terminvorschlag.ics</div>
+                                                                                <div class="text-[10px] text-[var(--ui-muted)]">Kalender · 4 KB</div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 bg-[var(--ui-bg)]/70 flex items-center justify-between">
+                                                                    <div class="text-xs text-[var(--ui-muted)]">Outbound</div>
+                                                                    <div class="flex items-center gap-2">
+                                                                        <button type="button" class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:underline" disabled title="(UI)">Erneut senden</button>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -270,6 +333,14 @@ Viele Grüße
                                                                     <div class="mt-1 text-[10px] text-[var(--ui-muted)] text-right">10:41</div>
                                                                 </div>
                                                             </div>
+                                                            <div class="flex justify-start">
+                                                                <div class="max-w-[85%] rounded-2xl bg-white border border-[var(--ui-border)]/60 px-4 py-2">
+                                                                    <div class="text-sm text-[var(--ui-secondary)]">
+                                                                        Ich schicke euch mal das Dokument.
+                                                                    </div>
+                                                                    <div class="mt-1 text-[10px] text-[var(--ui-muted)] text-right">10:41</div>
+                                                                </div>
+                                                            </div>
                                                             <div class="flex justify-end">
                                                                 <div class="max-w-[85%] rounded-2xl bg-[#dcf8c6] border border-[var(--ui-border)]/60 px-4 py-2">
                                                                     <div class="text-sm text-[var(--ui-secondary)]">
@@ -277,6 +348,36 @@ Viele Grüße
                                                                     </div>
                                                                     <div class="mt-1 flex items-center justify-end gap-1 text-[10px] text-[var(--ui-muted)]">
                                                                         <span>10:42</span>
+                                                                        <span class="text-[var(--ui-muted)]">✓✓</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            {{-- WhatsApp "Dokument"-Bubble --}}
+                                                            <div class="flex justify-start">
+                                                                <div class="max-w-[85%] rounded-2xl bg-white border border-[var(--ui-border)]/60 px-3 py-2">
+                                                                    <div class="flex items-center gap-3">
+                                                                        <div class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 text-[var(--ui-secondary)]">
+                                                                            @svg('heroicon-o-document-text', 'w-5 h-5')
+                                                                        </div>
+                                                                        <div class="min-w-0">
+                                                                            <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">Angebot_Q1.pdf</div>
+                                                                            <div class="text-xs text-[var(--ui-muted)]">312 KB · PDF</div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="mt-1 text-[10px] text-[var(--ui-muted)] text-right">10:43</div>
+                                                                </div>
+                                                            </div>
+                                                            {{-- WhatsApp "Bild"-Bubble --}}
+                                                            <div class="flex justify-end">
+                                                                <div class="max-w-[85%] rounded-2xl bg-[#dcf8c6] border border-[var(--ui-border)]/60 p-2">
+                                                                    <div class="w-64 h-36 rounded-xl bg-black/5 border border-[var(--ui-border)]/60 flex items-center justify-center">
+                                                                        <div class="text-xs text-[var(--ui-muted)] flex items-center gap-2">
+                                                                            @svg('heroicon-o-photo', 'w-4 h-4')
+                                                                            <span>Bild (UI)</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="mt-1 flex items-center justify-end gap-1 text-[10px] text-[var(--ui-muted)]">
+                                                                        <span>10:44</span>
                                                                         <span class="text-[var(--ui-muted)]">✓✓</span>
                                                                     </div>
                                                                 </div>
@@ -290,6 +391,14 @@ Viele Grüße
                                                                         <span>11:02</span>
                                                                         <span class="text-[var(--ui-muted)]">✓</span>
                                                                     </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="flex justify-start">
+                                                                <div class="max-w-[85%] rounded-2xl bg-white border border-[var(--ui-border)]/60 px-4 py-2">
+                                                                    <div class="text-sm text-[var(--ui-secondary)]">
+                                                                        Perfekt, danke!
+                                                                    </div>
+                                                                    <div class="mt-1 text-[10px] text-[var(--ui-muted)] text-right">11:05</div>
                                                                 </div>
                                                             </div>
                                                         </div>
