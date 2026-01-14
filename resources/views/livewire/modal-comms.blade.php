@@ -198,29 +198,6 @@
                                 <div class="flex items-center gap-2 flex-shrink-0"></div>
                             </div>
 
-                            {{-- E-Mail Absender (oben als Tabs/Badges) --}}
-                            <div class="px-4 pb-3 border-b border-[var(--ui-border)]/60" x-show="activeChannel === 'email'" x-cloak>
-                                <div class="flex items-center gap-2 overflow-x-auto">
-                                    <div class="text-[10px] font-semibold uppercase tracking-wide text-[var(--ui-muted)] flex-shrink-0">Absender</div>
-                                    @forelse($emailChannels as $c)
-                                        <button
-                                            type="button"
-                                            @click="activeEmailChannelId = {{ (int) $c['id'] }}"
-                                            class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap"
-                                            :class="activeEmailChannelId === {{ (int) $c['id'] }}
-                                                ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
-                                                : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'"
-                                        >
-                                            {{ $c['label'] }}
-                                        </button>
-                                    @empty
-                                        <span class="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
-                                            Kein E‑Mail Kanal (bitte unter „Kanäle verwalten“ anlegen)
-                                        </span>
-                                    @endforelse
-                                </div>
-                            </div>
-
                             <div class="flex-1 min-h-0 overflow-hidden w-full">
                                 {{-- Same inner layout as Playground, but mirrored: left sidebar + right chat --}}
                                 <div class="w-full h-full min-h-0 grid grid-cols-4 gap-5 px-4 py-4 overflow-hidden min-w-0" style="width:100%; max-width:100%;">
@@ -350,20 +327,6 @@
                                                                 Kein E‑Mail Kanal ausgewählt/verfügbar.
                                                             </div>
                                                         @else
-                                                            @if(!empty($emailDebug))
-                                                                <div class="rounded-xl border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-4 py-3">
-                                                                    <div class="text-xs font-semibold text-[var(--ui-secondary)]">Debug</div>
-                                                                    <div class="mt-2 space-y-1 text-[11px] text-[var(--ui-muted)]">
-                                                                        @foreach($emailDebug as $d)
-                                                                            <div class="flex items-center justify-between gap-3">
-                                                                                <span class="text-[10px]">{{ $d['at'] }}</span>
-                                                                                <span class="flex-1 text-right truncate">{{ $d['msg'] }}</span>
-                                                                            </div>
-                                                                        @endforeach
-                                                                    </div>
-                                                                </div>
-                                                            @endif
-
                                                             @forelse($emailTimeline as $m)
                                                                 @php
                                                                     $isInbound = ($m['direction'] ?? '') === 'inbound';
@@ -628,6 +591,7 @@
                                                                         x-init="$nextTick(() => autoGrow($refs.emailBody))"
                                                                         @input="autoGrow($event.target)"
                                                                         @focus="autoGrow($event.target)"
+                                                                        @keydown.enter="if(!$event.shiftKey){ $event.preventDefault(); $wire.sendEmail(); }"
                                                                         rows="1"
                                                                         wire:model="emailCompose.body"
                                                                         class="w-full px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
@@ -639,11 +603,12 @@
                                                                 </div>
                                                                 <x-ui-button
                                                                     variant="primary"
-                                                                    size="sm"
+                                                                    size="md"
                                                                     wire:click="sendEmail"
                                                                     wire:loading.attr="disabled"
                                                                     wire:loading.class="animate-pulse"
                                                                     wire:target="sendEmail"
+                                                                    class="h-10"
                                                                 >
                                                                     <span wire:loading.remove wire:target="sendEmail">Senden</span>
                                                                     <span wire:loading wire:target="sendEmail">Sende…</span>
