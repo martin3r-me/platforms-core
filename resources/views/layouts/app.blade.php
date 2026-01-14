@@ -56,8 +56,18 @@
   <div class="flex h-screen w-full">
     <!-- Sidebar -->
     <x-ui-sidebar>
+        @php
+          // Defensive: in manchen Deploy-/View-Cache-Szenarien ist $class nicht gesetzt
+          $currentModuleKey = $currentModuleKey ?? (explode('.', request()->route()?->getName() ?? '')[0] ?? null);
+          $class = $class ?? (
+              $currentModuleKey
+                ? "\\Platform\\".str_replace('-', '', ucwords($currentModuleKey, '-'))."\\Livewire\\Sidebar"
+                : null
+          );
+        @endphp
+
         @if($class && class_exists($class))
-            @livewire($currentModuleKey.'.sidebar')
+          @livewire($currentModuleKey.'.sidebar')
         @endif
     </x-ui-sidebar>
 
