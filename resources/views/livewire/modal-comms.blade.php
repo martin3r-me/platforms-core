@@ -1,6 +1,8 @@
 <div>
+    {{-- Use a dedicated in-between size: big enough to work, but not full-screen. --}}
     <x-ui-modal size="wide" hideFooter="1" wire:model="open" :closeButton="true">
         <x-slot name="header">
+            {{-- Match Playground header layout 1:1 --}}
             <div class="flex items-center gap-3">
                 <div class="flex-shrink-0">
                     <div class="w-12 h-12 bg-gradient-to-br from-[var(--ui-primary-10)] to-[var(--ui-primary-5)] rounded-xl flex items-center justify-center shadow-sm">
@@ -9,91 +11,177 @@
                 </div>
                 <div class="flex-1 min-w-0">
                     <h3 class="text-xl font-bold text-[var(--ui-secondary)]">Kommunikation</h3>
-                    <p class="text-sm text-[var(--ui-muted)]">UI-Shell (ohne Daten) – nur Aufbau.</p>
+                    <p class="text-sm text-[var(--ui-muted)]">Chat, Threads, Kontext (Demo) – im Modal.</p>
+                </div>
+                {{-- Tabs in the modal header (requested) --}}
+                <div class="flex items-center gap-2">
+                    <button type="button"
+                        x-data
+                        @click="window.dispatchEvent(new CustomEvent('comms:set-tab', { detail: { tab: 'chat' } }))"
+                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
+                    >
+                        Chat
+                    </button>
+                    <button type="button"
+                        x-data
+                        @click="window.dispatchEvent(new CustomEvent('comms:set-tab', { detail: { tab: 'threads' } }))"
+                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
+                    >
+                        Threads
+                    </button>
+                    <button type="button"
+                        x-data
+                        @click="window.dispatchEvent(new CustomEvent('comms:set-tab', { detail: { tab: 'settings' } }))"
+                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
+                    >
+                        Settings
+                    </button>
                 </div>
             </div>
         </x-slot>
 
+        {{-- Match Playground body wrapper 1:1 (cancel modal padding) --}}
         <div class="-m-6 w-full h-full min-h-0 min-w-0 overflow-hidden" style="width:100%;">
-            <div class="p-6 h-full min-h-0">
-                {{-- Chat-Fenster (nur Andeutung, keine Logik) --}}
-                <div class="h-full min-h-0 flex flex-col rounded-xl border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] shadow-sm overflow-hidden">
-                    {{-- Header --}}
-                    <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <div class="flex items-center gap-2">
-                                    <div class="text-sm font-semibold text-[var(--ui-secondary)]">Chat</div>
-                                    <span class="text-[11px] text-[var(--ui-muted)]">(Demo)</span>
+            <div
+                x-data="{ tab: 'chat' }"
+                @comms:set-tab.window="tab = ($event.detail && $event.detail.tab) ? $event.detail.tab : tab"
+                class="w-full h-full min-h-0 overflow-hidden flex flex-col"
+                style="width:100%;"
+            >
+                <div class="w-full flex-1 min-h-0 overflow-hidden p-4 bg-[var(--ui-bg)]" style="width:100%;">
+                    {{-- Chat Tab --}}
+                    <div x-show="tab==='chat'" class="w-full h-full min-h-0" x-cloak>
+                        <div class="h-full min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/30">
+                            <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
+                                <div class="flex items-center gap-3 flex-1 min-w-0">
+                                    <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] flex-shrink-0">Chat</div>
+                                    {{-- Thread Tabs (hart codiert, nur UI) --}}
+                                    <div class="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
+                                        <div class="relative flex-shrink-0 flex items-center">
+                                            <button
+                                                type="button"
+                                                class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1 bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]"
+                                                title="Thread (E-Mail)"
+                                            >
+                                                <span class="inline-flex items-center gap-1">
+                                                    m.erren@bhgdigital.de
+                                                </span>
+                                                <span class="hidden ml-1 w-2 h-2 rounded-full bg-white/90 animate-pulse"></span>
+                                            </button>
+                                        </div>
+                                        <div class="relative flex-shrink-0 flex items-center">
+                                            <button
+                                                type="button"
+                                                class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1 bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
+                                                title="Thread (Telefon)"
+                                            >
+                                                <span class="inline-flex items-center gap-1">
+                                                    + 0172 123 12 14
+                                                </span>
+                                                <span class="hidden ml-1 w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
+                                            </button>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            class="px-2 py-1 rounded text-[11px] border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] flex-shrink-0"
+                                            title="Neuen Thread anlegen"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="mt-2 flex flex-wrap items-center gap-2">
-                                    {{-- Thread/Contact Badges (hart codiert) --}}
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-[var(--ui-muted-5)] px-2.5 py-1 text-xs text-[var(--ui-secondary)] border border-[var(--ui-border)]/60">
-                                        @svg('heroicon-o-envelope', 'w-4 h-4 text-[var(--ui-muted)]')
-                                        <span class="truncate max-w-[14rem]">m.erren@bhgdigital.de</span>
-                                    </span>
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-[var(--ui-muted-5)] px-2.5 py-1 text-xs text-[var(--ui-secondary)] border border-[var(--ui-border)]/60">
-                                        @svg('heroicon-o-phone', 'w-4 h-4 text-[var(--ui-muted)]')
-                                        <span class="truncate max-w-[14rem]">+ 0172 123 12 14</span>
-                                    </span>
-                                </div>
+                                {{-- Keep header clean (like Playground) --}}
+                                <div class="flex items-center gap-2 flex-shrink-0"></div>
                             </div>
 
-                            {{-- Plus (Thread anlegen) – nur UI --}}
-                            <button
-                                type="button"
-                                class="inline-flex items-center justify-center w-9 h-9 rounded-md border border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)] transition"
-                                title="Neuer Thread"
-                            >
-                                @svg('heroicon-o-plus', 'w-5 h-5')
-                            </button>
-                        </div>
-                    </div>
+                            <div class="flex-1 min-h-0 overflow-hidden w-full">
+                                {{-- Same inner layout as Playground, but mirrored: left sidebar + right chat --}}
+                                <div class="w-full h-full min-h-0 grid grid-cols-4 gap-5 px-4 py-4 overflow-hidden min-w-0" style="width:100%; max-width:100%;">
+                                    {{-- Left: "Debug" box mirrored to left, renamed to Threads --}}
+                                    <div class="col-span-1 min-h-0 min-w-0 bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm overflow-x-hidden">
+                                        <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
+                                            <div class="text-xs font-semibold text-[var(--ui-secondary)]">Threads</div>
+                                            <div class="flex items-center gap-3">
+                                                <button type="button" class="text-xs text-[var(--ui-muted)] hover:underline" title="(UI) Neu">Neu</button>
+                                                <button type="button" class="text-xs text-[var(--ui-muted)] hover:underline" title="(UI) Clear">Clear</button>
+                                            </div>
+                                        </div>
 
-                    {{-- Body --}}
-                    <div class="flex-1 min-h-0 overflow-y-auto bg-[var(--ui-muted-5)] p-4">
-                        <div class="max-w-3xl mx-auto space-y-3">
-                            <div class="flex justify-start">
-                                <div class="max-w-[85%] rounded-2xl bg-white border border-[var(--ui-border)]/60 px-4 py-3">
-                                    <div class="text-xs text-[var(--ui-muted)]">Gegenseite</div>
-                                    <div class="mt-1 text-sm text-[var(--ui-secondary)]">
-                                        Platzhalter-Nachricht (Inbound) …
+                                        <div class="p-4 space-y-3 flex-1 min-h-0 overflow-y-auto min-w-0">
+                                            <div class="min-w-0">
+                                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Übersicht (Demo)</div>
+                                                <div class="space-y-2">
+                                                    <div class="rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2">
+                                                        <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">m.erren@bhgdigital.de</div>
+                                                        <div class="text-[10px] text-[var(--ui-muted)] truncate">Letzte Nachricht: 10:41</div>
+                                                    </div>
+                                                    <div class="rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2">
+                                                        <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">+ 0172 123 12 14</div>
+                                                        <div class="text-[10px] text-[var(--ui-muted)] truncate">Letzte Nachricht: gestern</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="text-[10px] text-[var(--ui-muted)]">
+                                                (Später: echte Thread-Liste, Filter, Kontext)
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {{-- Right: Chat (3/4 width) --}}
+                                    <div class="col-span-3 min-h-0 min-w-0 flex flex-col overflow-hidden">
+                                        <div class="flex-1 min-h-0 bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
+                                            <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
+                                                <div id="chatList" class="space-y-4 min-w-0">
+                                                    <div class="flex justify-start">
+                                                        <div class="max-w-4xl rounded-lg p-3 break-words overflow-hidden bg-[var(--ui-surface)] border border-[var(--ui-border)]">
+                                                            <div class="text-sm font-semibold mb-1">Assistant</div>
+                                                            <div class="whitespace-pre-wrap break-words">Platzhalter-Nachricht (Inbound) …</div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex justify-end">
+                                                        <div class="max-w-4xl rounded-lg p-3 break-words overflow-hidden bg-[var(--ui-primary)] text-white">
+                                                            <div class="text-sm font-semibold mb-1">Du</div>
+                                                            <div class="whitespace-pre-wrap break-words">Platzhalter-Antwort (Outbound) …</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="border-t border-[var(--ui-border)]/60 p-3 flex-shrink-0 bg-[var(--ui-surface)]">
+                                                <form class="flex gap-2 items-center" method="post" action="javascript:void(0)" onsubmit="return false;">
+                                                    <div class="w-56">
+                                                        <div class="w-full h-10 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] flex items-center px-3 text-xs text-[var(--ui-muted)]">
+                                                            Kanal (später)
+                                                        </div>
+                                                    </div>
+                                                    <input
+                                                        type="text"
+                                                        class="flex-1 px-4 h-10 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                        placeholder="Nachricht eingeben…"
+                                                        autocomplete="off"
+                                                        disabled
+                                                    />
+                                                    <button type="submit" class="px-6 py-2 h-10 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90 flex items-center gap-2 opacity-60 cursor-not-allowed" disabled>
+                                                        <span>Senden</span>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="flex justify-end">
-                                <div class="max-w-[85%] rounded-2xl bg-[var(--ui-surface)] border border-[var(--ui-border)]/60 px-4 py-3">
-                                    <div class="text-xs text-[var(--ui-muted)] text-right">Du</div>
-                                    <div class="mt-1 text-sm text-[var(--ui-secondary)]">
-                                        Platzhalter-Antwort (Outbound) …
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="text-center text-xs text-[var(--ui-muted)] pt-2">
-                                (Hier später Threads, Verlauf, Attachments, etc.)
-                            </div>
                         </div>
                     </div>
 
-                    {{-- Footer --}}
-                    <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
-                        <div class="flex items-end gap-2">
-                            <div class="flex-1">
-                                <textarea
-                                    rows="2"
-                                    class="w-full rounded-md border border-[var(--ui-border)]/60 bg-white px-3 py-2 text-sm text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]/20"
-                                    placeholder="Nachricht… (UI only)"
-                                    disabled
-                                ></textarea>
-                            </div>
-                            <button
-                                type="button"
-                                class="inline-flex items-center gap-2 rounded-md bg-[var(--ui-primary)] px-3 py-2 text-sm font-semibold text-[var(--ui-on-primary)] opacity-60 cursor-not-allowed"
-                                disabled
-                            >
-                                @svg('heroicon-o-paper-airplane', 'w-4 h-4')
-                                Senden
-                            </button>
+                    {{-- Placeholder Tabs (UI only) --}}
+                    <div x-show="tab==='threads'" class="w-full h-full min-h-0" x-cloak>
+                        <div class="h-full min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex items-center justify-center shadow-sm ring-1 ring-[var(--ui-border)]/30">
+                            <div class="text-sm text-[var(--ui-muted)]">Threads (kommt später)</div>
+                        </div>
+                    </div>
+                    <div x-show="tab==='settings'" class="w-full h-full min-h-0" x-cloak>
+                        <div class="h-full min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex items-center justify-center shadow-sm ring-1 ring-[var(--ui-border)]/30">
+                            <div class="text-sm text-[var(--ui-muted)]">Settings (kommt später)</div>
                         </div>
                     </div>
                 </div>
