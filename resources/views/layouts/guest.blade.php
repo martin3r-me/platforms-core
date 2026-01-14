@@ -27,6 +27,7 @@
         @livewire('core.modal-user')
         @livewire('core.modal-pricing')
         @livewire('core.modal-modules')
+        @livewire('core.modal-comms')
     @endauth
         
     <livewire:notifications.notices.index />

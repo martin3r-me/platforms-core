@@ -37,6 +37,7 @@
     @livewire('core.modal-counters')
     @livewire('core.modal-pricing')
     @livewire('core.modal-modules')
+    @livewire('core.modal-comms')
     @livewire('core.modal-simple-tool-playground')
     @livewire('organization.modal-organization')
     @livewire('core.modal-tagging')
