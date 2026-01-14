@@ -78,6 +78,12 @@
                             if (!el) return;
                             el.scrollTop = el.scrollHeight;
                         });
+                    },
+                    init(){
+                        // Ensure scrolling works when switching threads/channels (even if content is swapped)
+                        this.$watch('activeThreadId', () => this.scrollToBottom());
+                        this.$watch('activeChannel', () => this.scrollToBottom());
+                        this.$watch('tab', () => this.scrollToBottom());
                     }
                 }"
                 @comms:set-tab.window="tab = ($event.detail && $event.detail.tab) ? $event.detail.tab : tab"
@@ -546,7 +552,6 @@ Viele Grüße
                                                                 type="text"
                                                                 class="w-64 px-4 h-10 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
                                                                 placeholder="Betreff…"
-                                                                disabled
                                                             />
                                                             <textarea
                                                                 x-ref="emailBody"
@@ -556,7 +561,6 @@ Viele Grüße
                                                                 rows="1"
                                                                 class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
                                                                 placeholder="Antwort (Text)…"
-                                                                disabled
                                                             ></textarea>
                                                             <button type="button" class="px-6 py-2 h-10 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90 flex items-center gap-2 opacity-60 cursor-not-allowed" disabled>
                                                                 <span>Senden</span>
@@ -581,7 +585,6 @@ Viele Grüße
                                                                 rows="1"
                                                                 class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
                                                                 placeholder="Nachricht…"
-                                                                disabled
                                                             ></textarea>
                                                             <button type="button" class="px-6 py-2 h-10 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90 flex items-center gap-2 opacity-60 cursor-not-allowed" disabled>
                                                                 <span>Senden</span>
@@ -599,7 +602,6 @@ Viele Grüße
                                                                     rows="1"
                                                                     class="w-full px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
                                                                     placeholder="Notiz zum Anruf…"
-                                                                    disabled
                                                                 ></textarea>
                                                             </div>
                                                             <button type="button" class="px-4 py-2 h-10 border border-[var(--ui-border)] rounded-lg text-[var(--ui-muted)] bg-[var(--ui-bg)] opacity-60 cursor-not-allowed" disabled>
