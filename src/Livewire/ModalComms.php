@@ -251,11 +251,15 @@ class ModalComms extends Component
             }
             $connectionId = $conn->id;
 
-            // Optional: Absender-Domain muss in hinterlegten Domains enthalten sein (wenn Domains existieren)
+            // Absender-Domain MUSS in hinterlegten Domains enthalten sein.
             $domain = strtolower((string) substr(strrchr($sender, '@') ?: '', 1));
             $configuredDomains = $conn->domains()->pluck('domain')->map(fn ($d) => strtolower((string) $d))->all();
-            if (!empty($configuredDomains) && $domain && !in_array($domain, $configuredDomains, true)) {
-                $this->channelsMessage = '⛔️ Domain ist nicht in den Postmark-Domains hinterlegt.';
+            if (empty($configuredDomains)) {
+                $this->channelsMessage = '⛔️ Bitte zuerst mindestens eine Domain in „Connections“ hinterlegen (Postmark Domains).';
+                return;
+            }
+            if (!$domain || !in_array($domain, $configuredDomains, true)) {
+                $this->channelsMessage = '⛔️ Absender-Domain ist nicht in den Postmark-Domains hinterlegt.';
                 return;
             }
         }
