@@ -31,6 +31,13 @@
                     </button>
                     <button type="button"
                         x-data
+                        @click="window.dispatchEvent(new CustomEvent('comms:set-tab', { detail: { tab: 'connections' } }))"
+                        class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
+                    >
+                        Connections
+                    </button>
+                    <button type="button"
+                        x-data
                         @click="window.dispatchEvent(new CustomEvent('comms:set-tab', { detail: { tab: 'settings' } }))"
                         class="px-3 py-1.5 rounded-md text-sm border transition bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
                     >
@@ -415,6 +422,11 @@ Viele Grüße
                     <div x-show="tab==='channels_manage'" class="w-full h-full min-h-0" x-cloak>
                         <div class="h-full min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex items-center justify-center shadow-sm ring-1 ring-[var(--ui-border)]/30">
                             <div class="text-sm text-[var(--ui-muted)]">Kanäle verwalten (kommt später)</div>
+                        </div>
+                    </div>
+                    <div x-show="tab==='connections'" class="w-full h-full min-h-0" x-cloak>
+                        <div class="h-full min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex items-center justify-center shadow-sm ring-1 ring-[var(--ui-border)]/30">
+                            <div class="text-sm text-[var(--ui-muted)]">Connections (kommt später)</div>
                         </div>
                     </div>
                     <div x-show="tab==='settings'" class="w-full h-full min-h-0" x-cloak>
