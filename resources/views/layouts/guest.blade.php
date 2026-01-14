@@ -12,7 +12,8 @@
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
     <!-- Styles -->
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @php($viteBuildDirectory = 'build/' . (config('app.asset_version') ?? env('ASSET_VERSION') ?? 'v1'))
+    @vite(['resources/css/app.css', 'resources/js/app.js'], $viteBuildDirectory)
     @livewireStyles
 
     <x-ui-styles/>
