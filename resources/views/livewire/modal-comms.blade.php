@@ -3,18 +3,21 @@
     <x-ui-modal size="wide" hideFooter="1" wire:model="open" :closeButton="true">
         <x-slot name="header">
             {{-- Match Playground header layout 1:1 --}}
-            <div class="flex items-center gap-3 w-full">
-                <div class="flex-shrink-0">
-                    <div class="w-12 h-12 bg-gradient-to-br from-[var(--ui-primary-10)] to-[var(--ui-primary-5)] rounded-xl flex items-center justify-center shadow-sm">
-                        @svg('heroicon-o-paper-airplane', 'w-6 h-6 text-[var(--ui-primary)]')
+            <div class="flex items-center justify-between gap-3 w-full">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="flex-shrink-0">
+                        <div class="w-12 h-12 bg-gradient-to-br from-[var(--ui-primary-10)] to-[var(--ui-primary-5)] rounded-xl flex items-center justify-center shadow-sm">
+                            @svg('heroicon-o-paper-airplane', 'w-6 h-6 text-[var(--ui-primary)]')
+                        </div>
+                    </div>
+                    <div class="min-w-0">
+                        <h3 class="text-xl font-bold text-[var(--ui-secondary)]">Kommunikation</h3>
+                        <p class="text-sm text-[var(--ui-muted)]">Chat, Threads, Kontext (Demo) – im Modal.</p>
                     </div>
                 </div>
-                <div class="flex-1 min-w-0">
-                    <h3 class="text-xl font-bold text-[var(--ui-secondary)]">Kommunikation</h3>
-                    <p class="text-sm text-[var(--ui-muted)]">Chat, Threads, Kontext (Demo) – im Modal.</p>
-                </div>
+
                 {{-- Tabs in the modal header (requested) --}}
-                <div class="flex items-center gap-2 ml-auto flex-shrink-0">
+                <div class="flex items-center gap-2 justify-end flex-shrink-0">
                     <button type="button"
                         x-data
                         @click="window.dispatchEvent(new CustomEvent('comms:set-tab', { detail: { tab: 'chat' } }))"
@@ -60,6 +63,13 @@
                     get activeChannelDetail(){
                         return this.activeChannel === 'email' ? 'm.erren@bhgdigital.de'
                             : '+49 172 123 12 14';
+                    },
+                    autoGrow(el, maxPx = 132){
+                        if(!el) return;
+                        el.style.height = 'auto';
+                        const next = Math.min(el.scrollHeight || 0, maxPx);
+                        el.style.height = (next > 0 ? next : 44) + 'px';
+                        el.style.overflowY = (el.scrollHeight > maxPx) ? 'auto' : 'hidden';
                     }
                 }"
                 @comms:set-tab.window="tab = ($event.detail && $event.detail.tab) ? $event.detail.tab : tab"
@@ -467,48 +477,71 @@ Viele Grüße
                                                 <form class="flex gap-2 items-center" method="post" action="javascript:void(0)" onsubmit="return false;">
                                                     {{-- Footer UI je Kanal (nur Optik) --}}
                                                     <template x-if="activeChannel==='email'">
-                                                        <div class="flex gap-2 items-center w-full">
+                                                        <div class="flex gap-2 items-end w-full">
+                                                            <button
+                                                                type="button"
+                                                                class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] opacity-60 cursor-not-allowed"
+                                                                title="Anhang hinzufügen (UI)"
+                                                                disabled
+                                                            >
+                                                                @svg('heroicon-o-paper-clip', 'w-5 h-5')
+                                                            </button>
                                                             <input
                                                                 type="text"
                                                                 class="w-64 px-4 h-10 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
                                                                 placeholder="Betreff…"
                                                                 disabled
                                                             />
-                                                            <input
-                                                                type="text"
-                                                                class="flex-1 px-4 h-10 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                            <textarea
+                                                                x-ref="emailBody"
+                                                                x-init="$nextTick(() => autoGrow($refs.emailBody))"
+                                                                @input="autoGrow($event.target)"
+                                                                rows="1"
+                                                                class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
                                                                 placeholder="Antwort (Text)…"
-                                                                autocomplete="off"
                                                                 disabled
-                                                            />
+                                                            ></textarea>
                                                             <button type="button" class="px-6 py-2 h-10 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90 flex items-center gap-2 opacity-60 cursor-not-allowed" disabled>
                                                                 <span>Senden</span>
                                                             </button>
                                                         </div>
                                                     </template>
                                                     <template x-if="activeChannel==='whatsapp'">
-                                                        <div class="flex gap-2 items-center w-full">
-                                                            <input
-                                                                type="text"
-                                                                class="flex-1 px-4 h-10 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                                                placeholder="Nachricht…"
-                                                                autocomplete="off"
+                                                        <div class="flex gap-2 items-end w-full">
+                                                            <button
+                                                                type="button"
+                                                                class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] opacity-60 cursor-not-allowed"
+                                                                title="Anhang hinzufügen (UI)"
                                                                 disabled
-                                                            />
+                                                            >
+                                                                @svg('heroicon-o-paper-clip', 'w-5 h-5')
+                                                            </button>
+                                                            <textarea
+                                                                x-ref="waBody"
+                                                                x-init="$nextTick(() => autoGrow($refs.waBody))"
+                                                                @input="autoGrow($event.target)"
+                                                                rows="1"
+                                                                class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
+                                                                placeholder="Nachricht…"
+                                                                disabled
+                                                            ></textarea>
                                                             <button type="button" class="px-6 py-2 h-10 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90 flex items-center gap-2 opacity-60 cursor-not-allowed" disabled>
                                                                 <span>Senden</span>
                                                             </button>
                                                         </div>
                                                     </template>
                                                     <template x-if="activeChannel==='phone'">
-                                                        <div class="flex gap-2 items-center w-full">
+                                                        <div class="flex gap-2 items-end w-full">
                                                             <div class="flex-1">
-                                                                <input
-                                                                    type="text"
-                                                                    class="w-full px-4 h-10 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                                <textarea
+                                                                    x-ref="callNote"
+                                                                    x-init="$nextTick(() => autoGrow($refs.callNote))"
+                                                                    @input="autoGrow($event.target)"
+                                                                    rows="1"
+                                                                    class="w-full px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
                                                                     placeholder="Notiz zum Anruf…"
                                                                     disabled
-                                                                />
+                                                                ></textarea>
                                                             </div>
                                                             <button type="button" class="px-4 py-2 h-10 border border-[var(--ui-border)] rounded-lg text-[var(--ui-muted)] bg-[var(--ui-bg)] opacity-60 cursor-not-allowed" disabled>
                                                                 Anrufen
