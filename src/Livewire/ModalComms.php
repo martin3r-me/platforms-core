@@ -27,7 +27,6 @@ class ModalComms extends Component
      */
     public array $postmark = [
         'server_token' => '',
-        'message_stream' => 'outbound',
         'inbound_user' => '',
         'inbound_pass' => '',
         'signing_secret' => '',
@@ -115,9 +114,6 @@ class ModalComms extends Component
 
         // Do not prefill secrets. Only show non-sensitive defaults if present.
         $creds = is_array($conn->credentials) ? $conn->credentials : [];
-        if (!empty($creds['message_stream'])) {
-            $this->postmark['message_stream'] = (string) $creds['message_stream'];
-        }
         if (!empty($creds['inbound_user'])) {
             $this->postmark['inbound_user'] = (string) $creds['inbound_user'];
         }
@@ -166,7 +162,6 @@ class ModalComms extends Component
 
         $this->validate([
             'postmark.server_token' => ['required', 'string', 'min:10'],
-            'postmark.message_stream' => ['required', 'string', 'max:120'],
             'postmark.inbound_user' => ['nullable', 'string', 'max:255'],
             'postmark.inbound_pass' => ['nullable', 'string', 'max:255'],
             'postmark.signing_secret' => ['nullable', 'string', 'max:255'],
@@ -183,7 +178,6 @@ class ModalComms extends Component
                 'is_active' => true,
                 'credentials' => [
                     'server_token' => (string) $this->postmark['server_token'],
-                    'message_stream' => (string) $this->postmark['message_stream'],
                     'inbound_user' => (string) ($this->postmark['inbound_user'] ?? ''),
                     'inbound_pass' => (string) ($this->postmark['inbound_pass'] ?? ''),
                     'signing_secret' => (string) ($this->postmark['signing_secret'] ?? ''),

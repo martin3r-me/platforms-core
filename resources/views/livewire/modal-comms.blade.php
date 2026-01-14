@@ -734,17 +734,6 @@ Viele Grüße
                                                 />
                                             </div>
 
-                                            <div>
-                                                <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Message Stream</label>
-                                                <input
-                                                    type="text"
-                                                    wire:model.defer="postmark.message_stream"
-                                                    class="w-full px-3 h-10 border border-[var(--ui-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                                    placeholder="outbound"
-                                                    @if(!$this->canManageProviderConnections()) disabled @endif
-                                                />
-                                            </div>
-
                                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                 <div>
                                                     <label class="block text-xs font-semibold text-[var(--ui-muted)] mb-1">Inbound User (Basic Auth)</label>
