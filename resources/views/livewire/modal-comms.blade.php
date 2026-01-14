@@ -132,14 +132,19 @@
                                             <button
                                                 type="button"
                                                 @click="activeChannel = 'email'"
-                                                class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1 bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]"
+                                                class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1"
+                                                :class="activeChannel === 'email'
+                                                    ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
+                                                    : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'"
                                                 title="Kanal: E-Mail"
                                             >
                                                 <span class="inline-flex items-center gap-2">
                                                     <span class="inline-flex items-center gap-1">
-                                                        @svg('heroicon-o-envelope', 'w-4 h-4 text-white/90')
+                                                        @svg('heroicon-o-envelope', 'w-4 h-4')
                                                         <span class="font-semibold">E-Mail</span>
-                                                        <span class="text-white/70 hidden sm:inline">· m.erren@bhgdigital.de</span>
+                                                        <span class="hidden sm:inline" :class="activeChannel === 'email' ? 'text-white/70' : 'text-[var(--ui-muted)]'">
+                                                            · {{ $activeEmailChannelAddress ?: 'kein Kanal' }}
+                                                        </span>
                                                     </span>
                                                 </span>
                                                 <span class="hidden ml-1 w-2 h-2 rounded-full bg-white/90 animate-pulse"></span>
@@ -149,14 +154,17 @@
                                             <button
                                                 type="button"
                                                 @click="activeChannel = 'phone'"
-                                                class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1 bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
+                                                class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1"
+                                                :class="activeChannel === 'phone'
+                                                    ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
+                                                    : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'"
                                                 title="Kanal: Anrufen"
                                             >
                                                 <span class="inline-flex items-center gap-2">
                                                     <span class="inline-flex items-center gap-1">
-                                                        @svg('heroicon-o-phone', 'w-4 h-4 text-[var(--ui-muted)]')
-                                                        <span class="font-semibold text-[var(--ui-secondary)]">Anrufen</span>
-                                                        <span class="text-[var(--ui-muted)] hidden sm:inline">· +49 172 123 12 14</span>
+                                                        @svg('heroicon-o-phone', 'w-4 h-4')
+                                                        <span class="font-semibold">Rufnummer</span>
+                                                        <span class="hidden sm:inline" :class="activeChannel === 'phone' ? 'text-white/70' : 'text-[var(--ui-muted)]'">· +49 172 123 12 14</span>
                                                     </span>
                                                 </span>
                                                 <span class="hidden ml-1 w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
@@ -166,27 +174,22 @@
                                             <button
                                                 type="button"
                                                 @click="activeChannel = 'whatsapp'"
-                                                class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1 bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]"
+                                                class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1"
+                                                :class="activeChannel === 'whatsapp'
+                                                    ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
+                                                    : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'"
                                                 title="Kanal: WhatsApp"
                                             >
                                                 <span class="inline-flex items-center gap-2">
                                                     <span class="inline-flex items-center gap-1">
-                                                        @svg('heroicon-o-chat-bubble-left-right', 'w-4 h-4 text-[var(--ui-muted)]')
-                                                        <span class="font-semibold text-[var(--ui-secondary)]">WhatsApp</span>
-                                                        <span class="text-[var(--ui-muted)] hidden sm:inline">· +49 172 123 12 14</span>
+                                                        @svg('heroicon-o-chat-bubble-left-right', 'w-4 h-4')
+                                                        <span class="font-semibold">WhatsApp</span>
+                                                        <span class="hidden sm:inline" :class="activeChannel === 'whatsapp' ? 'text-white/70' : 'text-[var(--ui-muted)]'">· +49 172 123 12 14</span>
                                                     </span>
                                                 </span>
                                                 <span class="hidden ml-1 w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
                                             </button>
                                         </div>
-
-                                        <button
-                                            type="button"
-                                            class="px-2 py-1 rounded text-[11px] border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] flex-shrink-0"
-                                            title="Neuen Kanal anlegen"
-                                        >
-                                            +
-                                        </button>
                                     </div>
                                 </div>
                                 {{-- Keep header clean (like Playground) --}}
@@ -201,7 +204,8 @@
                                         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                                             <div class="text-xs font-semibold text-[var(--ui-secondary)]">Threads</div>
                                             <div class="flex items-center gap-3">
-                                                <button type="button" @click="startNewThread()" class="text-xs text-[var(--ui-muted)] hover:underline" title="Neuen Thread starten">Neu</button>
+                                                <button type="button" @click="startNewThread()" class="text-xs text-[var(--ui-muted)] hover:underline" title="Neuen Thread starten" x-show="activeChannel !== 'email'">Neu</button>
+                                                <button type="button" class="text-xs text-[var(--ui-muted)] hover:underline" wire:click="startNewEmailThread" x-show="activeChannel === 'email'" x-cloak>Neu</button>
                                                 <button type="button" class="text-xs text-[var(--ui-muted)] hover:underline" title="(UI) Clear">Clear</button>
                                             </div>
                                         </div>
@@ -212,10 +216,45 @@
                                                     Kanal: <span x-text="activeChannelLabel"></span> <span class="text-[var(--ui-muted)] font-normal">(Demo)</span>
                                                 </div>
                                                 <div class="space-y-2">
+                                                    {{-- Email: echte Threads aus Core --}}
+                                                    <div x-show="activeChannel === 'email'" x-cloak class="space-y-2">
+                                                        @if(!empty($emailChannels))
+                                                            <x-ui-input-select
+                                                                name="activeEmailChannelId"
+                                                                label="E‑Mail Kanal"
+                                                                :options="$emailChannels"
+                                                                optionValue="id"
+                                                                optionLabel="label"
+                                                                :nullable="false"
+                                                                displayMode="dropdown"
+                                                                wire:model.live="activeEmailChannelId"
+                                                            />
+                                                        @else
+                                                            <div class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                                                Kein E‑Mail Kanal verfügbar. Bitte erst unter „Kanäle verwalten“ anlegen.
+                                                            </div>
+                                                        @endif
+
+                                                        @forelse($emailThreads as $t)
+                                                            <button
+                                                                type="button"
+                                                                wire:click="setActiveEmailThread({{ (int) $t['id'] }})"
+                                                                class="w-full text-left rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2 hover:bg-[var(--ui-muted-5)] transition"
+                                                                @if((int) $activeEmailThreadId === (int) $t['id']) style="outline: 1px solid rgba(var(--ui-primary-rgb), 0.4);" @endif
+                                                            >
+                                                                <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">{{ $t['subject'] }}</div>
+                                                                <div class="mt-0.5 text-[10px] text-[var(--ui-muted)] truncate">Thread: {{ $t['token'] }}</div>
+                                                            </button>
+                                                        @empty
+                                                            <div class="text-xs text-[var(--ui-muted)]">Noch keine Threads.</div>
+                                                        @endforelse
+                                                    </div>
+
                                                     <button type="button"
                                                         @click="selectThread(1)"
                                                         class="w-full text-left rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2 hover:bg-[var(--ui-muted-5)] transition"
                                                         :class="(!composeMode && activeThreadId === 1) ? 'ring-1 ring-[var(--ui-primary)]/40' : ''"
+                                                        x-show="activeChannel !== 'email'"
                                                     >
                                                         <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate" x-text="activeChannel === 'email' ? 'Re: Angebot – Q1' : (activeChannel === 'phone' ? 'Anrufnotiz · Termin' : 'WhatsApp · Follow-up')"></div>
                                                         <div class="mt-0.5 flex items-center justify-between gap-2">
@@ -233,6 +272,7 @@
                                                         @click="selectThread(2)"
                                                         class="w-full text-left rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2 hover:bg-[var(--ui-muted-5)] transition"
                                                         :class="(!composeMode && activeThreadId === 2) ? 'ring-1 ring-[var(--ui-primary)]/40' : ''"
+                                                        x-show="activeChannel !== 'email'"
                                                     >
                                                         <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate" x-text="activeChannel === 'email' ? 'Follow-up · Termin' : (activeChannel === 'phone' ? 'Rückruf · Frage' : 'WhatsApp · Angebot')"></div>
                                                         <div class="mt-0.5 flex items-center justify-between gap-2">
@@ -263,132 +303,61 @@
                                                     <div x-show="activeChannel==='email'" class="space-y-3" x-cloak>
                                                         <div class="text-xs text-[var(--ui-muted)] flex items-center gap-2">
                                                             <span class="px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
-                                                                Kanal: E-Mail
+                                                                Kanal: E‑Mail
                                                             </span>
-                                                            <span class="truncate">m.erren@bhgdigital.de</span>
-                                                            <span class="ml-auto text-[10px] text-[var(--ui-muted)]" x-show="composeMode">Neuer Thread</span>
+                                                            <span class="truncate">{{ $activeEmailChannelAddress ?: 'kein Kanal' }}</span>
+                                                            <span class="ml-auto text-[10px] text-[var(--ui-muted)]">
+                                                                @if(!$activeEmailThreadId) Neuer Thread @endif
+                                                            </span>
                                                         </div>
 
-                                                        {{-- inbound mail --}}
-                                                        <div class="flex justify-start" x-show="!composeMode">
-                                                            <div class="w-full max-w-4xl rounded-xl border border-[var(--ui-border)]/60 bg-white overflow-hidden">
-                                                                <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
-                                                                    <div class="flex items-start justify-between gap-3">
-                                                                        <div class="min-w-0">
-                                                                            <div class="flex items-center gap-2 min-w-0">
-                                                                                <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">Re: Angebot – Q1</div>
-                                                                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/60">
-                                                                                    Inbound
-                                                                                </span>
-                                                                            </div>
-                                                                            <div class="mt-1 text-xs text-[var(--ui-muted)] truncate">
-                                                                                <span class="font-semibold">Von:</span> Marius Erren &lt;m.erren@bhgdigital.de&gt;
-                                                                                <span class="mx-1">·</span>
-                                                                                <span class="font-semibold">An:</span> Team &lt;sales@company.de&gt;
-                                                                            </div>
-                                                                            <div class="mt-1 flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
-                                                                                <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 text-[10px] font-semibold">ME</span>
-                                                                                <span>Extern</span>
-                                                                            </div>
-                                                                        </div>
-                                                                        <div class="text-xs text-[var(--ui-muted)] whitespace-nowrap">Heute 10:41</div>
-                                                                    </div>
-                                                                </div>
-                                                                <div class="px-4 py-4 text-sm text-[var(--ui-secondary)] whitespace-pre-wrap">
-Hallo,
-
-habt ihr schon Feedback zum Angebot? Ich hätte gern nächste Woche einen Termin.
-
-Viele Grüße
-Marius
-                                                                </div>
-                                                                {{-- Attachments (UI only) --}}
-                                                                <div class="px-4 pb-4">
-                                                                    <div class="mt-1 flex flex-wrap gap-2">
-                                                                        <div class="inline-flex items-center gap-2 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2">
-                                                                            @svg('heroicon-o-paper-clip', 'w-4 h-4 text-[var(--ui-muted)]')
-                                                                            <div class="min-w-0">
-                                                                                <div class="text-xs font-semibold text-[var(--ui-secondary)] truncate">Angebot_Q1.pdf</div>
-                                                                                <div class="text-[10px] text-[var(--ui-muted)]">PDF · 312 KB</div>
-                                                                            </div>
-                                                                        </div>
-                                                                        <div class="inline-flex items-center gap-2 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2">
-                                                                            @svg('heroicon-o-paper-clip', 'w-4 h-4 text-[var(--ui-muted)]')
-                                                                            <div class="min-w-0">
-                                                                                <div class="text-xs font-semibold text-[var(--ui-secondary)] truncate">Screenshots.zip</div>
-                                                                                <div class="text-[10px] text-[var(--ui-muted)]">ZIP · 1.2 MB</div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 bg-[var(--ui-bg)] flex items-center justify-between">
-                                                                    <div class="text-xs text-[var(--ui-muted)]">Inbound</div>
-                                                                    <div class="flex items-center gap-2">
-                                                                        <button type="button" class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:underline" disabled title="(UI)">Antworten</button>
-                                                                        <button type="button" class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:underline" disabled title="(UI)">Weiterleiten</button>
-                                                                    </div>
-                                                                </div>
+                                                        @if(!$activeEmailChannelId)
+                                                            <div class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                                                                Kein E‑Mail Kanal ausgewählt/verfügbar.
                                                             </div>
-                                                        </div>
-
-                                                        {{-- outbound mail --}}
-                                                        <div class="flex justify-end" x-show="!composeMode">
-                                                            <div class="w-full max-w-4xl rounded-xl border border-[var(--ui-border)]/60 bg-[#dcf8c6] overflow-hidden">
-                                                                <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 bg-[var(--ui-bg)]/70">
-                                                                    <div class="flex items-start justify-between gap-3">
-                                                                        <div class="min-w-0">
-                                                                            <div class="flex items-center gap-2 min-w-0">
-                                                                                <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">Re: Angebot – Q1</div>
-                                                                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-white/60 text-[var(--ui-secondary)] border border-[var(--ui-border)]/60">
-                                                                                    Outbound
-                                                                                </span>
-                                                                            </div>
-                                                                            <div class="mt-1 text-xs text-[var(--ui-muted)] truncate">
-                                                                                <span class="font-semibold">Von:</span> Sales Team &lt;sales@company.de&gt;
-                                                                                <span class="mx-1">·</span>
-                                                                                <span class="font-semibold">An:</span> m.erren@bhgdigital.de
-                                                                            </div>
-                                                                            <div class="mt-1 flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
-                                                                                <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/60 border border-[var(--ui-border)]/60 text-[10px] font-semibold">MR</span>
-                                                                                <span>Gesendet von: Martin</span>
-                                                                            </div>
-                                                                        </div>
-                                                                        <div class="text-xs text-[var(--ui-muted)] whitespace-nowrap">Heute 11:02</div>
-                                                                    </div>
-                                                                </div>
-                                                                <div class="px-4 py-4 text-sm text-[var(--ui-secondary)] whitespace-pre-wrap">
-Hi Marius,
-
-ja — lass uns nächste Woche Dienstag 10:00 vorschlagen. Passt das?
-
-Viele Grüße
-                                                                </div>
-                                                                {{-- Attachments (UI only) --}}
-                                                                <div class="px-4 pb-4">
-                                                                    <div class="mt-1 flex flex-wrap gap-2">
-                                                                        <div class="inline-flex items-center gap-2 rounded-lg border border-[var(--ui-border)]/60 bg-white/60 px-3 py-2">
-                                                                            @svg('heroicon-o-paper-clip', 'w-4 h-4 text-[var(--ui-muted)]')
-                                                                            <div class="min-w-0">
-                                                                                <div class="text-xs font-semibold text-[var(--ui-secondary)] truncate">Terminvorschlag.ics</div>
-                                                                                <div class="text-[10px] text-[var(--ui-muted)]">Kalender · 4 KB</div>
+                                                        @else
+                                                            @forelse($emailTimeline as $m)
+                                                                @php
+                                                                    $isInbound = ($m['direction'] ?? '') === 'inbound';
+                                                                    $from = (string) ($m['from'] ?? '');
+                                                                    $to = (string) ($m['to'] ?? '');
+                                                                    $subject = (string) ($m['subject'] ?? '');
+                                                                    $body = (string) ($m['text'] ?? '');
+                                                                    if ($body === '' && !empty($m['html'])) {
+                                                                        $body = trim(strip_tags((string) $m['html']));
+                                                                    }
+                                                                @endphp
+                                                                <div class="flex {{ $isInbound ? 'justify-start' : 'justify-end' }}">
+                                                                    <div class="w-full max-w-4xl rounded-xl border {{ $isInbound ? 'border-[var(--ui-border)]/60' : 'border-[var(--ui-primary)]/20' }} bg-white overflow-hidden">
+                                                                        <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 {{ $isInbound ? 'bg-[var(--ui-bg)]' : 'bg-[rgba(var(--ui-primary-rgb),0.06)]' }}">
+                                                                            <div class="flex items-start justify-between gap-3">
+                                                                                <div class="min-w-0">
+                                                                                    <div class="flex items-center gap-2 min-w-0">
+                                                                                        <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">
+                                                                                            {{ $subject ?: 'Ohne Betreff' }}
+                                                                                        </div>
+                                                                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium {{ $isInbound ? 'bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/60' : 'bg-[rgba(var(--ui-primary-rgb),0.12)] text-[var(--ui-primary)] border border-[rgba(var(--ui-primary-rgb),0.18)]' }}">
+                                                                                            {{ $isInbound ? 'Inbound' : 'Outbound' }}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <div class="mt-1 text-xs text-[var(--ui-muted)] truncate">
+                                                                                        <span class="font-semibold">Von:</span> {{ $from ?: '—' }}
+                                                                                        <span class="mx-1">·</span>
+                                                                                        <span class="font-semibold">An:</span> {{ $to ?: '—' }}
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div class="text-xs text-[var(--ui-muted)] whitespace-nowrap">{{ $m['at'] ?? '' }}</div>
                                                                             </div>
                                                                         </div>
+                                                                        <div class="px-4 py-4 text-sm text-[var(--ui-secondary)] whitespace-pre-wrap">{{ $body }}</div>
                                                                     </div>
                                                                 </div>
-                                                                <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 bg-[var(--ui-bg)]/70 flex items-center justify-between">
-                                                                    <div class="text-xs text-[var(--ui-muted)]">Outbound</div>
-                                                                    <div class="flex items-center gap-2">
-                                                                        <button type="button" class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:underline" disabled title="(UI)">Erneut senden</button>
-                                                                    </div>
+                                                            @empty
+                                                                <div class="text-sm text-[var(--ui-muted)]">
+                                                                    Noch keine Nachrichten im Thread.
                                                                 </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {{-- New thread placeholder (UI only) --}}
-                                                        <div x-show="composeMode" x-cloak class="rounded-xl border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] p-4">
-                                                            <div class="text-sm font-semibold text-[var(--ui-secondary)]">Neuer E-Mail Thread</div>
-                                                            <div class="mt-1 text-sm text-[var(--ui-muted)]">Betreff + Nachricht verfassen (UI).</div>
-                                                        </div>
+                                                            @endforelse
+                                                        @endif
                                                     </div>
 
                                                     {{-- WhatsApp Verlauf (typische Bubbles) --}}
@@ -582,33 +551,39 @@ Viele Grüße
                                                     {{-- Footer UI je Kanal (nur Optik) --}}
                                                     <template x-if="activeChannel==='email'">
                                                         <div class="flex gap-2 items-end w-full">
-                                                            <button
-                                                                type="button"
-                                                                class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] opacity-60 cursor-not-allowed"
-                                                                title="Anhang hinzufügen (UI)"
-                                                                disabled
-                                                            >
-                                                                @svg('heroicon-o-paper-clip', 'w-5 h-5')
-                                                            </button>
-                                                            <input
-                                                                x-show="composeMode"
-                                                                x-cloak
-                                                                type="text"
-                                                                class="w-64 px-4 h-10 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                                                placeholder="Betreff…"
-                                                            />
-                                                            <textarea
-                                                                x-ref="emailBody"
-                                                                x-init="$nextTick(() => autoGrow($refs.emailBody))"
-                                                                @input="autoGrow($event.target)"
-                                                                @focus="autoGrow($event.target)"
-                                                                rows="1"
-                                                                class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
-                                                                :placeholder="composeMode ? 'Nachricht…' : 'Antwort…'"
-                                                            ></textarea>
-                                                            <button type="button" class="px-6 py-2 h-10 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90 flex items-center gap-2 opacity-60 cursor-not-allowed" disabled>
-                                                                <span>Senden</span>
-                                                            </button>
+                                                            <div class="flex-1 grid grid-cols-1 md:grid-cols-6 gap-2 items-end">
+                                                                <div class="md:col-span-2">
+                                                                    <x-ui-input-text
+                                                                        name="emailCompose.to"
+                                                                        label="An"
+                                                                        placeholder="empfaenger@firma.de"
+                                                                        wire:model.live="emailCompose.to"
+                                                                    />
+                                                                </div>
+                                                                <div class="md:col-span-2" x-show="{{ $activeEmailThreadId ? 'false' : 'true' }}">
+                                                                    <x-ui-input-text
+                                                                        name="emailCompose.subject"
+                                                                        label="Betreff"
+                                                                        placeholder="Betreff…"
+                                                                        wire:model.live="emailCompose.subject"
+                                                                    />
+                                                                </div>
+                                                                <div class="md:col-span-2">
+                                                                    <x-ui-input-textarea
+                                                                        name="emailCompose.body"
+                                                                        label="Nachricht"
+                                                                        rows="2"
+                                                                        placeholder="Nachricht…"
+                                                                        wire:model.live="emailCompose.body"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <x-ui-button
+                                                                variant="primary"
+                                                                size="sm"
+                                                                wire:click="sendEmail"
+                                                                wire:loading.attr="disabled"
+                                                            >Senden</x-ui-button>
                                                         </div>
                                                     </template>
                                                     <template x-if="activeChannel==='whatsapp'">

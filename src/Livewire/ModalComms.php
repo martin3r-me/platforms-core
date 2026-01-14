@@ -8,9 +8,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\QueryException;
 use Platform\Core\Enums\TeamRole;
 use Platform\Core\Models\CommsChannel;
+use Platform\Core\Models\CommsEmailThread;
+use Platform\Core\Models\CommsEmailInboundMail;
+use Platform\Core\Models\CommsEmailOutboundMail;
 use Platform\Core\Models\CommsProviderConnection;
 use Platform\Core\Models\CommsProviderConnectionDomain;
 use Platform\Core\Models\Team;
+use Platform\Core\Services\Comms\PostmarkEmailService;
 
 /**
  * UI-only Comms v2 shell (no data, no logic).
@@ -80,17 +84,302 @@ class ModalComms extends Component
 
     public ?string $channelsMessage = null;
 
+    // --- Runtime Email (Kanäle Tab) ---
+    /** @var array<int, array<string, mixed>> */
+    public array $emailChannels = [];
+    public ?int $activeEmailChannelId = null;
+    public ?string $activeEmailChannelAddress = null;
+
+    /** @var array<int, array<string, mixed>> */
+    public array $emailThreads = [];
+    public ?int $activeEmailThreadId = null;
+
+    /** @var array<int, array<string, mixed>> */
+    public array $emailTimeline = [];
+
+    /** @var array<string, mixed> */
+    public array $emailCompose = [
+        'to' => '',
+        'subject' => '',
+        'body' => '',
+    ];
+
+    public ?string $emailMessage = null;
+
     #[On('open-modal-comms')]
     public function openModal(array $payload = []): void
     {
         $this->open = true;
         $this->loadPostmarkConnection();
         $this->loadChannels();
+        $this->loadEmailRuntime();
     }
 
     public function closeModal(): void
     {
         $this->open = false;
+    }
+
+    public function loadEmailRuntime(): void
+    {
+        $this->emailMessage = null;
+        $this->emailChannels = [];
+        $this->emailThreads = [];
+        $this->emailTimeline = [];
+
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+        if (!$user || !$team) {
+            return;
+        }
+
+        /** @var Team $rootTeam */
+        $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+
+        // Channels visible to the current user:
+        // - team channels (shared)
+        // - private channels created by user
+        $channels = CommsChannel::query()
+            ->where('team_id', $rootTeam->id)
+            ->where('type', 'email')
+            ->where('provider', 'postmark')
+            ->where('is_active', true)
+            ->where(function ($q) use ($user) {
+                $q->where('visibility', 'team')
+                    ->orWhere(function ($q2) use ($user) {
+                        $q2->where('visibility', 'private')->where('created_by_user_id', $user->id);
+                    });
+            })
+            ->orderBy('visibility')
+            ->orderBy('sender_identifier')
+            ->get();
+
+        $this->emailChannels = $channels->map(fn (CommsChannel $c) => [
+            'id' => (int) $c->id,
+            'label' => (string) $c->sender_identifier,
+        ])->all();
+
+        if (!$this->activeEmailChannelId && $channels->isNotEmpty()) {
+            $this->activeEmailChannelId = (int) $channels->first()->id;
+        }
+
+        $this->refreshActiveEmailChannelLabel();
+        $this->loadEmailThreads();
+    }
+
+    public function updatedActiveEmailChannelId(): void
+    {
+        $this->refreshActiveEmailChannelLabel();
+        $this->activeEmailThreadId = null;
+        $this->emailCompose['subject'] = '';
+        $this->emailCompose['body'] = '';
+        $this->emailCompose['to'] = '';
+        $this->loadEmailThreads();
+    }
+
+    private function refreshActiveEmailChannelLabel(): void
+    {
+        $this->activeEmailChannelAddress = null;
+        if (!$this->activeEmailChannelId) {
+            return;
+        }
+        foreach ($this->emailChannels as $c) {
+            if ((int) ($c['id'] ?? 0) === (int) $this->activeEmailChannelId) {
+                $this->activeEmailChannelAddress = (string) ($c['label'] ?? null);
+                return;
+            }
+        }
+    }
+
+    public function loadEmailThreads(): void
+    {
+        $this->emailThreads = [];
+        $this->emailTimeline = [];
+
+        if (!$this->activeEmailChannelId) {
+            return;
+        }
+
+        $threads = CommsEmailThread::query()
+            ->where('comms_channel_id', $this->activeEmailChannelId)
+            ->orderByDesc('updated_at')
+            ->limit(50)
+            ->get();
+
+        $this->emailThreads = $threads->map(fn (CommsEmailThread $t) => [
+            'id' => (int) $t->id,
+            'subject' => (string) ($t->subject ?: 'Ohne Betreff'),
+            'token' => (string) $t->token,
+            'updated_at' => $t->updated_at?->toDateTimeString(),
+        ])->all();
+
+        if (!$this->activeEmailThreadId && $threads->isNotEmpty()) {
+            $this->setActiveEmailThread((int) $threads->first()->id);
+        }
+    }
+
+    public function setActiveEmailThread(int $threadId): void
+    {
+        $this->activeEmailThreadId = $threadId;
+        $this->loadEmailTimeline();
+
+        // Pre-fill "to" for reply with last inbound sender (best-effort).
+        $lastInbound = CommsEmailInboundMail::query()
+            ->where('thread_id', $threadId)
+            ->orderByDesc('received_at')
+            ->first();
+        if ($lastInbound?->from) {
+            $this->emailCompose['to'] = $this->extractEmailAddress((string) $lastInbound->from) ?: (string) $lastInbound->from;
+        }
+    }
+
+    private function extractEmailAddress(string $raw): ?string
+    {
+        if (preg_match('/<([^>]+)>/', $raw, $m)) {
+            return trim((string) ($m[1] ?? '')) ?: null;
+        }
+        if (filter_var($raw, FILTER_VALIDATE_EMAIL)) {
+            return $raw;
+        }
+        return null;
+    }
+
+    public function startNewEmailThread(): void
+    {
+        $this->activeEmailThreadId = null;
+        $this->emailTimeline = [];
+        $this->emailCompose['subject'] = '';
+        $this->emailCompose['body'] = '';
+        // keep "to" as-is
+    }
+
+    public function sendEmail(): void
+    {
+        $this->emailMessage = null;
+
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+        if (!$user || !$team) {
+            $this->emailMessage = '⛔️ Kein Team-Kontext gefunden.';
+            return;
+        }
+
+        if (!$this->activeEmailChannelId) {
+            $this->emailMessage = '⛔️ Kein E‑Mail Kanal ausgewählt.';
+            return;
+        }
+
+        $this->validate([
+            'emailCompose.to' => ['required', 'email', 'max:255'],
+            'emailCompose.body' => ['required', 'string', 'min:1'],
+            'emailCompose.subject' => [$this->activeEmailThreadId ? 'nullable' : 'required', 'string', 'max:255'],
+        ]);
+
+        $channel = CommsChannel::query()
+            ->whereKey($this->activeEmailChannelId)
+            ->where('type', 'email')
+            ->where('provider', 'postmark')
+            ->where('is_active', true)
+            ->first();
+        if (!$channel) {
+            $this->emailMessage = '⛔️ E‑Mail Kanal nicht gefunden.';
+            return;
+        }
+
+        $subject = (string) ($this->emailCompose['subject'] ?? '');
+        $isReply = false;
+        $token = null;
+
+        if ($this->activeEmailThreadId) {
+            $thread = CommsEmailThread::query()->whereKey($this->activeEmailThreadId)->first();
+            if ($thread) {
+                $subject = (string) ($thread->subject ?: $subject);
+                $token = (string) $thread->token;
+                $isReply = true;
+            }
+        }
+
+        try {
+            /** @var PostmarkEmailService $svc */
+            $svc = app(PostmarkEmailService::class);
+            $token = $svc->send(
+                $channel,
+                (string) $this->emailCompose['to'],
+                $subject ?: '(Ohne Betreff)',
+                nl2br(e((string) $this->emailCompose['body'])),
+                null,
+                [],
+                [
+                    'sender' => $user,
+                    'token' => $token,
+                    'is_reply' => $isReply,
+                ]
+            );
+        } catch (\Throwable $e) {
+            $this->emailMessage = '⛔️ Versand fehlgeschlagen: ' . $e->getMessage();
+            return;
+        }
+
+        $this->emailCompose['body'] = '';
+        if (!$this->activeEmailThreadId) {
+            $this->emailCompose['subject'] = '';
+        }
+
+        // Refresh threads & select the thread for the returned token
+        $this->loadEmailThreads();
+        if ($token) {
+            $thread = CommsEmailThread::query()
+                ->where('comms_channel_id', $channel->id)
+                ->where('token', $token)
+                ->first();
+            if ($thread) {
+                $this->setActiveEmailThread((int) $thread->id);
+            }
+        } elseif ($this->activeEmailThreadId) {
+            $this->loadEmailTimeline();
+        }
+
+        $this->emailMessage = '✅ E‑Mail gesendet.';
+    }
+
+    private function loadEmailTimeline(): void
+    {
+        $this->emailTimeline = [];
+        if (!$this->activeEmailThreadId) {
+            return;
+        }
+
+        $inbound = CommsEmailInboundMail::query()
+            ->where('thread_id', $this->activeEmailThreadId)
+            ->get()
+            ->map(fn (CommsEmailInboundMail $m) => [
+                'direction' => 'inbound',
+                'at' => $m->received_at?->toDateTimeString() ?: $m->created_at?->toDateTimeString(),
+                'from' => $m->from,
+                'to' => $m->to,
+                'subject' => $m->subject,
+                'html' => $m->html_body,
+                'text' => $m->text_body,
+            ]);
+
+        $outbound = CommsEmailOutboundMail::query()
+            ->where('thread_id', $this->activeEmailThreadId)
+            ->get()
+            ->map(fn (CommsEmailOutboundMail $m) => [
+                'direction' => 'outbound',
+                'at' => $m->sent_at?->toDateTimeString() ?: $m->created_at?->toDateTimeString(),
+                'from' => $m->from,
+                'to' => $m->to,
+                'subject' => $m->subject,
+                'html' => $m->html_body,
+                'text' => $m->text_body,
+            ]);
+
+        $this->emailTimeline = $inbound
+            ->concat($outbound)
+            ->sortBy(fn ($x) => $x['at'] ?? '')
+            ->values()
+            ->all();
     }
 
     public function canManageProviderConnections(): bool

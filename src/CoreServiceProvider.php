@@ -76,6 +76,11 @@ class CoreServiceProvider extends ServiceProvider
         $this->registerLivewireComponents();
 
         // Routes registrieren
+        // Comms Webhooks (no auth, no module guard)
+        Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
+            ->middleware(['web'])
+            ->group(__DIR__.'/../routes/comms-webhooks.php');
+
         Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
             ->middleware(['web', 'detect.module.guard'])
             ->group(__DIR__.'/../routes/guest.php');
