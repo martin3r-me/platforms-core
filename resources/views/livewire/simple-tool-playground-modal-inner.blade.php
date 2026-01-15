@@ -1419,6 +1419,10 @@
           debugState.payload = payload;
           updateDebugDump();
 
+          // Best practice: route the whole SSE stream to the thread that initiated the request.
+          // Livewire can temporarily desync the hidden input during re-renders; the request thread id is stable.
+          const requestThreadId = currentThreadId;
+
           const abortController = new AbortController();
           threadState.abortController = abortController;
           threadState.userAborted = false;
@@ -1471,6 +1475,9 @@
                   const n = parseInt(String(data?.thread_id ?? ''), 10);
                   if (Number.isFinite(n)) eventThreadId = n;
                 } catch (_) {}
+                // Fallback to the request thread id if the server doesn't include it (legacy).
+                if (eventThreadId == null && requestThreadId) eventThreadId = requestThreadId;
+
                 const st = (eventThreadId != null) ? getThreadState(eventThreadId) : threadState;
                 const visibleTid = refreshThreadIdFromDom();
                 const isVisible = (eventThreadId == null) ? true : (eventThreadId === visibleTid);
@@ -1740,6 +1747,9 @@
                     if (rtStatus) rtStatus.textContent = 'done';
                     updateDebugDump();
                     try { st.live.assistant = ''; } catch (_) {}
+                    try {
+                      appendStreamLog('complete', `\n[complete] tid=${eventThreadId || '—'} assistant_len=${(assistant || '').length} msgs=${Array.isArray(st.messages) ? st.messages.length : '—'}\n`);
+                    } catch (_) {}
                     break;
                   }
                   case 'error': {
