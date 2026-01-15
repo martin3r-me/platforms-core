@@ -67,20 +67,6 @@ class CoreServiceProvider extends ServiceProvider
         // Module ServiceProvider automatisch laden
         $this->loadModuleServiceProviders();
 
-        // Pseudo-Modul für Tool-Discovery (damit LLM "Communication" direkt findet)
-        // Hinweis: Die eigentlichen Tools bleiben in core.comms.* (Core ist immer erlaubt),
-        // aber communication.overview.GET dient als Einstiegspunkt.
-        try {
-            ModuleRegistry::register([
-                'key' => 'communication',
-                'title' => 'Communication',
-                'description' => 'Kommunikation (E‑Mail/Postmark): Kanäle, Threads, Senden, Timeline. Einstieg: communication.overview.GET',
-                'scope_type' => 'parent',
-            ]);
-        } catch (\Throwable $e) {
-            // ignore (duplicate registration etc.)
-        }
-
         // Konfigurationen veröffentlichen
         // Agent-Config Publishes entfernt – Agent ausgelagert
 

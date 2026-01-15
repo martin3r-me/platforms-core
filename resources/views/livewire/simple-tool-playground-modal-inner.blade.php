@@ -1279,6 +1279,17 @@
         document.addEventListener('livewire:update', () => {
           refreshThreadIdFromDom();
           refreshMessagesFromServerRender();
+          // After Livewire renders server history, remove any finalized bubbles that are now redundant.
+          // (Server history in chatList is the source of truth; client bubbles in pgStreamingSlot are only for streaming.)
+          try {
+            const slot = document.getElementById('pgStreamingSlot');
+            if (slot) {
+              const finalized = slot.querySelectorAll('[data-final="1"]');
+              finalized.forEach((el) => {
+                if (el.parentNode) el.parentNode.removeChild(el);
+              });
+            }
+          } catch (_) {}
           updateThreadBusyIndicators();
           updateFooterBusy();
           // Restore last event label after DOM re-render (prevents "Event: —" during active stream).

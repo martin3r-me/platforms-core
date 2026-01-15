@@ -58,6 +58,20 @@ class GetModulesTool implements ToolContract
                     ],
                 ], $modules);
             }
+
+            // Communication: Pseudo-Modul für Tool-Discovery (wie core, immer erlaubt).
+            // Die echten Tools liegen unter core.comms.*; communication.overview.GET ist nur Einstiegspunkt.
+            // WICHTIG: NICHT in ModuleRegistry registrieren (sonst landet es in DB und wird über hasAccess() geprüft).
+            // Stattdessen hier direkt hinzufügen, damit es nie über Module::hasAccess() läuft.
+            if (!isset($modules['communication'])) {
+                $modules = array_merge([
+                    'communication' => [
+                        'key' => 'communication',
+                        'title' => 'Communication',
+                        'description' => 'Kommunikation (E‑Mail/Postmark): Kanäle, Threads, Senden, Timeline. Einstieg: communication.overview.GET',
+                    ],
+                ], $modules);
+            }
             
             $result = [
                 'modules' => [],
