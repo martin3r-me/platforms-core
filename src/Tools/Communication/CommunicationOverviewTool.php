@@ -23,7 +23,7 @@ class CommunicationOverviewTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /communication/overview – Einstieg für E‑Mail Versand. Workflow: 1) core.comms.channels.GET (type=email) → 2) core.comms.email_messages.POST (send) → 3) core.comms.email_messages.GET (timeline). Für Details: core.comms.overview.GET.';
+        return 'GET /communication/overview – Einstiegspunkt für Communication-Tools. Zeigt verfügbare Tools unter core.comms.* und typische Workflows für E‑Mail Versand. REST-Parameter: keine.';
     }
 
     public function getSchema(): array

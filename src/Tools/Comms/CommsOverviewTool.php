@@ -22,7 +22,7 @@ class CommsOverviewTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /comms/overview – Schnellstart für E‑Mail Versand: channels.GET -> email_messages.POST (send) -> email_messages.GET (timeline). Root-Team Scope + Postmark.';
+        return 'GET /comms/overview – Übersicht über Communication-Tools und Workflows. Zeigt verfügbare Tools (channels, threads, messages) und typische Abläufe für E‑Mail Versand. REST-Parameter: keine.';
     }
 
     public function getSchema(): array

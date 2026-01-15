@@ -703,6 +703,7 @@
           scrollToBottom(true);
         };
 
+
         // Ephemeral UI notes (not stored, not sent to the model).
         const ensureEphemeralNotesRoot = () => {
           refreshDomRefs();
@@ -1877,14 +1878,19 @@
                     }
                     if (isVisible) {
                       // After complete: clear streaming slot completely
-                      // Livewire will render the final message in chatList
                       try {
                         const slot = document.getElementById('pgStreamingSlot');
                         if (slot) slot.innerHTML = '';
                       } catch (_) {}
                       removeStreamingMetaMessages();
-                      // Smooth scroll to show final message
-                      setTimeout(() => scrollToBottom(true), 100);
+                      // Refresh Livewire to load the final message from database
+                      try {
+                        if (window.Livewire && typeof livewireComponentId !== 'undefined') {
+                          window.Livewire.find(livewireComponentId).call('refreshMessages').catch(() => {});
+                        }
+                      } catch (_) {}
+                      // Smooth scroll to show final message after Livewire update
+                      setTimeout(() => scrollToBottom(true), 300);
                     }
                     st.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';

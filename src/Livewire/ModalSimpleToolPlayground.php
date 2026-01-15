@@ -338,6 +338,16 @@ class ModalSimpleToolPlayground extends Component
         $this->pricingSaveMessage = "✅ Default Model gesetzt: {$m->provider->key} → {$m->model_id}";
     }
 
+    /**
+     * Refresh messages after streaming completes.
+     * This method does nothing but triggers a Livewire re-render to show the new message.
+     */
+    public function refreshMessages(): void
+    {
+        // This method intentionally does nothing - it just triggers a Livewire re-render
+        // which will reload activeThreadMessages from the database
+    }
+
     public function render()
     {
         $models = CoreAiModel::query()
