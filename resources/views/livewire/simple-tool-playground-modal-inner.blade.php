@@ -1464,6 +1464,17 @@
                 let data;
                 try { data = JSON.parse(raw); } catch { data = { raw }; }
 
+                // Best practice: route all SSE UI updates by explicit thread_id (server-provided),
+                // never by DOM timing (Livewire can temporarily desync hidden inputs).
+                let eventThreadId = null;
+                try {
+                  const n = parseInt(String(data?.thread_id ?? ''), 10);
+                  if (Number.isFinite(n)) eventThreadId = n;
+                } catch (_) {}
+                const st = (eventThreadId != null) ? getThreadState(eventThreadId) : threadState;
+                const visibleTid = refreshThreadIdFromDom();
+                const isVisible = (eventThreadId == null) ? true : (eventThreadId === visibleTid);
+
                 // Always surface *every* SSE event in the footer (even if we don't have a special handler).
                 // For openai.event we still set the label inside its handler to show the upstream event name.
                 // Always reflect the raw incoming SSE event in the footer (no mapping/overwrites).
@@ -1493,47 +1504,47 @@
                       const delta = (typeof data?.delta === 'string') ? data.delta : '';
                       const full = (typeof data?.content === 'string') ? data.content : '';
                       if (delta !== '' || full !== '') {
-                        threadState.live.assistant = delta !== ''
-                          ? (threadState.live.assistant + delta)
+                        st.live.assistant = delta !== ''
+                          ? (st.live.assistant + delta)
                           : full;
-                        updateStreamingAssistantMessage(threadState.live.assistant);
+                        if (isVisible) updateStreamingAssistantMessage(st.live.assistant);
                         appendStreamLog('assistant.delta', delta !== '' ? delta : full);
                       }
-                      debugState.lastAssistant = threadState.live.assistant;
+                      debugState.lastAssistant = st.live.assistant;
                     }
                     break;
                   case 'assistant.reset':
-                    threadState.live.assistant = '';
-                    removeStreamingAssistantMessage();
+                    st.live.assistant = '';
+                    if (isVisible) removeStreamingAssistantMessage();
                     appendStreamLog('assistant.reset', '\n');
-                    if (refreshThreadIdFromDom() === currentThreadId) {
+                    if (isVisible) {
                       // Ensure element is ready for new stream
                       ensureStreamingAssistantMessage();
                     }
                     break;
                   case 'reasoning.delta':
                     if (data?.delta) {
-                      threadState.live.reasoning += data.delta;
-                      updateStreamingMetaMessage('reasoning', threadState.live.reasoning);
+                      st.live.reasoning += data.delta;
+                      if (isVisible) updateStreamingMetaMessage('reasoning', st.live.reasoning);
                       appendStreamLog('reasoning.delta', data.delta);
                     }
                     break;
                   case 'reasoning.reset':
-                    threadState.live.reasoning = '';
+                    st.live.reasoning = '';
                     const reasoningEl = document.getElementById('pgStreamingReasoningMsg');
-                    if (reasoningEl && reasoningEl.parentNode) reasoningEl.parentNode.removeChild(reasoningEl);
+                    if (isVisible && reasoningEl && reasoningEl.parentNode) reasoningEl.parentNode.removeChild(reasoningEl);
                     break;
                   case 'thinking.delta':
                     if (data?.delta) {
-                      threadState.live.thinking += data.delta;
-                      updateStreamingMetaMessage('thinking', threadState.live.thinking);
+                      st.live.thinking += data.delta;
+                      if (isVisible) updateStreamingMetaMessage('thinking', st.live.thinking);
                       appendStreamLog('thinking.delta', data.delta);
                     }
                     break;
                   case 'thinking.reset':
-                    threadState.live.thinking = '';
+                    st.live.thinking = '';
                     const thinkingEl = document.getElementById('pgStreamingThinkingMsg');
-                    if (thinkingEl && thinkingEl.parentNode) thinkingEl.parentNode.removeChild(thinkingEl);
+                    if (isVisible && thinkingEl && thinkingEl.parentNode) thinkingEl.parentNode.removeChild(thinkingEl);
                     break;
                   case 'debug.tools':
                     debugState.toolsVisible = data || null;
@@ -1703,11 +1714,7 @@
                     break;
                   }
                   case 'complete': {
-                    // Resolve the currently active thread state (Livewire can briefly desync DOM/state).
-                    const tid = refreshThreadIdFromDom();
-                    threadState = getThreadState(tid || currentThreadId || 'none');
-
-                    const assistant = data?.assistant || threadState.live.assistant || '';
+                    const assistant = data?.assistant || st.live.assistant || '';
                     const serverHistory = Array.isArray(data?.chat_history) ? data.chat_history : null;
                     if (serverHistory) {
                       const normalized = serverHistory
@@ -1717,19 +1724,22 @@
                       if (!hasAssistant && assistant) {
                         normalized.push({ role: 'assistant', content: assistant });
                       }
-                      threadState.messages = normalized;
+                      st.messages = normalized;
                     } else {
-                      threadState.messages = Array.isArray(threadState.messages) ? threadState.messages : [];
-                      threadState.messages.push({ role: 'assistant', content: assistant });
+                      st.messages = Array.isArray(st.messages) ? st.messages : [];
+                      st.messages.push({ role: 'assistant', content: assistant });
                     }
-                    removeStreamingAssistantMessage();
-                    removeStreamingMetaMessages();
-                    if (serverHistory) renderChatFromState();
-                    else renderMessage('assistant', assistant);
-                    threadState.continuation = data?.continuation || null;
+                    if (isVisible) {
+                      // Re-render the visible chat from the correct thread state.
+                      threadState = st;
+                      removeStreamingAssistantMessage();
+                      removeStreamingMetaMessages();
+                      renderChatFromState();
+                    }
+                    st.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';
                     updateDebugDump();
-                    try { threadState.live.assistant = ''; } catch (_) {}
+                    try { st.live.assistant = ''; } catch (_) {}
                     break;
                   }
                   case 'error': {
