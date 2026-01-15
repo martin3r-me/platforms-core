@@ -196,9 +196,6 @@
 
                                         <div class="p-4 space-y-3 flex-1 min-h-0 overflow-y-auto min-w-0">
                                             <div class="min-w-0">
-                                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">
-                                                    Kanal: <span x-text="activeChannelLabel"></span> <span class="text-[var(--ui-muted)] font-normal">(Demo)</span>
-                                                </div>
                                                 <div class="space-y-2">
                                                     {{-- Email: echte Threads aus Core --}}
                                                     <div x-show="activeChannel === 'email'" x-cloak class="space-y-2">
@@ -219,7 +216,20 @@
                                                                     class="w-full text-left"
                                                                 >
                                                                     <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">{{ $t['subject'] }}</div>
-                                                                    <div class="mt-0.5 text-[10px] text-[var(--ui-muted)] truncate">Thread: {{ $t['token'] }}</div>
+                                                                    <div class="mt-0.5 text-[10px] text-[var(--ui-muted)] truncate">
+                                                                        {{ $t['counterpart'] ?: '—' }}
+                                                                    </div>
+                                                                    <div class="mt-0.5 text-[10px] text-[var(--ui-muted)] flex items-center justify-between gap-2">
+                                                                        <span class="truncate">
+                                                                            {{ (int) ($t['messages_count'] ?? 0) }} Nachrichten
+                                                                            @if(!empty($t['last_direction']))
+                                                                                · {{ $t['last_direction'] === 'inbound' ? 'Inbound' : 'Outbound' }}
+                                                                            @endif
+                                                                        </span>
+                                                                        <span class="flex-shrink-0 whitespace-nowrap">
+                                                                            {{ $t['last_at'] ?? '' }}
+                                                                        </span>
+                                                                    </div>
                                                                 </button>
                                                                 <div class="mt-2 flex items-center justify-end">
                                                                     <x-ui-confirm-button

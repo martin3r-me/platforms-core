@@ -240,6 +240,7 @@ class ModalComms extends Component
 
         $threads = CommsEmailThread::query()
             ->where('comms_channel_id', $this->activeEmailChannelId)
+            ->withCount(['inboundMails', 'outboundMails'])
             ->orderByDesc('updated_at')
             ->limit(50)
             ->get();
@@ -247,8 +248,16 @@ class ModalComms extends Component
         $this->emailThreads = $threads->map(fn (CommsEmailThread $t) => [
             'id' => (int) $t->id,
             'subject' => (string) ($t->subject ?: 'Ohne Betreff'),
-            'token' => (string) $t->token,
-            'updated_at' => $t->updated_at?->toDateTimeString(),
+            'counterpart' => (string) ($t->last_inbound_from_address ?: $t->last_outbound_to_address ?: ''),
+            'messages_count' => (int) (($t->inbound_mails_count ?? 0) + ($t->outbound_mails_count ?? 0)),
+            'last_direction' => ($t->last_inbound_at && (!$t->last_outbound_at || $t->last_inbound_at->greaterThanOrEqualTo($t->last_outbound_at)))
+                ? 'inbound'
+                : (($t->last_outbound_at || $t->last_inbound_at) ? 'outbound' : null),
+            'last_at' => ($t->last_inbound_at || $t->last_outbound_at)
+                ? ((($t->last_inbound_at && (!$t->last_outbound_at || $t->last_inbound_at->greaterThanOrEqualTo($t->last_outbound_at))))
+                    ? $t->last_inbound_at?->format('d.m. H:i')
+                    : $t->last_outbound_at?->format('d.m. H:i'))
+                : ($t->updated_at?->format('d.m. H:i')),
         ])->all();
 
         if (!$this->activeEmailThreadId && $threads->isNotEmpty()) {
