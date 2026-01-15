@@ -243,16 +243,27 @@
 
                                                                     <span class="ml-auto flex items-center gap-2">
                                                                         <span class="whitespace-nowrap">{{ $t['last_at'] ?? '' }}</span>
-                                                                        <x-ui-confirm-button
-                                                                            action="deleteEmailThread"
-                                                                            :value="(int) $t['id']"
-                                                                            text=""
-                                                                            confirmText="Löschen?"
-                                                                            variant="muted-outline"
-                                                                            size="sm"
-                                                                            :icon="svg('heroicon-o-trash', 'w-4 h-4')"
-                                                                            class="!w-auto !px-2"
-                                                                        />
+                                                                        <div x-data="{ confirmDelete: false }">
+                                                                            <x-ui-button
+                                                                                variant="muted-outline"
+                                                                                size="sm"
+                                                                                class="!w-auto !px-2 h-7"
+                                                                                x-on:click="
+                                                                                    if (!confirmDelete) {
+                                                                                        confirmDelete = true;
+                                                                                        setTimeout(() => { confirmDelete = false; }, 2500);
+                                                                                    } else {
+                                                                                        $wire.call('deleteEmailThread', {{ (int) $t['id'] }});
+                                                                                    }
+                                                                                "
+                                                                                title="Thread löschen"
+                                                                            >
+                                                                                <span x-show="!confirmDelete" class="inline-flex items-center">
+                                                                                    @svg('heroicon-o-trash', 'w-4 h-4')
+                                                                                </span>
+                                                                                <span x-show="confirmDelete" x-cloak class="text-[10px] font-semibold">Löschen?</span>
+                                                                            </x-ui-button>
+                                                                        </div>
                                                                     </span>
                                                                 </div>
                                                             </div>
