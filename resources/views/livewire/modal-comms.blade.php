@@ -216,31 +216,44 @@
                                                                     class="w-full text-left"
                                                                 >
                                                                     <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">{{ $t['subject'] }}</div>
-                                                                    <div class="mt-0.5 text-[10px] text-[var(--ui-muted)] truncate">
-                                                                        {{ $t['counterpart'] ?: '—' }}
-                                                                    </div>
-                                                                    <div class="mt-0.5 text-[10px] text-[var(--ui-muted)] flex items-center justify-between gap-2">
-                                                                        <span class="truncate">
-                                                                            {{ (int) ($t['messages_count'] ?? 0) }} Nachrichten
-                                                                            @if(!empty($t['last_direction']))
-                                                                                · {{ $t['last_direction'] === 'inbound' ? 'Inbound' : 'Outbound' }}
-                                                                            @endif
+                                                                    <div class="mt-1 flex items-center gap-2 min-w-0">
+                                                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 text-[10px] font-semibold flex-shrink-0">
+                                                                            {{ strtoupper(substr((string) ($t['counterpart'] ?: '—'), 0, 1)) }}
                                                                         </span>
-                                                                        <span class="flex-shrink-0 whitespace-nowrap">
-                                                                            {{ $t['last_at'] ?? '' }}
-                                                                        </span>
+                                                                        <div class="text-[10px] text-[var(--ui-muted)] truncate">
+                                                                            {{ $t['counterpart'] ?: '—' }}
+                                                                        </div>
                                                                     </div>
                                                                 </button>
-                                                                <div class="mt-2 flex items-center justify-end">
-                                                                    <x-ui-confirm-button
-                                                                        action="deleteEmailThread"
-                                                                        :value="(int) $t['id']"
-                                                                        text="Löschen"
-                                                                        confirmText="Thread löschen?"
-                                                                        variant="muted-outline"
-                                                                        size="sm"
-                                                                        class="!w-auto"
-                                                                    />
+                                                                <div class="mt-2 flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
+                                                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-[var(--ui-border)]/60 bg-white">
+                                                                        @svg('heroicon-o-chat-bubble-left-ellipsis', 'w-3.5 h-3.5')
+                                                                        <span class="font-semibold">{{ (int) ($t['messages_count'] ?? 0) }}</span>
+                                                                    </span>
+
+                                                                    @if(!empty($t['last_direction']))
+                                                                        <span class="inline-flex items-center px-2 py-1 rounded-full border text-[10px] font-semibold
+                                                                            {{ $t['last_direction'] === 'inbound'
+                                                                                ? 'border-[rgba(var(--ui-primary-rgb),0.18)] bg-[rgba(var(--ui-primary-rgb),0.08)] text-[var(--ui-primary)]'
+                                                                                : 'border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)] text-[var(--ui-muted)]' }}
+                                                                        ">
+                                                                            {{ $t['last_direction'] === 'inbound' ? 'Inbound' : 'Outbound' }}
+                                                                        </span>
+                                                                    @endif
+
+                                                                    <span class="ml-auto flex items-center gap-2">
+                                                                        <span class="whitespace-nowrap">{{ $t['last_at'] ?? '' }}</span>
+                                                                        <x-ui-confirm-button
+                                                                            action="deleteEmailThread"
+                                                                            :value="(int) $t['id']"
+                                                                            text=""
+                                                                            confirmText="Löschen?"
+                                                                            variant="muted-outline"
+                                                                            size="sm"
+                                                                            :icon="svg('heroicon-o-trash', 'w-4 h-4')"
+                                                                            class="!w-auto !px-2"
+                                                                        />
+                                                                    </span>
                                                                 </div>
                                                             </div>
                                                         @empty
