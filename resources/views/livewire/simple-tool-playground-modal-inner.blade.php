@@ -1465,13 +1465,19 @@
 
                 switch (currentEvent) {
                   case 'assistant.delta':
-                    if (data?.delta) {
-                      threadState.live.assistant += data.delta;
-                      if (refreshThreadIdFromDom() === currentThreadId) {
-                        updateStreamingAssistantMessage(threadState.live.assistant);
+                    {
+                      const delta = (typeof data?.delta === 'string') ? data.delta : '';
+                      const full = (typeof data?.content === 'string') ? data.content : '';
+                      if (delta !== '' || full !== '') {
+                        threadState.live.assistant = delta !== ''
+                          ? (threadState.live.assistant + delta)
+                          : full;
+                        if (refreshThreadIdFromDom() === currentThreadId) {
+                          updateStreamingAssistantMessage(threadState.live.assistant);
+                        }
                       }
+                      debugState.lastAssistant = threadState.live.assistant;
                     }
-                    debugState.lastAssistant = threadState.live.assistant;
                     break;
                   case 'assistant.reset':
                     threadState.live.assistant = '';
@@ -1676,10 +1682,16 @@
                   }
                   case 'complete': {
                     const assistant = data?.assistant || threadState.live.assistant || '';
-                    threadState.messages.push({ role: 'assistant', content: assistant });
+                    const serverHistory = Array.isArray(data?.chat_history) ? data.chat_history : null;
+                    if (serverHistory) {
+                      threadState.messages = serverHistory;
+                    } else {
+                      threadState.messages.push({ role: 'assistant', content: assistant });
+                    }
                     removeStreamingAssistantMessage();
                     removeStreamingMetaMessages();
-                    renderMessage('assistant', assistant);
+                    if (serverHistory) renderChatFromState();
+                    else renderMessage('assistant', assistant);
                     threadState.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';
                     updateDebugDump();
