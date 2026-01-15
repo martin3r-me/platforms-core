@@ -607,7 +607,8 @@
 
         const renderMessage = (role, content) => {
           refreshDomRefs();
-          if (!chatList) return;
+          const root = document.getElementById('pgStreamingSlot') || chatList;
+          if (!root) return;
           const wrap = document.createElement('div');
           wrap.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
           wrap.innerHTML = `
@@ -617,7 +618,7 @@
             </div>
           `;
           wrap.querySelector('.whitespace-pre-wrap').textContent = content;
-          chatList.appendChild(wrap);
+          root.appendChild(wrap);
           const empty = document.getElementById('chatEmpty');
           if (empty) empty.style.display = 'none';
           scrollToBottom();
@@ -1272,14 +1273,12 @@
 
         refreshThreadIdFromDom();
         refreshMessagesFromServerRender();
-        renderChatFromState();
         updateThreadBusyIndicators();
         updateFooterBusy();
         let lastThreadId = currentThreadId;
         document.addEventListener('livewire:update', () => {
           refreshThreadIdFromDom();
           refreshMessagesFromServerRender();
-          renderChatFromState();
           updateThreadBusyIndicators();
           updateFooterBusy();
           // Restore last event label after DOM re-render (prevents "Event: —" during active stream).
@@ -1294,7 +1293,11 @@
             else removeStreamingAssistantMessage();
           } catch (_) {}
           if (currentThreadId !== lastThreadId) {
-            // Do NOT reset: keep per-thread state alive.
+            // When switching threads, clear the wire:ignore slot so we don't show stale client-rendered messages.
+            try {
+              const slot = document.getElementById('pgStreamingSlot');
+              if (slot) slot.innerHTML = '';
+            } catch (_) {}
             lastThreadId = currentThreadId;
           }
         });

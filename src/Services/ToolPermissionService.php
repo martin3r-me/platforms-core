@@ -30,7 +30,10 @@ class ToolPermissionService
         $moduleKey = $parts[0];
         
         // Core-Tools haben "core" als Präfix, aber sind immer erlaubt
-        if ($moduleKey === 'core' || $moduleKey === 'tools') {
+        // Zusätzlich behandeln wir "communication" als virtuelles Discovery-Modul:
+        // Die echten Comms-Tools leben unter core.comms.*; communication.* ist nur ein Einstiegspunkt
+        // und darf NICHT an Modul-Freischaltungen hängen.
+        if ($moduleKey === 'core' || $moduleKey === 'tools' || $moduleKey === 'communication') {
             return null; // Core-Tools sind immer erlaubt
         }
         
