@@ -95,6 +95,13 @@ class ModalComms extends Component
     public array $emailThreads = [];
     public ?int $activeEmailThreadId = null;
 
+    /**
+     * Remember the last active thread per email channel (comms_channel_id => comms_email_threads.id).
+     *
+     * @var array<int, int>
+     */
+    public array $lastActiveEmailThreadByChannel = [];
+
     /** @var array<int, array<string, mixed>> */
     public array $emailTimeline = [];
 
@@ -171,12 +178,41 @@ class ModalComms extends Component
     public function updatedActiveEmailChannelId(): void
     {
         $this->refreshActiveEmailChannelLabel();
-        $this->activeEmailThreadId = null;
+
+        $rememberedThreadId = (int) ($this->lastActiveEmailThreadByChannel[(int) $this->activeEmailChannelId] ?? 0);
+        $useRemembered = false;
+
         $this->emailCompose['subject'] = '';
         $this->emailCompose['body'] = '';
         $this->emailCompose['to'] = '';
+
+        // Prefer restoring the last active thread for this channel (if it still exists).
+        $this->activeEmailThreadId = null;
+        if ($rememberedThreadId > 0 && $this->activeEmailChannelId) {
+            $exists = CommsEmailThread::query()
+                ->where('comms_channel_id', $this->activeEmailChannelId)
+                ->whereKey($rememberedThreadId)
+                ->exists();
+            if ($exists) {
+                $this->activeEmailThreadId = $rememberedThreadId;
+                $useRemembered = true;
+            }
+        }
+
         $this->loadEmailThreads();
+        if ($useRemembered && $this->activeEmailThreadId) {
+            // loadEmailThreads() clears timeline; restore the remembered thread timeline explicitly
+            $this->setActiveEmailThread((int) $this->activeEmailThreadId);
+        }
         $this->dispatch('comms:scroll-bottom');
+    }
+
+    public function updatingActiveEmailChannelId($value): void
+    {
+        // Persist last active thread for the "old" channel before switching.
+        if ($this->activeEmailChannelId && $this->activeEmailThreadId) {
+            $this->lastActiveEmailThreadByChannel[(int) $this->activeEmailChannelId] = (int) $this->activeEmailThreadId;
+        }
     }
 
     private function refreshActiveEmailChannelLabel(): void

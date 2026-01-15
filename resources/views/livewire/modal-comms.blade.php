@@ -108,9 +108,6 @@
                         // Ensure scrolling works when switching threads/channels (even if content is swapped)
                         this.$watch('activeThreadId', () => this.scrollToBottom());
                         this.$watch('activeChannel', () => {
-                            // On channel change, select the first thread and exit compose mode (UI default)
-                            this.composeMode = false;
-                            this.activeThreadId = 1;
                             this.scrollToBottom();
                         });
                         this.$watch('tab', () => this.scrollToBottom());
@@ -128,70 +125,56 @@
                             <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                                 <div class="flex items-center gap-3 flex-1 min-w-0">
                                     <div class="text-xs font-semibold uppercase tracking-wide text-[var(--ui-muted)] flex-shrink-0">Kanäle</div>
-                                    {{-- Kanäle (hart codiert, nur UI) --}}
+                                    {{-- Kanäle (eine Zeile: alle E-Mail Absender + Rufnummer + WhatsApp) --}}
                                     <div class="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
-                                        <div class="relative flex-shrink-0 flex items-center">
+                                        @forelse($emailChannels as $c)
                                             <button
                                                 type="button"
-                                                @click="activeChannel = 'email'"
+                                                @click="activeChannel = 'email'; activeEmailChannelId = {{ (int) $c['id'] }};"
                                                 class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1"
-                                                :class="activeChannel === 'email'
+                                                :class="(activeChannel === 'email' && activeEmailChannelId === {{ (int) $c['id'] }})
                                                     ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
                                                     : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'"
-                                                title="Kanal: E-Mail"
+                                                title="E‑Mail Absender"
                                             >
-                                                <span class="inline-flex items-center gap-2">
-                                                    <span class="inline-flex items-center gap-1">
-                                                        @svg('heroicon-o-envelope', 'w-4 h-4')
-                                                        <span class="font-semibold">E-Mail</span>
-                                                        <span class="hidden sm:inline" :class="activeChannel === 'email' ? 'text-white/70' : 'text-[var(--ui-muted)]'">
-                                                            · {{ $activeEmailChannelAddress ?: 'kein Kanal' }}
-                                                        </span>
-                                                    </span>
-                                                </span>
-                                                <span class="hidden ml-1 w-2 h-2 rounded-full bg-white/90 animate-pulse"></span>
+                                                @svg('heroicon-o-envelope', 'w-4 h-4')
+                                                <span class="font-semibold">{{ (string) ($c['label'] ?? '') }}</span>
                                             </button>
-                                        </div>
-                                        <div class="relative flex-shrink-0 flex items-center">
-                                            <button
-                                                type="button"
-                                                @click="activeChannel = 'phone'"
-                                                class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1"
-                                                :class="activeChannel === 'phone'
-                                                    ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
-                                                    : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'"
-                                                title="Kanal: Anrufen"
-                                            >
-                                                <span class="inline-flex items-center gap-2">
-                                                    <span class="inline-flex items-center gap-1">
-                                                        @svg('heroicon-o-phone', 'w-4 h-4')
-                                                        <span class="font-semibold">Rufnummer</span>
-                                                        <span class="hidden sm:inline" :class="activeChannel === 'phone' ? 'text-white/70' : 'text-[var(--ui-muted)]'">· +49 172 123 12 14</span>
-                                                    </span>
-                                                </span>
-                                                <span class="hidden ml-1 w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
-                                            </button>
-                                        </div>
-                                        <div class="relative flex-shrink-0 flex items-center">
-                                            <button
-                                                type="button"
-                                                @click="activeChannel = 'whatsapp'"
-                                                class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1"
-                                                :class="activeChannel === 'whatsapp'
-                                                    ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
-                                                    : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'"
-                                                title="Kanal: WhatsApp"
-                                            >
-                                                <span class="inline-flex items-center gap-2">
-                                                    <span class="inline-flex items-center gap-1">
-                                                        @svg('heroicon-o-chat-bubble-left-right', 'w-4 h-4')
-                                                        <span class="font-semibold">WhatsApp</span>
-                                                        <span class="hidden sm:inline" :class="activeChannel === 'whatsapp' ? 'text-white/70' : 'text-[var(--ui-muted)]'">· +49 172 123 12 14</span>
-                                                    </span>
-                                                </span>
-                                                <span class="hidden ml-1 w-2 h-2 rounded-full bg-[var(--ui-primary)] animate-pulse"></span>
-                                            </button>
-                                        </div>
+                                        @empty
+                                            <div class="text-xs text-[var(--ui-muted)] px-2">
+                                                Kein E‑Mail Absender verfügbar.
+                                            </div>
+                                        @endforelse
+
+                                        <div class="mx-1 h-4 w-px bg-[var(--ui-border)]/60 flex-shrink-0"></div>
+
+                                        <button
+                                            type="button"
+                                            @click="activeChannel = 'phone'"
+                                            class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1"
+                                            :class="activeChannel === 'phone'
+                                                ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
+                                                : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'"
+                                            title="Kanal: Rufnummer"
+                                        >
+                                            @svg('heroicon-o-phone', 'w-4 h-4')
+                                            <span class="font-semibold">+49 172 123 12 14</span>
+                                            <span class="text-[10px]" :class="activeChannel === 'phone' ? 'text-white/70' : 'text-[var(--ui-muted)]'">(Demo)</span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            @click="activeChannel = 'whatsapp'"
+                                            class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1"
+                                            :class="activeChannel === 'whatsapp'
+                                                ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
+                                                : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'"
+                                            title="Kanal: WhatsApp"
+                                        >
+                                            @svg('heroicon-o-chat-bubble-left-right', 'w-4 h-4')
+                                            <span class="font-semibold">WhatsApp · +49 172 123 12 14</span>
+                                            <span class="text-[10px]" :class="activeChannel === 'whatsapp' ? 'text-white/70' : 'text-[var(--ui-muted)]'">(Demo)</span>
+                                        </button>
                                     </div>
                                 </div>
                                 {{-- Keep header clean (like Playground) --}}
@@ -208,7 +191,6 @@
                                             <div class="flex items-center gap-3">
                                                 <button type="button" @click="startNewThread()" class="text-xs text-[var(--ui-muted)] hover:underline" title="Neuen Thread starten" x-show="activeChannel !== 'email'">Neu</button>
                                                 <button type="button" class="text-xs text-[var(--ui-muted)] hover:underline" wire:click="startNewEmailThread" x-show="activeChannel === 'email'" x-cloak>Neu</button>
-                                                <button type="button" class="text-xs text-[var(--ui-muted)] hover:underline" title="(UI) Clear">Clear</button>
                                             </div>
                                         </div>
 
@@ -573,22 +555,17 @@
                                                             @endif
 
                                                             <div class="flex gap-2 items-end w-full">
-                                                                <div class="flex-1">
-                                                                    <textarea
-                                                                        x-ref="emailBody"
-                                                                        x-init="$nextTick(() => autoGrow($refs.emailBody))"
-                                                                        @input="autoGrow($event.target)"
-                                                                        @focus="autoGrow($event.target)"
-                                                                        @keydown.enter="if(!$event.shiftKey){ $event.preventDefault(); $wire.sendEmail(); }"
-                                                                        rows="1"
-                                                                        wire:model="emailCompose.body"
-                                                                        class="w-full px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
-                                                                        placeholder="Nachricht…"
-                                                                    ></textarea>
-                                                                    @error('emailCompose.body')
-                                                                        <div class="mt-1 text-sm text-[color:var(--ui-danger)]">{{ $message }}</div>
-                                                                    @enderror
-                                                                </div>
+                                                                <textarea
+                                                                    x-ref="emailBody"
+                                                                    x-init="$nextTick(() => autoGrow($refs.emailBody))"
+                                                                    @input="autoGrow($event.target)"
+                                                                    @focus="autoGrow($event.target)"
+                                                                    @keydown.enter="if(!$event.shiftKey){ $event.preventDefault(); $wire.sendEmail(); }"
+                                                                    rows="1"
+                                                                    wire:model="emailCompose.body"
+                                                                    class="flex-1 w-full px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
+                                                                    placeholder="Nachricht…"
+                                                                ></textarea>
                                                                 <x-ui-button
                                                                     variant="primary"
                                                                     size="md"
@@ -596,12 +573,15 @@
                                                                     wire:loading.attr="disabled"
                                                                     wire:loading.class="animate-pulse"
                                                                     wire:target="sendEmail"
-                                                                    class="h-10"
+                                                                    class="h-10 self-end"
                                                                 >
                                                                     <span wire:loading.remove wire:target="sendEmail">Senden</span>
                                                                     <span wire:loading wire:target="sendEmail">Sende…</span>
                                                                 </x-ui-button>
                                                             </div>
+                                                            @error('emailCompose.body')
+                                                                <div class="mt-1 text-sm text-[color:var(--ui-danger)]">{{ $message }}</div>
+                                                            @enderror
                                                         </div>
                                                     </template>
                                                     <template x-if="activeChannel==='whatsapp'">
