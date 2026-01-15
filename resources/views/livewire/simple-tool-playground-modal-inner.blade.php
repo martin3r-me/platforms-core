@@ -641,7 +641,9 @@
           
           setupScrollTracking();
           
-          const observeTargets = [chatList, document.getElementById('pgStreamingSlot')].filter(Boolean);
+          // Observe only chatList (server-rendered messages)
+          // Stream is only in debug panel, not in chat
+          const observeTargets = [chatList].filter(Boolean);
           if (observeTargets.length === 0) return;
           
           scrollObserver = new MutationObserver(() => {
@@ -753,42 +755,18 @@
           rtStreamLog.scrollTop = rtStreamLog.scrollHeight;
         };
 
-        // Streaming assistant message in chat (ephemeral: not persisted to DB).
+        // Streaming assistant message: NOT in chat, only in debug panel
+        // Chat will show final message after complete (rendered by Livewire)
         const ensureStreamingAssistantMessage = () => {
-          refreshDomRefs();
-          const root = document.getElementById('pgStreamingSlot') || chatList;
-          if (!root) return null;
-          let el = document.getElementById('pgStreamingAssistantMsg');
-          if (el) return el;
-          const wrap = document.createElement('div');
-          wrap.id = 'pgStreamingAssistantMsg';
-          wrap.className = 'flex justify-start';
-          wrap.innerHTML = `
-            <div class="max-w-4xl rounded-lg p-3 break-words overflow-hidden bg-[var(--ui-surface)] border border-[var(--ui-border)]">
-              <div class="text-sm font-semibold mb-1 flex items-center gap-2">
-                <span>Assistant</span>
-                  <span class="text-[10px] text-[var(--ui-muted)]" data-stream-status>(läuft)</span>
-              </div>
-              <div class="whitespace-pre-wrap break-words" data-stream-content></div>
-            </div>
-          `;
-          root.appendChild(wrap);
-          const empty = document.getElementById('chatEmpty');
-          if (empty) empty.style.display = 'none';
-          // Auto-scroll is handled by MutationObserver
-          return wrap;
+          // Do nothing - stream is only in debug panel
+          return null;
         };
         const updateStreamingAssistantMessage = (text) => {
-          const el = ensureStreamingAssistantMessage();
-          if (!el) return;
-          const c = el.querySelector('[data-stream-content]');
-          if (c) c.textContent = text || '';
-          // Smooth scroll during streaming (only if near bottom)
-          scrollToBottom();
+          // Do nothing - stream is only in debug panel
+          // The appendStreamLog function already handles debug output
         };
         const removeStreamingAssistantMessage = () => {
-          const el = document.getElementById('pgStreamingAssistantMsg');
-          if (el && el.parentNode) el.parentNode.removeChild(el);
+          // Do nothing - nothing to remove from chat
         };
 
         // Turn the current streaming assistant bubble into a "final" bubble that will not be removed
@@ -1395,12 +1373,7 @@
             const last = window.__simplePlaygroundLastEvent?.key;
             if (last) setEventLabel(last);
           } catch (_) {}
-          // Repaint streaming assistant if still running
-          try {
-            const st = getThreadState(currentThreadId || 'none');
-            if (st?.inFlight) updateStreamingAssistantMessage(st.live?.assistant || '');
-            else removeStreamingAssistantMessage();
-          } catch (_) {}
+          // Stream is only in debug panel, nothing to repaint in chat
           // Re-setup auto-scroll if needed (after Livewire re-renders DOM)
           setupAutoScroll();
           // Re-setup auto-grow for textarea (in case it was re-rendered)
@@ -1680,7 +1653,7 @@
                         st.live.assistant = delta !== ''
                           ? (st.live.assistant + delta)
                           : full;
-                        if (isVisible) updateStreamingAssistantMessage(st.live.assistant);
+                        // Stream only in debug panel, not in chat
                         appendStreamLog('assistant.delta', delta !== '' ? delta : full);
                       }
                       debugState.lastAssistant = st.live.assistant;
@@ -1688,7 +1661,7 @@
                     break;
                   case 'assistant.reset':
                     st.live.assistant = '';
-                    if (isVisible) removeStreamingAssistantMessage();
+                    // Stream only in debug panel, nothing to remove from chat
                     appendStreamLog('assistant.reset', '\n');
                     if (isVisible) {
                       // Ensure element is ready for new stream
