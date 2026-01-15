@@ -1496,9 +1496,7 @@
                         threadState.live.assistant = delta !== ''
                           ? (threadState.live.assistant + delta)
                           : full;
-                        if (refreshThreadIdFromDom() === currentThreadId) {
-                          updateStreamingAssistantMessage(threadState.live.assistant);
-                        }
+                        updateStreamingAssistantMessage(threadState.live.assistant);
                         appendStreamLog('assistant.delta', delta !== '' ? delta : full);
                       }
                       debugState.lastAssistant = threadState.live.assistant;
@@ -1516,9 +1514,7 @@
                   case 'reasoning.delta':
                     if (data?.delta) {
                       threadState.live.reasoning += data.delta;
-                      if (refreshThreadIdFromDom() === currentThreadId) {
-                        updateStreamingMetaMessage('reasoning', threadState.live.reasoning);
-                      }
+                      updateStreamingMetaMessage('reasoning', threadState.live.reasoning);
                       appendStreamLog('reasoning.delta', data.delta);
                     }
                     break;
@@ -1530,9 +1526,7 @@
                   case 'thinking.delta':
                     if (data?.delta) {
                       threadState.live.thinking += data.delta;
-                      if (refreshThreadIdFromDom() === currentThreadId) {
-                        updateStreamingMetaMessage('thinking', threadState.live.thinking);
-                      }
+                      updateStreamingMetaMessage('thinking', threadState.live.thinking);
                       appendStreamLog('thinking.delta', data.delta);
                     }
                     break;
