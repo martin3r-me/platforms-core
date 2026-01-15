@@ -20,7 +20,7 @@ class DeleteChannelTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'DELETE /comms/channels/{id} - Löscht einen Channel (soft delete). Parameter: channel_id (required), confirm=true (required), team_id (optional).';
+        return 'DELETE /comms/channels/{id} – Kanal entfernen (confirm=true). Hinweis: Senden läuft über core.comms.email_messages.POST (Postmark).';
     }
 
     public function getSchema(): array

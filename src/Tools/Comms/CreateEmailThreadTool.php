@@ -21,7 +21,7 @@ class CreateEmailThreadTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /comms/email_threads - Legt einen neuen E‑Mail Thread an (Root-Team Scope). Parameter: comms_channel_id (required), subject (optional).';
+        return 'POST /comms/email_threads – Legt einen leeren Thread an (optional). Meist reicht core.comms.email_messages.POST (erstellt Thread automatisch beim Senden).';
     }
 
     public function getSchema(): array

@@ -22,7 +22,7 @@ class CreateChannelTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /comms/channels - Legt einen neuen Kanal am Root-Team an (z.B. E-Mail Absender für Postmark). Parameter: type, provider, sender_identifier, visibility (private|team), name (optional), team_id (optional).';
+        return 'POST /comms/channels – Erstellt einen E‑Mail Absender (Postmark) fürs Senden. Danach mit core.comms.email_messages.POST E‑Mails versenden.';
     }
 
     public function getSchema(): array

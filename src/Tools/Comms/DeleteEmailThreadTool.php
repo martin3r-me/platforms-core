@@ -21,7 +21,7 @@ class DeleteEmailThreadTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'DELETE /comms/email_threads/{id} - Löscht einen E‑Mail Thread (hard delete, damit DB sauber bleibt). Parameter: thread_id (required), confirm=true (required), team_id (optional).';
+        return 'DELETE /comms/email_threads/{id} – Thread löschen/aufräumen (confirm=true). Achtung: hard delete (DB Cleanup).';
     }
 
     public function getSchema(): array

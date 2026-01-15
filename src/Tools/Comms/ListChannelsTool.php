@@ -22,7 +22,7 @@ class ListChannelsTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /comms/channels - Listet Comms-Kanäle auf, die der aktuelle User nutzen darf (Root-Team Scope). Parameter: team_id (optional), type/provider/visibility/include_inactive/include_all (optional), filters/search/sort/limit/offset (optional).';
+        return 'GET /comms/channels (Root-Team) – Absender-Kanäle für den E‑Mail Versand (Postmark). Tipp: erst channels.GET, dann core.comms.email_messages.POST zum Senden.';
     }
 
     public function getSchema(): array

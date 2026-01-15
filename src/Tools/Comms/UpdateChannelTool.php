@@ -20,7 +20,7 @@ class UpdateChannelTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'PUT /comms/channels/{id} - Aktualisiert Channel-Felder (name, visibility, is_active) im Root-Team Scope. sender_identifier/type/provider sind bewusst nicht änderbar.';
+        return 'PUT /comms/channels/{id} – Kanal pflegen (name/visibility/is_active). Für E‑Mail Versand: core.comms.channels.GET + core.comms.email_messages.POST.';
     }
 
     public function getSchema(): array

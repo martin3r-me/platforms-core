@@ -23,7 +23,7 @@ class ListEmailThreadsTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /comms/email_threads - Listet E‑Mail Threads für einen Channel auf (Root-Team Scope). Parameter: comms_channel_id (required), team_id (optional), filters/search/sort/limit/offset (optional).';
+        return 'GET /comms/email_threads – Threads zu einem Absender (comms_channel_id). Für Reply: thread_id wählen und mit core.comms.email_messages.POST senden.';
     }
 
     public function getSchema(): array

@@ -7,21 +7,23 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\CommsChannel;
+use Platform\Core\Models\CommsEmailInboundMail;
+use Platform\Core\Models\CommsEmailOutboundMail;
 use Platform\Core\Models\CommsEmailThread;
 use Platform\Core\Tools\Comms\Concerns\ResolvesCommsRootTeam;
 
-class UpdateEmailThreadTool implements ToolContract, ToolMetadataContract
+class ListEmailMessagesTool implements ToolContract, ToolMetadataContract
 {
     use ResolvesCommsRootTeam;
 
     public function getName(): string
     {
-        return 'core.comms.email_threads.PUT';
+        return 'core.comms.email_messages.GET';
     }
 
     public function getDescription(): string
     {
-        return 'PUT /comms/email_threads/{id} – Betreff ändern (nur solange der Thread noch keine Nachrichten hat). Für Versand: core.comms.email_messages.POST.';
+        return 'GET /comms/email_messages – Timeline (Inbound/Outbound) für thread_id. Nutze core.comms.email_messages.POST zum Senden/Reply.';
     }
 
     public function getSchema(): array
@@ -37,12 +39,12 @@ class UpdateEmailThreadTool implements ToolContract, ToolMetadataContract
                     'type' => 'integer',
                     'description' => 'ERFORDERLICH: Thread-ID.',
                 ],
-                'subject' => [
-                    'type' => 'string',
-                    'description' => 'ERFORDERLICH: Betreff (1..255).',
+                'include_bodies' => [
+                    'type' => 'boolean',
+                    'description' => 'Optional: Bodies mit zurückgeben (text/html). Standard: true.',
                 ],
             ],
-            'required' => ['thread_id', 'subject'],
+            'required' => ['thread_id'],
         ];
     }
 
@@ -58,11 +60,6 @@ class UpdateEmailThreadTool implements ToolContract, ToolMetadataContract
             $threadId = (int) ($arguments['thread_id'] ?? 0);
             if ($threadId <= 0) {
                 return ToolResult::error('VALIDATION_ERROR', 'thread_id ist erforderlich.');
-            }
-
-            $subject = trim((string) ($arguments['subject'] ?? ''));
-            if ($subject === '' || strlen($subject) > 255) {
-                return ToolResult::error('VALIDATION_ERROR', 'subject ist erforderlich (max. 255).');
             }
 
             $thread = CommsEmailThread::query()
@@ -83,48 +80,72 @@ class UpdateEmailThreadTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('NOT_FOUND', 'Channel zum Thread nicht gefunden.');
             }
 
-            // Access like UI:
-            // team channel: any member can read, but update is only meaningful for own/private usage;
-            // we still restrict private channels to creator/admin.
+            // Access like UI runtime:
             if ($channel->visibility === 'private' && (int) $channel->created_by_user_id !== (int) $context->user->id) {
                 if (!$this->isRootTeamAdmin($context, $rootTeam)) {
                     return ToolResult::error('ACCESS_DENIED', 'Du hast keinen Zugriff auf diesen privaten Kanal.');
                 }
             }
 
-            // Subject is immutable once mails exist.
-            if ($thread->inboundMails()->exists() || $thread->outboundMails()->exists()) {
-                return ToolResult::error('IMMUTABLE', 'Der Betreff kann nicht mehr geändert werden, sobald der Thread Nachrichten enthält.');
-            }
+            $includeBodies = array_key_exists('include_bodies', $arguments) ? (bool) $arguments['include_bodies'] : true;
 
-            $thread->subject = $subject;
-            $thread->save();
+            $inbound = CommsEmailInboundMail::query()
+                ->where('thread_id', $threadId)
+                ->get()
+                ->map(fn (CommsEmailInboundMail $m) => [
+                    'direction' => 'inbound',
+                    'at' => $m->received_at?->toIso8601String() ?: $m->created_at?->toIso8601String(),
+                    'from' => $m->from,
+                    'to' => $m->to,
+                    'subject' => $m->subject,
+                    'text' => $includeBodies ? $m->text_body : null,
+                    'html' => $includeBodies ? $m->html_body : null,
+                ]);
+
+            $outbound = CommsEmailOutboundMail::query()
+                ->where('thread_id', $threadId)
+                ->get()
+                ->map(fn (CommsEmailOutboundMail $m) => [
+                    'direction' => 'outbound',
+                    'at' => $m->sent_at?->toIso8601String() ?: $m->created_at?->toIso8601String(),
+                    'from' => $m->from,
+                    'to' => $m->to,
+                    'subject' => $m->subject,
+                    'text' => $includeBodies ? $m->text_body : null,
+                    'html' => $includeBodies ? $m->html_body : null,
+                ]);
+
+            $timeline = $inbound
+                ->concat($outbound)
+                ->sortBy(fn ($x) => $x['at'] ?? '')
+                ->values()
+                ->all();
 
             return ToolResult::success([
                 'thread' => [
                     'id' => (int) $thread->id,
-                    'comms_channel_id' => (int) $thread->comms_channel_id,
                     'token' => (string) $thread->token,
                     'subject' => (string) ($thread->subject ?: 'Ohne Betreff'),
-                    'updated_at' => $thread->updated_at?->toIso8601String(),
+                    'comms_channel_id' => (int) $thread->comms_channel_id,
                 ],
-                'message' => 'Thread aktualisiert.',
+                'messages' => $timeline,
+                'count' => count($timeline),
             ]);
         } catch (\Throwable $e) {
-            return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Aktualisieren des Threads: ' . $e->getMessage());
+            return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Laden der Timeline: ' . $e->getMessage());
         }
     }
 
     public function getMetadata(): array
     {
         return [
-            'read_only' => false,
-            'category' => 'action',
-            'tags' => ['comms', 'email', 'threads', 'update'],
-            'risk_level' => 'write',
+            'category' => 'query',
+            'tags' => ['comms', 'email', 'messages', 'timeline'],
+            'read_only' => true,
             'requires_auth' => true,
             'requires_team' => true,
-            'idempotent' => false,
+            'risk_level' => 'safe',
+            'idempotent' => true,
         ];
     }
 }
