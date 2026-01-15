@@ -75,10 +75,26 @@ class GetContextTool implements ToolContract
                     ?? ($user?->currentTeam ?? null);
 
                 $registered = ModuleRegistry::all(); // key => config
+                
+                // Pseudo-Module, die immer erlaubt sind (ohne DB-Prüfung)
+                $alwaysAllowed = ['core', 'tools', 'communication'];
+                
                 foreach ($registered as $key => $cfg) {
-                    if (!is_string($key) || $key === '' || $key === 'core' || $key === 'tools') {
+                    if (!is_string($key) || $key === '') {
                         continue;
                     }
+                    
+                    // Core/Tools/Communication: Immer erlauben (keine DB-Prüfung)
+                    if (in_array($key, $alwaysAllowed, true)) {
+                        $title = is_array($cfg) ? ($cfg['title'] ?? null) : null;
+                        $entry = ['key' => $key];
+                        if (is_string($title) && $title !== '') {
+                            $entry['title'] = $title;
+                        }
+                        $allowed[] = $entry;
+                        continue;
+                    }
+                    
                     $title = is_array($cfg) ? ($cfg['title'] ?? null) : null;
 
                     $hasAccess = false;
@@ -107,6 +123,15 @@ class GetContextTool implements ToolContract
                     } else {
                         $denied[] = $entry;
                     }
+                }
+                
+                // Communication explizit hinzufügen (falls nicht in ModuleRegistry)
+                // (wird in GetModulesTool auch so gehandhabt)
+                if (!isset($registered['communication'])) {
+                    $allowed[] = [
+                        'key' => 'communication',
+                        'title' => 'Communication',
+                    ];
                 }
 
                 $result['modules'] = [
