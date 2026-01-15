@@ -1473,6 +1473,14 @@
                     }
                     debugState.lastAssistant = threadState.live.assistant;
                     break;
+                  case 'assistant.reset':
+                    threadState.live.assistant = '';
+                    removeStreamingAssistantMessage();
+                    if (refreshThreadIdFromDom() === currentThreadId) {
+                      // Ensure element is ready for new stream
+                      ensureStreamingAssistantMessage();
+                    }
+                    break;
                   case 'reasoning.delta':
                     if (data?.delta) {
                       threadState.live.reasoning += data.delta;
@@ -1481,6 +1489,11 @@
                       }
                     }
                     break;
+                  case 'reasoning.reset':
+                    threadState.live.reasoning = '';
+                    const reasoningEl = document.getElementById('pgStreamingReasoningMsg');
+                    if (reasoningEl && reasoningEl.parentNode) reasoningEl.parentNode.removeChild(reasoningEl);
+                    break;
                   case 'thinking.delta':
                     if (data?.delta) {
                       threadState.live.thinking += data.delta;
@@ -1488,6 +1501,11 @@
                         updateStreamingMetaMessage('thinking', threadState.live.thinking);
                       }
                     }
+                    break;
+                  case 'thinking.reset':
+                    threadState.live.thinking = '';
+                    const thinkingEl = document.getElementById('pgStreamingThinkingMsg');
+                    if (thinkingEl && thinkingEl.parentNode) thinkingEl.parentNode.removeChild(thinkingEl);
                     break;
                   case 'debug.tools':
                     debugState.toolsVisible = data || null;
