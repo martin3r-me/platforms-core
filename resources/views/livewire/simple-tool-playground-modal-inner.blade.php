@@ -1394,6 +1394,11 @@
             // Smooth scroll to bottom after thread switch
             setTimeout(() => scrollToBottom(true), 150);
           }
+          // Scroll after Livewire update if flag is set (e.g., after complete event)
+          if (window.__simplePlaygroundShouldScrollAfterUpdate) {
+            window.__simplePlaygroundShouldScrollAfterUpdate = false;
+            setTimeout(() => scrollToBottom(true), 100);
+          }
         });
 
         // Iterations: keep high defaults; allow user override via localStorage.
@@ -1884,13 +1889,14 @@
                       } catch (_) {}
                       removeStreamingMetaMessages();
                       // Refresh Livewire to load the final message from database
+                      // Note: Debug window is NOT cleared here - it will be cleared on next send
                       try {
                         if (window.Livewire && typeof livewireComponentId !== 'undefined') {
+                          // Set a flag to scroll after Livewire update
+                          window.__simplePlaygroundShouldScrollAfterUpdate = true;
                           window.Livewire.find(livewireComponentId).call('refreshMessages').catch(() => {});
                         }
                       } catch (_) {}
-                      // Smooth scroll to show final message after Livewire update
-                      setTimeout(() => scrollToBottom(true), 300);
                     }
                     st.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';
