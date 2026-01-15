@@ -1893,15 +1893,15 @@
                         if (slot) slot.innerHTML = '';
                       } catch (_) {}
                       removeStreamingMetaMessages();
-                      // Refresh Livewire to load the final message from database
                       // Note: Debug window is NOT cleared here - it will be cleared on next send
-                      try {
-                        if (window.Livewire && typeof livewireComponentId !== 'undefined') {
-                          // Set a flag to scroll after Livewire update
-                          window.__simplePlaygroundShouldScrollAfterUpdate = true;
-                          window.Livewire.find(livewireComponentId).call('refreshMessages').catch(() => {});
-                        }
-                      } catch (_) {}
+                      // Note: We don't call refreshMessages() here - Livewire will automatically update
+                      // when the message is saved to DB. We just need to scroll after Livewire updates.
+                      // Set a flag to scroll after Livewire update (when message appears in chatList)
+                      window.__simplePlaygroundShouldScrollAfterUpdate = true;
+                      // Also try scrolling immediately in case Livewire already updated
+                      setTimeout(() => {
+                        scrollToBottom(true);
+                      }, 100);
                     }
                     st.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';
