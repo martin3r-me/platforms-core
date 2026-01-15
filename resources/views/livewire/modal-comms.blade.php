@@ -247,7 +247,7 @@
                                                                             <x-ui-button
                                                                                 variant="muted-outline"
                                                                                 size="sm"
-                                                                                class="!w-auto !px-2 h-7"
+                                                                                class="!w-auto !px-2 !py-1 h-6"
                                                                                 x-on:click="
                                                                                     if (!confirmDelete) {
                                                                                         confirmDelete = true;
@@ -259,7 +259,7 @@
                                                                                 title="Thread löschen"
                                                                             >
                                                                                 <span x-show="!confirmDelete" class="inline-flex items-center">
-                                                                                    @svg('heroicon-o-trash', 'w-4 h-4')
+                                                                                    @svg('heroicon-o-trash', 'w-3.5 h-3.5')
                                                                                 </span>
                                                                                 <span x-show="confirmDelete" x-cloak class="text-[10px] font-semibold">Löschen?</span>
                                                                             </x-ui-button>
