@@ -594,27 +594,61 @@
           el.style.overflowY = (el.scrollHeight > maxPx) ? 'auto' : 'hidden';
         };
 
-        // Best practice: MutationObserver for auto-scroll (no delays, no manual calls needed)
+        // Smart auto-scroll: only scroll if user is near bottom (don't interrupt manual scrolling)
+        let isUserScrolling = false;
+        let scrollTimeout = null;
+        const checkIfNearBottom = () => {
+          if (!chatScroll) return false;
+          const threshold = 100; // pixels from bottom
+          const distance = chatScroll.scrollHeight - chatScroll.scrollTop - chatScroll.clientHeight;
+          return distance < threshold;
+        };
+        
+        const scrollToBottom = (smooth = false) => {
+          refreshDomRefs();
+          if (!chatScroll) return;
+          // Only auto-scroll if user is near bottom (don't interrupt manual scrolling)
+          if (!checkIfNearBottom() && !smooth) return;
+          
+          requestAnimationFrame(() => {
+            if (!chatScroll) return;
+            if (smooth) {
+              chatScroll.scrollTo({ top: chatScroll.scrollHeight, behavior: 'smooth' });
+            } else {
+              chatScroll.scrollTop = chatScroll.scrollHeight;
+            }
+          });
+        };
+        
+        // Track user scrolling to avoid interrupting
+        const setupScrollTracking = () => {
+          if (!chatScroll) return;
+          chatScroll.addEventListener('scroll', () => {
+            isUserScrolling = true;
+            if (scrollTimeout) clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+              isUserScrolling = false;
+            }, 1000);
+          });
+        };
+        
+        // MutationObserver for auto-scroll (only when user is near bottom)
         let scrollObserver = null;
         const setupAutoScroll = () => {
-          if (scrollObserver) return; // Already set up
+          if (scrollObserver) return;
           refreshDomRefs();
           if (!chatScroll) return;
           
-          const scrollToBottom = () => {
-            if (!chatScroll) return;
-            requestAnimationFrame(() => {
-              if (!chatScroll) return;
-              chatScroll.scrollTop = chatScroll.scrollHeight;
-            });
-          };
+          setupScrollTracking();
           
-          // Observe both chatList (server-rendered) and pgStreamingSlot (client-rendered)
           const observeTargets = [chatList, document.getElementById('pgStreamingSlot')].filter(Boolean);
           if (observeTargets.length === 0) return;
           
           scrollObserver = new MutationObserver(() => {
-            scrollToBottom();
+            // Only auto-scroll if user is near bottom
+            if (!isUserScrolling || checkIfNearBottom()) {
+              scrollToBottom();
+            }
           });
           
           observeTargets.forEach(target => {
@@ -623,16 +657,6 @@
               subtree: true,
               characterData: true
             });
-          });
-        };
-        
-        const scrollToBottom = () => {
-          // Legacy function for manual scrolls (will be replaced by MutationObserver)
-          refreshDomRefs();
-          if (!chatScroll) return;
-          requestAnimationFrame(() => {
-            if (!chatScroll) return;
-            chatScroll.scrollTop = chatScroll.scrollHeight;
           });
         };
         
@@ -651,34 +675,30 @@
           return `${m}m ${String(rs).padStart(2, '0')}s`;
         };
 
-        const renderMessage = (role, content) => {
-          // IMPORTANT: User messages are rendered server-side by Livewire.
-          // Only render assistant messages client-side (for errors, warnings, etc.)
-          // Streaming assistant messages are handled separately via ensureStreamingAssistantMessage.
-          if (role === 'user') {
-            // User messages: Don't render client-side - Livewire will render them in chatList
-            // Just update the empty state
-            const empty = document.getElementById('chatEmpty');
-            if (empty) empty.style.display = 'none';
-            return;
-          }
-          
-          // Only render assistant messages client-side (errors, warnings, etc.)
+        const renderMessage = (role, content, temporary = false) => {
+          // Render messages in pgStreamingSlot (wire:ignore) for immediate feedback
+          // These will be removed when Livewire renders the server-side version
           refreshDomRefs();
           const root = document.getElementById('pgStreamingSlot');
           if (!root) return;
+          
           const wrap = document.createElement('div');
-          wrap.className = 'flex justify-start';
+          wrap.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+          if (temporary) wrap.dataset.temporary = '1'; // Mark as temporary (will be removed by Livewire)
           wrap.innerHTML = `
-            <div class="max-w-4xl rounded-lg p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]">
-              <div class="text-sm font-semibold mb-1">Assistant</div>
-              <div class="whitespace-pre-wrap"></div>
+            <div class="max-w-4xl rounded-lg p-3 break-words overflow-hidden ${role === 'user' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-surface)] border border-[var(--ui-border)]'}">
+              <div class="text-sm font-semibold mb-1">${role === 'user' ? 'Du' : 'Assistant'}</div>
+              <div class="whitespace-pre-wrap break-words"></div>
             </div>
           `;
           wrap.querySelector('.whitespace-pre-wrap').textContent = content;
           root.appendChild(wrap);
+          
           const empty = document.getElementById('chatEmpty');
           if (empty) empty.style.display = 'none';
+          
+          // Smooth scroll to bottom
+          scrollToBottom(true);
         };
 
         // Ephemeral UI notes (not stored, not sent to the model).
@@ -763,7 +783,8 @@
           if (!el) return;
           const c = el.querySelector('[data-stream-content]');
           if (c) c.textContent = text || '';
-          // Auto-scroll is handled by MutationObserver
+          // Smooth scroll during streaming (only if near bottom)
+          scrollToBottom();
         };
         const removeStreamingAssistantMessage = () => {
           const el = document.getElementById('pgStreamingAssistantMsg');
@@ -1333,7 +1354,7 @@
         refreshMessagesFromServerRender();
         updateThreadBusyIndicators();
         updateFooterBusy();
-        // Setup auto-scroll observer (best practice: no delays)
+        // Setup auto-scroll observer (smart: only scrolls if user is near bottom)
         setupAutoScroll();
         // Setup auto-grow for textarea (adapted from comms modal)
         if (input && input.tagName === 'TEXTAREA' && !input.dataset.autoGrowBound) {
@@ -1344,30 +1365,26 @@
           input.addEventListener('focus', (e) => autoGrow(e.target));
           input.dataset.autoGrowBound = '1';
         }
-        // Initial scroll after setup
-        requestAnimationFrame(() => scrollToBottom());
+        // Initial smooth scroll after setup
+        setTimeout(() => scrollToBottom(true), 200);
         let lastThreadId = currentThreadId;
         document.addEventListener('livewire:update', () => {
           refreshThreadIdFromDom();
           refreshMessagesFromServerRender();
-          // After Livewire renders server history, remove any finalized bubbles and user messages that are now redundant.
-          // (Server history in chatList is the source of truth; client bubbles in pgStreamingSlot are only for streaming.)
+          // After Livewire renders server history, remove all temporary messages from pgStreamingSlot.
+          // (Server history in chatList is the source of truth; pgStreamingSlot is only for streaming.)
           try {
             const slot = document.getElementById('pgStreamingSlot');
             if (slot) {
+              // Remove all temporary messages (marked with data-temporary="1")
+              const temporary = slot.querySelectorAll('[data-temporary="1"]');
+              temporary.forEach((el) => {
+                if (el.parentNode) el.parentNode.removeChild(el);
+              });
               // Remove finalized assistant messages (they're now in chatList)
               const finalized = slot.querySelectorAll('[data-final="1"]');
               finalized.forEach((el) => {
                 if (el.parentNode) el.parentNode.removeChild(el);
-              });
-              // Remove user messages (they're now in chatList via Livewire)
-              // User messages have justify-end class and are not the streaming assistant message
-              const userMessages = slot.querySelectorAll('.flex.justify-end');
-              userMessages.forEach((el) => {
-                // Only remove if it's not the streaming assistant message (which has justify-start)
-                if (el.id !== 'pgStreamingAssistantMsg' && el.parentNode) {
-                  el.parentNode.removeChild(el);
-                }
               });
             }
           } catch (_) {}
@@ -1400,8 +1417,8 @@
               if (slot) slot.innerHTML = '';
             } catch (_) {}
             lastThreadId = currentThreadId;
-            // Scroll after thread switch (auto-scroll observer will handle subsequent updates)
-            requestAnimationFrame(() => scrollToBottom());
+            // Smooth scroll to bottom after thread switch
+            setTimeout(() => scrollToBottom(true), 150);
           }
         });
 
@@ -1497,16 +1514,13 @@
 
           if (!isContinue) {
             threadState.messages.push({ role: 'user', content: text });
-            // User messages are rendered server-side by Livewire - don't render client-side
-            // Just update empty state
-            const empty = document.getElementById('chatEmpty');
-            if (empty) empty.style.display = 'none';
+            // Render user message immediately for smooth UX (temporary - will be replaced by Livewire)
+            renderMessage('user', text, true);
             // Remember what we just added, so we can revert it on Abort (and avoid polluting DB/history).
             try {
               refreshDomRefs();
               threadState._lastSentUserContent = text;
               threadState._lastSentUserIndex = (threadState.messages?.length || 1) - 1;
-              threadState._lastSentUserEl = chatList?.lastElementChild || null;
             } catch (_) {}
             input.value = '';
             // Reset textarea height after sending (auto-grow will shrink it back)
@@ -1889,11 +1903,15 @@
                       st.messages.push({ role: 'assistant', content: assistant });
                     }
                     if (isVisible) {
-                      // Best practice with Livewire: keep server chat list server-owned.
-                      // Promote the streaming bubble (wire:ignore) to a final bubble.
-                      finalizeStreamingAssistantMessage(assistant);
+                      // After complete: clear streaming slot completely
+                      // Livewire will render the final message in chatList
+                      try {
+                        const slot = document.getElementById('pgStreamingSlot');
+                        if (slot) slot.innerHTML = '';
+                      } catch (_) {}
                       removeStreamingMetaMessages();
-                      // Auto-scroll is handled by MutationObserver
+                      // Smooth scroll to show final message
+                      setTimeout(() => scrollToBottom(true), 100);
                     }
                     st.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';

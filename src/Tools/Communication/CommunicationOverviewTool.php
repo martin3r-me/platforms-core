@@ -30,12 +30,7 @@ class CommunicationOverviewTool implements ToolContract, ToolMetadataContract
     {
         return [
             'type' => 'object',
-            'properties' => [
-                'goal' => [
-                    'type' => 'string',
-                    'description' => 'Optional: Ziel/Use-Case (z.B. "Sende eine E‑Mail", "Liste Threads").',
-                ],
-            ],
+            'properties' => [],
             'required' => [],
         ];
     }
@@ -43,7 +38,6 @@ class CommunicationOverviewTool implements ToolContract, ToolMetadataContract
     public function execute(array $arguments, ToolContext $context): ToolResult
     {
         return ToolResult::success([
-            'goal' => $arguments['goal'] ?? null,
             'hint' => 'Die echten Comms-Tools liegen unter core.comms.* (Root-Team Scope, Postmark Credentials in DB).',
             'start_here' => [
                 'overview' => 'core.comms.overview.GET',

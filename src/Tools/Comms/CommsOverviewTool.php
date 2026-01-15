@@ -29,12 +29,7 @@ class CommsOverviewTool implements ToolContract, ToolMetadataContract
     {
         return [
             'type' => 'object',
-            'properties' => [
-                'note' => [
-                    'type' => 'string',
-                    'description' => 'Optional: Freitext, wofür der Überblick benötigt wird (wird nur zurückgespiegelt).',
-                ],
-            ],
+            'properties' => [],
             'required' => [],
         ];
     }
@@ -42,7 +37,6 @@ class CommsOverviewTool implements ToolContract, ToolMetadataContract
     public function execute(array $arguments, ToolContext $context): ToolResult
     {
         return ToolResult::success([
-            'note' => $arguments['note'] ?? null,
             'capabilities' => [
                 'channels' => [
                     'purpose' => 'Sender-IDs (z.B. E‑Mail Absender) am Root-Team, inkl. Sichtbarkeit (private/team).',

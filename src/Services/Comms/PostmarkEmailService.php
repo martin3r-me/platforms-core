@@ -111,8 +111,23 @@ class PostmarkEmailService
 
         // 5) Send via Postmark (always send conversation token header)
         // NOTE: postmark-php expects an associative array; it converts to [{Name,Value}, ...] internally.
+        // Build RFC 5322 compliant headers for best deliverability
+        $senderEmail = $this->extractEmailAddress($channel->sender_identifier) ?: $channel->sender_identifier;
+        $messageIdDomain = substr(strrchr($senderEmail, '@'), 1) ?: 'postmark';
+        
+        // Generate RFC 5322 compliant Message-ID: <unique-id@domain>
+        // Format: timestamp + ULID for uniqueness, using sender domain for better alignment
+        $messageId = '<' . time() . '.' . Str::ulid()->toBase32() . '@' . $messageIdDomain . '>';
+        
+        // Best practice headers for deliverability (especially Microsoft 365/Outlook)
+        // - Message-ID: Required for threading and spam filtering (RFC 5322)
+        // - MIME-Version: Required when using MIME features (multipart, HTML, attachments)
+        // - Date: Postmark sets this automatically, but explicit is better
+        // Note: Content-Type is automatically set by Postmark based on HtmlBody/TextBody/Attachments
         $headersArray = [
             'X-Conversation-Token' => $token,
+            'Message-ID' => $messageId,
+            'MIME-Version' => '1.0',
         ];
 
         $fromName = null;
