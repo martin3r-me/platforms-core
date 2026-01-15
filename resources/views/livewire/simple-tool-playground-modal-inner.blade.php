@@ -112,6 +112,9 @@
                                     @endforeach
                                 </div>
 
+                                {{-- Streaming output lives outside Livewire diffing to prevent wipes. --}}
+                                <div id="pgStreamingSlot" class="space-y-4 min-w-0" wire:ignore></div>
+
                                 {{-- Ephemeral (UI-only) notes + streaming meta (JS renders here; not persisted, not sent as chat_history). --}}
                                 <div id="pgEphemeralNotes" class="space-y-3"></div>
 
@@ -675,7 +678,8 @@
         // Streaming assistant message in chat (ephemeral: not persisted to DB).
         const ensureStreamingAssistantMessage = () => {
           refreshDomRefs();
-          if (!chatList) return null;
+          const root = document.getElementById('pgStreamingSlot') || chatList;
+          if (!root) return null;
           let el = document.getElementById('pgStreamingAssistantMsg');
           if (el) return el;
           const wrap = document.createElement('div');
@@ -690,7 +694,7 @@
               <div class="whitespace-pre-wrap break-words" data-stream-content></div>
             </div>
           `;
-          chatList.appendChild(wrap);
+          root.appendChild(wrap);
           const empty = document.getElementById('chatEmpty');
           if (empty) empty.style.display = 'none';
           scrollToBottom();
@@ -710,7 +714,8 @@
         // Streaming reasoning/thinking as ephemeral chat messages (not persisted, not sent as chat_history).
         const ensureStreamingMetaMessage = (kind) => {
           refreshDomRefs();
-          if (!chatList) return null;
+          const root = document.getElementById('pgStreamingSlot') || chatList;
+          if (!root) return null;
           const id = kind === 'reasoning' ? 'pgStreamingReasoningMsg' : 'pgStreamingThinkingMsg';
           const label = kind === 'reasoning' ? 'Reasoning' : 'Thinking';
           let el = document.getElementById(id);
@@ -727,7 +732,7 @@
               <div class="whitespace-pre-wrap break-words text-[11px] text-[var(--ui-secondary)]" data-stream-content></div>
             </div>
           `;
-          chatList.appendChild(wrap);
+          root.appendChild(wrap);
           const empty = document.getElementById('chatEmpty');
           if (empty) empty.style.display = 'none';
           scrollToBottom();
