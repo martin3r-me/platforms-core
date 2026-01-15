@@ -73,17 +73,28 @@ class CommsOverviewTool implements ToolContract, ToolMetadataContract
             'typical_flows' => [
                 [
                     'name' => 'E‑Mail senden (neuer Thread)',
+                    'description' => 'Schritt-für-Schritt:',
                     'steps' => [
-                        '1) core.comms.channels.GET (type=email, provider=postmark) -> comms_channel_id wählen',
-                        '2) core.comms.email_messages.POST { comms_channel_id, to, subject, body }',
-                        '3) core.comms.email_messages.GET { thread_id } (optional)',
+                        '1) core.comms.channels.GET { type: "email", provider: "postmark" } → wähle eine comms_channel_id aus dem Ergebnis',
+                        '2) core.comms.email_messages.POST { comms_channel_id: <id>, to: "empfaenger@example.com", subject: "Betreff", body: "Nachrichtentext" }',
+                        '3) Optional: core.comms.email_messages.GET { thread_id: <id> } um die Timeline zu sehen',
+                    ],
+                    'example' => [
+                        'channels_get' => 'core.comms.channels.GET({ type: "email", provider: "postmark" })',
+                        'send_post' => 'core.comms.email_messages.POST({ comms_channel_id: 1, to: "test@example.com", subject: "Test", body: "Hallo" })',
                     ],
                 ],
                 [
-                    'name' => 'E‑Mail senden (reply)',
+                    'name' => 'E‑Mail senden (Reply)',
+                    'description' => 'Antwort auf bestehenden Thread:',
                     'steps' => [
-                        '1) core.comms.email_threads.GET { comms_channel_id } -> thread_id wählen',
-                        '2) core.comms.email_messages.POST { thread_id, body } (to/subject werden aus Thread-Rollups abgeleitet)',
+                        '1) core.comms.email_threads.GET { comms_channel_id: <id> } → wähle eine thread_id aus',
+                        '2) core.comms.email_messages.POST { thread_id: <id>, body: "Antworttext" }',
+                        'Hinweis: to und subject werden automatisch aus dem Thread übernommen (keine Angabe nötig)',
+                    ],
+                    'example' => [
+                        'threads_get' => 'core.comms.email_threads.GET({ comms_channel_id: 1 })',
+                        'reply_post' => 'core.comms.email_messages.POST({ thread_id: 5, body: "Meine Antwort" })',
                     ],
                 ],
             ],

@@ -22,7 +22,7 @@ class ListChannelsTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /comms/channels (Root-Team) – Absender-Kanäle für den E‑Mail Versand (Postmark). Tipp: erst channels.GET, dann core.comms.email_messages.POST zum Senden.';
+        return 'GET /comms/channels – Liste verfügbarer E‑Mail Absender (Postmark). Nutze die comms_channel_id aus dem Ergebnis für core.comms.email_messages.POST. Filter: type=email, provider=postmark.';
     }
 
     public function getSchema(): array

@@ -23,7 +23,7 @@ class SendEmailMessageTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /comms/email_messages – E‑Mail senden via Postmark. Neu: comms_channel_id+to+subject+body. Reply: thread_id+body (to/subject werden aus Thread/Inbound abgeleitet).';
+        return 'POST /comms/email_messages – E‑Mail senden (Postmark). NEUER THREAD: { comms_channel_id, to, subject, body } (alle 4 erforderlich). REPLY: { thread_id, body } (to/subject automatisch aus Thread).';
     }
 
     public function getSchema(): array
@@ -37,23 +37,23 @@ class SendEmailMessageTool implements ToolContract, ToolMetadataContract
                 ],
                 'comms_channel_id' => [
                     'type' => 'integer',
-                    'description' => 'Optional: Channel-ID (required für neuen Thread).',
+                    'description' => 'ERFORDERLICH für neuen Thread. Hole verfügbare Channels mit core.comms.channels.GET. Ignoriere für Reply (nutze thread_id).',
                 ],
                 'thread_id' => [
                     'type' => 'integer',
-                    'description' => 'Optional: Thread-ID (wenn reply).',
+                    'description' => 'ERFORDERLICH für Reply. Ignoriere für neuen Thread (nutze comms_channel_id+to+subject).',
                 ],
                 'to' => [
                     'type' => 'string',
-                    'description' => 'Required für neuen Thread. Optional für reply (wird sonst aus last_inbound_from_address abgeleitet).',
+                    'description' => 'ERFORDERLICH für neuen Thread (E‑Mail Adresse). Bei Reply optional (wird automatisch aus Thread abgeleitet).',
                 ],
                 'subject' => [
                     'type' => 'string',
-                    'description' => 'Required für neuen Thread. Optional für reply (wird sonst aus Thread.subject abgeleitet).',
+                    'description' => 'ERFORDERLICH für neuen Thread. Bei Reply optional (wird automatisch aus Thread.subject übernommen).',
                 ],
                 'body' => [
                     'type' => 'string',
-                    'description' => 'ERFORDERLICH: Nachrichtentext.',
+                    'description' => 'ERFORDERLICH: Nachrichtentext (Plaintext, wird automatisch zu HTML konvertiert).',
                 ],
             ],
             'required' => ['body'],
@@ -99,7 +99,7 @@ class SendEmailMessageTool implements ToolContract, ToolMetadataContract
             } else {
                 $channelId = (int) ($arguments['comms_channel_id'] ?? 0);
                 if ($channelId <= 0) {
-                    return ToolResult::error('VALIDATION_ERROR', 'comms_channel_id ist erforderlich (für neuen Thread).');
+                    return ToolResult::error('VALIDATION_ERROR', 'Für einen neuen Thread benötigst du: comms_channel_id (hole mit core.comms.channels.GET), to, subject, body.');
                 }
                 $channel = CommsChannel::query()
                     ->where('team_id', $rootTeam->id)

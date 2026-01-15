@@ -140,13 +140,14 @@
                                             class="w-full h-10"
                                         />
                                     </div>
-                                    <input
+                                    <textarea
                                         id="chatInput"
-                                        type="text"
-                                        class="flex-1 px-4 h-10 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                        rows="1"
+                                        class="flex-1 w-full px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
                                         placeholder="Nachricht eingeben…"
                                         autocomplete="off"
-                                    />
+                                        style="min-height: 44px; max-height: 132px; overflow-y: auto;"
+                                    ></textarea>
                                     <button id="chatSend" type="submit" class="px-6 py-2 h-10 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90 flex items-center gap-2">
                                         <span>Senden</span>
                                     </button>
@@ -583,6 +584,15 @@
           selectedModel = defaultModelId;
         }
         localStorage.setItem('simple.selectedModel', selectedModel);
+
+        // Auto-grow textarea (adapted from comms modal)
+        const autoGrow = (el, maxPx = 132) => {
+          if (!el) return;
+          el.style.height = 'auto';
+          const next = Math.min(el.scrollHeight || 0, maxPx);
+          el.style.height = (next > 0 ? next : 44) + 'px';
+          el.style.overflowY = (el.scrollHeight > maxPx) ? 'auto' : 'hidden';
+        };
 
         // Best practice: MutationObserver for auto-scroll (no delays, no manual calls needed)
         let scrollObserver = null;
@@ -1325,6 +1335,15 @@
         updateFooterBusy();
         // Setup auto-scroll observer (best practice: no delays)
         setupAutoScroll();
+        // Setup auto-grow for textarea (adapted from comms modal)
+        if (input && input.tagName === 'TEXTAREA' && !input.dataset.autoGrowBound) {
+          // Initial auto-grow
+          requestAnimationFrame(() => autoGrow(input));
+          // Auto-grow on input and focus
+          input.addEventListener('input', (e) => autoGrow(e.target));
+          input.addEventListener('focus', (e) => autoGrow(e.target));
+          input.dataset.autoGrowBound = '1';
+        }
         // Initial scroll after setup
         requestAnimationFrame(() => scrollToBottom());
         let lastThreadId = currentThreadId;
@@ -1367,6 +1386,13 @@
           } catch (_) {}
           // Re-setup auto-scroll if needed (after Livewire re-renders DOM)
           setupAutoScroll();
+          // Re-setup auto-grow for textarea (in case it was re-rendered)
+          if (input && input.tagName === 'TEXTAREA' && !input.dataset.autoGrowBound) {
+            requestAnimationFrame(() => autoGrow(input));
+            input.addEventListener('input', (e) => autoGrow(e.target));
+            input.addEventListener('focus', (e) => autoGrow(e.target));
+            input.dataset.autoGrowBound = '1';
+          }
           if (currentThreadId !== lastThreadId) {
             // When switching threads, clear the wire:ignore slot so we don't show stale client-rendered messages.
             try {
@@ -1483,6 +1509,10 @@
               threadState._lastSentUserEl = chatList?.lastElementChild || null;
             } catch (_) {}
             input.value = '';
+            // Reset textarea height after sending (auto-grow will shrink it back)
+            if (input && input.tagName === 'TEXTAREA') {
+              requestAnimationFrame(() => autoGrow(input));
+            }
           }
 
           threadState.inFlight = true;
