@@ -706,6 +706,7 @@
           if (!el) return;
           const c = el.querySelector('[data-stream-content]');
           if (c) c.textContent = text || '';
+          scrollToBottom();
         };
         const removeStreamingAssistantMessage = () => {
           const el = document.getElementById('pgStreamingAssistantMsg');
@@ -1279,14 +1280,24 @@
         document.addEventListener('livewire:update', () => {
           refreshThreadIdFromDom();
           refreshMessagesFromServerRender();
-          // After Livewire renders server history, remove any finalized bubbles that are now redundant.
+          // After Livewire renders server history, remove any finalized bubbles and user messages that are now redundant.
           // (Server history in chatList is the source of truth; client bubbles in pgStreamingSlot are only for streaming.)
           try {
             const slot = document.getElementById('pgStreamingSlot');
             if (slot) {
+              // Remove finalized assistant messages (they're now in chatList)
               const finalized = slot.querySelectorAll('[data-final="1"]');
               finalized.forEach((el) => {
                 if (el.parentNode) el.parentNode.removeChild(el);
+              });
+              // Remove user messages (they're now in chatList via Livewire)
+              // User messages have justify-end class and are not the streaming assistant message
+              const userMessages = slot.querySelectorAll('.flex.justify-end');
+              userMessages.forEach((el) => {
+                // Only remove if it's not the streaming assistant message (which has justify-start)
+                if (el.id !== 'pgStreamingAssistantMsg' && el.parentNode) {
+                  el.parentNode.removeChild(el);
+                }
               });
             }
           } catch (_) {}
@@ -1414,6 +1425,8 @@
               threadState._lastSentUserEl = chatList?.lastElementChild || null;
             } catch (_) {}
             input.value = '';
+            // Ensure scroll after user message is rendered (with small delay to ensure DOM is ready)
+            setTimeout(() => scrollToBottom(), 50);
           }
 
           threadState.inFlight = true;
@@ -1794,6 +1807,7 @@
                       // Promote the streaming bubble (wire:ignore) to a final bubble.
                       finalizeStreamingAssistantMessage(assistant);
                       removeStreamingMetaMessages();
+                      scrollToBottom();
                     }
                     st.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';

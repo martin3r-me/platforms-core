@@ -93,10 +93,22 @@ class ListToolsTool implements ToolContract
             $moduleFilterApplied = false;
             if ($module) {
                 $beforeModuleFilter = count($filteredTools);
-                $filteredTools = array_filter($filteredTools, function($tool) use ($module) {
-                    $toolName = $tool->getName();
-                    return str_starts_with($toolName, $module . '.');
-                });
+                
+                // Sonderbehandlung: "communication" Modul zeigt auch core.comms.* Tools
+                // (communication ist ein Pseudo-Modul für Discovery; echte Tools sind unter core.comms.*)
+                if ($module === 'communication') {
+                    $filteredTools = array_filter($filteredTools, function($tool) {
+                        $toolName = $tool->getName();
+                        return str_starts_with($toolName, 'communication.') 
+                            || str_starts_with($toolName, 'core.comms.');
+                    });
+                } else {
+                    $filteredTools = array_filter($filteredTools, function($tool) use ($module) {
+                        $toolName = $tool->getName();
+                        return str_starts_with($toolName, $module . '.');
+                    });
+                }
+                
                 $moduleFilterApplied = true;
             }
             
