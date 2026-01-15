@@ -355,6 +355,45 @@ class CoreServiceProvider extends ServiceProvider
         if (class_exists(\Platform\Core\Tools\UpdateAiModelTool::class) && !$registry->has('core.ai_models.PUT')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\UpdateAiModelTool::class)); } catch (\Throwable $e) {}
         }
+
+        // Communication Tools (core.comms.* + communication.overview.GET)
+        // Diese Tools müssen immer registriert sein, damit sie via tools.GET(module="communication") gefunden werden
+        if (class_exists(\Platform\Core\Tools\Communication\CommunicationOverviewTool::class) && !$registry->has('communication.overview.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Communication\CommunicationOverviewTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Comms\CommsOverviewTool::class) && !$registry->has('core.comms.overview.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\CommsOverviewTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Comms\ListChannelsTool::class) && !$registry->has('core.comms.channels.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\ListChannelsTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Comms\CreateChannelTool::class) && !$registry->has('core.comms.channels.POST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\CreateChannelTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Comms\UpdateChannelTool::class) && !$registry->has('core.comms.channels.PUT')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\UpdateChannelTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Comms\DeleteChannelTool::class) && !$registry->has('core.comms.channels.DELETE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\DeleteChannelTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Comms\ListEmailThreadsTool::class) && !$registry->has('core.comms.email_threads.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\ListEmailThreadsTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Comms\CreateEmailThreadTool::class) && !$registry->has('core.comms.email_threads.POST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\CreateEmailThreadTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Comms\UpdateEmailThreadTool::class) && !$registry->has('core.comms.email_threads.PUT')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\UpdateEmailThreadTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Comms\DeleteEmailThreadTool::class) && !$registry->has('core.comms.email_threads.DELETE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\DeleteEmailThreadTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Comms\ListEmailMessagesTool::class) && !$registry->has('core.comms.email_messages.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\ListEmailMessagesTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Comms\SendEmailMessageTool::class) && !$registry->has('core.comms.email_messages.POST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\SendEmailMessageTool::class)); } catch (\Throwable $e) {}
+        }
     }
 
 

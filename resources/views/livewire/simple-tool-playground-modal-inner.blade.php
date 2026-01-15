@@ -584,10 +584,29 @@
         }
         localStorage.setItem('simple.selectedModel', selectedModel);
 
-        const scrollToBottom = () => {
+        const scrollToBottom = (force = false) => {
           refreshDomRefs();
-          if (!chatScroll) return;
-          chatScroll.scrollTop = chatScroll.scrollHeight;
+          if (!chatScroll) {
+            // Try to find it again
+            chatScroll = document.getElementById('chatScroll');
+            if (!chatScroll) return;
+          }
+          // Use requestAnimationFrame to ensure DOM is fully updated
+          requestAnimationFrame(() => {
+            refreshDomRefs();
+            if (!chatScroll) return;
+            const targetScroll = chatScroll.scrollHeight;
+            chatScroll.scrollTop = targetScroll;
+            // Double-check: if scroll didn't work, try again after a short delay
+            if (force && Math.abs(chatScroll.scrollTop - targetScroll) > 10) {
+              setTimeout(() => {
+                refreshDomRefs();
+                if (chatScroll) {
+                  chatScroll.scrollTop = chatScroll.scrollHeight;
+                }
+              }, 100);
+            }
+          });
         };
         
         // Helper: format numbers
@@ -706,7 +725,8 @@
           if (!el) return;
           const c = el.querySelector('[data-stream-content]');
           if (c) c.textContent = text || '';
-          scrollToBottom();
+          // Scroll after DOM update
+          requestAnimationFrame(() => scrollToBottom());
         };
         const removeStreamingAssistantMessage = () => {
           const el = document.getElementById('pgStreamingAssistantMsg');
@@ -1276,6 +1296,8 @@
         refreshMessagesFromServerRender();
         updateThreadBusyIndicators();
         updateFooterBusy();
+        // Scroll to bottom on initial load (after DOM is ready)
+        setTimeout(() => scrollToBottom(true), 200);
         let lastThreadId = currentThreadId;
         document.addEventListener('livewire:update', () => {
           refreshThreadIdFromDom();
@@ -1314,6 +1336,8 @@
             if (st?.inFlight) updateStreamingAssistantMessage(st.live?.assistant || '');
             else removeStreamingAssistantMessage();
           } catch (_) {}
+          // Scroll after Livewire update (new messages may have been added)
+          setTimeout(() => scrollToBottom(), 50);
           if (currentThreadId !== lastThreadId) {
             // When switching threads, clear the wire:ignore slot so we don't show stale client-rendered messages.
             try {
@@ -1321,6 +1345,8 @@
               if (slot) slot.innerHTML = '';
             } catch (_) {}
             lastThreadId = currentThreadId;
+            // Scroll to bottom when switching threads (after DOM update)
+            setTimeout(() => scrollToBottom(true), 200);
           }
         });
 
@@ -1425,8 +1451,8 @@
               threadState._lastSentUserEl = chatList?.lastElementChild || null;
             } catch (_) {}
             input.value = '';
-            // Ensure scroll after user message is rendered (with small delay to ensure DOM is ready)
-            setTimeout(() => scrollToBottom(), 50);
+            // Ensure scroll after user message is rendered (with delay to ensure DOM is ready)
+            setTimeout(() => scrollToBottom(true), 100);
           }
 
           threadState.inFlight = true;
@@ -1807,7 +1833,8 @@
                       // Promote the streaming bubble (wire:ignore) to a final bubble.
                       finalizeStreamingAssistantMessage(assistant);
                       removeStreamingMetaMessages();
-                      scrollToBottom();
+                      // Scroll after finalization (with delay to ensure Livewire has updated DOM)
+                      setTimeout(() => scrollToBottom(true), 150);
                     }
                     st.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';
