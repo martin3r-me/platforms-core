@@ -689,7 +689,7 @@
             <div class="max-w-4xl rounded-lg p-3 break-words overflow-hidden bg-[var(--ui-surface)] border border-[var(--ui-border)]">
               <div class="text-sm font-semibold mb-1 flex items-center gap-2">
                 <span>Assistant</span>
-                <span class="text-[10px] text-[var(--ui-muted)]">(läuft)</span>
+                  <span class="text-[10px] text-[var(--ui-muted)]" data-stream-status>(läuft)</span>
               </div>
               <div class="whitespace-pre-wrap break-words" data-stream-content></div>
             </div>
@@ -709,6 +709,45 @@
         const removeStreamingAssistantMessage = () => {
           const el = document.getElementById('pgStreamingAssistantMsg');
           if (el && el.parentNode) el.parentNode.removeChild(el);
+        };
+
+        // Turn the current streaming assistant bubble into a "final" bubble that will not be removed
+        // by future streaming resets (we drop the streaming id).
+        const finalizeStreamingAssistantMessage = (finalText) => {
+          const el = document.getElementById('pgStreamingAssistantMsg');
+          if (el) {
+            try {
+              const c = el.querySelector('[data-stream-content]');
+              if (c) c.textContent = String(finalText || '');
+              const s = el.querySelector('[data-stream-status]');
+              if (s) s.textContent = '(fertig)';
+              // Remove streaming id so removeStreamingAssistantMessage() won't delete it.
+              el.removeAttribute('id');
+              el.dataset.final = '1';
+            } catch (_) {}
+            return;
+          }
+          // Fallback: if no streaming bubble exists, render a final one into the streaming slot.
+          try {
+            const root = document.getElementById('pgStreamingSlot') || chatList;
+            if (!root) return;
+            const wrap = document.createElement('div');
+            wrap.className = 'flex justify-start';
+            wrap.dataset.final = '1';
+            wrap.innerHTML = `
+              <div class="max-w-4xl rounded-lg p-3 break-words overflow-hidden bg-[var(--ui-surface)] border border-[var(--ui-border)]">
+                <div class="text-sm font-semibold mb-1 flex items-center gap-2">
+                  <span>Assistant</span>
+                  <span class="text-[10px] text-[var(--ui-muted)]">(fertig)</span>
+                </div>
+                <div class="whitespace-pre-wrap break-words" data-stream-content></div>
+              </div>
+            `;
+            const c = wrap.querySelector('[data-stream-content]');
+            if (c) c.textContent = String(finalText || '');
+            root.appendChild(wrap);
+            scrollToBottom();
+          } catch (_) {}
         };
 
         // Streaming reasoning/thinking as ephemeral chat messages (not persisted, not sent as chat_history).
@@ -1737,11 +1776,10 @@
                       st.messages.push({ role: 'assistant', content: assistant });
                     }
                     if (isVisible) {
-                      // Re-render the visible chat from the correct thread state.
-                      threadState = st;
-                      removeStreamingAssistantMessage();
+                      // Best practice with Livewire: keep server chat list server-owned.
+                      // Promote the streaming bubble (wire:ignore) to a final bubble.
+                      finalizeStreamingAssistantMessage(assistant);
                       removeStreamingMetaMessages();
-                      renderChatFromState();
                     }
                     st.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';
