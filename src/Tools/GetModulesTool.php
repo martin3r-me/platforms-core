@@ -60,7 +60,7 @@ class GetModulesTool implements ToolContract
             }
 
             // Communication: Pseudo-Modul für Tool-Discovery (wie core, immer erlaubt).
-            // Die echten Tools liegen unter core.comms.*; communication.overview.GET ist nur Einstiegspunkt.
+            // Die echten Tools liegen unter core.comms.* (z.B. core.comms.channels.GET, core.comms.email_messages.POST).
             // WICHTIG: NICHT in ModuleRegistry registrieren (sonst landet es in DB und wird über hasAccess() geprüft).
             // Stattdessen hier direkt hinzufügen, damit es nie über Module::hasAccess() läuft.
             if (!isset($modules['communication'])) {
@@ -68,7 +68,7 @@ class GetModulesTool implements ToolContract
                     'communication' => [
                         'key' => 'communication',
                         'title' => 'Communication',
-                        'description' => 'Kommunikation (E‑Mail/Postmark): Kanäle, Threads, Senden, Timeline. Einstieg: communication.overview.GET',
+                        'description' => 'Kommunikation: E‑Mail Versand (Postmark), später WhatsApp/Telefonie. Tools unter core.comms.* (channels, threads, messages). Einstieg: core.comms.overview.GET oder tools.GET(module="communication").',
                     ],
                 ], $modules);
             }

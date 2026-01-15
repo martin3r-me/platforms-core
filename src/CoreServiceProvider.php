@@ -356,11 +356,9 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register($this->app->make(\Platform\Core\Tools\UpdateAiModelTool::class)); } catch (\Throwable $e) {}
         }
 
-        // Communication Tools (core.comms.* + communication.overview.GET)
+        // Communication Tools (core.comms.*)
         // Diese Tools müssen immer registriert sein, damit sie via tools.GET(module="communication") gefunden werden
-        if (class_exists(\Platform\Core\Tools\Communication\CommunicationOverviewTool::class) && !$registry->has('communication.overview.GET')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Communication\CommunicationOverviewTool::class)); } catch (\Throwable $e) {}
-        }
+        // Hinweis: communication.overview.GET wurde entfernt (verursachte Loops) - nutze direkt core.comms.overview.GET
         if (class_exists(\Platform\Core\Tools\Comms\CommsOverviewTool::class) && !$registry->has('core.comms.overview.GET')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\CommsOverviewTool::class)); } catch (\Throwable $e) {}
         }

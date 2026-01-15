@@ -166,7 +166,7 @@
                             </div>
                         </div>
 
-                        <div class="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto min-w-0">
+                        <div class="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto min-w-0" wire:ignore>
                             <div class="min-w-0">
                                 <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Tool Calls (alle im Request)</div>
                                 <div id="rtToolCalls" class="space-y-2 max-h-[60vh] overflow-y-auto"></div>
@@ -1397,7 +1397,12 @@
           // Scroll after Livewire update if flag is set (e.g., after complete event)
           if (window.__simplePlaygroundShouldScrollAfterUpdate) {
             window.__simplePlaygroundShouldScrollAfterUpdate = false;
-            setTimeout(() => scrollToBottom(true), 100);
+            // Wait a bit longer to ensure the message is fully rendered
+            setTimeout(() => {
+              scrollToBottom(true);
+              // Also try again after a short delay to catch any late rendering
+              setTimeout(() => scrollToBottom(true), 200);
+            }, 150);
           }
         });
 
