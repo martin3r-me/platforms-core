@@ -797,7 +797,7 @@ class CoreToolPlaygroundController extends Controller
                                  */
                                 if ($internalToolName === 'tools.request') {
                                     $candidate = $toolArguments['module'] ?? null;
-                                    if (is_string($candidate) && str_contains($candidate, '.') && preg_match('/\.(GET|POST|PUT|DELETE)$/', $candidate)) {
+                                    if (is_string($candidate) && str_contains($candidate, '.') && preg_match('/\.(GET|POST|PUT|PATCH|DELETE|EDIT)$/', $candidate)) {
                                         if ($registry->has($candidate)) {
                                             // Tool existiert – injiziere es on-demand
                                             $openAiService->loadToolsDynamically([$candidate]);
@@ -2784,7 +2784,7 @@ class CoreToolPlaygroundController extends Controller
     {
         // Systematisch: Prüfe für ALLE Operationen (GET, POST, PUT, DELETE)
         // GET-Operationen können auch mehrfach mit gleichen Argumenten aufgerufen werden
-        $isWriteOperation = preg_match('/\.(POST|PUT|DELETE)$/', $toolName);
+        $isWriteOperation = preg_match('/\.(POST|PUT|PATCH|DELETE|EDIT)$/', $toolName);
         $isReadOperation = preg_match('/\.GET$/', $toolName);
         
         if (!$isWriteOperation && !$isReadOperation) {
@@ -3806,7 +3806,7 @@ class CoreToolPlaygroundController extends Controller
                                     // tools.request Guardrail
                                     if ($internalToolName === 'tools.request') {
                                         $candidate = $toolArguments['module'] ?? null;
-                                        if (is_string($candidate) && str_contains($candidate, '.') && preg_match('/\.(GET|POST|PUT|DELETE)$/', $candidate)) {
+                                        if (is_string($candidate) && str_contains($candidate, '.') && preg_match('/\.(GET|POST|PUT|PATCH|DELETE|EDIT)$/', $candidate)) {
                                             if ($registry->has($candidate)) {
                                                 $openAiService->loadToolsDynamically([$candidate]);
                                                 $toolsWereLoaded = true;

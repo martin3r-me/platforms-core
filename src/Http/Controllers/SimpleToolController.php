@@ -1146,7 +1146,7 @@ class SimpleToolController extends Controller
                             // Dedup/cache: if the model calls the same tool with the same args repeatedly
                             // (common in early iterations), reuse the previous result to avoid cost.
                             $isGet = (bool) preg_match('/\.GET$/', $canonical);
-                            $isWrite = (bool) preg_match('/\.(POST|PUT|DELETE)$/', $canonical);
+                            $isWrite = (bool) preg_match('/\.(POST|PUT|PATCH|DELETE|EDIT)$/', $canonical);
                             $isCacheable = $isGet; // cache only reads (GET)
 
                             // Stable cache key: normalize args (sort object keys recursively) so equivalent JSON

@@ -337,7 +337,7 @@
                                                                     $from = (string) ($m['from'] ?? '');
                                                                     $to = (string) ($m['to'] ?? '');
                                                                     $subject = (string) ($m['subject'] ?? '');
-                                                                    $body = (string) ($m['text'] ?? '');
+                                                                    $body = trim((string) ($m['text'] ?? ''));
                                                                     if ($body === '' && !empty($m['html'])) {
                                                                         $body = trim(strip_tags((string) $m['html']));
                                                                     }

@@ -1703,11 +1703,23 @@
                     break;
                   }
                   case 'complete': {
+                    // Resolve the currently active thread state (Livewire can briefly desync DOM/state).
+                    const tid = refreshThreadIdFromDom();
+                    threadState = getThreadState(tid || currentThreadId || 'none');
+
                     const assistant = data?.assistant || threadState.live.assistant || '';
                     const serverHistory = Array.isArray(data?.chat_history) ? data.chat_history : null;
                     if (serverHistory) {
-                      threadState.messages = serverHistory;
+                      const normalized = serverHistory
+                        .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+                        .map((m) => ({ role: m.role, content: m.content }));
+                      const hasAssistant = normalized.some((m) => m.role === 'assistant' && m.content === assistant);
+                      if (!hasAssistant && assistant) {
+                        normalized.push({ role: 'assistant', content: assistant });
+                      }
+                      threadState.messages = normalized;
                     } else {
+                      threadState.messages = Array.isArray(threadState.messages) ? threadState.messages : [];
                       threadState.messages.push({ role: 'assistant', content: assistant });
                     }
                     removeStreamingAssistantMessage();
