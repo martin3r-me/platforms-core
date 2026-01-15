@@ -78,7 +78,8 @@ class CoreServiceProvider extends ServiceProvider
         // Routes registrieren
         // Comms Webhooks (no auth, no module guard)
         Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
-            ->middleware(['web'])
+            // Important: webhooks must not run through CSRF (419). We authenticate via BasicAuth/HMAC instead.
+            ->middleware(['api'])
             ->group(__DIR__.'/../routes/comms-webhooks.php');
 
         Route::domain(parse_url(config('app.url'), PHP_URL_HOST))

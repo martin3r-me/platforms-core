@@ -167,6 +167,10 @@
                                 <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Tool Calls (alle im Request)</div>
                                 <div id="rtToolCalls" class="space-y-2 max-h-[60vh] overflow-y-auto"></div>
                             </div>
+                            <div class="min-w-0">
+                                <div class="text-xs font-semibold text-[var(--ui-secondary)] mb-1">Stream (raw deltas)</div>
+                                <pre id="rtStreamLog" class="text-[10px] whitespace-pre-wrap text-[var(--ui-muted)] max-h-[40vh] overflow-y-auto bg-[var(--ui-bg)] border border-[var(--ui-border)]/60 rounded p-2"></pre>
+                            </div>
                             <div id="rtCopyStatus" class="text-[10px] text-[var(--ui-muted)]"></div>
                         </div>
                     </div>
@@ -537,6 +541,7 @@
         const rtCostCached = document.getElementById('rtCostCached');
         const rtCostOut = document.getElementById('rtCostOut');
         const rtCostTotal = document.getElementById('rtCostTotal');
+        const rtStreamLog = document.getElementById('rtStreamLog');
         const rtCostRequest = document.getElementById('rtCostRequest');
         const rtCostNote = document.getElementById('rtCostNote');
         const rtToolCalls = document.getElementById('rtToolCalls');
@@ -654,6 +659,18 @@
         };
         // Convenience for debugging from console
         window.simplePlaygroundNote = (text, title = 'Debug', kind = 'info') => renderEphemeralNote(title, text, kind);
+
+        window.__simplePlaygroundStreamLog = window.__simplePlaygroundStreamLog || '';
+        const appendStreamLog = (label, chunk) => {
+          if (!rtStreamLog) return;
+          const safeLabel = label ? `[${label}] ` : '';
+          const text = `${safeLabel}${String(chunk || '')}`;
+          const next = (window.__simplePlaygroundStreamLog || '') + text;
+          const trimmed = next.length > 12000 ? next.slice(-12000) : next;
+          window.__simplePlaygroundStreamLog = trimmed;
+          rtStreamLog.textContent = trimmed;
+          rtStreamLog.scrollTop = rtStreamLog.scrollHeight;
+        };
 
         // Streaming assistant message in chat (ephemeral: not persisted to DB).
         const ensureStreamingAssistantMessage = () => {
@@ -1004,6 +1021,8 @@
           if (rtThinking) rtThinking.textContent = '';
           if (rtEvents) rtEvents.innerHTML = '';
           if (rtToolCalls) rtToolCalls.innerHTML = '';
+          if (rtStreamLog) rtStreamLog.textContent = '';
+          window.__simplePlaygroundStreamLog = '';
           if (rtTokensIn) rtTokensIn.textContent = '—';
           if (rtTokensOut) rtTokensOut.textContent = '—';
           if (rtTokensTotal) rtTokensTotal.textContent = '—';
@@ -1475,6 +1494,7 @@
                         if (refreshThreadIdFromDom() === currentThreadId) {
                           updateStreamingAssistantMessage(threadState.live.assistant);
                         }
+                        appendStreamLog('assistant.delta', delta !== '' ? delta : full);
                       }
                       debugState.lastAssistant = threadState.live.assistant;
                     }
@@ -1482,6 +1502,7 @@
                   case 'assistant.reset':
                     threadState.live.assistant = '';
                     removeStreamingAssistantMessage();
+                    appendStreamLog('assistant.reset', '\n');
                     if (refreshThreadIdFromDom() === currentThreadId) {
                       // Ensure element is ready for new stream
                       ensureStreamingAssistantMessage();
@@ -1493,6 +1514,7 @@
                       if (refreshThreadIdFromDom() === currentThreadId) {
                         updateStreamingMetaMessage('reasoning', threadState.live.reasoning);
                       }
+                      appendStreamLog('reasoning.delta', data.delta);
                     }
                     break;
                   case 'reasoning.reset':
@@ -1506,6 +1528,7 @@
                       if (refreshThreadIdFromDom() === currentThreadId) {
                         updateStreamingMetaMessage('thinking', threadState.live.thinking);
                       }
+                      appendStreamLog('thinking.delta', data.delta);
                     }
                     break;
                   case 'thinking.reset':
