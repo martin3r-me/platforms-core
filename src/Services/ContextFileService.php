@@ -38,7 +38,7 @@ class ContextFileService
      * @param UploadedFile $file
      * @param string $contextType
      * @param int $contextId
-     * @param array $options ['keep_original' => bool, 'generate_variants' => bool]
+     * @param array $options ['keep_original' => bool, 'generate_variants' => bool, 'user_id' => int, 'team_id' => int]
      * @return array ['id', 'token', 'path', 'original_name', 'url', 'variants']
      */
     public function uploadForContext(
@@ -47,11 +47,35 @@ class ContextFileService
         int $contextId,
         array $options = []
     ): array {
-        $user = Auth::user();
-        $team = $user->currentTeamRelation;
-
-        if (!$team) {
-            throw new \Exception('Kein Team-Kontext vorhanden');
+        // User-ID und Team-ID aus Options oder Auth holen (für Commands)
+        $userId = $options['user_id'] ?? null;
+        $teamId = $options['team_id'] ?? null;
+        
+        // Wenn user_id und team_id NICHT beide in Options vorhanden sind, versuche von Auth zu holen
+        // WICHTIG: Verwende is_null() statt empty(), da 0 ein gültiger Wert sein könnte
+        if (is_null($userId) || is_null($teamId)) {
+            // Fallback: Versuche von Auth zu holen (für Web-Requests)
+            // WICHTIG: Nur wenn Auth::check() true ist, versuche Auth zu verwenden
+            if (Auth::check()) {
+                $user = Auth::user();
+                if ($user) {
+                    $team = $user->currentTeamRelation ?? null;
+                    if ($team) {
+                        $userId = $userId ?: $user->id;
+                        $teamId = $teamId ?: $team->id;
+                    }
+                }
+            }
+            
+            // Wenn immer noch keine user_id oder team_id vorhanden sind, Fehler werfen
+            if (is_null($userId) || is_null($teamId)) {
+                throw new \Exception('Kein User/Team-Kontext vorhanden. Bitte user_id und team_id in options übergeben. user_id: ' . ($userId ?? 'null') . ', team_id: ' . ($teamId ?? 'null'));
+            }
+        }
+        
+        // Validierung: Beide müssen vorhanden sein
+        if (is_null($userId) || is_null($teamId)) {
+            throw new \Exception('user_id und team_id müssen beide vorhanden sein. user_id: ' . ($userId ?? 'null') . ', team_id: ' . ($teamId ?? 'null'));
         }
 
         // Token generieren (eindeutig)
@@ -97,7 +121,7 @@ class ContextFileService
             'mime_type' => $mimeType,
             'file_size' => $fileSize,
             'uploaded_at' => now()->toIso8601String(),
-            'uploaded_by' => $user->id,
+            'uploaded_by' => $userId,
         ];
 
         // Bild-Dimensionen in Meta speichern
@@ -109,8 +133,8 @@ class ContextFileService
         // ContextFile in Datenbank speichern
         $contextFile = \Platform\Core\Models\ContextFile::create([
             'token' => $token,
-            'team_id' => $team->id,
-            'user_id' => $user->id,
+            'team_id' => $teamId,
+            'user_id' => $userId,
             'context_type' => $contextType,
             'context_id' => $contextId,
             'disk' => $this->disk,
