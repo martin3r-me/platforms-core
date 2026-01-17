@@ -2048,6 +2048,16 @@
               const last = window.__simplePlaygroundLastEvent?.key;
               if (last) setEventLabel(last);
             } catch (_) {}
+            // Scroll to bottom if flag is set (after complete event)
+            if (window.__simplePlaygroundShouldScrollAfterUpdate) {
+              window.__simplePlaygroundShouldScrollAfterUpdate = false;
+              // Wait a bit longer to ensure the message is fully rendered
+              setTimeout(() => {
+                scrollToBottom(true);
+                // Also try again after a short delay to catch any late rendering
+                setTimeout(() => scrollToBottom(true), 200);
+              }, 150);
+            }
           }, 50);
         });
       };
