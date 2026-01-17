@@ -677,30 +677,14 @@
           return `${m}m ${String(rs).padStart(2, '0')}s`;
         };
 
-        const renderMessage = (role, content, temporary = false) => {
-          // Render messages in pgStreamingSlot (wire:ignore) for immediate feedback
-          // These will be removed when Livewire renders the server-side version
-          refreshDomRefs();
-          const root = document.getElementById('pgStreamingSlot');
-          if (!root) return;
-          
-          const wrap = document.createElement('div');
-          wrap.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
-          if (temporary) wrap.dataset.temporary = '1'; // Mark as temporary (will be removed by Livewire)
-          wrap.innerHTML = `
-            <div class="max-w-4xl rounded-lg p-3 break-words overflow-hidden ${role === 'user' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-surface)] border border-[var(--ui-border)]'}">
-              <div class="text-sm font-semibold mb-1">${role === 'user' ? 'Du' : 'Assistant'}</div>
-              <div class="whitespace-pre-wrap break-words"></div>
-            </div>
-          `;
-          wrap.querySelector('.whitespace-pre-wrap').textContent = content;
-          root.appendChild(wrap);
-          
-          const empty = document.getElementById('chatEmpty');
-          if (empty) empty.style.display = 'none';
-          
-          // Smooth scroll to bottom
-          scrollToBottom(true);
+        // Helper: Trigger Livewire to reload messages from DB (for complete, error, etc.)
+        const refreshLivewireMessages = () => {
+          try {
+            if (window.Livewire && typeof livewireComponentId !== 'undefined') {
+              window.__simplePlaygroundShouldScrollAfterUpdate = true;
+              window.Livewire.find(livewireComponentId).call('refreshMessages').catch(() => {});
+            }
+          } catch (_) {}
         };
 
 
@@ -1894,9 +1878,8 @@
                       } catch (_) {}
                       removeStreamingMetaMessages();
                       // Note: Debug window is NOT cleared here - it will be cleared on next send
-                      // Livewire will automatically render the message from DB
-                      // Set flag to scroll after Livewire update
-                      window.__simplePlaygroundShouldScrollAfterUpdate = true;
+                      // Trigger Livewire to reload messages from DB and show the new assistant message
+                      refreshLivewireMessages();
                     }
                     st.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';
@@ -1910,7 +1893,8 @@
                   case 'error': {
                     const msg = data?.error || 'Unbekannter Fehler';
                     threadState.messages.push({ role: 'assistant', content: `❌ Fehler: ${msg}` });
-                    renderMessage('assistant', `❌ Fehler: ${msg}`);
+                    // Note: Error messages are not saved to DB, so no need to refresh Livewire
+                    // They're only shown in the debug panel
                     if (rtStatus) rtStatus.textContent = 'error';
                     updateDebugDump();
                     removeStreamingAssistantMessage();
