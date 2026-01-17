@@ -7,7 +7,8 @@
       "laravel/socialite": "^5.0",
       "socialiteproviders/microsoft": "^5.23",
       "openai-php/client": "^0.8.0",
-      "wildbit/postmark-php": "^7.0"
+      "wildbit/postmark-php": "^7.0",
+      "intervention/image": "^3.11"
   },
   "autoload": {
     "psr-4": {
