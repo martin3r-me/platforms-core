@@ -80,8 +80,17 @@ class ToolValidationService
         }
 
         // Prüfe Enum (falls vorhanden)
-        if (isset($property['enum']) && !in_array($value, $property['enum'], true)) {
-            $errors[] = "Feld '{$key}' muss einer der folgenden Werte sein: " . implode(', ', $property['enum']);
+        if (isset($property['enum'])) {
+            // Für String-Enum-Werte: trimmen vor Validierung
+            $valueToCheck = ($type === 'string' && is_string($value)) ? trim($value) : $value;
+            if (!in_array($valueToCheck, $property['enum'], true)) {
+                $errors[] = "Feld '{$key}' muss einer der folgenden Werte sein: " . implode(', ', $property['enum']);
+            } else {
+                // Wenn getrimmt wurde, verwende den getrimmten Wert
+                if ($type === 'string' && is_string($value) && $valueToCheck !== $value) {
+                    $validatedValue = $valueToCheck;
+                }
+            }
         }
 
         // Prüfe String-Constraints
