@@ -1498,8 +1498,6 @@
 
           if (!isContinue) {
             threadState.messages.push({ role: 'user', content: text });
-            // Render user message immediately for smooth UX (temporary - will be replaced by Livewire)
-            renderMessage('user', text, true);
             // Remember what we just added, so we can revert it on Abort (and avoid polluting DB/history).
             try {
               refreshDomRefs();
@@ -1511,6 +1509,8 @@
             if (input && input.tagName === 'TEXTAREA') {
               requestAnimationFrame(() => autoGrow(input));
             }
+            // Scroll after sending (Livewire will render the user message)
+            setTimeout(() => scrollToBottom(true), 100);
           }
 
           threadState.inFlight = true;
@@ -1894,14 +1894,9 @@
                       } catch (_) {}
                       removeStreamingMetaMessages();
                       // Note: Debug window is NOT cleared here - it will be cleared on next send
-                      // Note: We don't call refreshMessages() here - Livewire will automatically update
-                      // when the message is saved to DB. We just need to scroll after Livewire updates.
-                      // Set a flag to scroll after Livewire update (when message appears in chatList)
+                      // Livewire will automatically render the message from DB
+                      // Set flag to scroll after Livewire update
                       window.__simplePlaygroundShouldScrollAfterUpdate = true;
-                      // Also try scrolling immediately in case Livewire already updated
-                      setTimeout(() => {
-                        scrollToBottom(true);
-                      }, 100);
                     }
                     st.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';
