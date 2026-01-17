@@ -604,20 +604,15 @@
           return distance < threshold;
         };
         
-        const scrollToBottom = (smooth = false) => {
+        const scrollToBottom = (force = false) => {
           refreshDomRefs();
           if (!chatScroll) return;
           // Only auto-scroll if user is near bottom (don't interrupt manual scrolling)
-          if (!checkIfNearBottom() && !smooth) return;
+          // Unless force is true (e.g., after sending a message or receiving a response)
+          if (!force && !checkIfNearBottom()) return;
           
-          requestAnimationFrame(() => {
-            if (!chatScroll) return;
-            if (smooth) {
-              chatScroll.scrollTo({ top: chatScroll.scrollHeight, behavior: 'smooth' });
-            } else {
-              chatScroll.scrollTop = chatScroll.scrollHeight;
-            }
-          });
+          // Simple direct scroll (like in communication modal)
+          chatScroll.scrollTop = chatScroll.scrollHeight;
         };
         
         // Track user scrolling to avoid interrupting
@@ -1494,7 +1489,10 @@
               requestAnimationFrame(() => autoGrow(input));
             }
             // Scroll after sending (Livewire will render the user message)
-            setTimeout(() => scrollToBottom(true), 100);
+            // Use requestAnimationFrame + setTimeout to ensure DOM is ready
+            requestAnimationFrame(() => {
+              setTimeout(() => scrollToBottom(true), 50);
+            });
           }
 
           threadState.inFlight = true;
@@ -2051,12 +2049,14 @@
             // Scroll to bottom if flag is set (after complete event)
             if (window.__simplePlaygroundShouldScrollAfterUpdate) {
               window.__simplePlaygroundShouldScrollAfterUpdate = false;
-              // Wait a bit longer to ensure the message is fully rendered
-              setTimeout(() => {
-                scrollToBottom(true);
-                // Also try again after a short delay to catch any late rendering
-                setTimeout(() => scrollToBottom(true), 200);
-              }, 150);
+              // Use requestAnimationFrame to ensure DOM is updated, then scroll
+              requestAnimationFrame(() => {
+                setTimeout(() => {
+                  scrollToBottom(true);
+                  // Retry once more after a short delay to catch any late rendering
+                  setTimeout(() => scrollToBottom(true), 100);
+                }, 50);
+              });
             }
           }, 50);
         });
