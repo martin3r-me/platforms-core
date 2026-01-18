@@ -131,7 +131,7 @@
 
                             <div class="flex gap-2">
                                 <a
-                                    href="{{ route('meta.oauth.redirect') }}"
+                                    href="{{ route('integrations.oauth2.start', ['integrationKey' => 'meta']) }}"
                                     class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
                                 >
                                     @svg('heroicon-o-arrow-path', 'w-4 h-4')
@@ -153,7 +153,7 @@
                                 Verbinde dein Meta-Konto, um Facebook Pages und Instagram Accounts zu verwalten.
                             </p>
                             <a
-                                href="{{ route('meta.oauth.redirect') }}"
+                                href="{{ route('integrations.oauth2.start', ['integrationKey' => 'meta']) }}"
                                 class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
                             >
                                 @svg('heroicon-o-link', 'w-4 h-4')
