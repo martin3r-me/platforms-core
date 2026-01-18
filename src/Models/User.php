@@ -261,4 +261,36 @@ class User extends Authenticatable
             $this->collectAllChildTeams($childTeam, $collection);
         }
     }
+
+    /**
+     * Meta OAuth Token dieses Users
+     */
+    public function metaToken()
+    {
+        return $this->hasOne(\Platform\Integrations\Models\IntegrationsMetaToken::class, 'user_id');
+    }
+
+    /**
+     * Facebook Pages dieses Users
+     */
+    public function facebookPages()
+    {
+        return $this->hasMany(\Platform\Integrations\Models\IntegrationsFacebookPage::class, 'user_id');
+    }
+
+    /**
+     * Instagram Accounts dieses Users
+     */
+    public function instagramAccounts()
+    {
+        return $this->hasMany(\Platform\Integrations\Models\IntegrationsInstagramAccount::class, 'user_id');
+    }
+
+    /**
+     * WhatsApp Accounts dieses Users
+     */
+    public function whatsappAccounts()
+    {
+        return $this->hasMany(\Platform\Integrations\Models\IntegrationsWhatsAppAccount::class, 'user_id');
+    }
 }

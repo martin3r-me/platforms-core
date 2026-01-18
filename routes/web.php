@@ -276,5 +276,11 @@ Route::middleware(['web', 'auth'])->group(function () {
 
     // SSE darf NICHT unter force.json laufen, sonst wird Content-Type auf application/json überschrieben.
     Route::post('/core/tools/simple/stream', [SimpleToolController::class, 'stream'])->name('core.tools.simple.stream');
+    
+    // Meta OAuth Routes (User-Ebene, nicht brand-spezifisch)
+    Route::get('/meta/oauth/redirect', [\Platform\Brands\Http\Controllers\FacebookPageOAuthController::class, 'redirect'])
+        ->name('meta.oauth.redirect');
+    Route::get('/meta/oauth/callback', [\Platform\Brands\Http\Controllers\FacebookPageOAuthController::class, 'callback'])
+        ->name('meta.oauth.callback');
 });
 
