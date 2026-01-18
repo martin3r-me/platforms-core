@@ -64,6 +64,11 @@ trait Encryptable
                     // Feld wurde geändert, aber Plain-Text nicht gespeichert
                     // (kann passieren bei direkten DB-Updates oder anderen Szenarien)
                     $plain = $model->getAttribute($field);
+                    
+                    // Für JSON-Felder: Array zu JSON-String konvertieren
+                    if ($type === 'json' && is_array($plain)) {
+                        $plain = json_encode($plain, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    }
                 }
                 
                 // Temporäres Attribut entfernen (nicht in DB speichern)
@@ -85,7 +90,23 @@ trait Encryptable
                 }
                 
                 // Hash nur setzen, wenn Plain-Text vorhanden ist
+                // Für JSON-Felder: Stelle sicher, dass es ein String ist
                 if ($plain !== null) {
+                    // Wenn Plain-Text ein Array ist (für JSON-Felder), zu JSON-String konvertieren
+                    if ($type === 'json' && is_array($plain)) {
+                        $plain = json_encode($plain, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    }
+                    
+                    // Stelle sicher, dass Plain-Text ein String ist
+                    if (!is_string($plain)) {
+                        \Log::warning('Encryptable: Plain value is not a string, converting', [
+                            'field' => $field,
+                            'type' => gettype($plain),
+                            'model' => get_class($model),
+                        ]);
+                        $plain = (string) $plain;
+                    }
+                    
                     $model->setAttribute($hashField, FieldHasher::hmacSha256($plain, $teamSalt));
                 }
             }
