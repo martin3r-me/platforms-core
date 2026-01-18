@@ -4,9 +4,10 @@ namespace Platform\Core\Livewire;
 
 use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
-use Platform\Integrations\Models\IntegrationsMetaToken;
+use Platform\Integrations\Models\IntegrationConnection;
 use Platform\Integrations\Models\IntegrationsFacebookPage;
 use Platform\Integrations\Models\IntegrationsInstagramAccount;
+use Platform\Integrations\Services\MetaIntegrationService;
 
 class ModalUser extends Component
 {
@@ -51,11 +52,19 @@ class ModalUser extends Component
         ]);
     }
 
-    public function getMetaTokenProperty()
+    public function getMetaConnectionProperty()
     {
         $user = Auth::user();
-        return IntegrationsMetaToken::where('user_id', $user->id)
-            ->first();
+        $metaService = app(MetaIntegrationService::class);
+        return $metaService->getConnectionForUser($user);
+    }
+    
+    /**
+     * @deprecated Verwende stattdessen getMetaConnectionProperty()
+     */
+    public function getMetaTokenProperty()
+    {
+        return $this->getMetaConnectionProperty();
     }
 
     public function getFacebookPagesProperty()
@@ -72,14 +81,14 @@ class ModalUser extends Component
             ->get();
     }
 
-    public function deleteMetaToken()
+    public function deleteMetaConnection()
     {
         $user = Auth::user();
-        $metaToken = IntegrationsMetaToken::where('user_id', $user->id)
-            ->first();
+        $metaService = app(MetaIntegrationService::class);
+        $metaConnection = $metaService->getConnectionForUser($user);
 
-        if ($metaToken) {
-            $metaToken->delete();
+        if ($metaConnection) {
+            $metaConnection->delete();
 
             $this->dispatch('notice', [
                 'type' => 'success',

@@ -96,7 +96,7 @@
                 <div class="p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Meta-Verbindung</h3>
-                        @if($this->metaToken)
+                        @if($this->metaConnection)
                             <span class="px-3 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
                                 Verbunden
                             </span>
@@ -107,24 +107,30 @@
                         @endif
                     </div>
 
-                    @if($this->metaToken)
+                    @if($this->metaConnection)
+                        @php
+                            $oauth = $this->metaConnection->credentials['oauth'] ?? [];
+                            $expiresAt = isset($oauth['expires_at']) ? \Carbon\Carbon::createFromTimestamp($oauth['expires_at']) : null;
+                            $isExpired = $expiresAt && $expiresAt->isPast();
+                            $isExpiringSoon = $expiresAt && $expiresAt->isBefore(now()->addHours(24));
+                        @endphp
                         <div class="space-y-3">
                             <div class="text-sm text-[var(--ui-muted)]">
                                 <div class="flex items-center justify-between mb-2">
                                     <span>Token abgelaufen:</span>
                                     <span class="font-medium">
-                                        @if($this->metaToken->isExpired)
+                                        @if($isExpired)
                                             <span class="text-red-600">Abgelaufen</span>
-                                        @elseif($this->metaToken->isExpiringSoon)
+                                        @elseif($isExpiringSoon)
                                             <span class="text-amber-600">Läuft bald ab</span>
                                         @else
                                             <span class="text-green-600">Aktiv</span>
                                         @endif
                                     </span>
                                 </div>
-                                @if($this->metaToken->expires_at)
+                                @if($expiresAt)
                                     <div class="text-xs text-[var(--ui-muted)]">
-                                        {{ $this->metaToken->expires_at->format('d.m.Y H:i') }} Uhr
+                                        {{ $expiresAt->format('d.m.Y H:i') }} Uhr
                                     </div>
                                 @endif
                             </div>
@@ -138,7 +144,7 @@
                                     Erneut verbinden
                                 </a>
                                 <button
-                                    wire:click="deleteMetaToken"
+                                    wire:click="deleteMetaConnection"
                                     wire:confirm="Meta-Verbindung wirklich löschen? Alle verknüpften Facebook Pages und Instagram Accounts werden entfernt."
                                     class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
                                 >
@@ -164,7 +170,7 @@
                 </div>
 
                 {{-- Facebook Pages --}}
-                @if($this->metaToken)
+                @if($this->metaConnection)
                     <div>
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Facebook Pages</h3>

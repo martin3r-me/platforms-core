@@ -265,9 +265,22 @@ class User extends Authenticatable
     /**
      * Meta OAuth Token dieses Users
      */
+    /**
+     * Ruft die Meta IntegrationConnection für diesen User ab
+     * @deprecated Verwende stattdessen MetaIntegrationService::getConnectionForUser()
+     */
+    public function metaConnection()
+    {
+        $metaService = app(\Platform\Integrations\Services\MetaIntegrationService::class);
+        return $metaService->getConnectionForUser($this);
+    }
+    
+    /**
+     * @deprecated Verwende stattdessen metaConnection()
+     */
     public function metaToken()
     {
-        return $this->hasOne(\Platform\Integrations\Models\IntegrationsMetaToken::class, 'user_id');
+        return $this->metaConnection();
     }
 
     /**
