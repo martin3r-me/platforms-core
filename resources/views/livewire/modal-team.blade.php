@@ -344,7 +344,163 @@
 
     {{-- Create Tab --}}
     <div class="mt-6" x-show="tab === 'create'" x-cloak>
-        <p>Create Tab - Inhalt entfernt zum Debuggen</p>
+        <div class="space-y-6">
+            <div>
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Neues Team anlegen</h3>
+                <form wire:submit.prevent="createTeam" class="space-y-4">
+                    {{-- Team Name --}}
+                    <x-ui-input-text
+                        name="newTeamName"
+                        label="Team-Name"
+                        wire:model.live="newTeamName"
+                        required
+                        placeholder="Name des Teams"
+                        :errorKey="'newTeamName'"
+                    />
+
+                    {{-- Parent Team Selection --}}
+                    @if(!empty($availableParentTeams) && count($availableParentTeams) > 0)
+                        <div>
+                            <x-ui-input-select
+                                name="newParentTeamId"
+                                label="Eltern-Team (optional)"
+                                :options="$availableParentTeams"
+                                :nullable="true"
+                                nullLabel="Kein Eltern-Team"
+                                wire:model.live="newParentTeamId"
+                                :errorKey="'newParentTeamId'"
+                            />
+                            <p class="text-xs text-[var(--ui-muted)] mt-2">
+                                Optional: Wähle ein Root-Team als Parent-Team. Kind-Teams erben Zugriff auf root-scoped Module (z.B. CRM, Organization).
+                            </p>
+                        </div>
+                    @else
+                        <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">
+                            Keine verfügbaren Parent-Teams. Erstelle zuerst ein Root-Team.
+                        </div>
+                    @endif
+
+                    {{-- Initial Members --}}
+                    @if(!empty($availableUsersForTeam) && count($availableUsersForTeam) > 0)
+                        <div x-data="{ 
+                            selectedUsers: @entangle('newInitialMembers'),
+                            toggleUser(userId) {
+                                const index = this.selectedUsers.findIndex(u => u.user_id == userId);
+                                if (index >= 0) {
+                                    this.selectedUsers.splice(index, 1);
+                                } else {
+                                    this.selectedUsers.push({ user_id: userId, role: 'member' });
+                                }
+                            },
+                            updateRole(userId, role) {
+                                const index = this.selectedUsers.findIndex(u => u.user_id == userId);
+                                if (index >= 0) {
+                                    this.selectedUsers[index].role = role;
+                                }
+                            },
+                            isSelected(userId) {
+                                return this.selectedUsers.some(u => u.user_id == userId);
+                            },
+                            getRole(userId) {
+                                const user = this.selectedUsers.find(u => u.user_id == userId);
+                                return user ? user.role : 'member';
+                            }
+                        }">
+                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">
+                                Initiale Mitarbeiter hinzufügen (optional)
+                            </label>
+                            <p class="text-xs text-[var(--ui-muted)] mb-3">
+                                Wähle Mitarbeiter und AI-User aus, die direkt beim Erstellen zum Team hinzugefügt werden sollen. Du kannst für jeden eine Rolle festlegen.
+                            </p>
+                            <div class="space-y-2 max-h-96 overflow-y-auto border border-[var(--ui-border)]/60 rounded-md p-3 bg-[var(--ui-muted-5)]">
+                                @foreach($availableUsersForTeam as $availableUser)
+                                    <div class="p-3 rounded-md border border-[var(--ui-border)]/40" :class="{ 'bg-[var(--ui-primary)]/10 border-[var(--ui-primary)]/40': isSelected({{ $availableUser->id }}) }">
+                                        <div class="flex items-center gap-3">
+                                            <input 
+                                                type="checkbox" 
+                                                :checked="isSelected({{ $availableUser->id }})"
+                                                @change="toggleUser({{ $availableUser->id }})"
+                                                class="rounded border-[var(--ui-border)] text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]"
+                                            />
+                                            <div class="flex items-center gap-3 flex-1">
+                                                @if($availableUser->isAiUser())
+                                                    <div class="w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center">
+                                                        <span class="text-xs font-semibold">AI</span>
+                                                    </div>
+                                                @elseif(!empty($availableUser->avatar))
+                                                    <img src="{{ $availableUser->avatar }}" alt="{{ $availableUser->fullname ?? $availableUser->name }}" class="w-8 h-8 rounded-full object-cover" />
+                                                @else
+                                                    <div class="w-8 h-8 bg-[var(--ui-primary)] text-[var(--ui-on-primary)] rounded-full flex items-center justify-center">
+                                                        <span class="text-xs font-semibold">{{ strtoupper(mb_substr(($availableUser->fullname ?? $availableUser->name), 0, 2)) }}</span>
+                                                    </div>
+                                                @endif
+                                                <div class="flex-1">
+                                                    <div class="flex items-center gap-2">
+                                                        <div class="text-sm font-medium text-[var(--ui-secondary)]">
+                                                            {{ $availableUser->fullname ?? $availableUser->name }}
+                                                        </div>
+                                                        @if($availableUser->isAiUser())
+                                                            <x-ui-badge variant="purple" size="sm">AI</x-ui-badge>
+                                                        @endif
+                                                    </div>
+                                                    @if($availableUser->email)
+                                                        <div class="text-xs text-[var(--ui-muted)]">
+                                                            {{ $availableUser->email }}
+                                                        </div>
+                                                    @elseif($availableUser->isAiUser())
+                                                        <div class="text-xs text-[var(--ui-muted)]">AI-User</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {{-- Rollen-Auswahl (nur wenn User ausgewählt) --}}
+                                        <div x-show="isSelected({{ $availableUser->id }})" x-cloak class="mt-3 pt-3 border-t border-[var(--ui-border)]/40">
+                                            <label class="block text-xs font-medium text-[var(--ui-secondary)] mb-2">
+                                                Rolle für diesen Benutzer:
+                                            </label>
+                                            <select 
+                                                :value="getRole({{ $availableUser->id }})"
+                                                @change="updateRole({{ $availableUser->id }}, $event.target.value)"
+                                                class="w-full px-3 py-2 text-sm border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-[var(--ui-primary)] bg-[var(--ui-surface)] text-[var(--ui-secondary)]"
+                                            >
+                                                <option value="member">Member</option>
+                                                <option value="admin">Admin</option>
+                                                <option value="viewer">Viewer</option>
+                                                @if(!$availableUser->isAiUser())
+                                                    <option value="owner">Owner</option>
+                                                @endif
+                                            </select>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                            @error('newInitialMembers')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    @else
+                        <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">
+                            Keine verfügbaren Mitarbeiter zum Hinzufügen. Du kannst später Mitglieder einladen.
+                        </div>
+                    @endif
+
+                    {{-- Submit Button --}}
+                    <div class="flex gap-2 pt-4">
+                        <x-ui-button type="submit" variant="primary" wire:loading.attr="disabled">
+                            @svg('heroicon-o-user-group', 'w-4 h-4 mr-2')
+                            Team erstellen
+                        </x-ui-button>
+                        <x-ui-button 
+                            type="button" 
+                            variant="secondary-outline" 
+                            @click="tab = 'team'"
+                        >
+                            Abbrechen
+                        </x-ui-button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     {{-- Billing Tab --}}

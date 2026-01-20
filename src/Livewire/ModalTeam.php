@@ -65,6 +65,10 @@ class ModalTeam extends Component
     public $availableAiModels = [];
     public $availableAiUsersToAdd = [];
     public bool $canAddUsers = false;
+    
+    // Create Team properties
+    public $newInitialMembers = []; // Array von ['user_id' => X, 'role' => 'member']
+    public $availableUsersForTeam = [];
 
     protected $listeners = ['open-modal-team' => 'openModal'];
 
@@ -97,6 +101,41 @@ class ModalTeam extends Component
         $this->loadAvailableAiModels();
         $this->loadAvailableAiUsersToAdd();
         $this->loadCanAddUsers();
+        $this->loadAvailableUsersForTeam();
+    }
+
+    /**
+     * Lädt verfügbare User, die beim Erstellen eines Teams hinzugefügt werden können.
+     * Dies sind alle User (inkl. AI-User), die in Teams sind, zu denen der aktuelle User Zugriff hat.
+     */
+    public function loadAvailableUsersForTeam()
+    {
+        $user = auth()->user();
+        if (!$user) {
+            $this->availableUsersForTeam = [];
+            return;
+        }
+
+        // Hole alle Teams, zu denen der User Zugriff hat
+        $userTeams = Team::whereHas('users', function ($query) use ($user) {
+            $query->where('user_id', $user->id);
+        })->get();
+
+        // Sammle alle User aus diesen Teams (außer dem aktuellen User, aber inkl. AI-User)
+        $availableUsers = collect();
+        foreach ($userTeams as $team) {
+            $teamUsers = $team->users()
+                ->where('users.id', '!=', $user->id)
+                ->get();
+            
+            foreach ($teamUsers as $teamUser) {
+                if (!$availableUsers->contains('id', $teamUser->id)) {
+                    $availableUsers->push($teamUser);
+                }
+            }
+        }
+
+        $this->availableUsersForTeam = $availableUsers->sortBy('name')->values()->all();
     }
 
     protected function loadCanAddUsers(): void
@@ -335,6 +374,9 @@ class ModalTeam extends Component
                     }
                 },
             ],
+            'newInitialMembers' => 'nullable|array',
+            'newInitialMembers.*.user_id' => 'required|integer|exists:users,id',
+            'newInitialMembers.*.role' => 'required|string|in:owner,admin,member,viewer',
         ]);
 
         $team = Team::create([
@@ -344,12 +386,45 @@ class ModalTeam extends Component
             'personal_team' => false,
         ]);
 
+        // Owner hinzufügen
         $team->users()->attach(auth()->id(), ['role' => TeamRole::OWNER->value]);
+
+        // Initial members hinzufügen, falls ausgewählt
+        if (!empty($this->newInitialMembers) && is_array($this->newInitialMembers)) {
+            foreach ($this->newInitialMembers as $memberData) {
+                if (!isset($memberData['user_id']) || !isset($memberData['role'])) {
+                    continue;
+                }
+                
+                $memberId = (int) $memberData['user_id'];
+                $role = $memberData['role'];
+                
+                // Validiere Rolle
+                if (!in_array($role, ['owner', 'admin', 'member', 'viewer'])) {
+                    $role = TeamRole::MEMBER->value;
+                }
+                
+                if ($memberId > 0 && $memberId !== auth()->id()) {
+                    // Prüfe, ob User existiert und nicht bereits hinzugefügt wurde
+                    $member = User::find($memberId);
+                    if ($member && !$team->users()->where('users.id', $memberId)->exists()) {
+                        // AI-User können nicht Owner sein
+                        if ($member->isAiUser() && $role === 'owner') {
+                            $role = TeamRole::MEMBER->value;
+                        }
+                        
+                        $team->users()->attach($memberId, ['role' => $role]);
+                    }
+                }
+            }
+        }
 
         $this->newTeamName = '';
         $this->newParentTeamId = null;
+        $this->newInitialMembers = [];
         $this->loadTeams();
         $this->loadAvailableParentTeams();
+        $this->loadAvailableUsersForTeam();
 
         // Direkt auf das neue Team wechseln
         $user = auth()->user();
