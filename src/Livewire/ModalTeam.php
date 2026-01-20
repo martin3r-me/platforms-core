@@ -198,6 +198,7 @@ class ModalTeam extends Component
     /**
      * Lädt verfügbare Parent-Teams (Root-Teams, zu denen der User Zugriff hat).
      * Nur Root-Teams können als Parent-Teams verwendet werden.
+     * User muss Owner oder Admin sein (nicht nur Member).
      */
     public function loadAvailableParentTeams()
     {
@@ -205,10 +206,11 @@ class ModalTeam extends Component
         $currentTeamId = $this->team?->id;
         $currentParentTeamId = $this->team?->parent_team_id;
 
-        // Root-Teams, zu denen der User Zugriff hat (und nicht das aktuelle Team)
+        // Root-Teams, bei denen der User Owner oder Admin ist (und nicht das aktuelle Team)
         $rootTeamsQuery = Team::query()
             ->whereHas('users', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
+                $query->where('user_id', $user->id)
+                    ->whereIn('role', [TeamRole::OWNER->value, TeamRole::ADMIN->value]);
             })
             ->whereNull('parent_team_id');
 
@@ -219,11 +221,12 @@ class ModalTeam extends Component
         $rootTeams = $rootTeamsQuery->get();
 
         // Wenn bereits ein Parent-Team gesetzt ist, dieses auch in die Liste aufnehmen,
-        // aber nur, wenn der User Zugriff hat (sonst würden wir fremde Teams anzeigen).
+        // aber nur, wenn der User Owner oder Admin ist (sonst würden wir fremde Teams anzeigen).
         if ($currentParentTeamId) {
             $currentParent = Team::query()
                 ->whereHas('users', function ($query) use ($user) {
-                    $query->where('user_id', $user->id);
+                    $query->where('user_id', $user->id)
+                        ->whereIn('role', [TeamRole::OWNER->value, TeamRole::ADMIN->value]);
                 })
                 ->where('id', $currentParentTeamId)
                 ->first();
@@ -299,6 +302,16 @@ class ModalTeam extends Component
                 $this->dispatch('notice', [
                     'type' => 'error',
                     'message' => 'Du hast keinen Zugriff auf das ausgewählte Parent-Team.'
+                ]);
+                return;
+            }
+
+            // Prüfe ob User Owner oder Admin des Parent-Teams ist
+            $userRole = $parentTeam->users()->where('user_id', $user->id)->first()?->pivot->role;
+            if (!in_array($userRole, [TeamRole::OWNER->value, TeamRole::ADMIN->value])) {
+                $this->dispatch('notice', [
+                    'type' => 'error',
+                    'message' => 'Nur Owner oder Admin können ein Parent-Team setzen.'
                 ]);
                 return;
             }
