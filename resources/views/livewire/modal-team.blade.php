@@ -72,6 +72,7 @@
             @endif
 
             {{-- Team Members --}}
+            @if(isset($team))
             <div>
                 <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Team-Mitglieder</h3>
                 <div class="space-y-3">
@@ -132,6 +133,7 @@
                     @endforeach
                 </div>
             </div>
+            @endif
             @endisset
 
             {{-- Invite Member --}}
