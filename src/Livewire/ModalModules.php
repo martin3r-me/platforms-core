@@ -122,6 +122,13 @@ class ModalModules extends Component
         $currentTeam = $user->currentTeamRelation; // Basis-Team (nicht dynamisch)
         if (!$currentTeam) { return; }
 
+        // Prüfe, ob der User Owner-Rolle im Team hat
+        $userRole = $currentTeam->users()->where('user_id', $user->id)->first()?->pivot->role;
+        if ($userRole !== TeamRole::OWNER->value) {
+            // Nur Owner können Module-Freigaben vergeben
+            return;
+        }
+
         $targetUser = \Platform\Core\Models\User::findOrFail($userId);
         $module = \Platform\Core\Models\Module::findOrFail($moduleId);
 

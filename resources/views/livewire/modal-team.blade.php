@@ -100,10 +100,24 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
-                                @if(($team->user_id ?? null) === auth()->id())
+                                @php
+                                    $currentTeam = auth()->user()?->currentTeamRelation;
+                                    $currentUserRole = $currentTeam ? $currentTeam->users()->where('user_id', auth()->id())->first()?->pivot->role : null;
+                                    $isOwnerOrAdmin = in_array($currentUserRole, [\Platform\Core\Enums\TeamRole::OWNER->value, \Platform\Core\Enums\TeamRole::ADMIN->value], true);
+                                    $isOwner = $currentUserRole === \Platform\Core\Enums\TeamRole::OWNER->value;
+                                    
+                                    // Verfügbare Rollen basierend auf eigener Rolle
+                                    $availableRoles = [];
+                                    if ($isOwner) {
+                                        $availableRoles = ['owner' => 'Owner', 'admin' => 'Admin', 'member' => 'Member', 'viewer' => 'Viewer'];
+                                    } elseif ($currentUserRole === \Platform\Core\Enums\TeamRole::ADMIN->value) {
+                                        $availableRoles = ['admin' => 'Admin', 'member' => 'Member', 'viewer' => 'Viewer'];
+                                    }
+                                @endphp
+                                @if($isOwnerOrAdmin)
                                     <x-ui-input-select
                                         name="member_role_{{ $member->id }}"
-                                        :options="['owner' => 'Owner', 'admin' => 'Admin', 'member' => 'Member', 'viewer' => 'Viewer']"
+                                        :options="$availableRoles"
                                         :nullable="false"
                                         x-data
                                         @change="$wire.updateMemberRole({{ $member->id }}, $event.target.value)"
@@ -458,6 +472,10 @@
                                             <label class="block text-xs font-medium text-[var(--ui-secondary)] mb-2">
                                                 Rolle für diesen Benutzer:
                                             </label>
+                                            @php
+                                                // Beim Erstellen eines Teams ist der Ersteller automatisch Owner, also kann er alle Rollen vergeben
+                                                $canAssignOwner = true; // Beim Erstellen ist der User automatisch Owner
+                                            @endphp
                                             <select 
                                                 :value="getRole({{ $availableUser->id }})"
                                                 @change="updateRole({{ $availableUser->id }}, $event.target.value)"
@@ -466,7 +484,7 @@
                                                 <option value="member">Member</option>
                                                 <option value="admin">Admin</option>
                                                 <option value="viewer">Viewer</option>
-                                                @if(!$availableUser->isAiUser())
+                                                @if(!$availableUser->isAiUser() && $canAssignOwner)
                                                     <option value="owner">Owner</option>
                                                 @endif
                                             </select>

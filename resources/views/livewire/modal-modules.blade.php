@@ -7,7 +7,12 @@
             </div>
             <div class="flex items-center gap-1">
                 <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2" :class="tab === 'modules' ? 'text-[var(--ui-primary)] border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'text-[var(--ui-muted)] border-transparent hover:text-[var(--ui-secondary)]'" @click="tab = 'modules'">Navigation</button>
-                @if(auth()->user()?->currentTeam && auth()->user()->currentTeam->user_id === auth()->id())
+                @php
+                    $currentTeam = auth()->user()?->currentTeamRelation;
+                    $userRole = $currentTeam ? $currentTeam->users()->where('user_id', auth()->id())->first()?->pivot->role : null;
+                    $isOwner = $userRole === \Platform\Core\Enums\TeamRole::OWNER->value;
+                @endphp
+                @if($isOwner)
                     <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2" :class="tab === 'matrix' ? 'text-[var(--ui-primary)] border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'text-[var(--ui-muted)] border-transparent hover:text-[var(--ui-secondary)]'" @click="tab = 'matrix'">Matrix</button>
                 @endif
             </div>
@@ -114,7 +119,12 @@
         </div>
 
         {{-- Matrix --}}
-        @if(auth()->user()?->currentTeam && auth()->user()->currentTeam->user_id === auth()->id())
+        @php
+            $currentTeam = auth()->user()?->currentTeamRelation;
+            $userRole = $currentTeam ? $currentTeam->users()->where('user_id', auth()->id())->first()?->pivot->role : null;
+            $isOwner = $userRole === \Platform\Core\Enums\TeamRole::OWNER->value;
+        @endphp
+        @if($isOwner)
         <div class="mt-6" x-show="tab === 'matrix'" x-cloak>
             @if(!empty($matrixUsers) && !empty($matrixModules))
                 <div class="overflow-auto rounded-lg border border-[var(--ui-border)]/60">

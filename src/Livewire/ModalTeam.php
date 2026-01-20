@@ -435,7 +435,11 @@ class ModalTeam extends Component
         $team->users()->attach(auth()->id(), ['role' => TeamRole::OWNER->value]);
 
         // Initial members hinzufügen, falls ausgewählt
+        // Beim Erstellen eines Teams wird der Ersteller automatisch Owner, also kann er alle Rollen vergeben
+        // Aber wir prüfen trotzdem für Konsistenz
         if (!empty($this->newInitialMembers) && is_array($this->newInitialMembers)) {
+            $creatorRole = TeamRole::OWNER->value; // Beim Erstellen ist der Ersteller automatisch Owner
+            
             foreach ($this->newInitialMembers as $memberData) {
                 if (!isset($memberData['user_id']) || !isset($memberData['role'])) {
                     continue;
@@ -455,6 +459,12 @@ class ModalTeam extends Component
                     if ($member && !$team->users()->where('users.id', $memberId)->exists()) {
                         // AI-User können nicht Owner sein
                         if ($member->isAiUser() && $role === 'owner') {
+                            $role = TeamRole::MEMBER->value;
+                        }
+                        
+                        // Prüfe, ob die Rolle basierend auf der eigenen Rolle vergeben werden darf
+                        if (!$this->canAssignRole($creatorRole, $role)) {
+                            // Fallback auf Member, wenn die Rolle nicht vergeben werden darf
                             $role = TeamRole::MEMBER->value;
                         }
                         
@@ -490,14 +500,83 @@ class ModalTeam extends Component
         return $this->redirect(request()->fullUrl());
     }
 
+    /**
+     * Gibt die maximale Rolle zurück, die ein User basierend auf seiner eigenen Rolle vergeben darf.
+     * Owner kann alle Rollen vergeben, Admin kann admin/member/viewer vergeben, Member kann keine Rollen vergeben.
+     */
+    protected function getMaxAssignableRole(?string $userRole): ?string
+    {
+        if ($userRole === TeamRole::OWNER->value) {
+            return TeamRole::OWNER->value; // Owner kann alle Rollen vergeben
+        }
+        if ($userRole === TeamRole::ADMIN->value) {
+            return TeamRole::ADMIN->value; // Admin kann admin/member/viewer vergeben
+        }
+        return null; // Member kann keine Rollen vergeben
+    }
+
+    /**
+     * Prüft, ob eine Rolle basierend auf der eigenen Rolle vergeben werden darf.
+     */
+    protected function canAssignRole(?string $userRole, string $targetRole): bool
+    {
+        $maxRole = $this->getMaxAssignableRole($userRole);
+        if ($maxRole === null) {
+            return false; // Member kann keine Rollen vergeben
+        }
+
+        // Owner kann alle Rollen vergeben
+        if ($maxRole === TeamRole::OWNER->value) {
+            return true;
+        }
+
+        // Admin kann admin, member, viewer vergeben (aber nicht owner)
+        if ($maxRole === TeamRole::ADMIN->value) {
+            return in_array($targetRole, [TeamRole::ADMIN->value, TeamRole::MEMBER->value, 'viewer'], true);
+        }
+
+        return false;
+    }
+
     public function updateMemberRole($memberId, $role)
     {
         $team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
-        if ($team && $team->user_id === auth()->id()) {
-            $team->users()->updateExistingPivot($memberId, ['role' => $role]);
-            $this->memberRoles[$memberId] = $role;
-            $this->dispatch('member-role-updated');
+        if (!$team) {
+            return;
         }
+
+        // Prüfe, ob User Owner oder Admin ist
+        $userRole = $team->users()->where('user_id', auth()->id())->first()?->pivot->role;
+        if (!in_array($userRole, [TeamRole::OWNER->value, TeamRole::ADMIN->value], true)) {
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'Nur Owner oder Admin können Rollen ändern.',
+            ]);
+            return;
+        }
+
+        // Prüfe, ob die Rolle basierend auf der eigenen Rolle vergeben werden darf
+        if (!$this->canAssignRole($userRole, $role)) {
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'Du kannst diese Rolle nicht vergeben. ' . 
+                    ($userRole === TeamRole::ADMIN->value ? 'Als Admin kannst du nur Admin, Member oder Viewer vergeben.' : ''),
+            ]);
+            return;
+        }
+
+        // Owner kann nur durch Owner vergeben werden
+        if ($role === TeamRole::OWNER->value && $userRole !== TeamRole::OWNER->value) {
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'Nur Owner können die Owner-Rolle vergeben.',
+            ]);
+            return;
+        }
+
+        $team->users()->updateExistingPivot($memberId, ['role' => $role]);
+        $this->memberRoles[$memberId] = $role;
+        $this->dispatch('member-role-updated');
     }
 
     public function updatedUser($property, $value)
