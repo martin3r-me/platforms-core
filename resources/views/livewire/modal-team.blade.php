@@ -16,21 +16,50 @@
     {{-- Team Tab --}}
     <div class="mt-6" x-show="tab === 'team'" x-cloak>
         <div class="space-y-6">
+            {{-- Team Switch --}}
             <div>
-                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Team-Mitglieder</h3>
-                @if(isset($team) && $team)
-                    <div class="space-y-3">
-                        @foreach($team->users ?? [] as $member)
-                            <div class="flex items-center justify-between p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <div class="font-semibold text-[var(--ui-secondary)]">{{ $member->fullname ?? $member->name }}</div>
-                                <div class="text-sm text-[var(--ui-muted)]">{{ ucfirst($member->pivot->role ?? 'member') }}</div>
-                            </div>
-                        @endforeach
-                    </div>
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Aktuelles Team wechseln</h3>
+                @if(!empty($allTeams) && count($allTeams) > 1)
+                    <x-ui-input-select
+                        name="user.current_team_id"
+                        label="Team auswählen"
+                        :options="$allTeams"
+                        optionValue="id"
+                        optionLabel="name"
+                        :nullable="false"
+                        wire:model.live="user.current_team_id"
+                        x-data
+                        @change="$wire.changeCurrentTeam($event.target.value)"
+                    />
                 @else
-                    <div class="text-sm text-[var(--ui-muted)]">Kein Team ausgewählt.</div>
+                    <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">Nur ein Team vorhanden.</div>
                 @endif
             </div>
+
+            {{-- Team Members --}}
+            @if(isset($team) && $team)
+            <div>
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Team-Mitglieder</h3>
+                <div class="space-y-3">
+                    @foreach($team->users ?? [] as $member)
+                        <div class="flex items-center justify-between p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                            <div class="flex items-center gap-3">
+                                <div class="font-semibold text-[var(--ui-secondary)]">{{ $member->fullname ?? $member->name }}</div>
+                                @if($member->isAiUser())
+                                    <x-ui-badge variant="purple" size="sm">AI</x-ui-badge>
+                                @endif
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <x-ui-badge variant="primary" size="sm">{{ ucfirst($member->pivot->role ?? 'member') }}</x-ui-badge>
+                                @if(($member->id ?? null) === auth()->id())
+                                    <x-ui-badge variant="success" size="sm">Du</x-ui-badge>
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+            @endif
         </div>
     </div>
 
