@@ -198,8 +198,13 @@ class ModalTeam extends Component
 
     /**
      * Lädt verfügbare Parent-Teams (Root-Teams, zu denen der User Zugriff hat).
-     * Nur Root-Teams können als Parent-Teams verwendet werden.
-     * User muss Owner oder Admin sein (nicht nur Member).
+     * 
+     * Ein Team qualifiziert sich als Parent-Team, wenn:
+     * 1. Es ein Root-Team ist (parent_team_id ist null)
+     * 2. Der User Owner oder Admin ist (über team_user Pivot-Tabelle ODER direkt als user_id)
+     * 3. Es nicht das aktuelle Team ist (wenn das aktuelle Team bereits ein Child-Team ist)
+     * 
+     * Das aktuelle Team wird angezeigt, wenn es ein Root-Team ist (z.B. beim Erstellen eines neuen Teams)
      */
     public function loadAvailableParentTeams()
     {
@@ -207,7 +212,7 @@ class ModalTeam extends Component
         $currentTeamId = $this->team?->id;
         $currentParentTeamId = $this->team?->parent_team_id;
 
-        // Root-Teams, bei denen der User Owner oder Admin ist (und nicht das aktuelle Team)
+        // Root-Teams, bei denen der User Owner oder Admin ist
         // Option 1: Teams, bei denen der User über die users-Beziehung Owner oder Admin ist
         // Option 2: Teams, bei denen der User direkt als Owner gesetzt ist (user_id)
         
@@ -229,7 +234,12 @@ class ModalTeam extends Component
             })
             ->whereNull('parent_team_id');
 
-        if ($currentTeamId) {
+        // Das aktuelle Team nur ausschließen, wenn es bereits ein Parent-Team hat
+        // (ein Team kann nicht sein eigenes Parent-Team sein)
+        // Wenn das aktuelle Team ein Root-Team ist, sollte es angezeigt werden
+        // (z.B. wenn man ein neues Team erstellt und das aktuelle Team als Parent wählen will)
+        if ($currentTeamId && $this->team && $this->team->parent_team_id !== null) {
+            // Nur ausschließen, wenn es bereits ein Child-Team ist
             $rootTeamsQuery->where('id', '!=', $currentTeamId);
         }
 
