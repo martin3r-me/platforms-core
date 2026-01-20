@@ -100,24 +100,10 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
-                                @php
-                                    $currentTeam = auth()->user()?->currentTeamRelation;
-                                    $currentUserRole = $currentTeam ? $currentTeam->users()->where('user_id', auth()->id())->first()?->pivot->role : null;
-                                    $isOwnerOrAdmin = in_array($currentUserRole, [\Platform\Core\Enums\TeamRole::OWNER->value, \Platform\Core\Enums\TeamRole::ADMIN->value], true);
-                                    $isOwner = $currentUserRole === \Platform\Core\Enums\TeamRole::OWNER->value;
-                                    
-                                    // Verfügbare Rollen basierend auf eigener Rolle
-                                    $availableRoles = [];
-                                    if ($isOwner) {
-                                        $availableRoles = ['owner' => 'Owner', 'admin' => 'Admin', 'member' => 'Member', 'viewer' => 'Viewer'];
-                                    } elseif ($currentUserRole === \Platform\Core\Enums\TeamRole::ADMIN->value) {
-                                        $availableRoles = ['admin' => 'Admin', 'member' => 'Member', 'viewer' => 'Viewer'];
-                                    }
-                                @endphp
-                                @if($isOwnerOrAdmin && !empty($availableRoles))
+                                @if(($team->user_id ?? null) === auth()->id())
                                     <x-ui-input-select
                                         name="member_role_{{ $member->id }}"
-                                        :options="$availableRoles"
+                                        :options="['owner' => 'Owner', 'admin' => 'Admin', 'member' => 'Member', 'viewer' => 'Viewer']"
                                         :nullable="false"
                                         x-data
                                         @change="$wire.updateMemberRole({{ $member->id }}, $event.target.value)"
