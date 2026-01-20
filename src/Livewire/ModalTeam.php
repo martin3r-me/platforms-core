@@ -207,10 +207,17 @@ class ModalTeam extends Component
         $currentParentTeamId = $this->team?->parent_team_id;
 
         // Root-Teams, bei denen der User Owner oder Admin ist (und nicht das aktuelle Team)
+        // Option 1: Teams, bei denen der User über die users-Beziehung Owner oder Admin ist
+        // Option 2: Teams, bei denen der User direkt als Owner gesetzt ist (user_id)
         $rootTeamsQuery = Team::query()
-            ->whereHas('users', function ($query) use ($user) {
-                $query->where('user_id', $user->id)
-                    ->whereIn('role', [TeamRole::OWNER->value, TeamRole::ADMIN->value]);
+            ->where(function ($query) use ($user) {
+                // Über users-Beziehung (Owner oder Admin)
+                $query->whereHas('users', function ($q) use ($user) {
+                    $q->where('user_id', $user->id)
+                        ->wherePivotIn('role', [TeamRole::OWNER->value, TeamRole::ADMIN->value]);
+                })
+                // Oder direkt als Owner (user_id)
+                ->orWhere('user_id', $user->id);
             })
             ->whereNull('parent_team_id');
 
@@ -224,9 +231,14 @@ class ModalTeam extends Component
         // aber nur, wenn der User Owner oder Admin ist (sonst würden wir fremde Teams anzeigen).
         if ($currentParentTeamId) {
             $currentParent = Team::query()
-                ->whereHas('users', function ($query) use ($user) {
-                    $query->where('user_id', $user->id)
-                        ->whereIn('role', [TeamRole::OWNER->value, TeamRole::ADMIN->value]);
+                ->where(function ($query) use ($user, $currentParentTeamId) {
+                    // Über users-Beziehung
+                    $query->whereHas('users', function ($q) use ($user) {
+                        $q->where('user_id', $user->id)
+                            ->wherePivotIn('role', [TeamRole::OWNER->value, TeamRole::ADMIN->value]);
+                    })
+                    // Oder direkt als Owner (user_id)
+                    ->orWhere('user_id', $user->id);
                 })
                 ->where('id', $currentParentTeamId)
                 ->first();
