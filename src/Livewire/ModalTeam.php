@@ -7,6 +7,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 use Platform\Core\Models\Team;
 use Platform\Core\Models\TeamInvitation;
 use Platform\Core\Models\User;
@@ -209,15 +210,22 @@ class ModalTeam extends Component
         // Root-Teams, bei denen der User Owner oder Admin ist (und nicht das aktuelle Team)
         // Option 1: Teams, bei denen der User über die users-Beziehung Owner oder Admin ist
         // Option 2: Teams, bei denen der User direkt als Owner gesetzt ist (user_id)
+        
+        // Hole alle Team-IDs, bei denen der User Owner oder Admin ist (über Pivot-Tabelle)
+        $teamIdsFromPivot = DB::table('team_user')
+            ->where('user_id', $user->id)
+            ->whereIn('role', [TeamRole::OWNER->value, TeamRole::ADMIN->value])
+            ->pluck('team_id')
+            ->toArray();
+        
         $rootTeamsQuery = Team::query()
-            ->where(function ($query) use ($user) {
-                // Über users-Beziehung (Owner oder Admin)
-                $query->whereHas('users', function ($q) use ($user) {
-                    $q->where('user_id', $user->id)
-                        ->wherePivotIn('role', [TeamRole::OWNER->value, TeamRole::ADMIN->value]);
-                })
+            ->where(function ($query) use ($user, $teamIdsFromPivot) {
+                // Über users-Beziehung (Owner oder Admin) - über Pivot-Tabelle
+                if (!empty($teamIdsFromPivot)) {
+                    $query->whereIn('id', $teamIdsFromPivot);
+                }
                 // Oder direkt als Owner (user_id)
-                ->orWhere('user_id', $user->id);
+                $query->orWhere('user_id', $user->id);
             })
             ->whereNull('parent_team_id');
 
@@ -230,21 +238,23 @@ class ModalTeam extends Component
         // Wenn bereits ein Parent-Team gesetzt ist, dieses auch in die Liste aufnehmen,
         // aber nur, wenn der User Owner oder Admin ist (sonst würden wir fremde Teams anzeigen).
         if ($currentParentTeamId) {
-            $currentParent = Team::query()
-                ->where(function ($query) use ($user, $currentParentTeamId) {
-                    // Über users-Beziehung
-                    $query->whereHas('users', function ($q) use ($user) {
-                        $q->where('user_id', $user->id)
-                            ->wherePivotIn('role', [TeamRole::OWNER->value, TeamRole::ADMIN->value]);
-                    })
-                    // Oder direkt als Owner (user_id)
-                    ->orWhere('user_id', $user->id);
-                })
-                ->where('id', $currentParentTeamId)
-                ->first();
-
-            if ($currentParent) {
-                $rootTeams->push($currentParent);
+            // Prüfe ob User Owner oder Admin ist (über Pivot-Tabelle)
+            $isOwnerOrAdmin = DB::table('team_user')
+                ->where('team_id', $currentParentTeamId)
+                ->where('user_id', $user->id)
+                ->whereIn('role', [TeamRole::OWNER->value, TeamRole::ADMIN->value])
+                ->exists();
+            
+            // Oder direkt als Owner (user_id)
+            $isDirectOwner = Team::where('id', $currentParentTeamId)
+                ->where('user_id', $user->id)
+                ->exists();
+            
+            if ($isOwnerOrAdmin || $isDirectOwner) {
+                $currentParent = Team::find($currentParentTeamId);
+                if ($currentParent && !$rootTeams->contains('id', $currentParentTeamId)) {
+                    $rootTeams->push($currentParent);
+                }
             }
         }
 
