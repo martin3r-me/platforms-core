@@ -114,7 +114,7 @@
                                         $availableRoles = ['admin' => 'Admin', 'member' => 'Member', 'viewer' => 'Viewer'];
                                     }
                                 @endphp
-                                @if($isOwnerOrAdmin)
+                                @if($isOwnerOrAdmin && !empty($availableRoles))
                                     <x-ui-input-select
                                         name="member_role_{{ $member->id }}"
                                         :options="$availableRoles"
