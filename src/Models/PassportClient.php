@@ -94,34 +94,7 @@ class PassportClient extends Client
     {
         return Attribute::make(
             get: function ($value, array $attributes) {
-                $rawValue = $value ?? $attributes['grant_types'] ?? null;
-
-                // If it's already an array, return it
-                if (is_array($rawValue) && count($rawValue) > 0) {
-                    return $rawValue;
-                }
-
-                // If it's a JSON string, decode it
-                if (is_string($rawValue) && str_starts_with(trim($rawValue), '[')) {
-                    $decoded = json_decode($rawValue, true);
-                    if (is_array($decoded) && count($decoded) > 0) {
-                        return $decoded;
-                    }
-                }
-
-                // Legacy: single grant type as string
-                if (is_string($rawValue) && !empty($rawValue) && !str_starts_with(trim($rawValue), '[')) {
-                    return [$rawValue];
-                }
-
-                // Default grant types for backwards compatibility
-                // Wenn keine grant_types gesetzt sind, erlaube die gängigsten
-                return [
-                    'authorization_code',
-                    'refresh_token',
-                    'personal_access',
-                    'password',
-                ];
+                return $this->resolveGrantTypes($value, $attributes);
             },
             set: function ($value) {
                 if (is_array($value)) {
@@ -135,5 +108,57 @@ class PassportClient extends Client
                 return json_encode([]);
             }
         );
+    }
+
+    /**
+     * Resolve grant types from raw value.
+     */
+    protected function resolveGrantTypes($value = null, array $attributes = []): array
+    {
+        $rawValue = $value ?? $attributes['grant_types'] ?? $this->attributes['grant_types'] ?? null;
+
+        // If it's already an array, return it
+        if (is_array($rawValue) && count($rawValue) > 0) {
+            return $rawValue;
+        }
+
+        // If it's a JSON string, decode it
+        if (is_string($rawValue) && str_starts_with(trim($rawValue), '[')) {
+            $decoded = json_decode($rawValue, true);
+            if (is_array($decoded) && count($decoded) > 0) {
+                return $decoded;
+            }
+        }
+
+        // Legacy: single grant type as string
+        if (is_string($rawValue) && !empty($rawValue) && !str_starts_with(trim($rawValue), '[')) {
+            return [$rawValue];
+        }
+
+        // Default grant types for backwards compatibility
+        return [
+            'authorization_code',
+            'refresh_token',
+            'personal_access',
+            'password',
+        ];
+    }
+
+    /**
+     * Determine if the client has a specific grant type.
+     * Override to ensure backwards compatibility.
+     */
+    public function hasGrantType(string $grantType): bool
+    {
+        $grantTypes = $this->resolveGrantTypes();
+        return in_array($grantType, $grantTypes);
+    }
+
+    /**
+     * Get all grant types for this client.
+     */
+    public function getGrantTypesAttribute(): array
+    {
+        return $this->resolveGrantTypes();
     }
 }
