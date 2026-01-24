@@ -13,7 +13,8 @@ use Platform\Core\Models\CoreAiModel;
 
 class User extends Authenticatable
 {
-    use PassportHasApiTokens, SanctumHasApiTokens {
+    // Sanctum zuerst, damit $accessToken Property von Sanctum kommt
+    use SanctumHasApiTokens, PassportHasApiTokens {
         // Passport's Methoden haben Vorrang (für OAuth)
         PassportHasApiTokens::tokens insteadof SanctumHasApiTokens;
         PassportHasApiTokens::tokenCan insteadof SanctumHasApiTokens;
@@ -35,11 +36,13 @@ class User extends Authenticatable
 
     /**
      * Access Token Property - kompatibel mit beiden Traits
-     * Wird von Sanctum verwendet (currentAccessToken() hat Vorrang)
+     * Sanctum: protected $accessToken; (ohne Typ)
+     * Passport: protected ?ScopeAuthorizable $accessToken = null;
+     * Wir definieren ohne Typ, damit es mit beiden kompatibel ist
      * 
      * @var mixed
      */
-    protected $accessToken;
+    protected $accessToken = null;
 
     protected $fillable = [
         'name',
