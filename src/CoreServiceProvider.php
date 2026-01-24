@@ -493,14 +493,14 @@ class CoreServiceProvider extends ServiceProvider
         // AuthorizationViewResponse - für die OAuth Authorization Page
         $this->app->bind(
             \Laravel\Passport\Contracts\AuthorizationViewResponse::class,
-            \Laravel\Passport\Http\Responses\AuthorizationViewResponse::class
+            \Platform\Core\Http\Responses\Passport\AuthorizationViewResponse::class
         );
 
         // ApproveAuthorizationResponse
         if (interface_exists(\Laravel\Passport\Contracts\ApproveAuthorizationResponse::class)) {
             $this->app->bind(
                 \Laravel\Passport\Contracts\ApproveAuthorizationResponse::class,
-                \Laravel\Passport\Http\Responses\ApproveAuthorizationResponse::class
+                \Platform\Core\Http\Responses\Passport\ApproveAuthorizationResponse::class
             );
         }
 
@@ -508,7 +508,7 @@ class CoreServiceProvider extends ServiceProvider
         if (interface_exists(\Laravel\Passport\Contracts\DenyAuthorizationResponse::class)) {
             $this->app->bind(
                 \Laravel\Passport\Contracts\DenyAuthorizationResponse::class,
-                \Laravel\Passport\Http\Responses\DenyAuthorizationResponse::class
+                \Platform\Core\Http\Responses\Passport\DenyAuthorizationResponse::class
             );
         }
     }
