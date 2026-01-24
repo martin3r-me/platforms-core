@@ -97,20 +97,6 @@ class CoreServiceProvider extends ServiceProvider
             ->prefix('api')
             ->group(__DIR__.'/../routes/api.php');
 
-        // MCP-Routen registrieren (nur wenn Server konfiguriert ist)
-        // KEINE Middleware - Laravel MCP handhabt alles selbst
-        $mcpConfig = config('mcp');
-        $serverConfig = $mcpConfig['servers']['default'] ?? null;
-        if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig['class'])) {
-            $prefix = $mcpConfig['routes']['prefix'] ?? 'mcp';
-            
-            Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
-                ->prefix($prefix)
-                ->group(__DIR__.'/../routes/mcp.php');
-        }
-
-        // Keine Agent/Schema Logs mehr
-
         // Command registrieren (nur in der Konsole)
         if ($this->app->runningInConsole()) {
             $this->commands([
