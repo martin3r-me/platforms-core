@@ -13,7 +13,13 @@ use Platform\Core\Models\CoreAiModel;
 
 class User extends Authenticatable
 {
-    use PassportHasApiTokens, SanctumHasApiTokens, HasFactory, Notifiable;
+    use PassportHasApiTokens, SanctumHasApiTokens {
+        // Passport's tokens() Methode hat Vorrang
+        PassportHasApiTokens::tokens insteadof SanctumHasApiTokens;
+        // Sanctum's tokens() Methode als sanctumTokens() verfügbar machen
+        SanctumHasApiTokens::tokens as sanctumTokens;
+    }
+    use HasFactory, Notifiable;
 
     protected $fillable = [
         'name',
