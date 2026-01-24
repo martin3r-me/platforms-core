@@ -67,14 +67,10 @@ if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig
                     'cursor_ide' => [
                         'mcpServers' => [
                             $serverNameKey => [
-                                'command' => 'php',
-                                'args' => [
-                                    $artisanPath,
-                                    'mcp:start',
-                                    $serverNameKey
-                                ],
-                                'env' => [
-                                    'MCP_AUTH_TOKEN' => 'YOUR_TOKEN_HERE'
+                                'url' => $baseUrl . '/' . $prefix . '/' . $serverNameKey,
+                                'auth' => [
+                                    'type' => 'bearer',
+                                    'token' => 'YOUR_TOKEN_HERE'
                                 ]
                             ]
                         ]
@@ -84,7 +80,7 @@ if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig
             'instructions' => [
                 'chatgpt_desktop' => 'Füge die "chatgpt_desktop" Konfiguration in deine ChatGPT Desktop App ein (Settings → Features → Model Context Protocol)',
                 'web_client' => 'Nutze die "web_config" für HTTP-basierte Clients. Ersetze YOUR_TOKEN_HERE mit deinem Sanctum Token.',
-                'cursor_ide' => 'Füge die "cursor_ide" Konfiguration in Cursor IDE ein (Settings → Features → Model Context Protocol). Ersetze YOUR_TOKEN_HERE mit deinem Sanctum Token. Der Token wird als Umgebungsvariable MCP_AUTH_TOKEN übergeben.',
+                'cursor_ide' => 'Füge die "cursor_ide" Konfiguration in Cursor IDE ein (Settings → Features → Model Context Protocol). Ersetze YOUR_TOKEN_HERE mit deinem Sanctum Token. Cursor verwendet HTTP für die Kommunikation.',
                 'get_token' => 'Erstelle einen Token mit: php artisan api:token:create --email=your@email.com --name="MCP Token" --show'
             ]
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
@@ -113,4 +109,21 @@ if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig
     Route::post('tools/{toolName}', [\Platform\Core\Http\Controllers\McpController::class, 'proxy'])
         ->middleware($authMiddleware)
         ->name('mcp.tools.proxy');
+    
+    // Cursor IDE Konfiguration - direktes JSON-Objekt zum Kopieren
+    Route::get('cursor-config.json', function () use ($serverConfig, $serverNameKey, $prefix) {
+        $baseUrl = config('app.url');
+        
+        return response()->json([
+            'mcpServers' => [
+                $serverNameKey => [
+                    'url' => $baseUrl . '/' . $prefix . '/' . $serverNameKey,
+                    'auth' => [
+                        'type' => 'bearer',
+                        'token' => 'YOUR_TOKEN_HERE'
+                    ]
+                ]
+            ]
+        ], 200, [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    })->name('mcp.cursor.config');
 }

@@ -256,27 +256,27 @@
                 <h2>📝 Schritt 4: Cursor IDE Konfiguration</h2>
                 <div class="step">
                     <span class="step-number">4</span>
-                    Für Cursor IDE MCP Server Integration (STDIO-basiert, wie ChatGPT Desktop)
+                    Für Cursor IDE MCP Server Integration (HTTP-basiert)
                 </div>
                 <div class="config-box">
-                    <p><strong>Cursor MCP Server Konfiguration (STDIO):</strong></p>
+                    <p><strong>Cursor MCP Server Konfiguration (HTTP):</strong></p>
                     <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Füge diese Konfiguration in deine Cursor-Einstellungen ein (Settings → Features → Model Context Protocol):</p>
                     <pre id="cursor-config">{
   "mcpServers": {
     "{{ $serverNameKey ?? 'platform' }}": {
-      "command": "php",
-      "args": [
-        "{{ $artisanPath }}",
-        "mcp:start",
-        "{{ $serverNameKey ?? 'platform' }}"
-      ],
-      "env": {
-        "MCP_AUTH_TOKEN": "YOUR_TOKEN_HERE"
+      "url": "{{ $serverUrl }}",
+      "auth": {
+        "type": "bearer",
+        "token": "YOUR_TOKEN_HERE"
       }
     }
   }
 }</pre>
                     <button class="btn btn-success" onclick="copyConfig('cursor-config')">📋 Cursor Konfiguration kopieren</button>
+                    <p style="margin-top: 15px; color: #666; font-size: 14px;">
+                        <strong>Oder direkt als JSON laden:</strong> 
+                        <a href="{{ $baseUrl }}/mcp/cursor-config.json" target="_blank" style="color: #667eea; text-decoration: underline;">{{ $baseUrl }}/mcp/cursor-config.json</a>
+                    </p>
                 </div>
                 <div class="alert alert-info">
                     <strong>💡 Anleitung:</strong>
@@ -285,7 +285,7 @@
                         <li>Füge die obige Konfiguration ein</li>
                         <li><strong>Wichtig:</strong> Ersetze <code>YOUR_TOKEN_HERE</code> mit deinem Sanctum Token (aus Schritt 1)</li>
                         <li>Speichere die Einstellungen</li>
-                        <li><strong>Hinweis:</strong> Der Token wird als Umgebungsvariable <code>MCP_AUTH_TOKEN</code> übergeben</li>
+                        <li><strong>Hinweis:</strong> Cursor verwendet HTTP für die Kommunikation mit dem MCP Server</li>
                     </ol>
                 </div>
             </div>

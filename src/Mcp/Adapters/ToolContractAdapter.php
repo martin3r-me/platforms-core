@@ -105,17 +105,25 @@ class ToolContractAdapter extends Tool
      */
     public function handle(array $arguments): McpToolResult
     {
-        // JSON-Strings in Arrays/Objekte konvertieren (falls nötig)
-        $arguments = $this->normalizeArguments($arguments);
-        
-        // Context aus Request extrahieren
-        $context = $this->createContextFromRequest();
-        
-        // Tool ausführen
-        $result = $this->tool->execute($arguments, $context);
-        
-        // ToolResult zu MCP ToolResult konvertieren
-        return $this->convertToolResult($result);
+        try {
+            // JSON-Strings in Arrays/Objekte konvertieren (falls nötig)
+            $arguments = $this->normalizeArguments($arguments);
+
+            // Context aus Request extrahieren
+            $context = $this->createContextFromRequest();
+
+            // Tool ausführen
+            $result = $this->tool->execute($arguments, $context);
+
+            // ToolResult zu MCP ToolResult konvertieren
+            return $this->convertToolResult($result);
+        } catch (\RuntimeException $e) {
+            // Authentifizierungsfehler als Fehler-Result zurückgeben
+            return McpToolResult::error($e->getMessage());
+        } catch (\Throwable $e) {
+            // Andere Fehler ebenfalls als Fehler-Result zurückgeben
+            return McpToolResult::error('Tool execution failed: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -166,7 +174,15 @@ class ToolContractAdapter extends Tool
         }
         
         if (!$user) {
-            throw new \RuntimeException('User must be authenticated to execute tools. Provide MCP_AUTH_TOKEN environment variable or authenticate via HTTP request.');
+            // Bei STDIO-Servern: Prüfe ob Token in Umgebungsvariable vorhanden ist
+            $token = env('MCP_AUTH_TOKEN') ?? $_ENV['MCP_AUTH_TOKEN'] ?? getenv('MCP_AUTH_TOKEN');
+            
+            if (!$token) {
+                throw new \RuntimeException('User must be authenticated to execute tools. Provide MCP_AUTH_TOKEN environment variable or authenticate via HTTP request.');
+            }
+            
+            // Token wurde gefunden, aber User konnte nicht authentifiziert werden
+            throw new \RuntimeException('Invalid MCP_AUTH_TOKEN. Please check your token and try again.');
         }
         
         // Team aus User extrahieren (falls vorhanden)

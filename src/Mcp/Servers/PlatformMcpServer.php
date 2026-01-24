@@ -46,8 +46,16 @@ class PlatformMcpServer extends Server
      */
     public function boot(): void
     {
-        // Parent boot() aufrufen
-        parent::boot();
+        try {
+            // Parent boot() aufrufen
+            parent::boot();
+        } catch (\Throwable $e) {
+            Log::error("[PlatformMcpServer] Fehler beim Parent-Boot", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            // Weiter machen, auch wenn Parent-Boot fehlschlägt
+        }
         
         // 1. Lade alle ToolContract Tools aus Registry und wrappe sie
         try {
@@ -91,7 +99,8 @@ class PlatformMcpServer extends Server
                     }
                 } catch (\Throwable $e) {
                     Log::warning("[PlatformMcpServer] Tool-Loading fehlgeschlagen", [
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
                     ]);
                 }
             }
@@ -107,23 +116,33 @@ class PlatformMcpServer extends Server
                 } catch (\Throwable $e) {
                     Log::warning("[PlatformMcpServer] Tool konnte nicht als MCP Tool gewrappt werden", [
                         'tool' => $toolContract->getName(),
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
+                        'trace' => substr($e->getTraceAsString(), 0, 500)
                     ]);
                 }
             }
         } catch (\Throwable $e) {
-            Log::warning("[PlatformMcpServer] ToolRegistry konnte nicht geladen werden", [
-                'error' => $e->getMessage()
+            Log::error("[PlatformMcpServer] ToolRegistry konnte nicht geladen werden", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
+            // Weiter machen, auch wenn Registry nicht geladen werden kann
         }
         
         // 2. Füge zusätzliche direkte MCP Tools hinzu
         foreach ($this->additionalTools as $toolClass) {
-            if (class_exists($toolClass)) {
-                $this->addTool($toolClass);
-            } else {
-                Log::warning("[PlatformMcpServer] MCP Tool-Klasse nicht gefunden", [
-                    'class' => $toolClass
+            try {
+                if (class_exists($toolClass)) {
+                    $this->addTool($toolClass);
+                } else {
+                    Log::warning("[PlatformMcpServer] MCP Tool-Klasse nicht gefunden", [
+                        'class' => $toolClass
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                Log::warning("[PlatformMcpServer] Fehler beim Hinzufügen von MCP Tool", [
+                    'class' => $toolClass,
+                    'error' => $e->getMessage()
                 ]);
             }
         }
