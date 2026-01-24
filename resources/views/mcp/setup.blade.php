@@ -253,9 +253,43 @@
             </div>
             
             <div class="section">
-                <h2>🤖 Schritt 4: Custom GPT (Actions) - ChatGPT GPT Builder</h2>
+                <h2>📝 Schritt 4: Cursor IDE Konfiguration</h2>
                 <div class="step">
                     <span class="step-number">4</span>
+                    Für Cursor IDE MCP Server Integration
+                </div>
+                <div class="config-box">
+                    <p><strong>Cursor MCP Server Konfiguration:</strong></p>
+                    <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Füge diese Konfiguration in deine Cursor-Einstellungen ein (Settings → Features → Model Context Protocol):</p>
+                    <pre id="cursor-config">{
+  "mcpServers": {
+    "{{ $serverNameKey ?? 'platform' }}": {
+      "url": "{{ $serverUrl }}",
+      "description": "{{ $serverName ?? 'Platform MCP Server' }}",
+      "auth": {
+        "type": "bearer",
+        "token": "YOUR_TOKEN_HERE"
+      }
+    }
+  }
+}</pre>
+                    <button class="btn btn-success" onclick="copyConfig('cursor-config')">📋 Cursor Konfiguration kopieren</button>
+                </div>
+                <div class="alert alert-info">
+                    <strong>💡 Anleitung:</strong>
+                    <ol style="margin-top: 10px; padding-left: 20px;">
+                        <li>Öffne Cursor → Settings → Features → Model Context Protocol</li>
+                        <li>Füge die obige Konfiguration ein</li>
+                        <li>Ersetze <code>YOUR_TOKEN_HERE</code> mit deinem Sanctum Token (aus Schritt 1)</li>
+                        <li>Speichere die Einstellungen</li>
+                    </ol>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>🤖 Schritt 5: Custom GPT (Actions) - ChatGPT GPT Builder</h2>
+                <div class="step">
+                    <span class="step-number">5</span>
                     Für Custom GPTs im GPT Builder (chat.openai.com → Create GPT → Actions)
                 </div>
                 <div class="config-box">

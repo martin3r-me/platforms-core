@@ -4,6 +4,7 @@ namespace Platform\Core\Mcp\Servers;
 
 use Laravel\Mcp\Server;
 use Platform\Core\Tools\ToolRegistry;
+use Platform\Core\Tools\ToolLoader;
 use Platform\Core\Mcp\Adapters\ToolContractAdapter;
 use Illuminate\Support\Facades\Log;
 
@@ -51,6 +52,51 @@ class PlatformMcpServer extends Server
         // 1. Lade alle ToolContract Tools aus Registry und wrappe sie
         try {
             $registry = app(ToolRegistry::class);
+            
+            // WICHTIG: Stelle sicher, dass Tools geladen sind (falls Registry noch leer ist)
+            // Dies berührt das interne System nicht - wir nutzen nur die vorhandenen Methoden
+            if (count($registry->all()) === 0) {
+                try {
+                    // Core-Tools laden
+                    $coreTools = ToolLoader::loadCoreTools();
+                    foreach ($coreTools as $tool) {
+                        try {
+                            if (!$registry->has($tool->getName())) {
+                                $registry->register($tool);
+                            }
+                        } catch (\Throwable $e) {
+                            Log::warning("[PlatformMcpServer] Core-Tool konnte nicht registriert werden", [
+                                'tool' => get_class($tool),
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
+                    
+                    // Module-Tools laden
+                    $modulesPath = realpath(__DIR__ . '/../../../../modules');
+                    if ($modulesPath && is_dir($modulesPath)) {
+                        $moduleTools = ToolLoader::loadFromAllModules($modulesPath);
+                        foreach ($moduleTools as $tool) {
+                            try {
+                                if (!$registry->has($tool->getName())) {
+                                    $registry->register($tool);
+                                }
+                            } catch (\Throwable $e) {
+                                Log::warning("[PlatformMcpServer] Module-Tool konnte nicht registriert werden", [
+                                    'tool' => get_class($tool),
+                                    'error' => $e->getMessage()
+                                ]);
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("[PlatformMcpServer] Tool-Loading fehlgeschlagen", [
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+            
+            // Jetzt alle Tools aus Registry holen und wrappen
             $toolContractTools = $registry->all();
             
             foreach ($toolContractTools as $toolContract) {
