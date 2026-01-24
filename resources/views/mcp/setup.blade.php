@@ -265,9 +265,9 @@
   "mcpServers": {
     "{{ $serverNameKey ?? 'platform' }}": {
       "url": "{{ $serverUrl }}",
-      "auth": {
-        "type": "bearer",
-        "token": "YOUR_TOKEN_HERE"
+      "headers": {
+        "Authorization": "Bearer YOUR_TOKEN_HERE",
+        "Content-Type": "application/json"
       }
     }
   }
