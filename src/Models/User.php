@@ -5,44 +5,14 @@ namespace Platform\Core\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens as SanctumHasApiTokens;
-use Laravel\Passport\HasApiTokens as PassportHasApiTokens;
+use Platform\Core\Traits\HasApiTokens;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Platform\Core\Models\Module;
 use Platform\Core\Models\CoreAiModel;
 
 class User extends Authenticatable
 {
-    // Sanctum zuerst, damit $accessToken Property von Sanctum kommt
-    use SanctumHasApiTokens, PassportHasApiTokens {
-        // Passport's Methoden haben Vorrang (für OAuth)
-        PassportHasApiTokens::tokens insteadof SanctumHasApiTokens;
-        PassportHasApiTokens::tokenCan insteadof SanctumHasApiTokens;
-        PassportHasApiTokens::tokenCant insteadof SanctumHasApiTokens;
-        // Sanctum's createToken(), currentAccessToken() und withAccessToken() haben Vorrang (wird für Bearer Tokens verwendet)
-        SanctumHasApiTokens::createToken insteadof PassportHasApiTokens;
-        SanctumHasApiTokens::currentAccessToken insteadof PassportHasApiTokens;
-        SanctumHasApiTokens::withAccessToken insteadof PassportHasApiTokens;
-        // Sanctum's Methoden als sanctum*() verfügbar machen (für explizite Verwendung)
-        SanctumHasApiTokens::tokens as sanctumTokens;
-        SanctumHasApiTokens::tokenCan as sanctumTokenCan;
-        SanctumHasApiTokens::tokenCant as sanctumTokenCant;
-        // Passport's Methoden als passport*() verfügbar machen (falls benötigt)
-        PassportHasApiTokens::createToken as passportCreateToken;
-        PassportHasApiTokens::currentAccessToken as passportCurrentAccessToken;
-        PassportHasApiTokens::withAccessToken as passportWithAccessToken;
-    }
-    use HasFactory, Notifiable;
-
-    /**
-     * Access Token Property - kompatibel mit beiden Traits
-     * Sanctum: protected $accessToken; (ohne Typ)
-     * Passport: protected ?ScopeAuthorizable $accessToken = null;
-     * Wir definieren ohne Typ, damit es mit beiden kompatibel ist
-     * 
-     * @var mixed
-     */
-    protected $accessToken = null;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
         'name',
