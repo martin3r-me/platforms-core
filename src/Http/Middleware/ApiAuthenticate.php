@@ -5,6 +5,7 @@ namespace Platform\Core\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -20,9 +21,32 @@ class ApiAuthenticate
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Versuche zuerst Sanctum-Authentifizierung
+        // Versuche zuerst Sanctum-Authentifizierung über Bearer Token
+        $bearerToken = $request->bearerToken();
+        
+        if ($bearerToken) {
+            // Finde den Token in der Datenbank
+            $accessToken = PersonalAccessToken::findToken($bearerToken);
+            
+            if ($accessToken) {
+                // Token gefunden - authentifiziere den User
+                $user = $accessToken->tokenable;
+                if ($user) {
+                    Auth::setUser($user);
+                    return $next($request);
+                }
+            }
+        }
+
+        // Fallback: Versuche über Request->user('sanctum')
+        $user = $request->user('sanctum');
+        if ($user) {
+            Auth::setUser($user);
+            return $next($request);
+        }
+
+        // Fallback: Versuche über Auth::guard('sanctum')
         if (Auth::guard('sanctum')->check()) {
-            // Setze den authentifizierten User für den Request
             Auth::setUser(Auth::guard('sanctum')->user());
             return $next($request);
         }
