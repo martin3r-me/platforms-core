@@ -31,8 +31,10 @@ if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig
     
     // MCP Server Route mit Authentifizierung
     // Unterstützt sowohl GET (für SSE) als auch POST (für JSON-RPC)
-    Route::match(['GET', 'POST'], $serverNameKey, function () use ($serverClass) {
-        $transport = new \Laravel\Mcp\Server\Transport\HttpTransport(request());
+    // Verwende Route::any() um alle HTTP-Methoden zu unterstützen
+    Route::any($serverNameKey, function () use ($serverClass) {
+        $request = request();
+        $transport = new \Laravel\Mcp\Server\Transport\HttpTransport($request);
         $server = new $serverClass;
         $server->connect($transport);
         return $transport->run();
