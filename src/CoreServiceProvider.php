@@ -126,7 +126,6 @@ class CoreServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/platform.php', 'platform');
         $this->mergeConfigFrom(__DIR__.'/../config/security.php', 'security');
         $this->mergeConfigFrom(__DIR__.'/../config/checkins.php', 'checkins');
-        $this->mergeConfigFrom(__DIR__.'/../config/mcp.php', 'mcp');
         // Agent-Config entfernt – Agent ausgelagert
 
         // Counter→KeyResult Sync (Default: No-Op; OKR-Modul kann überschreiben)
