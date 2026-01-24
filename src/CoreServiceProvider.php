@@ -24,6 +24,7 @@ use Platform\Core\Services\AgentOrchestrator;
 use Platform\Core\Contracts\CounterKeyResultSyncer;
 use Platform\Core\Services\NullCounterKeyResultSyncer;
 use Platform\Core\Registry\ModuleRegistry;
+use Laravel\Passport\Passport;
 
 // Command-Klasse importieren!
 use Platform\Core\Commands\TrackBillableUsage;
@@ -127,6 +128,9 @@ class CoreServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/security.php', 'security');
         $this->mergeConfigFrom(__DIR__.'/../config/checkins.php', 'checkins');
         // Agent-Config entfernt – Agent ausgelagert
+
+        // Passport Contracts binden (für OAuth Authorization Views)
+        $this->registerPassportBindings();
 
         // Counter→KeyResult Sync (Default: No-Op; OKR-Modul kann überschreiben)
         $this->app->singleton(CounterKeyResultSyncer::class, function () {
@@ -475,6 +479,38 @@ class CoreServiceProvider extends ServiceProvider
             'eloquent.deleted: *',
             \Platform\Core\Listeners\ModelVersioningListener::class . '@handleDeleted'
         );
+    }
+
+    /**
+     * Register Passport contract bindings for OAuth views.
+     */
+    protected function registerPassportBindings(): void
+    {
+        if (!class_exists(\Laravel\Passport\Passport::class)) {
+            return;
+        }
+
+        // AuthorizationViewResponse - für die OAuth Authorization Page
+        $this->app->bind(
+            \Laravel\Passport\Contracts\AuthorizationViewResponse::class,
+            \Laravel\Passport\Http\Responses\AuthorizationViewResponse::class
+        );
+
+        // ApproveAuthorizationResponse
+        if (interface_exists(\Laravel\Passport\Contracts\ApproveAuthorizationResponse::class)) {
+            $this->app->bind(
+                \Laravel\Passport\Contracts\ApproveAuthorizationResponse::class,
+                \Laravel\Passport\Http\Responses\ApproveAuthorizationResponse::class
+            );
+        }
+
+        // DenyAuthorizationResponse
+        if (interface_exists(\Laravel\Passport\Contracts\DenyAuthorizationResponse::class)) {
+            $this->app->bind(
+                \Laravel\Passport\Contracts\DenyAuthorizationResponse::class,
+                \Laravel\Passport\Http\Responses\DenyAuthorizationResponse::class
+            );
+        }
     }
 
     protected function loadModuleServiceProviders(): void
