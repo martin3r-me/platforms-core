@@ -97,6 +97,19 @@ class CoreServiceProvider extends ServiceProvider
             ->prefix('api')
             ->group(__DIR__.'/../routes/api.php');
 
+        // MCP-Routen registrieren (nur wenn Server konfiguriert ist)
+        $mcpConfig = config('mcp');
+        $serverConfig = $mcpConfig['servers']['default'] ?? null;
+        if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig['class'])) {
+            $prefix = $mcpConfig['routes']['prefix'] ?? 'mcp';
+            $middleware = $mcpConfig['routes']['middleware'] ?? ['api'];
+            
+            Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
+                ->middleware($middleware)
+                ->prefix($prefix)
+                ->group(__DIR__.'/../routes/mcp.php');
+        }
+
         // Keine Agent/Schema Logs mehr
 
         // Command registrieren (nur in der Konsole)
@@ -128,6 +141,7 @@ class CoreServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/platform.php', 'platform');
         $this->mergeConfigFrom(__DIR__.'/../config/security.php', 'security');
         $this->mergeConfigFrom(__DIR__.'/../config/checkins.php', 'checkins');
+        $this->mergeConfigFrom(__DIR__.'/../config/mcp.php', 'mcp');
         // Agent-Config entfernt – Agent ausgelagert
 
         // Counter→KeyResult Sync (Default: No-Op; OKR-Modul kann überschreiben)
