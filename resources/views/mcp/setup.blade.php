@@ -256,10 +256,10 @@
                 <h2>📝 Schritt 4: Cursor IDE Konfiguration</h2>
                 <div class="step">
                     <span class="step-number">4</span>
-                    Für Cursor IDE MCP Server Integration (HTTP-basiert)
+                    Für Cursor IDE MCP Server Integration (HTTP-basiert mit SSE)
                 </div>
                 <div class="config-box">
-                    <p><strong>Cursor MCP Server Konfiguration (HTTP):</strong></p>
+                    <p><strong>Cursor MCP Server Konfiguration (HTTP mit SSE):</strong></p>
                     <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Füge diese Konfiguration in deine Cursor-Einstellungen ein (Settings → Features → Model Context Protocol):</p>
                     <pre id="cursor-config">{
   "mcpServers": {
@@ -267,6 +267,7 @@
       "url": "{{ $serverUrl }}",
       "headers": {
         "Authorization": "Bearer YOUR_TOKEN_HERE",
+        "Accept": "text/event-stream",
         "Content-Type": "application/json"
       }
     }
@@ -285,7 +286,8 @@
                         <li>Füge die obige Konfiguration ein</li>
                         <li><strong>Wichtig:</strong> Ersetze <code>YOUR_TOKEN_HERE</code> mit deinem Sanctum Token (aus Schritt 1)</li>
                         <li>Speichere die Einstellungen</li>
-                        <li><strong>Hinweis:</strong> Cursor verwendet HTTP für die Kommunikation mit dem MCP Server</li>
+                        <li><strong>Hinweis:</strong> Cursor verwendet HTTP mit Server-Sent Events (SSE) für die Kommunikation. Der Server konvertiert automatisch JSON-Responses in SSE-Format.</li>
+                        <li><strong>Technisch:</strong> Der Server unterstützt GET-Requests (Cursor sendet GET) und konvertiert sie automatisch in POST-Requests mit MCP Initialize.</li>
                     </ol>
                 </div>
             </div>
