@@ -85,4 +85,49 @@ class PassportClient extends Client
             ? json_encode($value)
             : $value;
     }
+
+    /**
+     * Get the grant types as an array.
+     * Handles both legacy string format and new array format.
+     */
+    protected function grantTypes(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value, array $attributes) {
+                $rawValue = $value ?? $attributes['grant_types'] ?? null;
+
+                // If it's already an array, return it
+                if (is_array($rawValue)) {
+                    return $rawValue;
+                }
+
+                // If it's a JSON string, decode it
+                if (is_string($rawValue) && str_starts_with(trim($rawValue), '[')) {
+                    $decoded = json_decode($rawValue, true);
+                    if (is_array($decoded)) {
+                        return $decoded;
+                    }
+                }
+
+                // Legacy: single grant type as string or empty
+                if (is_string($rawValue) && !empty($rawValue)) {
+                    return [$rawValue];
+                }
+
+                // Default grant types
+                return [];
+            },
+            set: function ($value) {
+                if (is_array($value)) {
+                    return json_encode($value);
+                }
+
+                if (is_string($value) && !empty($value)) {
+                    return json_encode([$value]);
+                }
+
+                return json_encode([]);
+            }
+        );
+    }
 }
