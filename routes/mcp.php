@@ -29,21 +29,9 @@ if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig
     $serverName = $serverConfig['name'] ?? 'MCP Server';
     $serverClass = $serverConfig['class'];
     
-    // MCP Server Route mit Authentifizierung
-    // Verwende die offizielle Laravel MCP Methode wie in der Dokumentation
-    // Erweitere um GET-Unterstützung für SSE (Cursor benötigt GET für SSE-Initialisierung)
-    $webRoute = Mcp::web($serverNameKey, $serverClass)
-        ->middleware($authMiddleware);
-    
-    // Füge GET-Unterstützung hinzu für SSE (Laravel MCP unterstützt automatisch SSE-Streaming)
-    Route::get($serverNameKey, function () use ($serverClass) {
-        $transport = new \Laravel\Mcp\Server\Transport\HttpTransport(request());
-        $server = new $serverClass;
-        $server->connect($transport);
-        return $transport->run();
-    })
-        ->middleware($authMiddleware)
-        ->name('mcp-server.' . $serverNameKey . '.get');
+    // MCP Server Route - genau wie in der Laravel Dokumentation
+    // KEINE Middleware - Laravel MCP handhabt Authentifizierung selbst
+    Mcp::web($serverNameKey, $serverClass);
     
     // Local Server für ChatGPT Desktop (STDIO)
     Mcp::local($serverNameKey, $serverClass);
@@ -58,7 +46,7 @@ if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig
                 $serverNameKey => [
                     'name' => $serverConfig['name'] ?? 'MCP Server',
                     'version' => $serverConfig['version'] ?? '1.0.0',
-                    'url' => $baseUrl . '/' . $prefix . '/' . $serverNameKey,
+                    'url' => $baseUrl . '/' . $prefix,
                     'description' => $serverConfig['description'] ?? 'MCP Server',
                     'authentication' => 'Bearer Token (Sanctum)',
                     'chatgpt_desktop' => [
@@ -70,7 +58,7 @@ if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig
                         ],
                     ],
                     'web_config' => [
-                        'url' => $baseUrl . '/' . $prefix . '/' . $serverNameKey,
+                        'url' => $baseUrl . '/' . $prefix,
                         'headers' => [
                             'Authorization' => 'Bearer YOUR_TOKEN_HERE',
                             'Content-Type' => 'application/json'
@@ -79,7 +67,7 @@ if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig
                     'cursor_ide' => [
                         'mcpServers' => [
                             $serverNameKey => [
-                                'url' => $baseUrl . '/' . $prefix . '/' . $serverNameKey,
+                                'url' => $baseUrl . '/' . $prefix,
                                 'auth' => [
                                     'type' => 'bearer',
                                     'token' => 'YOUR_TOKEN_HERE'
@@ -117,10 +105,9 @@ if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig
     Route::get('openapi.json', [\Platform\Core\Http\Controllers\McpController::class, 'schema'])
         ->name('mcp.openapi');
     
-    // Proxy-Endpoint für Custom GPT Actions
-    // Middleware entfernt - Controller macht eigene Authentifizierung
-    Route::post('tools/{toolName}', [\Platform\Core\Http\Controllers\McpController::class, 'proxy'])
-        ->name('mcp.tools.proxy');
+    // Proxy-Endpoint für Custom GPT Actions - TEMPORÄR DEAKTIVIERT
+    // Route::post('tools/{toolName}', [\Platform\Core\Http\Controllers\McpController::class, 'proxy'])
+    //     ->name('mcp.tools.proxy');
     
     // Cursor IDE Konfiguration - direktes JSON-Objekt zum Kopieren
     Route::get('cursor-config.json', function () use ($serverConfig, $serverNameKey, $prefix) {
@@ -129,7 +116,7 @@ if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig
         return response()->json([
             'mcpServers' => [
                 $serverNameKey => [
-                    'url' => $baseUrl . '/' . $prefix . '/' . $serverNameKey,
+                    'url' => $baseUrl . '/' . $prefix,
                     'auth' => [
                         'type' => 'bearer',
                         'token' => 'YOUR_TOKEN_HERE'
