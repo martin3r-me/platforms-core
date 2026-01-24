@@ -493,6 +493,12 @@ class CoreServiceProvider extends ServiceProvider
         // Custom Client Model für Abwärtskompatibilität (redirect string -> array)
         Passport::useClientModel(\Platform\Core\Models\PassportClient::class);
 
+        // Custom ClientRepository für grant_types Abwärtskompatibilität
+        $this->app->bind(
+            \Laravel\Passport\Bridge\ClientRepository::class,
+            \Platform\Core\Passport\ClientRepository::class
+        );
+
         // AuthorizationViewResponse - für die OAuth Authorization Page
         $this->app->bind(
             \Laravel\Passport\Contracts\AuthorizationViewResponse::class,
