@@ -128,8 +128,8 @@ if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig
         ->name('mcp.openapi');
     
     // Proxy-Endpoint für Custom GPT Actions
+    // Middleware entfernt - Authentifizierung wird im Controller geprüft
     Route::post('tools/{toolName}', [\Platform\Core\Http\Controllers\McpController::class, 'proxy'])
-        ->middleware($authMiddleware)
         ->name('mcp.tools.proxy');
     
     // Cursor IDE Konfiguration - direktes JSON-Objekt zum Kopieren
