@@ -14,10 +14,16 @@ use Platform\Core\Models\CoreAiModel;
 class User extends Authenticatable
 {
     use PassportHasApiTokens, SanctumHasApiTokens {
-        // Passport's tokens() Methode hat Vorrang
+        // Passport's Methoden haben Vorrang (für OAuth)
         PassportHasApiTokens::tokens insteadof SanctumHasApiTokens;
-        // Sanctum's tokens() Methode als sanctumTokens() verfügbar machen
+        PassportHasApiTokens::tokenCan insteadof SanctumHasApiTokens;
+        // Sanctum's createToken() hat Vorrang (wird für Bearer Tokens verwendet)
+        SanctumHasApiTokens::createToken insteadof PassportHasApiTokens;
+        // Sanctum's Methoden als sanctum*() verfügbar machen (für explizite Verwendung)
         SanctumHasApiTokens::tokens as sanctumTokens;
+        SanctumHasApiTokens::tokenCan as sanctumTokenCan;
+        // Passport's createToken() als passportCreateToken() verfügbar machen (falls benötigt)
+        PassportHasApiTokens::createToken as passportCreateToken;
     }
     use HasFactory, Notifiable;
 
