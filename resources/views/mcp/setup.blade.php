@@ -269,7 +269,10 @@
         "{{ $artisanPath }}",
         "mcp:start",
         "{{ $serverNameKey ?? 'platform' }}"
-      ]
+      ],
+      "env": {
+        "MCP_AUTH_TOKEN": "YOUR_TOKEN_HERE"
+      }
     }
   }
 }</pre>
@@ -279,9 +282,10 @@
                     <strong>💡 Anleitung:</strong>
                     <ol style="margin-top: 10px; padding-left: 20px;">
                         <li>Öffne Cursor → Settings → Features → Model Context Protocol</li>
-                        <li>Füge die obige Konfiguration ein (STDIO-basiert, wie ChatGPT Desktop)</li>
+                        <li>Füge die obige Konfiguration ein</li>
+                        <li><strong>Wichtig:</strong> Ersetze <code>YOUR_TOKEN_HERE</code> mit deinem Sanctum Token (aus Schritt 1)</li>
                         <li>Speichere die Einstellungen</li>
-                        <li><strong>Hinweis:</strong> Cursor verwendet STDIO (Standard Input/Output) für die Kommunikation, daher wird kein Token benötigt</li>
+                        <li><strong>Hinweis:</strong> Der Token wird als Umgebungsvariable <code>MCP_AUTH_TOKEN</code> übergeben</li>
                     </ol>
                 </div>
             </div>

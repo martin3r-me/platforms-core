@@ -72,6 +72,9 @@ if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig
                                     $artisanPath,
                                     'mcp:start',
                                     $serverNameKey
+                                ],
+                                'env' => [
+                                    'MCP_AUTH_TOKEN' => 'YOUR_TOKEN_HERE'
                                 ]
                             ]
                         ]
@@ -81,7 +84,7 @@ if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig
             'instructions' => [
                 'chatgpt_desktop' => 'Füge die "chatgpt_desktop" Konfiguration in deine ChatGPT Desktop App ein (Settings → Features → Model Context Protocol)',
                 'web_client' => 'Nutze die "web_config" für HTTP-basierte Clients. Ersetze YOUR_TOKEN_HERE mit deinem Sanctum Token.',
-                'cursor_ide' => 'Füge die "cursor_ide" Konfiguration in Cursor IDE ein (Settings → Features → Model Context Protocol). Cursor verwendet STDIO (wie ChatGPT Desktop), daher wird kein Token benötigt.',
+                'cursor_ide' => 'Füge die "cursor_ide" Konfiguration in Cursor IDE ein (Settings → Features → Model Context Protocol). Ersetze YOUR_TOKEN_HERE mit deinem Sanctum Token. Der Token wird als Umgebungsvariable MCP_AUTH_TOKEN übergeben.',
                 'get_token' => 'Erstelle einen Token mit: php artisan api:token:create --email=your@email.com --name="MCP Token" --show'
             ]
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);

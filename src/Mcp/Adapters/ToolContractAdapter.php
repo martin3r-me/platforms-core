@@ -143,14 +143,30 @@ class ToolContractAdapter extends Tool
     }
 
     /**
-     * Erstellt ToolContext aus dem aktuellen Request
+     * Erstellt ToolContext aus dem aktuellen Request oder Umgebungsvariable
      */
     private function createContextFromRequest(): ToolContext
     {
+        // 1. Versuche User aus HTTP-Request zu holen (für Web-basierte Clients)
         $user = auth()->user();
         
+        // 2. Falls kein User im Request, versuche Token aus Umgebungsvariable (für STDIO-Server)
         if (!$user) {
-            throw new \RuntimeException('User must be authenticated to execute tools');
+            $token = env('MCP_AUTH_TOKEN') ?? $_ENV['MCP_AUTH_TOKEN'] ?? null;
+            
+            if ($token) {
+                // Authentifiziere User via Sanctum Token
+                $personalAccessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+                if ($personalAccessToken) {
+                    $user = $personalAccessToken->tokenable;
+                    // Setze User für Auth-System
+                    auth()->setUser($user);
+                }
+            }
+        }
+        
+        if (!$user) {
+            throw new \RuntimeException('User must be authenticated to execute tools. Provide MCP_AUTH_TOKEN environment variable or authenticate via HTTP request.');
         }
         
         // Team aus User extrahieren (falls vorhanden)
