@@ -178,11 +178,42 @@ class McpController extends Controller
         }
         
         // Authentifiziere User
-        $user = \Laravel\Sanctum\PersonalAccessToken::findToken($token)?->tokenable;
-        if (!$user) {
+        try {
+            $personalAccessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+            
+            if (!$personalAccessToken) {
+                // Debug: Prüfe Token-Format
+                $tokenParts = explode('|', $token, 2);
+                $tokenId = $tokenParts[0] ?? null;
+                
+                return response()->json([
+                    'error' => 'Unauthorized',
+                    'message' => 'Invalid token',
+                    'debug' => [
+                        'token_id' => $tokenId,
+                        'token_length' => strlen($token),
+                        'token_format' => count($tokenParts) === 2 ? 'valid' : 'invalid',
+                    ],
+                ], 401);
+            }
+            
+            $user = $personalAccessToken->tokenable;
+            
+            if (!$user) {
+                return response()->json([
+                    'error' => 'Unauthorized',
+                    'message' => 'Token has no associated user',
+                ], 401);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('[McpController] Token validation failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
             return response()->json([
                 'error' => 'Unauthorized',
-                'message' => 'Invalid token',
+                'message' => 'Token validation failed: ' . $e->getMessage(),
             ], 401);
         }
         
