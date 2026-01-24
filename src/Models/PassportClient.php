@@ -97,25 +97,31 @@ class PassportClient extends Client
                 $rawValue = $value ?? $attributes['grant_types'] ?? null;
 
                 // If it's already an array, return it
-                if (is_array($rawValue)) {
+                if (is_array($rawValue) && count($rawValue) > 0) {
                     return $rawValue;
                 }
 
                 // If it's a JSON string, decode it
                 if (is_string($rawValue) && str_starts_with(trim($rawValue), '[')) {
                     $decoded = json_decode($rawValue, true);
-                    if (is_array($decoded)) {
+                    if (is_array($decoded) && count($decoded) > 0) {
                         return $decoded;
                     }
                 }
 
-                // Legacy: single grant type as string or empty
-                if (is_string($rawValue) && !empty($rawValue)) {
+                // Legacy: single grant type as string
+                if (is_string($rawValue) && !empty($rawValue) && !str_starts_with(trim($rawValue), '[')) {
                     return [$rawValue];
                 }
 
-                // Default grant types
-                return [];
+                // Default grant types for backwards compatibility
+                // Wenn keine grant_types gesetzt sind, erlaube die gängigsten
+                return [
+                    'authorization_code',
+                    'refresh_token',
+                    'personal_access',
+                    'password',
+                ];
             },
             set: function ($value) {
                 if (is_array($value)) {
