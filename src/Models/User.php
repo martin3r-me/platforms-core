@@ -5,14 +5,15 @@ namespace Platform\Core\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
+use Laravel\Sanctum\HasApiTokens as SanctumHasApiTokens;
+use Laravel\Passport\HasApiTokens as PassportHasApiTokens;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Platform\Core\Models\Module;
 use Platform\Core\Models\CoreAiModel;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use PassportHasApiTokens, SanctumHasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
         'name',

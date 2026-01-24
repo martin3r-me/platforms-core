@@ -232,6 +232,58 @@
             </div>
             
             <div class="section">
+                <h2>🤖 Schritt 2b: Claude Desktop Konfiguration</h2>
+                <div class="step">
+                    <span class="step-number">2b</span>
+                    Öffne Claude Desktop → Settings → Developer → Model Context Protocol
+                </div>
+                <div class="config-box">
+                    <p><strong>Claude Desktop MCP Server Konfiguration (OAuth):</strong></p>
+                    <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Claude Desktop bevorzugt OAuth. Füge diese Konfiguration ein:</p>
+                    <pre id="claude-oauth-config">{
+  "mcpServers": {
+    "{{ $serverNameKey ?? 'platform' }}": {
+      "url": "{{ $serverUrl }}",
+      "oauth": {
+        "authorizationServer": "{{ $baseUrl }}/.well-known/oauth-authorization-server",
+        "protectedResource": "{{ $baseUrl }}/.well-known/oauth-protected-resource"
+      }
+    }
+  }
+}</pre>
+                    <button class="btn btn-success" onclick="copyConfig('claude-oauth-config')">📋 OAuth Konfiguration kopieren</button>
+                </div>
+                <div class="alert alert-info">
+                    <strong>💡 OAuth-Anleitung:</strong>
+                    <ol style="margin-top: 10px; padding-left: 20px;">
+                        <li>Öffne Claude Desktop → Settings → Developer → Model Context Protocol</li>
+                        <li>Klicke auf "Benutzerdefinierten Connector hinzufügen"</li>
+                        <li>Füge die obige OAuth-Konfiguration ein</li>
+                        <li>Claude Desktop wird automatisch den OAuth-Flow starten</li>
+                        <li>Du wirst zur Autorisierung weitergeleitet und musst dich anmelden</li>
+                        <li>Nach erfolgreicher Autorisierung ist der Connector verbunden</li>
+                    </ol>
+                </div>
+                <div class="config-box" style="margin-top: 20px;">
+                    <p><strong>Alternative: Bearer Token (falls OAuth nicht funktioniert):</strong></p>
+                    <pre id="claude-bearer-config">{
+  "mcpServers": {
+    "{{ $serverNameKey ?? 'platform' }}": {
+      "url": "{{ $serverUrl }}",
+      "headers": {
+        "Authorization": "Bearer YOUR_TOKEN_HERE"
+      }
+    }
+  }
+}</pre>
+                    <button class="btn btn-success" onclick="copyConfig('claude-bearer-config')">📋 Bearer Token Konfiguration kopieren</button>
+                    <p style="margin-top: 10px; color: #666; font-size: 14px;">
+                        <strong>Hinweis:</strong> Ersetze <code>YOUR_TOKEN_HERE</code> mit deinem Sanctum Token (aus Schritt 1)
+                    </p>
+                </div>
+            </div>
+            
+            <div class="section">
                 <h2>🌐 Schritt 3: Web Client Konfiguration</h2>
                 <div class="step">
                     <span class="step-number">3</span>
