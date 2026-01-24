@@ -17,13 +17,17 @@ class User extends Authenticatable
         // Passport's Methoden haben Vorrang (für OAuth)
         PassportHasApiTokens::tokens insteadof SanctumHasApiTokens;
         PassportHasApiTokens::tokenCan insteadof SanctumHasApiTokens;
-        // Sanctum's createToken() hat Vorrang (wird für Bearer Tokens verwendet)
+        PassportHasApiTokens::tokenCant insteadof SanctumHasApiTokens;
+        // Sanctum's createToken() und currentAccessToken() haben Vorrang (wird für Bearer Tokens verwendet)
         SanctumHasApiTokens::createToken insteadof PassportHasApiTokens;
+        SanctumHasApiTokens::currentAccessToken insteadof PassportHasApiTokens;
         // Sanctum's Methoden als sanctum*() verfügbar machen (für explizite Verwendung)
         SanctumHasApiTokens::tokens as sanctumTokens;
         SanctumHasApiTokens::tokenCan as sanctumTokenCan;
-        // Passport's createToken() als passportCreateToken() verfügbar machen (falls benötigt)
+        SanctumHasApiTokens::tokenCant as sanctumTokenCant;
+        // Passport's Methoden als passport*() verfügbar machen (falls benötigt)
         PassportHasApiTokens::createToken as passportCreateToken;
+        PassportHasApiTokens::currentAccessToken as passportCurrentAccessToken;
     }
     use HasFactory, Notifiable;
 
