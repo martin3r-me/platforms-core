@@ -30,30 +30,20 @@ if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig
     $serverClass = $serverConfig['class'];
     
     // MCP Server Route mit Authentifizierung
-    // Unterstützt sowohl GET (für SSE) als auch POST (für JSON-RPC)
-    Route::any($serverNameKey, function () use ($serverClass) {
-        $request = request();
-        $transport = new \Laravel\Mcp\Server\Transport\HttpTransport($request);
+    // Verwende die offizielle Laravel MCP Methode wie in der Dokumentation
+    // Erweitere um GET-Unterstützung für SSE (Cursor benötigt GET für SSE-Initialisierung)
+    $webRoute = Mcp::web($serverNameKey, $serverClass)
+        ->middleware($authMiddleware);
+    
+    // Füge GET-Unterstützung hinzu für SSE (Laravel MCP unterstützt automatisch SSE-Streaming)
+    Route::get($serverNameKey, function () use ($serverClass) {
+        $transport = new \Laravel\Mcp\Server\Transport\HttpTransport(request());
         $server = new $serverClass;
         $server->connect($transport);
-        
-        // Bei GET-Requests: Stelle sicher, dass ein Stream gestartet wird
-        if ($request->isMethod('GET')) {
-            // Starte einen leeren Stream, damit Content-Type korrekt ist
-            $transport->stream(function() {
-                // Keep-alive Stream für SSE
-                while (true) {
-                    echo ": keepalive\n\n";
-                    @flush();
-                    sleep(30);
-                }
-            });
-        }
-        
         return $transport->run();
     })
         ->middleware($authMiddleware)
-        ->name('mcp-server.' . $serverNameKey);
+        ->name('mcp-server.' . $serverNameKey . '.get');
     
     // Local Server für ChatGPT Desktop (STDIO)
     Mcp::local($serverNameKey, $serverClass);
