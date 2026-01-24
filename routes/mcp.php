@@ -30,8 +30,15 @@ if ($serverConfig && isset($serverConfig['class']) && class_exists($serverConfig
     $serverClass = $serverConfig['class'];
     
     // MCP Server Route mit Authentifizierung
-    Mcp::web($serverNameKey, $serverClass)
-        ->middleware($authMiddleware);
+    // Unterstützt sowohl GET (für SSE) als auch POST (für JSON-RPC)
+    Route::match(['GET', 'POST'], $serverNameKey, function () use ($serverClass) {
+        $transport = new \Laravel\Mcp\Server\Transport\HttpTransport(request());
+        $server = new $serverClass;
+        $server->connect($transport);
+        return $transport->run();
+    })
+        ->middleware($authMiddleware)
+        ->name('mcp-server.' . $serverNameKey);
     
     // Local Server für ChatGPT Desktop (STDIO)
     Mcp::local($serverNameKey, $serverClass);
