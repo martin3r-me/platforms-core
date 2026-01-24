@@ -33,6 +33,14 @@ class User extends Authenticatable
     }
     use HasFactory, Notifiable;
 
+    /**
+     * Access Token Property - wird von Sanctum verwendet
+     * Muss explizit definiert werden, um Konflikt mit Passport zu vermeiden
+     * 
+     * @var \Laravel\Sanctum\PersonalAccessToken|null
+     */
+    public $accessToken;
+
     protected $fillable = [
         'name',
         'email',
