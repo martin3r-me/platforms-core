@@ -8,6 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Prüfe ob Tabelle existiert (wird möglicherweise später erstellt)
+        if (!Schema::hasTable('tool_requests')) {
+            return;
+        }
+        
         Schema::table('tool_requests', function (Blueprint $table) {
             // Similar Requests (JSON) - IDs ähnlicher Requests
             if (!Schema::hasColumn('tool_requests', 'similar_requests')) {
@@ -23,6 +28,11 @@ return new class extends Migration
 
     public function down(): void
     {
+        // Prüfe ob Tabelle existiert
+        if (!Schema::hasTable('tool_requests')) {
+            return;
+        }
+        
         Schema::table('tool_requests', function (Blueprint $table) {
             if (Schema::hasColumn('tool_requests', 'deduplication_key')) {
                 $table->dropIndex(['deduplication_key']);

@@ -17,9 +17,14 @@ return new class extends Migration
         Schema::create('comms_provider_connection_domains', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('comms_provider_connection_id')
-                ->constrained('comms_provider_connections')
-                ->cascadeOnDelete();
+            // Foreign Key nur erstellen, wenn die Tabelle existiert
+            $table->foreignId('comms_provider_connection_id');
+            if (Schema::hasTable('comms_provider_connections')) {
+                $table->foreign('comms_provider_connection_id', 'cpcd_connection_id_fk')
+                    ->references('id')
+                    ->on('comms_provider_connections')
+                    ->cascadeOnDelete();
+            }
 
             // e.g. bhgdigital.de, company.de
             $table->string('domain', 255);

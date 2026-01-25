@@ -8,6 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Prüfe ob Tabelle existiert (wird möglicherweise später erstellt)
+        if (!Schema::hasTable('tool_executions')) {
+            return;
+        }
+        
         Schema::table('tool_executions', function (Blueprint $table) {
             // Retries
             if (!Schema::hasColumn('tool_executions', 'retries')) {
@@ -36,6 +41,11 @@ return new class extends Migration
 
     public function down(): void
     {
+        // Prüfe ob Tabelle existiert
+        if (!Schema::hasTable('tool_executions')) {
+            return;
+        }
+        
         Schema::table('tool_executions', function (Blueprint $table) {
             if (Schema::hasColumn('tool_executions', 'retries')) {
                 $table->dropColumn('retries');

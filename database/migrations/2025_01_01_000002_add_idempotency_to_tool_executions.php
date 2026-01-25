@@ -8,6 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Prüfe ob Tabelle existiert (wird möglicherweise später erstellt)
+        if (!Schema::hasTable('tool_executions')) {
+            return;
+        }
+        
         Schema::table('tool_executions', function (Blueprint $table) {
             // Idempotency-Key (für Duplikat-Erkennung)
             if (!Schema::hasColumn('tool_executions', 'idempotency_key')) {
@@ -28,6 +33,11 @@ return new class extends Migration
 
     public function down(): void
     {
+        // Prüfe ob Tabelle existiert
+        if (!Schema::hasTable('tool_executions')) {
+            return;
+        }
+        
         Schema::table('tool_executions', function (Blueprint $table) {
             if (Schema::hasColumn('tool_executions', 'original_run_id')) {
                 $table->dropForeign(['original_run_id']);
