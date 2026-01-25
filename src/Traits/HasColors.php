@@ -4,9 +4,20 @@ namespace Platform\Core\Traits;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Platform\Core\Models\Colorable;
 
 trait HasColors
 {
+    /**
+     * Polymorphe Beziehung zu colorables (für Eager Loading)
+     *
+     * @return MorphMany
+     */
+    public function contextColors(): MorphMany
+    {
+        return $this->morphMany(Colorable::class, 'colorable');
+    }
     /**
      * Aktuelle Farbe dieser Entity (Team oder persönlich, persönlich hat Priorität)
      */
@@ -19,6 +30,28 @@ trait HasColors
 
             $userId = Auth::id();
             
+            // Wenn contextColors eager-geladen wurde, verwende diese (vermeidet N+1)
+            if ($this->relationLoaded('contextColors')) {
+                $contextColors = $this->getRelation('contextColors');
+                
+                // Zuerst persönliche Farbe prüfen
+                if ($userId) {
+                    $personalColor = $contextColors->firstWhere('user_id', $userId);
+                    if ($personalColor) {
+                        return $personalColor->color;
+                    }
+                }
+                
+                // Dann Team-Farbe prüfen
+                $teamColor = $contextColors->firstWhere('user_id', null);
+                if ($teamColor) {
+                    return $teamColor->color;
+                }
+                
+                return null;
+            }
+            
+            // Fallback: Direkte Datenbankabfrage (wenn nicht eager-geladen)
             // Zuerst persönliche Farbe prüfen
             if ($userId) {
                 $personalColor = DB::table('colorables')
