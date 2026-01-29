@@ -95,7 +95,7 @@
                                         ->filter(fn($m) => in_array($m->role, ['user', 'assistant'], true))
                                         ->values();
                                     $initialMessages = $msgs
-                                        ->map(fn($m) => ['role' => $m->role, 'content' => $m->content])
+                                        ->map(fn($m) => ['role' => $m->role, 'content' => $m->content, 'attachments' => $m->meta['attachments'] ?? []])
                                         ->values();
                                 @endphp
                                 <script>
@@ -103,9 +103,41 @@
                                 </script>
                                 <div id="chatList" class="space-y-4 min-w-0" wire:key="chat-list-{{ $activeThreadId ?? 'none' }}">
                                     @foreach($msgs as $m)
+                                        @php
+                                            $attachments = [];
+                                            if (!empty($m->meta['attachments'])) {
+                                                $attachments = \Platform\Core\Models\ContextFile::whereIn('id', $m->meta['attachments'])
+                                                    ->with('variants')
+                                                    ->get();
+                                            }
+                                        @endphp
                                         <div wire:key="chat-msg-{{ $m->id }}" class="flex {{ $m->role === 'user' ? 'justify-end' : 'justify-start' }}">
                                             <div class="max-w-4xl rounded-lg p-3 break-words overflow-hidden {{ $m->role === 'user' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-surface)] border border-[var(--ui-border)]' }}">
                                                 <div class="text-sm font-semibold mb-1">{{ $m->role === 'user' ? 'Du' : 'Assistant' }}</div>
+                                                {{-- Show attachments if present --}}
+                                                @if($attachments->count() > 0)
+                                                    <div class="mb-2 flex flex-wrap gap-2">
+                                                        @foreach($attachments as $attachment)
+                                                            @if($attachment->isImage())
+                                                                <a href="{{ $attachment->url }}" target="_blank" class="block group relative">
+                                                                    <img
+                                                                        src="{{ $attachment->thumbnail?->url ?? $attachment->url }}"
+                                                                        alt="{{ $attachment->original_name }}"
+                                                                        class="w-20 h-20 object-cover rounded border {{ $m->role === 'user' ? 'border-white/30' : 'border-[var(--ui-border)]' }} hover:opacity-80 transition-opacity"
+                                                                        title="{{ $attachment->original_name }}"
+                                                                    />
+                                                                </a>
+                                                            @else
+                                                                <a href="{{ $attachment->url }}" target="_blank" class="flex items-center gap-2 px-2 py-1 rounded {{ $m->role === 'user' ? 'bg-white/20 hover:bg-white/30' : 'bg-[var(--ui-muted-5)] hover:bg-[var(--ui-muted-10)]' }} transition-colors">
+                                                                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                                                    </svg>
+                                                                    <span class="text-xs truncate max-w-[100px]" title="{{ $attachment->original_name }}">{{ $attachment->original_name }}</span>
+                                                                </a>
+                                                            @endif
+                                                        @endforeach
+                                                    </div>
+                                                @endif
                                                 <div class="whitespace-pre-wrap break-words">{{ $m->content }}</div>
                                             </div>
                                         </div>
@@ -128,6 +160,11 @@
                                 </div>
                             </div>
                             <div class="border-t border-[var(--ui-border)]/60 p-3 flex-shrink-0 bg-[var(--ui-surface)]">
+                                {{-- Uploaded attachments preview --}}
+                                <div id="pgAttachmentsPreview" class="mb-2 flex flex-wrap gap-2" style="display: none;">
+                                    {{-- Attachments will be rendered by JavaScript --}}
+                                </div>
+
                                 <form id="chatForm" class="flex gap-2 items-center" method="post" action="javascript:void(0)" onsubmit="return false;">
                                     <div class="w-56">
                                         <x-ui-input-select
@@ -139,6 +176,37 @@
                                             :value="$activeThreadModel ?? $defaultModelId ?? 'gpt-5.2'"
                                             class="w-full h-10"
                                         />
+                                    </div>
+                                    {{-- File upload button --}}
+                                    <div class="relative flex-shrink-0">
+                                        <input
+                                            type="file"
+                                            id="pgFileInput"
+                                            multiple
+                                            accept="image/*,.pdf,.doc,.docx,.txt,.md,.json,.xml,.csv"
+                                            class="hidden"
+                                        />
+                                        <button
+                                            type="button"
+                                            id="pgFileUploadBtn"
+                                            class="p-2 h-10 w-10 border border-[var(--ui-border)] rounded-lg hover:bg-[var(--ui-muted-5)] flex items-center justify-center text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] transition-colors"
+                                            title="Dateien anhängen"
+                                        >
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
+                                            </svg>
+                                        </button>
+                                        {{-- Upload progress indicator --}}
+                                        <div id="pgUploadProgress" class="hidden absolute -top-1 -right-1 w-4 h-4">
+                                            <svg class="animate-spin w-4 h-4 text-[var(--ui-primary)]" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                        </div>
+                                        {{-- Attachment count badge --}}
+                                        <div id="pgAttachmentCount" class="hidden absolute -top-1 -right-1 w-5 h-5 bg-[var(--ui-primary)] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                                            0
+                                        </div>
                                     </div>
                                     <textarea
                                         id="chatInput"
@@ -483,6 +551,10 @@
         const modelsUrl = window.__simpleModelsUrl;
         const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
         const serverDefaultModel = 'gpt-5.2';
+
+        // File upload URLs
+        window.__simplePlaygroundUploadUrl = '{{ route("core.playground.upload") }}';
+        window.__simplePlaygroundDeleteUrl = '{{ route("core.playground.attachment.delete", ["id" => "__ID__"]) }}'.replace('/__ID__', '');
 
         const ctx = window.__simplePlaygroundContext || null;
         const ctxLabel = document.getElementById('pgContextLabel');
@@ -1475,8 +1547,17 @@
           // Ensure threadState points to the real thread now.
           threadState = getThreadState(currentThreadId);
 
+          // Get current attachments
+          const attachmentIds = typeof window.__simplePlaygroundGetAttachmentIds === 'function'
+            ? window.__simplePlaygroundGetAttachmentIds()
+            : [];
+
           if (!isContinue) {
-            threadState.messages.push({ role: 'user', content: text });
+            const userMessage = { role: 'user', content: text };
+            if (attachmentIds.length > 0) {
+              userMessage.attachments = attachmentIds;
+            }
+            threadState.messages.push(userMessage);
             // Remember what we just added, so we can revert it on Abort (and avoid polluting DB/history).
             try {
               refreshDomRefs();
@@ -1487,6 +1568,10 @@
             // Reset textarea height after sending (auto-grow will shrink it back)
             if (input && input.tagName === 'TEXTAREA') {
               requestAnimationFrame(() => autoGrow(input));
+            }
+            // Clear attachments after adding to message
+            if (typeof window.__simplePlaygroundClearAttachments === 'function') {
+              window.__simplePlaygroundClearAttachments();
             }
             // Scroll after sending (Livewire will render the user message)
             // Use requestAnimationFrame + setTimeout to ensure DOM is ready
@@ -1547,6 +1632,7 @@
             continuation: (isContinue ? threadState.continuation : null),
             context: ctx || null,
             max_iterations: getMaxIterations(),
+            attachments: attachmentIds.length > 0 ? attachmentIds : null,
           };
           debugState.payload = payload;
           updateDebugDump();
@@ -2033,12 +2119,167 @@
         
         bindSubmitHandlers();
         bindFooterHandlers();
-        
+
+        // File upload handling
+        window.__simplePlaygroundAttachments = window.__simplePlaygroundAttachments || [];
+
+        const bindFileUploadHandlers = () => {
+          const fileInput = document.getElementById('pgFileInput');
+          const fileBtn = document.getElementById('pgFileUploadBtn');
+          const attachmentsPreview = document.getElementById('pgAttachmentsPreview');
+          const attachmentCount = document.getElementById('pgAttachmentCount');
+          const uploadProgress = document.getElementById('pgUploadProgress');
+
+          if (fileBtn && !fileBtn.dataset.clickBound) {
+            fileBtn.addEventListener('click', () => {
+              if (fileInput) fileInput.click();
+            });
+            fileBtn.dataset.clickBound = '1';
+          }
+
+          if (fileInput && !fileInput.dataset.changeBound) {
+            fileInput.addEventListener('change', async (e) => {
+              const files = e.target.files;
+              if (!files || files.length === 0) return;
+
+              // Show upload progress
+              if (uploadProgress) uploadProgress.classList.remove('hidden');
+              if (attachmentCount) attachmentCount.classList.add('hidden');
+
+              // Upload each file via Livewire
+              for (const file of files) {
+                try {
+                  // Create FormData for upload
+                  const formData = new FormData();
+                  formData.append('file', file);
+                  formData.append('thread_id', currentThreadId);
+
+                  // Upload via API endpoint
+                  const uploadUrl = window.__simplePlaygroundUploadUrl || '/api/core/playground/upload';
+                  const res = await fetch(uploadUrl, {
+                    method: 'POST',
+                    headers: {
+                      'X-CSRF-TOKEN': csrf,
+                      'Accept': 'application/json',
+                    },
+                    body: formData,
+                    credentials: 'same-origin',
+                  });
+
+                  if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    console.error('Upload failed:', errData);
+                    continue;
+                  }
+
+                  const data = await res.json();
+                  if (data.success && data.attachment) {
+                    window.__simplePlaygroundAttachments.push(data.attachment);
+                    updateAttachmentsPreview();
+                  }
+                } catch (err) {
+                  console.error('Upload error:', err);
+                }
+              }
+
+              // Hide progress, show count
+              if (uploadProgress) uploadProgress.classList.add('hidden');
+              updateAttachmentCount();
+
+              // Reset input
+              fileInput.value = '';
+            });
+            fileInput.dataset.changeBound = '1';
+          }
+        };
+
+        const updateAttachmentsPreview = () => {
+          const preview = document.getElementById('pgAttachmentsPreview');
+          if (!preview) return;
+
+          const attachments = window.__simplePlaygroundAttachments || [];
+          if (attachments.length === 0) {
+            preview.style.display = 'none';
+            preview.innerHTML = '';
+            return;
+          }
+
+          preview.style.display = 'flex';
+          preview.innerHTML = attachments.map((att, idx) => {
+            if (att.is_image) {
+              return `
+                <div class="relative group">
+                  <img src="${att.url}" alt="${att.original_name}" class="w-16 h-16 object-cover rounded border border-[var(--ui-border)]" title="${att.original_name}" />
+                  <button type="button" onclick="window.__simplePlaygroundRemoveAttachment(${idx})" class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                </div>
+              `;
+            } else {
+              return `
+                <div class="relative group flex items-center gap-2 px-2 py-1 rounded bg-[var(--ui-muted-5)] border border-[var(--ui-border)]">
+                  <svg class="w-4 h-4 flex-shrink-0 text-[var(--ui-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                  <span class="text-xs truncate max-w-[80px]" title="${att.original_name}">${att.original_name}</span>
+                  <button type="button" onclick="window.__simplePlaygroundRemoveAttachment(${idx})" class="w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] hover:bg-red-600">×</button>
+                </div>
+              `;
+            }
+          }).join('');
+        };
+
+        const updateAttachmentCount = () => {
+          const countEl = document.getElementById('pgAttachmentCount');
+          const attachments = window.__simplePlaygroundAttachments || [];
+          if (!countEl) return;
+
+          if (attachments.length > 0) {
+            countEl.textContent = attachments.length;
+            countEl.classList.remove('hidden');
+          } else {
+            countEl.classList.add('hidden');
+          }
+        };
+
+        window.__simplePlaygroundRemoveAttachment = (idx) => {
+          const attachments = window.__simplePlaygroundAttachments || [];
+          if (idx >= 0 && idx < attachments.length) {
+            // Optionally call API to delete the file
+            const att = attachments[idx];
+            if (att.id) {
+              fetch((window.__simplePlaygroundDeleteUrl || '/api/core/playground/attachment') + '/' + att.id, {
+                method: 'DELETE',
+                headers: {
+                  'X-CSRF-TOKEN': csrf,
+                  'Accept': 'application/json',
+                },
+                credentials: 'same-origin',
+              }).catch(() => {});
+            }
+            attachments.splice(idx, 1);
+            window.__simplePlaygroundAttachments = attachments;
+            updateAttachmentsPreview();
+            updateAttachmentCount();
+          }
+        };
+
+        window.__simplePlaygroundClearAttachments = () => {
+          window.__simplePlaygroundAttachments = [];
+          updateAttachmentsPreview();
+          updateAttachmentCount();
+        };
+
+        window.__simplePlaygroundGetAttachmentIds = () => {
+          return (window.__simplePlaygroundAttachments || []).map(a => a.id).filter(Boolean);
+        };
+
+        bindFileUploadHandlers();
+
         // Re-bind after Livewire updates
         document.addEventListener('livewire:update', () => {
           setTimeout(() => {
             bindSubmitHandlers();
             bindFooterHandlers();
+            bindFileUploadHandlers();
             // After DOM re-render, recompute busy state so Stop doesn't "disappear" (disabled) mid-stream.
             updateThreadBusyIndicators();
             updateFooterBusy();

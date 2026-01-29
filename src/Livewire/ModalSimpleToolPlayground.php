@@ -5,17 +5,28 @@ namespace Platform\Core\Livewire;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Platform\Core\Models\CoreAiModel;
 use Platform\Core\Models\CoreAiProvider;
 use Platform\Core\Models\CoreChat;
 use Platform\Core\Models\CoreChatThread;
 use Platform\Core\Models\CoreChatMessage;
+use Platform\Core\Models\ContextFile;
+use Platform\Core\Services\ContextFileService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class ModalSimpleToolPlayground extends Component
 {
+    use WithFileUploads;
+
     public bool $open = false;
+
+    /** @var array File uploads for the current message */
+    public $pendingFiles = [];
+
+    /** @var array Uploaded files ready to be attached */
+    public array $uploadedAttachments = [];
 
     /** @var array<string,mixed>|null */
     public ?array $context = null;
@@ -346,6 +357,125 @@ class ModalSimpleToolPlayground extends Component
     {
         // This method intentionally does nothing - it just triggers a Livewire re-render
         // which will reload activeThreadMessages from the database
+    }
+
+    /**
+     * Upload pending files and add them to uploadedAttachments.
+     */
+    public function uploadPendingFiles(): void
+    {
+        if (empty($this->pendingFiles)) {
+            return;
+        }
+
+        $user = Auth::user();
+        if (!$user || !$user->currentTeamRelation) {
+            return;
+        }
+
+        $service = app(ContextFileService::class);
+
+        foreach ($this->pendingFiles as $file) {
+            try {
+                $result = $service->uploadForContext(
+                    $file,
+                    CoreChatThread::class,
+                    $this->activeThreadId ?? 0,
+                    [
+                        'keep_original' => false,
+                        'generate_variants' => true,
+                    ]
+                );
+
+                $this->uploadedAttachments[] = [
+                    'id' => $result['id'],
+                    'token' => $result['token'],
+                    'original_name' => $result['original_name'],
+                    'url' => $result['url'],
+                    'mime_type' => $result['mime_type'],
+                    'file_size' => $result['file_size'],
+                    'width' => $result['width'] ?? null,
+                    'height' => $result['height'] ?? null,
+                    'is_image' => str_starts_with($result['mime_type'], 'image/'),
+                ];
+            } catch (\Exception $e) {
+                $this->dispatch('notify', [
+                    'type' => 'error',
+                    'message' => 'Fehler beim Hochladen: ' . $e->getMessage(),
+                ]);
+            }
+        }
+
+        $this->pendingFiles = [];
+    }
+
+    /**
+     * Remove an uploaded attachment before sending.
+     */
+    public function removeAttachment(int $index): void
+    {
+        if (isset($this->uploadedAttachments[$index])) {
+            // Optionally delete the file from storage
+            try {
+                $attachment = $this->uploadedAttachments[$index];
+                if (isset($attachment['id'])) {
+                    $service = app(ContextFileService::class);
+                    $service->delete($attachment['id']);
+                }
+            } catch (\Exception $e) {
+                // Ignore deletion errors
+            }
+
+            array_splice($this->uploadedAttachments, $index, 1);
+        }
+    }
+
+    /**
+     * Clear all uploaded attachments (called after message is sent).
+     */
+    public function clearAttachments(): void
+    {
+        $this->uploadedAttachments = [];
+        $this->pendingFiles = [];
+    }
+
+    /**
+     * Get current attachments as JSON for JavaScript.
+     */
+    public function getAttachmentsJson(): string
+    {
+        return json_encode($this->uploadedAttachments);
+    }
+
+    /**
+     * Get attachments for a specific message by its meta.
+     */
+    public function getMessageAttachments(int $messageId): array
+    {
+        $message = CoreChatMessage::find($messageId);
+        if (!$message || empty($message->meta['attachments'])) {
+            return [];
+        }
+
+        $attachmentIds = $message->meta['attachments'];
+        return ContextFile::whereIn('id', $attachmentIds)
+            ->with('variants')
+            ->get()
+            ->map(function ($file) {
+                return [
+                    'id' => $file->id,
+                    'token' => $file->token,
+                    'original_name' => $file->original_name,
+                    'url' => $file->url,
+                    'mime_type' => $file->mime_type,
+                    'file_size' => $file->file_size,
+                    'width' => $file->width,
+                    'height' => $file->height,
+                    'is_image' => $file->isImage(),
+                    'thumbnail' => $file->thumbnail?->url ?? null,
+                ];
+            })
+            ->toArray();
     }
 
     public function render()

@@ -393,6 +393,9 @@ class SimpleToolController extends Controller
                         'continuation' => 'nullable|array',
                         'continuation.previous_response_id' => 'nullable|string',
                         'continuation.next_input' => 'nullable|array',
+                        // File attachments (array of context_file IDs)
+                        'attachments' => 'nullable|array',
+                        'attachments.*' => 'integer|exists:context_files,id',
                     ]);
                 } catch (\Throwable $e) {
                     $sendEvent('error', [
@@ -404,6 +407,8 @@ class SimpleToolController extends Controller
                 $userMessage = (string) ($request->input('message') ?? '');
                 $threadId = $request->input('thread_id');
                 $chatHistory = $request->input('chat_history', []);
+                $attachmentIds = $request->input('attachments', []);
+                $attachmentIds = is_array($attachmentIds) ? array_filter($attachmentIds, 'is_numeric') : [];
                 $createdUserMessageId = null;
                 $assistantSavedToDb = false;
 
@@ -501,15 +506,37 @@ class SimpleToolController extends Controller
                 
                 // Füge neue User-Message hinzu
                 if (trim($userMessage) !== '') {
+                    // Build user message content with attachment context
+                    $userContent = $userMessage;
+
+                    // If there are attachments, add context about them
+                    if (!empty($attachmentIds)) {
+                        $attachmentContext = [];
+                        $contextFiles = \Platform\Core\Models\ContextFile::whereIn('id', $attachmentIds)->get();
+                        foreach ($contextFiles as $file) {
+                            $attachmentContext[] = sprintf(
+                                '- %s (%s, %s)',
+                                $file->original_name,
+                                $file->mime_type,
+                                $file->file_size > 1024*1024
+                                    ? round($file->file_size / (1024*1024), 2) . ' MB'
+                                    : round($file->file_size / 1024, 2) . ' KB'
+                            );
+                        }
+                        if (!empty($attachmentContext)) {
+                            $userContent .= "\n\n[Angehängte Dateien:\n" . implode("\n", $attachmentContext) . "]";
+                        }
+                    }
+
                     $messages[] = [
                         'role' => 'user',
-                        'content' => $userMessage,
+                        'content' => $userContent,
                     ];
                     
                     // Save user message to DB if thread exists
                     // Note: User messages don't have token costs (they're input), but we store the structure for consistency
                     if ($thread) {
-                        $created = CoreChatMessage::create([
+                        $messageData = [
                             'core_chat_id' => $thread->core_chat_id,
                             'thread_id' => $thread->id,
                             'role' => 'user',
@@ -521,7 +548,14 @@ class SimpleToolController extends Controller
                             'cost' => 0.0,
                             'pricing_currency' => 'USD',
                             'model_id' => $model ?? null,
-                        ]);
+                        ];
+
+                        // Add attachments to meta if present
+                        if (!empty($attachmentIds)) {
+                            $messageData['meta'] = ['attachments' => array_map('intval', $attachmentIds)];
+                        }
+
+                        $created = CoreChatMessage::create($messageData);
                         $createdUserMessageId = $created?->id;
                     }
                 }
