@@ -104,7 +104,7 @@
                                 <div id="chatList" class="space-y-4 min-w-0" wire:key="chat-list-{{ $activeThreadId ?? 'none' }}">
                                     @foreach($msgs as $m)
                                         @php
-                                            $attachments = [];
+                                            $attachments = collect([]);
                                             if (!empty($m->meta['attachments'])) {
                                                 $attachments = \Platform\Core\Models\ContextFile::whereIn('id', $m->meta['attachments'])
                                                     ->with('variants')
