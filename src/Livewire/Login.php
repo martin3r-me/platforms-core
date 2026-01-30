@@ -9,9 +9,9 @@ use Platform\Core\Contracts\AuthAccessPolicy;
 
 class Login extends Component
 {
-    public string $email = '';
-    public string $password = '';
-    public bool $remember = false;
+    public $email = '';
+    public $password = '';
+    public $remember = false;
 
     public function mount()
     {
@@ -27,7 +27,7 @@ class Login extends Component
         }
 
         $credentials = $this->validate([
-            'email'    => 'required|email',
+            'email'    => 'required|string|email',
             'password' => 'required|string',
         ]);
 
