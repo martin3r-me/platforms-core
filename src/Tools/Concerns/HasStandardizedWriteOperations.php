@@ -170,6 +170,12 @@ trait HasStandardizedWriteOperations
             $baseSchema['properties'] = array_merge($baseSchema['properties'], $customSchema['properties']);
         }
 
+        // WICHTIG: Leeres properties-Array als stdClass (für JSON {} statt [])
+        // OpenAI strict mode erfordert "properties": {} statt "properties": []
+        if (empty($baseSchema['properties'])) {
+            $baseSchema['properties'] = new \stdClass();
+        }
+
         // Merge Required-Felder
         if (isset($customSchema['required'])) {
             $baseSchema['required'] = array_merge($baseSchema['required'], $customSchema['required']);

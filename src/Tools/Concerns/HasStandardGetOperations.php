@@ -37,6 +37,7 @@ trait HasStandardGetOperations
                                 'description' => 'Operator: eq (gleich), ne (ungleich), gt (größer), gte (größer gleich), lt (kleiner), lte (kleiner gleich), like (enthält), in (in Liste), not_in (nicht in Liste), is_null (ist null), is_not_null (ist nicht null)'
                             ],
                             'value' => [
+                                'type' => 'string',
                                 'description' => 'Wert für den Filter. Bei "in" oder "not_in" ein Array, sonst String/Number/Boolean. Bei "is_null" oder "is_not_null" kann value weggelassen werden.'
                             ]
                         ],

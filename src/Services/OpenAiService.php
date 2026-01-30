@@ -1708,38 +1708,47 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
         $compressed = [
             'type' => $schema['type'] ?? 'object',
         ];
-        
+
         // Properties komprimieren
-        if (isset($schema['properties']) && is_array($schema['properties'])) {
+        // WICHTIG: Behandle sowohl Array als auch stdClass (für leere properties)
+        $properties = $schema['properties'] ?? null;
+        $isValidProperties = is_array($properties) || $properties instanceof \stdClass;
+
+        if ($isValidProperties) {
+            // Konvertiere stdClass zu Array für die Iteration
+            $propertiesArray = is_array($properties) ? $properties : (array) $properties;
+
             $compressedProperties = [];
-            foreach ($schema['properties'] as $key => $property) {
+            foreach ($propertiesArray as $key => $property) {
+                // Skip wenn property kein Array ist (ungültiges Schema)
+                if (!is_array($property)) {
+                    continue;
+                }
+
                 $compressedProperty = [
                     'type' => $property['type'] ?? 'string',
                 ];
-                
+
                 // WICHTIG: Für Arrays muss 'items' erhalten bleiben (OpenAI-Requirement)
                 if (($property['type'] ?? '') === 'array' && isset($property['items'])) {
                     $compressedProperty['items'] = $this->compressSchema($property['items']);
                 }
-                
-                // Nur required fields behalten
+
+                // WICHTIG: enum-Werte IMMER behalten (für strict mode erforderlich)
+                if (isset($property['enum'])) {
+                    $compressedProperty['enum'] = $property['enum'];
+                }
+
+                // Descriptions für required fields behalten (oder kürzen)
                 if (isset($schema['required']) && in_array($key, $schema['required'])) {
-                    // Für required fields: kürze description auf max 50 Zeichen
                     if (isset($property['description']) && mb_strlen($property['description']) > 50) {
                         $compressedProperty['description'] = mb_substr($property['description'], 0, 47) . '...';
                     } elseif (isset($property['description'])) {
                         $compressedProperty['description'] = $property['description'];
                     }
-                    
-                    // Enum-Werte behalten (wichtig für Validierung)
-                    if (isset($property['enum'])) {
-                        $compressedProperty['enum'] = $property['enum'];
-                    }
                 } else {
-                    // Für optionale fields: nur type, keine description (spart Tokens)
-                    // ABER: items für Arrays immer behalten!
+                    // Für optionale fields: description nur bei Arrays behalten
                     if (($property['type'] ?? '') === 'array' && isset($property['description'])) {
-                        // Für optionale Arrays: description behalten (wichtig für LLM)
                         if (mb_strlen($property['description']) > 50) {
                             $compressedProperty['description'] = mb_substr($property['description'], 0, 47) . '...';
                         } else {
@@ -1747,27 +1756,35 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
                         }
                     }
                 }
-                
+
                 $compressedProperties[$key] = $compressedProperty;
             }
             // WICHTIG: OpenAI erwartet immer ein 'properties' Objekt bei type: "object"
             // Auch wenn leer, muss es vorhanden sein (als leeres Objekt {}, nicht Array [])
-            // Wenn leer, konvertiere zu Objekt, damit es zu {} in JSON wird, nicht []
+            // Wenn leer, konvertiere zu stdClass, damit es zu {} in JSON wird, nicht []
             if (empty($compressedProperties)) {
                 $compressed['properties'] = new \stdClass();
             } else {
-            $compressed['properties'] = $compressedProperties;
+                $compressed['properties'] = $compressedProperties;
             }
         } elseif (($schema['type'] ?? 'object') === 'object') {
             // Wenn kein properties im Schema, aber type ist "object", füge leeres Objekt hinzu
             $compressed['properties'] = new \stdClass();
         }
-        
-        // Required fields behalten (nur wenn nicht leer)
-        if (isset($schema['required']) && is_array($schema['required']) && !empty($schema['required'])) {
-            $compressed['required'] = $schema['required'];
+
+        // WICHTIG für strict mode: additionalProperties: false hinzufügen
+        if (($compressed['type'] ?? 'object') === 'object') {
+            $compressed['additionalProperties'] = false;
         }
-        
+
+        // Required fields behalten - auch leeres Array für strict mode
+        if (isset($schema['required']) && is_array($schema['required'])) {
+            $compressed['required'] = $schema['required'];
+        } else {
+            // Für strict mode: leeres required Array wenn nicht vorhanden
+            $compressed['required'] = [];
+        }
+
         return $compressed;
     }
 

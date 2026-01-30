@@ -27,7 +27,7 @@ class GetUserTool implements ToolContract
     {
         return [
             'type' => 'object',
-            'properties' => [],
+            'properties' => new \stdClass(),
             'required' => []
         ];
     }
