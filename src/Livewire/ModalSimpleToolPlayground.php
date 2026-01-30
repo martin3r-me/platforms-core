@@ -40,7 +40,7 @@ class ModalSimpleToolPlayground extends Component
     public ?string $pricingSaveMessage = null;
 
     public ?int $activeThreadId = null;
-    public ?CoreChat $chat = null;
+    public ?int $chatId = null;
 
     #[On('playground:open')]
     public function openModal(array $payload = []): void
@@ -92,7 +92,7 @@ class ModalSimpleToolPlayground extends Component
             return;
         }
 
-        $this->chat = CoreChat::firstOrCreate(
+        $chat = CoreChat::firstOrCreate(
             [
                 'user_id' => $user->id,
                 'title' => 'Simple Playground',
@@ -104,15 +104,17 @@ class ModalSimpleToolPlayground extends Component
             ]
         );
 
+        $this->chatId = $chat->id;
+
         // Load most recent open thread or create one
-        $thread = $this->chat->threads()
+        $thread = $chat->threads()
             ->where('status', 'open')
             ->orderBy('created_at', 'desc')
             ->first();
 
         if (!$thread) {
-            $thread = $this->chat->threads()->create([
-                'title' => 'Thread ' . ($this->chat->threads()->count() + 1),
+            $thread = $chat->threads()->create([
+                'title' => 'Thread ' . ($chat->threads()->count() + 1),
                 'status' => 'open',
                 'started_at' => now(),
             ]);
@@ -123,15 +125,17 @@ class ModalSimpleToolPlayground extends Component
 
     public function createThread(): void
     {
-        if (!$this->chat) {
+        if (!$this->chatId) {
             $this->loadOrCreateChat();
         }
-        if (!$this->chat) {
+
+        $chat = $this->chat;
+        if (!$chat) {
             return;
         }
 
-        $thread = $this->chat->threads()->create([
-            'title' => 'Thread ' . ($this->chat->threads()->count() + 1),
+        $thread = $chat->threads()->create([
+            'title' => 'Thread ' . ($chat->threads()->count() + 1),
             'status' => 'open',
             'started_at' => now(),
         ]);
@@ -141,16 +145,29 @@ class ModalSimpleToolPlayground extends Component
 
     public function switchThread(int $threadId): void
     {
-        if (!$this->chat) {
+        $chat = $this->chat;
+        if (!$chat) {
             return;
         }
 
-        $thread = $this->chat->threads()->find($threadId);
+        $thread = $chat->threads()->find($threadId);
         if (!$thread) {
             return;
         }
 
         $this->activeThreadId = $threadId;
+    }
+
+    /**
+     * Get the chat model on demand to avoid Livewire synth issues with Eloquent models.
+     */
+    #[Computed]
+    public function chat(): ?CoreChat
+    {
+        if (!$this->chatId) {
+            return null;
+        }
+        return CoreChat::find($this->chatId);
     }
 
     #[Computed]
@@ -184,11 +201,12 @@ class ModalSimpleToolPlayground extends Component
 
     public function updateThreadModel(int $threadId, string $modelId): void
     {
-        if (!$this->chat) {
+        $chat = $this->chat;
+        if (!$chat) {
             return;
         }
 
-        $thread = $this->chat->threads()->find($threadId);
+        $thread = $chat->threads()->find($threadId);
         if (!$thread) {
             return;
         }
@@ -198,11 +216,12 @@ class ModalSimpleToolPlayground extends Component
 
     public function updateThreadTitle(int $threadId, string $title): void
     {
-        if (!$this->chat) {
+        $chat = $this->chat;
+        if (!$chat) {
             return;
         }
 
-        $thread = $this->chat->threads()->find($threadId);
+        $thread = $chat->threads()->find($threadId);
         if (!$thread) {
             return;
         }
@@ -217,14 +236,15 @@ class ModalSimpleToolPlayground extends Component
 
     public function deleteActiveThread(): void
     {
-        if (!$this->chat || !$this->activeThreadId) {
+        $chat = $this->chat;
+        if (!$chat || !$this->activeThreadId) {
             return;
         }
 
         $threadId = (int) $this->activeThreadId;
 
         // Ensure we never delete across chats/users
-        $thread = $this->chat->threads()->find($threadId);
+        $thread = $chat->threads()->find($threadId);
         if (!$thread) {
             return;
         }
@@ -236,14 +256,14 @@ class ModalSimpleToolPlayground extends Component
         });
 
         // Pick newest open thread or create a new one
-        $next = $this->chat->threads()
+        $next = $chat->threads()
             ->where('status', 'open')
             ->orderBy('created_at', 'desc')
             ->first();
 
         if (!$next) {
-            $next = $this->chat->threads()->create([
-                'title' => 'Thread ' . ($this->chat->threads()->count() + 1),
+            $next = $chat->threads()->create([
+                'title' => 'Thread ' . ($chat->threads()->count() + 1),
                 'status' => 'open',
                 'started_at' => now(),
             ]);
