@@ -599,31 +599,6 @@ class SimpleToolController extends Controller
                     return $v;
                 };
 
-                // ===========================================
-                // HALLO WELT - TEST OB NEUER CODE LÄUFT
-                // ===========================================
-                $sendEvent('debug.tools', [
-                    'HALLO_WELT' => 'JA! Neuer Code läuft!',
-                    'iteration' => 0,
-                    'timestamp' => now()->toIso8601String(),
-                ]);
-
-                // Tool-Change Detection: Speichere Tool-Count und alle Tool-Calls für Rebuild
-                // OpenAI Responses API mit previous_response_id erlaubt KEINE Tool-Änderungen.
-                // Wenn sich die Tool-Liste ändert, muss ein neuer Chain gestartet werden.
-                $lastToolCount = $openAiService->getCurrentToolCount();
-                $fullConversationMessages = $messages; // Original-Konversation (für Rebuild bei Tool-Change)
-                $allToolCallsHistory = []; // Alle bisherigen Tool-Calls und -Outputs für Rebuild
-
-                $sendEvent('debug.tool_change_init', [
-                    'initial_tool_count' => $lastToolCount,
-                    'dynamically_loaded' => $openAiService->getDynamicallyLoadedTools(),
-                ]);
-                Log::debug('[SimpleToolController] Tool change detection initialized', [
-                    'initial_tool_count' => $lastToolCount,
-                    'dynamically_loaded' => $openAiService->getDynamicallyLoadedTools(),
-                ]);
-                
                 // Aggregate token usage across the whole request (multiple Responses API calls/iterations).
                 $usageAggregate = [
                     'input_tokens' => 0,
@@ -747,15 +722,6 @@ class SimpleToolController extends Controller
 
                             // Tool-call args can be interleaved; we need a stable map item_id -> call_id across events.
                             $toolCallIdByItemId = [];
-
-                            // DEBUG: Was wird tatsächlich an streamChat übergeben?
-                            $sendEvent('debug.tools', [
-                                'DEBUG_BEFORE_STREAM' => true,
-                                'iteration' => $iteration,
-                                'passPreviousResponseId' => $passPreviousResponseId,
-                                'previousResponseId_raw' => $previousResponseId,
-                                'messagesForApi_count' => count($passMessagesForApi),
-                            ]);
 
                             $openAiService->streamChat(
                                 $passMessagesForApi,
@@ -1378,102 +1344,11 @@ class SimpleToolController extends Controller
                         }
                     }
 
-                    // Sammle Tool-Calls und -Outputs für History (für Rebuild bei Tool-Change)
-                    // Falls der Assistant Text vor den Tool-Calls gesendet hat, diesen auch speichern
-                    if (trim($assistant) !== '') {
-                        $allToolCallsHistory[] = [
-                            'role' => 'assistant',
-                            'content' => $assistant,
-                        ];
-                    }
-                    foreach ($toolCallsCollector as $callId => $call) {
-                        $allToolCallsHistory[] = [
-                            'type' => 'function_call',
-                            'id' => $call['id'] ?? null,
-                            'call_id' => $callId,
-                            'name' => $call['name'] ?? null,
-                            'arguments' => $call['arguments'] ?? '',
-                        ];
-                    }
-                    foreach ($toolOutputsForNextIteration as $output) {
-                        $allToolCallsHistory[] = $output;
-                    }
-
-                    // Tool-Change Detection:
-                    // OpenAI Responses API mit previous_response_id erlaubt KEINE Tool-Änderungen.
-                    // Wenn sich die Tool-Anzahl ändert (z.B. nach tools.GET(module="helpdesk")),
-                    // muss ein neuer Chain gestartet werden mit vollständiger Konversation.
-                    $currentToolCount = $openAiService->getCurrentToolCount();
-
-                    // Debug: Log tool count check
-                    $sendEvent('debug.tool_change_check', [
-                        'iteration' => $iteration,
-                        'lastToolCount' => $lastToolCount,
-                        'currentToolCount' => $currentToolCount,
-                        'will_rebuild' => ($lastToolCount !== null && $currentToolCount !== $lastToolCount),
-                    ]);
-                    Log::debug('[SimpleToolController] Tool count check', [
-                        'iteration' => $iteration,
-                        'lastToolCount' => $lastToolCount,
-                        'currentToolCount' => $currentToolCount,
-                        'dynamically_loaded' => $openAiService->getDynamicallyLoadedTools(),
-                    ]);
-
-                    if ($lastToolCount !== null && $currentToolCount !== $lastToolCount) {
-                        Log::info('[SimpleToolController] Tool count changed - starting new chain', [
-                            'previous_count' => $lastToolCount,
-                            'current_count' => $currentToolCount,
-                            'iteration' => $iteration,
-                        ]);
-
-                        // DEBUG: Tool change detected!
-                        $sendEvent('debug.tools', [
-                            'DEBUG_TOOL_CHANGE_DETECTED' => true,
-                            'iteration' => $iteration,
-                            'lastToolCount' => $lastToolCount,
-                            'currentToolCount' => $currentToolCount,
-                            'previousResponseId_BEFORE' => $previousResponseId,
-                        ]);
-
-                        $sendEvent('openai.event', [
-                            'event' => 'server.tools.changed',
-                            'preview' => [
-                                'previous_count' => $lastToolCount,
-                                'current_count' => $currentToolCount,
-                            ],
-                            'raw' => null,
-                        ]);
-
-                        // Neuer Chain: previous_response_id entfernen und vollständige Konversation aufbauen
-                        $previousResponseId = null;
-
-                        // DEBUG: Confirm null was set
-                        $sendEvent('debug.tools', [
-                            'DEBUG_TOOL_CHANGE_APPLIED' => true,
-                            'previousResponseId_AFTER' => $previousResponseId,
-                        ]);
-
-                        // FIX: Verwende $messages direkt - es enthält bereits:
-                        // - System prompt
-                        // - Original conversation (user/assistant messages)
-                        // - function_call_output items (unsere Tool-Antworten)
-                        // WICHTIG: KEINE function_call Items (die darf die Responses API nicht als Input bekommen!)
-                        $messagesForApi = $messages;
-
-                        Log::debug('[SimpleToolController] Using $messages for new chain (tool change)', [
-                            'total_messages' => count($messagesForApi),
-                        ]);
-
-                        $sendEvent('debug.tools', [
-                            'DEBUG_REBUILD_USED_MESSAGES' => true,
-                            'messagesForApi_count' => count($messagesForApi),
-                        ]);
-                    } else {
-                        // Normal: Nur Tool-Outputs mit previous_response_id
-                        $previousResponseId = $currentResponseId;
-                        $messagesForApi = $toolOutputsForNextIteration;
-                    }
-                    $lastToolCount = $currentToolCount;
+                    // Continue the tool loop using Responses API best practice:
+                    // Provide tool outputs as the ONLY next input, and chain via previous_response_id.
+                    // Tools werden bei jeder Iteration neu gesendet (inkl. dynamisch geladene).
+                    $previousResponseId = $currentResponseId;
+                    $messagesForApi = $toolOutputsForNextIteration;
                 }
 
                 // Safety: do not end with a hard error in the chat UI; provide a graceful completion.

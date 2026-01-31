@@ -394,34 +394,11 @@ class OpenAiService
             'max_output_tokens' => $options['max_tokens'] ?? 1000,
         ];
         // Responses API: continue from previous response (best practice for tool calling loops)
-        $hasPreviousResponseId = isset($options['previous_response_id']) && is_string($options['previous_response_id']) && $options['previous_response_id'] !== '';
-        if ($hasPreviousResponseId) {
+        // HINWEIS: Tools werden IMMER gesendet (auch mit previous_response_id),
+        // damit dynamisch geladene Tools verfügbar sind.
+        // Die alte Tool-Change-Detection wurde entfernt - sie verursachte mehr Probleme als sie löste.
+        if (isset($options['previous_response_id']) && is_string($options['previous_response_id']) && $options['previous_response_id'] !== '') {
             $payload['previous_response_id'] = $options['previous_response_id'];
-        }
-
-        // Tool-Count-Change Detection:
-        // OpenAI Responses API mit previous_response_id erlaubt KEINE Tool-Änderungen.
-        // Wenn sich die Tool-Anzahl ändert (z.B. nach tools.GET(module="helpdesk")),
-        // muss previous_response_id entfernt werden, sonst HTTP 400.
-        // Der Caller (SimpleToolController) muss dann vollständige Messages senden.
-        if ($hasPreviousResponseId) {
-            $currentToolCount = count($this->getAvailableTools());
-            if ($this->lastToolCount !== null && $currentToolCount !== $this->lastToolCount) {
-                Log::warning('[OpenAI Stream] Tool count changed during continuation - dropping previous_response_id', [
-                    'previous_count' => $this->lastToolCount,
-                    'current_count' => $currentToolCount,
-                    'previous_response_id' => $options['previous_response_id'] ?? null,
-                ]);
-                $hasPreviousResponseId = false;
-                unset($payload['previous_response_id']);
-
-                // Notify caller that tool change occurred (via options reference won't work, use exception-free signaling)
-                // The caller should detect this by checking if previous_response_id was actually used
-            }
-            $this->lastToolCount = $currentToolCount;
-        } else {
-            // Bei neuem Request: Tool-Count initialisieren
-            $this->lastToolCount = count($this->getAvailableTools());
         }
 
         // DB-driven parameter support (fallback: one retry stripping unsupported params).
