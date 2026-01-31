@@ -1042,18 +1042,56 @@
         const eventCounters = { all: 0, reasoning: 0, thinking: 0 };
 
         // Keep a copyable debug blob, even if we don't render it in the UI.
+        // FIX: Fokussiert auf Tool-Diagnose - nur das Relevante, weniger Rauschen.
         window.__simplePlaygroundDebugDumpText = window.__simplePlaygroundDebugDumpText || '';
         const updateDebugDump = () => {
+          // Payload ohne chat_history (zu groß), aber mit message + model
+          const cleanPayload = debugState.payload ? {
+            message: debugState.payload.message,
+            model: debugState.payload.model,
+            thread_id: debugState.payload.thread_id,
+            max_iterations: debugState.payload.max_iterations,
+            history_length: debugState.payload.chat_history?.length || 0,
+          } : null;
+
+          // SSE Events: Nur Tool-relevante (nicht jeden delta)
+          const toolRelevantEvents = ['debug.tools', 'tool.start', 'tool.executed', 'openai.event', 'done', 'error'];
+          const filteredSseEvents = debugState.sseEvents
+            .filter(e => {
+              // Immer behalten: tool-relevante events
+              if (toolRelevantEvents.some(t => e.event?.includes(t))) return true;
+              // Bei openai.event: nur function_call, tool_call, output_item events
+              if (e.event === 'openai.event' && e.raw) {
+                const r = e.raw;
+                if (r.includes('function_call') || r.includes('tool_call') || r.includes('output_item') || r.includes('mcp_call')) return true;
+              }
+              // Behalten: Events die "to=functions" enthalten (das Problem!)
+              if (e.raw && e.raw.includes('to=functions')) return true;
+              return false;
+            })
+            .slice(-50);
+
+          // Assistant gekürzt (max 500 chars)
+          const assistantPreview = debugState.lastAssistant
+            ? (debugState.lastAssistant.length > 500
+                ? debugState.lastAssistant.slice(0, 500) + '...[' + debugState.lastAssistant.length + ' chars]'
+                : debugState.lastAssistant)
+            : '';
+
           const out = {
-            startedAt: debugState.startedAt,
-            payload: debugState.payload,
+            _info: 'Debug-Dump für Tool-Diagnose. Kopieren und teilen.',
+            session: {
+              startedAt: debugState.startedAt,
+              model: debugState.model,
+            },
+            request: cleanPayload,
+            tools: debugState.toolsVisible,  // WICHTIG: Welche Tools wurden registriert?
+            toolCalls: debugState.toolCalls.slice(-20),  // Was wurde aufgerufen?
             usage: debugState.usage,
-            model: debugState.model,
-            lastAssistant: debugState.lastAssistant,
-            events: debugState.events.slice(-120),
-            sse_events: debugState.sseEvents.slice(-250),
-            toolCalls: debugState.toolCalls.slice(-20),
-            toolsVisible: debugState.toolsVisible,
+            assistantPreview: assistantPreview,
+            relevantEvents: filteredSseEvents,
+            // Fallback: Alle Events (falls nötig)
+            _allEventsCount: debugState.sseEvents.length,
           };
           const text = JSON.stringify(out, null, 2);
           window.__simplePlaygroundDebugDumpText = text;
