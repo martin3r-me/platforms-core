@@ -707,10 +707,10 @@
           if (!chatScroll) return;
           
           setupScrollTracking();
-          
-          // Observe only chatList (server-rendered messages)
-          // Stream is only in debug panel, not in chat
-          const observeTargets = [chatList].filter(Boolean);
+
+          // Observe chatList (server-rendered) + pgStreamingSlot (live streaming + temp messages)
+          const streamSlot = document.getElementById('pgStreamingSlot');
+          const observeTargets = [chatList, streamSlot].filter(Boolean);
           if (observeTargets.length === 0) return;
           
           scrollObserver = new MutationObserver(() => {
@@ -807,18 +807,42 @@
           rtStreamLog.scrollTop = rtStreamLog.scrollHeight;
         };
 
-        // Streaming assistant message: NOT in chat, only in debug panel
-        // Chat will show final message after complete (rendered by Livewire)
+        // Streaming assistant message: show live in chat (like Claude Code), remove on complete
         const ensureStreamingAssistantMessage = () => {
-          // Do nothing - stream is only in debug panel
-          return null;
+          refreshDomRefs();
+          const root = document.getElementById('pgStreamingSlot') || chatList;
+          if (!root) return null;
+          let el = document.getElementById('pgStreamingAssistantMsg');
+          if (el) return el;
+          const wrap = document.createElement('div');
+          wrap.id = 'pgStreamingAssistantMsg';
+          wrap.className = 'flex justify-start';
+          wrap.dataset.streaming = '1';
+          wrap.innerHTML = `
+            <div class="max-w-4xl rounded-lg p-3 break-words overflow-hidden bg-[var(--ui-surface)] border border-[var(--ui-border)]">
+              <div class="text-sm font-semibold mb-1 flex items-center gap-2">
+                <span>Assistant</span>
+                <span class="text-[10px] text-[var(--ui-muted)] animate-pulse" data-stream-status>(streaming…)</span>
+              </div>
+              <div class="whitespace-pre-wrap break-words" data-stream-content></div>
+            </div>
+          `;
+          root.appendChild(wrap);
+          const empty = document.getElementById('chatEmpty');
+          if (empty) empty.style.display = 'none';
+          return wrap;
         };
         const updateStreamingAssistantMessage = (text) => {
-          // Do nothing - stream is only in debug panel
-          // The appendStreamLog function already handles debug output
+          const el = ensureStreamingAssistantMessage();
+          if (!el) return;
+          const c = el.querySelector('[data-stream-content]');
+          if (c) c.textContent = text || '';
+          // Auto-scroll during streaming
+          scrollToBottom();
         };
         const removeStreamingAssistantMessage = () => {
-          // Do nothing - nothing to remove from chat
+          const el = document.getElementById('pgStreamingAssistantMsg');
+          if (el && el.parentNode) el.parentNode.removeChild(el);
         };
 
         // Render a message in the chat UI (used for temporary messages before Livewire re-renders)
@@ -909,11 +933,12 @@
           const wrap = document.createElement('div');
           wrap.id = id;
           wrap.className = 'flex justify-start';
+          wrap.dataset.streaming = '1';
           wrap.innerHTML = `
             <div class="max-w-4xl rounded-lg p-3 break-words overflow-hidden bg-[var(--ui-bg)] border border-[var(--ui-border)]/60">
               <div class="text-[11px] font-semibold mb-1 flex items-center gap-2 text-[var(--ui-secondary)]">
                 <span>${label}</span>
-                <span class="text-[10px] text-[var(--ui-muted)]">(live)</span>
+                <span class="text-[10px] text-[var(--ui-muted)] animate-pulse">(live)</span>
               </div>
               <div class="whitespace-pre-wrap break-words text-[11px] text-[var(--ui-secondary)]" data-stream-content></div>
             </div>
@@ -921,7 +946,8 @@
           root.appendChild(wrap);
           const empty = document.getElementById('chatEmpty');
           if (empty) empty.style.display = 'none';
-          // Auto-scroll is handled by MutationObserver
+          // Auto-scroll during streaming meta messages
+          scrollToBottom();
           return wrap;
         };
         const updateStreamingMetaMessage = (kind, text) => {
@@ -929,6 +955,8 @@
           if (!el) return;
           const c = el.querySelector('[data-stream-content]');
           if (c) c.textContent = text || '';
+          // Auto-scroll during streaming
+          scrollToBottom();
         };
         const removeStreamingMetaMessages = () => {
           const a = document.getElementById('pgStreamingReasoningMsg');
@@ -1502,19 +1530,24 @@
             const slot = document.getElementById('pgStreamingSlot');
             const st = getThreadState(currentThreadId || 'none');
             if (slot) {
-              // If stream is NOT in flight, remove ALL temporary messages immediately
-              // (Livewire has rendered the real messages from DB in chatList)
-              if (!st || !st.inFlight) {
-                const temporary = slot.querySelectorAll('[data-temporary="1"]');
-                temporary.forEach((el) => {
-                  if (el.parentNode) el.parentNode.removeChild(el);
-                });
-              }
+              // ALWAYS remove temporary USER messages (they're now in chatList from DB)
+              // This fixes the duplicate sender issue during streaming
+              const temporary = slot.querySelectorAll('[data-temporary="1"]');
+              temporary.forEach((el) => {
+                if (el.parentNode) el.parentNode.removeChild(el);
+              });
               // Remove finalized assistant messages (they're now in chatList)
               const finalized = slot.querySelectorAll('[data-final="1"]');
               finalized.forEach((el) => {
                 if (el.parentNode) el.parentNode.removeChild(el);
               });
+              // If stream is NOT in flight, also remove streaming messages
+              if (!st || !st.inFlight) {
+                const streaming = slot.querySelectorAll('[data-streaming="1"]');
+                streaming.forEach((el) => {
+                  if (el.parentNode) el.parentNode.removeChild(el);
+                });
+              }
             }
           } catch (_) {}
           updateThreadBusyIndicators();
@@ -1524,7 +1557,6 @@
             const last = window.__simplePlaygroundLastEvent?.key;
             if (last) setEventLabel(last);
           } catch (_) {}
-          // Stream is only in debug panel, nothing to repaint in chat
           // Re-setup auto-scroll if needed (after Livewire re-renders DOM)
           setupAutoScroll();
           // Re-setup auto-grow for textarea (in case it was re-rendered)
@@ -1838,18 +1870,19 @@
                         st.live.assistant = delta !== ''
                           ? (st.live.assistant + delta)
                           : full;
-                        // Stream only in debug panel, not in chat
+                        // Show stream in both: debug panel AND chat (like Claude Code)
                         appendStreamLog('assistant.delta', delta !== '' ? delta : full);
+                        if (isVisible) updateStreamingAssistantMessage(st.live.assistant);
                       }
                       debugState.lastAssistant = st.live.assistant;
                     }
                     break;
                   case 'assistant.reset':
                     st.live.assistant = '';
-                    // Stream only in debug panel, nothing to remove from chat
+                    // Reset both: debug panel AND chat streaming bubble
                     appendStreamLog('assistant.reset', '\n');
                     if (isVisible) {
-                      // Ensure element is ready for new stream
+                      removeStreamingAssistantMessage();
                       ensureStreamingAssistantMessage();
                     }
                     break;
