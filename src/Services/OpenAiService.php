@@ -394,7 +394,8 @@ class OpenAiService
             'max_output_tokens' => $options['max_tokens'] ?? 1000,
         ];
         // Responses API: continue from previous response (best practice for tool calling loops)
-        if (isset($options['previous_response_id']) && is_string($options['previous_response_id']) && $options['previous_response_id'] !== '') {
+        $hasPreviousResponseId = isset($options['previous_response_id']) && is_string($options['previous_response_id']) && $options['previous_response_id'] !== '';
+        if ($hasPreviousResponseId) {
             $payload['previous_response_id'] = $options['previous_response_id'];
         }
         // DB-driven parameter support (fallback: one retry stripping unsupported params).
@@ -405,10 +406,24 @@ class OpenAiService
         if (isset($options['reasoning']) && is_array($options['reasoning'])) {
             $payload['reasoning'] = $options['reasoning'];
         }
-        if (isset($options['tools']) && $options['tools'] === false) {
+
+        // WICHTIG: Bei previous_response_id (Tool-Continuation) werden Tools NICHT erneut gesendet!
+        // Die Tools sind bereits in der vorherigen Response enthalten. Wenn wir sie erneut senden,
+        // kann es zu Inkonsistenzen kommen (z.B. durch dynamisch geladene Tools), was HTTP 400 verursacht.
+        if ($hasPreviousResponseId) {
+            // Bei Continuation: Keine Tools senden - OpenAI nutzt die Tools aus der vorherigen Response
+            // Debug-Log für Troubleshooting
+            if (config('app.debug', false)) {
+                Log::debug('[OpenAI Stream] Continuation mode - Tools nicht gesendet (previous_response_id aktiv)', [
+                    'previous_response_id' => $options['previous_response_id'],
+                    'input_count' => count($payload['input'] ?? []),
+                    'input_types' => array_map(fn($i) => $i['type'] ?? ($i['role'] ?? 'unknown'), $payload['input'] ?? []),
+                ]);
+            }
+        } elseif (isset($options['tools']) && $options['tools'] === false) {
             // Tools explizit deaktiviert - nichts hinzufügen
         } else {
-            // Tools aktiviert:
+            // Tools aktiviert (nur bei initialem Request ohne previous_response_id):
             // - Wenn $options['tools'] ein Array ist, nutzen wir es direkt (z.B. OpenAI built-in Tools wie web_search)
             // - Sonst: Standard = interne Tools aus Registry
             if (isset($options['tools']) && is_array($options['tools'])) {
@@ -419,7 +434,7 @@ class OpenAiService
                 $tools = $this->getAvailableTools();
                 $payload['tools'] = $this->normalizeToolsForResponses($tools);
                 $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
-                
+
                 // Debug: Log Tools (nur wenn Logging aktiviert ist)
                 if (config('app.debug', false)) {
                     Log::debug('[OpenAI Stream] Tools aktiviert', [
@@ -430,7 +445,7 @@ class OpenAiService
                     ]);
                 }
             }
-            
+
             // Debug: Log Tools (nur wenn Logging aktiviert ist)
             if (config('app.debug', false)) {
                 Log::debug('[OpenAI Stream] Tool payload (final)', [
@@ -441,7 +456,8 @@ class OpenAiService
         }
 
         // Optional: prepend OpenAI built-in tools (e.g. web_search) while still using internal discovery tools.
-        if (!empty($options['include_web_search'])) {
+        // WICHTIG: Nicht bei previous_response_id, da Tools dort nicht gesendet werden dürfen!
+        if (!empty($options['include_web_search']) && !$hasPreviousResponseId) {
             $payload['tools'] = $payload['tools'] ?? [];
             $hasWebSearch = false;
             foreach ($payload['tools'] as $t) {
@@ -560,11 +576,18 @@ class OpenAiService
                 $originalName = $fn['name'] ?? null;
                 $openAiName = $this->normalizeToolNameForOpenAi($originalName);
                 
+                // WICHTIG: OpenAI erwartet ein Object für parameters, NICHT null
+                // Ein leeres Schema ist { "type": "object", "properties": {} }
+                $parameters = $fn['parameters'] ?? null;
+                if ($parameters === null || (is_array($parameters) && empty($parameters))) {
+                    $parameters = ['type' => 'object', 'properties' => new \stdClass()];
+                }
+
                 $out[] = [
                     'type' => 'function',
                     'name' => $openAiName,
-                    'description' => $fn['description'] ?? ($tool['description'] ?? null),
-                    'parameters' => $fn['parameters'] ?? null,
+                    'description' => $fn['description'] ?? ($tool['description'] ?? ''),
+                    'parameters' => $parameters,
                 ];
             } else {
                 $out[] = $tool;
@@ -1331,6 +1354,7 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
     private function formatApiErrorMessage(int $status, string $body): string
     {
         $prefix = match (true) {
+            $status === 400 => 'BAD_REQUEST',
             $status === 401 => 'AUTHENTICATION_FAILED',
             $status === 403 => 'PERMISSION_DENIED',
             $status === 404 => 'NOT_FOUND',
