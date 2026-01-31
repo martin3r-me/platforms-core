@@ -674,19 +674,26 @@
         const scrollToBottom = () => {
           // Always get fresh reference
           const scroller = document.getElementById('chatScroll');
-          if (!scroller) return;
+          if (!scroller) {
+            console.log('[SCROLL] chatScroll element not found!');
+            return;
+          }
+          const before = scroller.scrollTop;
           scroller.scrollTop = scroller.scrollHeight;
+          console.log('[SCROLL] scrolled:', before, '->', scroller.scrollTop, '(height:', scroller.scrollHeight + ')');
         };
 
         // Scroll interval during streaming (more reliable than MutationObserver)
         let scrollInterval = null;
         const startScrollInterval = () => {
+          console.log('[SCROLL] startScrollInterval, existing:', !!scrollInterval);
           if (scrollInterval) return;
           scrollInterval = setInterval(() => {
             scrollToBottom();
           }, 100);
         };
         const stopScrollInterval = () => {
+          console.log('[SCROLL] stopScrollInterval');
           if (scrollInterval) {
             clearInterval(scrollInterval);
             scrollInterval = null;
@@ -1796,6 +1803,7 @@
                   }
                 } catch (_) {}
 
+                console.log('[SSE] event:', currentEvent);
                 switch (currentEvent) {
                   case 'assistant.delta':
                     {
