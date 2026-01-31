@@ -673,37 +673,16 @@
           el.style.overflowY = (el.scrollHeight > maxPx) ? 'auto' : 'hidden';
         };
 
-        // Auto-scroll: simple and robust
+        // Manual scroll to bottom (only needed for initial load and thread switch)
+        // Note: overflow-anchor CSS handles auto-scroll during streaming
         const scrollToBottom = () => {
           const scroller = document.getElementById('simpleChatScroll');
-          if (!scroller) {
-            console.log('[SCROLL] simpleChatScroll not found');
-            return;
-          }
-          const before = scroller.scrollTop;
-          const maxScroll = scroller.scrollHeight - scroller.clientHeight;
-          scroller.scrollTop = scroller.scrollHeight;
-          const after = scroller.scrollTop;
-          const atBottom = after >= maxScroll - 5;
-          console.log('[SCROLL]', atBottom ? 'AT BOTTOM' : 'NOT at bottom', '- scrollTop:', before, '->', after, '/', maxScroll, '(scrollHeight:', scroller.scrollHeight, 'clientHeight:', scroller.clientHeight + ')');
+          if (scroller) scroller.scrollTop = scroller.scrollHeight;
         };
 
-        // Scroll interval during streaming (more reliable than MutationObserver)
-        let scrollInterval = null;
-        const startScrollInterval = () => {
-          console.log('[SCROLL] startScrollInterval, existing:', !!scrollInterval);
-          if (scrollInterval) return;
-          scrollInterval = setInterval(() => {
-            scrollToBottom();
-          }, 100);
-        };
-        const stopScrollInterval = () => {
-          console.log('[SCROLL] stopScrollInterval');
-          if (scrollInterval) {
-            clearInterval(scrollInterval);
-            scrollInterval = null;
-          }
-        };
+        // Note: overflow-anchor CSS handles auto-scroll now, no interval needed
+        const startScrollInterval = () => {};
+        const stopScrollInterval = () => {};
 
         // Placeholder for backwards compatibility
         const setupAutoScroll = () => {};
@@ -822,10 +801,7 @@
           // Hide empty state
           const empty = document.getElementById('chatEmpty');
           if (empty) empty.style.display = 'none';
-
-          // Scroll to bottom
-          scrollToBottom();
-
+          // Note: overflow-anchor CSS handles auto-scroll
           return wrap;
         };
 
@@ -895,8 +871,7 @@
           root.appendChild(wrap);
           const empty = document.getElementById('chatEmpty');
           if (empty) empty.style.display = 'none';
-          // Auto-scroll during streaming meta messages
-          scrollToBottom();
+          // Note: overflow-anchor CSS handles auto-scroll
           return wrap;
         };
         const updateStreamingMetaMessage = (kind, text) => {
@@ -904,8 +879,7 @@
           if (!el) return;
           const c = el.querySelector('[data-stream-content]');
           if (c) c.textContent = text || '';
-          // Auto-scroll during streaming
-          scrollToBottom();
+          // Note: overflow-anchor CSS handles auto-scroll
         };
         const removeStreamingMetaMessages = () => {
           const a = document.getElementById('pgStreamingReasoningMsg');
@@ -1525,18 +1499,7 @@
             // Smooth scroll to bottom after thread switch
             setTimeout(() => scrollToBottom(), 150);
           }
-          // Scroll after Livewire update if flag is set (e.g., after complete event)
-          if (window.__simplePlaygroundShouldScrollAfterUpdate) {
-            window.__simplePlaygroundShouldScrollAfterUpdate = false;
-            // Wait a bit longer to ensure the message is fully rendered
-            setTimeout(() => {
-              scrollToBottom();
-              // Also try again after a short delay to catch any late rendering
-              setTimeout(() => scrollToBottom(), 200);
-            }, 150);
-          }
-          // Always scroll after Livewire updates (new messages from DB)
-          setTimeout(() => scrollToBottom(), 100);
+          // Note: overflow-anchor CSS handles auto-scroll now
         });
 
         // Iterations: keep high defaults; allow user override via localStorage.
@@ -2060,10 +2023,7 @@
                       // Note: Debug window is NOT cleared here - it will be cleared on next send
                       // Trigger Livewire to reload messages from DB and show the new assistant message
                       refreshLivewireMessages();
-                      // Direct scroll calls to catch the new content after Livewire re-renders
-                      setTimeout(() => scrollToBottom(), 200);
-                      setTimeout(() => scrollToBottom(), 500);
-                      setTimeout(() => scrollToBottom(), 1000);
+                      // Note: overflow-anchor CSS handles auto-scroll now
                     }
                     st.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';
@@ -2175,12 +2135,7 @@
             updateThreadBusyIndicators();
             updateFooterBusy();
             threadState.userAborted = false;
-            // Final scroll to bottom after stream completes
-            // Multiple attempts to catch Livewire re-render
-            setTimeout(() => scrollToBottom(), 100);
-            setTimeout(() => scrollToBottom(), 300);
-            setTimeout(() => scrollToBottom(), 600);
-            setTimeout(() => scrollToBottom(), 1000);
+            // Note: overflow-anchor CSS handles auto-scroll now
           }
         };
 
@@ -2421,18 +2376,7 @@
               const last = window.__simplePlaygroundLastEvent?.key;
               if (last) setEventLabel(last);
             } catch (_) {}
-            // Scroll to bottom if flag is set (after complete event)
-            if (window.__simplePlaygroundShouldScrollAfterUpdate) {
-              window.__simplePlaygroundShouldScrollAfterUpdate = false;
-              // Use requestAnimationFrame to ensure DOM is updated, then scroll
-              requestAnimationFrame(() => {
-                setTimeout(() => {
-                  scrollToBottom();
-                  // Retry once more after a short delay to catch any late rendering
-                  setTimeout(() => scrollToBottom(), 100);
-                }, 50);
-              });
-            }
+            // Note: overflow-anchor CSS handles auto-scroll now
           }, 50);
         });
       };
