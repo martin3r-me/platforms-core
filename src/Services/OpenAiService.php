@@ -651,6 +651,13 @@ class OpenAiService
             }
         }
 
+        // reasoning (only supported by certain models like o1, o3-mini, gpt-5.2-thinking)
+        if (isset($payload['reasoning'])) {
+            if ($this->isParamSupportedByDb($model, 'reasoning') === false) {
+                unset($payload['reasoning']);
+            }
+        }
+
         return $payload;
     }
 
@@ -716,6 +723,7 @@ class OpenAiService
             'top_p' => 'supports_top_p',
             'presence_penalty' => 'supports_presence_penalty',
             'frequency_penalty' => 'supports_frequency_penalty',
+            'reasoning' => 'supports_reasoning_tokens',
             default => null,
         };
         if ($field === null) {
