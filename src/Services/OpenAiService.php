@@ -1382,6 +1382,14 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
             $prompt = $context['data']['system_prompt'] ?? $defaultPrompt;
             $u = $context['data']['user'] ?? null; $t = $context['data']['team'] ?? null;
             $module = $context['data']['module'] ?? null; $route = $context['data']['route'] ?? null; $url = $context['data']['url'] ?? null; $time = $context['data']['current_time'] ?? null; $tz = $context['data']['timezone'] ?? null;
+
+            // Debug: Timezone im Context loggen (PRC-Bug hunting)
+            \Log::debug('[OpenAiService] buildMessagesWithContext timezone', [
+                'timezone_from_context' => $tz,
+                'php_default_timezone' => @date_default_timezone_get(),
+                '_debug_timezone' => $context['data']['_debug_timezone'] ?? null,
+            ]);
+
             $naturalCtx = trim(implode(' ', array_filter([
                 $u ? 'Nutzer: ' . ($u['name'] ?? ('#'.$u['id'])) : null,
                 $t ? 'Team: ' . ($t['name'] ?? ('#'.$t['id'])) : null,

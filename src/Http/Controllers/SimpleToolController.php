@@ -371,6 +371,31 @@ class SimpleToolController extends Controller
             @flush();
 
             try {
+                // Debug: Timezone-Informationen sammeln (PRC-Bug hunting)
+                $timezoneDebug = [
+                    'php_default' => @date_default_timezone_get(),
+                    'config_app_timezone' => config('app.timezone'),
+                    'env_app_timezone' => env('APP_TIMEZONE'),
+                    'ini_date_timezone' => @ini_get('date.timezone'),
+                    'carbon_default' => class_exists(\Carbon\Carbon::class) ? \Carbon\Carbon::now()->timezoneName : null,
+                ];
+
+                // User/Team Timezone falls vorhanden
+                $user = $request->user();
+                if ($user) {
+                    $timezoneDebug['user_id'] = $user->id;
+                    $timezoneDebug['user_timezone'] = $user->timezone ?? '(not set)';
+                    $timezoneDebug['user_attributes'] = array_keys($user->getAttributes());
+                    if ($user->currentTeam) {
+                        $timezoneDebug['team_id'] = $user->currentTeam->id;
+                        $timezoneDebug['team_timezone'] = $user->currentTeam->timezone ?? '(not set)';
+                        $timezoneDebug['team_attributes'] = array_keys($user->currentTeam->getAttributes());
+                    }
+                }
+
+                Log::info('[SimpleToolController] Timezone Debug', $timezoneDebug);
+                $sendEvent('debug.timezone', $timezoneDebug);
+
                 // Debug: Eingehende Header/Body (hilft bei 400)
                 $sendEvent('debug.request', [
                     'content_type' => $request->header('Content-Type'),
