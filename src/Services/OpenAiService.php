@@ -406,8 +406,14 @@ class OpenAiService
 
         // Optional: enable reasoning signals in the Responses API (model-dependent)
         // Example: ['effort' => 'medium', 'summary' => 'auto']
+        // WICHTIG: Reasoning NUR bei initialem Call senden (ohne previous_response_id)!
+        // Bei Continuations verursacht reasoning einen 400 Bad Request Error
+        // (OpenAI Problem: "Item 'rs_xxx' of type 'reasoning' was provided without its required following item")
         if (isset($options['reasoning']) && is_array($options['reasoning'])) {
-            $payload['reasoning'] = $options['reasoning'];
+            // Nur bei initialem Call (ohne previous_response_id)
+            if (!isset($payload['previous_response_id'])) {
+                $payload['reasoning'] = $options['reasoning'];
+            }
         }
 
         // Tools werden bei jeder Iteration gesendet (auch bei previous_response_id),
@@ -517,6 +523,7 @@ class OpenAiService
                     'tool_names' => array_map(fn($t) => $t['name'] ?? ($t['type'] ?? 'unknown'), $payload['tools'] ?? []),
                     'has_reasoning' => isset($payload['reasoning']),
                     'reasoning' => $payload['reasoning'] ?? null,
+                    'reasoning_skipped_for_continuation' => isset($options['reasoning']) && isset($payload['previous_response_id']),
                     'has_previous_response_id' => isset($payload['previous_response_id']),
                     'max_output_tokens' => $payload['max_output_tokens'] ?? null,
                     // Input-Messages ohne vollständigen Content (Datenschutz)
