@@ -34,6 +34,18 @@ class CoreServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
+        // [SECURITY] PRC Timezone Detection - Früher Check beim Boot
+        // Wenn PRC Timezone bereits gesetzt ist, sofort loggen mit Backtrace
+        $tz = @date_default_timezone_get();
+        if ($tz === 'PRC' || strpos($tz, 'PRC') !== false) {
+            \Illuminate\Support\Facades\Log::critical('[SECURITY] PRC timezone detected at boot!', [
+                'timezone' => $tz,
+                'backtrace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 30),
+                'server' => $_SERVER ?? [],
+                'env_tz' => getenv('TZ'),
+            ]);
+        }
+
         // Views & Migrations
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'platform');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');

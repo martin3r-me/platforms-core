@@ -332,6 +332,23 @@ class SimpleToolController extends Controller
             } catch (\Throwable $e) {
                 $rid = (string) (microtime(true));
             }
+            // [SECURITY] Error Handler für verdächtige Timezone-Änderungen
+            // PRC-Bug: Unbekannter Ursprung setzt 'PRC' Timezone → Backtrace erfassen
+            set_error_handler(function($errno, $errstr, $errfile, $errline) use ($rid) {
+                if (strpos($errstr, 'Timezone ID') !== false || strpos($errstr, 'PRC') !== false) {
+                    $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 20);
+                    Log::critical('[SECURITY] Suspicious timezone change detected', [
+                        'rid' => $rid,
+                        'error' => $errstr,
+                        'file' => $errfile,
+                        'line' => $errline,
+                        'backtrace' => $backtrace,
+                        'current_timezone' => @date_default_timezone_get(),
+                    ]);
+                }
+                return false; // Let PHP handle it normally
+            }, E_ALL);
+
             Log::info('[SimpleToolController] SSE stream start', [
                 'rid' => $rid,
                 'path' => $request->path(),
