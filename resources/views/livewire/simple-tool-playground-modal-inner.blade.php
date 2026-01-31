@@ -672,15 +672,18 @@
 
         // Auto-scroll: simple and robust
         const scrollToBottom = () => {
-          // Always get fresh reference
-          const scroller = document.getElementById('chatScroll');
-          if (!scroller) {
-            console.log('[SCROLL] chatScroll element not found!');
-            return;
+          // Find ALL chatScroll elements and scroll the one with content (height > 0)
+          const scrollers = document.querySelectorAll('#chatScroll');
+          console.log('[SCROLL] found', scrollers.length, 'chatScroll elements');
+          for (const scroller of scrollers) {
+            if (scroller.scrollHeight > 0) {
+              const before = scroller.scrollTop;
+              scroller.scrollTop = scroller.scrollHeight;
+              console.log('[SCROLL] scrolled:', before, '->', scroller.scrollTop, '(height:', scroller.scrollHeight + ')');
+              return;
+            }
           }
-          const before = scroller.scrollTop;
-          scroller.scrollTop = scroller.scrollHeight;
-          console.log('[SCROLL] scrolled:', before, '->', scroller.scrollTop, '(height:', scroller.scrollHeight + ')');
+          console.log('[SCROLL] no chatScroll with content found');
         };
 
         // Scroll interval during streaming (more reliable than MutationObserver)
