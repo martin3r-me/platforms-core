@@ -398,6 +398,32 @@ class OpenAiService
         if ($hasPreviousResponseId) {
             $payload['previous_response_id'] = $options['previous_response_id'];
         }
+
+        // Tool-Count-Change Detection:
+        // OpenAI Responses API mit previous_response_id erlaubt KEINE Tool-Änderungen.
+        // Wenn sich die Tool-Anzahl ändert (z.B. nach tools.GET(module="helpdesk")),
+        // muss previous_response_id entfernt werden, sonst HTTP 400.
+        // Der Caller (SimpleToolController) muss dann vollständige Messages senden.
+        if ($hasPreviousResponseId) {
+            $currentToolCount = count($this->getAvailableTools());
+            if ($this->lastToolCount !== null && $currentToolCount !== $this->lastToolCount) {
+                Log::warning('[OpenAI Stream] Tool count changed during continuation - dropping previous_response_id', [
+                    'previous_count' => $this->lastToolCount,
+                    'current_count' => $currentToolCount,
+                    'previous_response_id' => $options['previous_response_id'] ?? null,
+                ]);
+                $hasPreviousResponseId = false;
+                unset($payload['previous_response_id']);
+
+                // Notify caller that tool change occurred (via options reference won't work, use exception-free signaling)
+                // The caller should detect this by checking if previous_response_id was actually used
+            }
+            $this->lastToolCount = $currentToolCount;
+        } else {
+            // Bei neuem Request: Tool-Count initialisieren
+            $this->lastToolCount = count($this->getAvailableTools());
+        }
+
         // DB-driven parameter support (fallback: one retry stripping unsupported params).
         $payload = $this->applySupportedSamplingParams($payload, $options);
 
@@ -1588,6 +1614,13 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
     private array $dynamicallyLoadedTools = [];
 
     /**
+     * Letzter Tool-Count für Erkennung von Tool-Änderungen bei Continuations.
+     * OpenAI Responses API mit previous_response_id erlaubt KEINE Tool-Änderungen.
+     * Wenn sich die Tool-Anzahl ändert, muss ein neuer Chain gestartet werden.
+     */
+    protected ?int $lastToolCount = null;
+
+    /**
      * Lädt Tools dynamisch nach (wird aufgerufen, wenn LLM tools.GET verwendet hat)
      * 
      * @param array $toolNames Array von Tool-Namen, die nachgeladen werden sollen
@@ -1712,6 +1745,42 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
     public function getDynamicallyLoadedTools(): array
     {
         return array_keys($this->dynamicallyLoadedTools);
+    }
+
+    /**
+     * Gibt die aktuelle Tool-Anzahl zurück (für Tool-Change Detection).
+     * Inkludiert Discovery-Tools + dynamisch geladene Tools.
+     *
+     * @return int Anzahl der aktuell verfügbaren Tools
+     */
+    public function getCurrentToolCount(): int
+    {
+        return count($this->getAvailableTools());
+    }
+
+    /**
+     * Gibt den zuletzt gespeicherten Tool-Count zurück.
+     * Wird für Tool-Change Detection im Controller benötigt.
+     *
+     * @return int|null Letzter Tool-Count oder null wenn noch nicht initialisiert
+     */
+    public function getLastToolCount(): ?int
+    {
+        return $this->lastToolCount;
+    }
+
+    /**
+     * Prüft, ob sich die Tool-Anzahl seit dem letzten Aufruf geändert hat.
+     * Nützlich für den Controller, um zu entscheiden, ob ein neuer Chain gestartet werden muss.
+     *
+     * @return bool True wenn sich die Tool-Anzahl geändert hat
+     */
+    public function hasToolCountChanged(): bool
+    {
+        if ($this->lastToolCount === null) {
+            return false;
+        }
+        return count($this->getAvailableTools()) !== $this->lastToolCount;
     }
 
     private function getAvailableTools(): array

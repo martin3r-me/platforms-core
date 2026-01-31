@@ -598,6 +598,13 @@ class SimpleToolController extends Controller
                     }
                     return $v;
                 };
+
+                // Tool-Change Detection: Speichere Tool-Count und alle Tool-Calls für Rebuild
+                // OpenAI Responses API mit previous_response_id erlaubt KEINE Tool-Änderungen.
+                // Wenn sich die Tool-Liste ändert, muss ein neuer Chain gestartet werden.
+                $lastToolCount = $openAiService->getCurrentToolCount();
+                $fullConversationMessages = $messages; // Original-Konversation (für Rebuild bei Tool-Change)
+                $allToolCallsHistory = []; // Alle bisherigen Tool-Calls und -Outputs für Rebuild
                 
                 // Aggregate token usage across the whole request (multiple Responses API calls/iterations).
                 $usageAggregate = [
@@ -1344,10 +1351,67 @@ class SimpleToolController extends Controller
                         }
                     }
 
-                    // Continue the tool loop using Responses API best practice:
-                    // Provide tool outputs as the ONLY next input, and chain via previous_response_id.
-                    $previousResponseId = $currentResponseId;
-                    $messagesForApi = $toolOutputsForNextIteration;
+                    // Sammle Tool-Calls und -Outputs für History (für Rebuild bei Tool-Change)
+                    // Falls der Assistant Text vor den Tool-Calls gesendet hat, diesen auch speichern
+                    if (trim($assistant) !== '') {
+                        $allToolCallsHistory[] = [
+                            'role' => 'assistant',
+                            'content' => $assistant,
+                        ];
+                    }
+                    foreach ($toolCallsCollector as $callId => $call) {
+                        $allToolCallsHistory[] = [
+                            'type' => 'function_call',
+                            'id' => $call['id'] ?? null,
+                            'call_id' => $callId,
+                            'name' => $call['name'] ?? null,
+                            'arguments' => $call['arguments'] ?? '',
+                        ];
+                    }
+                    foreach ($toolOutputsForNextIteration as $output) {
+                        $allToolCallsHistory[] = $output;
+                    }
+
+                    // Tool-Change Detection:
+                    // OpenAI Responses API mit previous_response_id erlaubt KEINE Tool-Änderungen.
+                    // Wenn sich die Tool-Anzahl ändert (z.B. nach tools.GET(module="helpdesk")),
+                    // muss ein neuer Chain gestartet werden mit vollständiger Konversation.
+                    $currentToolCount = $openAiService->getCurrentToolCount();
+                    if ($lastToolCount !== null && $currentToolCount !== $lastToolCount) {
+                        Log::info('[SimpleToolController] Tool count changed - starting new chain', [
+                            'previous_count' => $lastToolCount,
+                            'current_count' => $currentToolCount,
+                            'iteration' => $iteration,
+                        ]);
+                        $sendEvent('openai.event', [
+                            'event' => 'server.tools.changed',
+                            'preview' => [
+                                'previous_count' => $lastToolCount,
+                                'current_count' => $currentToolCount,
+                            ],
+                            'raw' => null,
+                        ]);
+
+                        // Neuer Chain: previous_response_id entfernen und vollständige Konversation aufbauen
+                        $previousResponseId = null;
+
+                        // Rebuild: Volle Konversation + alle bisherigen Tool-Calls/Outputs
+                        $messagesForApi = $fullConversationMessages;
+                        foreach ($allToolCallsHistory as $historyItem) {
+                            $messagesForApi[] = $historyItem;
+                        }
+
+                        Log::debug('[SimpleToolController] Rebuilt full conversation for new chain', [
+                            'original_messages' => count($fullConversationMessages),
+                            'tool_history_items' => count($allToolCallsHistory),
+                            'total_messages' => count($messagesForApi),
+                        ]);
+                    } else {
+                        // Normal: Nur Tool-Outputs mit previous_response_id
+                        $previousResponseId = $currentResponseId;
+                        $messagesForApi = $toolOutputsForNextIteration;
+                    }
+                    $lastToolCount = $currentToolCount;
                 }
 
                 // Safety: do not end with a hard error in the chat UI; provide a graceful completion.
