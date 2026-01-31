@@ -89,7 +89,7 @@
                     {{-- Left: Chat (3/4 width) --}}
                     <div class="col-span-3 min-h-0 min-w-0 flex flex-col overflow-hidden">
                         <div class="flex-1 min-h-0 bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
-                            <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="simpleChatScroll" style="overflow-anchor: none;">
+                            <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="simpleChatScroll">
                                 @php
                                     $msgs = collect($activeThreadMessages ?? [])
                                         ->filter(fn($m) => in_array($m->role, ['user', 'assistant'], true))
@@ -159,8 +159,6 @@
                                     </div>
                                 </div>
 
-                                {{-- Scroll anchor: browser keeps this element in view when content is added above --}}
-                                <div id="chatScrollAnchor" style="overflow-anchor: auto; height: 1px;"></div>
                             </div>
                             <div class="border-t border-[var(--ui-border)]/60 p-3 flex-shrink-0 bg-[var(--ui-surface)]">
                                 {{-- Uploaded attachments preview --}}
@@ -673,18 +671,33 @@
           el.style.overflowY = (el.scrollHeight > maxPx) ? 'auto' : 'hidden';
         };
 
-        // Manual scroll to bottom (only needed for initial load and thread switch)
-        // Note: overflow-anchor CSS handles auto-scroll during streaming
+        // Scroll to bottom helper
         const scrollToBottom = () => {
           const scroller = document.getElementById('simpleChatScroll');
           if (scroller) scroller.scrollTop = scroller.scrollHeight;
         };
 
-        // Note: overflow-anchor CSS handles auto-scroll now, no interval needed
-        const startScrollInterval = () => {};
-        const stopScrollInterval = () => {};
+        // MutationObserver for auto-scroll: watches for new content and scrolls
+        let scrollObserver = null;
+        const startScrollObserver = () => {
+          if (scrollObserver) return;
+          const scroller = document.getElementById('simpleChatScroll');
+          if (!scroller) return;
+          scrollObserver = new MutationObserver(() => {
+            scroller.scrollTop = scroller.scrollHeight;
+          });
+          scrollObserver.observe(scroller, { childList: true, subtree: true, characterData: true });
+        };
+        const stopScrollObserver = () => {
+          if (scrollObserver) {
+            scrollObserver.disconnect();
+            scrollObserver = null;
+          }
+        };
 
-        // Placeholder for backwards compatibility
+        // Backwards compatibility aliases
+        const startScrollInterval = startScrollObserver;
+        const stopScrollInterval = stopScrollObserver;
         const setupAutoScroll = () => {};
         
         // Helper: format numbers
