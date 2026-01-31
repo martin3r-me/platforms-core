@@ -1498,13 +1498,35 @@
           refreshMessagesFromServerRender();
           // After Livewire renders server history, remove all temporary messages from pgStreamingSlot.
           // (Server history in chatList is the source of truth; pgStreamingSlot is only for streaming.)
+          // FIX: Also check if the temporary user message content already exists in chatList to prevent duplicates
           try {
             const slot = document.getElementById('pgStreamingSlot');
+            const list = document.getElementById('chatList');
             if (slot) {
               // Remove all temporary messages (marked with data-temporary="1")
+              // If the same message content now exists in chatList (from DB), remove the temporary version
               const temporary = slot.querySelectorAll('[data-temporary="1"]');
               temporary.forEach((el) => {
-                if (el.parentNode) el.parentNode.removeChild(el);
+                // Check if this is a user message (has justify-end class)
+                const isUserMsg = el.classList.contains('justify-end');
+                // Check if this temporary message's content already exists in chatList
+                const content = el.querySelector('[data-msg-content]')?.textContent?.trim() || '';
+                if (content && list && isUserMsg) {
+                  // Look for matching USER content in chatList (user messages have justify-end class)
+                  const userMsgsInList = list.querySelectorAll('.justify-end .whitespace-pre-wrap');
+                  const existsInList = Array.from(userMsgsInList).some(
+                    (listEl) => listEl.textContent?.trim() === content
+                  );
+                  if (existsInList) {
+                    if (el.parentNode) el.parentNode.removeChild(el);
+                    return;
+                  }
+                }
+                // Also remove if stream is not in flight (complete has been called)
+                const st = getThreadState(currentThreadId || 'none');
+                if (!st || !st.inFlight) {
+                  if (el.parentNode) el.parentNode.removeChild(el);
+                }
               });
               // Remove finalized assistant messages (they're now in chatList)
               const finalized = slot.querySelectorAll('[data-final="1"]');
