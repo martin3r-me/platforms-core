@@ -599,6 +599,15 @@ class SimpleToolController extends Controller
                     return $v;
                 };
 
+                // ===========================================
+                // HALLO WELT - TEST OB NEUER CODE LÄUFT
+                // ===========================================
+                $sendEvent('debug.hallo_welt', [
+                    'message' => 'HALLO WELT! Neuer Code läuft!',
+                    'timestamp' => now()->toIso8601String(),
+                    'php_version' => PHP_VERSION,
+                ]);
+
                 // Tool-Change Detection: Speichere Tool-Count und alle Tool-Calls für Rebuild
                 // OpenAI Responses API mit previous_response_id erlaubt KEINE Tool-Änderungen.
                 // Wenn sich die Tool-Liste ändert, muss ein neuer Chain gestartet werden.
