@@ -89,7 +89,7 @@
                     {{-- Left: Chat (3/4 width) --}}
                     <div class="col-span-3 min-h-0 min-w-0 flex flex-col overflow-hidden">
                         <div class="flex-1 min-h-0 bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
-                            <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="simpleChatScroll">
+                            <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="simpleChatScroll" style="overflow-anchor: none;">
                                 @php
                                     $msgs = collect($activeThreadMessages ?? [])
                                         ->filter(fn($m) => in_array($m->role, ['user', 'assistant'], true))
@@ -158,6 +158,9 @@
                                         Tipp: Links kannst du Models per Drag&Drop wählen, und direkt neben dem Input pro Request wechseln.
                                     </div>
                                 </div>
+
+                                {{-- Scroll anchor: browser keeps this element in view when content is added above --}}
+                                <div id="chatScrollAnchor" style="overflow-anchor: auto; height: 1px;"></div>
                             </div>
                             <div class="border-t border-[var(--ui-border)]/60 p-3 flex-shrink-0 bg-[var(--ui-surface)]">
                                 {{-- Uploaded attachments preview --}}
