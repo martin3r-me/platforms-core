@@ -833,12 +833,42 @@ class OpenAiService
                     Log::info('[OpenAI Stream] Stream completed', ['delta_count' => $deltaCount]);
                     return; 
                 }
-                $decoded = json_decode($data, true); 
-                if (!is_array($decoded)) { 
+                $decoded = json_decode($data, true);
+                if (!is_array($decoded)) {
                     Log::debug('[OpenAI Stream] Non-array data', ['data' => substr($data, 0, 100)]);
-                    continue; 
+                    continue;
                 }
-                
+
+                // FIX: Verwende 'type' aus Payload falls vorhanden (robuster als nur event: Header).
+                // OpenAI sendet in jedem Event-Payload ein 'type'-Feld, das den echten Event-Typ angibt.
+                // Wenn der event: Header fehlt oder falsch ist, verhindert dies das Leaken von
+                // Tool-Arguments in den Text-Stream.
+                if (isset($decoded['type']) && is_string($decoded['type']) && $decoded['type'] !== '') {
+                    $currentEvent = $decoded['type'];
+                }
+
+                // FIX: Zusätzliche Absicherung - erkenne Tool-Call-Payloads anhand ihrer Struktur,
+                // auch wenn der Event-Name falsch geroutet wurde.
+                // Tool-Call-Payloads haben typischerweise 'call_id', 'name' + 'arguments', oder 'item_id' mit fc_ Präfix.
+                $looksLikeToolCall = (
+                    isset($decoded['call_id']) ||
+                    (isset($decoded['name']) && isset($decoded['arguments'])) ||
+                    (isset($decoded['item_id']) && is_string($decoded['item_id']) && str_starts_with($decoded['item_id'], 'fc_'))
+                );
+
+                // Wenn der aktuelle Event als Text-Delta geroutet werden würde, aber wie ein Tool-Call aussieht,
+                // korrigiere das Routing auf function_call_arguments.delta
+                if ($looksLikeToolCall && in_array($currentEvent, ['response.output_text.delta', 'response.output.delta', 'output_text.delta', 'output.delta'], true)) {
+                    Log::warning('[OpenAI Stream] Prevented tool-call leak into text stream', [
+                        'original_event' => $currentEvent,
+                        'decoded_keys' => array_keys($decoded),
+                        'call_id' => $decoded['call_id'] ?? null,
+                        'item_id' => $decoded['item_id'] ?? null,
+                    ]);
+                    // Reroute zu function_call_arguments.delta, damit es korrekt akkumuliert wird
+                    $currentEvent = 'response.function_call_arguments.delta';
+                }
+
                 // Debug: Log alle Events für die ersten 20 Events
                 if ($eventCount < 20) {
                     Log::debug('[OpenAI Stream] Event data', [
@@ -915,10 +945,41 @@ class OpenAiService
                         } elseif (isset($decoded['delta']['text'])) {
                             $delta = $decoded['delta']['text'];
                         }
-                        
-                        if ($delta !== '') { 
+
+                        // FIX: Letzte Absicherung - erkenne Tool-Arguments anhand des Inhalts.
+                        // Tool-Arguments sind JSON-Objekte, die mit '{' beginnen und typische
+                        // Schema-Felder enthalten (module, search, limit, etc.).
+                        // Normale Text-Deltas beginnen selten mit '{' direkt gefolgt von '"'.
+                        if ($delta !== '' && str_starts_with(ltrim($delta), '{"')) {
+                            // Prüfe ob es wie ein Tool-Argument-JSON aussieht
+                            $trimmedDelta = ltrim($delta);
+                            // Typische Tool-Schema-Felder (aus den registrierten Tools)
+                            $toolSchemaIndicators = ['"module":', '"search":', '"limit":', '"offset":', '"id":', '"name":', '"query":'];
+                            $looksLikeToolArgs = false;
+                            foreach ($toolSchemaIndicators as $indicator) {
+                                if (str_contains($trimmedDelta, $indicator)) {
+                                    $looksLikeToolArgs = true;
+                                    break;
+                                }
+                            }
+                            // Zusätzlich: Wenn es valides JSON ist und die typischen Tool-Felder hat
+                            if ($looksLikeToolArgs) {
+                                $parsed = @json_decode($trimmedDelta, true);
+                                if (is_array($parsed) && (isset($parsed['module']) || isset($parsed['id']) || isset($parsed['query']))) {
+                                    Log::warning('[OpenAI Stream] Blocked tool-arguments from text stream (content inspection)', [
+                                        'delta_preview' => substr($delta, 0, 100),
+                                        'parsed_keys' => is_array($parsed) ? array_keys($parsed) : null,
+                                    ]);
+                                    // Akkumuliere in toolArguments statt an Text-Stream senden
+                                    $toolArguments .= $delta;
+                                    break; // Nicht an onDelta senden
+                                }
+                            }
+                        }
+
+                        if ($delta !== '') {
                             $deltaCount++;
-                            $onDelta($delta); 
+                            $onDelta($delta);
                         }
                         break;
                     case 'response.output_item.added':
