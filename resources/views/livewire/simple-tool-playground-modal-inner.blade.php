@@ -671,35 +671,26 @@
           // Always get fresh reference
           const scroller = document.getElementById('chatScroll');
           if (!scroller) return;
-          // Use requestAnimationFrame for smooth scrolling
-          requestAnimationFrame(() => {
-            scroller.scrollTop = scroller.scrollHeight;
-          });
+          scroller.scrollTop = scroller.scrollHeight;
         };
 
-        // MutationObserver for auto-scroll on content changes
-        let scrollObserver = null;
-        const setupAutoScroll = () => {
-          // Disconnect old observer if exists
-          if (scrollObserver) {
-            scrollObserver.disconnect();
-            scrollObserver = null;
-          }
-
-          const scroller = document.getElementById('chatScroll');
-          if (!scroller) return;
-
-          // Observe the entire scroller for any content changes
-          scrollObserver = new MutationObserver(() => {
+        // Scroll interval during streaming (more reliable than MutationObserver)
+        let scrollInterval = null;
+        const startScrollInterval = () => {
+          if (scrollInterval) return;
+          scrollInterval = setInterval(() => {
             scrollToBottom();
-          });
-
-          scrollObserver.observe(scroller, {
-            childList: true,
-            subtree: true,
-            characterData: true
-          });
+          }, 100);
         };
+        const stopScrollInterval = () => {
+          if (scrollInterval) {
+            clearInterval(scrollInterval);
+            scrollInterval = null;
+          }
+        };
+
+        // Placeholder for backwards compatibility
+        const setupAutoScroll = () => {};
         
         // Helper: format numbers
         const formatNumber = (n) => {
@@ -865,11 +856,13 @@
         const ensureStreamingMetaMessage = (kind) => {
           refreshDomRefs();
           const root = document.getElementById('pgStreamingSlot') || chatList;
+          console.log('[DEBUG] ensureStreamingMetaMessage', kind, 'root:', root);
           if (!root) return null;
           const id = kind === 'reasoning' ? 'pgStreamingReasoningMsg' : 'pgStreamingThinkingMsg';
           const label = kind === 'reasoning' ? 'Reasoning' : 'Thinking';
           let el = document.getElementById(id);
           if (el) return el;
+          console.log('[DEBUG] creating new streaming meta message:', kind);
           const wrap = document.createElement('div');
           wrap.id = id;
           wrap.className = 'flex justify-start';
@@ -1651,6 +1644,8 @@
           threadState.startedAtMs = Date.now();
           setSendButtonBusy(true);
           input.disabled = true;
+          // Start auto-scroll during streaming
+          startScrollInterval();
           // Disable model switching during an active stream (reduces confusion)
           const ms = document.getElementById('modelSelect');
           if (ms) ms.disabled = true;
@@ -1827,6 +1822,7 @@
                     if (isVisible && reasoningEl && reasoningEl.parentNode) reasoningEl.parentNode.removeChild(reasoningEl);
                     break;
                   case 'thinking.delta':
+                    console.log('[DEBUG] thinking.delta received, isVisible:', isVisible, 'delta:', data?.delta?.substring(0, 50));
                     if (data?.delta) {
                       st.live.thinking += data.delta;
                       if (isVisible) updateStreamingMetaMessage('thinking', st.live.thinking);
@@ -2141,6 +2137,8 @@
               if (rtStatus) rtStatus.textContent = 'error';
             }
           } finally {
+            // Stop auto-scroll interval
+            stopScrollInterval();
             threadState.inFlight = false;
             threadState.abortController = null;
             setSendButtonBusy(false);
@@ -2152,9 +2150,7 @@
             updateFooterBusy();
             threadState.userAborted = false;
             // Final scroll to bottom after stream completes
-            requestAnimationFrame(() => {
-              setTimeout(() => scrollToBottom(), 100);
-            });
+            setTimeout(() => scrollToBottom(), 100);
           }
         };
 
