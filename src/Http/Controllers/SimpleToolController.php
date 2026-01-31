@@ -1453,16 +1453,20 @@ class SimpleToolController extends Controller
                             'previousResponseId_AFTER' => $previousResponseId,
                         ]);
 
-                        // Rebuild: Volle Konversation + alle bisherigen Tool-Calls/Outputs
-                        $messagesForApi = $fullConversationMessages;
-                        foreach ($allToolCallsHistory as $historyItem) {
-                            $messagesForApi[] = $historyItem;
-                        }
+                        // FIX: Verwende $messages direkt - es enthält bereits:
+                        // - System prompt
+                        // - Original conversation (user/assistant messages)
+                        // - function_call_output items (unsere Tool-Antworten)
+                        // WICHTIG: KEINE function_call Items (die darf die Responses API nicht als Input bekommen!)
+                        $messagesForApi = $messages;
 
-                        Log::debug('[SimpleToolController] Rebuilt full conversation for new chain', [
-                            'original_messages' => count($fullConversationMessages),
-                            'tool_history_items' => count($allToolCallsHistory),
+                        Log::debug('[SimpleToolController] Using $messages for new chain (tool change)', [
                             'total_messages' => count($messagesForApi),
+                        ]);
+
+                        $sendEvent('debug.tools', [
+                            'DEBUG_REBUILD_USED_MESSAGES' => true,
+                            'messagesForApi_count' => count($messagesForApi),
                         ]);
                     } else {
                         // Normal: Nur Tool-Outputs mit previous_response_id
