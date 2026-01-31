@@ -783,6 +783,7 @@ class OpenAiService
         $buffer = '';
         $currentEvent = null; $currentToolCall = null; $toolArguments = '';
         $currentMcpServer = null; // MCP: Server-Name für aktuellen Tool-Call
+        $jsonBuffer = ''; // FIX: Buffer für fragmentierte Tool-Call/Result JSON Detection
         $onToolStart = $options['on_tool_start'] ?? null; $toolExecutor = $options['tool_executor'] ?? null;
         $onDebug = $options['on_debug'] ?? null; // Optional: Debug-Callback für detailliertes Logging
         // Optional: Separate Streams für reasoning/thinking (gpt-5.2-thinking)
@@ -829,9 +830,15 @@ class OpenAiService
                 }
                 if (strncmp($line, 'data:', 5) !== 0) { continue; }
                 $data = ltrim(substr($line, 5)); 
-                if ($data === '[DONE]') { 
+                if ($data === '[DONE]') {
+                    // FIX: Flush any remaining jsonBuffer content before ending
+                    if ($jsonBuffer !== '') {
+                        Log::debug('[OpenAI Stream] Flushing jsonBuffer at stream end', ['length' => strlen($jsonBuffer)]);
+                        $onDelta($jsonBuffer);
+                        $jsonBuffer = '';
+                    }
                     Log::info('[OpenAI Stream] Stream completed', ['delta_count' => $deltaCount]);
-                    return; 
+                    return;
                 }
                 $decoded = json_decode($data, true);
                 if (!is_array($decoded)) {
@@ -946,33 +953,108 @@ class OpenAiService
                             $delta = $decoded['delta']['text'];
                         }
 
-                        // FIX: Letzte Absicherung - erkenne Tool-Arguments anhand des Inhalts.
-                        // Tool-Arguments sind JSON-Objekte, die mit '{' beginnen und typische
-                        // Schema-Felder enthalten (module, search, limit, etc.).
-                        // Normale Text-Deltas beginnen selten mit '{' direkt gefolgt von '"'.
-                        if ($delta !== '' && str_starts_with(ltrim($delta), '{"')) {
-                            // Prüfe ob es wie ein Tool-Argument-JSON aussieht
+                        // FIX: Erweiterte Absicherung - erkenne Tool-Arguments, Tool-Calls und Tool-Results.
+                        // OpenAI streamt diese manchmal als normale text.delta Events (zeichenweise!).
+                        // Wir müssen sowohl vollständige JSON als auch fragmentierte JSON erkennen.
+
+                        // Buffer-Logik für fragmentierte JSON Detection
+                        if ($delta !== '') {
                             $trimmedDelta = ltrim($delta);
-                            // Typische Tool-Schema-Felder (aus den registrierten Tools)
-                            $toolSchemaIndicators = ['"module":', '"search":', '"limit":', '"offset":', '"id":', '"name":', '"query":'];
-                            $looksLikeToolArgs = false;
-                            foreach ($toolSchemaIndicators as $indicator) {
-                                if (str_contains($trimmedDelta, $indicator)) {
-                                    $looksLikeToolArgs = true;
+
+                            // Fall 1: Delta beginnt mit '{' - potenzieller JSON-Start
+                            if ($jsonBuffer === '' && str_starts_with($trimmedDelta, '{')) {
+                                $jsonBuffer = $trimmedDelta;
+                            }
+                            // Fall 2: Wir sammeln bereits JSON
+                            elseif ($jsonBuffer !== '') {
+                                $jsonBuffer .= $delta;
+                            }
+
+                            // Prüfe ob Buffer ein vollständiges JSON enthält
+                            if ($jsonBuffer !== '') {
+                                $parsed = @json_decode($jsonBuffer, true);
+                                $isCompleteJson = (json_last_error() === JSON_ERROR_NONE && is_array($parsed));
+
+                                if ($isCompleteJson) {
+                                    // Prüfe ob es ein Tool-Call, Tool-Result oder Tool-Arguments ist
+                                    $isToolPayload = (
+                                        // Tool-Arguments (bestehend)
+                                        isset($parsed['module']) || isset($parsed['id']) || isset($parsed['query']) ||
+                                        // Tool-Call Format: {"name":"...", "args":{...}} oder {"name":"...", "arguments":{...}}
+                                        (isset($parsed['name']) && (isset($parsed['args']) || isset($parsed['arguments']))) ||
+                                        // Tool-Result Format: {"ok":..., "data":...} oder {"ok":..., "error":...}
+                                        (array_key_exists('ok', $parsed) && (array_key_exists('data', $parsed) || array_key_exists('error', $parsed))) ||
+                                        // Alternative Tool-Result: nur data/error ohne ok
+                                        (isset($parsed['data']) && !isset($parsed['text'])) ||
+                                        (isset($parsed['error']) && is_array($parsed['error']))
+                                    );
+
+                                    if ($isToolPayload) {
+                                        Log::warning('[OpenAI Stream] Blocked tool-payload from text stream (buffered detection)', [
+                                            'buffer_length' => strlen($jsonBuffer),
+                                            'parsed_keys' => array_keys($parsed),
+                                            'type' => isset($parsed['name']) ? 'tool-call' : (array_key_exists('ok', $parsed) ? 'tool-result' : 'tool-args'),
+                                        ]);
+                                        // Akkumuliere in toolArguments statt an Text-Stream senden
+                                        $toolArguments .= $jsonBuffer;
+                                        $jsonBuffer = ''; // Buffer leeren
+                                        break; // Nicht an onDelta senden
+                                    } else {
+                                        // Gültiges JSON, aber kein Tool-Payload (z.B. Code-Block)
+                                        // Buffer an onDelta senden und zurücksetzen
+                                        $delta = $jsonBuffer;
+                                        $jsonBuffer = '';
+                                    }
+                                }
+                                // Buffer wächst weiter - noch kein vollständiges JSON
+                                elseif (strlen($jsonBuffer) < 10000) {
+                                    // Warte auf mehr Daten, aber sende nichts an onDelta
                                     break;
+                                } else {
+                                    // Buffer zu groß, wahrscheinlich kein Tool-JSON
+                                    // Sende Buffer-Inhalt an onDelta und reset
+                                    Log::debug('[OpenAI Stream] JSON buffer overflow, flushing', ['length' => strlen($jsonBuffer)]);
+                                    $delta = $jsonBuffer;
+                                    $jsonBuffer = '';
                                 }
                             }
-                            // Zusätzlich: Wenn es valides JSON ist und die typischen Tool-Felder hat
-                            if ($looksLikeToolArgs) {
-                                $parsed = @json_decode($trimmedDelta, true);
-                                if (is_array($parsed) && (isset($parsed['module']) || isset($parsed['id']) || isset($parsed['query']))) {
-                                    Log::warning('[OpenAI Stream] Blocked tool-arguments from text stream (content inspection)', [
-                                        'delta_preview' => substr($delta, 0, 100),
-                                        'parsed_keys' => is_array($parsed) ? array_keys($parsed) : null,
-                                    ]);
-                                    // Akkumuliere in toolArguments statt an Text-Stream senden
-                                    $toolArguments .= $delta;
-                                    break; // Nicht an onDelta senden
+
+                            // Zusätzlich: Direkte Prüfung für vollständige JSON im Delta (ohne Buffer)
+                            if ($jsonBuffer === '' && str_starts_with($trimmedDelta, '{"')) {
+                                // Typische Tool-Schema-Felder (erweitert)
+                                $toolSchemaIndicators = [
+                                    // Bestehende Tool-Argument-Felder
+                                    '"module":', '"search":', '"limit":', '"offset":', '"id":', '"query":',
+                                    // Tool-Call Format
+                                    '"args":', '"arguments":',
+                                    // Tool-Result Format
+                                    '"ok":', '"data":', '"error":',
+                                ];
+                                $looksLikeToolPayload = false;
+                                foreach ($toolSchemaIndicators as $indicator) {
+                                    if (str_contains($trimmedDelta, $indicator)) {
+                                        $looksLikeToolPayload = true;
+                                        break;
+                                    }
+                                }
+
+                                if ($looksLikeToolPayload) {
+                                    $parsed = @json_decode($trimmedDelta, true);
+                                    if (is_array($parsed) && (
+                                        // Tool-Arguments
+                                        isset($parsed['module']) || isset($parsed['id']) || isset($parsed['query']) ||
+                                        // Tool-Call
+                                        (isset($parsed['name']) && (isset($parsed['args']) || isset($parsed['arguments']))) ||
+                                        // Tool-Result
+                                        (array_key_exists('ok', $parsed))
+                                    )) {
+                                        Log::warning('[OpenAI Stream] Blocked tool-payload from text stream (direct detection)', [
+                                            'delta_preview' => substr($delta, 0, 100),
+                                            'parsed_keys' => array_keys($parsed),
+                                        ]);
+                                        $toolArguments .= $delta;
+                                        break; // Nicht an onDelta senden
+                                    }
                                 }
                             }
                         }
