@@ -539,7 +539,9 @@
     </div>
 
     <script>
+      console.log('[PLAYGROUND] Script starting...');
       (() => {
+        console.log('[PLAYGROUND] IIFE starting...');
         // Blade variables (set before script execution)
         const defaultModelId = @json($defaultModelId ?? 'gpt-5.2');
         const activeThreadId = @json($activeThreadId ?? null);
@@ -547,7 +549,9 @@
         const livewireComponentId = '{{ $this->getId() }}';
         
         const boot = () => {
+        console.log('[PLAYGROUND] boot() called');
         const url = window.__simpleStreamUrl;
+        console.log('[PLAYGROUND] streamUrl:', url);
         const modelsUrl = window.__simpleModelsUrl;
         const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
         const serverDefaultModel = 'gpt-5.2';
@@ -1590,8 +1594,10 @@
 
         // Send (parity with page playground: chat updates only on complete)
         const send = async () => {
+          console.log('[PLAYGROUND] send() called');
           refreshDomRefs();
           const text = (input?.value || '').trim();
+          console.log('[PLAYGROUND] text:', text, 'inFlight:', threadState.inFlight);
           if (threadState.inFlight) return;
 
           const canContinue = !!(threadState.continuation && threadState.continuation.pending);
