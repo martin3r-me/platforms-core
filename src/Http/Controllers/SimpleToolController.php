@@ -748,6 +748,15 @@ class SimpleToolController extends Controller
                             // Tool-call args can be interleaved; we need a stable map item_id -> call_id across events.
                             $toolCallIdByItemId = [];
 
+                            // DEBUG: Was wird tatsächlich an streamChat übergeben?
+                            $sendEvent('debug.tools', [
+                                'DEBUG_BEFORE_STREAM' => true,
+                                'iteration' => $iteration,
+                                'passPreviousResponseId' => $passPreviousResponseId,
+                                'previousResponseId_raw' => $previousResponseId,
+                                'messagesForApi_count' => count($passMessagesForApi),
+                            ]);
+
                             $openAiService->streamChat(
                                 $passMessagesForApi,
                                 function(string $delta) use ($sendEvent, &$assistant) {
@@ -1416,6 +1425,16 @@ class SimpleToolController extends Controller
                             'current_count' => $currentToolCount,
                             'iteration' => $iteration,
                         ]);
+
+                        // DEBUG: Tool change detected!
+                        $sendEvent('debug.tools', [
+                            'DEBUG_TOOL_CHANGE_DETECTED' => true,
+                            'iteration' => $iteration,
+                            'lastToolCount' => $lastToolCount,
+                            'currentToolCount' => $currentToolCount,
+                            'previousResponseId_BEFORE' => $previousResponseId,
+                        ]);
+
                         $sendEvent('openai.event', [
                             'event' => 'server.tools.changed',
                             'preview' => [
@@ -1427,6 +1446,12 @@ class SimpleToolController extends Controller
 
                         // Neuer Chain: previous_response_id entfernen und vollständige Konversation aufbauen
                         $previousResponseId = null;
+
+                        // DEBUG: Confirm null was set
+                        $sendEvent('debug.tools', [
+                            'DEBUG_TOOL_CHANGE_APPLIED' => true,
+                            'previousResponseId_AFTER' => $previousResponseId,
+                        ]);
 
                         // Rebuild: Volle Konversation + alle bisherigen Tool-Calls/Outputs
                         $messagesForApi = $fullConversationMessages;
