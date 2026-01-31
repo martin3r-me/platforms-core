@@ -89,7 +89,7 @@
                     {{-- Left: Chat (3/4 width) --}}
                     <div class="col-span-3 min-h-0 min-w-0 flex flex-col overflow-hidden">
                         <div class="flex-1 min-h-0 bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
-                            <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll">
+                            <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="simpleChatScroll">
                                 @php
                                     $msgs = collect($activeThreadMessages ?? [])
                                         ->filter(fn($m) => in_array($m->role, ['user', 'assistant'], true))
@@ -578,14 +578,14 @@
         // NOTE: Livewire re-renders these nodes. Keep them as "let" and refresh on demand,
         // otherwise we end up with stale references after a thread switch.
         let chatList = document.getElementById('chatList');
-        let chatScroll = document.getElementById('chatScroll');
+        let chatScroll = document.getElementById('simpleChatScroll');
         let form = document.getElementById('chatForm');
         let input = document.getElementById('chatInput');
         let sendBtn = document.getElementById('chatSend');
 
         const refreshDomRefs = () => {
           chatList = document.getElementById('chatList');
-          chatScroll = document.getElementById('chatScroll');
+          chatScroll = document.getElementById('simpleChatScroll');
           form = document.getElementById('chatForm');
           input = document.getElementById('chatInput');
           sendBtn = document.getElementById('chatSend');
@@ -672,18 +672,17 @@
 
         // Auto-scroll: simple and robust
         const scrollToBottom = () => {
-          // Find ALL chatScroll elements and scroll the one with content (height > 0)
-          const scrollers = document.querySelectorAll('#chatScroll');
-          console.log('[SCROLL] found', scrollers.length, 'chatScroll elements');
-          for (const scroller of scrollers) {
-            if (scroller.scrollHeight > 0) {
-              const before = scroller.scrollTop;
-              scroller.scrollTop = scroller.scrollHeight;
-              console.log('[SCROLL] scrolled:', before, '->', scroller.scrollTop, '(height:', scroller.scrollHeight + ')');
-              return;
-            }
+          const scroller = document.getElementById('simpleChatScroll');
+          if (!scroller) {
+            console.log('[SCROLL] simpleChatScroll not found');
+            return;
           }
-          console.log('[SCROLL] no chatScroll with content found');
+          const before = scroller.scrollTop;
+          const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+          scroller.scrollTop = scroller.scrollHeight;
+          const after = scroller.scrollTop;
+          const atBottom = after >= maxScroll - 5;
+          console.log('[SCROLL]', atBottom ? 'AT BOTTOM' : 'NOT at bottom', '- scrollTop:', before, '->', after, '/', maxScroll, '(scrollHeight:', scroller.scrollHeight, 'clientHeight:', scroller.clientHeight + ')');
         };
 
         // Scroll interval during streaming (more reliable than MutationObserver)
@@ -2209,7 +2208,7 @@
           input = currentInput;
           sendBtn = currentSendBtn;
           chatList = document.getElementById('chatList');
-          chatScroll = document.getElementById('chatScroll');
+          chatScroll = document.getElementById('simpleChatScroll');
           
           if (currentForm && !currentForm.dataset.submitBound) {
             currentForm.addEventListener('submit', (e) => { 
