@@ -821,6 +821,43 @@
           // Do nothing - nothing to remove from chat
         };
 
+        // Render a message in the chat UI (used for temporary messages before Livewire re-renders)
+        const renderMessage = (role, content, options = {}) => {
+          refreshDomRefs();
+          // Prefer rendering into pgStreamingSlot (wire:ignore) so Livewire diffing doesn't touch it.
+          const targetEl = document.getElementById('pgStreamingSlot') || chatList;
+          if (!targetEl) return null;
+
+          const wrap = document.createElement('div');
+          wrap.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+          wrap.dataset.temporary = '1'; // Mark as temporary so it can be cleaned up after Livewire re-render
+
+          const bubbleClasses = role === 'user'
+            ? 'bg-[var(--ui-primary)] text-white'
+            : 'bg-[var(--ui-surface)] border border-[var(--ui-border)]';
+
+          wrap.innerHTML = `
+            <div class="max-w-4xl rounded-lg p-3 break-words overflow-hidden ${bubbleClasses}">
+              <div class="text-sm font-semibold mb-1">${role === 'user' ? 'Du' : 'Assistant'}</div>
+              <div class="whitespace-pre-wrap break-words" data-msg-content></div>
+            </div>
+          `;
+
+          const contentEl = wrap.querySelector('[data-msg-content]');
+          if (contentEl) contentEl.textContent = content || '';
+
+          targetEl.appendChild(wrap);
+
+          // Hide empty state
+          const empty = document.getElementById('chatEmpty');
+          if (empty) empty.style.display = 'none';
+
+          // Scroll to bottom
+          scrollToBottom(true);
+
+          return wrap;
+        };
+
         // Turn the current streaming assistant bubble into a "final" bubble that will not be removed
         // by future streaming resets (we drop the streaming id).
         const finalizeStreamingAssistantMessage = (finalText) => {
@@ -1558,11 +1595,14 @@
               userMessage.attachments = attachmentIds;
             }
             threadState.messages.push(userMessage);
+            // Render user message immediately in the chat (will be replaced by Livewire on complete)
+            const userMsgEl = renderMessage('user', text);
             // Remember what we just added, so we can revert it on Abort (and avoid polluting DB/history).
             try {
               refreshDomRefs();
               threadState._lastSentUserContent = text;
               threadState._lastSentUserIndex = (threadState.messages?.length || 1) - 1;
+              threadState._lastSentUserEl = userMsgEl; // Store element reference for abort cleanup
             } catch (_) {}
             input.value = '';
             // Reset textarea height after sending (auto-grow will shrink it back)
@@ -1573,8 +1613,7 @@
             if (typeof window.__simplePlaygroundClearAttachments === 'function') {
               window.__simplePlaygroundClearAttachments();
             }
-            // Scroll after sending (Livewire will render the user message)
-            // Use requestAnimationFrame + setTimeout to ensure DOM is ready
+            // Scroll after rendering user message
             requestAnimationFrame(() => {
               setTimeout(() => scrollToBottom(true), 50);
             });

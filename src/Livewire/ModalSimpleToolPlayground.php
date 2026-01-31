@@ -371,12 +371,14 @@ class ModalSimpleToolPlayground extends Component
 
     /**
      * Refresh messages after streaming completes.
-     * This method does nothing but triggers a Livewire re-render to show the new message.
+     * Forces Livewire to re-fetch computed properties from the database.
      */
     public function refreshMessages(): void
     {
-        // This method intentionally does nothing - it just triggers a Livewire re-render
-        // which will reload activeThreadMessages from the database
+        // Clear the computed property cache so Livewire fetches fresh data from DB.
+        // Computed properties in Livewire 3 are cached per-request; calling unset() forces re-evaluation.
+        unset($this->activeThreadMessages);
+        unset($this->activeThread);
     }
 
     /**
