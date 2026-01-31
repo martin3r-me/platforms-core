@@ -602,10 +602,10 @@ class SimpleToolController extends Controller
                 // ===========================================
                 // HALLO WELT - TEST OB NEUER CODE LÄUFT
                 // ===========================================
-                $sendEvent('debug.hallo_welt', [
-                    'message' => 'HALLO WELT! Neuer Code läuft!',
+                $sendEvent('debug.tools', [
+                    'HALLO_WELT' => 'JA! Neuer Code läuft!',
+                    'iteration' => 0,
                     'timestamp' => now()->toIso8601String(),
-                    'php_version' => PHP_VERSION,
                 ]);
 
                 // Tool-Change Detection: Speichere Tool-Count und alle Tool-Calls für Rebuild
