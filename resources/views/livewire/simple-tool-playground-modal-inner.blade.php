@@ -1766,6 +1766,9 @@
                 let data;
                 try { data = JSON.parse(raw); } catch { data = { raw }; }
 
+                // DEBUG: Log ALL SSE events with full details
+                console.log('[SSE DETAIL]', currentEvent, JSON.stringify(data, null, 2).substring(0, 500));
+
                 // Best practice: route all SSE UI updates by explicit thread_id (server-provided),
                 // never by DOM timing (Livewire can temporarily desync hidden inputs).
                 let eventThreadId = null;
