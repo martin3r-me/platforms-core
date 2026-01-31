@@ -990,12 +990,41 @@ class OpenAiService
                                     );
 
                                     if ($isToolPayload) {
-                                        Log::warning('[OpenAI Stream] Blocked tool-payload from text stream (buffered detection)', [
+                                        // Tool-Call erkannt: {"name":"...", "args":{...}}
+                                        if (isset($parsed['name']) && (isset($parsed['args']) || isset($parsed['arguments']))) {
+                                            $toolName = $parsed['name'];
+                                            $toolArgs = $parsed['args'] ?? ($parsed['arguments'] ?? []);
+
+                                            Log::warning('[OpenAI Stream] Intercepted inline tool-call, executing', [
+                                                'tool_name' => $toolName,
+                                                'has_args' => !empty($toolArgs),
+                                            ]);
+
+                                            // Setze Tool-Daten für Ausführung
+                                            $currentToolCall = $toolName;
+                                            $toolArguments = is_array($toolArgs) ? json_encode($toolArgs) : (string)$toolArgs;
+
+                                            // Führe Tool sofort aus
+                                            $this->executeToolIfReady($currentToolCall, $toolArguments, $toolExecutor, $onDelta, $messages);
+                                            $currentToolCall = null;
+                                            $toolArguments = '';
+                                            $jsonBuffer = '';
+                                            break;
+                                        }
+
+                                        // Tool-Result erkannt: {"ok":..., "data":...}
+                                        // Diese werden blockiert aber nicht ausgeführt (sind Antworten, keine Calls)
+                                        if (array_key_exists('ok', $parsed)) {
+                                            Log::debug('[OpenAI Stream] Blocked inline tool-result from output');
+                                            $jsonBuffer = '';
+                                            break;
+                                        }
+
+                                        // Sonstige Tool-Arguments (module, id, query etc.)
+                                        Log::warning('[OpenAI Stream] Blocked tool-arguments from text stream (buffered detection)', [
                                             'buffer_length' => strlen($jsonBuffer),
                                             'parsed_keys' => array_keys($parsed),
-                                            'type' => isset($parsed['name']) ? 'tool-call' : (array_key_exists('ok', $parsed) ? 'tool-result' : 'tool-args'),
                                         ]);
-                                        // Akkumuliere in toolArguments statt an Text-Stream senden
                                         $toolArguments .= $jsonBuffer;
                                         $jsonBuffer = ''; // Buffer leeren
                                         break; // Nicht an onDelta senden
@@ -1040,20 +1069,35 @@ class OpenAiService
 
                                 if ($looksLikeToolPayload) {
                                     $parsed = @json_decode($trimmedDelta, true);
-                                    if (is_array($parsed) && (
-                                        // Tool-Arguments
-                                        isset($parsed['module']) || isset($parsed['id']) || isset($parsed['query']) ||
-                                        // Tool-Call
-                                        (isset($parsed['name']) && (isset($parsed['args']) || isset($parsed['arguments']))) ||
-                                        // Tool-Result
-                                        (array_key_exists('ok', $parsed))
-                                    )) {
-                                        Log::warning('[OpenAI Stream] Blocked tool-payload from text stream (direct detection)', [
-                                            'delta_preview' => substr($delta, 0, 100),
-                                            'parsed_keys' => array_keys($parsed),
-                                        ]);
-                                        $toolArguments .= $delta;
-                                        break; // Nicht an onDelta senden
+                                    if (is_array($parsed)) {
+                                        // Tool-Call erkannt - ausführen!
+                                        if (isset($parsed['name']) && (isset($parsed['args']) || isset($parsed['arguments']))) {
+                                            $toolName = $parsed['name'];
+                                            $toolArgs = $parsed['args'] ?? ($parsed['arguments'] ?? []);
+
+                                            Log::warning('[OpenAI Stream] Intercepted inline tool-call (direct), executing', [
+                                                'tool_name' => $toolName,
+                                            ]);
+
+                                            $this->executeToolIfReady($toolName, json_encode($toolArgs), $toolExecutor, $onDelta, $messages);
+                                            break;
+                                        }
+
+                                        // Tool-Result blockieren (sind Antworten, keine Calls)
+                                        if (array_key_exists('ok', $parsed)) {
+                                            Log::debug('[OpenAI Stream] Blocked inline tool-result (direct)');
+                                            break;
+                                        }
+
+                                        // Sonstige Tool-Arguments (module, id, query etc.)
+                                        if (isset($parsed['module']) || isset($parsed['id']) || isset($parsed['query'])) {
+                                            Log::warning('[OpenAI Stream] Blocked tool-arguments from text stream (direct detection)', [
+                                                'delta_preview' => substr($delta, 0, 100),
+                                                'parsed_keys' => array_keys($parsed),
+                                            ]);
+                                            $toolArguments .= $delta;
+                                            break; // Nicht an onDelta senden
+                                        }
                                     }
                                 }
                             }
