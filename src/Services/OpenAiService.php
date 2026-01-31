@@ -507,7 +507,24 @@ class OpenAiService
                 }
             }
             $this->logApiError('OpenAI API Error (responses stream)', $response->status(), $errorBody);
-            
+
+            // IMMER Payload loggen bei 400er Fehlern (für Diagnose in Production)
+            if ($response->status() === 400) {
+                Log::error('[OpenAI Stream] 400 Bad Request - Payload für Diagnose', [
+                    'status' => 400,
+                    'model' => $payload['model'] ?? 'unknown',
+                    'tool_count' => count($payload['tools'] ?? []),
+                    'tool_names' => array_map(fn($t) => $t['name'] ?? ($t['type'] ?? 'unknown'), $payload['tools'] ?? []),
+                    'has_reasoning' => isset($payload['reasoning']),
+                    'reasoning' => $payload['reasoning'] ?? null,
+                    'has_previous_response_id' => isset($payload['previous_response_id']),
+                    'max_output_tokens' => $payload['max_output_tokens'] ?? null,
+                    // Input-Messages ohne vollständigen Content (Datenschutz)
+                    'input_count' => count($payload['input'] ?? []),
+                    'input_types' => array_map(fn($i) => $i['type'] ?? ($i['role'] ?? 'unknown'), $payload['input'] ?? []),
+                ]);
+            }
+
             // Debug: Zeige vollständige Fehlerantwort
             if (config('app.debug', false)) {
                 Log::error('[OpenAI Stream] Full error response', [
