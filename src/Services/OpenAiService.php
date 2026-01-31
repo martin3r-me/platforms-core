@@ -1775,19 +1775,15 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
                         $writeCount++;
                     }
                     
-                    // Entry-Points/Discovery:
-                    // - Core discovery tools (tools.GET, core.*)
-                    // - Module overview tools (z.B. planner.overview.GET) damit das LLM Entitäten/Beziehungen versteht
+                    // Entry-Points/Discovery: 5 Basis-Tools initial
+                    // LLM nutzt tools.GET(module="...") um weitere Tools nachzuladen
                     $isDiscoveryTool = in_array($toolName, [
-                        'tools.GET',           // Tool-Liste anfordern (wichtigste Discovery-Tool)
-                        'tools.request',       // Fehlende Tools anmelden
-                        'core.modules.GET',    // Verfügbare Module sehen
-                        'core.context.GET',    // Aktuellen Kontext sehen
-                        'core.user.GET',       // Aktuellen User sehen
-                        'core.teams.GET',      // Verfügbare Teams sehen
-                    ]) || str_ends_with($toolName, '.overview.GET')
-                      || (($metadata['category'] ?? null) === 'overview')
-                      || (is_array($metadata['tags'] ?? null) && in_array('overview', $metadata['tags'], true));
+                        'core.user.GET',       // Wer bin ich?
+                        'core.teams.GET',      // Welche Teams?
+                        'core.context.GET',    // Kontext der Anfrage
+                        'core.modules.GET',    // Welche Module gibt es?
+                        'tools.GET',           // Tool-Discovery (ZENTRAL!)
+                    ]);
                     
                     // NUR Discovery-Tools senden.
                     if ($isDiscoveryTool) {

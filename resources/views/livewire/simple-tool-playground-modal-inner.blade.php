@@ -1054,22 +1054,26 @@
             history_length: debugState.payload.chat_history?.length || 0,
           } : null;
 
-          // SSE Events: Nur Tool-relevante (nicht jeden delta)
-          const toolRelevantEvents = ['debug.tools', 'tool.start', 'tool.executed', 'openai.event', 'done', 'error'];
+          // SSE Events: Nur "complete" Events, keine Deltas
           const filteredSseEvents = debugState.sseEvents
             .filter(e => {
-              // Immer behalten: tool-relevante events
-              if (toolRelevantEvents.some(t => e.event?.includes(t))) return true;
-              // Bei openai.event: nur function_call, tool_call, output_item events
-              if (e.event === 'openai.event' && e.raw) {
+              const evt = e.event || '';
+
+              // Immer behalten: Wichtige Lifecycle-Events
+              if (['debug.tools', 'tool.start', 'tool.executed', 'done', 'error'].includes(evt)) return true;
+
+              // openai.event: Nur ".done" und ".completed" Events, keine ".delta"
+              if (evt === 'openai.event' && e.raw) {
                 const r = e.raw;
-                if (r.includes('function_call') || r.includes('tool_call') || r.includes('output_item') || r.includes('mcp_call')) return true;
+                // Keine Deltas
+                if (r.includes('.delta')) return false;
+                // Nur complete Events + function_call
+                if (r.includes('.done') || r.includes('.completed') || r.includes('function_call')) return true;
               }
-              // Behalten: Events die "to=functions" enthalten (das Problem!)
-              if (e.raw && e.raw.includes('to=functions')) return true;
+
               return false;
             })
-            .slice(-50);
+            .slice(-30);
 
           // Assistant gekürzt (max 500 chars)
           const assistantPreview = debugState.lastAssistant
