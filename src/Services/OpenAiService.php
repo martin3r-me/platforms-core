@@ -390,7 +390,7 @@ class OpenAiService
         $payload = [
             'model' => $model,
             'input' => $this->buildResponsesInput($messagesWithContext),
-            'stream' => true,
+            'stream' => false, // TEMPORÄR DIAGNOSE! Um Error-Body bei 400 zu sehen. ACHTUNG: Chat funktioniert nicht normal! Zurücksetzen auf: true
             'max_output_tokens' => $options['max_tokens'] ?? 1000,
         ];
         // Responses API: continue from previous response (best practice for tool calling loops)
