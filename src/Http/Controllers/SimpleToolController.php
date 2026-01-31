@@ -605,6 +605,15 @@ class SimpleToolController extends Controller
                 $lastToolCount = $openAiService->getCurrentToolCount();
                 $fullConversationMessages = $messages; // Original-Konversation (für Rebuild bei Tool-Change)
                 $allToolCallsHistory = []; // Alle bisherigen Tool-Calls und -Outputs für Rebuild
+
+                $sendEvent('debug.tool_change_init', [
+                    'initial_tool_count' => $lastToolCount,
+                    'dynamically_loaded' => $openAiService->getDynamicallyLoadedTools(),
+                ]);
+                Log::debug('[SimpleToolController] Tool change detection initialized', [
+                    'initial_tool_count' => $lastToolCount,
+                    'dynamically_loaded' => $openAiService->getDynamicallyLoadedTools(),
+                ]);
                 
                 // Aggregate token usage across the whole request (multiple Responses API calls/iterations).
                 $usageAggregate = [
@@ -1377,6 +1386,21 @@ class SimpleToolController extends Controller
                     // Wenn sich die Tool-Anzahl ändert (z.B. nach tools.GET(module="helpdesk")),
                     // muss ein neuer Chain gestartet werden mit vollständiger Konversation.
                     $currentToolCount = $openAiService->getCurrentToolCount();
+
+                    // Debug: Log tool count check
+                    $sendEvent('debug.tool_change_check', [
+                        'iteration' => $iteration,
+                        'lastToolCount' => $lastToolCount,
+                        'currentToolCount' => $currentToolCount,
+                        'will_rebuild' => ($lastToolCount !== null && $currentToolCount !== $lastToolCount),
+                    ]);
+                    Log::debug('[SimpleToolController] Tool count check', [
+                        'iteration' => $iteration,
+                        'lastToolCount' => $lastToolCount,
+                        'currentToolCount' => $currentToolCount,
+                        'dynamically_loaded' => $openAiService->getDynamicallyLoadedTools(),
+                    ]);
+
                     if ($lastToolCount !== null && $currentToolCount !== $lastToolCount) {
                         Log::info('[SimpleToolController] Tool count changed - starting new chain', [
                             'previous_count' => $lastToolCount,
