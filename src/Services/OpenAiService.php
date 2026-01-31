@@ -390,7 +390,7 @@ class OpenAiService
         $payload = [
             'model' => $model,
             'input' => $this->buildResponsesInput($messagesWithContext),
-            'stream' => false, // TEMPORÄR DIAGNOSE! Um Error-Body bei 400 zu sehen. ACHTUNG: Chat funktioniert nicht normal! Zurücksetzen auf: true
+            'stream' => true,
             'max_output_tokens' => $options['max_tokens'] ?? 1000,
         ];
         // Responses API: continue from previous response (best practice for tool calling loops)
@@ -499,7 +499,7 @@ class OpenAiService
             }
             // Last resort (debug/opt-in only): replay the same request once without streaming to capture error details.
             // In production this can cause extra latency/cost, so keep it behind a flag.
-            if (trim($errorBody) === '' && (config('app.debug', false) || config('services.openai.diagnose_empty_stream_errors', false))) {
+            if (trim($errorBody) === '' && ($response->status() === 400 || config('app.debug', false) || config('services.openai.diagnose_empty_stream_errors', false))) {
                 try {
                     $diagPayload = $payload;
                     $diagPayload['stream'] = false;
