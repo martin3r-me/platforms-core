@@ -691,10 +691,8 @@ class SimpleToolController extends Controller
                             'include_web_search' => true,
                             'registry_bound' => $isBound,
                             'registry_count' => $registryCount,
-                            'registry_names_sample' => $registryNamesSample,
                             'tools_count' => count($names) + 1, // +web_search
                             'tools' => array_merge(['web_search'], $names),
-                            'tool_name_map_sample' => array_slice($toolNameMap, 0, 40, true),
                             'dynamically_loaded' => $openAiService->getDynamicallyLoadedTools(),
                         ]);
                     } catch (\Throwable $e) {

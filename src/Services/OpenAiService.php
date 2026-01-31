@@ -407,20 +407,9 @@ class OpenAiService
             $payload['reasoning'] = $options['reasoning'];
         }
 
-        // WICHTIG: Bei previous_response_id (Tool-Continuation) werden Tools NICHT erneut gesendet!
-        // Die Tools sind bereits in der vorherigen Response enthalten. Wenn wir sie erneut senden,
-        // kann es zu Inkonsistenzen kommen (z.B. durch dynamisch geladene Tools), was HTTP 400 verursacht.
-        if ($hasPreviousResponseId) {
-            // Bei Continuation: Keine Tools senden - OpenAI nutzt die Tools aus der vorherigen Response
-            // Debug-Log für Troubleshooting
-            if (config('app.debug', false)) {
-                Log::debug('[OpenAI Stream] Continuation mode - Tools nicht gesendet (previous_response_id aktiv)', [
-                    'previous_response_id' => $options['previous_response_id'],
-                    'input_count' => count($payload['input'] ?? []),
-                    'input_types' => array_map(fn($i) => $i['type'] ?? ($i['role'] ?? 'unknown'), $payload['input'] ?? []),
-                ]);
-            }
-        } elseif (isset($options['tools']) && $options['tools'] === false) {
+        // Tools werden bei jeder Iteration gesendet (auch bei previous_response_id),
+        // damit dynamisch geladene Tools (z.B. nach tools.GET) verfügbar sind.
+        if (isset($options['tools']) && $options['tools'] === false) {
             // Tools explizit deaktiviert - nichts hinzufügen
         } else {
             // Tools aktiviert (nur bei initialem Request ohne previous_response_id):
@@ -456,8 +445,7 @@ class OpenAiService
         }
 
         // Optional: prepend OpenAI built-in tools (e.g. web_search) while still using internal discovery tools.
-        // WICHTIG: Nicht bei previous_response_id, da Tools dort nicht gesendet werden dürfen!
-        if (!empty($options['include_web_search']) && !$hasPreviousResponseId) {
+        if (!empty($options['include_web_search'])) {
             $payload['tools'] = $payload['tools'] ?? [];
             $hasWebSearch = false;
             foreach ($payload['tools'] as $t) {
