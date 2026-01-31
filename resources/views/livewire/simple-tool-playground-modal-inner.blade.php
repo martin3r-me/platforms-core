@@ -1032,12 +1032,17 @@
           startedAt: null,
           payload: null,
           usage: null,
+          partialUsage: null,  // Akkumuliert Usage während Stream
           model: null,
           events: [],
           sseEvents: [],
           lastAssistant: '',
           toolCalls: [],
           toolsVisible: null,
+          streamCompleted: false,  // Wurde 'complete' Event empfangen?
+          streamError: null,  // Stream-Fehler Info
+          bytesReceived: 0,  // Bytes empfangen vor Fehler
+          lastEventType: null,  // Letzter Event-Typ
         };
         const eventCounters = { all: 0, reasoning: 0, thinking: 0 };
 
@@ -1091,9 +1096,15 @@
             request: cleanPayload,
             tools: debugState.toolsVisible,  // WICHTIG: Welche Tools wurden registriert?
             toolCalls: debugState.toolCalls.slice(-20),  // Was wurde aufgerufen?
-            usage: debugState.usage,
+            usage: debugState.usage || debugState.partialUsage || null,  // Final oder Partial Usage
             assistantPreview: assistantPreview,
             relevantEvents: filteredSseEvents,
+            // Stream-Status für Debugging
+            streamCompleted: debugState.streamCompleted,
+            streamIncomplete: !debugState.streamCompleted && debugState.sseEvents.length > 0,
+            streamError: debugState.streamError,
+            bytesReceived: debugState.bytesReceived,
+            lastEventType: debugState.lastEventType,
             // Fallback: Alle Events (falls nötig)
             _allEventsCount: debugState.sseEvents.length,
           };
@@ -1272,12 +1283,17 @@
           debugState.startedAt = null;
           debugState.payload = null;
           debugState.usage = null;
+          debugState.partialUsage = null;
           debugState.model = null;
           debugState.events = [];
           debugState.sseEvents = [];
           debugState.lastAssistant = '';
           debugState.toolCalls = [];
           debugState.toolsVisible = null;
+          debugState.streamCompleted = false;
+          debugState.streamError = null;
+          debugState.bytesReceived = 0;
+          debugState.lastEventType = null;
           updateDebugDump();
 
           try {
@@ -1755,6 +1771,8 @@
             while (true) {
               const { done, value } = await reader.read();
               if (done) break;
+              // Track bytes received for debug
+              if (value) debugState.bytesReceived += value.length;
               buffer += decoder.decode(value, { stream: true });
               const lines = buffer.split('\n');
               buffer = lines.pop() || '';
@@ -1785,6 +1803,9 @@
                 // For openai.event we still set the label inside its handler to show the upstream event name.
                 // Always reflect the raw incoming SSE event in the footer (no mapping/overwrites).
                 try { if (currentEvent) setEventLabel(currentEvent, data); } catch (_) {}
+
+                // Track last event type for debugging stream interruptions
+                if (currentEvent) debugState.lastEventType = currentEvent;
 
                 // Also persist every SSE event into the copyable debug dump (bounded + truncated).
                 try {
@@ -2016,10 +2037,18 @@
 
                     debugState.model = data?.model || debugState.model;
                     debugState.usage = usage;
+                    // Akkumuliere Partial Usage (für den Fall dass der Stream abbricht)
+                    debugState.partialUsage = {
+                      input_tokens: (debugState.partialUsage?.input_tokens || 0) + (usage.input_tokens || 0),
+                      output_tokens: (debugState.partialUsage?.output_tokens || 0) + (usage.output_tokens || 0),
+                      cached_tokens: usage?.input_tokens_details?.cached_tokens ?? debugState.partialUsage?.cached_tokens ?? null,
+                      reasoning_tokens: usage?.output_tokens_details?.reasoning_tokens ?? debugState.partialUsage?.reasoning_tokens ?? null,
+                    };
                     updateDebugDump();
                     break;
                   }
                   case 'complete': {
+                    debugState.streamCompleted = true;  // Markiere Stream als erfolgreich abgeschlossen
                     const assistant = data?.assistant || st.live.assistant || '';
                     const serverHistory = Array.isArray(data?.chat_history) ? data.chat_history : null;
                     if (serverHistory) {
@@ -2099,6 +2128,18 @@
                 threadState._lastSentUserContent = null;
               } catch (_) {}
 
+              // Capture abort info for debugging (user-initiated, not an error)
+              debugState.streamError = {
+                message: 'User aborted',
+                name: 'AbortError',
+                timestamp: new Date().toISOString(),
+                lastEventType: debugState.lastEventType,
+                bytesReceived: debugState.bytesReceived,
+                sseEventsCount: debugState.sseEvents.length,
+                userAborted: true,
+              };
+              updateDebugDump();
+
               // Show status via footer/event (no persistence in chat_history)
               try { setEventLabel('abgebrochen'); } catch (_) {}
               if (rtStatus) rtStatus.textContent = 'abgebrochen';
@@ -2113,6 +2154,20 @@
               } catch (_) {}
               try { removeStreamingMetaMessages(); } catch (_) {}
             } else {
+              // Capture stream error info for debugging
+              debugState.streamError = {
+                message: e?.message || 'Unbekannter Fehler',
+                name: e?.name || null,
+                timestamp: new Date().toISOString(),
+                lastEventType: debugState.lastEventType,
+                bytesReceived: debugState.bytesReceived,
+                sseEventsCount: debugState.sseEvents.length,
+                toolCallsCount: debugState.toolCalls.length,
+                lastToolCall: debugState.toolCalls.slice(-1)[0] || null,
+                streamCompleted: debugState.streamCompleted,
+              };
+              updateDebugDump();
+
               threadState.messages.push({ role: 'assistant', content: `❌ Fehler: ${e?.message || 'Unbekannter Fehler'}` });
               renderMessage('assistant', `❌ Fehler: ${e?.message || 'Unbekannter Fehler'}`);
               if (rtStatus) rtStatus.textContent = 'error';
