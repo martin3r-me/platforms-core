@@ -2057,6 +2057,10 @@
                       // Note: Debug window is NOT cleared here - it will be cleared on next send
                       // Trigger Livewire to reload messages from DB and show the new assistant message
                       refreshLivewireMessages();
+                      // Direct scroll calls to catch the new content after Livewire re-renders
+                      setTimeout(() => scrollToBottom(), 200);
+                      setTimeout(() => scrollToBottom(), 500);
+                      setTimeout(() => scrollToBottom(), 1000);
                     }
                     st.continuation = data?.continuation || null;
                     if (rtStatus) rtStatus.textContent = 'done';
@@ -2169,7 +2173,11 @@
             updateFooterBusy();
             threadState.userAborted = false;
             // Final scroll to bottom after stream completes
+            // Multiple attempts to catch Livewire re-render
             setTimeout(() => scrollToBottom(), 100);
+            setTimeout(() => scrollToBottom(), 300);
+            setTimeout(() => scrollToBottom(), 600);
+            setTimeout(() => scrollToBottom(), 1000);
           }
         };
 
