@@ -666,66 +666,38 @@
           el.style.overflowY = (el.scrollHeight > maxPx) ? 'auto' : 'hidden';
         };
 
-        // Smart auto-scroll: only scroll if user is near bottom (don't interrupt manual scrolling)
-        let isUserScrolling = false;
-        let scrollTimeout = null;
-        const checkIfNearBottom = () => {
-          if (!chatScroll) return false;
-          const threshold = 100; // pixels from bottom
-          const distance = chatScroll.scrollHeight - chatScroll.scrollTop - chatScroll.clientHeight;
-          return distance < threshold;
-        };
-        
-        const scrollToBottom = (force = false) => {
-          refreshDomRefs();
-          if (!chatScroll) return;
-          // Only auto-scroll if user is near bottom (don't interrupt manual scrolling)
-          // Unless force is true (e.g., after sending a message or receiving a response)
-          if (!force && !checkIfNearBottom()) return;
-          
-          // Simple direct scroll (like in communication modal)
-          chatScroll.scrollTop = chatScroll.scrollHeight;
-        };
-        
-        // Track user scrolling to avoid interrupting
-        const setupScrollTracking = () => {
-          if (!chatScroll) return;
-          chatScroll.addEventListener('scroll', () => {
-            isUserScrolling = true;
-            if (scrollTimeout) clearTimeout(scrollTimeout);
-            scrollTimeout = setTimeout(() => {
-              isUserScrolling = false;
-            }, 1000);
+        // Auto-scroll: simple and robust
+        const scrollToBottom = () => {
+          // Always get fresh reference
+          const scroller = document.getElementById('chatScroll');
+          if (!scroller) return;
+          // Use requestAnimationFrame for smooth scrolling
+          requestAnimationFrame(() => {
+            scroller.scrollTop = scroller.scrollHeight;
           });
         };
-        
-        // MutationObserver for auto-scroll (only when user is near bottom)
+
+        // MutationObserver for auto-scroll on content changes
         let scrollObserver = null;
         const setupAutoScroll = () => {
-          if (scrollObserver) return;
-          refreshDomRefs();
-          if (!chatScroll) return;
-          
-          setupScrollTracking();
+          // Disconnect old observer if exists
+          if (scrollObserver) {
+            scrollObserver.disconnect();
+            scrollObserver = null;
+          }
 
-          // Observe chatList (server-rendered) + pgStreamingSlot (live streaming + temp messages)
-          const streamSlot = document.getElementById('pgStreamingSlot');
-          const observeTargets = [chatList, streamSlot].filter(Boolean);
-          if (observeTargets.length === 0) return;
-          
+          const scroller = document.getElementById('chatScroll');
+          if (!scroller) return;
+
+          // Observe the entire scroller for any content changes
           scrollObserver = new MutationObserver(() => {
-            // Only auto-scroll if user is near bottom
-            if (!isUserScrolling || checkIfNearBottom()) {
-              scrollToBottom();
-            }
+            scrollToBottom();
           });
-          
-          observeTargets.forEach(target => {
-            scrollObserver.observe(target, {
-              childList: true,
-              subtree: true,
-              characterData: true
-            });
+
+          scrollObserver.observe(scroller, {
+            childList: true,
+            subtree: true,
+            characterData: true
           });
         };
         
@@ -807,43 +779,11 @@
           rtStreamLog.scrollTop = rtStreamLog.scrollHeight;
         };
 
-        // Streaming assistant message: show live in chat (like Claude Code), remove on complete
-        const ensureStreamingAssistantMessage = () => {
-          refreshDomRefs();
-          const root = document.getElementById('pgStreamingSlot') || chatList;
-          if (!root) return null;
-          let el = document.getElementById('pgStreamingAssistantMsg');
-          if (el) return el;
-          const wrap = document.createElement('div');
-          wrap.id = 'pgStreamingAssistantMsg';
-          wrap.className = 'flex justify-start';
-          wrap.dataset.streaming = '1';
-          wrap.innerHTML = `
-            <div class="max-w-4xl rounded-lg p-3 break-words overflow-hidden bg-[var(--ui-surface)] border border-[var(--ui-border)]">
-              <div class="text-sm font-semibold mb-1 flex items-center gap-2">
-                <span>Assistant</span>
-                <span class="text-[10px] text-[var(--ui-muted)] animate-pulse" data-stream-status>(streaming…)</span>
-              </div>
-              <div class="whitespace-pre-wrap break-words" data-stream-content></div>
-            </div>
-          `;
-          root.appendChild(wrap);
-          const empty = document.getElementById('chatEmpty');
-          if (empty) empty.style.display = 'none';
-          return wrap;
-        };
-        const updateStreamingAssistantMessage = (text) => {
-          const el = ensureStreamingAssistantMessage();
-          if (!el) return;
-          const c = el.querySelector('[data-stream-content]');
-          if (c) c.textContent = text || '';
-          // Auto-scroll during streaming
-          scrollToBottom();
-        };
-        const removeStreamingAssistantMessage = () => {
-          const el = document.getElementById('pgStreamingAssistantMsg');
-          if (el && el.parentNode) el.parentNode.removeChild(el);
-        };
+        // Streaming assistant message: NOT shown in chat (only debug panel)
+        // Final result is rendered by Livewire after complete
+        const ensureStreamingAssistantMessage = () => null;
+        const updateStreamingAssistantMessage = (text) => {};
+        const removeStreamingAssistantMessage = () => {};
 
         // Render a message in the chat UI (used for temporary messages before Livewire re-renders)
         const renderMessage = (role, content, options = {}) => {
@@ -877,7 +817,7 @@
           if (empty) empty.style.display = 'none';
 
           // Scroll to bottom
-          scrollToBottom(true);
+          scrollToBottom();
 
           return wrap;
         };
@@ -1519,7 +1459,7 @@
           input.dataset.autoGrowBound = '1';
         }
         // Initial smooth scroll after setup
-        setTimeout(() => scrollToBottom(true), 200);
+        setTimeout(() => scrollToBottom(), 200);
         let lastThreadId = currentThreadId;
         document.addEventListener('livewire:update', () => {
           refreshThreadIdFromDom();
@@ -1574,18 +1514,20 @@
             } catch (_) {}
             lastThreadId = currentThreadId;
             // Smooth scroll to bottom after thread switch
-            setTimeout(() => scrollToBottom(true), 150);
+            setTimeout(() => scrollToBottom(), 150);
           }
           // Scroll after Livewire update if flag is set (e.g., after complete event)
           if (window.__simplePlaygroundShouldScrollAfterUpdate) {
             window.__simplePlaygroundShouldScrollAfterUpdate = false;
             // Wait a bit longer to ensure the message is fully rendered
             setTimeout(() => {
-              scrollToBottom(true);
+              scrollToBottom();
               // Also try again after a short delay to catch any late rendering
-              setTimeout(() => scrollToBottom(true), 200);
+              setTimeout(() => scrollToBottom(), 200);
             }, 150);
           }
+          // Always scroll after Livewire updates (new messages from DB)
+          setTimeout(() => scrollToBottom(), 100);
         });
 
         // Iterations: keep high defaults; allow user override via localStorage.
@@ -1689,17 +1631,13 @@
               userMessage.attachments = attachmentIds;
             }
             threadState.messages.push(userMessage);
-            // Render user message immediately in the chat (will be replaced by Livewire on complete)
-            const userMsgEl = renderMessage('user', text);
-            // Remember what we just added, so we can revert it on Abort (and avoid polluting DB/history).
+            // User message is rendered by Livewire (not JS) - just track for abort
             try {
-              refreshDomRefs();
               threadState._lastSentUserContent = text;
               threadState._lastSentUserIndex = (threadState.messages?.length || 1) - 1;
-              threadState._lastSentUserEl = userMsgEl; // Store element reference for abort cleanup
             } catch (_) {}
             input.value = '';
-            // Reset textarea height after sending (auto-grow will shrink it back)
+            // Reset textarea height after sending
             if (input && input.tagName === 'TEXTAREA') {
               requestAnimationFrame(() => autoGrow(input));
             }
@@ -1707,10 +1645,6 @@
             if (typeof window.__simplePlaygroundClearAttachments === 'function') {
               window.__simplePlaygroundClearAttachments();
             }
-            // Scroll after rendering user message
-            requestAnimationFrame(() => {
-              setTimeout(() => scrollToBottom(true), 50);
-            });
           }
 
           threadState.inFlight = true;
@@ -1870,21 +1804,15 @@
                         st.live.assistant = delta !== ''
                           ? (st.live.assistant + delta)
                           : full;
-                        // Show stream in both: debug panel AND chat (like Claude Code)
+                        // Stream only in debug panel (final result rendered by Livewire)
                         appendStreamLog('assistant.delta', delta !== '' ? delta : full);
-                        if (isVisible) updateStreamingAssistantMessage(st.live.assistant);
                       }
                       debugState.lastAssistant = st.live.assistant;
                     }
                     break;
                   case 'assistant.reset':
                     st.live.assistant = '';
-                    // Reset both: debug panel AND chat streaming bubble
                     appendStreamLog('assistant.reset', '\n');
-                    if (isVisible) {
-                      removeStreamingAssistantMessage();
-                      ensureStreamingAssistantMessage();
-                    }
                     break;
                   case 'reasoning.delta':
                     if (data?.delta) {
@@ -2225,7 +2153,7 @@
             threadState.userAborted = false;
             // Final scroll to bottom after stream completes
             requestAnimationFrame(() => {
-              setTimeout(() => scrollToBottom(true), 100);
+              setTimeout(() => scrollToBottom(), 100);
             });
           }
         };
@@ -2473,9 +2401,9 @@
               // Use requestAnimationFrame to ensure DOM is updated, then scroll
               requestAnimationFrame(() => {
                 setTimeout(() => {
-                  scrollToBottom(true);
+                  scrollToBottom();
                   // Retry once more after a short delay to catch any late rendering
-                  setTimeout(() => scrollToBottom(true), 100);
+                  setTimeout(() => scrollToBottom(), 100);
                 }, 50);
               });
             }
