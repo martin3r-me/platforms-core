@@ -49,6 +49,16 @@
             window.__simpleStreamUrl = @json($simpleStreamUrl);
             window.__simpleModelsUrl = @json($simpleModelsUrl);
             window.__simplePlaygroundContext = @json($context);
+
+            // Playground-Context via Livewire-Event aktualisieren (z.B. wenn Task-Seite den Context setzt)
+            // Livewire 3: dispatch() feuert Livewire-Events, die über Livewire.on() gehört werden
+            document.addEventListener('livewire:init', () => {
+                Livewire.on('playground-context-updated', (data) => {
+                    window.__simplePlaygroundContext = data.context || data[0]?.context || data;
+                    // Trigger browser event für inner modal listener
+                    window.dispatchEvent(new CustomEvent('playground-context-updated', { detail: { context: window.__simplePlaygroundContext } }));
+                });
+            });
         </script>
 
         {{-- x-ui-modal (non-full) has a padded, scrollable body already.
