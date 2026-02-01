@@ -47,6 +47,17 @@
         {{-- Context als data-Attribut für JS-Zugriff (wird von Livewire aktualisiert) --}}
         <div id="pgPlaygroundContextData" class="hidden" data-context="{{ json_encode($context) }}"></div>
 
+        {{-- DEBUG: Context direkt anzeigen --}}
+        @if($context)
+            <div class="bg-yellow-100 text-yellow-800 text-xs p-2 mb-2">
+                DEBUG Context: {{ json_encode($context) }}
+            </div>
+        @else
+            <div class="bg-red-100 text-red-800 text-xs p-2 mb-2">
+                DEBUG: Context ist NULL
+            </div>
+        @endif
+
         <script>
             // URLs für das Modal-Playground
             window.__simpleStreamUrl = @json($simpleStreamUrl);
@@ -55,15 +66,20 @@
             // Context wird aus data-Attribut gelesen (Livewire aktualisiert es bei Re-Render)
             window.__simplePlaygroundReadContext = () => {
                 const el = document.getElementById('pgPlaygroundContextData');
+                console.log('[Playground] Reading context from data-attribute:', el?.dataset?.context);
                 if (!el) return null;
                 try {
-                    return JSON.parse(el.dataset.context || 'null');
+                    const ctx = JSON.parse(el.dataset.context || 'null');
+                    console.log('[Playground] Parsed context:', ctx);
+                    return ctx;
                 } catch (e) {
+                    console.error('[Playground] Error parsing context:', e);
                     return null;
                 }
             };
             // Initial setzen
             window.__simplePlaygroundContext = window.__simplePlaygroundReadContext();
+            console.log('[Playground] Initial context set:', window.__simplePlaygroundContext);
         </script>
 
         {{-- x-ui-modal (non-full) has a padded, scrollable body already.

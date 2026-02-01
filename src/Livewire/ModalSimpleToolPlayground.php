@@ -45,6 +45,10 @@ class ModalSimpleToolPlayground extends Component
     #[On('playground')]
     public function setPlaygroundContext(array $payload = []): void
     {
+        \Log::info('[Playground] setPlaygroundContext called', [
+            'payload' => $payload,
+            'component_id' => $this->getId(),
+        ]);
         $this->context = $payload;
         // Kein JS-Event nötig - Livewire re-rendert und $context ist in der View verfügbar
     }

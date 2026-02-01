@@ -672,17 +672,20 @@
 
         // Context row UI: show/hide based on available context and update checkbox state
         const updateContextRow = () => {
+          console.log('[Playground] updateContextRow called');
           // Context aus data-Attribut lesen (wird von Livewire aktualisiert)
           if (typeof window.__simplePlaygroundReadContext === 'function') {
             window.__simplePlaygroundContext = window.__simplePlaygroundReadContext();
           }
           const ctx = window.__simplePlaygroundContext;
+          console.log('[Playground] Context in updateContextRow:', ctx);
           const row = document.getElementById('pgContextRow');
           const typeEl = document.getElementById('pgContextType');
           const titleEl = document.getElementById('pgContextTitle');
           const checkbox = document.getElementById('pgContextCheckbox');
 
           if (!row || !ctx || !ctx.title) {
+            console.log('[Playground] Hiding context row - row:', !!row, 'ctx:', !!ctx, 'title:', ctx?.title);
             if (row) row.classList.add('hidden');
             return;
           }
