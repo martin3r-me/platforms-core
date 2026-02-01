@@ -691,7 +691,9 @@
           }
 
           // Show context row
+          console.log('[Playground] SHOWING context row! Type:', ctx.type, 'Title:', ctx.title);
           row.classList.remove('hidden');
+          row.style.display = 'flex'; // Force display in case CSS hides it
 
           // Type comes from context itself (dispatcher provides it)
           const typeName = ctx.type || ctx.type_label || 'Kontext';
