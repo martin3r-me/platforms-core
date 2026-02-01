@@ -565,6 +565,29 @@ class SimpleToolController extends Controller
                         'role' => 'system',
                         'content' => "[Aktueller Kontext]\n" . implode("\n", $contextParts),
                     ];
+
+                    // Füge angehängte Dateien als separate System-Messages hinzu
+                    if (!empty($clientContext['files']) && is_array($clientContext['files'])) {
+                        foreach ($clientContext['files'] as $file) {
+                            $fileName = $file['name'] ?? 'Unbekannt';
+                            $mimeType = $file['mime_type'] ?? 'application/octet-stream';
+                            $content = $file['content'] ?? '';
+
+                            if (!empty($content) && !str_starts_with($content, '[')) {
+                                // Text-Datei mit Inhalt
+                                $messages[] = [
+                                    'role' => 'system',
+                                    'content' => "[Datei: {$fileName}]\nTyp: {$mimeType}\n\n```\n{$content}\n```",
+                                ];
+                            } else {
+                                // Binärdatei oder Bild - nur Referenz
+                                $messages[] = [
+                                    'role' => 'system',
+                                    'content' => "[Datei: {$fileName}]\nTyp: {$mimeType}\nHinweis: {$content}",
+                                ];
+                            }
+                        }
+                    }
                 }
 
                 // Füge Chat-Historie hinzu (falls vorhanden)

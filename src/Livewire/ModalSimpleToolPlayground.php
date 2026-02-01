@@ -35,6 +35,9 @@ class ModalSimpleToolPlayground extends Component
     /** @var bool Ob Context mitgesendet werden soll */
     public bool $sendContext = true;
 
+    /** @var array<int> IDs der Context-Files die mitgesendet werden sollen */
+    public array $selectedContextFiles = [];
+
     /** @var array<int, array<string,mixed>> */
     public array $pricingEdits = [];
 
@@ -51,6 +54,7 @@ class ModalSimpleToolPlayground extends Component
     {
         $this->context = $payload;
         $this->sendContext = true; // Bei neuem Context: Checkbox aktivieren
+        $this->selectedContextFiles = []; // Reset file selection bei neuem Context
     }
 
     #[Computed]
@@ -71,6 +75,33 @@ class ModalSimpleToolPlayground extends Component
         return $this->context['title'] ?? '';
     }
 
+    /** Files die am Context-Objekt hängen (z.B. Task-Attachments) */
+    #[Computed]
+    public function contextFiles(): array
+    {
+        $model = $this->context['model'] ?? null;
+        $modelId = $this->context['modelId'] ?? null;
+
+        if (!$model || !$modelId) {
+            return [];
+        }
+
+        return ContextFile::query()
+            ->where('context_type', $model)
+            ->where('context_id', $modelId)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn($file) => [
+                'id' => $file->id,
+                'name' => $file->original_name,
+                'mime_type' => $file->mime_type,
+                'size' => $file->file_size,
+                'is_image' => str_starts_with($file->mime_type, 'image/'),
+                'url' => $file->url,
+            ])
+            ->toArray();
+    }
+
     /** Context für API-Request (nur wenn Checkbox aktiv) */
     #[Renderless]
     public function getContextForRequest(): ?array
@@ -80,7 +111,63 @@ class ModalSimpleToolPlayground extends Component
         }
         // Nach dem Senden: Checkbox deaktivieren
         $this->sendContext = false;
-        return $this->context;
+
+        // Füge ausgewählte Files zum Context hinzu
+        $result = $this->context;
+        if (!empty($this->selectedContextFiles)) {
+            $files = ContextFile::whereIn('id', $this->selectedContextFiles)->get();
+            $result['files'] = $files->map(fn($f) => [
+                'id' => $f->id,
+                'name' => $f->original_name,
+                'mime_type' => $f->mime_type,
+                'content' => $this->getFileContent($f),
+            ])->toArray();
+            // Reset nach dem Senden
+            $this->selectedContextFiles = [];
+        }
+
+        return $result;
+    }
+
+    /** Liest den Inhalt einer Datei für die LLM (Text/Code) */
+    private function getFileContent(ContextFile $file): ?string
+    {
+        // Nur Text-basierte Dateien einlesen
+        $textMimeTypes = [
+            'text/', 'application/json', 'application/xml', 'application/javascript',
+            'application/x-php', 'application/x-python', 'application/x-ruby',
+        ];
+
+        $isText = false;
+        foreach ($textMimeTypes as $prefix) {
+            if (str_starts_with($file->mime_type, $prefix)) {
+                $isText = true;
+                break;
+            }
+        }
+
+        if (!$isText) {
+            // Für Bilder: URL zurückgeben, nicht Inhalt
+            if (str_starts_with($file->mime_type, 'image/')) {
+                return '[Bild: ' . $file->original_name . ']';
+            }
+            return '[Binärdatei: ' . $file->original_name . ']';
+        }
+
+        try {
+            $disk = \Illuminate\Support\Facades\Storage::disk($file->disk);
+            if (!$disk->exists($file->path)) {
+                return '[Datei nicht gefunden]';
+            }
+            $content = $disk->get($file->path);
+            // Limitiere auf 50KB um Token-Explosion zu vermeiden
+            if (strlen($content) > 50000) {
+                return substr($content, 0, 50000) . "\n\n[... Datei gekürzt, " . strlen($content) . " Bytes total]";
+            }
+            return $content;
+        } catch (\Exception $e) {
+            return '[Fehler beim Lesen: ' . $e->getMessage() . ']';
+        }
     }
 
     #[On('playground:open')]

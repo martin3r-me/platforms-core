@@ -234,6 +234,30 @@
                                         <span class="opacity-70">{{ $this->contextType }}:</span>
                                         <span class="font-medium text-[var(--ui-secondary)] truncate max-w-[300px]">{{ $this->contextTitle }}</span>
                                     </div>
+                                    {{-- Context-Files mit individuellen Checkboxen --}}
+                                    @if(count($this->contextFiles) > 0)
+                                        <div class="px-2 py-1 text-xs border-t border-[var(--ui-border)]/30">
+                                            <div class="text-[var(--ui-muted)] mb-1">Dateien mitsenden:</div>
+                                            <div class="flex flex-wrap gap-2">
+                                                @foreach($this->contextFiles as $file)
+                                                    <label class="flex items-center gap-1.5 cursor-pointer select-none px-2 py-1 rounded bg-[var(--ui-muted-5)] hover:bg-[var(--ui-muted-10)] transition-colors">
+                                                        <input
+                                                            type="checkbox"
+                                                            value="{{ $file['id'] }}"
+                                                            wire:model.live="selectedContextFiles"
+                                                            class="w-3 h-3 rounded border-[var(--ui-border)] text-[var(--ui-primary)] focus:ring-[var(--ui-primary)] cursor-pointer"
+                                                        />
+                                                        @if($file['is_image'])
+                                                            <svg class="w-3.5 h-3.5 text-[var(--ui-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                                        @else
+                                                            <svg class="w-3.5 h-3.5 text-[var(--ui-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                                        @endif
+                                                        <span class="truncate max-w-[150px]" title="{{ $file['name'] }}">{{ $file['name'] }}</span>
+                                                    </label>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endif
                                 @endif
                             </div>
                         </div>
