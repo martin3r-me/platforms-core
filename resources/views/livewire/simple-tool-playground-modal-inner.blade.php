@@ -224,6 +224,15 @@
                                         <span>Senden</span>
                                     </button>
                                 </form>
+                                {{-- Context-Info unterhalb des Input-Bereichs --}}
+                                <div id="pgContextRow" class="hidden flex items-center gap-2 px-2 py-1.5 text-xs text-[var(--ui-muted)]">
+                                    <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                                        <input type="checkbox" id="pgContextCheckbox" checked class="w-3.5 h-3.5 rounded border-[var(--ui-border)] text-[var(--ui-primary)] focus:ring-[var(--ui-primary)] cursor-pointer" />
+                                        <span>Kontext mitsenden:</span>
+                                    </label>
+                                    <span id="pgContextType" class="opacity-70"></span>
+                                    <span id="pgContextTitle" class="font-medium text-[var(--ui-secondary)] truncate max-w-[300px]"></span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -543,9 +552,7 @@
     </div>
 
     <script>
-      console.log('[PLAYGROUND] Script starting...');
       (() => {
-        console.log('[PLAYGROUND] IIFE starting...');
         // Blade variables (set before script execution)
         const defaultModelId = @json($defaultModelId ?? 'gpt-5.2');
         const activeThreadId = @json($activeThreadId ?? null);
@@ -553,9 +560,7 @@
         const livewireComponentId = '{{ $this->getId() }}';
         
         const boot = () => {
-        console.log('[PLAYGROUND] boot() called');
         const url = window.__simpleStreamUrl;
-        console.log('[PLAYGROUND] streamUrl:', url);
         const modelsUrl = window.__simpleModelsUrl;
         const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
         const serverDefaultModel = 'gpt-5.2';
@@ -664,6 +669,38 @@
           selectedModel = defaultModelId;
         }
         localStorage.setItem('simple.selectedModel', selectedModel);
+
+        // Context row UI: show/hide based on available context and update checkbox state
+        const updateContextRow = () => {
+          const ctx = window.__simplePlaygroundContext;
+          const row = document.getElementById('pgContextRow');
+          const typeEl = document.getElementById('pgContextType');
+          const titleEl = document.getElementById('pgContextTitle');
+          const checkbox = document.getElementById('pgContextCheckbox');
+
+          if (!row || !ctx || !ctx.title) {
+            if (row) row.classList.add('hidden');
+            return;
+          }
+
+          // Show context row
+          row.classList.remove('hidden');
+
+          // Type comes from context itself (dispatcher provides it)
+          const typeName = ctx.type || ctx.type_label || 'Kontext';
+          typeEl.textContent = typeName + ':';
+          titleEl.textContent = ctx.title || '—';
+
+          // For new/empty threads: checkbox enabled, otherwise disabled
+          const isNewThread = !threadState.messages || threadState.messages.length === 0;
+          checkbox.checked = isNewThread;
+        };
+
+        // Listen for context updates from outside
+        window.addEventListener('playground-context-updated', (e) => {
+          window.__simplePlaygroundContext = e.detail?.context || e.detail;
+          updateContextRow();
+        });
 
         // Auto-grow textarea (adapted from comms modal)
         const autoGrow = (el, maxPx = 132) => {
@@ -864,13 +901,11 @@
         const ensureStreamingMetaMessage = (kind) => {
           refreshDomRefs();
           const root = document.getElementById('pgStreamingSlot') || chatList;
-          console.log('[DEBUG] ensureStreamingMetaMessage', kind, 'root:', root);
           if (!root) return null;
           const id = kind === 'reasoning' ? 'pgStreamingReasoningMsg' : 'pgStreamingThinkingMsg';
           const label = kind === 'reasoning' ? 'Reasoning' : 'Thinking';
           let el = document.getElementById(id);
           if (el) return el;
-          console.log('[DEBUG] creating new streaming meta message:', kind);
           const wrap = document.createElement('div');
           wrap.id = id;
           wrap.className = 'flex justify-start';
@@ -1446,6 +1481,7 @@
         refreshMessagesFromServerRender();
         updateThreadBusyIndicators();
         updateFooterBusy();
+        updateContextRow();
         // Setup auto-scroll observer (smart: only scrolls if user is near bottom)
         setupAutoScroll();
         // Setup auto-grow for textarea (adapted from comms modal)
@@ -1463,6 +1499,7 @@
         document.addEventListener('livewire:update', () => {
           refreshThreadIdFromDom();
           refreshMessagesFromServerRender();
+          updateContextRow();
           // After Livewire renders server history, remove temporary messages from pgStreamingSlot.
           // Server history in chatList is the source of truth; pgStreamingSlot is only for streaming.
           try {
@@ -1585,10 +1622,8 @@
 
         // Send (parity with page playground: chat updates only on complete)
         const send = async () => {
-          console.log('[PLAYGROUND] send() called');
           refreshDomRefs();
           const text = (input?.value || '').trim();
-          console.log('[PLAYGROUND] text:', text, 'inFlight:', threadState.inFlight);
           if (threadState.inFlight) return;
 
           const canContinue = !!(threadState.continuation && threadState.continuation.pending);
@@ -1683,16 +1718,26 @@
           // Fallback to default if no model selected
           const modelToUse = selectedModel || defaultModelId;
 
+          // Check if context should be sent (only when checkbox is checked)
+          const contextCheckbox = document.getElementById('pgContextCheckbox');
+          const shouldSendContext = contextCheckbox?.checked ?? false;
+          const contextToSend = shouldSendContext ? (window.__simplePlaygroundContext || null) : null;
+
           const payload = {
             message: (isContinue ? '' : text),
             chat_history: threadState.messages,
             thread_id: currentThreadId,
             model: modelToUse,
             continuation: (isContinue ? threadState.continuation : null),
-            context: ctx || null,
+            context: contextToSend,
             max_iterations: getMaxIterations(),
             attachments: attachmentIds.length > 0 ? attachmentIds : null,
           };
+
+          // Auto-deactivate context checkbox after send (context only needed once per thread)
+          if (shouldSendContext && contextCheckbox) {
+            contextCheckbox.checked = false;
+          }
           debugState.payload = payload;
           updateDebugDump();
 
@@ -1747,9 +1792,6 @@
                 let data;
                 try { data = JSON.parse(raw); } catch { data = { raw }; }
 
-                // DEBUG: Log ALL SSE events with full details
-                console.log('[SSE DETAIL]', currentEvent, JSON.stringify(data, null, 2).substring(0, 500));
-
                 // Best practice: route all SSE UI updates by explicit thread_id (server-provided),
                 // never by DOM timing (Livewire can temporarily desync hidden inputs).
                 let eventThreadId = null;
@@ -1790,7 +1832,6 @@
                   }
                 } catch (_) {}
 
-                console.log('[SSE] event:', currentEvent);
                 switch (currentEvent) {
                   case 'assistant.delta':
                     {
@@ -1823,7 +1864,6 @@
                     if (isVisible && reasoningEl && reasoningEl.parentNode) reasoningEl.parentNode.removeChild(reasoningEl);
                     break;
                   case 'thinking.delta':
-                    console.log('[DEBUG] thinking.delta received, isVisible:', isVisible, 'delta:', data?.delta?.substring(0, 50));
                     if (data?.delta) {
                       st.live.thinking += data.delta;
                       if (isVisible) updateStreamingMetaMessage('thinking', st.live.thinking);
