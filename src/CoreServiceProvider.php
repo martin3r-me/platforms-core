@@ -370,6 +370,15 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register($this->app->make(\Platform\Core\Tools\UpdateAiModelTool::class)); } catch (\Throwable $e) {}
         }
 
+        // Context Files Tools (core.context.files.*)
+        // Diese Tools ermöglichen der LLM, Dateien an Context-Objekten zu entdecken und deren Inhalt abzurufen
+        if (class_exists(\Platform\Core\Tools\GetContextFilesTool::class) && !$registry->has('core.context.files.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\GetContextFilesTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\GetContextFileContentTool::class) && !$registry->has('core.context.files.content.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\GetContextFileContentTool::class)); } catch (\Throwable $e) {}
+        }
+
         // Communication Tools (core.comms.*)
         // Diese Tools müssen immer registriert sein, damit sie via tools.GET(module="communication") gefunden werden
         // Hinweis: communication.overview.GET wurde entfernt (verursachte Loops) - nutze direkt core.comms.overview.GET

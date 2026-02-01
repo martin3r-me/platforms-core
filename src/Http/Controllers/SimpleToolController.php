@@ -531,7 +531,8 @@ class SimpleToolController extends Controller
                         . "Du siehst anfangs nur Discovery-Tools (z.B. tools.GET, core.teams.GET). Nutze tools.GET mit module/search, um weitere Tools zu entdecken.\n"
                         . "Für Tool-Discovery nutze tools.GET (nicht core.modules.GET mit include_tools=true – das ist sehr groß und kostet viele Tokens).\n"
                         . "Wenn es um Teams in der Plattform geht, nutze core.teams.GET.\n"
-                        . "Wenn Kontext nötig ist, rufe core.context.GET auf.\n",
+                        . "Wenn Kontext nötig ist, rufe core.context.GET auf.\n"
+                        . "Wenn es um Dateien/Attachments an einem Objekt geht, nutze core.context.files.GET um verfügbare Dateien zu sehen und core.context.files.content.GET um deren Inhalt abzurufen.\n",
                 ];
 
                 // Füge Client-Kontext als System-Message hinzu (z.B. aktueller Task/Ticket)
@@ -566,28 +567,8 @@ class SimpleToolController extends Controller
                         'content' => "[Aktueller Kontext]\n" . implode("\n", $contextParts),
                     ];
 
-                    // Füge angehängte Dateien als separate System-Messages hinzu
-                    if (!empty($clientContext['files']) && is_array($clientContext['files'])) {
-                        foreach ($clientContext['files'] as $file) {
-                            $fileName = $file['name'] ?? 'Unbekannt';
-                            $mimeType = $file['mime_type'] ?? 'application/octet-stream';
-                            $content = $file['content'] ?? '';
-
-                            if (!empty($content) && !str_starts_with($content, '[')) {
-                                // Text-Datei mit Inhalt
-                                $messages[] = [
-                                    'role' => 'system',
-                                    'content' => "[Datei: {$fileName}]\nTyp: {$mimeType}\n\n```\n{$content}\n```",
-                                ];
-                            } else {
-                                // Binärdatei oder Bild - nur Referenz
-                                $messages[] = [
-                                    'role' => 'system',
-                                    'content' => "[Datei: {$fileName}]\nTyp: {$mimeType}\nHinweis: {$content}",
-                                ];
-                            }
-                        }
-                    }
+                    // Dateien werden nicht mehr vorab injiziert.
+                    // Die LLM kann bei Bedarf core.context.files.GET und core.context.files.content.GET nutzen.
                 }
 
                 // Füge Chat-Historie hinzu (falls vorhanden)
