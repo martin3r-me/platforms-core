@@ -31,6 +31,9 @@ class ModalSimpleToolPlayground extends Component
     /** @var array<string,mixed>|null */
     public ?array $context = null;
 
+    /** @var bool Ob Context mitgesendet werden soll */
+    public bool $sendContext = true;
+
     /** @var array<int, array<string,mixed>> */
     public array $pricingEdits = [];
 
@@ -45,12 +48,37 @@ class ModalSimpleToolPlayground extends Component
     #[On('playground')]
     public function setPlaygroundContext(array $payload = []): void
     {
-        \Log::info('[Playground] setPlaygroundContext called', [
-            'payload' => $payload,
-            'component_id' => $this->getId(),
-        ]);
         $this->context = $payload;
-        // Kein JS-Event nötig - Livewire re-rendert und $context ist in der View verfügbar
+        $this->sendContext = true; // Bei neuem Context: Checkbox aktivieren
+    }
+
+    #[Computed]
+    public function hasContext(): bool
+    {
+        return !empty($this->context['title']);
+    }
+
+    #[Computed]
+    public function contextType(): string
+    {
+        return $this->context['type'] ?? 'Kontext';
+    }
+
+    #[Computed]
+    public function contextTitle(): string
+    {
+        return $this->context['title'] ?? '';
+    }
+
+    /** Context für API-Request (nur wenn Checkbox aktiv) */
+    public function getContextForRequest(): ?array
+    {
+        if (!$this->sendContext || empty($this->context)) {
+            return null;
+        }
+        // Nach dem Senden: Checkbox deaktivieren
+        $this->sendContext = false;
+        return $this->context;
     }
 
     #[On('playground:open')]

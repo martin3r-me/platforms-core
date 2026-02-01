@@ -224,15 +224,17 @@
                                         <span>Senden</span>
                                     </button>
                                 </form>
-                                {{-- Context-Info unterhalb des Input-Bereichs --}}
-                                <div id="pgContextRow" class="hidden flex items-center gap-2 px-2 py-1.5 text-xs text-[var(--ui-muted)]">
-                                    <label class="flex items-center gap-1.5 cursor-pointer select-none">
-                                        <input type="checkbox" id="pgContextCheckbox" checked class="w-3.5 h-3.5 rounded border-[var(--ui-border)] text-[var(--ui-primary)] focus:ring-[var(--ui-primary)] cursor-pointer" />
-                                        <span>Kontext mitsenden:</span>
-                                    </label>
-                                    <span id="pgContextType" class="opacity-70"></span>
-                                    <span id="pgContextTitle" class="font-medium text-[var(--ui-secondary)] truncate max-w-[300px]"></span>
-                                </div>
+                                {{-- Context-Info unterhalb des Input-Bereichs (Livewire-gesteuert) --}}
+                                @if($this->hasContext)
+                                    <div class="flex items-center gap-2 px-2 py-1.5 text-xs text-[var(--ui-muted)]">
+                                        <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                                            <input type="checkbox" wire:model.live="sendContext" class="w-3.5 h-3.5 rounded border-[var(--ui-border)] text-[var(--ui-primary)] focus:ring-[var(--ui-primary)] cursor-pointer" />
+                                            <span>Kontext mitsenden:</span>
+                                        </label>
+                                        <span class="opacity-70">{{ $this->contextType }}:</span>
+                                        <span class="font-medium text-[var(--ui-secondary)] truncate max-w-[300px]">{{ $this->contextTitle }}</span>
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -669,41 +671,6 @@
           selectedModel = defaultModelId;
         }
         localStorage.setItem('simple.selectedModel', selectedModel);
-
-        // Context row UI: show/hide based on available context and update checkbox state
-        const updateContextRow = () => {
-          console.log('[Playground] updateContextRow called');
-          // Context aus data-Attribut lesen (wird von Livewire aktualisiert)
-          if (typeof window.__simplePlaygroundReadContext === 'function') {
-            window.__simplePlaygroundContext = window.__simplePlaygroundReadContext();
-          }
-          const ctx = window.__simplePlaygroundContext;
-          console.log('[Playground] Context in updateContextRow:', ctx);
-          const row = document.getElementById('pgContextRow');
-          const typeEl = document.getElementById('pgContextType');
-          const titleEl = document.getElementById('pgContextTitle');
-          const checkbox = document.getElementById('pgContextCheckbox');
-
-          if (!row || !ctx || !ctx.title) {
-            console.log('[Playground] Hiding context row - row:', !!row, 'ctx:', !!ctx, 'title:', ctx?.title);
-            if (row) row.classList.add('hidden');
-            return;
-          }
-
-          // Show context row
-          console.log('[Playground] SHOWING context row! Type:', ctx.type, 'Title:', ctx.title);
-          row.classList.remove('hidden');
-          row.style.display = 'flex'; // Force display in case CSS hides it
-
-          // Type comes from context itself (dispatcher provides it)
-          const typeName = ctx.type || ctx.type_label || 'Kontext';
-          typeEl.textContent = typeName + ':';
-          titleEl.textContent = ctx.title || '—';
-
-          // For new/empty threads: checkbox enabled, otherwise disabled
-          const isNewThread = !threadState.messages || threadState.messages.length === 0;
-          checkbox.checked = isNewThread;
-        };
 
         // Auto-grow textarea (adapted from comms modal)
         const autoGrow = (el, maxPx = 132) => {
@@ -1484,7 +1451,6 @@
         refreshMessagesFromServerRender();
         updateThreadBusyIndicators();
         updateFooterBusy();
-        updateContextRow();
         // Setup auto-scroll observer (smart: only scrolls if user is near bottom)
         setupAutoScroll();
         // Setup auto-grow for textarea (adapted from comms modal)
@@ -1502,7 +1468,6 @@
         document.addEventListener('livewire:update', () => {
           refreshThreadIdFromDom();
           refreshMessagesFromServerRender();
-          updateContextRow();
           // After Livewire renders server history, remove temporary messages from pgStreamingSlot.
           // Server history in chatList is the source of truth; pgStreamingSlot is only for streaming.
           try {
@@ -1721,10 +1686,13 @@
           // Fallback to default if no model selected
           const modelToUse = selectedModel || defaultModelId;
 
-          // Check if context should be sent (only when checkbox is checked)
-          const contextCheckbox = document.getElementById('pgContextCheckbox');
-          const shouldSendContext = contextCheckbox?.checked ?? false;
-          const contextToSend = shouldSendContext ? (window.__simplePlaygroundContext || null) : null;
+          // Context vom Livewire-Component holen (inkl. Auto-Deaktivierung)
+          let contextToSend = null;
+          try {
+            contextToSend = await window.Livewire.find(livewireComponentId).call('getContextForRequest');
+          } catch (e) {
+            console.warn('[Playground] Could not get context from Livewire:', e);
+          }
 
           const payload = {
             message: (isContinue ? '' : text),
@@ -1736,11 +1704,6 @@
             max_iterations: getMaxIterations(),
             attachments: attachmentIds.length > 0 ? attachmentIds : null,
           };
-
-          // Auto-deactivate context checkbox after send (context only needed once per thread)
-          if (shouldSendContext && contextCheckbox) {
-            contextCheckbox.checked = false;
-          }
           debugState.payload = payload;
           updateDebugDump();
 
