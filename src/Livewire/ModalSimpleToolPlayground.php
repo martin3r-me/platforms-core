@@ -48,6 +48,7 @@ class ModalSimpleToolPlayground extends Component
     #[On('playground')]
     public function setPlaygroundContext(array $payload = []): void
     {
+        \Log::info('[Playground] setPlaygroundContext', ['payload' => $payload]);
         $this->context = $payload;
         $this->sendContext = true; // Bei neuem Context: Checkbox aktivieren
     }
