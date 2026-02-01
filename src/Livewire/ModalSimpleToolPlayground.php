@@ -22,6 +22,11 @@ class ModalSimpleToolPlayground extends Component
 
     public bool $open = false;
 
+    public function boot(): void
+    {
+        \Log::info('[Playground] Component BOOT', ['component_id' => $this->getId()]);
+    }
+
     /** @var array File uploads for the current message */
     public $pendingFiles = [];
 
@@ -48,9 +53,14 @@ class ModalSimpleToolPlayground extends Component
     #[On('playground')]
     public function setPlaygroundContext(array $payload = []): void
     {
-        \Log::info('[Playground] setPlaygroundContext', ['payload' => $payload]);
-        $this->context = $payload;
-        $this->sendContext = true; // Bei neuem Context: Checkbox aktivieren
+        try {
+            \Log::info('[Playground] setPlaygroundContext CALLED', ['payload' => $payload, 'component_id' => $this->getId()]);
+            $this->context = $payload;
+            $this->sendContext = true; // Bei neuem Context: Checkbox aktivieren
+            \Log::info('[Playground] setPlaygroundContext DONE', ['context' => $this->context]);
+        } catch (\Throwable $e) {
+            \Log::error('[Playground] setPlaygroundContext ERROR', ['error' => $e->getMessage()]);
+        }
     }
 
     #[Computed]
