@@ -22,11 +22,6 @@ class ModalSimpleToolPlayground extends Component
 
     public bool $open = false;
 
-    public function boot(): void
-    {
-        \Log::info('[Playground] Component BOOT', ['component_id' => $this->getId()]);
-    }
-
     /** @var array File uploads for the current message */
     public $pendingFiles = [];
 
@@ -53,14 +48,8 @@ class ModalSimpleToolPlayground extends Component
     #[On('playground')]
     public function setPlaygroundContext(array $payload = []): void
     {
-        try {
-            \Log::info('[Playground] setPlaygroundContext CALLED', ['payload' => $payload, 'component_id' => $this->getId()]);
-            $this->context = $payload;
-            $this->sendContext = true; // Bei neuem Context: Checkbox aktivieren
-            \Log::info('[Playground] setPlaygroundContext DONE', ['context' => $this->context]);
-        } catch (\Throwable $e) {
-            \Log::error('[Playground] setPlaygroundContext ERROR', ['error' => $e->getMessage()]);
-        }
+        $this->context = $payload;
+        $this->sendContext = true; // Bei neuem Context: Checkbox aktivieren
     }
 
     #[Computed]
@@ -95,8 +84,14 @@ class ModalSimpleToolPlayground extends Component
     #[On('playground:open')]
     public function openModal(array $payload = []): void
     {
+        // Context nur setzen wenn im Payload vorhanden, NICHT überschreiben wenn bereits gesetzt
         $ctx = $payload['context'] ?? $payload['terminal_context'] ?? null;
-        $this->context = is_array($ctx) ? $ctx : null;
+        if (is_array($ctx)) {
+            $this->context = $ctx;
+            $this->sendContext = true;
+        }
+        // Wenn kein Context im Payload: bestehenden Context behalten!
+
         $this->open = true;
 
         // Pre-fill pricing edits for the "Model settings" tab.

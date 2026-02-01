@@ -225,11 +225,6 @@
                                     </button>
                                 </form>
                                 {{-- Context-Info unterhalb des Input-Bereichs (Livewire-gesteuert) --}}
-                                {{-- DEBUG --}}
-                                <div class="text-xs p-1 bg-gray-100">
-                                    DEBUG: hasContext={{ $this->hasContext ? 'true' : 'false' }},
-                                    context={{ json_encode($context) }}
-                                </div>
                                 @if($this->hasContext)
                                     <div class="flex items-center gap-2 px-2 py-1.5 text-xs text-[var(--ui-muted)]">
                                         <label class="flex items-center gap-1.5 cursor-pointer select-none">
