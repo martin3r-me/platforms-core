@@ -533,7 +533,40 @@ class SimpleToolController extends Controller
                         . "Wenn es um Teams in der Plattform geht, nutze core.teams.GET.\n"
                         . "Wenn Kontext nötig ist, rufe core.context.GET auf.\n",
                 ];
-                
+
+                // Füge Client-Kontext als System-Message hinzu (z.B. aktueller Task/Ticket)
+                if (!empty($clientContext['title'])) {
+                    $contextParts = [];
+                    $contextType = $clientContext['type'] ?? 'Element';
+                    $contextParts[] = "Der User befindet sich aktuell auf: {$contextType}";
+                    $contextParts[] = "Titel: {$clientContext['title']}";
+
+                    if (!empty($clientContext['description'])) {
+                        $contextParts[] = "Beschreibung: {$clientContext['description']}";
+                    }
+
+                    if (!empty($clientContext['meta']) && is_array($clientContext['meta'])) {
+                        $metaParts = [];
+                        foreach ($clientContext['meta'] as $key => $value) {
+                            if ($value !== null && $value !== '') {
+                                $metaParts[] = "{$key}: " . (is_bool($value) ? ($value ? 'Ja' : 'Nein') : $value);
+                            }
+                        }
+                        if (!empty($metaParts)) {
+                            $contextParts[] = "Details: " . implode(', ', $metaParts);
+                        }
+                    }
+
+                    if (!empty($clientContext['modelId'])) {
+                        $contextParts[] = "ID: {$clientContext['modelId']}";
+                    }
+
+                    $messages[] = [
+                        'role' => 'system',
+                        'content' => "[Aktueller Kontext]\n" . implode("\n", $contextParts),
+                    ];
+                }
+
                 // Füge Chat-Historie hinzu (falls vorhanden)
                 if (!empty($chatHistory) && is_array($chatHistory)) {
                     foreach ($chatHistory as $msg) {
