@@ -4,6 +4,7 @@ namespace Platform\Core\Livewire;
 
 use Livewire\Attributes\On;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Renderless;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Platform\Core\Models\CoreAiModel;
@@ -71,6 +72,7 @@ class ModalSimpleToolPlayground extends Component
     }
 
     /** Context für API-Request (nur wenn Checkbox aktiv) */
+    #[Renderless]
     public function getContextForRequest(): ?array
     {
         if (!$this->sendContext || empty($this->context)) {

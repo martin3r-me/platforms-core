@@ -1624,7 +1624,8 @@
               userMessage.attachments = attachmentIds;
             }
             threadState.messages.push(userMessage);
-            // User message is rendered by Livewire (not JS) - just track for abort
+            // Render user message immediately in the UI
+            renderMessage('user', text);
             try {
               threadState._lastSentUserContent = text;
               threadState._lastSentUserIndex = (threadState.messages?.length || 1) - 1;
