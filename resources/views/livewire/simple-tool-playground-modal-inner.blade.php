@@ -89,7 +89,9 @@
                     {{-- Left: Chat (3/4 width) --}}
                     <div class="col-span-3 min-h-0 min-w-0 flex flex-col overflow-hidden">
                         <div class="flex-1 min-h-0 bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
-                            <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="simpleChatScroll">
+                            <div class="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col-reverse" id="simpleChatScroll">
+                                {{-- Single wrapper for column-reverse auto-scroll trick --}}
+                                <div class="space-y-4">
                                 @php
                                     $msgs = collect($activeThreadMessages ?? [])
                                         ->filter(fn($m) => in_array($m->role, ['user', 'assistant'], true))
@@ -159,6 +161,7 @@
                                     </div>
                                 </div>
 
+                                </div>{{-- end wrapper for column-reverse --}}
                             </div>
                             <div class="border-t border-[var(--ui-border)]/60 p-3 flex-shrink-0 bg-[var(--ui-surface)]">
                                 {{-- Uploaded attachments preview --}}
