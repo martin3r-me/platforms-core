@@ -672,6 +672,10 @@
 
         // Context row UI: show/hide based on available context and update checkbox state
         const updateContextRow = () => {
+          // Context aus data-Attribut lesen (wird von Livewire aktualisiert)
+          if (typeof window.__simplePlaygroundReadContext === 'function') {
+            window.__simplePlaygroundContext = window.__simplePlaygroundReadContext();
+          }
           const ctx = window.__simplePlaygroundContext;
           const row = document.getElementById('pgContextRow');
           const typeEl = document.getElementById('pgContextType');
@@ -695,12 +699,6 @@
           const isNewThread = !threadState.messages || threadState.messages.length === 0;
           checkbox.checked = isNewThread;
         };
-
-        // Listen for context updates from outside
-        window.addEventListener('playground-context-updated', (e) => {
-          window.__simplePlaygroundContext = e.detail?.context || e.detail;
-          updateContextRow();
-        });
 
         // Auto-grow textarea (adapted from comms modal)
         const autoGrow = (el, maxPx = 132) => {

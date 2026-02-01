@@ -44,21 +44,26 @@
             $simpleModelsUrl = route('core.tools.simple.models');
         @endphp
 
+        {{-- Context als data-Attribut für JS-Zugriff (wird von Livewire aktualisiert) --}}
+        <div id="pgPlaygroundContextData" class="hidden" data-context="{{ json_encode($context) }}"></div>
+
         <script>
-            // URLs + Context für das Modal-Playground (keine Blade-Parsing-Probleme im @verbatim Block unten).
+            // URLs für das Modal-Playground
             window.__simpleStreamUrl = @json($simpleStreamUrl);
             window.__simpleModelsUrl = @json($simpleModelsUrl);
-            window.__simplePlaygroundContext = @json($context);
 
-            // Playground-Context via Livewire-Event aktualisieren (z.B. wenn Task-Seite den Context setzt)
-            // Livewire 3: dispatch() feuert Livewire-Events, die über Livewire.on() gehört werden
-            document.addEventListener('livewire:init', () => {
-                Livewire.on('playground-context-updated', (data) => {
-                    window.__simplePlaygroundContext = data.context || data[0]?.context || data;
-                    // Trigger browser event für inner modal listener
-                    window.dispatchEvent(new CustomEvent('playground-context-updated', { detail: { context: window.__simplePlaygroundContext } }));
-                });
-            });
+            // Context wird aus data-Attribut gelesen (Livewire aktualisiert es bei Re-Render)
+            window.__simplePlaygroundReadContext = () => {
+                const el = document.getElementById('pgPlaygroundContextData');
+                if (!el) return null;
+                try {
+                    return JSON.parse(el.dataset.context || 'null');
+                } catch (e) {
+                    return null;
+                }
+            };
+            // Initial setzen
+            window.__simplePlaygroundContext = window.__simplePlaygroundReadContext();
         </script>
 
         {{-- x-ui-modal (non-full) has a padded, scrollable body already.

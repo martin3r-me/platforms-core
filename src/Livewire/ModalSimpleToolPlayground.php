@@ -42,6 +42,13 @@ class ModalSimpleToolPlayground extends Component
     public ?int $activeThreadId = null;
     public ?int $chatId = null;
 
+    #[On('playground')]
+    public function setPlaygroundContext(array $payload = []): void
+    {
+        $this->context = $payload;
+        // Kein JS-Event nötig - Livewire re-rendert und $context ist in der View verfügbar
+    }
+
     #[On('playground:open')]
     public function openModal(array $payload = []): void
     {
