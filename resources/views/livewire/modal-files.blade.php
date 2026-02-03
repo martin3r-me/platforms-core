@@ -192,10 +192,18 @@
                                     @endforeach
                                 </div>
 
-                                <div class="flex justify-end mt-4">
-                                    <x-ui-button variant="primary" wire:click="assignToReference">
-                                        @svg('heroicon-o-check', 'w-4 h-4 mr-1')
-                                        Zuweisen
+                                {{-- Footer mit Speichern-Button --}}
+                                <div class="flex justify-end gap-2 mt-4 pt-4 border-t border-[var(--ui-border)]">
+                                    <x-ui-button variant="secondary-outline" size="sm" wire:click="cancelSelection">
+                                        Abbrechen
+                                    </x-ui-button>
+                                    <x-ui-button
+                                        variant="primary"
+                                        size="sm"
+                                        wire:click="confirmSelection"
+                                        :disabled="!$selectedVariantId && !$selectedFileForVariant"
+                                    >
+                                        Speichern
                                     </x-ui-button>
                                 </div>
                             </div>
@@ -271,10 +279,18 @@
                                     @endforeach
                                 </div>
 
-                                <div class="flex justify-end mt-4">
-                                    <x-ui-button variant="primary" wire:click="createReference">
-                                        @svg('heroicon-o-plus', 'w-4 h-4 mr-1')
-                                        Hinzufügen
+                                {{-- Footer mit Speichern-Button --}}
+                                <div class="flex justify-end gap-2 mt-4 pt-4 border-t border-[var(--ui-border)]">
+                                    <x-ui-button variant="secondary-outline" size="sm" wire:click="cancelSelection">
+                                        Abbrechen
+                                    </x-ui-button>
+                                    <x-ui-button
+                                        variant="primary"
+                                        size="sm"
+                                        wire:click="confirmSelection"
+                                        :disabled="!$selectedVariantId && !$selectedFileForVariant"
+                                    >
+                                        Speichern
                                     </x-ui-button>
                                 </div>
                             </div>

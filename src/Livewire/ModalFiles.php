@@ -124,6 +124,19 @@ class ModalFiles extends Component
 
     public function confirmSelection(): void
     {
+        // Handle assign mode (existierende Referenz aktualisieren)
+        if ($this->mode === 'assign') {
+            $this->assignToReference();
+            return;
+        }
+
+        // Handle picker mode with referenceType (neue Referenz erstellen)
+        if ($this->referenceType) {
+            $this->createReference();
+            return;
+        }
+
+        // Handle picker mode without referenceType (einfache Datei-Auswahl)
         $files = ContextFile::whereIn('id', $this->selectedFiles)
             ->with('variants')
             ->get();
@@ -142,6 +155,15 @@ class ModalFiles extends Component
         ]);
 
         $this->close();
+    }
+
+    /**
+     * Auswahl abbrechen und zurück zur Datei-Übersicht
+     */
+    public function cancelSelection(): void
+    {
+        $this->selectedFileForVariant = null;
+        $this->selectedVariantId = null;
     }
 
     /**
