@@ -104,6 +104,18 @@ class ModalFiles extends Component
 
     public function close(): void
     {
+        // Event für Refresh dispatchen wenn wir im assign/picker mode waren
+        if ($this->mode === 'assign' && $this->assignReferenceId) {
+            $this->dispatch('files:reference-updated', [
+                'reference_id' => $this->assignReferenceId,
+            ]);
+        } elseif ($this->referenceType && $this->referenceId) {
+            $this->dispatch('files:reference-created', [
+                'reference_type' => $this->referenceType,
+                'reference_id' => $this->referenceId,
+            ]);
+        }
+
         $this->resetValidation();
         $this->open = false;
         $this->reset('contextType', 'contextId', 'files', 'uploadedFiles', 'keepOriginal', 'generateVariants', 'mode', 'activeTab', 'multiple', 'selectedFiles', 'callback', 'referenceType', 'referenceId', 'selectedFileForVariant', 'selectedVariantId', 'assignReferenceId');

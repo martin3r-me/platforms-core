@@ -191,21 +191,6 @@
                                         </div>
                                     @endforeach
                                 </div>
-
-                                {{-- Footer mit Speichern-Button --}}
-                                <div class="flex justify-end gap-2 mt-4 pt-4 border-t border-[var(--ui-border)]">
-                                    <x-ui-button variant="secondary-outline" size="sm" wire:click="cancelSelection">
-                                        Abbrechen
-                                    </x-ui-button>
-                                    <x-ui-button
-                                        variant="primary"
-                                        size="sm"
-                                        wire:click="confirmSelection"
-                                        :disabled="!$selectedVariantId && !$selectedFileForVariant"
-                                    >
-                                        Speichern
-                                    </x-ui-button>
-                                </div>
                             </div>
                         @endif
                     @elseif(count($uploadedFiles) > 0)
@@ -277,21 +262,6 @@
                                             <p class="text-xs text-center text-[var(--ui-muted)]">{{ $variant['width'] }}×{{ $variant['height'] }}</p>
                                         </div>
                                     @endforeach
-                                </div>
-
-                                {{-- Footer mit Speichern-Button --}}
-                                <div class="flex justify-end gap-2 mt-4 pt-4 border-t border-[var(--ui-border)]">
-                                    <x-ui-button variant="secondary-outline" size="sm" wire:click="cancelSelection">
-                                        Abbrechen
-                                    </x-ui-button>
-                                    <x-ui-button
-                                        variant="primary"
-                                        size="sm"
-                                        wire:click="confirmSelection"
-                                        :disabled="!$selectedVariantId && !$selectedFileForVariant"
-                                    >
-                                        Speichern
-                                    </x-ui-button>
                                 </div>
                             </div>
                         @endif
@@ -535,30 +505,45 @@
 
     <x-slot name="footer">
         <div class="flex justify-between items-center w-full">
-            @if($mode === 'assign')
+            @if($selectedFileForVariant)
+                <span class="text-sm text-[var(--ui-muted)]">
+                    Variante auswählen und speichern
+                </span>
+            @elseif($mode === 'assign')
                 <span class="text-sm text-[var(--ui-muted)]">
                     Bild anklicken um es zuzuweisen
-                </span>
-            @elseif($mode === 'picker' && !$referenceType && count($selectedFiles) > 0)
-                <span class="text-sm text-[var(--ui-muted)]">
-                    {{ count($selectedFiles) }} Datei(en) ausgewählt
                 </span>
             @elseif($mode === 'picker' && $referenceType)
                 <span class="text-sm text-[var(--ui-muted)]">
                     Bild anklicken um Variante zu wählen
                 </span>
+            @elseif($mode === 'picker' && count($selectedFiles) > 0)
+                <span class="text-sm text-[var(--ui-muted)]">
+                    {{ count($selectedFiles) }} Datei(en) ausgewählt
+                </span>
             @else
                 <span></span>
             @endif
+
             <div class="flex gap-3">
-                <x-ui-button variant="secondary" wire:click="close">
-                    {{ $mode === 'assign' ? 'Abbrechen' : ($mode === 'picker' ? ($referenceType ? 'Schließen' : 'Abbrechen') : 'Schließen') }}
-                </x-ui-button>
-                @if($mode === 'picker' && !$referenceType)
-                    <x-ui-button variant="primary" wire:click="confirmSelection" :disabled="empty($selectedFiles)">
-                        @svg('heroicon-o-check', 'w-4 h-4 mr-1')
-                        {{ count($selectedFiles) }} Datei(en) übernehmen
+                @if($selectedFileForVariant)
+                    {{-- Varianten-Auswahl aktiv: Abbrechen + Speichern --}}
+                    <x-ui-button variant="secondary" wire:click="cancelSelection">
+                        Abbrechen
                     </x-ui-button>
+                    <x-ui-button variant="primary" wire:click="confirmSelection">
+                        Speichern
+                    </x-ui-button>
+                @else
+                    {{-- Standard: Schließen + ggf. Übernehmen --}}
+                    <x-ui-button variant="secondary" wire:click="close">
+                        {{ $mode === 'assign' ? 'Abbrechen' : 'Schließen' }}
+                    </x-ui-button>
+                    @if($mode === 'picker' && !$referenceType && count($selectedFiles) > 0)
+                        <x-ui-button variant="primary" wire:click="confirmSelection" :disabled="empty($selectedFiles)">
+                            {{ count($selectedFiles) }} Datei(en) übernehmen
+                        </x-ui-button>
+                    @endif
                 @endif
             </div>
         </div>
