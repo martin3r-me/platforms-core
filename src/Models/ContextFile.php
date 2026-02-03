@@ -50,6 +50,14 @@ class ContextFile extends Model
         return $this->hasMany(ContextFileVariant::class);
     }
 
+    /**
+     * Referenzen zu diesem File (wo wird es verwendet?)
+     */
+    public function references(): HasMany
+    {
+        return $this->hasMany(ContextFileReference::class);
+    }
+
     public function getUrlAttribute(): string
     {
         try {

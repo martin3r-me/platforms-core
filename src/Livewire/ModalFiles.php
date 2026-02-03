@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Platform\Core\Models\ContextFile;
+use Platform\Core\Models\ContextFileReference;
 use Platform\Core\Services\ContextFileService;
 
 class ModalFiles extends Component
@@ -22,6 +24,22 @@ class ModalFiles extends Component
     public bool $generateVariants = true; // Varianten generieren (Standard: true)
 
     public $uploadedFiles = [];
+
+    // Picker Mode Properties
+    public string $mode = 'upload';        // 'upload' | 'picker'
+    public string $activeTab = 'upload';   // 'upload' | 'browse'
+    public bool $multiple = true;
+    public array $selectedFiles = [];
+    public ?string $callback = null;
+
+    // Reference Mode Properties (Modal erstellt Referenz selbst)
+    public ?string $referenceType = null;    // z.B. LocationGalleryBoard::class
+    public ?int $referenceId = null;         // z.B. board_id
+    public ?int $selectedFileForVariant = null;
+    public ?int $selectedVariantId = null;
+
+    // Assign Mode Properties (existierende Referenz aktualisieren)
+    public ?int $assignReferenceId = null;   // ID der zu befüllenden Referenz
 
     public function mount(): void
     {
@@ -42,6 +60,44 @@ class ModalFiles extends Component
             return;
         }
 
+        $this->mode = 'upload';
+        $this->activeTab = 'upload';
+        $this->loadFiles();
+        $this->open = true;
+    }
+
+    #[On('files:picker')]
+    public function openPicker(array $payload = []): void
+    {
+        if (!Auth::check() || !Auth::user()->currentTeamRelation) {
+            return;
+        }
+
+        $this->mode = 'picker';
+        $this->referenceType = $payload['reference_type'] ?? null;
+        $this->referenceId = isset($payload['reference_id']) ? (int) $payload['reference_id'] : null;
+        $this->multiple = $payload['multiple'] ?? true;
+        $this->callback = $payload['callback'] ?? null;
+        $this->selectedFiles = [];
+        $this->selectedFileForVariant = null;
+        $this->selectedVariantId = null;
+        $this->activeTab = 'browse';  // Im Picker standardmaessig "Durchsuchen"
+        $this->loadFiles();
+        $this->open = true;
+    }
+
+    #[On('files:assign')]
+    public function openAssignMode(array $payload = []): void
+    {
+        if (!Auth::check() || !Auth::user()->currentTeamRelation) {
+            return;
+        }
+
+        $this->mode = 'assign';
+        $this->assignReferenceId = $payload['reference_id'] ?? null;
+        $this->selectedFileForVariant = null;
+        $this->selectedVariantId = null;
+        $this->activeTab = 'browse';
         $this->loadFiles();
         $this->open = true;
     }
@@ -50,7 +106,162 @@ class ModalFiles extends Component
     {
         $this->resetValidation();
         $this->open = false;
-        $this->reset('contextType', 'contextId', 'files', 'uploadedFiles', 'keepOriginal', 'generateVariants');
+        $this->reset('contextType', 'contextId', 'files', 'uploadedFiles', 'keepOriginal', 'generateVariants', 'mode', 'activeTab', 'multiple', 'selectedFiles', 'callback', 'referenceType', 'referenceId', 'selectedFileForVariant', 'selectedVariantId', 'assignReferenceId');
+    }
+
+    public function toggleFileSelection(int $fileId): void
+    {
+        if (in_array($fileId, $this->selectedFiles)) {
+            $this->selectedFiles = array_values(array_diff($this->selectedFiles, [$fileId]));
+        } else {
+            if ($this->multiple) {
+                $this->selectedFiles[] = $fileId;
+            } else {
+                $this->selectedFiles = [$fileId];
+            }
+        }
+    }
+
+    public function confirmSelection(): void
+    {
+        $files = ContextFile::whereIn('id', $this->selectedFiles)
+            ->with('variants')
+            ->get();
+
+        $this->dispatch('files:selected', [
+            'files' => $files->map(fn($f) => [
+                'id' => $f->id,
+                'token' => $f->token,
+                'original_name' => $f->original_name,
+                'url' => $f->url,
+                'thumbnail' => $f->variants()->where('variant_type', 'thumbnail_4_3')->first()?->url
+                    ?? $f->variants()->where('variant_type', 'like', 'thumbnail_%')->first()?->url
+                    ?? $f->url,
+            ])->toArray(),
+            'callback' => $this->callback,
+        ]);
+
+        $this->close();
+    }
+
+    /**
+     * Bild für Varianten-Auswahl selektieren
+     */
+    public function selectFileForVariant(int $fileId): void
+    {
+        $this->selectedFileForVariant = $fileId;
+        $this->selectedVariantId = null;
+    }
+
+    /**
+     * Variante wählen (null = Original)
+     */
+    public function selectVariant(?int $variantId): void
+    {
+        $this->selectedVariantId = $variantId;
+    }
+
+    /**
+     * Varianten-Auswahl abbrechen
+     */
+    public function cancelVariantSelection(): void
+    {
+        $this->selectedFileForVariant = null;
+        $this->selectedVariantId = null;
+    }
+
+    /**
+     * Referenz DIREKT im Modal erstellen
+     */
+    public function createReference(): void
+    {
+        if (!$this->referenceType || !$this->referenceId || !$this->selectedFileForVariant) {
+            return;
+        }
+
+        $file = ContextFile::find($this->selectedFileForVariant);
+        if (!$file) {
+            return;
+        }
+
+        // Prüfen ob bereits existiert (File + Variante Kombination)
+        $exists = ContextFileReference::where('context_file_id', $file->id)
+            ->where('context_file_variant_id', $this->selectedVariantId)
+            ->where('reference_type', $this->referenceType)
+            ->where('reference_id', $this->referenceId)
+            ->exists();
+
+        if (!$exists) {
+            ContextFileReference::create([
+                'context_file_id' => $file->id,
+                'context_file_variant_id' => $this->selectedVariantId,
+                'reference_type' => $this->referenceType,
+                'reference_id' => $this->referenceId,
+                'meta' => ['title' => $file->original_name],
+            ]);
+        }
+
+        // Event: Komponente soll neu laden
+        $this->dispatch('files:reference-created', [
+            'reference_type' => $this->referenceType,
+            'reference_id' => $this->referenceId,
+        ]);
+
+        // Reset für nächste Auswahl (oder schließen wenn single)
+        $this->selectedFileForVariant = null;
+        $this->selectedVariantId = null;
+
+        if (!$this->multiple) {
+            $this->close();
+        }
+    }
+
+    /**
+     * Existierende Referenz aktualisieren (assign mode)
+     */
+    public function assignToReference(): void
+    {
+        if (!$this->assignReferenceId || !$this->selectedFileForVariant) {
+            return;
+        }
+
+        $reference = ContextFileReference::find($this->assignReferenceId);
+        if (!$reference) {
+            return;
+        }
+
+        $file = ContextFile::find($this->selectedFileForVariant);
+        if (!$file) {
+            return;
+        }
+
+        $reference->update([
+            'context_file_id' => $file->id,
+            'context_file_variant_id' => $this->selectedVariantId,
+            'meta' => array_merge($reference->meta ?? [], ['title' => $file->original_name]),
+        ]);
+
+        $this->dispatch('files:reference-updated', [
+            'reference_id' => $this->assignReferenceId,
+        ]);
+
+        $this->close();
+    }
+
+    /**
+     * Referenz löschen (aus dem Modal heraus)
+     */
+    public function deleteReference(int $referenceId): void
+    {
+        ContextFileReference::where('id', $referenceId)
+            ->where('reference_type', $this->referenceType)
+            ->where('reference_id', $this->referenceId)
+            ->delete();
+
+        $this->dispatch('files:reference-deleted', [
+            'reference_type' => $this->referenceType,
+            'reference_id' => $this->referenceId,
+        ]);
     }
 
     public function uploadFiles(): void
@@ -149,6 +360,7 @@ class ModalFiles extends Component
                         ?? null,
                     'variants' => $file->variants->mapWithKeys(function($v) {
                         return [$v->variant_type => [
+                            'id' => $v->id,
                             'type' => $v->variant_type,
                             'url' => $v->url,
                             'width' => $v->width,

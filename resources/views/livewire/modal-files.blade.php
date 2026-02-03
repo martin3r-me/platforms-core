@@ -4,12 +4,24 @@
         <div class="flex items-center gap-3">
             <div class="flex-shrink-0">
                 <div class="w-12 h-12 bg-[var(--ui-primary-5)] flex items-center justify-center">
-                    @svg('heroicon-o-paper-clip', 'w-6 h-6 text-[var(--ui-primary)]')
+                    @if($mode === 'assign')
+                        @svg('heroicon-o-photo', 'w-6 h-6 text-[var(--ui-primary)]')
+                    @else
+                        @svg('heroicon-o-paper-clip', 'w-6 h-6 text-[var(--ui-primary)]')
+                    @endif
                 </div>
             </div>
             <div class="flex-1 min-w-0">
-                <h3 class="text-xl font-bold text-[var(--ui-secondary)]">Dateien</h3>
-                @if($contextType && $contextId && $this->contextBreadcrumb)
+                <h3 class="text-xl font-bold text-[var(--ui-secondary)]">
+                    @if($mode === 'assign')
+                        Bild zuweisen
+                    @else
+                        Dateien
+                    @endif
+                </h3>
+                @if($mode === 'assign')
+                    <p class="text-sm text-[var(--ui-muted)] mt-1">Wählen Sie ein Bild und eine Variante aus</p>
+                @elseif($contextType && $contextId && $this->contextBreadcrumb)
                     <div class="flex items-center gap-2 mt-1 flex-wrap">
                         @foreach($this->contextBreadcrumb as $index => $crumb)
                             <div class="flex items-center gap-2">
@@ -32,13 +44,33 @@
 
     <div>
         @if($contextType && $contextId)
-            <!-- Datei-Upload Bereich -->
-            <div class="space-y-6">
-                <div>
-                    <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">
-                        Dateien hochladen
-                    </h4>
-                    
+            {{-- Tab Navigation --}}
+            <div class="flex border-b border-[var(--ui-border)]/60 mb-4">
+                @if($mode !== 'assign')
+                    <button wire:click="$set('activeTab', 'upload')"
+                        class="px-4 py-2 text-sm font-medium border-b-2 transition-colors {{ $activeTab === 'upload' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}">
+                        @svg('heroicon-o-cloud-arrow-up', 'w-4 h-4 inline mr-1')
+                        Hochladen
+                    </button>
+                @endif
+                <button wire:click="$set('activeTab', 'browse')"
+                    class="px-4 py-2 text-sm font-medium border-b-2 transition-colors {{ $activeTab === 'browse' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}">
+                    @svg('heroicon-o-folder-open', 'w-4 h-4 inline mr-1')
+                    @if($mode === 'assign')
+                        Bild auswählen
+                    @else
+                        Durchsuchen
+                    @endif
+                    @if(count($uploadedFiles) > 0)
+                        <span class="ml-1 px-1.5 py-0.5 text-xs bg-[var(--ui-muted-5)] rounded">{{ count($uploadedFiles) }}</span>
+                    @endif
+                </button>
+            </div>
+
+            {{-- Tab Content --}}
+            @if($activeTab === 'upload' && $mode !== 'assign')
+                {{-- Upload Tab (nicht im assign mode) --}}
+                <div class="space-y-6">
                     <div class="border-2 border-dashed border-[var(--ui-border)]/60 rounded-xl p-8 text-center bg-[var(--ui-muted-5)]/30">
                         <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-primary-5)] flex items-center justify-center">
                             @svg('heroicon-o-cloud-arrow-up', 'w-8 h-8 text-[var(--ui-primary)]')
@@ -66,7 +98,7 @@
                     </div>
 
                     @if(count($files) > 0)
-                        <div class="mt-4 p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                        <div class="p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                             <p class="text-sm font-medium text-[var(--ui-secondary)] mb-3">
                                 {{ count($files) }} Datei(en) ausgewählt
                             </p>
@@ -78,7 +110,7 @@
                                     </div>
                                 @endforeach
                             </div>
-                            
+
                             <!-- Optionen für Bilder -->
                             <div class="space-y-2 mb-4">
                                 <label class="flex items-center gap-2 cursor-pointer">
@@ -118,13 +150,175 @@
                         </div>
                     @endif
                 </div>
+            @elseif($activeTab === 'browse')
+                {{-- Browse Tab --}}
+                @if($mode === 'assign')
+                    {{-- Assign Mode: Varianten-Auswahl für existierende Referenz --}}
+                    @if($selectedFileForVariant)
+                        {{-- Varianten-Auswahl-Panel --}}
+                        @php
+                            $file = collect($uploadedFiles)->firstWhere('id', $selectedFileForVariant);
+                        @endphp
+                        @if($file)
+                            <div class="p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h4 class="text-sm font-semibold text-[var(--ui-secondary)]">Variante wählen</h4>
+                                    <button wire:click="cancelVariantSelection" class="text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]">
+                                        @svg('heroicon-o-x-mark', 'w-5 h-5')
+                                    </button>
+                                </div>
 
-                <!-- Hochgeladene Dateien -->
-                <div>
-                    <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">
-                        Hochgeladene Dateien
-                    </h4>
-                    
+                                <div class="grid grid-cols-4 gap-3">
+                                    {{-- Original --}}
+                                    <div wire:click="selectVariant(null)"
+                                         class="cursor-pointer rounded-lg border-2 p-2 transition-all
+                                                {{ $selectedVariantId === null ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/40' }}">
+                                        <img src="{{ $file['url'] }}" alt="Original" class="w-full aspect-square object-cover rounded" />
+                                        <p class="text-xs text-center mt-2 font-medium text-[var(--ui-secondary)]">Original</p>
+                                        @if($file['width'] && $file['height'])
+                                            <p class="text-xs text-center text-[var(--ui-muted)]">{{ $file['width'] }}x{{ $file['height'] }}</p>
+                                        @endif
+                                    </div>
+
+                                    {{-- Varianten --}}
+                                    @foreach($file['variants'] ?? [] as $key => $variant)
+                                        <div wire:click="selectVariant({{ $variant['id'] ?? 'null' }})"
+                                             class="cursor-pointer rounded-lg border-2 p-2 transition-all
+                                                    {{ $selectedVariantId === ($variant['id'] ?? null) ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/40' }}">
+                                            <img src="{{ $variant['url'] }}" alt="{{ $variant['type'] ?? $key }}" class="w-full aspect-square object-cover rounded" />
+                                            <p class="text-xs text-center mt-2 font-medium text-[var(--ui-secondary)]">{{ $variant['type'] ?? $key }}</p>
+                                            <p class="text-xs text-center text-[var(--ui-muted)]">{{ $variant['width'] }}x{{ $variant['height'] }}</p>
+                                        </div>
+                                    @endforeach
+                                </div>
+
+                                <div class="flex justify-end mt-4">
+                                    <x-ui-button variant="primary" wire:click="assignToReference">
+                                        @svg('heroicon-o-check', 'w-4 h-4 mr-1')
+                                        Zuweisen
+                                    </x-ui-button>
+                                </div>
+                            </div>
+                        @endif
+                    @elseif(count($uploadedFiles) > 0)
+                        {{-- Datei-Grid (klick öffnet Varianten-Auswahl) --}}
+                        <div class="grid grid-cols-4 gap-3">
+                            @foreach($uploadedFiles as $file)
+                                <div wire:click="selectFileForVariant({{ $file['id'] }})"
+                                     class="cursor-pointer rounded-lg border overflow-hidden relative group transition-all border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60">
+                                    @if($file['is_image'] && $file['thumbnail'])
+                                        <img src="{{ $file['thumbnail'] }}" alt="{{ $file['original_name'] }}" class="w-full aspect-square object-cover" />
+                                    @elseif($file['is_image'])
+                                        <img src="{{ $file['url'] }}" alt="{{ $file['original_name'] }}" class="w-full aspect-square object-cover" />
+                                    @else
+                                        <div class="w-full aspect-square bg-[var(--ui-muted-5)] flex items-center justify-center">
+                                            @svg('heroicon-o-document', 'w-12 h-12 text-[var(--ui-muted)]')
+                                        </div>
+                                    @endif
+                                    <div class="absolute top-2 right-2 w-5 h-5 border-2 border-white/80 rounded-full opacity-0 group-hover:opacity-100 transition-opacity bg-black/20"></div>
+                                    <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                                        <p class="text-xs text-white truncate">{{ $file['original_name'] }}</p>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="p-8 text-center text-[var(--ui-muted)] bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                            <div class="flex flex-col items-center gap-3">
+                                @svg('heroicon-o-photo', 'w-12 h-12 text-[var(--ui-muted)]/50')
+                                <p>Noch keine Dateien vorhanden</p>
+                                <p class="text-sm">Laden Sie zuerst Dateien hoch, um sie zuweisen zu können</p>
+                            </div>
+                        </div>
+                    @endif
+                @elseif($mode === 'picker')
+                    {{-- Picker Mode mit Varianten-Auswahl (wenn referenceType gesetzt) --}}
+                    @if($referenceType && $selectedFileForVariant)
+                        {{-- Varianten-Auswahl-Panel --}}
+                        @php
+                            $file = collect($uploadedFiles)->firstWhere('id', $selectedFileForVariant);
+                        @endphp
+                        @if($file)
+                            <div class="p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h4 class="text-sm font-semibold text-[var(--ui-secondary)]">Variante wählen</h4>
+                                    <button wire:click="cancelVariantSelection" class="text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]">
+                                        @svg('heroicon-o-x-mark', 'w-5 h-5')
+                                    </button>
+                                </div>
+
+                                <div class="grid grid-cols-4 gap-3">
+                                    {{-- Original --}}
+                                    <div wire:click="selectVariant(null)"
+                                         class="cursor-pointer rounded-lg border-2 p-2 transition-all
+                                                {{ $selectedVariantId === null ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/40' }}">
+                                        <img src="{{ $file['url'] }}" alt="Original" class="w-full aspect-square object-cover rounded" />
+                                        <p class="text-xs text-center mt-2 font-medium text-[var(--ui-secondary)]">Original</p>
+                                        @if($file['width'] && $file['height'])
+                                            <p class="text-xs text-center text-[var(--ui-muted)]">{{ $file['width'] }}×{{ $file['height'] }}</p>
+                                        @endif
+                                    </div>
+
+                                    {{-- Varianten --}}
+                                    @foreach($file['variants'] ?? [] as $key => $variant)
+                                        <div wire:click="selectVariant({{ $variant['id'] ?? 'null' }})"
+                                             class="cursor-pointer rounded-lg border-2 p-2 transition-all
+                                                    {{ $selectedVariantId === ($variant['id'] ?? null) ? 'border-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/40' }}">
+                                            <img src="{{ $variant['url'] }}" alt="{{ $variant['type'] ?? $key }}" class="w-full aspect-square object-cover rounded" />
+                                            <p class="text-xs text-center mt-2 font-medium text-[var(--ui-secondary)]">{{ $variant['type'] ?? $key }}</p>
+                                            <p class="text-xs text-center text-[var(--ui-muted)]">{{ $variant['width'] }}×{{ $variant['height'] }}</p>
+                                        </div>
+                                    @endforeach
+                                </div>
+
+                                <div class="flex justify-end mt-4">
+                                    <x-ui-button variant="primary" wire:click="createReference">
+                                        @svg('heroicon-o-plus', 'w-4 h-4 mr-1')
+                                        Hinzufügen
+                                    </x-ui-button>
+                                </div>
+                            </div>
+                        @endif
+                    @elseif(count($uploadedFiles) > 0)
+                        {{-- Datei-Grid (klick öffnet Varianten-Auswahl wenn referenceType) --}}
+                        <div class="grid grid-cols-4 gap-3">
+                            @foreach($uploadedFiles as $file)
+                                <div wire:click="{{ $referenceType ? 'selectFileForVariant(' . $file['id'] . ')' : 'toggleFileSelection(' . $file['id'] . ')' }}"
+                                     class="cursor-pointer rounded-lg border overflow-hidden relative group transition-all
+                                            {{ in_array($file['id'], $selectedFiles) ? 'ring-2 ring-[var(--ui-primary)] border-[var(--ui-primary)]' : 'border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60' }}">
+                                    @if($file['is_image'] && $file['thumbnail'])
+                                        <img src="{{ $file['thumbnail'] }}" alt="{{ $file['original_name'] }}" class="w-full aspect-square object-cover" />
+                                    @elseif($file['is_image'])
+                                        <img src="{{ $file['url'] }}" alt="{{ $file['original_name'] }}" class="w-full aspect-square object-cover" />
+                                    @else
+                                        <div class="w-full aspect-square bg-[var(--ui-muted-5)] flex items-center justify-center">
+                                            @svg('heroicon-o-document', 'w-12 h-12 text-[var(--ui-muted)]')
+                                        </div>
+                                    @endif
+                                    @if(in_array($file['id'], $selectedFiles))
+                                        <div class="absolute top-2 right-2 w-5 h-5 bg-[var(--ui-primary)] rounded-full flex items-center justify-center">
+                                            @svg('heroicon-s-check', 'w-3 h-3 text-white')
+                                        </div>
+                                    @else
+                                        <div class="absolute top-2 right-2 w-5 h-5 border-2 border-white/80 rounded-full opacity-0 group-hover:opacity-100 transition-opacity bg-black/20"></div>
+                                    @endif
+                                    <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                                        <p class="text-xs text-white truncate">{{ $file['original_name'] }}</p>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="p-8 text-center text-[var(--ui-muted)] bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                            <div class="flex flex-col items-center gap-3">
+                                @svg('heroicon-o-photo', 'w-12 h-12 text-[var(--ui-muted)]/50')
+                                <p>Noch keine Dateien vorhanden</p>
+                                <p class="text-sm">Wechseln Sie zum Tab "Hochladen" um Dateien hinzuzufügen</p>
+                            </div>
+                        </div>
+                    @endif
+                @else
+                    {{-- Normal Mode: Datei-Liste mit Details --}}
                     <div class="space-y-2">
                         @forelse($uploadedFiles as $file)
                             <div class="p-4 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40 rounded-lg">
@@ -310,8 +504,8 @@
                             </div>
                         @endforelse
                     </div>
-                </div>
-            </div>
+                @endif
+            @endif
         @else
             <div class="text-center py-12">
                 <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-muted-5)] flex items-center justify-center">
@@ -324,10 +518,33 @@
     </div>
 
     <x-slot name="footer">
-        <div class="flex justify-end gap-3">
-            <x-ui-button variant="secondary" wire:click="close">
-                Schließen
-            </x-ui-button>
+        <div class="flex justify-between items-center w-full">
+            @if($mode === 'assign')
+                <span class="text-sm text-[var(--ui-muted)]">
+                    Bild anklicken um es zuzuweisen
+                </span>
+            @elseif($mode === 'picker' && !$referenceType && count($selectedFiles) > 0)
+                <span class="text-sm text-[var(--ui-muted)]">
+                    {{ count($selectedFiles) }} Datei(en) ausgewählt
+                </span>
+            @elseif($mode === 'picker' && $referenceType)
+                <span class="text-sm text-[var(--ui-muted)]">
+                    Bild anklicken um Variante zu wählen
+                </span>
+            @else
+                <span></span>
+            @endif
+            <div class="flex gap-3">
+                <x-ui-button variant="secondary" wire:click="close">
+                    {{ $mode === 'assign' ? 'Abbrechen' : ($mode === 'picker' ? ($referenceType ? 'Schließen' : 'Abbrechen') : 'Schließen') }}
+                </x-ui-button>
+                @if($mode === 'picker' && !$referenceType)
+                    <x-ui-button variant="primary" wire:click="confirmSelection" :disabled="empty($selectedFiles)">
+                        @svg('heroicon-o-check', 'w-4 h-4 mr-1')
+                        {{ count($selectedFiles) }} Datei(en) übernehmen
+                    </x-ui-button>
+                @endif
+            </div>
         </div>
     </x-slot>
 </x-ui-modal>
