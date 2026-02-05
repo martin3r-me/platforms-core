@@ -12,6 +12,7 @@ use Platform\Core\Models\Team;
 use Platform\Core\Models\TeamInvitation;
 use Platform\Core\Models\User;
 use Platform\Core\Models\CoreAiModel;
+use Platform\Core\Models\TeamCoreAiModel;
 use Platform\Core\Enums\TeamRole;
 use Platform\Core\Services\TeamInvitationService;
 use Illuminate\Support\Facades\Gate;
@@ -71,6 +72,11 @@ class ModalTeam extends Component
     public $newInitialMembers = []; // Array von ['user_id' => X, 'role' => 'member']
     public $availableUsersForTeam = [];
 
+    // Team AI Model properties
+    public array $teamModelToggles = [];
+    public $teamAiModels = [];
+    public ?string $teamModelMessage = null;
+
     protected $listeners = ['open-modal-team' => 'openModal'];
 
     public function mount()
@@ -87,6 +93,7 @@ class ModalTeam extends Component
         $this->loadAvailableAiModels();
         $this->loadAvailableAiUsersToAdd();
         $this->loadCanAddUsers();
+        $this->loadTeamAiModels();
     }
 
     public function openModal()
@@ -103,6 +110,7 @@ class ModalTeam extends Component
         $this->loadAvailableAiUsersToAdd();
         $this->loadCanAddUsers();
         $this->loadAvailableUsersForTeam();
+        $this->loadTeamAiModels();
     }
 
     /**
@@ -977,6 +985,127 @@ class ModalTeam extends Component
             'type' => 'success',
             'message' => 'AI-User erfolgreich entfernt.',
         ]);
+    }
+
+    public function loadTeamAiModels(): void
+    {
+        $this->teamModelToggles = [];
+        $this->teamAiModels = [];
+        $this->teamModelMessage = null;
+
+        if (!Schema::hasTable('core_ai_models') || !class_exists(CoreAiModel::class)) {
+            return;
+        }
+
+        try {
+            $this->teamAiModels = CoreAiModel::query()
+                ->with('provider')
+                ->where('is_active', true)
+                ->where('is_deprecated', false)
+                ->orderBy('provider_id')
+                ->orderBy('model_id')
+                ->get();
+        } catch (\Exception $e) {
+            $this->teamAiModels = collect([]);
+            return;
+        }
+
+        $team = $this->team ?? auth()->user()?->currentTeamRelation;
+        if (!$team) {
+            foreach ($this->teamAiModels as $m) {
+                $this->teamModelToggles[(int)$m->id] = true;
+            }
+            return;
+        }
+
+        $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+        $records = TeamCoreAiModel::where('scope_team_id', $rootTeam->id)->get();
+
+        if ($records->isEmpty()) {
+            foreach ($this->teamAiModels as $m) {
+                $this->teamModelToggles[(int)$m->id] = true;
+            }
+        } else {
+            $enabledMap = $records->pluck('is_enabled', 'core_ai_model_id')->all();
+            foreach ($this->teamAiModels as $m) {
+                $this->teamModelToggles[(int)$m->id] = (bool)($enabledMap[(int)$m->id] ?? false);
+            }
+        }
+    }
+
+    public function canManageAiModels(): bool
+    {
+        $user = auth()->user();
+        if (!$user) return false;
+        $team = $user->currentTeam ?? $user->currentTeamRelation;
+        if (!$team) return false;
+        $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+        return $rootTeam->users()
+            ->where('user_id', $user->id)
+            ->wherePivot('role', TeamRole::OWNER->value)
+            ->exists();
+    }
+
+    public function hasTeamModelRecords(): bool
+    {
+        $team = $this->team ?? auth()->user()?->currentTeamRelation;
+        if (!$team) return false;
+        $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+        return TeamCoreAiModel::where('scope_team_id', $rootTeam->id)->exists();
+    }
+
+    public function toggleTeamModel(int $coreAiModelId): void
+    {
+        if (!$this->canManageAiModels()) {
+            return;
+        }
+
+        $user = auth()->user();
+        $team = $this->team ?? $user?->currentTeamRelation;
+        if (!$team) {
+            return;
+        }
+
+        $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+
+        $currentEnabled = $this->teamModelToggles[$coreAiModelId] ?? true;
+        $newEnabled = !$currentEnabled;
+
+        TeamCoreAiModel::updateOrCreate(
+            [
+                'scope_team_id' => $rootTeam->id,
+                'core_ai_model_id' => $coreAiModelId,
+            ],
+            [
+                'is_enabled' => $newEnabled,
+                'created_by_user_id' => $user->id,
+            ]
+        );
+
+        $this->teamModelToggles[$coreAiModelId] = $newEnabled;
+    }
+
+    public function resetTeamModels(): void
+    {
+        if (!$this->canManageAiModels()) {
+            return;
+        }
+
+        $user = auth()->user();
+        $team = $this->team ?? $user?->currentTeamRelation;
+        if (!$team) {
+            return;
+        }
+
+        $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+
+        TeamCoreAiModel::where('scope_team_id', $rootTeam->id)->delete();
+
+        foreach ($this->teamModelToggles as $id => $val) {
+            $this->teamModelToggles[$id] = true;
+        }
+
+        $this->teamModelMessage = 'Team-Filter zurückgesetzt: alle Modelle verfügbar.';
     }
 
     public function render()

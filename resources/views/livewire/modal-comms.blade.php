@@ -50,6 +50,20 @@
             </div>
         </x-slot>
 
+        {{-- DEBUG: Kontext-Anzeige --}}
+        @if($contextModel)
+            <div class="mx-2 mt-2 mb-0 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                <span class="font-semibold">Kontext:</span>
+                {{ class_basename($contextModel) }} #{{ $contextModelId }}
+                @if($contextSubject) &mdash; {{ $contextSubject }} @endif
+                @if($contextSource) <span class="text-blue-500">({{ $contextSource }})</span> @endif
+            </div>
+        @else
+            <div class="mx-2 mt-2 mb-0 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-400 italic">
+                Kein Kontext gesetzt (kein comms-Dispatch empfangen).
+            </div>
+        @endif
+
         {{-- Match Playground body wrapper 1:1 (cancel modal padding) --}}
         <div class="-m-6 w-full h-full min-h-0 min-w-0 overflow-hidden" style="width:100%;">
             <div

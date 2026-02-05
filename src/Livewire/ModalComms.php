@@ -25,6 +25,17 @@ class ModalComms extends Component
 {
     public bool $open = false;
 
+    // --- Kontext (via dispatch('comms', [...]) von Ticket/Task/etc.) ---
+    public ?string $contextModel = null;
+    public ?int $contextModelId = null;
+    public ?string $contextSubject = null;
+    public ?string $contextDescription = null;
+    public ?string $contextUrl = null;
+    public ?string $contextSource = null;
+    public array $contextRecipients = [];
+    public array $contextMeta = [];
+    public array $contextCapabilities = [];
+
     /**
      * Postmark provider connection form (stored at root team level).
      * Secrets remain encrypted in DB via model casts.
@@ -113,6 +124,25 @@ class ModalComms extends Component
     ];
 
     public ?string $emailMessage = null;
+
+    #[On('comms')]
+    public function setCommsContext(array $payload = []): void
+    {
+        $this->contextModel       = $payload['model']       ?? null;
+        $this->contextModelId     = $payload['modelId']      ?? null;
+        $this->contextSubject     = $payload['subject']      ?? null;
+        $this->contextDescription = $payload['description']  ?? null;
+        $this->contextUrl         = $payload['url']          ?? null;
+        $this->contextSource      = $payload['source']       ?? null;
+        $this->contextRecipients  = $payload['recipients']   ?? [];
+        $this->contextMeta        = $payload['meta']         ?? [];
+        $this->contextCapabilities = $payload['capabilities'] ?? [];
+    }
+
+    public function hasContext(): bool
+    {
+        return !empty($this->contextModel) && !empty($this->contextModelId);
+    }
 
     #[On('open-modal-comms')]
     public function openModal(array $payload = []): void
