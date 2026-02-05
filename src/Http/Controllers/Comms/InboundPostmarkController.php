@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Storage;
 use Platform\Core\Models\CommsChannel;
 use Platform\Core\Models\CommsEmailInboundMail;
 use Platform\Core\Models\CommsEmailThread;
+use Platform\Core\Events\CommsInboundReceived;
 use Platform\Comms\Services\CommsActivityService;
 
 class InboundPostmarkController extends Controller
@@ -139,6 +140,9 @@ class InboundPostmarkController extends Controller
                     occurredAt: $mail->received_at ?? now(),
                 );
             }
+
+            // 8) Dispatch inbound event for module listeners (e.g. Helpdesk ticket creation)
+            event(new CommsInboundReceived($channel, $thread, $mail, $thread->wasRecentlyCreated));
 
             return response()->noContent();
         } catch (\Throwable $e) {

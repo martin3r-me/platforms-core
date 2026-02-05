@@ -5,6 +5,7 @@ namespace Platform\Core\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CommsChannel extends Model
 {
@@ -43,6 +44,11 @@ class CommsChannel extends Model
     public function providerConnection(): BelongsTo
     {
         return $this->belongsTo(CommsProviderConnection::class, 'comms_provider_connection_id');
+    }
+
+    public function contexts(): HasMany
+    {
+        return $this->hasMany(CommsChannelContext::class, 'comms_channel_id');
     }
 }
 
