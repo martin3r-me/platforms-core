@@ -42,8 +42,7 @@
             </div>
 
             {{-- Team Settings (nur für Owner) --}}
-            @isset($team)
-            @if(($team->user_id ?? null) === auth()->id())
+            @if(isset($team) && ($team->user_id ?? null) === auth()->id())
             <div>
                 <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Team-Einstellungen</h3>
                 <div class="space-y-4 p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
@@ -73,6 +72,7 @@
             @endif
 
             {{-- Team Members --}}
+            @if(isset($team))
             <div>
                 <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Team-Mitglieder</h3>
                 <div class="space-y-3">
@@ -133,7 +133,7 @@
                     @endforeach
                 </div>
             </div>
-            @endisset
+            @endif
 
             {{-- Invite Member --}}
             @if(isset($team) && !($team->personal_team ?? true))
@@ -201,9 +201,9 @@
                 $watch('showCreateForm', value => {
                     if (!value) {
                         // Formular zurücksetzen wenn geschlossen
-                        @this.set('aiUserForm.name', '');
-                        @this.set('aiUserForm.core_ai_model_id', null);
-                        @this.set('aiUserForm.instruction', '');
+                        $wire.set('aiUserForm.name', '');
+                        $wire.set('aiUserForm.core_ai_model_id', null);
+                        $wire.set('aiUserForm.instruction', '');
                     }
                 });
                 window.addEventListener('ai-user-created', () => {
