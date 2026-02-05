@@ -370,7 +370,22 @@
                             <span class="ml-2 text-[var(--ui-danger)] font-semibold">Read-only (nur Root/Eltern-Team Owner darf speichern).</span>
                         @endif
                     </div>
-                    <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline flex-shrink-0">Reload</button>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        @if($hasTeamModelRecords ?? false)
+                            <span class="text-[10px] px-2 py-1 rounded bg-[var(--ui-warning-10)] text-[var(--ui-warning)]">Team-Filter aktiv</span>
+                            @if($canManageAiModels ?? false)
+                                <button
+                                    type="button"
+                                    class="text-[10px] px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-bg)] hover:bg-[var(--ui-muted-5)] text-[var(--ui-muted)]"
+                                    wire:click="resetTeamModels"
+                                    title="Team-Filter zurücksetzen: alle Modelle wieder verfügbar"
+                                >Reset Team-Filter</button>
+                            @endif
+                        @else
+                            <span class="text-[10px] px-2 py-1 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">Alle Modelle verfügbar</span>
+                        @endif
+                        <button id="modelsReload" type="button" class="text-xs text-[var(--ui-muted)] hover:underline flex-shrink-0">Reload</button>
+                    </div>
                 </div>
 
                 @if(($coreAiModels ?? collect())->count() === 0)
@@ -391,7 +406,10 @@
                                     <th class="text-left py-2 pr-4 font-semibold">Pricing</th>
                                     <th class="text-left py-2 pr-4 font-semibold">Param Support</th>
                                     <th class="text-left py-2 pr-4 font-semibold">Default</th>
-                                    <th class="text-left py-2 pr-0 font-semibold">Status</th>
+                                    <th class="text-left py-2 pr-4 font-semibold">Status</th>
+                                    @if($canManageAiModels ?? false)
+                                        <th class="text-left py-2 pr-0 font-semibold">Team</th>
+                                    @endif
                                 </tr>
                             </thead>
                             <tbody class="text-[var(--ui-secondary)]">
@@ -534,7 +552,7 @@
                                                 {{ $isDefault ? '✅ default' : 'set default' }}
                                             </button>
                                         </td>
-                                        <td class="py-2 pr-0">
+                                        <td class="py-2 pr-4">
                                             @if($m->is_deprecated)
                                                 <span class="text-[10px] px-2 py-1 rounded bg-[var(--ui-danger-5)] text-[var(--ui-danger)]">deprecated</span>
                                             @elseif(!$m->is_active)
@@ -543,6 +561,21 @@
                                                 <span class="text-[10px] px-2 py-1 rounded bg-[var(--ui-primary-10)] text-[var(--ui-primary)]">active</span>
                                             @endif
                                         </td>
+                                        @if($canManageAiModels ?? false)
+                                            <td class="py-2 pr-0">
+                                                @php
+                                                    $teamEnabled = $this->teamModelToggles[(int)$m->id] ?? true;
+                                                @endphp
+                                                <button
+                                                    type="button"
+                                                    class="text-[10px] px-2 py-1 rounded border border-[var(--ui-border)] {{ $teamEnabled ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]' : 'bg-[var(--ui-danger-5)] text-[var(--ui-danger)]' }}"
+                                                    wire:click="toggleTeamModel({{ $m->id }})"
+                                                    title="{{ $teamEnabled ? 'Modell für Team deaktivieren' : 'Modell für Team aktivieren' }}"
+                                                >
+                                                    {{ $teamEnabled ? 'aktiv' : 'gesperrt' }}
+                                                </button>
+                                            </td>
+                                        @endif
                                     </tr>
                                 @endforeach
                             </tbody>

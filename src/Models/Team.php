@@ -237,4 +237,39 @@ class Team extends Model
     {
         return $this->childTeams();
     }
+
+    /**
+     * AI-Modelle, die für dieses Team (als Scope-Team) konfiguriert sind.
+     */
+    public function coreAiModels(): BelongsToMany
+    {
+        return $this->belongsToMany(CoreAiModel::class, 'team_core_ai_models', 'scope_team_id', 'core_ai_model_id')
+            ->withPivot(['is_enabled', 'created_by_user_id'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Gibt die erlaubten AI-Model-IDs für dieses Team zurück.
+     *
+     * Geht intern über getRootTeam(). Wenn keine Records in team_core_ai_models
+     * für das Root-Team existieren, wird null zurückgegeben (= alle Modelle erlaubt).
+     * Ansonsten Array der core_ai_model IDs, die is_enabled=true haben.
+     *
+     * @return array<int>|null
+     */
+    public function getAllowedAiModelIds(): ?array
+    {
+        $rootTeam = $this->getRootTeam();
+
+        $records = TeamCoreAiModel::where('scope_team_id', $rootTeam->id)->get();
+
+        if ($records->isEmpty()) {
+            return null; // keine Einschränkung → alle erlaubt
+        }
+
+        return $records->where('is_enabled', true)
+            ->pluck('core_ai_model_id')
+            ->values()
+            ->all();
+    }
 }

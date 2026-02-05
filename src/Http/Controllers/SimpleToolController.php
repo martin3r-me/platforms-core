@@ -182,6 +182,9 @@ class SimpleToolController extends Controller
         // We default to provider=openai for now; later this can be extended to other providers.
         $providerKey = (string) ($request->query('provider') ?? 'openai');
 
+        // Team-basierte Filterung: nur erlaubte Modelle für das Team des Users
+        $userTeam = $request->user()?->currentTeam;
+
         // Prefer models for the requested provider. If the provider doesn't exist yet, fall back to all active models.
         $models = CoreAiModel::query()
             ->with(['provider', 'provider.defaultModel'])
@@ -192,6 +195,9 @@ class SimpleToolController extends Controller
                     $qq->where('key', $providerKey)->where('is_active', true);
                 });
             })
+            ->when($userTeam, function ($q) use ($userTeam) {
+                $q->allowedForTeam($userTeam);
+            })
             ->orderBy('provider_id')
             ->orderBy('model_id')
             ->get();
@@ -201,6 +207,9 @@ class SimpleToolController extends Controller
                 ->with(['provider', 'provider.defaultModel'])
                 ->where('is_active', true)
                 ->where('is_deprecated', false)
+                ->when($userTeam, function ($q) use ($userTeam) {
+                    $q->allowedForTeam($userTeam);
+                })
                 ->orderBy('provider_id')
                 ->orderBy('model_id')
                 ->get();
@@ -481,6 +490,9 @@ class SimpleToolController extends Controller
                 $provider = CoreAiProvider::where('key', $providerKey)->where('is_active', true)->with('defaultModel')->first();
                 $fallback = $provider?->defaultModel?->model_id ?: 'gpt-5.2';
 
+                // Team-basierte Filterung
+                $userTeam = $request->user()?->currentTeam;
+
                 if ($model === '') {
                     $model = $fallback;
                 } else {
@@ -489,6 +501,7 @@ class SimpleToolController extends Controller
                         ->where('model_id', $model)
                         ->where('is_active', true)
                         ->where('is_deprecated', false)
+                        ->when($userTeam, fn($q) => $q->allowedForTeam($userTeam))
                         ->exists();
                     if (!$ok) {
                         $model = $fallback;

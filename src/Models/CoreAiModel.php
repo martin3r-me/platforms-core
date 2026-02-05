@@ -2,8 +2,10 @@
 
 namespace Platform\Core\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Symfony\Component\Uid\UuidV7;
 
 class CoreAiModel extends Model
@@ -76,6 +78,40 @@ class CoreAiModel extends Model
     public function scopeAvailable($query)
     {
         return $query->where('is_active', true)->where('is_deprecated', false);
+    }
+
+    /**
+     * Teams, die dieses Modell in ihrer Konfiguration haben.
+     */
+    public function teams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class, 'team_core_ai_models', 'core_ai_model_id', 'scope_team_id')
+            ->withPivot(['is_enabled', 'created_by_user_id'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Filtert Models auf die für ein Team erlaubten.
+     *
+     * Wenn für das Root-Team keine Records in team_core_ai_models existieren,
+     * wird der Query unverändert zurückgegeben (= alle erlaubt, rückwärtskompatibel).
+     * Ansonsten werden nur Modelle zurückgegeben, die is_enabled=true haben.
+     */
+    public function scopeAllowedForTeam(Builder $query, Team $team): Builder
+    {
+        $rootTeam = $team->getRootTeam();
+
+        $hasRecords = TeamCoreAiModel::where('scope_team_id', $rootTeam->id)->exists();
+
+        if (!$hasRecords) {
+            return $query; // keine Einschränkung
+        }
+
+        $enabledIds = TeamCoreAiModel::where('scope_team_id', $rootTeam->id)
+            ->where('is_enabled', true)
+            ->pluck('core_ai_model_id');
+
+        return $query->whereIn('core_ai_models.id', $enabledIds);
     }
 
     protected static function booted(): void

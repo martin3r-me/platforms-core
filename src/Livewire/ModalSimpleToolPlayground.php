@@ -9,6 +9,7 @@ use Livewire\Component;
 use Livewire\WithFileUploads;
 use Platform\Core\Models\CoreAiModel;
 use Platform\Core\Models\CoreAiProvider;
+use Platform\Core\Models\TeamCoreAiModel;
 use Platform\Core\Models\CoreChat;
 use Platform\Core\Models\CoreChatThread;
 use Platform\Core\Models\CoreChatMessage;
@@ -42,6 +43,9 @@ class ModalSimpleToolPlayground extends Component
     public array $modelEdits = [];
 
     public ?string $pricingSaveMessage = null;
+
+    /** @var array<int, bool> Team-Model-Toggles: core_ai_model_id => enabled */
+    public array $teamModelToggles = [];
 
     public ?int $activeThreadId = null;
     public ?int $chatId = null;
@@ -124,6 +128,26 @@ class ModalSimpleToolPlayground extends Component
             ];
         }
         $this->pricingSaveMessage = null;
+
+        // Team-Model-Toggles befüllen
+        $this->teamModelToggles = [];
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+        if ($team) {
+            $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+            $records = TeamCoreAiModel::where('scope_team_id', $rootTeam->id)->get();
+            if ($records->isEmpty()) {
+                // Keine Records = alle Modelle aktiv
+                foreach ($models as $m) {
+                    $this->teamModelToggles[(int)$m->id] = true;
+                }
+            } else {
+                $enabledMap = $records->pluck('is_enabled', 'core_ai_model_id')->all();
+                foreach ($models as $m) {
+                    $this->teamModelToggles[(int)$m->id] = (bool)($enabledMap[(int)$m->id] ?? false);
+                }
+            }
+        }
 
         // Load or create chat for this user
         $this->loadOrCreateChat();
@@ -548,6 +572,62 @@ class ModalSimpleToolPlayground extends Component
             ->toArray();
     }
 
+    public function toggleTeamModel(int $coreAiModelId): void
+    {
+        if (!$this->canManageAiModels()) {
+            return;
+        }
+
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+        if (!$team) {
+            return;
+        }
+
+        $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+
+        // Aktuellen Zustand ermitteln
+        $currentEnabled = $this->teamModelToggles[$coreAiModelId] ?? true;
+        $newEnabled = !$currentEnabled;
+
+        TeamCoreAiModel::updateOrCreate(
+            [
+                'scope_team_id' => $rootTeam->id,
+                'core_ai_model_id' => $coreAiModelId,
+            ],
+            [
+                'is_enabled' => $newEnabled,
+                'created_by_user_id' => $user->id,
+            ]
+        );
+
+        $this->teamModelToggles[$coreAiModelId] = $newEnabled;
+    }
+
+    public function resetTeamModels(): void
+    {
+        if (!$this->canManageAiModels()) {
+            return;
+        }
+
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+        if (!$team) {
+            return;
+        }
+
+        $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+
+        TeamCoreAiModel::where('scope_team_id', $rootTeam->id)->delete();
+
+        // Alle Toggles auf true setzen
+        foreach ($this->teamModelToggles as $id => $val) {
+            $this->teamModelToggles[$id] = true;
+        }
+
+        $this->pricingSaveMessage = 'Team-Filter zurückgesetzt: alle Modelle verfügbar.';
+    }
+
     public function render()
     {
         $models = CoreAiModel::query()
@@ -556,8 +636,17 @@ class ModalSimpleToolPlayground extends Component
             ->orderBy('model_id')
             ->get();
 
-        // Prepare model options for select component (only active models)
+        // Team-Filter: modelOptions für den Dropdown filtern (nicht-Owner sehen nur erlaubte)
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+        $allowedIds = $team ? $team->getAllowedAiModelIds() : null;
+        $hasTeamModelRecords = ($allowedIds !== null);
+
+        // Prepare model options for select component (only active models, team-filtered)
         $activeModels = $models->filter(fn($m) => $m->is_active);
+        if ($allowedIds !== null) {
+            $activeModels = $activeModels->filter(fn($m) => in_array((int)$m->id, $allowedIds, true));
+        }
         $modelOptions = $activeModels->mapWithKeys(function ($model) {
             return [$model->model_id => $model->model_id];
         })->toArray();
@@ -581,6 +670,7 @@ class ModalSimpleToolPlayground extends Component
             'defaultModelId' => $defaultModelId,
             'activeThreadMessages' => $this->activeThreadMessages,
             'canManageAiModels' => $this->canManageAiModels(),
+            'hasTeamModelRecords' => $hasTeamModelRecords,
         ]);
     }
 }
