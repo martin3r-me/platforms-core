@@ -123,6 +123,8 @@ class ModalComms extends Component
         'body' => '',
     ];
 
+    public bool $showAllThreads = false;
+
     public ?string $emailMessage = null;
 
     #[On('comms')]
@@ -259,6 +261,12 @@ class ModalComms extends Component
         }
     }
 
+    public function toggleShowAllThreads(): void
+    {
+        $this->showAllThreads = !$this->showAllThreads;
+        $this->loadEmailThreads();
+    }
+
     public function loadEmailThreads(): void
     {
         $this->emailThreads = [];
@@ -268,8 +276,15 @@ class ModalComms extends Component
             return;
         }
 
-        $threads = CommsEmailThread::query()
-            ->where('comms_channel_id', $this->activeEmailChannelId)
+        $query = CommsEmailThread::query()
+            ->where('comms_channel_id', $this->activeEmailChannelId);
+
+        if ($this->hasContext() && !$this->showAllThreads) {
+            $query->where('context_model', $this->contextModel)
+                  ->where('context_model_id', $this->contextModelId);
+        }
+
+        $threads = $query
             ->withCount(['inboundMails', 'outboundMails'])
             ->orderByDesc('updated_at')
             ->limit(50)
@@ -391,9 +406,16 @@ class ModalComms extends Component
     {
         $this->activeEmailThreadId = null;
         $this->emailTimeline = [];
-        $this->emailCompose['subject'] = '';
         $this->emailCompose['body'] = '';
-        // keep "to" as-is
+
+        // Prefill from context if available
+        if ($this->hasContext()) {
+            $this->emailCompose['subject'] = (string) ($this->contextSubject ?? '');
+            $this->emailCompose['to'] = (string) (($this->contextRecipients[0] ?? '') ?: $this->emailCompose['to']);
+        } else {
+            $this->emailCompose['subject'] = '';
+        }
+
         $this->dispatch('comms:scroll-bottom');
     }
 
@@ -496,6 +518,20 @@ class ModalComms extends Component
         if ($wasNewThread) {
             $this->emailCompose['subject'] = '';
             $this->emailCompose['to'] = '';
+        }
+
+        // Link new thread to context if applicable
+        if ($wasNewThread && $this->hasContext() && $token) {
+            $newThread = CommsEmailThread::query()
+                ->where('comms_channel_id', $channel->id)
+                ->where('token', $token)
+                ->first();
+            if ($newThread && !$newThread->context_model) {
+                $newThread->update([
+                    'context_model' => $this->contextModel,
+                    'context_model_id' => $this->contextModelId,
+                ]);
+            }
         }
 
         // Refresh threads & select the thread for the returned token

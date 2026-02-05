@@ -18,6 +18,8 @@ class CommsEmailThread extends Model
         'comms_channel_id',
         'token',
         'subject',
+        'context_model',
+        'context_model_id',
         'last_inbound_from',
         'last_inbound_from_address',
         'last_inbound_at',

@@ -50,20 +50,6 @@
             </div>
         </x-slot>
 
-        {{-- DEBUG: Kontext-Anzeige --}}
-        @if($contextModel)
-            <div class="mx-2 mt-2 mb-0 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-                <span class="font-semibold">Kontext:</span>
-                {{ class_basename($contextModel) }} #{{ $contextModelId }}
-                @if($contextSubject) &mdash; {{ $contextSubject }} @endif
-                @if($contextSource) <span class="text-blue-500">({{ $contextSource }})</span> @endif
-            </div>
-        @else
-            <div class="mx-2 mt-2 mb-0 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-400 italic">
-                Kein Kontext gesetzt (kein comms-Dispatch empfangen).
-            </div>
-        @endif
-
         {{-- Match Playground body wrapper 1:1 (cancel modal padding) --}}
         <div class="-m-6 w-full h-full min-h-0 min-w-0 overflow-hidden" style="width:100%;">
             <div
@@ -209,6 +195,34 @@
                                         </div>
 
                                         <div class="p-4 space-y-3 flex-1 min-h-0 overflow-y-auto min-w-0">
+                                            {{-- Kontext-Karte (nur wenn Kontext gesetzt) --}}
+                                            @if($contextModel)
+                                                <div class="rounded-lg border border-[rgba(var(--ui-primary-rgb),0.2)] bg-[rgba(var(--ui-primary-rgb),0.04)] px-3 py-2 mb-1">
+                                                    <div class="flex items-center gap-1.5">
+                                                        @svg('heroicon-o-link', 'w-3.5 h-3.5 text-[var(--ui-primary)] flex-shrink-0')
+                                                        <span class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">{{ class_basename($contextModel) }} #{{ $contextModelId }}</span>
+                                                    </div>
+                                                    @if($contextSubject)
+                                                        <div class="mt-1 text-[10px] text-[var(--ui-muted)] truncate">{{ $contextSubject }}</div>
+                                                    @endif
+                                                    @if($contextSource)
+                                                        <div class="mt-0.5 text-[10px] text-[var(--ui-primary)]/70">{{ $contextSource }}</div>
+                                                    @endif
+                                                </div>
+
+                                                {{-- Toggle: Alle Threads anzeigen --}}
+                                                <button
+                                                    type="button"
+                                                    wire:click="toggleShowAllThreads"
+                                                    class="w-full text-left text-[10px] px-2 py-1 rounded border transition
+                                                        {{ $showAllThreads
+                                                            ? 'border-[var(--ui-primary)]/30 bg-[rgba(var(--ui-primary-rgb),0.06)] text-[var(--ui-primary)] font-semibold'
+                                                            : 'border-[var(--ui-border)]/60 bg-[var(--ui-bg)] text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}"
+                                                >
+                                                    {{ $showAllThreads ? 'Nur Kontext-Threads' : 'Alle Threads anzeigen' }}
+                                                </button>
+                                            @endif
+
                                             <div class="min-w-0">
                                                 <div class="space-y-2">
                                                     {{-- Email: echte Threads aus Core --}}
