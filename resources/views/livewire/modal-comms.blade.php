@@ -195,7 +195,7 @@
                                         </div>
 
                                         <div class="p-4 space-y-3 flex-1 min-h-0 overflow-y-auto min-w-0">
-                                            {{-- Kontext-Karte (nur wenn Kontext gesetzt) --}}
+                                            {{-- Kontext-Karte --}}
                                             @if($contextModel)
                                                 <div class="rounded-lg border border-[rgba(var(--ui-primary-rgb),0.2)] bg-[rgba(var(--ui-primary-rgb),0.04)] px-3 py-2 mb-1">
                                                     <div class="flex items-center gap-1.5">
@@ -221,6 +221,15 @@
                                                 >
                                                     {{ $showAllThreads ? 'Nur Kontext-Threads' : 'Alle Threads anzeigen' }}
                                                 </button>
+                                            @else
+                                                {{-- Kein Kontext - Hinweis anzeigen --}}
+                                                <div class="rounded-lg border border-dashed border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)] px-3 py-2 mb-1">
+                                                    <div class="flex items-center gap-1.5">
+                                                        @svg('heroicon-o-link-slash', 'w-3.5 h-3.5 text-[var(--ui-muted)] flex-shrink-0')
+                                                        <span class="text-[11px] font-medium text-[var(--ui-muted)]">Kein Kontext</span>
+                                                    </div>
+                                                    <div class="mt-1 text-[10px] text-[var(--ui-muted)]/70">Alle Threads werden angezeigt</div>
+                                                </div>
                                             @endif
 
                                             <div class="min-w-0">
