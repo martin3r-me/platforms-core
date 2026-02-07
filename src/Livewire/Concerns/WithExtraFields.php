@@ -96,7 +96,7 @@ trait WithExtraFields
             // Find or create the value record
             $valueRecord = CoreExtraFieldValue::query()
                 ->where('definition_id', $definitionId)
-                ->where('fieldable_type', get_class($model))
+                ->where('fieldable_type', $model->getMorphClass())
                 ->where('fieldable_id', $model->id)
                 ->first();
 
@@ -109,7 +109,7 @@ trait WithExtraFields
                 if (!$valueRecord) {
                     $valueRecord = new CoreExtraFieldValue([
                         'definition_id' => $definitionId,
-                        'fieldable_type' => get_class($model),
+                        'fieldable_type' => $model->getMorphClass(),
                         'fieldable_id' => $model->id,
                     ]);
                 }
