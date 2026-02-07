@@ -45,13 +45,15 @@
                         <div class="flex items-end gap-4 flex-wrap">
                             <x-ui-input-checkbox
                                 name="newField.is_required"
-                                label="Pflichtfeld"
+                                checkedLabel="Pflichtfeld"
+                                uncheckedLabel="Als Pflichtfeld markieren"
                                 wire:model="newField.is_required"
                             />
 
                             <x-ui-input-checkbox
                                 name="newField.is_encrypted"
-                                label="Verschlüsselt"
+                                checkedLabel="Verschlüsselt"
+                                uncheckedLabel="Als verschlüsselt markieren"
                                 wire:model="newField.is_encrypted"
                             />
                         </div>
@@ -64,7 +66,8 @@
                                 <span class="text-sm font-medium text-[var(--ui-secondary)]">Auswahloptionen</span>
                                 <x-ui-input-checkbox
                                     name="newField.is_multiple"
-                                    label="Mehrfachauswahl"
+                                    checkedLabel="Mehrfachauswahl aktiv"
+                                    uncheckedLabel="Mehrfachauswahl aktivieren"
                                     wire:model="newField.is_multiple"
                                 />
                             </div>
@@ -189,6 +192,8 @@
                                                 @if($editingDefinitionId === $def['id'])
                                                     <x-ui-input-checkbox
                                                         name="editField.is_required"
+                                                        checkedLabel="Ja"
+                                                        uncheckedLabel="Nein"
                                                         wire:model="editField.is_required"
                                                     />
                                                 @else
@@ -203,6 +208,8 @@
                                                 @if($editingDefinitionId === $def['id'])
                                                     <x-ui-input-checkbox
                                                         name="editField.is_encrypted"
+                                                        checkedLabel="Ja"
+                                                        uncheckedLabel="Nein"
                                                         wire:model="editField.is_encrypted"
                                                     />
                                                 @else
@@ -268,7 +275,8 @@
                                                             <span class="text-sm font-medium text-[var(--ui-secondary)]">Auswahloptionen</span>
                                                             <x-ui-input-checkbox
                                                                 name="editField.is_multiple"
-                                                                label="Mehrfachauswahl"
+                                                                checkedLabel="Mehrfachauswahl aktiv"
+                                                                uncheckedLabel="Mehrfachauswahl aktivieren"
                                                                 wire:model="editField.is_multiple"
                                                             />
                                                         </div>
