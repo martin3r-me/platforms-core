@@ -70,6 +70,43 @@ trait WithExtraFields
     }
 
     /**
+     * Load extra field values with inherited definitions from parent model.
+     *
+     * @param Model $model The model to load values for (e.g., Ticket)
+     * @param Model $parentModel The parent model with definitions (e.g., Board)
+     */
+    public function loadExtraFieldValuesFromParent(Model $model, Model $parentModel): void
+    {
+        $this->extraFieldsModel = $model;
+
+        // Load definitions from PARENT model
+        $this->extraFieldDefinitions = $parentModel->getExtraFieldsWithLabels();
+
+        // Load VALUES from current model, but using parent's definition IDs
+        $values = $model->extraFieldValues()->with('definition')->get()->keyBy('definition_id');
+
+        // Initialize values array
+        $this->extraFieldValues = [];
+        foreach ($this->extraFieldDefinitions as $field) {
+            $value = $values->get($field['id'])?->typed_value;
+
+            // Für Mehrfachauswahl muss der Wert ein Array sein
+            if ($field['type'] === 'select' && ($field['options']['multiple'] ?? false)) {
+                if ($value === null) {
+                    $value = [];
+                } elseif (!is_array($value)) {
+                    $value = [$value];
+                }
+            }
+
+            $this->extraFieldValues[$field['id']] = $value;
+        }
+
+        // Store original for dirty checking
+        $this->originalExtraFieldValues = $this->extraFieldValues;
+    }
+
+    /**
      * Refresh extra field definitions (e.g., after definitions were changed)
      */
     public function refreshExtraFieldDefinitions(): void
