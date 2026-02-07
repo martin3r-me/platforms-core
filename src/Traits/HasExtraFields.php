@@ -162,11 +162,11 @@ trait HasExtraFields
     protected function getTeamIdForExtraFields(): ?int
     {
         // Wenn Entity selbst team_id hat, verwende diese
-        if (isset($this->team_id)) {
+        if (isset($this->team_id) && $this->team_id) {
             return $this->team_id;
         }
 
-        // Fallback: Aktueller User-Kontext
+        // Fallback: Aktuelles Team des Users
         try {
             $user = Auth::user();
             if (!$user) {
@@ -174,12 +174,7 @@ trait HasExtraFields
             }
 
             $baseTeam = $user->currentTeamRelation;
-            if (!$baseTeam) {
-                return null;
-            }
-
-            $rootTeam = method_exists($baseTeam, 'getRootTeam') ? $baseTeam->getRootTeam() : $baseTeam;
-            return $rootTeam?->id;
+            return $baseTeam?->id;
         } catch (\Exception $e) {
             return null;
         }

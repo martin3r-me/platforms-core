@@ -398,8 +398,7 @@ class ModalExtraFields extends Component
                 return null;
             }
 
-            $rootTeam = method_exists($baseTeam, 'getRootTeam') ? $baseTeam->getRootTeam() : $baseTeam;
-            return $rootTeam?->id;
+            return $baseTeam->id;
         } catch (\Exception $e) {
             return null;
         }
