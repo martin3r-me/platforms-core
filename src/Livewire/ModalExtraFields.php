@@ -52,12 +52,16 @@ class ModalExtraFields extends Component
     public function setContext(array $payload = []): void
     {
         $this->contextType = $payload['context_type'] ?? null;
-        $this->contextId = isset($payload['context_id']) ? (int) $payload['context_id'] : null;
+        $this->contextId = isset($payload['context_id']) && $payload['context_id'] !== null
+            ? (int) $payload['context_id']
+            : null;
 
         // Wenn Modal bereits offen ist, Daten neu laden
-        if ($this->open && $this->contextType && $this->contextId) {
+        if ($this->open && $this->contextType) {
             $this->loadDefinitions();
-            $this->loadValues();
+            if ($this->contextId) {
+                $this->loadValues();
+            }
         }
     }
 
@@ -70,13 +74,19 @@ class ModalExtraFields extends Component
 
         // Reset
         $this->resetForm();
-        $this->activeTab = 'values';
         $this->editingDefinitionId = null;
 
+        // Tab basierend auf Kontext setzen
+        // Ohne contextId (Index-Seite): Definitionen-Tab
+        // Mit contextId (Show-Seite): Werte-Tab
+        $this->activeTab = $this->contextId ? 'values' : 'definitions';
+
         // Daten laden
-        if ($this->contextType && $this->contextId) {
+        if ($this->contextType) {
             $this->loadDefinitions();
-            $this->loadValues();
+            if ($this->contextId) {
+                $this->loadValues();
+            }
         }
 
         $this->open = true;
@@ -92,7 +102,7 @@ class ModalExtraFields extends Component
 
     public function loadDefinitions(): void
     {
-        if (!$this->contextType || !$this->contextId) {
+        if (!$this->contextType) {
             $this->definitions = [];
             return;
         }

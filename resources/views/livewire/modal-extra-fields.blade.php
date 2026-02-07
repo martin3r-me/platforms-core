@@ -352,7 +352,7 @@
                 </div>
             </div>
 
-        @elseif(!$contextType || !$contextId)
+        @elseif(!$contextType)
             <div class="text-center py-12">
                 <p class="text-[var(--ui-muted)]">Kein Kontext ausgewählt.</p>
                 <p class="text-sm text-[var(--ui-muted)] mt-2">Wählen Sie einen Kontext aus, um Extra-Felder zu verwalten.</p>
