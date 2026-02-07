@@ -18,12 +18,8 @@ class ModalExtraFields extends Component
     public ?string $contextType = null;
     public ?int $contextId = null;
 
-    // Tab-Steuerung
-    public string $activeTab = 'values'; // 'values', 'definitions'
-
     // Daten
     public array $definitions = [];
-    public array $values = [];
 
     // Neues Feld Formular
     public array $newField = [
@@ -59,9 +55,6 @@ class ModalExtraFields extends Component
         // Wenn Modal bereits offen ist, Daten neu laden
         if ($this->open && $this->contextType) {
             $this->loadDefinitions();
-            if ($this->contextId) {
-                $this->loadValues();
-            }
         }
     }
 
@@ -76,17 +69,9 @@ class ModalExtraFields extends Component
         $this->resetForm();
         $this->editingDefinitionId = null;
 
-        // Tab basierend auf Kontext setzen
-        // Ohne contextId (Index-Seite): Definitionen-Tab
-        // Mit contextId (Show-Seite): Werte-Tab
-        $this->activeTab = $this->contextId ? 'values' : 'definitions';
-
         // Daten laden
         if ($this->contextType) {
             $this->loadDefinitions();
-            if ($this->contextId) {
-                $this->loadValues();
-            }
         }
 
         $this->open = true;
@@ -96,7 +81,7 @@ class ModalExtraFields extends Component
     {
         $this->resetValidation();
         $this->open = false;
-        $this->reset('contextType', 'contextId', 'definitions', 'values', 'activeTab', 'editingDefinitionId');
+        $this->reset('contextType', 'contextId', 'definitions', 'editingDefinitionId');
         $this->resetForm();
     }
 
@@ -153,116 +138,6 @@ class ModalExtraFields extends Component
                 ->toArray();
         } catch (\Exception $e) {
             $this->definitions = [];
-        }
-    }
-
-    public function loadValues(): void
-    {
-        if (!$this->contextType || !$this->contextId) {
-            $this->values = [];
-            return;
-        }
-
-        if (!class_exists($this->contextType)) {
-            $this->values = [];
-            return;
-        }
-
-        try {
-            if (!Schema::hasTable('core_extra_field_values')) {
-                $this->values = [];
-                return;
-            }
-
-            $context = $this->contextType::find($this->contextId);
-            if (!$context) {
-                $this->values = [];
-                return;
-            }
-
-            // Prüfe ob Model HasExtraFields Trait verwendet
-            if (!method_exists($context, 'extraFieldValues')) {
-                $this->values = [];
-                return;
-            }
-
-            // Werte laden
-            $valuesCollection = $context->extraFieldValues()
-                ->with('definition')
-                ->get()
-                ->keyBy('definition_id');
-
-            $this->values = [];
-            foreach ($this->definitions as $def) {
-                $valueModel = $valuesCollection->get($def['id']);
-                $this->values[$def['id']] = $valueModel?->typed_value ?? '';
-            }
-        } catch (\Exception $e) {
-            $this->values = [];
-        }
-    }
-
-    public function updateValue(int $definitionId): void
-    {
-        if (!$this->contextType || !$this->contextId) {
-            return;
-        }
-
-        if (!class_exists($this->contextType)) {
-            return;
-        }
-
-        try {
-            $context = $this->contextType::find($this->contextId);
-            if (!$context || !method_exists($context, 'extraFieldValues')) {
-                return;
-            }
-
-            $definition = CoreExtraFieldDefinition::find($definitionId);
-            if (!$definition) {
-                return;
-            }
-
-            $value = $this->values[$definitionId] ?? null;
-
-            // Validierung für required Felder
-            if ($definition->is_required && ($value === null || $value === '')) {
-                $this->addError("values.{$definitionId}", 'Dieses Feld ist erforderlich.');
-                return;
-            }
-
-            // Wert speichern oder aktualisieren
-            $fieldValue = $context->extraFieldValues()
-                ->where('definition_id', $definitionId)
-                ->first();
-
-            if ($value === null || $value === '') {
-                // Wert löschen wenn leer
-                if ($fieldValue) {
-                    $fieldValue->delete();
-                }
-            } else {
-                if (!$fieldValue) {
-                    $fieldValue = new CoreExtraFieldValue([
-                        'definition_id' => $definitionId,
-                        'fieldable_type' => get_class($context),
-                        'fieldable_id' => $context->id,
-                    ]);
-                }
-
-                $fieldValue->setTypedValue($value);
-                $fieldValue->save();
-            }
-
-            $this->dispatch('notify', [
-                'type' => 'success',
-                'message' => 'Wert gespeichert.',
-            ]);
-        } catch (\Exception $e) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Fehler beim Speichern.',
-            ]);
         }
     }
 
@@ -323,7 +198,6 @@ class ModalExtraFields extends Component
 
             // Definitionen neu laden
             $this->loadDefinitions();
-            $this->loadValues();
 
             $this->dispatch('notify', [
                 'type' => 'success',
@@ -426,7 +300,6 @@ class ModalExtraFields extends Component
             $definition->delete();
 
             $this->loadDefinitions();
-            $this->loadValues();
 
             $this->dispatch('notify', [
                 'type' => 'success',

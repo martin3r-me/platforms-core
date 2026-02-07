@@ -1,4 +1,4 @@
-<div x-data="{ activeTab: $wire.entangle('activeTab') }">
+<div>
 <x-ui-modal size="lg" wire:model="open" :closeButton="true">
     <x-slot name="header">
         <div class="flex items-center gap-3">
@@ -8,131 +8,15 @@
                 </div>
             </div>
             <div class="flex-1 min-w-0">
-                <h3 class="text-xl font-bold text-[var(--ui-secondary)]">Extra-Felder</h3>
-                @if($contextType && $contextId && $this->contextBreadcrumb)
-                    <div class="flex items-center gap-2 mt-1 flex-wrap">
-                        @foreach($this->contextBreadcrumb as $index => $crumb)
-                            <div class="flex items-center gap-2">
-                                @if($index > 0)
-                                    @svg('heroicon-o-chevron-right', 'w-3 h-3 text-[var(--ui-muted)]')
-                                @endif
-                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] border border-[var(--ui-border)]/40">
-                                    <span class="text-[var(--ui-muted)]">{{ $crumb['type'] }}:</span>
-                                    <span class="font-semibold">{{ $crumb['label'] }}</span>
-                                </span>
-                            </div>
-                        @endforeach
-                    </div>
-                @else
-                    <p class="text-sm text-[var(--ui-muted)] mt-1">Zusatzfelder verwalten</p>
-                @endif
+                <h3 class="text-xl font-bold text-[var(--ui-secondary)]">Extra-Felder Definitionen</h3>
+                <p class="text-sm text-[var(--ui-muted)] mt-1">Felder für alle Einträge dieses Typs definieren</p>
             </div>
         </div>
     </x-slot>
 
     <div>
-        <!-- Tabs -->
-        <div class="border-b border-[var(--ui-border)]/40 mb-6">
-            <nav class="-mb-px flex space-x-6" aria-label="Tabs">
-                @if($contextType && $contextId)
-                    <button
-                        @click="activeTab = 'values'"
-                        :class="activeTab === 'values' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                        class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium transition-colors"
-                        wire:click="$set('activeTab', 'values')"
-                    >
-                        Werte
-                    </button>
-                @endif
-                <button
-                    @click="activeTab = 'definitions'"
-                    :class="activeTab === 'definitions' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                    class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium transition-colors"
-                    wire:click="$set('activeTab', 'definitions')"
-                >
-                    Definitionen
-                </button>
-            </nav>
-        </div>
-
-        @if($activeTab === 'values' && $contextType && $contextId)
-            <!-- Werte Tab -->
-            <div class="space-y-6">
-                @if(count($definitions) > 0)
-                    <div class="space-y-4">
-                        @foreach($definitions as $def)
-                            <div class="p-4 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
-                                <div class="flex items-start justify-between gap-4">
-                                    <div class="flex-1">
-                                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">
-                                            {{ $def['label'] }}
-                                            @if($def['is_required'])
-                                                <span class="text-[var(--ui-danger)]">*</span>
-                                            @endif
-                                            <span class="text-xs text-[var(--ui-muted)] ml-2">({{ $def['type_label'] }})</span>
-                                            @if($def['is_encrypted'] ?? false)
-                                                @svg('heroicon-o-lock-closed', 'w-3.5 h-3.5 text-[var(--ui-warning)] inline ml-1')
-                                            @endif
-                                        </label>
-
-                                        @if($def['type'] === 'textarea')
-                                            <textarea
-                                                wire:model.lazy="values.{{ $def['id'] }}"
-                                                wire:change="updateValue({{ $def['id'] }})"
-                                                rows="3"
-                                                class="w-full px-4 py-2 border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
-                                                placeholder="Wert eingeben..."
-                                            ></textarea>
-                                        @elseif($def['type'] === 'number')
-                                            <input
-                                                type="number"
-                                                wire:model.lazy="values.{{ $def['id'] }}"
-                                                wire:change="updateValue({{ $def['id'] }})"
-                                                class="w-full px-4 py-2 border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
-                                                placeholder="Wert eingeben..."
-                                                step="any"
-                                            />
-                                        @else
-                                            <input
-                                                type="text"
-                                                wire:model.lazy="values.{{ $def['id'] }}"
-                                                wire:change="updateValue({{ $def['id'] }})"
-                                                class="w-full px-4 py-2 border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
-                                                placeholder="Wert eingeben..."
-                                            />
-                                        @endif
-
-                                        @error("values.{$def['id']}")
-                                            <p class="mt-1 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
-                                        @enderror
-                                    </div>
-
-                                    @if($def['is_global'])
-                                        <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[var(--ui-primary-10)] text-[var(--ui-primary)] border border-[var(--ui-primary)]/20">
-                                            Global
-                                        </span>
-                                    @endif
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                @else
-                    <div class="text-center py-12">
-                        @svg('heroicon-o-squares-plus', 'w-12 h-12 text-[var(--ui-muted)] mx-auto mb-4')
-                        <h4 class="text-lg font-medium text-[var(--ui-secondary)] mb-2">Keine Extra-Felder definiert</h4>
-                        <p class="text-[var(--ui-muted)] mb-4">Es wurden noch keine Extra-Felder für diesen Typ erstellt.</p>
-                        <button
-                            wire:click="$set('activeTab', 'definitions')"
-                            class="px-4 py-2 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors text-sm font-medium"
-                        >
-                            Feld erstellen
-                        </button>
-                    </div>
-                @endif
-            </div>
-
-        @elseif($activeTab === 'definitions')
-            <!-- Definitionen Tab -->
+        @if($contextType && !$contextId)
+            <!-- Definitionen -->
             <div class="space-y-6">
                 <!-- Neues Feld erstellen -->
                 <div class="p-4 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
@@ -356,6 +240,11 @@
             <div class="text-center py-12">
                 <p class="text-[var(--ui-muted)]">Kein Kontext ausgewählt.</p>
                 <p class="text-sm text-[var(--ui-muted)] mt-2">Wählen Sie einen Kontext aus, um Extra-Felder zu verwalten.</p>
+            </div>
+        @else
+            {{-- contextId ist gesetzt - Modal sollte nicht geöffnet werden, Werte werden inline bearbeitet --}}
+            <div class="text-center py-12">
+                <p class="text-[var(--ui-muted)]">Werte können direkt auf der Detailseite bearbeitet werden.</p>
             </div>
         @endif
     </div>

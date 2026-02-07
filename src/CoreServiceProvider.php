@@ -2,6 +2,7 @@
 
 namespace Platform\Core;
 
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Livewire\LivewireServiceProvider;
 use Illuminate\Support\Facades\Route;
@@ -49,6 +50,9 @@ class CoreServiceProvider extends ServiceProvider
         // Views & Migrations
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'platform');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+
+        // Blade Components
+        Blade::component('platform::components.extra-fields-form', 'core-extra-fields-form');
         
         // Teams SSO Routes laden
         $this->loadRoutesFrom(__DIR__.'/../routes/teams-sso.php');
