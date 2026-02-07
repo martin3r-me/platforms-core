@@ -25,7 +25,7 @@
             <div>
                 @switch($field['type'])
                     @case('textarea')
-                        <x-ui-form-input-textarea
+                        <x-ui-input-textarea
                             :name="'extraFieldValues.' . $field['id']"
                             :label="$field['label']"
                             :required="$field['is_required']"
@@ -37,7 +37,7 @@
                         @break
 
                     @case('number')
-                        <x-ui-form-input-number
+                        <x-ui-input-number
                             :name="'extraFieldValues.' . $field['id']"
                             :label="$field['label']"
                             :required="$field['is_required']"
@@ -54,7 +54,7 @@
                         @break
 
                     @default
-                        <x-ui-form-input-text
+                        <x-ui-input-text
                             :name="'extraFieldValues.' . $field['id']"
                             :label="$field['label']"
                             :required="$field['is_required']"
