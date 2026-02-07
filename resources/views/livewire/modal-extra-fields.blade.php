@@ -1,5 +1,5 @@
 <div>
-<x-ui-modal size="lg" wire:model="open" :closeButton="true">
+<x-ui-modal size="xl" wire:model="open" :closeButton="true">
     <x-slot name="header">
         <div class="flex items-center gap-3">
             <div class="flex-shrink-0">
@@ -25,64 +25,99 @@
                     </h4>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">
-                                Label <span class="text-[var(--ui-danger)]">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                wire:model="newField.label"
-                                class="w-full px-4 py-2 border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
-                                placeholder="z.B. Gehaltsvorstellung"
-                            />
-                            @error('newField.label')
-                                <p class="mt-1 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
-                            @enderror
-                        </div>
+                        <x-ui-input-text
+                            name="newField.label"
+                            label="Label"
+                            :required="true"
+                            wire:model="newField.label"
+                            placeholder="z.B. Gehaltsvorstellung"
+                        />
 
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">
-                                Typ <span class="text-[var(--ui-danger)]">*</span>
-                            </label>
-                            <select
-                                wire:model="newField.type"
-                                class="w-full px-4 py-2 border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
-                            >
-                                @foreach($this->availableTypes as $value => $label)
-                                    <option value="{{ $value }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                        <x-ui-input-select
+                            name="newField.type"
+                            label="Typ"
+                            :required="true"
+                            :options="$this->availableTypes"
+                            wire:model.live="newField.type"
+                            displayMode="dropdown"
+                        />
 
                         <div class="flex items-end gap-4 flex-wrap">
-                            <label class="flex items-center gap-2 pb-2">
-                                <input
-                                    type="checkbox"
-                                    wire:model="newField.is_required"
-                                    class="w-4 h-4 text-[var(--ui-primary)] border-[var(--ui-border)] focus:ring-[var(--ui-primary)]"
-                                />
-                                <span class="text-sm text-[var(--ui-secondary)]">Pflichtfeld</span>
-                            </label>
+                            <x-ui-input-checkbox
+                                name="newField.is_required"
+                                label="Pflichtfeld"
+                                wire:model="newField.is_required"
+                            />
 
-                            <label class="flex items-center gap-2 pb-2" title="Wert wird verschlüsselt in der Datenbank gespeichert">
-                                <input
-                                    type="checkbox"
-                                    wire:model="newField.is_encrypted"
-                                    class="w-4 h-4 text-[var(--ui-warning)] border-[var(--ui-border)] focus:ring-[var(--ui-warning)]"
-                                />
-                                <span class="text-sm text-[var(--ui-secondary)] flex items-center gap-1">
-                                    @svg('heroicon-o-lock-closed', 'w-3.5 h-3.5')
-                                    Verschlüsselt
-                                </span>
-                            </label>
-
-                            <button
-                                wire:click="createDefinition"
-                                class="px-4 py-2 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors text-sm font-medium"
-                            >
-                                Erstellen
-                            </button>
+                            <x-ui-input-checkbox
+                                name="newField.is_encrypted"
+                                label="Verschlüsselt"
+                                wire:model="newField.is_encrypted"
+                            />
                         </div>
+                    </div>
+
+                    {{-- Select-Optionen --}}
+                    @if($newField['type'] === 'select')
+                        <div class="mt-4 p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-sm font-medium text-[var(--ui-secondary)]">Auswahloptionen</span>
+                                <x-ui-input-checkbox
+                                    name="newField.is_multiple"
+                                    label="Mehrfachauswahl"
+                                    wire:model="newField.is_multiple"
+                                />
+                            </div>
+
+                            <div class="flex gap-2 mb-3">
+                                <input
+                                    type="text"
+                                    wire:model="newOptionText"
+                                    wire:keydown.enter.prevent="addNewOption"
+                                    class="flex-1 px-3 py-1.5 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                    placeholder="Option eingeben..."
+                                />
+                                <button
+                                    type="button"
+                                    wire:click="addNewOption"
+                                    class="px-3 py-1.5 bg-[var(--ui-primary)] text-white text-sm hover:bg-[var(--ui-primary)]/90"
+                                >
+                                    Hinzufügen
+                                </button>
+                            </div>
+
+                            @if(count($newField['options']) > 0)
+                                <div class="flex flex-wrap gap-2">
+                                    @foreach($newField['options'] as $index => $option)
+                                        <span class="inline-flex items-center gap-1 px-2 py-1 bg-[var(--ui-muted-5)] text-sm text-[var(--ui-secondary)] border border-[var(--ui-border)]/40">
+                                            {{ $option }}
+                                            <button
+                                                type="button"
+                                                wire:click="removeNewOption({{ $index }})"
+                                                class="text-[var(--ui-muted)] hover:text-[var(--ui-danger)]"
+                                            >
+                                                @svg('heroicon-o-x-mark', 'w-3.5 h-3.5')
+                                            </button>
+                                        </span>
+                                    @endforeach
+                                </div>
+                            @else
+                                <p class="text-xs text-[var(--ui-muted)]">Noch keine Optionen hinzugefügt.</p>
+                            @endif
+
+                            @error('newField.options')
+                                <p class="mt-2 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    @endif
+
+                    <div class="mt-4 flex justify-end">
+                        <button
+                            wire:click="createDefinition"
+                            class="px-4 py-2 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors text-sm font-medium"
+                        >
+                            Feld erstellen
+                        </button>
                     </div>
                 </div>
 
@@ -122,10 +157,10 @@
                                         <tr class="hover:bg-[var(--ui-muted-5)]/50 transition-colors">
                                             <td class="whitespace-nowrap py-4 pl-6 pr-3">
                                                 @if($editingDefinitionId === $def['id'])
-                                                    <input
-                                                        type="text"
+                                                    <x-ui-input-text
+                                                        name="editField.label"
                                                         wire:model="editField.label"
-                                                        class="px-2 py-1 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                        size="sm"
                                                     />
                                                 @else
                                                     <div>
@@ -136,24 +171,25 @@
                                             </td>
                                             <td class="whitespace-nowrap px-3 py-4">
                                                 @if($editingDefinitionId === $def['id'])
-                                                    <select
-                                                        wire:model="editField.type"
-                                                        class="px-2 py-1 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                                    >
-                                                        @foreach($this->availableTypes as $value => $label)
-                                                            <option value="{{ $value }}">{{ $label }}</option>
-                                                        @endforeach
-                                                    </select>
+                                                    <x-ui-input-select
+                                                        name="editField.type"
+                                                        :options="$this->availableTypes"
+                                                        wire:model.live="editField.type"
+                                                        size="sm"
+                                                        displayMode="dropdown"
+                                                    />
                                                 @else
                                                     <span class="text-sm text-[var(--ui-muted)]">{{ $def['type_label'] }}</span>
+                                                    @if($def['type'] === 'select' && isset($def['options']['multiple']) && $def['options']['multiple'])
+                                                        <span class="ml-1 text-xs text-[var(--ui-primary)]">(Mehrfach)</span>
+                                                    @endif
                                                 @endif
                                             </td>
                                             <td class="whitespace-nowrap px-3 py-4 text-center">
                                                 @if($editingDefinitionId === $def['id'])
-                                                    <input
-                                                        type="checkbox"
+                                                    <x-ui-input-checkbox
+                                                        name="editField.is_required"
                                                         wire:model="editField.is_required"
-                                                        class="w-4 h-4 text-[var(--ui-primary)] border-[var(--ui-border)] focus:ring-[var(--ui-primary)]"
                                                     />
                                                 @else
                                                     @if($def['is_required'])
@@ -165,10 +201,9 @@
                                             </td>
                                             <td class="whitespace-nowrap px-3 py-4 text-center">
                                                 @if($editingDefinitionId === $def['id'])
-                                                    <input
-                                                        type="checkbox"
+                                                    <x-ui-input-checkbox
+                                                        name="editField.is_encrypted"
                                                         wire:model="editField.is_encrypted"
-                                                        class="w-4 h-4 text-[var(--ui-warning)] border-[var(--ui-border)] focus:ring-[var(--ui-warning)]"
                                                     />
                                                 @else
                                                     @if($def['is_encrypted'] ?? false)
@@ -224,6 +259,63 @@
                                                 @endif
                                             </td>
                                         </tr>
+                                        {{-- Select-Optionen bearbeiten --}}
+                                        @if($editingDefinitionId === $def['id'] && $editField['type'] === 'select')
+                                            <tr class="bg-[var(--ui-muted-5)]/30">
+                                                <td colspan="6" class="px-6 py-4">
+                                                    <div class="p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40">
+                                                        <div class="flex items-center justify-between mb-3">
+                                                            <span class="text-sm font-medium text-[var(--ui-secondary)]">Auswahloptionen</span>
+                                                            <x-ui-input-checkbox
+                                                                name="editField.is_multiple"
+                                                                label="Mehrfachauswahl"
+                                                                wire:model="editField.is_multiple"
+                                                            />
+                                                        </div>
+
+                                                        <div class="flex gap-2 mb-3">
+                                                            <input
+                                                                type="text"
+                                                                wire:model="editOptionText"
+                                                                wire:keydown.enter.prevent="addEditOption"
+                                                                class="flex-1 px-3 py-1.5 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                                placeholder="Option eingeben..."
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                wire:click="addEditOption"
+                                                                class="px-3 py-1.5 bg-[var(--ui-primary)] text-white text-sm hover:bg-[var(--ui-primary)]/90"
+                                                            >
+                                                                Hinzufügen
+                                                            </button>
+                                                        </div>
+
+                                                        @if(count($editField['options']) > 0)
+                                                            <div class="flex flex-wrap gap-2">
+                                                                @foreach($editField['options'] as $index => $option)
+                                                                    <span class="inline-flex items-center gap-1 px-2 py-1 bg-[var(--ui-muted-5)] text-sm text-[var(--ui-secondary)] border border-[var(--ui-border)]/40">
+                                                                        {{ $option }}
+                                                                        <button
+                                                                            type="button"
+                                                                            wire:click="removeEditOption({{ $index }})"
+                                                                            class="text-[var(--ui-muted)] hover:text-[var(--ui-danger)]"
+                                                                        >
+                                                                            @svg('heroicon-o-x-mark', 'w-3.5 h-3.5')
+                                                                        </button>
+                                                                    </span>
+                                                                @endforeach
+                                                            </div>
+                                                        @else
+                                                            <p class="text-xs text-[var(--ui-muted)]">Noch keine Optionen hinzugefügt.</p>
+                                                        @endif
+
+                                                        @error('editField.options')
+                                                            <p class="mt-2 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
+                                                        @enderror
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @endif
                                     @endforeach
                                 </tbody>
                             </table>

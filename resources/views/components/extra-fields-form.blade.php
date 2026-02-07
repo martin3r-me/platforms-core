@@ -53,6 +53,85 @@
                         @endif
                         @break
 
+                    @case('boolean')
+                        <div>
+                            <x-ui-label
+                                :text="$field['label']"
+                                :required="$field['is_required']"
+                                class="mb-2"
+                            />
+                            <x-ui-input-select
+                                :name="'extraFieldValues.' . $field['id']"
+                                :options="['1' => 'Ja', '0' => 'Nein']"
+                                :nullable="!$field['is_required']"
+                                nullLabel="Nicht ausgewählt"
+                                wire:model.live="extraFieldValues.{{ $field['id'] }}"
+                                displayMode="badges"
+                            />
+                            @if($field['is_encrypted'])
+                                <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mt-1">
+                                    @svg('heroicon-o-lock-closed', 'w-3 h-3')
+                                    Verschlüsselt
+                                </span>
+                            @endif
+                        </div>
+                        @break
+
+                    @case('select')
+                        @php
+                            $choices = $field['options']['choices'] ?? [];
+                            $isMultiple = $field['options']['multiple'] ?? false;
+                            $selectOptions = array_combine($choices, $choices);
+                        @endphp
+                        @if($isMultiple)
+                            {{-- Mehrfachauswahl mit Checkboxen --}}
+                            <div>
+                                <x-ui-label
+                                    :text="$field['label']"
+                                    :required="$field['is_required']"
+                                    class="mb-2"
+                                />
+                                @if($field['is_encrypted'])
+                                    <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mb-2">
+                                        @svg('heroicon-o-lock-closed', 'w-3 h-3')
+                                        Verschlüsselt
+                                    </span>
+                                @endif
+                                <div class="flex flex-wrap gap-2">
+                                    @foreach($choices as $choice)
+                                        <label class="inline-flex items-center gap-2 px-3 py-1.5 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40 cursor-pointer hover:bg-[var(--ui-muted-5)] transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                value="{{ $choice }}"
+                                                wire:model.live="extraFieldValues.{{ $field['id'] }}"
+                                                class="w-4 h-4 text-[var(--ui-primary)] border-[var(--ui-border)] focus:ring-[var(--ui-primary)]"
+                                            />
+                                            <span class="text-sm text-[var(--ui-secondary)]">{{ $choice }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @else
+                            {{-- Einzelauswahl --}}
+                            <x-ui-input-select
+                                :name="'extraFieldValues.' . $field['id']"
+                                :label="$field['label']"
+                                :required="$field['is_required']"
+                                :options="$selectOptions"
+                                :nullable="!$field['is_required']"
+                                nullLabel="Bitte wählen..."
+                                wire:model.live="extraFieldValues.{{ $field['id'] }}"
+                                :displayMode="count($choices) <= 5 ? 'badges' : 'dropdown'"
+                            />
+                            @if($field['is_encrypted'])
+                                <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mt-1">
+                                    @svg('heroicon-o-lock-closed', 'w-3 h-3')
+                                    Verschlüsselt
+                                </span>
+                            @endif
+                        @endif
+                        @break
+
                     @default
                         <x-ui-input-text
                             :name="'extraFieldValues.' . $field['id']"

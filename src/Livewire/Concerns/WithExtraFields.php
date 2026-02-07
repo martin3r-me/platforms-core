@@ -78,10 +78,14 @@ trait WithExtraFields
 
     /**
      * Save extra field values to the model
+     *
+     * @param Model|null $model Optional model to save to (useful when extraFieldsModel is not hydrated)
      */
-    public function saveExtraFieldValues(): void
+    public function saveExtraFieldValues(?Model $model = null): void
     {
-        if (!$this->extraFieldsModel) {
+        $model = $model ?? $this->extraFieldsModel;
+
+        if (!$model) {
             return;
         }
 
@@ -92,8 +96,8 @@ trait WithExtraFields
             // Find or create the value record
             $valueRecord = CoreExtraFieldValue::query()
                 ->where('definition_id', $definitionId)
-                ->where('fieldable_type', get_class($this->extraFieldsModel))
-                ->where('fieldable_id', $this->extraFieldsModel->id)
+                ->where('fieldable_type', get_class($model))
+                ->where('fieldable_id', $model->id)
                 ->first();
 
             if ($newValue === null || $newValue === '') {
@@ -105,8 +109,8 @@ trait WithExtraFields
                 if (!$valueRecord) {
                     $valueRecord = new CoreExtraFieldValue([
                         'definition_id' => $definitionId,
-                        'fieldable_type' => get_class($this->extraFieldsModel),
-                        'fieldable_id' => $this->extraFieldsModel->id,
+                        'fieldable_type' => get_class($model),
+                        'fieldable_id' => $model->id,
                     ]);
                 }
 
@@ -163,6 +167,20 @@ trait WithExtraFields
                 case 'textarea':
                     $fieldRules[] = 'string';
                     $fieldRules[] = 'max:65535';
+                    break;
+                case 'boolean':
+                    $fieldRules[] = 'in:0,1';
+                    break;
+                case 'select':
+                    $isMultiple = $field['options']['multiple'] ?? false;
+                    if ($isMultiple) {
+                        $fieldRules[] = 'array';
+                    } else {
+                        $choices = $field['options']['choices'] ?? [];
+                        if (!empty($choices)) {
+                            $fieldRules[] = 'in:' . implode(',', $choices);
+                        }
+                    }
                     break;
             }
 

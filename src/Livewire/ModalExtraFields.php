@@ -28,6 +28,8 @@ class ModalExtraFields extends Component
         'type' => 'text',
         'is_required' => false,
         'is_encrypted' => false,
+        'options' => [],
+        'is_multiple' => false,
     ];
 
     // Bearbeitungs-Modus
@@ -37,7 +39,13 @@ class ModalExtraFields extends Component
         'type' => 'text',
         'is_required' => false,
         'is_encrypted' => false,
+        'options' => [],
+        'is_multiple' => false,
     ];
+
+    // Temporäre Option für Eingabe
+    public string $newOptionText = '';
+    public string $editOptionText = '';
 
     public function mount(): void
     {
@@ -141,14 +149,51 @@ class ModalExtraFields extends Component
         }
     }
 
+    public function addNewOption(): void
+    {
+        $text = trim($this->newOptionText);
+        if ($text !== '' && !in_array($text, $this->newField['options'])) {
+            $this->newField['options'][] = $text;
+        }
+        $this->newOptionText = '';
+    }
+
+    public function removeNewOption(int $index): void
+    {
+        unset($this->newField['options'][$index]);
+        $this->newField['options'] = array_values($this->newField['options']);
+    }
+
+    public function addEditOption(): void
+    {
+        $text = trim($this->editOptionText);
+        if ($text !== '' && !in_array($text, $this->editField['options'])) {
+            $this->editField['options'][] = $text;
+        }
+        $this->editOptionText = '';
+    }
+
+    public function removeEditOption(int $index): void
+    {
+        unset($this->editField['options'][$index]);
+        $this->editField['options'] = array_values($this->editField['options']);
+    }
+
     public function createDefinition(): void
     {
-        $this->validate([
+        $rules = [
             'newField.label' => ['required', 'string', 'max:255'],
-            'newField.type' => ['required', 'string', 'in:text,number,textarea'],
+            'newField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select'],
             'newField.is_required' => ['boolean'],
             'newField.is_encrypted' => ['boolean'],
-        ]);
+        ];
+
+        // Select braucht mindestens eine Option
+        if ($this->newField['type'] === 'select') {
+            $rules['newField.options'] = ['required', 'array', 'min:1'];
+        }
+
+        $this->validate($rules);
 
         try {
             $teamId = $this->getTeamId();
@@ -180,6 +225,15 @@ class ModalExtraFields extends Component
                 ->forContext($this->contextType, null)
                 ->max('order') ?? 0;
 
+            // Options für Select-Felder
+            $options = null;
+            if ($this->newField['type'] === 'select') {
+                $options = [
+                    'choices' => $this->newField['options'],
+                    'multiple' => $this->newField['is_multiple'] ?? false,
+                ];
+            }
+
             CoreExtraFieldDefinition::create([
                 'team_id' => $teamId,
                 'created_by_user_id' => $user->id,
@@ -191,6 +245,7 @@ class ModalExtraFields extends Component
                 'is_required' => $this->newField['is_required'] ?? false,
                 'is_encrypted' => $this->newField['is_encrypted'] ?? false,
                 'order' => $maxOrder + 1,
+                'options' => $options,
             ]);
 
             // Reset Formular
@@ -224,7 +279,10 @@ class ModalExtraFields extends Component
             'type' => $definition['type'],
             'is_required' => $definition['is_required'],
             'is_encrypted' => $definition['is_encrypted'],
+            'options' => $definition['options']['choices'] ?? [],
+            'is_multiple' => $definition['options']['multiple'] ?? false,
         ];
+        $this->editOptionText = '';
     }
 
     public function cancelEditDefinition(): void
@@ -235,7 +293,10 @@ class ModalExtraFields extends Component
             'type' => 'text',
             'is_required' => false,
             'is_encrypted' => false,
+            'options' => [],
+            'is_multiple' => false,
         ];
+        $this->editOptionText = '';
     }
 
     public function saveEditDefinition(): void
@@ -244,12 +305,19 @@ class ModalExtraFields extends Component
             return;
         }
 
-        $this->validate([
+        $rules = [
             'editField.label' => ['required', 'string', 'max:255'],
-            'editField.type' => ['required', 'string', 'in:text,number,textarea'],
+            'editField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select'],
             'editField.is_required' => ['boolean'],
             'editField.is_encrypted' => ['boolean'],
-        ]);
+        ];
+
+        // Select braucht mindestens eine Option
+        if ($this->editField['type'] === 'select') {
+            $rules['editField.options'] = ['required', 'array', 'min:1'];
+        }
+
+        $this->validate($rules);
 
         try {
             $definition = CoreExtraFieldDefinition::find($this->editingDefinitionId);
@@ -257,11 +325,21 @@ class ModalExtraFields extends Component
                 return;
             }
 
+            // Options für Select-Felder
+            $options = null;
+            if ($this->editField['type'] === 'select') {
+                $options = [
+                    'choices' => $this->editField['options'],
+                    'multiple' => $this->editField['is_multiple'] ?? false,
+                ];
+            }
+
             $definition->update([
                 'label' => trim($this->editField['label']),
                 'type' => $this->editField['type'],
                 'is_required' => $this->editField['is_required'] ?? false,
                 'is_encrypted' => $this->editField['is_encrypted'] ?? false,
+                'options' => $options,
             ]);
 
             $this->cancelEditDefinition();
@@ -382,7 +460,10 @@ class ModalExtraFields extends Component
             'type' => 'text',
             'is_required' => false,
             'is_encrypted' => false,
+            'options' => [],
+            'is_multiple' => false,
         ];
+        $this->newOptionText = '';
     }
 
     protected function getTeamId(): ?int

@@ -40,6 +40,8 @@ class CoreExtraFieldDefinition extends Model
         'text' => 'Text',
         'number' => 'Zahl',
         'textarea' => 'Mehrzeiliger Text',
+        'boolean' => 'Ja/Nein',
+        'select' => 'Auswahl',
     ];
 
     /**
