@@ -82,6 +82,7 @@ class CoreExtraFieldValue extends Model
         return match ($type) {
             'number' => is_numeric($value) ? (float) $value : null,
             'text', 'textarea' => (string) $value,
+            'select' => $this->decodeSelectValue($value),
             default => $value,
         };
     }
@@ -101,6 +102,7 @@ class CoreExtraFieldValue extends Model
         $stringValue = match ($type) {
             'number' => is_numeric($value) ? (string) $value : null,
             'text', 'textarea' => (string) $value,
+            'select' => is_array($value) ? json_encode($value) : (string) $value,
             default => (string) $value,
         };
 
@@ -136,6 +138,22 @@ class CoreExtraFieldValue extends Model
         }
 
         return self::getEncryptedStringCast()->get($this, 'value', $value, $this->attributes);
+    }
+
+    /**
+     * Dekodiert Select-Werte (können JSON-Arrays sein für Mehrfachauswahl)
+     */
+    protected function decodeSelectValue(string $value): mixed
+    {
+        // Prüfen ob es ein JSON-Array ist
+        if (str_starts_with($value, '[') && str_ends_with($value, ']')) {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return $value;
     }
 
     /**

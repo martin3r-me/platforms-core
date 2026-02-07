@@ -51,7 +51,18 @@ trait WithExtraFields
         // Initialize values array with current values
         $this->extraFieldValues = [];
         foreach ($this->extraFieldDefinitions as $field) {
-            $this->extraFieldValues[$field['id']] = $field['value'];
+            $value = $field['value'];
+
+            // Für Mehrfachauswahl muss der Wert ein Array sein
+            if ($field['type'] === 'select' && ($field['options']['multiple'] ?? false)) {
+                if ($value === null) {
+                    $value = [];
+                } elseif (!is_array($value)) {
+                    $value = [$value];
+                }
+            }
+
+            $this->extraFieldValues[$field['id']] = $value;
         }
 
         // Store original for dirty checking
@@ -131,11 +142,16 @@ trait WithExtraFields
         foreach ($this->extraFieldValues as $id => $value) {
             $original = $this->originalExtraFieldValues[$id] ?? null;
 
-            // Normalize for comparison (treat empty string as null)
-            $normalizedValue = ($value === '' || $value === null) ? null : $value;
-            $normalizedOriginal = ($original === '' || $original === null) ? null : $original;
+            // Normalize for comparison (treat empty string as null, empty arrays as null)
+            $normalizedValue = ($value === '' || $value === null || $value === []) ? null : $value;
+            $normalizedOriginal = ($original === '' || $original === null || $original === []) ? null : $original;
 
-            if ($normalizedValue !== $normalizedOriginal) {
+            // Array comparison
+            if (is_array($normalizedValue) || is_array($normalizedOriginal)) {
+                if ($normalizedValue != $normalizedOriginal) {
+                    return true;
+                }
+            } elseif ($normalizedValue !== $normalizedOriginal) {
                 return true;
             }
         }
