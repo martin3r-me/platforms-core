@@ -32,6 +32,21 @@ class CoreExtraFieldValue extends Model
     }
 
     /**
+     * Entferne temporäre _plain_* Attribute vor dem Speichern
+     * Diese werden vom EncryptedString Cast gesetzt, existieren aber nicht in der DB
+     */
+    protected static function booted(): void
+    {
+        static::saving(function ($model) {
+            foreach (array_keys($model->getAttributes()) as $key) {
+                if (str_starts_with($key, '_plain_')) {
+                    unset($model->attributes[$key]);
+                }
+            }
+        });
+    }
+
+    /**
      * Beziehungen
      */
     public function definition(): BelongsTo
