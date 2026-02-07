@@ -11,6 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Drop if exists for safe re-runs
+        Schema::dropIfExists('core_extra_field_definitions');
+
         Schema::create('core_extra_field_definitions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('team_id')->constrained('teams')->cascadeOnDelete();
@@ -31,8 +34,8 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // Indices
-            $table->index(['team_id', 'context_type', 'context_id']);
+            // Indices (with explicit short names to avoid MySQL 64-char limit)
+            $table->index(['team_id', 'context_type', 'context_id'], 'extra_field_def_ctx_idx');
             $table->unique(['team_id', 'context_type', 'context_id', 'name'], 'extra_field_def_unique');
         });
     }
