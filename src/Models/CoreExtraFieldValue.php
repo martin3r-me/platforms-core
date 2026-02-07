@@ -1,0 +1,133 @@
+<?php
+
+namespace Platform\Core\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Platform\Core\Casts\EncryptedString;
+
+class CoreExtraFieldValue extends Model
+{
+    protected $table = 'core_extra_field_values';
+
+    protected $fillable = [
+        'definition_id',
+        'fieldable_type',
+        'fieldable_id',
+        'value',
+    ];
+
+    /**
+     * EncryptedString Cast Instanz (wiederverwendbar)
+     */
+    protected static ?EncryptedString $encryptedStringCast = null;
+
+    protected static function getEncryptedStringCast(): EncryptedString
+    {
+        if (self::$encryptedStringCast === null) {
+            self::$encryptedStringCast = new EncryptedString();
+        }
+        return self::$encryptedStringCast;
+    }
+
+    /**
+     * Beziehungen
+     */
+    public function definition(): BelongsTo
+    {
+        return $this->belongsTo(CoreExtraFieldDefinition::class, 'definition_id');
+    }
+
+    public function fieldable(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    /**
+     * Gibt den typisierten und ggf. entschlüsselten Wert zurück
+     */
+    public function getTypedValueAttribute(): mixed
+    {
+        $rawValue = $this->attributes['value'] ?? null;
+
+        if ($rawValue === null) {
+            return null;
+        }
+
+        // Entschlüsseln wenn nötig (nutzt EncryptedString Cast)
+        $value = $this->decryptIfNeeded($rawValue);
+
+        if ($value === null) {
+            return null;
+        }
+
+        $type = $this->definition?->type ?? 'text';
+
+        return match ($type) {
+            'number' => is_numeric($value) ? (float) $value : null,
+            'text', 'textarea' => (string) $value,
+            default => $value,
+        };
+    }
+
+    /**
+     * Setzt den Wert und konvertiert/verschlüsselt ihn
+     */
+    public function setTypedValue(mixed $value): void
+    {
+        if ($value === null || $value === '') {
+            $this->attributes['value'] = null;
+            return;
+        }
+
+        $type = $this->definition?->type ?? 'text';
+
+        $stringValue = match ($type) {
+            'number' => is_numeric($value) ? (string) $value : null,
+            'text', 'textarea' => (string) $value,
+            default => (string) $value,
+        };
+
+        if ($stringValue === null) {
+            $this->attributes['value'] = null;
+            return;
+        }
+
+        // Verschlüsseln wenn Definition is_encrypted = true (nutzt EncryptedString Cast)
+        $this->attributes['value'] = $this->encryptIfNeeded($stringValue);
+    }
+
+    /**
+     * Verschlüsselt den Wert wenn die Definition is_encrypted hat
+     * Nutzt den gleichen EncryptedString Cast wie der Encryptable Trait
+     */
+    protected function encryptIfNeeded(string $value): string
+    {
+        if ($this->definition?->is_encrypted) {
+            return self::getEncryptedStringCast()->set($this, 'value', $value, $this->attributes);
+        }
+        return $value;
+    }
+
+    /**
+     * Entschlüsselt den Wert wenn die Definition is_encrypted hat
+     * Nutzt den gleichen EncryptedString Cast wie der Encryptable Trait
+     */
+    protected function decryptIfNeeded(string $value): ?string
+    {
+        if (!$this->definition?->is_encrypted) {
+            return $value;
+        }
+
+        return self::getEncryptedStringCast()->get($this, 'value', $value, $this->attributes);
+    }
+
+    /**
+     * Prüft ob der Wert verschlüsselt ist
+     */
+    public function isEncrypted(): bool
+    {
+        return $this->definition?->is_encrypted ?? false;
+    }
+}
