@@ -207,10 +207,10 @@ class ModalExtraFields extends Component
             // Name aus Label generieren
             $name = Str::slug($this->newField['label'], '_');
 
-            // Prüfe ob Name bereits existiert
+            // Prüfe ob Name bereits existiert (im selben Kontext)
             $exists = CoreExtraFieldDefinition::query()
                 ->forTeam($teamId)
-                ->forContext($this->contextType, null) // Global für diesen Typ
+                ->forContext($this->contextType, $this->contextId)
                 ->where('name', $name)
                 ->exists();
 
@@ -219,10 +219,10 @@ class ModalExtraFields extends Component
                 return;
             }
 
-            // Höchste order ermitteln
+            // Höchste order ermitteln (im selben Kontext)
             $maxOrder = CoreExtraFieldDefinition::query()
                 ->forTeam($teamId)
-                ->forContext($this->contextType, null)
+                ->forContext($this->contextType, $this->contextId)
                 ->max('order') ?? 0;
 
             // Options für Select-Felder
@@ -238,7 +238,7 @@ class ModalExtraFields extends Component
                 'team_id' => $teamId,
                 'created_by_user_id' => $user->id,
                 'context_type' => $this->contextType,
-                'context_id' => null, // Global für alle dieses Typs
+                'context_id' => $this->contextId, // Spezifisch für diesen Kontext (oder null für global)
                 'name' => $name,
                 'label' => trim($this->newField['label']),
                 'type' => $this->newField['type'],

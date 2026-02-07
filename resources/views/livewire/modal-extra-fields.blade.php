@@ -9,13 +9,19 @@
             </div>
             <div class="flex-1 min-w-0">
                 <h3 class="text-xl font-bold text-[var(--ui-secondary)]">Extra-Felder Definitionen</h3>
-                <p class="text-sm text-[var(--ui-muted)] mt-1">Felder für alle Einträge dieses Typs definieren</p>
+                <p class="text-sm text-[var(--ui-muted)] mt-1">
+                    @if($contextId)
+                        Felder für diesen Kontext definieren
+                    @else
+                        Felder für alle Einträge dieses Typs definieren
+                    @endif
+                </p>
             </div>
         </div>
     </x-slot>
 
     <div>
-        @if($contextType && !$contextId)
+        @if($contextType)
             <!-- Definitionen -->
             <div class="space-y-6">
                 <!-- Neues Feld erstellen -->
