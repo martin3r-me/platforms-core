@@ -301,6 +301,10 @@ trait WithExtraFields
      */
     public function openExtraFieldFilePicker(int $fieldId, bool $multiple = false): void
     {
+        if (!$this->extraFieldsModel) {
+            return;
+        }
+
         $this->activeExtraFieldFilePickerId = $fieldId;
         $this->activeExtraFieldFilePickerMultiple = $multiple;
 

@@ -384,6 +384,14 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register($this->app->make(\Platform\Core\Tools\GetContextFileContentTool::class)); } catch (\Throwable $e) {}
         }
 
+        // Extra Fields Tools (core.extra_fields.*)
+        if (class_exists(\Platform\Core\Tools\GetExtraFieldsTool::class) && !$registry->has('core.extra_fields.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\GetExtraFieldsTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\UpdateExtraFieldsTool::class) && !$registry->has('core.extra_fields.PUT')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\UpdateExtraFieldsTool::class)); } catch (\Throwable $e) {}
+        }
+
         // Communication Tools (core.comms.*)
         // Diese Tools müssen immer registriert sein, damit sie via tools.GET(module="communication") gefunden werden
         // Hinweis: communication.overview.GET wurde entfernt (verursachte Loops) - nutze direkt core.comms.overview.GET
