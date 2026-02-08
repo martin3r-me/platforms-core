@@ -28,7 +28,7 @@
                         <x-ui-input-textarea
                             :name="'extraFieldValues.' . $field['id']"
                             :label="$field['label']"
-                            :required="$field['is_required']"
+                            :required="$field['is_mandatory'] || $field['is_required']"
                             :hint="$field['is_encrypted'] ? 'Verschlüsselt' : null"
                             wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}"
                             rows="3"
@@ -40,7 +40,7 @@
                         <x-ui-input-number
                             :name="'extraFieldValues.' . $field['id']"
                             :label="$field['label']"
-                            :required="$field['is_required']"
+                            :required="$field['is_mandatory'] || $field['is_required']"
                             wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}"
                             step="any"
                             placeholder="Wert eingeben..."
@@ -57,13 +57,13 @@
                         <div>
                             <x-ui-label
                                 :text="$field['label']"
-                                :required="$field['is_required']"
+                                :required="$field['is_mandatory'] || $field['is_required']"
                                 class="mb-2"
                             />
                             <x-ui-input-select
                                 :name="'extraFieldValues.' . $field['id']"
                                 :options="['1' => 'Ja', '0' => 'Nein']"
-                                :nullable="!$field['is_required']"
+                                :nullable="!$field['is_mandatory'] && !$field['is_required']"
                                 nullLabel="Nicht ausgewählt"
                                 wire:model.live="extraFieldValues.{{ $field['id'] }}"
                                 displayMode="badges"
@@ -86,7 +86,7 @@
                         <div>
                             <x-ui-label
                                 :text="$field['label']"
-                                :required="$field['is_required']"
+                                :required="$field['is_mandatory'] || $field['is_required']"
                                 class="mb-2"
                             />
 
@@ -156,7 +156,7 @@
                             <div>
                                 <x-ui-label
                                     :text="$field['label']"
-                                    :required="$field['is_required']"
+                                    :required="$field['is_mandatory'] || $field['is_required']"
                                     class="mb-2"
                                 />
                                 @if($field['is_encrypted'])
@@ -184,9 +184,9 @@
                             <x-ui-input-select
                                 :name="'extraFieldValues.' . $field['id']"
                                 :label="$field['label']"
-                                :required="$field['is_required']"
+                                :required="$field['is_mandatory'] || $field['is_required']"
                                 :options="$selectOptions"
-                                :nullable="!$field['is_required']"
+                                :nullable="!$field['is_mandatory'] && !$field['is_required']"
                                 nullLabel="Bitte wählen..."
                                 wire:model.live="extraFieldValues.{{ $field['id'] }}"
                                 :displayMode="count($choices) <= 5 ? 'badges' : 'dropdown'"
@@ -204,7 +204,7 @@
                         <x-ui-input-text
                             :name="'extraFieldValues.' . $field['id']"
                             :label="$field['label']"
-                            :required="$field['is_required']"
+                            :required="$field['is_mandatory'] || $field['is_required']"
                             :hint="$field['is_encrypted'] ? 'Verschlüsselt' : null"
                             wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}"
                             placeholder="Wert eingeben..."

@@ -51,9 +51,16 @@
                         <div class="flex items-end gap-4 flex-wrap">
                             <x-ui-input-checkbox
                                 name="newField.is_required"
-                                checkedLabel="Pflichtfeld"
-                                uncheckedLabel="Als Pflichtfeld markieren"
+                                checkedLabel="Erforderlich (Fortschritt)"
+                                uncheckedLabel="Erforderlich (Fortschritt)"
                                 wire:model="newField.is_required"
+                            />
+
+                            <x-ui-input-checkbox
+                                name="newField.is_mandatory"
+                                checkedLabel="Pflichtfeld (blockiert Speichern)"
+                                uncheckedLabel="Pflichtfeld (blockiert Speichern)"
+                                wire:model="newField.is_mandatory"
                             />
 
                             <x-ui-input-checkbox
@@ -160,6 +167,9 @@
                                             Typ
                                         </th>
                                         <th scope="col" class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
+                                            Erforderl.
+                                        </th>
+                                        <th scope="col" class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
                                             Pflicht
                                         </th>
                                         <th scope="col" class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
@@ -225,6 +235,22 @@
                                             <td class="whitespace-nowrap px-3 py-4 text-center">
                                                 @if($editingDefinitionId === $def['id'])
                                                     <x-ui-input-checkbox
+                                                        name="editField.is_mandatory"
+                                                        checkedLabel="Ja"
+                                                        uncheckedLabel="Nein"
+                                                        wire:model="editField.is_mandatory"
+                                                    />
+                                                @else
+                                                    @if($def['is_mandatory'])
+                                                        @svg('heroicon-o-check', 'w-5 h-5 text-[var(--ui-danger)] mx-auto')
+                                                    @else
+                                                        @svg('heroicon-o-minus', 'w-5 h-5 text-[var(--ui-muted)] mx-auto')
+                                                    @endif
+                                                @endif
+                                            </td>
+                                            <td class="whitespace-nowrap px-3 py-4 text-center">
+                                                @if($editingDefinitionId === $def['id'])
+                                                    <x-ui-input-checkbox
                                                         name="editField.is_encrypted"
                                                         checkedLabel="Ja"
                                                         uncheckedLabel="Nein"
@@ -275,7 +301,7 @@
                                                         </button>
                                                         <button
                                                             wire:click="deleteDefinition({{ $def['id'] }})"
-                                                            wire:confirm="Feld wirklich löschen? Nur möglich, wenn keine Werte existieren."
+                                                            wire:confirm="Feld und alle zugehörigen Werte wirklich löschen?"
                                                             class="text-xs px-3 py-1.5 text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 hover:bg-[var(--ui-danger-5)] transition-colors"
                                                         >
                                                             Löschen
@@ -287,7 +313,7 @@
                                         {{-- Select-Optionen bearbeiten --}}
                                         @if($editingDefinitionId === $def['id'] && $editField['type'] === 'select')
                                             <tr class="bg-[var(--ui-muted-5)]/30">
-                                                <td colspan="6" class="px-6 py-4">
+                                                <td colspan="7" class="px-6 py-4">
                                                     <div class="p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40">
                                                         <div class="flex items-center justify-between mb-3">
                                                             <span class="text-sm font-medium text-[var(--ui-secondary)]">Auswahloptionen</span>
@@ -346,7 +372,7 @@
                                         {{-- File-Optionen bearbeiten --}}
                                         @if($editingDefinitionId === $def['id'] && $editField['type'] === 'file')
                                             <tr class="bg-[var(--ui-muted-5)]/30">
-                                                <td colspan="6" class="px-6 py-4">
+                                                <td colspan="7" class="px-6 py-4">
                                                     <div class="p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40">
                                                         <x-ui-input-checkbox
                                                             name="editField.is_multiple"

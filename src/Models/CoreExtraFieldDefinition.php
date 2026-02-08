@@ -20,6 +20,7 @@ class CoreExtraFieldDefinition extends Model
         'label',
         'type',
         'is_required',
+        'is_mandatory',
         'is_encrypted',
         'order',
         'options',
@@ -27,6 +28,7 @@ class CoreExtraFieldDefinition extends Model
 
     protected $casts = [
         'is_required' => 'boolean',
+        'is_mandatory' => 'boolean',
         'is_encrypted' => 'boolean',
         'order' => 'integer',
         'options' => 'array',

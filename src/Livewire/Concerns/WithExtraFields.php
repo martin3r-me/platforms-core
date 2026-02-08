@@ -235,7 +235,7 @@ trait WithExtraFields
         foreach ($this->extraFieldDefinitions as $field) {
             $fieldRules = [];
 
-            if ($field['is_required']) {
+            if ($field['is_mandatory'] ?? false) {
                 $fieldRules[] = 'required';
             } else {
                 $fieldRules[] = 'nullable';

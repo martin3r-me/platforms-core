@@ -27,6 +27,7 @@ class ModalExtraFields extends Component
         'label' => '',
         'type' => 'text',
         'is_required' => false,
+        'is_mandatory' => false,
         'is_encrypted' => false,
         'options' => [],
         'is_multiple' => false,
@@ -38,6 +39,7 @@ class ModalExtraFields extends Component
         'label' => '',
         'type' => 'text',
         'is_required' => false,
+        'is_mandatory' => false,
         'is_encrypted' => false,
         'options' => [],
         'is_multiple' => false,
@@ -137,6 +139,7 @@ class ModalExtraFields extends Component
                         'type' => $def->type,
                         'type_label' => $def->type_label,
                         'is_required' => $def->is_required,
+                        'is_mandatory' => $def->is_mandatory,
                         'is_encrypted' => $def->is_encrypted,
                         'is_global' => $def->isGlobal(),
                         'options' => $def->options,
@@ -185,6 +188,7 @@ class ModalExtraFields extends Component
             'newField.label' => ['required', 'string', 'max:255'],
             'newField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select,file'],
             'newField.is_required' => ['boolean'],
+            'newField.is_mandatory' => ['boolean'],
             'newField.is_encrypted' => ['boolean'],
         ];
 
@@ -250,6 +254,7 @@ class ModalExtraFields extends Component
                 'label' => trim($this->newField['label']),
                 'type' => $this->newField['type'],
                 'is_required' => $this->newField['is_required'] ?? false,
+                'is_mandatory' => $this->newField['is_mandatory'] ?? false,
                 'is_encrypted' => $this->newField['is_encrypted'] ?? false,
                 'order' => $maxOrder + 1,
                 'options' => $options,
@@ -285,6 +290,7 @@ class ModalExtraFields extends Component
             'label' => $definition['label'],
             'type' => $definition['type'],
             'is_required' => $definition['is_required'],
+            'is_mandatory' => $definition['is_mandatory'],
             'is_encrypted' => $definition['is_encrypted'],
             'options' => $definition['options']['choices'] ?? [],
             'is_multiple' => $definition['options']['multiple'] ?? false,
@@ -299,6 +305,7 @@ class ModalExtraFields extends Component
             'label' => '',
             'type' => 'text',
             'is_required' => false,
+            'is_mandatory' => false,
             'is_encrypted' => false,
             'options' => [],
             'is_multiple' => false,
@@ -316,6 +323,7 @@ class ModalExtraFields extends Component
             'editField.label' => ['required', 'string', 'max:255'],
             'editField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select,file'],
             'editField.is_required' => ['boolean'],
+            'editField.is_mandatory' => ['boolean'],
             'editField.is_encrypted' => ['boolean'],
         ];
 
@@ -352,6 +360,7 @@ class ModalExtraFields extends Component
                 'label' => trim($this->editField['label']),
                 'type' => $this->editField['type'],
                 'is_required' => $this->editField['is_required'] ?? false,
+                'is_mandatory' => $this->editField['is_mandatory'] ?? false,
                 'is_encrypted' => $this->editField['is_encrypted'] ?? false,
                 'options' => $options,
             ]);
@@ -379,15 +388,8 @@ class ModalExtraFields extends Component
                 return;
             }
 
-            // Prüfe ob Werte existieren
-            $hasValues = CoreExtraFieldValue::where('definition_id', $definitionId)->exists();
-            if ($hasValues) {
-                $this->dispatch('notify', [
-                    'type' => 'error',
-                    'message' => 'Feld hat Werte und kann nicht gelöscht werden.',
-                ]);
-                return;
-            }
+            // Werte mit löschen (cascade)
+            CoreExtraFieldValue::where('definition_id', $definitionId)->delete();
 
             $definition->delete();
 
@@ -473,6 +475,7 @@ class ModalExtraFields extends Component
             'label' => '',
             'type' => 'text',
             'is_required' => false,
+            'is_mandatory' => false,
             'is_encrypted' => false,
             'options' => [],
             'is_multiple' => false,

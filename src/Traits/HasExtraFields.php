@@ -131,6 +131,7 @@ trait HasExtraFields
                 'type' => $definition->type,
                 'value' => $value?->typed_value,
                 'is_required' => $definition->is_required,
+                'is_mandatory' => $definition->is_mandatory,
                 'is_encrypted' => $definition->is_encrypted,
                 'options' => $definition->options,
             ];
