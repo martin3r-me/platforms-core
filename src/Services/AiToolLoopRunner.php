@@ -62,6 +62,11 @@ class AiToolLoopRunner
         // Important: start from discovery-only tool set, then allow tools.GET to expand.
         $this->openAi->resetDynamicallyLoadedTools();
 
+        $preloadTools = $options['preload_tools'] ?? [];
+        if (!empty($preloadTools) && is_array($preloadTools)) {
+            $this->openAi->loadToolsDynamically($preloadTools);
+        }
+
         $previousResponseId = null;
         $messagesForApi = $messages;
         $assistantFull = '';
@@ -156,7 +161,15 @@ class AiToolLoopRunner
             $assistantFull .= $assistant;
             $lastToolCalls = array_values($toolCallsCollector);
             foreach ($lastToolCalls as $call) {
-                $allToolCallNames[] = $call['name'] ?? '?';
+                $rawName = $call['name'] ?? '?';
+                $allToolCallNames[] = $this->nameMapper->toCanonical($rawName);
+            }
+
+            // on_iteration callback
+            $onIteration = $options['on_iteration'] ?? null;
+            if (is_callable($onIteration)) {
+                $iterToolNames = array_map(fn($c) => $this->nameMapper->toCanonical($c['name'] ?? '?'), $lastToolCalls);
+                $onIteration($iteration, $iterToolNames, strlen($assistant));
             }
 
             // Auto-continue truncated output (only when there are no tool calls).
@@ -238,7 +251,8 @@ class AiToolLoopRunner
                 $assistantFull .= $assistantMore;
                 $lastToolCalls = array_values($toolCallsCollector);
                 foreach ($lastToolCalls as $call) {
-                    $allToolCallNames[] = $call['name'] ?? '?';
+                    $rawName = $call['name'] ?? '?';
+                    $allToolCallNames[] = $this->nameMapper->toCanonical($rawName);
                 }
 
                 if (!empty($toolCallsCollector)) {
