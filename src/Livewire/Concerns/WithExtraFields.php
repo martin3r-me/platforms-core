@@ -3,6 +3,7 @@
 namespace Platform\Core\Livewire\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
+use Livewire\Attributes\On;
 use Platform\Core\Models\CoreExtraFieldDefinition;
 use Platform\Core\Models\CoreExtraFieldValue;
 
@@ -39,6 +40,16 @@ trait WithExtraFields
     protected ?Model $extraFieldsModel = null;
 
     /**
+     * Active file picker field ID
+     */
+    public ?int $activeExtraFieldFilePickerId = null;
+
+    /**
+     * Whether the active file picker allows multiple files
+     */
+    public bool $activeExtraFieldFilePickerMultiple = false;
+
+    /**
      * Load extra field values from a model
      */
     public function loadExtraFieldValues(Model $model): void
@@ -55,6 +66,15 @@ trait WithExtraFields
 
             // Für Mehrfachauswahl muss der Wert ein Array sein
             if ($field['type'] === 'select' && ($field['options']['multiple'] ?? false)) {
+                if ($value === null) {
+                    $value = [];
+                } elseif (!is_array($value)) {
+                    $value = [$value];
+                }
+            }
+
+            // Für File-Felder: Array normalisieren
+            if ($field['type'] === 'file' && ($field['options']['multiple'] ?? false)) {
                 if ($value === null) {
                     $value = [];
                 } elseif (!is_array($value)) {
@@ -92,6 +112,15 @@ trait WithExtraFields
 
             // Für Mehrfachauswahl muss der Wert ein Array sein
             if ($field['type'] === 'select' && ($field['options']['multiple'] ?? false)) {
+                if ($value === null) {
+                    $value = [];
+                } elseif (!is_array($value)) {
+                    $value = [$value];
+                }
+            }
+
+            // Für File-Felder: Array normalisieren
+            if ($field['type'] === 'file' && ($field['options']['multiple'] ?? false)) {
                 if ($value === null) {
                     $value = [];
                 } elseif (!is_array($value)) {
@@ -235,6 +264,14 @@ trait WithExtraFields
                         }
                     }
                     break;
+                case 'file':
+                    $isMultiple = $field['options']['multiple'] ?? false;
+                    if ($isMultiple) {
+                        $fieldRules[] = 'array';
+                    } else {
+                        $fieldRules[] = 'integer';
+                    }
+                    break;
             }
 
             $rules["extraFieldValues.{$field['id']}"] = $fieldRules;
@@ -257,5 +294,75 @@ trait WithExtraFields
         }
 
         return $messages;
+    }
+
+    /**
+     * Öffnet den File-Picker für ein Extra-Feld
+     */
+    public function openExtraFieldFilePicker(int $fieldId, bool $multiple = false): void
+    {
+        $this->activeExtraFieldFilePickerId = $fieldId;
+        $this->activeExtraFieldFilePickerMultiple = $multiple;
+
+        // Context aus Model bestimmen
+        $contextType = get_class($this->extraFieldsModel);
+        $contextId = $this->extraFieldsModel->id;
+
+        $this->dispatch('files', [
+            'context_type' => $contextType,
+            'context_id' => $contextId,
+        ]);
+
+        $this->dispatch('files:picker', [
+            'multiple' => $multiple,
+            'callback' => 'extrafield',
+        ]);
+    }
+
+    /**
+     * Entfernt eine Datei aus einem Extra-Feld
+     */
+    public function removeExtraFieldFile(int $fieldId, int $fileId): void
+    {
+        $currentValue = $this->extraFieldValues[$fieldId] ?? null;
+
+        if (is_array($currentValue)) {
+            $this->extraFieldValues[$fieldId] = array_values(
+                array_filter($currentValue, fn($id) => $id != $fileId)
+            );
+        } else {
+            $this->extraFieldValues[$fieldId] = null;
+        }
+    }
+
+    /**
+     * Listener für File-Picker Callback
+     */
+    #[On('files:selected')]
+    public function handleExtraFieldFileSelected(array $payload): void
+    {
+        if (($payload['callback'] ?? null) !== 'extrafield') {
+            return;
+        }
+
+        if (!$this->activeExtraFieldFilePickerId) {
+            return;
+        }
+
+        $fieldId = $this->activeExtraFieldFilePickerId;
+        $selectedFileIds = collect($payload['files'] ?? [])->pluck('id')->toArray();
+
+        if ($this->activeExtraFieldFilePickerMultiple) {
+            // Multiple: Zu bestehenden hinzufügen
+            $current = $this->extraFieldValues[$fieldId] ?? [];
+            $current = is_array($current) ? $current : ($current ? [$current] : []);
+            $this->extraFieldValues[$fieldId] = array_values(array_unique(array_merge($current, $selectedFileIds)));
+        } else {
+            // Single: Ersetzen
+            $this->extraFieldValues[$fieldId] = $selectedFileIds[0] ?? null;
+        }
+
+        $this->activeExtraFieldFilePickerId = null;
+        $this->activeExtraFieldFilePickerMultiple = false;
     }
 }

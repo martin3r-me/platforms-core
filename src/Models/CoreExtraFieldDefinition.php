@@ -42,6 +42,7 @@ class CoreExtraFieldDefinition extends Model
         'textarea' => 'Mehrzeiliger Text',
         'boolean' => 'Ja/Nein',
         'select' => 'Auswahl',
+        'file' => 'Datei',
     ];
 
     /**

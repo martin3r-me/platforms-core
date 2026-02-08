@@ -77,6 +77,74 @@
                         </div>
                         @break
 
+                    @case('file')
+                        @php
+                            $isMultiple = $field['options']['multiple'] ?? false;
+                            $fileIds = $extraFieldValues[$field['id']] ?? ($isMultiple ? [] : null);
+                            $fileIds = is_array($fileIds) ? $fileIds : ($fileIds ? [$fileIds] : []);
+                        @endphp
+                        <div>
+                            <x-ui-label
+                                :text="$field['label']"
+                                :required="$field['is_required']"
+                                class="mb-2"
+                            />
+
+                            {{-- Datei-Vorschau --}}
+                            @if(count($fileIds) > 0)
+                                <div class="flex flex-wrap gap-2 mb-2">
+                                    @foreach($fileIds as $fileId)
+                                        @php
+                                            $file = \Platform\Core\Models\ContextFile::find($fileId);
+                                        @endphp
+                                        @if($file)
+                                            <div class="relative group">
+                                                @if($file->isImage())
+                                                    <img
+                                                        src="{{ $file->thumbnail?->url ?? $file->url }}"
+                                                        alt="{{ $file->original_name }}"
+                                                        class="w-16 h-16 object-cover border border-[var(--ui-border)]/40"
+                                                    />
+                                                @else
+                                                    <div class="w-16 h-16 flex items-center justify-center bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
+                                                        @svg('heroicon-o-document', 'w-6 h-6 text-[var(--ui-muted)]')
+                                                    </div>
+                                                @endif
+                                                <button
+                                                    type="button"
+                                                    wire:click="removeExtraFieldFile({{ $field['id'] }}, {{ $fileId }})"
+                                                    class="absolute -top-1 -right-1 w-5 h-5 bg-[var(--ui-danger)] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    @svg('heroicon-o-x-mark', 'w-3 h-3')
+                                                </button>
+                                                <span class="block text-xs text-[var(--ui-muted)] truncate max-w-[4rem]" title="{{ $file->original_name }}">
+                                                    {{ $file->original_name }}
+                                                </span>
+                                            </div>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            @endif
+
+                            {{-- Datei-Auswahl Button --}}
+                            <button
+                                type="button"
+                                wire:click="openExtraFieldFilePicker({{ $field['id'] }}, {{ $isMultiple ? 'true' : 'false' }})"
+                                class="px-3 py-1.5 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] hover:bg-[var(--ui-muted-5)] transition-colors flex items-center gap-2"
+                            >
+                                @svg('heroicon-o-paper-clip', 'w-4 h-4')
+                                {{ $isMultiple ? 'Dateien auswählen' : 'Datei auswählen' }}
+                            </button>
+
+                            @if($field['is_encrypted'])
+                                <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mt-1">
+                                    @svg('heroicon-o-lock-closed', 'w-3 h-3')
+                                    Verschlüsselt
+                                </span>
+                            @endif
+                        </div>
+                        @break
+
                     @case('select')
                         @php
                             $choices = $field['options']['choices'] ?? [];

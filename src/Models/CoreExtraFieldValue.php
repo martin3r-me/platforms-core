@@ -83,6 +83,7 @@ class CoreExtraFieldValue extends Model
             'number' => is_numeric($value) ? (float) $value : null,
             'text', 'textarea' => (string) $value,
             'select' => $this->decodeSelectValue($value),
+            'file' => $this->decodeFileValue($value),
             default => $value,
         };
     }
@@ -103,6 +104,7 @@ class CoreExtraFieldValue extends Model
             'number' => is_numeric($value) ? (string) $value : null,
             'text', 'textarea' => (string) $value,
             'select' => is_array($value) ? json_encode($value) : (string) $value,
+            'file' => is_array($value) ? json_encode($value) : (string) $value,
             default => (string) $value,
         };
 
@@ -154,6 +156,23 @@ class CoreExtraFieldValue extends Model
         }
 
         return $value;
+    }
+
+    /**
+     * Dekodiert File-Werte (können JSON-Arrays sein für Mehrfachdateien)
+     */
+    protected function decodeFileValue(string $value): mixed
+    {
+        // Prüfen ob es ein JSON-Array ist (multiple files)
+        if (str_starts_with($value, '[') && str_ends_with($value, ']')) {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        // Einzelne File-ID
+        return (int) $value;
     }
 
     /**

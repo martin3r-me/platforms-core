@@ -120,6 +120,18 @@
                         </div>
                     @endif
 
+                    {{-- File-Optionen --}}
+                    @if($newField['type'] === 'file')
+                        <div class="mt-4 p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40">
+                            <x-ui-input-checkbox
+                                name="newField.is_multiple"
+                                checkedLabel="Mehrere Dateien erlaubt"
+                                uncheckedLabel="Mehrere Dateien erlauben"
+                                wire:model="newField.is_multiple"
+                            />
+                        </div>
+                    @endif
+
                     <div class="mt-4 flex justify-end">
                         <button
                             wire:click="createDefinition"
@@ -189,7 +201,7 @@
                                                     />
                                                 @else
                                                     <span class="text-sm text-[var(--ui-muted)]">{{ $def['type_label'] }}</span>
-                                                    @if($def['type'] === 'select' && isset($def['options']['multiple']) && $def['options']['multiple'])
+                                                    @if(($def['type'] === 'select' || $def['type'] === 'file') && isset($def['options']['multiple']) && $def['options']['multiple'])
                                                         <span class="ml-1 text-xs text-[var(--ui-primary)]">(Mehrfach)</span>
                                                     @endif
                                                 @endif
@@ -326,6 +338,22 @@
                                                         @error('editField.options')
                                                             <p class="mt-2 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
                                                         @enderror
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @endif
+
+                                        {{-- File-Optionen bearbeiten --}}
+                                        @if($editingDefinitionId === $def['id'] && $editField['type'] === 'file')
+                                            <tr class="bg-[var(--ui-muted-5)]/30">
+                                                <td colspan="6" class="px-6 py-4">
+                                                    <div class="p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40">
+                                                        <x-ui-input-checkbox
+                                                            name="editField.is_multiple"
+                                                            checkedLabel="Mehrere Dateien erlaubt"
+                                                            uncheckedLabel="Mehrere Dateien erlauben"
+                                                            wire:model="editField.is_multiple"
+                                                        />
                                                     </div>
                                                 </td>
                                             </tr>

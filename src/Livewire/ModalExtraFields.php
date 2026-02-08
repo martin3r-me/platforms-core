@@ -183,7 +183,7 @@ class ModalExtraFields extends Component
     {
         $rules = [
             'newField.label' => ['required', 'string', 'max:255'],
-            'newField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select'],
+            'newField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select,file'],
             'newField.is_required' => ['boolean'],
             'newField.is_encrypted' => ['boolean'],
         ];
@@ -230,6 +230,13 @@ class ModalExtraFields extends Component
             if ($this->newField['type'] === 'select') {
                 $options = [
                     'choices' => $this->newField['options'],
+                    'multiple' => $this->newField['is_multiple'] ?? false,
+                ];
+            }
+
+            // Options für File-Felder
+            if ($this->newField['type'] === 'file') {
+                $options = [
                     'multiple' => $this->newField['is_multiple'] ?? false,
                 ];
             }
@@ -307,7 +314,7 @@ class ModalExtraFields extends Component
 
         $rules = [
             'editField.label' => ['required', 'string', 'max:255'],
-            'editField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select'],
+            'editField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select,file'],
             'editField.is_required' => ['boolean'],
             'editField.is_encrypted' => ['boolean'],
         ];
@@ -330,6 +337,13 @@ class ModalExtraFields extends Component
             if ($this->editField['type'] === 'select') {
                 $options = [
                     'choices' => $this->editField['options'],
+                    'multiple' => $this->editField['is_multiple'] ?? false,
+                ];
+            }
+
+            // Options für File-Felder
+            if ($this->editField['type'] === 'file') {
+                $options = [
                     'multiple' => $this->editField['is_multiple'] ?? false,
                 ];
             }
