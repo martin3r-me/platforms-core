@@ -90,7 +90,13 @@ class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
                 }
 
                 $model->setExtraField($fieldName, $value);
-                $updated[] = $fieldName;
+                $savedValue = $model->getExtraField($fieldName);
+                $expectNull = ($value === null || $value === '');
+                if ($expectNull ? $savedValue === null : $savedValue !== null) {
+                    $updated[] = $fieldName;
+                } else {
+                    $errors[] = "Feld '{$fieldName}' konnte nicht gespeichert werden (Definition nicht gefunden oder Kontext-Fehler).";
+                }
             }
 
             $result = [
