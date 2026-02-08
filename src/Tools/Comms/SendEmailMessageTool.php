@@ -178,6 +178,18 @@ class SendEmailMessageTool implements ToolContract, ToolMetadataContract
                 ->where('token', $token)
                 ->first();
 
+            // Kontext aus ToolContext-Metadata übernehmen (z.B. AutoPilot → Bewerber)
+            if ($resultThread && !$resultThread->context_model) {
+                $ctxModel = $context->metadata['context_model'] ?? null;
+                $ctxModelId = $context->metadata['context_model_id'] ?? null;
+                if ($ctxModel && $ctxModelId) {
+                    $resultThread->update([
+                        'context_model' => $ctxModel,
+                        'context_model_id' => $ctxModelId,
+                    ]);
+                }
+            }
+
             return ToolResult::success([
                 'message' => 'E‑Mail gesendet.',
                 'token' => $token,
