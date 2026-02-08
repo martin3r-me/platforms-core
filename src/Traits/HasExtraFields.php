@@ -85,7 +85,7 @@ trait HasExtraFields
         if (!$fieldValue) {
             $fieldValue = new CoreExtraFieldValue([
                 'definition_id' => $definition->id,
-                'fieldable_type' => get_class($this),
+                'fieldable_type' => $this->getMorphClass(),
                 'fieldable_id' => $this->id,
             ]);
         }
