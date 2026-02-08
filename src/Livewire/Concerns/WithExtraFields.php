@@ -40,6 +40,11 @@ trait WithExtraFields
     protected ?Model $extraFieldsModel = null;
 
     /**
+     * The parent model for inherited definitions (e.g., Board for Ticket)
+     */
+    protected ?Model $extraFieldsParentModel = null;
+
+    /**
      * Active file picker field ID
      */
     public ?int $activeExtraFieldFilePickerId = null;
@@ -56,8 +61,12 @@ trait WithExtraFields
     {
         $this->extraFieldsModel = $model;
 
-        // Load definitions
-        $this->extraFieldDefinitions = $model->getExtraFieldsWithLabels();
+        // Load definitions and mark as own (not inherited)
+        $definitions = $model->getExtraFieldsWithLabels();
+        $this->extraFieldDefinitions = array_map(function ($def) {
+            $def['is_inherited'] = false;
+            return $def;
+        }, $definitions);
 
         // Initialize values array with current values
         $this->extraFieldValues = [];
@@ -91,6 +100,7 @@ trait WithExtraFields
 
     /**
      * Load extra field values with inherited definitions from parent model.
+     * Also loads own definitions specific to the model itself.
      *
      * @param Model $model The model to load values for (e.g., Ticket)
      * @param Model $parentModel The parent model with definitions (e.g., Board)
@@ -98,11 +108,29 @@ trait WithExtraFields
     public function loadExtraFieldValuesFromParent(Model $model, Model $parentModel): void
     {
         $this->extraFieldsModel = $model;
+        $this->extraFieldsParentModel = $parentModel;
 
         // Load definitions from PARENT model
-        $this->extraFieldDefinitions = $parentModel->getExtraFieldsWithLabels();
+        $parentDefinitions = $parentModel->getExtraFieldsWithLabels();
 
-        // Load VALUES from current model, but using parent's definition IDs
+        // Load definitions specific to THIS model (own definitions)
+        $ownDefinitions = $model->getExtraFieldsWithLabels();
+
+        // Merge: Parent definitions first, then own definitions
+        // Mark each definition with its source for UI distinction
+        $parentDefinitions = array_map(function ($def) {
+            $def['is_inherited'] = true;
+            return $def;
+        }, $parentDefinitions);
+
+        $ownDefinitions = array_map(function ($def) {
+            $def['is_inherited'] = false;
+            return $def;
+        }, $ownDefinitions);
+
+        $this->extraFieldDefinitions = array_merge($parentDefinitions, $ownDefinitions);
+
+        // Load VALUES from current model
         $values = $model->extraFieldValues()->with('definition')->get()->keyBy('definition_id');
 
         // Initialize values array
@@ -140,15 +168,36 @@ trait WithExtraFields
      */
     public function refreshExtraFieldDefinitions(): void
     {
-        if ($this->extraFieldsModel) {
-            $this->extraFieldDefinitions = $this->extraFieldsModel->getExtraFieldsWithLabels();
+        if (!$this->extraFieldsModel) {
+            return;
+        }
 
-            // Add any new definitions to values array
-            foreach ($this->extraFieldDefinitions as $field) {
-                if (!array_key_exists($field['id'], $this->extraFieldValues)) {
-                    $this->extraFieldValues[$field['id']] = $field['value'];
-                    $this->originalExtraFieldValues[$field['id']] = $field['value'];
-                }
+        // If we have a parent model, reload both sources
+        if ($this->extraFieldsParentModel) {
+            $parentDefinitions = $this->extraFieldsParentModel->getExtraFieldsWithLabels();
+            $ownDefinitions = $this->extraFieldsModel->getExtraFieldsWithLabels();
+
+            $parentDefinitions = array_map(function ($def) {
+                $def['is_inherited'] = true;
+                return $def;
+            }, $parentDefinitions);
+
+            $ownDefinitions = array_map(function ($def) {
+                $def['is_inherited'] = false;
+                return $def;
+            }, $ownDefinitions);
+
+            $this->extraFieldDefinitions = array_merge($parentDefinitions, $ownDefinitions);
+        } else {
+            // No parent - just load own definitions
+            $this->extraFieldDefinitions = $this->extraFieldsModel->getExtraFieldsWithLabels();
+        }
+
+        // Add any new definitions to values array
+        foreach ($this->extraFieldDefinitions as $field) {
+            if (!array_key_exists($field['id'], $this->extraFieldValues)) {
+                $this->extraFieldValues[$field['id']] = $field['value'] ?? null;
+                $this->originalExtraFieldValues[$field['id']] = $field['value'] ?? null;
             }
         }
     }
