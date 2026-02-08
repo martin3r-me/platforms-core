@@ -53,7 +53,8 @@ class CoreServiceProvider extends ServiceProvider
 
         // Blade Components
         Blade::component('platform::components.extra-fields-form', 'core-extra-fields-form');
-        
+        Blade::component('platform::components.extra-fields-section', 'core-extra-fields-section');
+
         // Teams SSO Routes laden
         $this->loadRoutesFrom(__DIR__.'/../routes/teams-sso.php');
         
