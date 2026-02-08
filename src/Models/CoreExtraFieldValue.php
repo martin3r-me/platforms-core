@@ -81,6 +81,7 @@ class CoreExtraFieldValue extends Model
 
         return match ($type) {
             'number' => is_numeric($value) ? (float) $value : null,
+            'boolean' => in_array($value, ['1', 'true'], true),
             'text', 'textarea' => (string) $value,
             'select' => $this->decodeSelectValue($value),
             'file' => $this->decodeFileValue($value),
@@ -102,6 +103,7 @@ class CoreExtraFieldValue extends Model
 
         $stringValue = match ($type) {
             'number' => is_numeric($value) ? (string) $value : null,
+            'boolean' => $this->normalizeBooleanForStorage($value),
             'text', 'textarea' => (string) $value,
             'select' => is_array($value) ? json_encode($value) : (string) $value,
             'file' => is_array($value) ? json_encode($value) : (string) $value,
@@ -115,6 +117,18 @@ class CoreExtraFieldValue extends Model
 
         // Verschlüsseln wenn Definition is_encrypted = true (nutzt EncryptedString Cast)
         $this->attributes['value'] = $this->encryptIfNeeded($stringValue);
+    }
+
+    private function normalizeBooleanForStorage(mixed $value): string
+    {
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+        $lower = strtolower(trim((string) $value));
+        if (in_array($lower, ['1', 'true', 'ja', 'yes'], true)) {
+            return '1';
+        }
+        return '0';
     }
 
     /**

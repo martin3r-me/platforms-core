@@ -36,7 +36,7 @@ class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
                 ],
                 'fields' => [
                     'type' => 'object',
-                    'description' => 'Key-Value-Paare der zu setzenden Extra-Fields. Key = field name, Value = neuer Wert. Nutze null oder "" um einen Wert zu löschen.',
+                    'description' => 'Key-Value-Paare der zu setzenden Extra-Fields. Key = field name, Value = neuer Wert. Für boolean-Felder: true/false oder "Ja"/"Nein". Für select-Felder mit Mehrfachauswahl: Array von Strings. Nutze null oder "" um einen Wert zu löschen.',
                 ],
                 'team_id' => [
                     'type' => 'integer',
