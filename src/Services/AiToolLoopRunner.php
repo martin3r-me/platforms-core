@@ -66,6 +66,7 @@ class AiToolLoopRunner
         $messagesForApi = $messages;
         $assistantFull = '';
         $lastToolCalls = [];
+        $allToolCallNames = [];
 
         // Auto continuation for max_output_tokens (no tool calls) – keep small to avoid runaway.
         $maxOutputContinuations = (int)($options['max_output_continuations'] ?? 8);
@@ -154,6 +155,9 @@ class AiToolLoopRunner
 
             $assistantFull .= $assistant;
             $lastToolCalls = array_values($toolCallsCollector);
+            foreach ($lastToolCalls as $call) {
+                $allToolCallNames[] = $call['name'] ?? '?';
+            }
 
             // Auto-continue truncated output (only when there are no tool calls).
             $continuationPass = 0;
@@ -233,6 +237,9 @@ class AiToolLoopRunner
 
                 $assistantFull .= $assistantMore;
                 $lastToolCalls = array_values($toolCallsCollector);
+                foreach ($lastToolCalls as $call) {
+                    $allToolCallNames[] = $call['name'] ?? '?';
+                }
 
                 if (!empty($toolCallsCollector)) {
                     // tool calls exist → break auto-continuation and continue with tool execution below.
@@ -248,6 +255,7 @@ class AiToolLoopRunner
                     'previous_response_id' => null,
                     'next_input' => null,
                     'last_tool_calls' => $lastToolCalls,
+                    'all_tool_call_names' => $allToolCallNames,
                 ];
             }
 
@@ -319,6 +327,7 @@ class AiToolLoopRunner
                     'previous_response_id' => null,
                     'next_input' => null,
                     'last_tool_calls' => $lastToolCalls,
+                    'all_tool_call_names' => $allToolCallNames,
                 ];
             }
         }
@@ -330,6 +339,7 @@ class AiToolLoopRunner
             'previous_response_id' => $previousResponseId,
             'next_input' => $messagesForApi,
             'last_tool_calls' => $lastToolCalls,
+            'all_tool_call_names' => $allToolCallNames,
         ];
     }
 }
