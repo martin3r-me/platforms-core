@@ -176,7 +176,19 @@ class WhatsAppWebhookController extends Controller
      */
     protected function findChannelByPhoneNumberId(string $phoneNumberId): ?CommsChannel
     {
-        // Search for a channel where the provider connection has this phone_number_id
+        // First try to find in channel meta (where credentials are stored when channel is created)
+        $channel = CommsChannel::query()
+            ->where('type', 'whatsapp')
+            ->where('provider', 'whatsapp_meta')
+            ->where('is_active', true)
+            ->whereJsonContains('meta->phone_number_id', $phoneNumberId)
+            ->first();
+
+        if ($channel) {
+            return $channel;
+        }
+
+        // Fallback: search in provider connection credentials
         return CommsChannel::query()
             ->where('type', 'whatsapp')
             ->where('provider', 'whatsapp_meta')
