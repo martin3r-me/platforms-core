@@ -20,13 +20,39 @@ class WhatsAppChannelSyncService
     {
         $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
 
-        // Find accounts where owner belongs to this root team
-        // Check via teams relationship (user is member of root team or any subteam)
+        // Find accounts where a team member has access (as owner OR via grant)
         $accounts = IntegrationsWhatsAppAccount::query()
-            ->whereHas('integrationConnection.ownerUser', function ($query) use ($rootTeam) {
-                $query->whereHas('teams', function ($tq) use ($rootTeam) {
-                    $tq->where('teams.id', $rootTeam->id)
-                       ->orWhere('teams.parent_id', $rootTeam->id);
+            ->whereHas('integrationConnection', function ($connQuery) use ($rootTeam) {
+                $connQuery->where(function ($q) use ($rootTeam) {
+                    // Owner belongs to this team hierarchy
+                    $q->whereHas('ownerUser', function ($uq) use ($rootTeam) {
+                        $uq->where(function ($u) use ($rootTeam) {
+                            $u->whereHas('currentTeamRelation', function ($tq) use ($rootTeam) {
+                                $tq->where('id', $rootTeam->id)
+                                   ->orWhere('parent_id', $rootTeam->id);
+                            });
+                        })->orWhere(function ($u) use ($rootTeam) {
+                            $u->whereHas('team', function ($tq) use ($rootTeam) {
+                                $tq->where('id', $rootTeam->id)
+                                   ->orWhere('parent_id', $rootTeam->id);
+                            });
+                        });
+                    });
+                })->orWhere(function ($q) use ($rootTeam) {
+                    // OR a grantee belongs to this team hierarchy
+                    $q->whereHas('grants.granteeUser', function ($uq) use ($rootTeam) {
+                        $uq->where(function ($u) use ($rootTeam) {
+                            $u->whereHas('currentTeamRelation', function ($tq) use ($rootTeam) {
+                                $tq->where('id', $rootTeam->id)
+                                   ->orWhere('parent_id', $rootTeam->id);
+                            });
+                        })->orWhere(function ($u) use ($rootTeam) {
+                            $u->whereHas('team', function ($tq) use ($rootTeam) {
+                                $tq->where('id', $rootTeam->id)
+                                   ->orWhere('parent_id', $rootTeam->id);
+                            });
+                        });
+                    });
                 });
             })
             ->whereNotNull('phone_number')

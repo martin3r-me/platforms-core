@@ -97,9 +97,17 @@ class ModalComms extends Component
         'sender_domain' => '',
         'name' => '',
         'visibility' => 'private', // private|team
+        'whatsapp_account_id' => null, // for WhatsApp channels
     ];
 
     public ?string $channelsMessage = null;
+
+    /**
+     * Available WhatsApp accounts for channel creation (user has access via owner or grant).
+     *
+     * @var array<int, array<string, mixed>>
+     */
+    public array $availableWhatsAppAccounts = [];
 
     // --- Runtime Email (Kanäle Tab) ---
     /** @var array<int, array<string, mixed>> */
@@ -1175,11 +1183,12 @@ class ModalComms extends Component
         $this->rootTeamId = (int) $rootTeam->id;
         $this->rootTeamName = (string) ($rootTeam->name ?? '');
 
-        // For now, we list only email/postmark channels (we'll expand later).
+        // Load both email and whatsapp channels
         $this->channels = CommsChannel::query()
             ->where('team_id', $rootTeam->id)
-            ->where('type', 'email')
+            ->whereIn('type', ['email', 'whatsapp'])
             ->orderByDesc('is_active')
+            ->orderBy('type')
             ->orderBy('visibility')
             ->orderBy('sender_identifier')
             ->get()
@@ -1193,6 +1202,45 @@ class ModalComms extends Component
                 'is_active' => (bool) $c->is_active,
             ])
             ->all();
+
+        // Load available WhatsApp accounts for channel creation
+        $this->loadAvailableWhatsAppAccounts();
+    }
+
+    /**
+     * Load WhatsApp accounts that the current user has access to (as owner or via grant).
+     */
+    public function loadAvailableWhatsAppAccounts(): void
+    {
+        $this->availableWhatsAppAccounts = [];
+
+        $user = Auth::user();
+        if (!$user) {
+            return;
+        }
+
+        // Get all IntegrationConnections where user is owner or has a grant
+        $accounts = IntegrationsWhatsAppAccount::query()
+            ->whereHas('integrationConnection', function ($q) use ($user) {
+                $q->where('owner_user_id', $user->id)
+                  ->orWhereHas('grants', function ($gq) use ($user) {
+                      $gq->where('grantee_user_id', $user->id);
+                  });
+            })
+            ->whereNotNull('phone_number')
+            ->where('phone_number', '!=', '')
+            ->with('integrationConnection.ownerUser')
+            ->get();
+
+        $this->availableWhatsAppAccounts = $accounts->map(fn (IntegrationsWhatsAppAccount $a) => [
+            'id' => (int) $a->id,
+            'phone_number' => (string) $a->phone_number,
+            'title' => $a->title ? (string) $a->title : null,
+            'label' => $a->title
+                ? "{$a->title} ({$a->phone_number})"
+                : (string) $a->phone_number,
+            'owner' => $a->integrationConnection?->ownerUser?->name ?? '—',
+        ])->all();
     }
 
     public function createChannel(): void
@@ -1209,6 +1257,24 @@ class ModalComms extends Component
         /** @var Team $rootTeam */
         $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
 
+        $type = (string) ($this->newChannel['type'] ?? 'email');
+        $visibility = (string) ($this->newChannel['visibility'] ?? 'private');
+
+        if ($visibility === 'team' && !$this->canCreateTeamSharedChannel()) {
+            $this->channelsMessage = '⛔️ Teamweite Kanäle dürfen nur Owner/Admin des Root-Teams anlegen.';
+            return;
+        }
+
+        // Handle different channel types
+        if ($type === 'whatsapp') {
+            $this->createWhatsAppChannel($rootTeam, $user, $visibility);
+        } else {
+            $this->createEmailChannel($rootTeam, $user, $visibility);
+        }
+    }
+
+    private function createEmailChannel(Team $rootTeam, $user, string $visibility): void
+    {
         $this->validate([
             'newChannel.type' => ['required', 'string', 'max:32'],
             'newChannel.provider' => ['required', 'string', 'max:64'],
@@ -1218,31 +1284,21 @@ class ModalComms extends Component
             'newChannel.visibility' => ['required', 'in:private,team'],
         ]);
 
-        $type = (string) $this->newChannel['type'];
         $provider = (string) $this->newChannel['provider'];
         $local = trim((string) $this->newChannel['sender_local_part']);
         $selectedDomain = strtolower(trim((string) $this->newChannel['sender_domain']));
         $sender = $local . '@' . $selectedDomain;
-        $visibility = (string) $this->newChannel['visibility'];
 
-        if ($visibility === 'team' && !$this->canCreateTeamSharedChannel()) {
-            $this->channelsMessage = '⛔️ Teamweite Kanäle dürfen nur Owner/Admin des Root-Teams anlegen.';
+        if (!filter_var($sender, FILTER_VALIDATE_EMAIL)) {
+            $this->channelsMessage = '⛔️ Bitte eine gültige E‑Mail-Adresse als Absender eintragen.';
             return;
         }
 
-        // For email, basic validation + (optional) enforce configured domains
-        if ($type === 'email') {
-            if (!filter_var($sender, FILTER_VALIDATE_EMAIL)) {
-                $this->channelsMessage = '⛔️ Bitte eine gültige E‑Mail-Adresse als Absender eintragen.';
-                return;
-            }
-        }
-
         $connectionId = null;
-        if ($type === 'email' && $provider === 'postmark') {
+        if ($provider === 'postmark') {
             $conn = CommsProviderConnection::forTeamProvider($rootTeam, 'postmark');
             if (!$conn) {
-                $this->channelsMessage = '⛔️ Keine Postmark Connection gefunden. Bitte zuerst im Tab „Connections“ speichern.';
+                $this->channelsMessage = '⛔️ Keine Postmark Connection gefunden. Bitte zuerst im Tab „Connections" speichern.';
                 return;
             }
             $connectionId = $conn->id;
@@ -1250,7 +1306,7 @@ class ModalComms extends Component
             // Absender-Domain MUSS in hinterlegten Domains enthalten sein.
             $configuredDomains = $conn->domains()->pluck('domain')->map(fn ($d) => strtolower((string) $d))->all();
             if (empty($configuredDomains)) {
-                $this->channelsMessage = '⛔️ Bitte zuerst mindestens eine Domain in „Connections“ hinterlegen (Postmark Domains).';
+                $this->channelsMessage = '⛔️ Bitte zuerst mindestens eine Domain in „Connections" hinterlegen (Postmark Domains).';
                 return;
             }
             if (!$selectedDomain || !in_array($selectedDomain, $configuredDomains, true)) {
@@ -1264,7 +1320,7 @@ class ModalComms extends Component
                 'team_id' => $rootTeam->id,
                 'created_by_user_id' => $user->id,
                 'comms_provider_connection_id' => $connectionId,
-                'type' => $type,
+                'type' => 'email',
                 'provider' => $provider,
                 'name' => trim((string) ($this->newChannel['name'] ?? '')) ?: null,
                 'sender_identifier' => $sender,
@@ -1283,7 +1339,83 @@ class ModalComms extends Component
         $this->newChannel['visibility'] = 'private';
 
         $this->loadChannels();
-        $this->channelsMessage = '✅ Kanal angelegt.';
+        $this->channelsMessage = '✅ E-Mail Kanal angelegt.';
+    }
+
+    private function createWhatsAppChannel(Team $rootTeam, $user, string $visibility): void
+    {
+        $this->validate([
+            'newChannel.whatsapp_account_id' => ['required', 'integer'],
+            'newChannel.name' => ['nullable', 'string', 'max:255'],
+            'newChannel.visibility' => ['required', 'in:private,team'],
+        ]);
+
+        $accountId = (int) $this->newChannel['whatsapp_account_id'];
+
+        // Verify the user has access to this account
+        $account = IntegrationsWhatsAppAccount::query()
+            ->whereKey($accountId)
+            ->whereHas('integrationConnection', function ($q) use ($user) {
+                $q->where('owner_user_id', $user->id)
+                  ->orWhereHas('grants', function ($gq) use ($user) {
+                      $gq->where('grantee_user_id', $user->id);
+                  });
+            })
+            ->first();
+
+        if (!$account) {
+            $this->channelsMessage = '⛔️ WhatsApp Account nicht gefunden oder keine Berechtigung.';
+            return;
+        }
+
+        if (!$account->phone_number) {
+            $this->channelsMessage = '⛔️ Der gewählte WhatsApp Account hat keine Telefonnummer.';
+            return;
+        }
+
+        // Get or create the WhatsApp Meta provider connection for this team
+        $connection = CommsProviderConnection::firstOrCreate(
+            [
+                'team_id' => $rootTeam->id,
+                'provider' => 'whatsapp_meta',
+            ],
+            [
+                'name' => 'WhatsApp Meta',
+                'is_active' => true,
+                'credentials' => [],
+            ]
+        );
+
+        try {
+            CommsChannel::create([
+                'team_id' => $rootTeam->id,
+                'created_by_user_id' => $user->id,
+                'comms_provider_connection_id' => $connection->id,
+                'type' => 'whatsapp',
+                'provider' => 'whatsapp_meta',
+                'name' => trim((string) ($this->newChannel['name'] ?? '')) ?: ($account->title ?: $account->phone_number),
+                'sender_identifier' => $account->phone_number,
+                'visibility' => $visibility,
+                'is_active' => true,
+                'meta' => [
+                    'integrations_whatsapp_account_id' => $account->id,
+                    'phone_number_id' => $account->phone_number_id,
+                    'access_token' => $account->access_token,
+                ],
+            ]);
+        } catch (QueryException $e) {
+            $this->channelsMessage = '⛔️ Dieser WhatsApp Kanal existiert bereits.';
+            return;
+        }
+
+        $this->newChannel['whatsapp_account_id'] = null;
+        $this->newChannel['name'] = '';
+        $this->newChannel['visibility'] = 'private';
+        $this->newChannel['type'] = 'email'; // Reset to default
+
+        $this->loadChannels();
+        $this->loadWhatsAppRuntime(); // Refresh WhatsApp runtime
+        $this->channelsMessage = '✅ WhatsApp Kanal angelegt.';
     }
 
     public function removeChannel(int $channelId): void

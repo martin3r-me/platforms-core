@@ -850,28 +850,37 @@
                                 <div class="rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] p-4">
                                     <div class="flex items-center justify-between gap-3">
                                         <div class="text-sm font-semibold text-[var(--ui-secondary)]">Neuer Kanal</div>
-                                        <div class="text-xs text-[var(--ui-muted)]">aktuell: Email via Postmark</div>
                                     </div>
 
                                     <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
                                         <x-ui-input-select
                                             name="newChannel.type"
                                             label="Typ"
-                                            :options="['email' => 'Email']"
+                                            :options="['email' => 'E-Mail', 'whatsapp' => 'WhatsApp']"
                                             :nullable="false"
                                             displayMode="dropdown"
-                                            wire:model.defer="newChannel.type"
-                                            :disabled="true"
+                                            wire:model.live="newChannel.type"
                                         />
-                                        <x-ui-input-select
-                                            name="newChannel.provider"
-                                            label="Provider"
-                                            :options="['postmark' => 'Postmark']"
-                                            :nullable="false"
-                                            displayMode="dropdown"
-                                            wire:model.defer="newChannel.provider"
-                                            :disabled="true"
-                                        />
+                                        @if($newChannel['type'] === 'email')
+                                            <x-ui-input-select
+                                                name="newChannel.provider"
+                                                label="Provider"
+                                                :options="['postmark' => 'Postmark']"
+                                                :nullable="false"
+                                                displayMode="dropdown"
+                                                wire:model.defer="newChannel.provider"
+                                                :disabled="true"
+                                            />
+                                        @else
+                                            <x-ui-input-select
+                                                name="newChannel.provider_wa"
+                                                label="Provider"
+                                                :options="['whatsapp_meta' => 'Meta (WhatsApp Business)']"
+                                                :nullable="false"
+                                                displayMode="dropdown"
+                                                :disabled="true"
+                                            />
+                                        @endif
                                         <div>
                                             <x-ui-input-select
                                                 name="newChannel.visibility"
@@ -889,64 +898,114 @@
                                         </div>
                                     </div>
 
-                                    <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
-                                        <div class="md:col-span-2">
-                                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                                <div class="md:col-span-2">
-                                                    <x-ui-input-text
-                                                        name="newChannel.sender_local_part"
-                                                        label="Absender (Local-Part)"
-                                                        placeholder="z.B. sales"
-                                                        wire:model.defer="newChannel.sender_local_part"
-                                                    />
-                                                    <div class="mt-2 text-[11px] text-[var(--ui-muted)]">
-                                                        Die Domain wird per Select gewählt (nur aus „Connections“).
+                                    {{-- Email-specific fields --}}
+                                    @if($newChannel['type'] === 'email')
+                                        <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                            <div class="md:col-span-2">
+                                                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                    <div class="md:col-span-2">
+                                                        <x-ui-input-text
+                                                            name="newChannel.sender_local_part"
+                                                            label="Absender (Local-Part)"
+                                                            placeholder="z.B. sales"
+                                                            wire:model.defer="newChannel.sender_local_part"
+                                                        />
+                                                        <div class="mt-2 text-[11px] text-[var(--ui-muted)]">
+                                                            Die Domain wird per Select gewählt (nur aus „Connections").
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <x-ui-input-select
+                                                            name="newChannel.sender_domain"
+                                                            label="Domain"
+                                                            :options="$postmarkDomains"
+                                                            optionValue="domain"
+                                                            optionLabel="domain"
+                                                            :nullable="true"
+                                                            nullLabel="(Domain wählen)"
+                                                            displayMode="dropdown"
+                                                            wire:model.defer="newChannel.sender_domain"
+                                                            :disabled="empty($postmarkDomains)"
+                                                        />
                                                     </div>
                                                 </div>
-                                                <div>
-                                                    <x-ui-input-select
-                                                        name="newChannel.sender_domain"
-                                                        label="Domain"
-                                                        :options="$postmarkDomains"
-                                                        optionValue="domain"
-                                                        optionLabel="domain"
-                                                        :nullable="true"
-                                                        nullLabel="(Domain wählen)"
-                                                        displayMode="dropdown"
-                                                        wire:model.defer="newChannel.sender_domain"
-                                                        :disabled="empty($postmarkDomains)"
-                                                    />
-                                                </div>
+                                                @if(empty($postmarkDomains))
+                                                    <div class="mt-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                                        Keine Domains hinterlegt (bitte erst in „Connections" anlegen)
+                                                    </div>
+                                                @endif
                                             </div>
-                                            @if(empty($postmarkDomains))
-                                                <div class="mt-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                                                    Keine Domains hinterlegt (bitte erst in „Connections“ anlegen)
-                                                </div>
-                                            @endif
+                                            <div>
+                                                <x-ui-input-text
+                                                    name="newChannel.name"
+                                                    label="Name (optional)"
+                                                    placeholder="z.B. Sales"
+                                                    wire:model.defer="newChannel.name"
+                                                />
+                                            </div>
                                         </div>
-                                        <div>
-                                            <x-ui-input-text
-                                                name="newChannel.name"
-                                                label="Name (optional)"
-                                                placeholder="z.B. Sales"
-                                                wire:model.defer="newChannel.name"
-                                            />
+
+                                        <div class="mt-3 flex items-center justify-end">
+                                            <x-ui-button
+                                                variant="primary"
+                                                size="sm"
+                                                wire:click="createChannel"
+                                                :disabled="empty($postmarkDomains)"
+                                                wire:loading.attr="disabled"
+                                            >E-Mail Kanal anlegen</x-ui-button>
                                         </div>
-                                    </div>
 
-                                    <div class="mt-3 flex items-center justify-end">
-                                        <x-ui-button
-                                            variant="primary"
-                                            size="sm"
-                                            wire:click="createChannel"
-                                            :disabled="empty($postmarkDomains)"
-                                            wire:loading.attr="disabled"
-                                        >Kanal anlegen</x-ui-button>
-                                    </div>
+                                        <div class="mt-2 text-xs text-[var(--ui-muted)]">
+                                            Hinweis: Der Kanal wird der Postmark-Connection zugeordnet und am Root-Team gespeichert.
+                                        </div>
+                                    @endif
 
-                                    <div class="mt-2 text-xs text-[var(--ui-muted)]">
-                                        Hinweis: Der Kanal wird immer der Postmark-Connection zugeordnet (FK) und am Root-Team gespeichert.
-                                    </div>
+                                    {{-- WhatsApp-specific fields --}}
+                                    @if($newChannel['type'] === 'whatsapp')
+                                        <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <div>
+                                                <x-ui-input-select
+                                                    name="newChannel.whatsapp_account_id"
+                                                    label="WhatsApp Account"
+                                                    :options="$availableWhatsAppAccounts"
+                                                    optionValue="id"
+                                                    optionLabel="label"
+                                                    :nullable="true"
+                                                    nullLabel="(Account wählen)"
+                                                    displayMode="dropdown"
+                                                    wire:model.defer="newChannel.whatsapp_account_id"
+                                                    :disabled="empty($availableWhatsAppAccounts)"
+                                                />
+                                                @if(empty($availableWhatsAppAccounts))
+                                                    <div class="mt-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                                        Keine WhatsApp Accounts verfügbar. Bitte verbinde zuerst dein Meta-Konto unter Integrationen.
+                                                    </div>
+                                                @endif
+                                            </div>
+                                            <div>
+                                                <x-ui-input-text
+                                                    name="newChannel.name"
+                                                    label="Name (optional)"
+                                                    placeholder="z.B. Support WhatsApp"
+                                                    wire:model.defer="newChannel.name"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div class="mt-3 flex items-center justify-end">
+                                            <x-ui-button
+                                                variant="primary"
+                                                size="sm"
+                                                wire:click="createChannel"
+                                                :disabled="empty($availableWhatsAppAccounts)"
+                                                wire:loading.attr="disabled"
+                                            >WhatsApp Kanal anlegen</x-ui-button>
+                                        </div>
+
+                                        <div class="mt-2 text-xs text-[var(--ui-muted)]">
+                                            Hinweis: Du kannst nur WhatsApp Accounts verwenden, für die du Inhaber bist oder eine Freigabe hast (Integrationen → Freigaben).
+                                        </div>
+                                    @endif
                                 </div>
 
                                 <div class="rounded-lg border border-[var(--ui-border)]/60 bg-white overflow-hidden">
@@ -960,17 +1019,23 @@
                                             <div class="px-4 py-3 flex items-center justify-between gap-3">
                                                 <div class="min-w-0">
                                                     <div class="flex items-center gap-2 min-w-0">
+                                                        @if($c['type'] === 'whatsapp')
+                                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-green-50 text-green-700 border border-green-200">
+                                                                WhatsApp
+                                                            </span>
+                                                        @else
+                                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                                                                E-Mail
+                                                            </span>
+                                                        @endif
                                                         <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">
                                                             {{ $c['sender_identifier'] }}
                                                         </div>
                                                         <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/60">
-                                                            {{ $c['provider'] }}
-                                                        </span>
-                                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/60">
                                                             {{ $c['visibility'] === 'team' ? 'teamweit' : 'privat' }}
                                                         </span>
                                                         @if(!$c['is_active'])
-                                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/60">
+                                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
                                                                 inaktiv
                                                             </span>
                                                         @endif
