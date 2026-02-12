@@ -46,6 +46,13 @@
                     >
                         Settings
                     </button>
+                    <button type="button"
+                        x-data
+                        @click="window.dispatchEvent(new CustomEvent('comms:set-tab', { detail: { tab: 'debug-whatsapp' } }))"
+                        class="px-3 py-1.5 rounded-md text-sm border border-red-300 text-red-600 hover:bg-red-50"
+                    >
+                        Debug WA
+                    </button>
                 </div>
             </div>
         </x-slot>
@@ -1243,6 +1250,140 @@
                                     </div>
                                     <div class="text-xs text-[var(--ui-muted)]" x-show="activeChannel==='whatsapp'" x-cloak>
                                         Meta OAuth, Templates, Webhook, Business-Nummer …
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Debug WhatsApp Tab --}}
+                    <div x-show="tab==='debug-whatsapp'" x-cloak class="w-full h-full min-h-0">
+                        <div class="h-full min-h-0 rounded-xl bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm ring-1 ring-[var(--ui-border)]/30">
+                            <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between">
+                                <div class="min-w-0">
+                                    <div class="text-sm font-semibold text-red-600">Debug WhatsApp</div>
+                                    <div class="text-xs text-[var(--ui-muted)] truncate">
+                                        Rohdaten aus der Datenbank (ohne Filter, ohne Berechtigungsprüfung)
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    <x-ui-button
+                                        variant="muted-outline"
+                                        size="sm"
+                                        wire:click="loadDebugWhatsApp"
+                                    >Aktualisieren</x-ui-button>
+                                </div>
+                            </div>
+
+                            <div class="p-4 flex-1 min-h-0 overflow-y-auto space-y-6">
+                                {{-- Debug Info --}}
+                                <div class="bg-gray-100 p-3 rounded text-xs font-mono">
+                                    <div class="font-bold mb-1">Context:</div>
+                                    @foreach($debugInfo as $key => $val)
+                                        <div>{{ $key }}: {{ $val ?? 'NULL' }}</div>
+                                    @endforeach
+                                </div>
+
+                                {{-- IntegrationsWhatsAppAccount --}}
+                                <div>
+                                    <h4 class="font-semibold text-sm mb-2">IntegrationsWhatsAppAccount ({{ count($debugWhatsAppAccounts) }})</h4>
+                                    <div class="overflow-x-auto">
+                                        <table class="min-w-full text-xs border border-[var(--ui-border)]/60">
+                                            <thead class="bg-gray-50">
+                                                <tr>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">ID</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Phone</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Title</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Active</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Connection</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Owner User</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Owner Team</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @forelse($debugWhatsAppAccounts as $a)
+                                                    <tr>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $a['id'] }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $a['phone_number'] }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $a['title'] }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $a['active'] ? 'Yes' : 'No' }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $a['connection_id'] }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $a['owner_user_id'] ?? '-' }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $a['owner_team_id'] ?? '-' }}</td>
+                                                    </tr>
+                                                @empty
+                                                    <tr><td colspan="7" class="border border-[var(--ui-border)]/60 px-2 py-1 text-gray-500">Keine Accounts</td></tr>
+                                                @endforelse
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                {{-- CommsChannel --}}
+                                <div>
+                                    <h4 class="font-semibold text-sm mb-2">CommsChannel type=whatsapp ({{ count($debugWhatsAppChannels) }})</h4>
+                                    <div class="overflow-x-auto">
+                                        <table class="min-w-full text-xs border border-[var(--ui-border)]/60">
+                                            <thead class="bg-gray-50">
+                                                <tr>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">ID</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Team</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Sender</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Name</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Visibility</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Active</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Meta</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @forelse($debugWhatsAppChannels as $c)
+                                                    <tr>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $c['id'] }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $c['team_id'] }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $c['sender_identifier'] }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $c['name'] }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $c['visibility'] }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $c['is_active'] ? 'Yes' : 'No' }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1 max-w-xs truncate">{{ json_encode($c['meta']) }}</td>
+                                                    </tr>
+                                                @empty
+                                                    <tr><td colspan="7" class="border border-[var(--ui-border)]/60 px-2 py-1 text-gray-500">Keine Channels</td></tr>
+                                                @endforelse
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                {{-- CommsWhatsAppThread --}}
+                                <div>
+                                    <h4 class="font-semibold text-sm mb-2">CommsWhatsAppThread ({{ count($debugWhatsAppThreads) }})</h4>
+                                    <div class="overflow-x-auto">
+                                        <table class="min-w-full text-xs border border-[var(--ui-border)]/60">
+                                            <thead class="bg-gray-50">
+                                                <tr>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">ID</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Channel</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Team</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Remote Phone</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Messages</th>
+                                                    <th class="border border-[var(--ui-border)]/60 px-2 py-1 text-left">Updated</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @forelse($debugWhatsAppThreads as $t)
+                                                    <tr>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $t['id'] }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $t['channel_id'] }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $t['team_id'] }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $t['remote_phone'] }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $t['messages_count'] }}</td>
+                                                        <td class="border border-[var(--ui-border)]/60 px-2 py-1">{{ $t['updated_at'] }}</td>
+                                                    </tr>
+                                                @empty
+                                                    <tr><td colspan="6" class="border border-[var(--ui-border)]/60 px-2 py-1 text-gray-500">Keine Threads</td></tr>
+                                                @endforelse
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             </div>
