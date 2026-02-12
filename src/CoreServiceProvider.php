@@ -91,6 +91,9 @@ class CoreServiceProvider extends ServiceProvider
         // Event-Listener für Tools registrieren
         $this->registerToolEventListeners();
 
+        // WhatsApp Channel Sync Listener registrieren
+        $this->registerWhatsAppChannelSyncListener();
+
         // Livewire-Komponenten registrieren (mit Präfix "core")
         $this->registerLivewireComponents();
 
@@ -594,7 +597,7 @@ class CoreServiceProvider extends ServiceProvider
         foreach ($modules as $moduleDir) {
             $moduleKey = basename($moduleDir);
             $serviceProviderClass = 'Platform\\'.Str::studly($moduleKey).'\\'.Str::studly($moduleKey).'ServiceProvider';
-            
+
             if (class_exists($serviceProviderClass)) {
                 // \Log::debug("CoreServiceProvider: Lade {$serviceProviderClass}");
                 $this->app->register($serviceProviderClass);
@@ -602,5 +605,23 @@ class CoreServiceProvider extends ServiceProvider
                 // \Log::debug("CoreServiceProvider: Klasse {$serviceProviderClass} nicht gefunden");
             }
         }
+    }
+
+    /**
+     * Register WhatsApp Channel Sync Listener
+     *
+     * Synchronisiert WhatsApp-Accounts aus Integrations zu CommsChannels
+     */
+    protected function registerWhatsAppChannelSyncListener(): void
+    {
+        // Nur registrieren wenn das Integrations-Modul verfügbar ist
+        if (!class_exists(\Platform\Integrations\Events\WhatsAppAccountsSynced::class)) {
+            return;
+        }
+
+        \Illuminate\Support\Facades\Event::listen(
+            \Platform\Integrations\Events\WhatsAppAccountsSynced::class,
+            \Platform\Core\Listeners\SyncWhatsAppChannelsListener::class
+        );
     }
 }
