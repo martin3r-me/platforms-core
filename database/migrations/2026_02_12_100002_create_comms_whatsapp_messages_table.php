@@ -26,7 +26,7 @@ return new class extends Migration
             $table->json('meta_payload')->nullable();  // Raw Meta API response/payload
             $table->timestamps();
 
-            $table->index(['comms_whatsapp_thread_id', 'created_at']);
+            $table->index(['comms_whatsapp_thread_id', 'created_at'], 'wa_messages_thread_created_index');
             $table->index('direction');
             $table->index('status');
         });

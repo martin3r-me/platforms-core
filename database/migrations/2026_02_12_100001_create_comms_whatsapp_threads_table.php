@@ -25,7 +25,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['comms_channel_id', 'remote_phone_number']);
+            $table->unique(['comms_channel_id', 'remote_phone_number'], 'wa_threads_channel_phone_unique');
             $table->index(['team_id', 'is_unread']);
             $table->index(['context_model', 'context_model_id']);
         });
