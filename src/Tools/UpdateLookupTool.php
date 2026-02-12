@@ -12,12 +12,12 @@ class UpdateLookupTool implements ToolContract, ToolMetadataContract
 {
     public function getName(): string
     {
-        return 'core.lookups.PUT';
+        return 'core.extra_fields.lookups.PUT';
     }
 
     public function getDescription(): string
     {
-        return 'PUT /core/lookups/{id} - Aktualisiert einen Lookup (Label, Beschreibung). Für Werte-Verwaltung nutze core.lookup_values.*.';
+        return 'PUT /core/extra-fields/lookups/{id} - Aktualisiert einen Lookup (Label, Beschreibung).';
     }
 
     public function getSchema(): array

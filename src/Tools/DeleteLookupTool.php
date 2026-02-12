@@ -13,12 +13,12 @@ class DeleteLookupTool implements ToolContract, ToolMetadataContract
 {
     public function getName(): string
     {
-        return 'core.lookups.DELETE';
+        return 'core.extra_fields.lookups.DELETE';
     }
 
     public function getDescription(): string
     {
-        return 'DELETE /core/lookups/{id} - Löscht einen Lookup und alle seine Werte. System-Lookups und Lookups die noch verwendet werden können nicht gelöscht werden.';
+        return 'DELETE /core/extra-fields/lookups/{id} - Löscht einen Lookup. System-Lookups und Lookups in Verwendung können nicht gelöscht werden.';
     }
 
     public function getSchema(): array

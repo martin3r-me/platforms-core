@@ -12,12 +12,12 @@ class ListLookupsTool implements ToolContract, ToolMetadataContract
 {
     public function getName(): string
     {
-        return 'core.lookups.LIST';
+        return 'core.extra_fields.lookups.LIST';
     }
 
     public function getDescription(): string
     {
-        return 'GET /core/lookups - Listet alle Lookups (Auswahllisten) für das aktuelle Team auf. Lookups sind zentral verwaltete Auswahllisten wie "Nationalität", "Krankenkasse" etc.';
+        return 'GET /core/extra-fields/lookups - Listet alle Lookup-Auswahllisten für Extra-Felder auf. Lookups sind zentrale Wertelisten (z.B. "Nationalität", "Krankenkasse") die in Extra-Feldern vom Typ "lookup" verwendet werden.';
     }
 
     public function getSchema(): array

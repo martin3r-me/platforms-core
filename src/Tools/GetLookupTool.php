@@ -12,12 +12,12 @@ class GetLookupTool implements ToolContract, ToolMetadataContract
 {
     public function getName(): string
     {
-        return 'core.lookups.GET';
+        return 'core.extra_fields.lookups.GET';
     }
 
     public function getDescription(): string
     {
-        return 'GET /core/lookups/{id} - Ruft einen einzelnen Lookup mit allen seinen Werten ab. Kann per ID oder Name gesucht werden.';
+        return 'GET /core/extra-fields/lookups/{id} - Ruft einen Lookup mit allen Werten ab. Nutze lookup_id oder name als Parameter.';
     }
 
     public function getSchema(): array

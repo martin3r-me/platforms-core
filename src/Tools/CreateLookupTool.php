@@ -14,12 +14,12 @@ class CreateLookupTool implements ToolContract, ToolMetadataContract
 {
     public function getName(): string
     {
-        return 'core.lookups.POST';
+        return 'core.extra_fields.lookups.POST';
     }
 
     public function getDescription(): string
     {
-        return 'POST /core/lookups - Erstellt einen neuen Lookup (Auswahlliste). Optional können direkt initiale Werte mitgegeben werden.';
+        return 'POST /core/extra-fields/lookups - Erstellt einen neuen Lookup für Extra-Felder. Optional können direkt initiale Werte mitgegeben werden.';
     }
 
     public function getSchema(): array

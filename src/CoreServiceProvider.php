@@ -393,6 +393,32 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register($this->app->make(\Platform\Core\Tools\UpdateExtraFieldsTool::class)); } catch (\Throwable $e) {}
         }
 
+        // Extra Fields: Lookup Tools (core.extra_fields.lookups.*)
+        // Ermöglichen der LLM, zentrale Auswahllisten für Extra-Felder zu verwalten
+        if (class_exists(\Platform\Core\Tools\ListLookupsTool::class) && !$registry->has('core.extra_fields.lookups.LIST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\ListLookupsTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\GetLookupTool::class) && !$registry->has('core.extra_fields.lookups.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\GetLookupTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\CreateLookupTool::class) && !$registry->has('core.extra_fields.lookups.POST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\CreateLookupTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\UpdateLookupTool::class) && !$registry->has('core.extra_fields.lookups.PUT')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\UpdateLookupTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\DeleteLookupTool::class) && !$registry->has('core.extra_fields.lookups.DELETE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\DeleteLookupTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\ManageLookupValuesTool::class) && !$registry->has('core.extra_fields.lookup_values.MANAGE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\ManageLookupValuesTool::class)); } catch (\Throwable $e) {}
+        }
+
+        // Extra Fields: Entities Discovery Tool
+        if (class_exists(\Platform\Core\Tools\ListExtraFieldEntitiesTool::class) && !$registry->has('core.extra_fields.LIST_ENTITIES')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\ListExtraFieldEntitiesTool::class)); } catch (\Throwable $e) {}
+        }
+
         // Communication Tools (core.comms.*)
         // Diese Tools müssen immer registriert sein, damit sie via tools.GET(module="communication") gefunden werden
         // Hinweis: communication.overview.GET wurde entfernt (verursachte Loops) - nutze direkt core.comms.overview.GET

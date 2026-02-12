@@ -13,12 +13,12 @@ class ManageLookupValuesTool implements ToolContract, ToolMetadataContract
 {
     public function getName(): string
     {
-        return 'core.lookup_values.MANAGE';
+        return 'core.extra_fields.lookup_values.MANAGE';
     }
 
     public function getDescription(): string
     {
-        return 'POST /core/lookup-values/manage - Verwaltet Lookup-Werte: hinzufügen, aktualisieren, löschen, aktivieren/deaktivieren, Reihenfolge ändern.';
+        return 'POST /core/extra-fields/lookup-values/manage - Verwaltet Lookup-Werte: add, update, delete, toggle_active, reorder.';
     }
 
     public function getSchema(): array
