@@ -16,6 +16,9 @@ use Platform\Core\Models\CommsProviderConnection;
 use Platform\Core\Models\CommsProviderConnectionDomain;
 use Platform\Core\Models\Team;
 use Platform\Core\Services\Comms\PostmarkEmailService;
+use Platform\Core\Services\Comms\WhatsAppMetaService;
+use Platform\Core\Models\CommsWhatsAppThread;
+use Platform\Core\Models\CommsWhatsAppMessage;
 
 /**
  * UI-only Comms v2 shell (no data, no logic).
@@ -127,6 +130,34 @@ class ModalComms extends Component
 
     public ?string $emailMessage = null;
 
+    // --- Runtime WhatsApp (Kanäle Tab) ---
+    /** @var array<int, array<string, mixed>> */
+    public array $whatsappChannels = [];
+    public ?int $activeWhatsAppChannelId = null;
+    public ?string $activeWhatsAppChannelPhone = null;
+
+    /** @var array<int, array<string, mixed>> */
+    public array $whatsappThreads = [];
+    public ?int $activeWhatsAppThreadId = null;
+
+    /**
+     * Remember the last active thread per WhatsApp channel (comms_channel_id => comms_whatsapp_threads.id).
+     *
+     * @var array<int, int>
+     */
+    public array $lastActiveWhatsAppThreadByChannel = [];
+
+    /** @var array<int, array<string, mixed>> */
+    public array $whatsappTimeline = [];
+
+    /** @var array<string, mixed> */
+    public array $whatsappCompose = [
+        'to' => '',
+        'body' => '',
+    ];
+
+    public ?string $whatsappMessage = null;
+
     #[On('comms')]
     public function setCommsContext(array $payload = []): void
     {
@@ -153,6 +184,7 @@ class ModalComms extends Component
         $this->loadPostmarkConnection();
         $this->loadChannels();
         $this->loadEmailRuntime();
+        $this->loadWhatsAppRuntime();
     }
 
     public function closeModal(): void
@@ -591,6 +623,376 @@ class ModalComms extends Component
             ->values()
             ->all();
 
+        $this->dispatch('comms:scroll-bottom');
+    }
+
+    // -------------------------------------------------------------------------
+    // WhatsApp Runtime Methods
+    // -------------------------------------------------------------------------
+
+    public function loadWhatsAppRuntime(): void
+    {
+        $this->whatsappMessage = null;
+        $this->whatsappChannels = [];
+        $this->whatsappThreads = [];
+        $this->whatsappTimeline = [];
+
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+        if (!$user || !$team) {
+            return;
+        }
+
+        /** @var Team $rootTeam */
+        $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+
+        // Channels visible to the current user (type=whatsapp, provider=whatsapp_meta):
+        // - team channels (shared)
+        // - private channels created by user
+        $channels = CommsChannel::query()
+            ->where('team_id', $rootTeam->id)
+            ->where('type', 'whatsapp')
+            ->where('provider', 'whatsapp_meta')
+            ->where('is_active', true)
+            ->where(function ($q) use ($user) {
+                $q->where('visibility', 'team')
+                    ->orWhere(function ($q2) use ($user) {
+                        $q2->where('visibility', 'private')->where('created_by_user_id', $user->id);
+                    });
+            })
+            ->orderBy('visibility')
+            ->orderBy('sender_identifier')
+            ->get();
+
+        $this->whatsappChannels = $channels->map(fn (CommsChannel $c) => [
+            'id' => (int) $c->id,
+            'label' => (string) $c->sender_identifier,
+            'name' => $c->name ? (string) $c->name : null,
+        ])->all();
+
+        if (!$this->activeWhatsAppChannelId && $channels->isNotEmpty()) {
+            $this->activeWhatsAppChannelId = (int) $channels->first()->id;
+        }
+
+        $this->refreshActiveWhatsAppChannelLabel();
+        $this->loadWhatsAppThreads();
+    }
+
+    public function updatedActiveWhatsAppChannelId(): void
+    {
+        $this->refreshActiveWhatsAppChannelLabel();
+
+        $rememberedThreadId = (int) ($this->lastActiveWhatsAppThreadByChannel[(int) $this->activeWhatsAppChannelId] ?? 0);
+        $useRemembered = false;
+
+        $this->whatsappCompose['body'] = '';
+        $this->whatsappCompose['to'] = '';
+
+        // Prefer restoring the last active thread for this channel (if it still exists).
+        $this->activeWhatsAppThreadId = null;
+        if ($rememberedThreadId > 0 && $this->activeWhatsAppChannelId) {
+            $exists = CommsWhatsAppThread::query()
+                ->where('comms_channel_id', $this->activeWhatsAppChannelId)
+                ->whereKey($rememberedThreadId)
+                ->exists();
+            if ($exists) {
+                $this->activeWhatsAppThreadId = $rememberedThreadId;
+                $useRemembered = true;
+            }
+        }
+
+        $this->loadWhatsAppThreads();
+        if ($useRemembered && $this->activeWhatsAppThreadId) {
+            $this->setActiveWhatsAppThread((int) $this->activeWhatsAppThreadId);
+        }
+        $this->dispatch('comms:scroll-bottom');
+    }
+
+    public function updatingActiveWhatsAppChannelId($value): void
+    {
+        // Persist last active thread for the "old" channel before switching.
+        if ($this->activeWhatsAppChannelId && $this->activeWhatsAppThreadId) {
+            $this->lastActiveWhatsAppThreadByChannel[(int) $this->activeWhatsAppChannelId] = (int) $this->activeWhatsAppThreadId;
+        }
+    }
+
+    private function refreshActiveWhatsAppChannelLabel(): void
+    {
+        $this->activeWhatsAppChannelPhone = null;
+        if (!$this->activeWhatsAppChannelId) {
+            return;
+        }
+        foreach ($this->whatsappChannels as $c) {
+            if ((int) ($c['id'] ?? 0) === (int) $this->activeWhatsAppChannelId) {
+                $this->activeWhatsAppChannelPhone = (string) ($c['label'] ?? null);
+                return;
+            }
+        }
+    }
+
+    public function loadWhatsAppThreads(): void
+    {
+        $this->whatsappThreads = [];
+        $this->whatsappTimeline = [];
+
+        if (!$this->activeWhatsAppChannelId) {
+            return;
+        }
+
+        $query = CommsWhatsAppThread::query()
+            ->where('comms_channel_id', $this->activeWhatsAppChannelId);
+
+        if ($this->hasContext() && !$this->showAllThreads) {
+            $query->where('context_model', $this->contextModel)
+                  ->where('context_model_id', $this->contextModelId);
+        }
+
+        $threads = $query
+            ->withCount('messages')
+            ->orderByDesc('updated_at')
+            ->limit(50)
+            ->get();
+
+        $this->whatsappThreads = $threads->map(fn (CommsWhatsAppThread $t) => [
+            'id' => (int) $t->id,
+            'remote_phone' => (string) ($t->remote_phone_number ?: '—'),
+            'messages_count' => (int) ($t->messages_count ?? 0),
+            'last_message_preview' => (string) ($t->last_message_preview ?: ''),
+            'is_unread' => (bool) $t->is_unread,
+            'last_direction' => ($t->last_inbound_at && (!$t->last_outbound_at || $t->last_inbound_at->greaterThanOrEqualTo($t->last_outbound_at)))
+                ? 'inbound'
+                : (($t->last_outbound_at || $t->last_inbound_at) ? 'outbound' : null),
+            'last_at' => ($t->last_inbound_at || $t->last_outbound_at)
+                ? ((($t->last_inbound_at && (!$t->last_outbound_at || $t->last_inbound_at->greaterThanOrEqualTo($t->last_outbound_at))))
+                    ? $t->last_inbound_at?->format('d.m. H:i')
+                    : $t->last_outbound_at?->format('d.m. H:i'))
+                : ($t->updated_at?->format('d.m. H:i')),
+        ])->all();
+
+        if (!$this->activeWhatsAppThreadId && $threads->isNotEmpty()) {
+            $this->setActiveWhatsAppThread((int) $threads->first()->id);
+        }
+    }
+
+    public function setActiveWhatsAppThread(int $threadId): void
+    {
+        $this->activeWhatsAppThreadId = $threadId;
+        $this->loadWhatsAppTimeline();
+
+        // Pre-fill "to" from thread phone number
+        $thread = CommsWhatsAppThread::query()->whereKey($threadId)->first();
+        if ($thread?->remote_phone_number) {
+            $this->whatsappCompose['to'] = (string) $thread->remote_phone_number;
+        }
+
+        // Mark thread as read
+        $thread?->markAsRead();
+
+        $this->dispatch('comms:scroll-bottom');
+    }
+
+    private function loadWhatsAppTimeline(): void
+    {
+        $this->whatsappTimeline = [];
+        if (!$this->activeWhatsAppThreadId) {
+            return;
+        }
+
+        $messages = CommsWhatsAppMessage::query()
+            ->where('comms_whatsapp_thread_id', $this->activeWhatsAppThreadId)
+            ->orderBy('sent_at')
+            ->orderBy('created_at')
+            ->get();
+
+        $this->whatsappTimeline = $messages->map(fn (CommsWhatsAppMessage $m) => [
+            'id' => (int) $m->id,
+            'direction' => (string) ($m->direction ?? 'outbound'),
+            'body' => (string) ($m->body ?? ''),
+            'message_type' => (string) ($m->message_type ?? 'text'),
+            'status' => (string) ($m->status ?? ''),
+            'at' => $m->sent_at?->format('H:i') ?: $m->created_at?->format('H:i'),
+            'full_at' => $m->sent_at?->format('d.m.Y H:i') ?: $m->created_at?->format('d.m.Y H:i'),
+            'sent_by' => $m->sentByUser?->name ?? null,
+            'attachments' => $m->attachments ?? [],
+        ])->all();
+
+        $this->dispatch('comms:scroll-bottom');
+    }
+
+    public function startNewWhatsAppThread(): void
+    {
+        $this->activeWhatsAppThreadId = null;
+        $this->whatsappTimeline = [];
+        $this->whatsappCompose['body'] = '';
+
+        // Prefill from context if available
+        if ($this->hasContext()) {
+            // Try to get phone from context recipients
+            $phone = (string) (($this->contextRecipients[0] ?? '') ?: $this->whatsappCompose['to']);
+            // Only use if it looks like a phone number
+            if (preg_match('/^\+?\d{7,}$/', preg_replace('/[\s\-()]/', '', $phone))) {
+                $this->whatsappCompose['to'] = $phone;
+            }
+        } else {
+            $this->whatsappCompose['to'] = '';
+        }
+
+        $this->dispatch('comms:scroll-bottom');
+    }
+
+    public function sendWhatsApp(): void
+    {
+        $this->whatsappMessage = null;
+        $wasNewThread = !$this->activeWhatsAppThreadId;
+
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+        if (!$user || !$team) {
+            $this->whatsappMessage = '⛔️ Kein Team-Kontext gefunden.';
+            return;
+        }
+
+        if (!$this->activeWhatsAppChannelId) {
+            $this->whatsappMessage = '⛔️ Kein WhatsApp Kanal ausgewählt.';
+            return;
+        }
+
+        $isReply = (bool) $this->activeWhatsAppThreadId;
+        try {
+            $this->validate([
+                'whatsappCompose.to' => [$isReply ? 'nullable' : 'required', 'string', 'max:32'],
+                'whatsappCompose.body' => ['required', 'string', 'min:1'],
+            ]);
+        } catch (ValidationException $e) {
+            $this->whatsappMessage = '⛔️ Bitte Eingaben prüfen.';
+            return;
+        }
+
+        $channel = CommsChannel::query()
+            ->whereKey($this->activeWhatsAppChannelId)
+            ->where('type', 'whatsapp')
+            ->where('provider', 'whatsapp_meta')
+            ->where('is_active', true)
+            ->first();
+
+        if (!$channel) {
+            $this->whatsappMessage = '⛔️ WhatsApp Kanal nicht gefunden.';
+            return;
+        }
+
+        $to = (string) ($this->whatsappCompose['to'] ?? '');
+
+        // For replies, resolve "to" from thread if not provided
+        if ($this->activeWhatsAppThreadId && trim($to) === '') {
+            $thread = CommsWhatsAppThread::query()->whereKey($this->activeWhatsAppThreadId)->first();
+            if ($thread?->remote_phone_number) {
+                $to = (string) $thread->remote_phone_number;
+            }
+            $this->whatsappCompose['to'] = $to;
+        }
+
+        if (trim($to) === '') {
+            $this->whatsappMessage = '⛔️ Kein Empfänger angegeben.';
+            return;
+        }
+
+        try {
+            /** @var WhatsAppMetaService $svc */
+            $svc = app(WhatsAppMetaService::class);
+            $message = $svc->sendText(
+                $channel,
+                $to,
+                (string) $this->whatsappCompose['body'],
+                $user
+            );
+        } catch (\Throwable $e) {
+            $this->whatsappMessage = '⛔️ Versand fehlgeschlagen: ' . $e->getMessage();
+            return;
+        }
+
+        $this->whatsappCompose['body'] = '';
+        if ($wasNewThread) {
+            $this->whatsappCompose['to'] = '';
+        }
+
+        // Link new thread to context if applicable
+        if ($wasNewThread && $this->hasContext() && $message?->thread) {
+            $newThread = $message->thread;
+            if ($newThread && !$newThread->context_model) {
+                $newThread->update([
+                    'context_model' => $this->contextModel,
+                    'context_model_id' => $this->contextModelId,
+                ]);
+            }
+        }
+
+        // Refresh threads & select the thread for the sent message
+        $this->loadWhatsAppThreads();
+        if ($message?->thread) {
+            $this->setActiveWhatsAppThread((int) $message->thread->id);
+        } elseif ($this->activeWhatsAppThreadId) {
+            $this->loadWhatsAppTimeline();
+        }
+
+        $this->whatsappMessage = '✅ Nachricht gesendet.';
+        $this->dispatch('comms:scroll-bottom');
+    }
+
+    public function deleteWhatsAppThread(int $threadId): void
+    {
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+        if (!$user || !$team) {
+            $this->whatsappMessage = '⛔️ Kein Team-Kontext gefunden.';
+            return;
+        }
+
+        /** @var Team $rootTeam */
+        $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+
+        $thread = CommsWhatsAppThread::query()
+            ->where('team_id', $rootTeam->id)
+            ->whereKey($threadId)
+            ->first();
+
+        if (!$thread) {
+            $this->whatsappMessage = '⛔️ Thread nicht gefunden.';
+            return;
+        }
+
+        $channel = CommsChannel::query()
+            ->where('team_id', $rootTeam->id)
+            ->whereKey($thread->comms_channel_id)
+            ->first();
+
+        if (!$channel) {
+            $this->whatsappMessage = '⛔️ Kanal zum Thread nicht gefunden.';
+            return;
+        }
+
+        // Permission: team channels: only owner/admin; private channels: owner/admin or channel creator
+        if ($channel->visibility === 'team') {
+            if (!$this->canManageProviderConnections()) {
+                $this->whatsappMessage = '⛔️ Keine Berechtigung (teamweite Kanäle nur Owner/Admin).';
+                return;
+            }
+        } else {
+            if (!$this->canManageProviderConnections() && (int) $channel->created_by_user_id !== (int) $user->id) {
+                $this->whatsappMessage = '⛔️ Keine Berechtigung (privater Kanal gehört einem anderen User).';
+                return;
+            }
+        }
+
+        // Soft-delete thread (messages remain for audit)
+        $thread->delete();
+
+        if ((int) $this->activeWhatsAppThreadId === (int) $threadId) {
+            $this->activeWhatsAppThreadId = null;
+            $this->whatsappTimeline = [];
+        }
+
+        $this->whatsappMessage = '✅ Thread gelöscht.';
+        $this->loadWhatsAppThreads();
         $this->dispatch('comms:scroll-bottom');
     }
 

@@ -57,6 +57,7 @@
                     tab: 'chat',
                     activeChannel: 'email',
                     activeEmailChannelId: @entangle('activeEmailChannelId').live,
+                    activeWhatsAppChannelId: @entangle('activeWhatsAppChannelId').live,
                     activeThreadId: 1,
                     composeMode: false,
                     get activeChannelLabel(){
@@ -162,19 +163,22 @@
                                             <span class="text-[10px]" :class="activeChannel === 'phone' ? 'text-white/70' : 'text-[var(--ui-muted)]'">(Demo)</span>
                                         </button>
 
-                                        <button
-                                            type="button"
-                                            @click="activeChannel = 'whatsapp'"
-                                            class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1"
-                                            :class="activeChannel === 'whatsapp'
-                                                ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
-                                                : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'"
-                                            title="Kanal: WhatsApp"
-                                        >
-                                            @svg('heroicon-o-chat-bubble-left-right', 'w-4 h-4')
-                                            <span class="font-semibold">WhatsApp · +49 172 123 12 14</span>
-                                            <span class="text-[10px]" :class="activeChannel === 'whatsapp' ? 'text-white/70' : 'text-[var(--ui-muted)]'">(Demo)</span>
-                                        </button>
+                                        @forelse($whatsappChannels as $wc)
+                                            <button
+                                                type="button"
+                                                @click="activeChannel = 'whatsapp'; activeWhatsAppChannelId = {{ (int) $wc['id'] }};"
+                                                class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1"
+                                                :class="(activeChannel === 'whatsapp' && activeWhatsAppChannelId === {{ (int) $wc['id'] }})
+                                                    ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
+                                                    : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'"
+                                                title="Kanal: WhatsApp"
+                                            >
+                                                @svg('heroicon-o-chat-bubble-left-right', 'w-4 h-4')
+                                                <span class="font-semibold">{{ $wc['name'] ?: 'WhatsApp' }} · {{ (string) ($wc['label'] ?? '') }}</span>
+                                            </button>
+                                        @empty
+                                            {{-- Kein WhatsApp Channel verfügbar --}}
+                                        @endforelse
                                     </div>
                                 </div>
                                 {{-- Keep header clean (like Playground) --}}
@@ -189,8 +193,9 @@
                                         <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex items-center justify-between flex-shrink-0">
                                             <div class="text-xs font-semibold text-[var(--ui-secondary)]">Threads</div>
                                             <div class="flex items-center gap-3">
-                                                <button type="button" @click="startNewThread()" class="text-xs text-[var(--ui-muted)] hover:underline" title="Neuen Thread starten" x-show="activeChannel !== 'email'">Neu</button>
+                                                <button type="button" @click="startNewThread()" class="text-xs text-[var(--ui-muted)] hover:underline" title="Neuen Thread starten" x-show="activeChannel === 'phone'">Neu</button>
                                                 <button type="button" class="text-xs text-[var(--ui-muted)] hover:underline" wire:click="startNewEmailThread" x-show="activeChannel === 'email'" x-cloak>Neu</button>
+                                                <button type="button" class="text-xs text-[var(--ui-muted)] hover:underline" wire:click="startNewWhatsAppThread" x-show="activeChannel === 'whatsapp'" x-cloak>Neu</button>
                                             </div>
                                         </div>
 
@@ -314,40 +319,110 @@
                                                         @endforelse
                                                     </div>
 
+                                                    {{-- WhatsApp: echte Threads aus Core --}}
+                                                    <div x-show="activeChannel === 'whatsapp'" x-cloak class="space-y-2">
+                                                        @if(!$activeWhatsAppChannelId)
+                                                            <div class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                                                Bitte oben einen WhatsApp Kanal wählen.
+                                                            </div>
+                                                        @endif
+
+                                                        @forelse($whatsappThreads as $wt)
+                                                            <div
+                                                                class="w-full rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2 hover:bg-[var(--ui-muted-5)] transition"
+                                                                @if((int) $activeWhatsAppThreadId === (int) $wt['id']) style="outline: 1px solid rgba(var(--ui-primary-rgb), 0.4);" @endif
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    wire:click="setActiveWhatsAppThread({{ (int) $wt['id'] }})"
+                                                                    class="w-full text-left"
+                                                                >
+                                                                    <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate flex items-center gap-2">
+                                                                        @svg('heroicon-o-chat-bubble-left-right', 'w-3.5 h-3.5 flex-shrink-0')
+                                                                        {{ $wt['remote_phone'] }}
+                                                                        @if($wt['is_unread'])
+                                                                            <span class="inline-flex items-center justify-center w-2 h-2 rounded-full bg-[var(--ui-primary)]"></span>
+                                                                        @endif
+                                                                    </div>
+                                                                    @if(!empty($wt['last_message_preview']))
+                                                                        <div class="mt-1 text-[10px] text-[var(--ui-muted)] truncate">
+                                                                            {{ \Illuminate\Support\Str::limit($wt['last_message_preview'], 50) }}
+                                                                        </div>
+                                                                    @endif
+                                                                </button>
+                                                                <div class="mt-2 flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
+                                                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-[var(--ui-border)]/60 bg-white">
+                                                                        @svg('heroicon-o-chat-bubble-left-ellipsis', 'w-3.5 h-3.5')
+                                                                        <span class="font-semibold">{{ (int) ($wt['messages_count'] ?? 0) }}</span>
+                                                                    </span>
+
+                                                                    @if(!empty($wt['last_direction']))
+                                                                        <span class="inline-flex items-center px-2 py-1 rounded-full border text-[10px] font-semibold
+                                                                            {{ $wt['last_direction'] === 'inbound'
+                                                                                ? 'border-[rgba(var(--ui-primary-rgb),0.18)] bg-[rgba(var(--ui-primary-rgb),0.08)] text-[var(--ui-primary)]'
+                                                                                : 'border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)] text-[var(--ui-muted)]' }}
+                                                                        ">
+                                                                            {{ $wt['last_direction'] === 'inbound' ? 'Inbound' : 'Outbound' }}
+                                                                        </span>
+                                                                    @endif
+
+                                                                    <span class="ml-auto flex items-center gap-2">
+                                                                        <span class="whitespace-nowrap">{{ $wt['last_at'] ?? '' }}</span>
+                                                                        <div x-data="{ confirmDelete: false }">
+                                                                            <x-ui-button
+                                                                                variant="muted-outline"
+                                                                                size="sm"
+                                                                                class="!w-auto !px-2 !py-1 h-6"
+                                                                                x-on:click="
+                                                                                    if (!confirmDelete) {
+                                                                                        confirmDelete = true;
+                                                                                        setTimeout(() => { confirmDelete = false; }, 2500);
+                                                                                    } else {
+                                                                                        $wire.call('deleteWhatsAppThread', {{ (int) $wt['id'] }});
+                                                                                    }
+                                                                                "
+                                                                                title="Thread löschen"
+                                                                            >
+                                                                                <span x-show="!confirmDelete" class="inline-flex items-center">
+                                                                                    @svg('heroicon-o-trash', 'w-3.5 h-3.5')
+                                                                                </span>
+                                                                                <span x-show="confirmDelete" x-cloak class="text-[10px] font-semibold">Löschen?</span>
+                                                                            </x-ui-button>
+                                                                        </div>
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        @empty
+                                                            <div class="rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] p-3">
+                                                                <div class="text-xs font-semibold text-[var(--ui-secondary)]">Neuer Thread</div>
+                                                                <div class="mt-1 text-xs text-[var(--ui-muted)]">
+                                                                    Klick oben auf <span class="font-semibold">Neu</span> und sende die erste Nachricht.
+                                                                </div>
+                                                            </div>
+                                                        @endforelse
+                                                    </div>
+
+                                                    {{-- Phone: Demo Threads (UI only) --}}
                                                     <button type="button"
                                                         @click="selectThread(1)"
                                                         class="w-full text-left rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2 hover:bg-[var(--ui-muted-5)] transition"
                                                         :class="(!composeMode && activeThreadId === 1) ? 'ring-1 ring-[var(--ui-primary)]/40' : ''"
-                                                        x-show="activeChannel !== 'email'"
+                                                        x-show="activeChannel === 'phone'"
                                                     >
-                                                        <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate" x-text="activeChannel === 'email' ? 'Re: Angebot – Q1' : (activeChannel === 'phone' ? 'Anrufnotiz · Termin' : 'WhatsApp · Follow-up')"></div>
+                                                        <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">Anrufnotiz · Termin</div>
                                                         <div class="mt-0.5 flex items-center justify-between gap-2">
-                                                            <div class="text-[10px] text-[var(--ui-muted)] truncate"
-                                                                 x-text="activeChannel === 'email' ? 'Letzte Nachricht: 10:41 · 2 ungelesen' : (activeChannel === 'phone' ? 'Letzte Nachricht: gestern · offen' : 'Letzte Nachricht: heute · 1 ungelesen')"></div>
-                                                            {{-- Attachments hint (UI only) --}}
-                                                            <div class="flex items-center gap-1 text-[10px] text-[var(--ui-muted)] flex-shrink-0"
-                                                                 x-show="activeChannel === 'email'">
-                                                                @svg('heroicon-o-paper-clip', 'w-3.5 h-3.5')
-                                                                <span>2</span>
-                                                            </div>
+                                                            <div class="text-[10px] text-[var(--ui-muted)] truncate">Letzte Nachricht: gestern · offen</div>
                                                         </div>
                                                     </button>
                                                     <button type="button"
                                                         @click="selectThread(2)"
                                                         class="w-full text-left rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2 hover:bg-[var(--ui-muted-5)] transition"
                                                         :class="(!composeMode && activeThreadId === 2) ? 'ring-1 ring-[var(--ui-primary)]/40' : ''"
-                                                        x-show="activeChannel !== 'email'"
+                                                        x-show="activeChannel === 'phone'"
                                                     >
-                                                        <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate" x-text="activeChannel === 'email' ? 'Follow-up · Termin' : (activeChannel === 'phone' ? 'Rückruf · Frage' : 'WhatsApp · Angebot')"></div>
+                                                        <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">Rückruf · Frage</div>
                                                         <div class="mt-0.5 flex items-center justify-between gap-2">
-                                                            <div class="text-[10px] text-[var(--ui-muted)] truncate"
-                                                                 x-text="activeChannel === 'email' ? 'Letzte Nachricht: gestern · gelesen' : (activeChannel === 'phone' ? 'Letzte Nachricht: letzte Woche · erledigt' : 'Letzte Nachricht: gestern · gelesen')"></div>
-                                                            {{-- Attachments hint (UI only) --}}
-                                                            <div class="flex items-center gap-1 text-[10px] text-[var(--ui-muted)] flex-shrink-0"
-                                                                 x-show="activeChannel === 'email'">
-                                                                @svg('heroicon-o-paper-clip', 'w-3.5 h-3.5')
-                                                                <span>1</span>
-                                                            </div>
+                                                            <div class="text-[10px] text-[var(--ui-muted)] truncate">Letzte Nachricht: letzte Woche · erledigt</div>
                                                         </div>
                                                     </button>
                                                 </div>
@@ -418,117 +493,112 @@
                                                             <span class="px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
                                                                 Kanal: WhatsApp
                                                             </span>
-                                                            <span class="truncate">+49 172 123 12 14</span>
-                                                            <span class="ml-auto text-[10px] text-[var(--ui-muted)]" x-show="composeMode">Neuer Thread</span>
+                                                            <span class="truncate">{{ $activeWhatsAppChannelPhone ?? '' }}</span>
+                                                            @if(!$activeWhatsAppThreadId)
+                                                                <span class="ml-auto text-[10px] text-[var(--ui-muted)]">Neuer Thread</span>
+                                                            @endif
                                                         </div>
 
-                                                        <div class="space-y-2" x-show="!composeMode">
-                                                            <div class="flex justify-start">
-                                                                <div class="max-w-[85%] rounded-2xl bg-white border border-[var(--ui-border)]/60 px-4 py-2">
-                                                                    <div class="flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
-                                                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 text-[10px] font-semibold">ME</span>
-                                                                        <span>Extern</span>
-                                                                    </div>
-                                                                    <div class="text-sm text-[var(--ui-secondary)]">
-                                                                        Hi, könnt ihr mir kurz den Status geben?
-                                                                    </div>
-                                                                    <div class="mt-1 text-[10px] text-[var(--ui-muted)] text-right">10:41</div>
-                                                                </div>
+                                                        @if(!$activeWhatsAppChannelId)
+                                                            <div class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                                                                Kein WhatsApp Kanal ausgewählt/verfügbar.
                                                             </div>
-                                                            <div class="flex justify-start">
-                                                                <div class="max-w-[85%] rounded-2xl bg-white border border-[var(--ui-border)]/60 px-4 py-2">
-                                                                    <div class="flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
-                                                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 text-[10px] font-semibold">ME</span>
-                                                                        <span>Extern</span>
-                                                                    </div>
-                                                                    <div class="text-sm text-[var(--ui-secondary)]">
-                                                                        Ich schicke euch mal das Dokument.
-                                                                    </div>
-                                                                    <div class="mt-1 text-[10px] text-[var(--ui-muted)] text-right">10:41</div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="flex justify-end">
-                                                                <div class="max-w-[85%] rounded-2xl bg-[#dcf8c6] border border-[var(--ui-border)]/60 px-4 py-2">
-                                                                    <div class="flex items-center justify-end gap-2 text-[10px] text-[var(--ui-muted)]">
-                                                                        <span>Martin</span>
-                                                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/60 border border-[var(--ui-border)]/60 text-[10px] font-semibold">MR</span>
-                                                                    </div>
-                                                                    <div class="text-sm text-[var(--ui-secondary)]">
-                                                                        Klar — ich schaue rein und melde mich gleich.
-                                                                    </div>
-                                                                    <div class="mt-1 flex items-center justify-end gap-1 text-[10px] text-[var(--ui-muted)]">
-                                                                        <span>10:42</span>
-                                                                        <span class="text-[var(--ui-muted)]">✓✓</span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            {{-- WhatsApp "Dokument"-Bubble --}}
-                                                            <div class="flex justify-start">
-                                                                <div class="max-w-[85%] rounded-2xl bg-white border border-[var(--ui-border)]/60 px-3 py-2">
-                                                                    <div class="flex items-center gap-3">
-                                                                        <div class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 text-[var(--ui-secondary)]">
-                                                                            @svg('heroicon-o-document-text', 'w-5 h-5')
-                                                                        </div>
-                                                                        <div class="min-w-0">
-                                                                            <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">Angebot_Q1.pdf</div>
-                                                                            <div class="text-xs text-[var(--ui-muted)]">312 KB · PDF</div>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div class="mt-1 text-[10px] text-[var(--ui-muted)] text-right">10:43</div>
-                                                                </div>
-                                                            </div>
-                                                            {{-- WhatsApp "Bild"-Bubble --}}
-                                                            <div class="flex justify-end">
-                                                                <div class="max-w-[85%] rounded-2xl bg-[#dcf8c6] border border-[var(--ui-border)]/60 p-2">
-                                                                    <div class="flex items-center justify-end gap-2 text-[10px] text-[var(--ui-muted)]">
-                                                                        <span>Kollege: Anna</span>
-                                                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/60 border border-[var(--ui-border)]/60 text-[10px] font-semibold">AK</span>
-                                                                    </div>
-                                                                    <div class="w-64 h-36 rounded-xl bg-black/5 border border-[var(--ui-border)]/60 flex items-center justify-center">
-                                                                        <div class="text-xs text-[var(--ui-muted)] flex items-center gap-2">
-                                                                            @svg('heroicon-o-photo', 'w-4 h-4')
-                                                                            <span>Bild (UI)</span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div class="mt-1 flex items-center justify-end gap-1 text-[10px] text-[var(--ui-muted)]">
-                                                                        <span>10:44</span>
-                                                                        <span class="text-[var(--ui-muted)]">✓✓</span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="flex justify-end">
-                                                                <div class="max-w-[85%] rounded-2xl bg-[#dcf8c6] border border-[var(--ui-border)]/60 px-4 py-2">
-                                                                    <div class="flex items-center justify-end gap-2 text-[10px] text-[var(--ui-muted)]">
-                                                                        <span>Martin</span>
-                                                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/60 border border-[var(--ui-border)]/60 text-[10px] font-semibold">MR</span>
-                                                                    </div>
-                                                                    <div class="text-sm text-[var(--ui-secondary)]">
-                                                                        Dienstag 10:00 passt?
-                                                                    </div>
-                                                                    <div class="mt-1 flex items-center justify-end gap-1 text-[10px] text-[var(--ui-muted)]">
-                                                                        <span>11:02</span>
-                                                                        <span class="text-[var(--ui-muted)]">✓</span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="flex justify-start">
-                                                                <div class="max-w-[85%] rounded-2xl bg-white border border-[var(--ui-border)]/60 px-4 py-2">
-                                                                    <div class="flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
-                                                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 text-[10px] font-semibold">ME</span>
-                                                                        <span>Extern</span>
-                                                                    </div>
-                                                                    <div class="text-sm text-[var(--ui-secondary)]">
-                                                                        Perfekt, danke!
-                                                                    </div>
-                                                                    <div class="mt-1 text-[10px] text-[var(--ui-muted)] text-right">11:05</div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
+                                                        @else
+                                                            @if($activeWhatsAppThreadId)
+                                                                {{-- Show messages for selected thread --}}
+                                                                <div class="space-y-2">
+                                                                    @forelse($whatsappTimeline as $wm)
+                                                                        @php
+                                                                            $isInbound = ($wm['direction'] ?? '') === 'inbound';
+                                                                            $body = (string) ($wm['body'] ?? '');
+                                                                            $at = (string) ($wm['at'] ?? '');
+                                                                            $fullAt = (string) ($wm['full_at'] ?? '');
+                                                                            $sentBy = (string) ($wm['sent_by'] ?? '');
+                                                                            $status = (string) ($wm['status'] ?? '');
+                                                                            $messageType = (string) ($wm['message_type'] ?? 'text');
+                                                                            $attachments = $wm['attachments'] ?? [];
+                                                                        @endphp
 
-                                                        <div x-show="composeMode" x-cloak class="rounded-xl border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] p-4">
-                                                            <div class="text-sm font-semibold text-[var(--ui-secondary)]">Neuer WhatsApp Thread</div>
-                                                            <div class="mt-1 text-sm text-[var(--ui-muted)]">Nachricht verfassen (UI).</div>
-                                                        </div>
+                                                                        @if($isInbound)
+                                                                            {{-- Inbound bubble (left, white) --}}
+                                                                            <div class="flex justify-start">
+                                                                                <div class="max-w-[85%] rounded-2xl bg-white border border-[var(--ui-border)]/60 px-4 py-2">
+                                                                                    <div class="flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
+                                                                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 text-[10px] font-semibold">
+                                                                                            @svg('heroicon-o-user', 'w-3 h-3')
+                                                                                        </span>
+                                                                                        <span>Extern</span>
+                                                                                    </div>
+                                                                                    @if($messageType !== 'text' && !empty($attachments))
+                                                                                        {{-- Media attachment --}}
+                                                                                        <div class="flex items-center gap-3 my-2">
+                                                                                            <div class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 text-[var(--ui-secondary)]">
+                                                                                                @if($messageType === 'image')
+                                                                                                    @svg('heroicon-o-photo', 'w-5 h-5')
+                                                                                                @elseif($messageType === 'video')
+                                                                                                    @svg('heroicon-o-video-camera', 'w-5 h-5')
+                                                                                                @elseif($messageType === 'audio')
+                                                                                                    @svg('heroicon-o-microphone', 'w-5 h-5')
+                                                                                                @else
+                                                                                                    @svg('heroicon-o-document-text', 'w-5 h-5')
+                                                                                                @endif
+                                                                                            </div>
+                                                                                            <div class="min-w-0">
+                                                                                                <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">{{ ucfirst($messageType) }}</div>
+                                                                                                <div class="text-xs text-[var(--ui-muted)]">Anhang</div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    @endif
+                                                                                    @if($body)
+                                                                                        <div class="text-sm text-[var(--ui-secondary)] whitespace-pre-wrap">{{ $body }}</div>
+                                                                                    @endif
+                                                                                    <div class="mt-1 text-[10px] text-[var(--ui-muted)] text-right" title="{{ $fullAt }}">{{ $at }}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                        @else
+                                                                            {{-- Outbound bubble (right, green) --}}
+                                                                            <div class="flex justify-end">
+                                                                                <div class="max-w-[85%] rounded-2xl bg-[#dcf8c6] border border-[var(--ui-border)]/60 px-4 py-2">
+                                                                                    <div class="flex items-center justify-end gap-2 text-[10px] text-[var(--ui-muted)]">
+                                                                                        <span>{{ $sentBy ?: 'Ich' }}</span>
+                                                                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/60 border border-[var(--ui-border)]/60 text-[10px] font-semibold">
+                                                                                            {{ strtoupper(substr($sentBy ?: 'I', 0, 1)) }}{{ strtoupper(substr($sentBy ?: '', -1, 1) ?: '') }}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    @if($body)
+                                                                                        <div class="text-sm text-[var(--ui-secondary)] whitespace-pre-wrap">{{ $body }}</div>
+                                                                                    @endif
+                                                                                    <div class="mt-1 flex items-center justify-end gap-1 text-[10px] text-[var(--ui-muted)]">
+                                                                                        <span title="{{ $fullAt }}">{{ $at }}</span>
+                                                                                        @if($status === 'read')
+                                                                                            <span class="text-blue-500">✓✓</span>
+                                                                                        @elseif($status === 'delivered')
+                                                                                            <span class="text-[var(--ui-muted)]">✓✓</span>
+                                                                                        @elseif($status === 'sent')
+                                                                                            <span class="text-[var(--ui-muted)]">✓</span>
+                                                                                        @elseif($status === 'failed')
+                                                                                            <span class="text-red-500">✕</span>
+                                                                                        @endif
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        @endif
+                                                                    @empty
+                                                                        <div class="text-sm text-[var(--ui-muted)]">
+                                                                            Noch keine Nachrichten im Thread.
+                                                                        </div>
+                                                                    @endforelse
+                                                                </div>
+                                                            @else
+                                                                {{-- New thread mode --}}
+                                                                <div class="rounded-xl border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] p-4">
+                                                                    <div class="text-sm font-semibold text-[var(--ui-secondary)]">Neuer WhatsApp Thread</div>
+                                                                    <div class="mt-1 text-sm text-[var(--ui-muted)]">
+                                                                        Gib unten eine Telefonnummer und Nachricht ein und klicke auf Senden.
+                                                                    </div>
+                                                                </div>
+                                                            @endif
+                                                        @endif
                                                     </div>
 
                                                     {{-- Anrufen Verlauf (Call Timeline) --}}
@@ -653,30 +723,64 @@
                                                             @error('emailCompose.body')
                                                                 <div class="mt-1 text-sm text-[color:var(--ui-danger)]">{{ $message }}</div>
                                                             @enderror
+                                                            @if($emailMessage)
+                                                                <div class="mt-1 text-sm text-[var(--ui-secondary)]">{{ $emailMessage }}</div>
+                                                            @endif
                                                         </div>
                                                     </template>
                                                     <template x-if="activeChannel==='whatsapp'">
-                                                        <div class="flex gap-2 items-end w-full">
-                                                            <button
-                                                                type="button"
-                                                                class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] opacity-60 cursor-not-allowed"
-                                                                title="Anhang hinzufügen (UI)"
-                                                                disabled
-                                                            >
-                                                                @svg('heroicon-o-paper-clip', 'w-5 h-5')
-                                                            </button>
-                                                            <textarea
-                                                                x-ref="waBody"
-                                                                x-init="$nextTick(() => autoGrow($refs.waBody))"
-                                                                @input="autoGrow($event.target)"
-                                                                @focus="autoGrow($event.target)"
-                                                                rows="1"
-                                                                class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
-                                                                placeholder="Nachricht…"
-                                                            ></textarea>
-                                                            <button type="button" class="px-6 py-2 h-10 bg-[var(--ui-primary)] text-white rounded-lg hover:bg-opacity-90 flex items-center gap-2 opacity-60 cursor-not-allowed" disabled>
-                                                                <span>Senden</span>
-                                                            </button>
+                                                        <div class="w-full space-y-2">
+                                                            {{-- New thread: show To field --}}
+                                                            @if(!$activeWhatsAppThreadId)
+                                                                <div class="grid grid-cols-1">
+                                                                    <x-ui-input-text
+                                                                        name="whatsappCompose.to"
+                                                                        label="An (Telefonnummer)"
+                                                                        placeholder="+49 172 123 45 67"
+                                                                        wire:model.live="whatsappCompose.to"
+                                                                    />
+                                                                </div>
+                                                            @endif
+
+                                                            <div class="flex gap-2 items-end w-full">
+                                                                <button
+                                                                    type="button"
+                                                                    class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] opacity-60 cursor-not-allowed"
+                                                                    title="Anhang (bald verfügbar)"
+                                                                    disabled
+                                                                >
+                                                                    @svg('heroicon-o-paper-clip', 'w-5 h-5')
+                                                                </button>
+                                                                <textarea
+                                                                    x-ref="waBody"
+                                                                    x-init="$nextTick(() => autoGrow($refs.waBody))"
+                                                                    @input="autoGrow($event.target)"
+                                                                    @focus="autoGrow($event.target)"
+                                                                    @keydown.enter="if(!$event.shiftKey){ $event.preventDefault(); $wire.sendWhatsApp(); }"
+                                                                    rows="1"
+                                                                    wire:model="whatsappCompose.body"
+                                                                    class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
+                                                                    placeholder="Nachricht…"
+                                                                ></textarea>
+                                                                <x-ui-button
+                                                                    variant="primary"
+                                                                    size="md"
+                                                                    wire:click="sendWhatsApp"
+                                                                    wire:loading.attr="disabled"
+                                                                    wire:loading.class="animate-pulse"
+                                                                    wire:target="sendWhatsApp"
+                                                                    class="h-10 self-end"
+                                                                >
+                                                                    <span wire:loading.remove wire:target="sendWhatsApp">Senden</span>
+                                                                    <span wire:loading wire:target="sendWhatsApp">Sende…</span>
+                                                                </x-ui-button>
+                                                            </div>
+                                                            @error('whatsappCompose.body')
+                                                                <div class="mt-1 text-sm text-[color:var(--ui-danger)]">{{ $message }}</div>
+                                                            @enderror
+                                                            @if($whatsappMessage)
+                                                                <div class="mt-1 text-sm text-[var(--ui-secondary)]">{{ $whatsappMessage }}</div>
+                                                            @endif
                                                         </div>
                                                     </template>
                                                     <template x-if="activeChannel==='phone'">
