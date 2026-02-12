@@ -440,16 +440,24 @@ class WhatsAppMetaService
     }
 
     /**
-     * Get credentials from channel's provider connection.
+     * Get credentials from channel's meta or provider connection.
      */
     protected function getCredentials(CommsChannel $channel): array
     {
-        $channel->loadMissing('providerConnection');
-        $connection = $channel->providerConnection;
-        $creds = is_array($connection?->credentials) ? $connection->credentials : [];
+        // First try channel meta (where credentials are stored when channel is created)
+        $meta = is_array($channel->meta) ? $channel->meta : [];
+        $phoneNumberId = (string) ($meta['phone_number_id'] ?? '');
+        $accessToken = (string) ($meta['access_token'] ?? '');
 
-        $phoneNumberId = (string) ($creds['phone_number_id'] ?? '');
-        $accessToken = (string) ($creds['access_token'] ?? '');
+        // Fallback to provider connection credentials
+        if ($phoneNumberId === '' || $accessToken === '') {
+            $channel->loadMissing('providerConnection');
+            $connection = $channel->providerConnection;
+            $creds = is_array($connection?->credentials) ? $connection->credentials : [];
+
+            $phoneNumberId = $phoneNumberId ?: (string) ($creds['phone_number_id'] ?? '');
+            $accessToken = $accessToken ?: (string) ($creds['access_token'] ?? '');
+        }
 
         if ($phoneNumberId === '' || $accessToken === '') {
             throw new \RuntimeException('Missing WhatsApp credentials in provider connection (phone_number_id, access_token).');
@@ -458,7 +466,7 @@ class WhatsAppMetaService
         return [
             'phone_number_id' => $phoneNumberId,
             'access_token' => $accessToken,
-            'integrations_whatsapp_account_id' => $creds['integrations_whatsapp_account_id'] ?? null,
+            'integrations_whatsapp_account_id' => $meta['integrations_whatsapp_account_id'] ?? null,
         ];
     }
 
