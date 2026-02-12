@@ -20,11 +20,17 @@ class WhatsAppChannelSyncService
     {
         $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
 
-        // Alle WhatsApp-Accounts finden, die zu Users dieses Teams gehören
+        // Find accounts where owner belongs to this root team
+        // Check via teams relationship (user is member of root team or any subteam)
         $accounts = IntegrationsWhatsAppAccount::query()
             ->whereHas('integrationConnection.ownerUser', function ($query) use ($rootTeam) {
-                $query->where('team_id', $rootTeam->id);
+                $query->whereHas('teams', function ($tq) use ($rootTeam) {
+                    $tq->where('teams.id', $rootTeam->id)
+                       ->orWhere('teams.parent_id', $rootTeam->id);
+                });
             })
+            ->whereNotNull('phone_number')
+            ->where('phone_number', '!=', '')
             ->get();
 
         Log::info('[WhatsAppChannelSyncService] Syncing channels for team', [
@@ -65,10 +71,11 @@ class WhatsAppChannelSyncService
             throw new \Exception("IntegrationConnection {$integrationConnection->id} has no OwnerUser");
         }
 
-        $team = $ownerUser->team;
+        // Regular users don't have team_id - use currentTeam as fallback
+        $team = $ownerUser->team ?? $ownerUser->currentTeam;
 
         if (!$team) {
-            throw new \Exception("User {$ownerUser->id} has no Team");
+            throw new \Exception("User {$ownerUser->id} has no Team (neither team nor currentTeam)");
         }
 
         $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
