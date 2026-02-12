@@ -559,7 +559,7 @@
                                                                                     @if($body)
                                                                                         <div class="text-sm text-[var(--ui-secondary)] whitespace-pre-wrap">{{ $body }}</div>
                                                                                     @endif
-                                                                                    <div class="mt-1 text-[10px] text-[var(--ui-muted)] text-right" title="{{ $fullAt }}">{{ $at }} <span class="text-red-500">[{{ $wm['sort_key'] ?? '?' }}]</span></div>
+                                                                                    <div class="mt-1 text-[10px] text-[var(--ui-muted)] text-right" title="{{ $fullAt }}">{{ $at }}</div>
                                                                                 </div>
                                                                             </div>
                                                                         @else
@@ -576,7 +576,7 @@
                                                                                         <div class="text-sm text-[var(--ui-secondary)] whitespace-pre-wrap">{{ $body }}</div>
                                                                                     @endif
                                                                                     <div class="mt-1 flex items-center justify-end gap-1 text-[10px] text-[var(--ui-muted)]">
-                                                                                        <span title="{{ $fullAt }}">{{ $at }} <span class="text-red-500">[{{ $wm['sort_key'] ?? '?' }}]</span></span>
+                                                                                        <span title="{{ $fullAt }}">{{ $at }}</span>
                                                                                         @if($status === 'read')
                                                                                             <span class="text-blue-500">✓✓</span>
                                                                                         @elseif($status === 'delivered')

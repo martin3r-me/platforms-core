@@ -176,7 +176,9 @@ class WhatsAppMetaService
             'message_type' => $messageType,
             'status' => 'received',
             'meta_payload' => $messageData,
-            'sent_at' => $timestamp ? \Carbon\Carbon::createFromTimestamp($timestamp) : now(),
+            'sent_at' => $timestamp
+                ? \Carbon\Carbon::createFromTimestampUTC($timestamp)->setTimezone(config('app.timezone'))
+                : now(),
         ]);
 
         // Update thread rollups
