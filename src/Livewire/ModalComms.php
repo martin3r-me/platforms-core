@@ -17,6 +17,7 @@ use Platform\Core\Models\CommsProviderConnectionDomain;
 use Platform\Core\Models\Team;
 use Platform\Core\Services\Comms\PostmarkEmailService;
 use Platform\Core\Services\Comms\WhatsAppMetaService;
+use Platform\Core\Services\Comms\WhatsAppChannelSyncService;
 use Platform\Core\Models\CommsWhatsAppThread;
 use Platform\Core\Models\CommsWhatsAppMessage;
 
@@ -649,7 +650,7 @@ class ModalComms extends Component
         // Channels visible to the current user (type=whatsapp, provider=whatsapp_meta):
         // - team channels (shared)
         // - private channels created by user
-        $channels = CommsChannel::query()
+        $channelQuery = fn () => CommsChannel::query()
             ->where('team_id', $rootTeam->id)
             ->where('type', 'whatsapp')
             ->where('provider', 'whatsapp_meta')
@@ -663,6 +664,23 @@ class ModalComms extends Component
             ->orderBy('visibility')
             ->orderBy('sender_identifier')
             ->get();
+
+        $channels = $channelQuery();
+
+        // Fallback: If no channels found, try syncing from integrations
+        if ($channels->isEmpty()) {
+            try {
+                $syncService = app(WhatsAppChannelSyncService::class);
+                $syncService->syncForTeam($rootTeam);
+
+                // Re-run query after sync
+                $channels = $channelQuery();
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('[ModalComms] WhatsApp sync failed', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         $this->whatsappChannels = $channels->map(fn (CommsChannel $c) => [
             'id' => (int) $c->id,
