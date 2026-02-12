@@ -845,6 +845,7 @@ class ModalComms extends Component
             'status' => (string) ($m->status ?? ''),
             'at' => $m->sent_at?->format('H:i') ?: $m->created_at?->format('H:i'),
             'full_at' => $m->sent_at?->format('d.m.Y H:i') ?: $m->created_at?->format('d.m.Y H:i'),
+            'sort_key' => ($m->sent_at ?? $m->created_at)?->format('Y-m-d H:i:s'),
             'sent_by' => $m->sentByUser?->name ?? null,
             'attachments' => $m->attachments ?? [],
         ])->all();
