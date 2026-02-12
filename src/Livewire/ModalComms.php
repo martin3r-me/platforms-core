@@ -834,8 +834,7 @@ class ModalComms extends Component
 
         $messages = CommsWhatsAppMessage::query()
             ->where('comms_whatsapp_thread_id', $this->activeWhatsAppThreadId)
-            ->orderBy('sent_at')
-            ->orderBy('created_at')
+            ->orderByRaw('COALESCE(sent_at, created_at) ASC')
             ->get();
 
         $this->whatsappTimeline = $messages->map(fn (CommsWhatsAppMessage $m) => [
@@ -1028,6 +1027,24 @@ class ModalComms extends Component
         $this->whatsappMessage = '✅ Thread gelöscht.';
         $this->loadWhatsAppThreads();
         $this->dispatch('comms:scroll-bottom');
+    }
+
+    /**
+     * Refresh timelines for polling (only when modal is open).
+     */
+    public function refreshTimelines(): void
+    {
+        if (!$this->open) {
+            return;
+        }
+
+        // Only refresh the active timeline
+        if ($this->activeWhatsAppThreadId) {
+            $this->loadWhatsAppTimeline();
+        }
+        if ($this->activeEmailThreadId) {
+            $this->loadEmailTimeline();
+        }
     }
 
     public function loadDebugWhatsApp(): void

@@ -1,4 +1,4 @@
-<div>
+<div @if($open) wire:poll.5s="refreshTimelines" @endif>
     {{-- Use a dedicated in-between size: big enough to work, but not full-screen. --}}
     <x-ui-modal size="wide" hideFooter="1" wire:model="open" :closeButton="true">
         <x-slot name="header">
@@ -441,7 +441,7 @@
                                     {{-- Right: Chat (3/4 width) --}}
                                     <div class="col-span-3 min-h-0 min-w-0 flex flex-col overflow-hidden">
                                         <div class="flex-1 min-h-0 bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
-                                            <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" id="chatScroll" x-ref="chatScroll">
+                                            <div class="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col-reverse" id="chatScroll" x-ref="chatScroll">
                                                 <div id="chatList" class="space-y-4 min-w-0">
                                                     {{-- E-Mail Verlauf (scrollbar wie Chat, aber mail-typisch) --}}
                                                     <div x-show="activeChannel==='email'" class="space-y-3" x-cloak>
