@@ -31,6 +31,7 @@ class ModalFiles extends Component
     public bool $multiple = true;
     public array $selectedFiles = [];
     public ?string $callback = null;
+    public ?string $pickerTitle = null;
 
     // Reference Mode Properties (Modal erstellt Referenz selbst)
     public ?string $referenceType = null;    // z.B. LocationGalleryBoard::class
@@ -78,6 +79,7 @@ class ModalFiles extends Component
         $this->referenceId = isset($payload['reference_id']) ? (int) $payload['reference_id'] : null;
         $this->multiple = $payload['multiple'] ?? true;
         $this->callback = $payload['callback'] ?? null;
+        $this->pickerTitle = $payload['title'] ?? null;
         $this->selectedFiles = [];
         $this->selectedFileForVariant = null;
         $this->selectedVariantId = null;
@@ -118,7 +120,7 @@ class ModalFiles extends Component
 
         $this->resetValidation();
         $this->open = false;
-        $this->reset('contextType', 'contextId', 'files', 'uploadedFiles', 'keepOriginal', 'generateVariants', 'mode', 'activeTab', 'multiple', 'selectedFiles', 'callback', 'referenceType', 'referenceId', 'selectedFileForVariant', 'selectedVariantId', 'assignReferenceId');
+        $this->reset('contextType', 'contextId', 'files', 'uploadedFiles', 'keepOriginal', 'generateVariants', 'mode', 'activeTab', 'multiple', 'selectedFiles', 'callback', 'pickerTitle', 'referenceType', 'referenceId', 'selectedFileForVariant', 'selectedVariantId', 'assignReferenceId');
     }
 
     public function toggleFileSelection(int $fileId): void

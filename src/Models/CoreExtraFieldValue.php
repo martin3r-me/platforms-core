@@ -16,6 +16,29 @@ class CoreExtraFieldValue extends Model
         'fieldable_type',
         'fieldable_id',
         'value',
+        'verification_status',
+        'verification_result',
+        'verified_at',
+        'auto_filled',
+        'auto_filled_at',
+    ];
+
+    /**
+     * Verification status constants
+     */
+    public const VERIFICATION_STATUSES = [
+        'pending' => 'Ausstehend',
+        'verifying' => 'Wird geprüft...',
+        'verified' => 'Verifiziert',
+        'rejected' => 'Abgelehnt',
+        'error' => 'Fehler',
+    ];
+
+    protected $casts = [
+        'verification_result' => 'array',
+        'verified_at' => 'datetime',
+        'auto_filled' => 'boolean',
+        'auto_filled_at' => 'datetime',
     ];
 
     /**

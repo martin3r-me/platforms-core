@@ -18,7 +18,7 @@ class GetExtraFieldsTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /core/extra-fields - Liest Extra-Field-Definitionen und -Werte für ein beliebiges Model (z.B. hcm_applicant, hcm_employee). Gibt name, label, type, value, is_required, options zurück.';
+        return 'GET /core/extra-fields - Liest Extra-Field-Definitionen und -Werte für ein beliebiges Model. Unterstützt: hcm_applicant, hcm_employee, planner_task, helpdesk_ticket, etc. Bei Lookup-Feldern werden die verfügbaren Optionen mitgeliefert.';
     }
 
     public function getSchema(): array

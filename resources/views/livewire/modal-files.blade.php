@@ -15,6 +15,8 @@
                 <h3 class="text-xl font-bold text-[var(--ui-secondary)]">
                     @if($mode === 'assign')
                         Bild zuweisen
+                    @elseif($pickerTitle)
+                        Datei: {{ $pickerTitle }}
                     @else
                         Dateien
                     @endif

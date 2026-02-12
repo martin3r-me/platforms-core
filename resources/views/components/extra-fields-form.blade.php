@@ -25,6 +25,9 @@
             <div>
                 @switch($field['type'])
                     @case('textarea')
+                        @php
+                            $isAutoFilled = $extraFieldMeta[$field['id']]['auto_filled'] ?? false;
+                        @endphp
                         <x-ui-input-textarea
                             :name="'extraFieldValues.' . $field['id']"
                             :label="$field['label']"
@@ -34,9 +37,18 @@
                             rows="3"
                             placeholder="Wert eingeben..."
                         />
+                        @if($isAutoFilled)
+                            <span class="text-xs text-[var(--ui-primary)] flex items-center gap-1 mt-1">
+                                @svg('heroicon-o-sparkles', 'w-3 h-3')
+                                Automatisch ausgefüllt
+                            </span>
+                        @endif
                         @break
 
                     @case('number')
+                        @php
+                            $isAutoFilled = $extraFieldMeta[$field['id']]['auto_filled'] ?? false;
+                        @endphp
                         <x-ui-input-number
                             :name="'extraFieldValues.' . $field['id']"
                             :label="$field['label']"
@@ -45,7 +57,12 @@
                             step="any"
                             placeholder="Wert eingeben..."
                         />
-                        @if($field['is_encrypted'])
+                        @if($isAutoFilled)
+                            <span class="text-xs text-[var(--ui-primary)] flex items-center gap-1 mt-1">
+                                @svg('heroicon-o-sparkles', 'w-3 h-3')
+                                Automatisch ausgefüllt
+                            </span>
+                        @elseif($field['is_encrypted'])
                             <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mt-1">
                                 @svg('heroicon-o-lock-closed', 'w-3 h-3')
                                 Verschlüsselt
@@ -82,6 +99,8 @@
                             $isMultiple = $field['options']['multiple'] ?? false;
                             $fileIds = $extraFieldValues[$field['id']] ?? ($isMultiple ? [] : null);
                             $fileIds = is_array($fileIds) ? $fileIds : ($fileIds ? [$fileIds] : []);
+                            $verificationStatus = $extraFieldMeta[$field['id']]['verification_status'] ?? null;
+                            $verificationResult = $extraFieldMeta[$field['id']]['verification_result'] ?? null;
                         @endphp
                         <div>
                             <x-ui-label
@@ -136,6 +155,48 @@
                                 {{ $isMultiple ? 'Dateien auswählen' : 'Datei auswählen' }}
                             </button>
 
+                            {{-- LLM Verification Status --}}
+                            @if($field['type'] === 'file' && ($field['verify_by_llm'] ?? false) && $verificationStatus)
+                                <div class="flex items-center gap-2 mt-2 flex-wrap">
+                                    {{-- Status Badge --}}
+                                    <span class="px-2 py-0.5 text-xs rounded {{ match($verificationStatus) {
+                                        'verified' => 'bg-green-100 text-green-800',
+                                        'rejected' => 'bg-red-100 text-red-800',
+                                        'verifying' => 'bg-yellow-100 text-yellow-800 animate-pulse',
+                                        'pending' => 'bg-gray-100 text-gray-600',
+                                        'error' => 'bg-red-100 text-red-800',
+                                        default => 'bg-gray-100'
+                                    } }}">
+                                        {{ \Platform\Core\Models\CoreExtraFieldValue::VERIFICATION_STATUSES[$verificationStatus] ?? $verificationStatus }}
+                                    </span>
+
+                                    {{-- Re-Verify Button (nicht während Prüfung) --}}
+                                    @if($verificationStatus !== 'verifying' && count($fileIds) > 0)
+                                        <button
+                                            type="button"
+                                            wire:click="retryExtraFieldVerification({{ $field['id'] }})"
+                                            class="text-xs text-[var(--ui-primary)] hover:underline"
+                                        >
+                                            Erneut prüfen
+                                        </button>
+                                    @endif
+
+                                    {{-- Begründung bei rejected/verified --}}
+                                    @if(in_array($verificationStatus, ['verified', 'rejected']) && ($reason = $verificationResult['reason'] ?? null))
+                                        <span class="text-xs text-[var(--ui-muted)]" title="{{ $reason }}">
+                                            {{ \Illuminate\Support\Str::limit($reason, 50) }}
+                                        </span>
+                                    @endif
+
+                                    {{-- Error message --}}
+                                    @if($verificationStatus === 'error' && ($error = $verificationResult['error'] ?? null))
+                                        <span class="text-xs text-[var(--ui-danger)]" title="{{ $error }}">
+                                            {{ \Illuminate\Support\Str::limit($error, 50) }}
+                                        </span>
+                                    @endif
+                                </div>
+                            @endif
+
                             @if($field['is_encrypted'])
                                 <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mt-1">
                                     @svg('heroicon-o-lock-closed', 'w-3 h-3')
@@ -145,11 +206,78 @@
                         </div>
                         @break
 
+                    @case('lookup')
+                        @php
+                            $lookupId = $field['options']['lookup_id'] ?? null;
+                            $isMultiple = $field['options']['multiple'] ?? false;
+                            $lookup = $lookupId ? \Platform\Core\Models\CoreLookup::find($lookupId) : null;
+                            $lookupOptions = $lookup ? $lookup->getOptionsArray() : [];
+                            $isAutoFilled = $extraFieldMeta[$field['id']]['auto_filled'] ?? false;
+                        @endphp
+                        @if($isMultiple)
+                            {{-- Mehrfachauswahl mit Checkboxen --}}
+                            <div>
+                                <x-ui-label
+                                    :text="$field['label']"
+                                    :required="$field['is_mandatory'] || $field['is_required']"
+                                    class="mb-2"
+                                />
+                                @if($field['is_encrypted'])
+                                    <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mb-2">
+                                        @svg('heroicon-o-lock-closed', 'w-3 h-3')
+                                        Verschlüsselt
+                                    </span>
+                                @endif
+                                @if(count($lookupOptions) > 0)
+                                    <div class="flex flex-wrap gap-2">
+                                        @foreach($lookupOptions as $value => $label)
+                                            <label class="inline-flex items-center gap-2 px-3 py-1.5 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40 cursor-pointer hover:bg-[var(--ui-muted-5)] transition-colors">
+                                                <input
+                                                    type="checkbox"
+                                                    value="{{ $value }}"
+                                                    wire:model.live="extraFieldValues.{{ $field['id'] }}"
+                                                    class="w-4 h-4 text-[var(--ui-primary)] border-[var(--ui-border)] focus:ring-[var(--ui-primary)]"
+                                                />
+                                                <span class="text-sm text-[var(--ui-secondary)]">{{ $label }}</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <p class="text-sm text-[var(--ui-muted)]">Lookup enthält keine Werte.</p>
+                                @endif
+                            </div>
+                        @else
+                            {{-- Einzelauswahl --}}
+                            <x-ui-input-select
+                                :name="'extraFieldValues.' . $field['id']"
+                                :label="$field['label']"
+                                :required="$field['is_mandatory'] || $field['is_required']"
+                                :options="$lookupOptions"
+                                :nullable="!$field['is_mandatory'] && !$field['is_required']"
+                                nullLabel="Bitte wählen..."
+                                wire:model.live="extraFieldValues.{{ $field['id'] }}"
+                                :displayMode="count($lookupOptions) <= 5 ? 'badges' : 'dropdown'"
+                            />
+                            @if($isAutoFilled)
+                                <span class="text-xs text-[var(--ui-primary)] flex items-center gap-1 mt-1">
+                                    @svg('heroicon-o-sparkles', 'w-3 h-3')
+                                    Automatisch ausgefüllt
+                                </span>
+                            @elseif($field['is_encrypted'])
+                                <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mt-1">
+                                    @svg('heroicon-o-lock-closed', 'w-3 h-3')
+                                    Verschlüsselt
+                                </span>
+                            @endif
+                        @endif
+                        @break
+
                     @case('select')
                         @php
                             $choices = $field['options']['choices'] ?? [];
                             $isMultiple = $field['options']['multiple'] ?? false;
                             $selectOptions = array_combine($choices, $choices);
+                            $isAutoFilled = $extraFieldMeta[$field['id']]['auto_filled'] ?? false;
                         @endphp
                         @if($isMultiple)
                             {{-- Mehrfachauswahl mit Checkboxen --}}
@@ -191,7 +319,12 @@
                                 wire:model.live="extraFieldValues.{{ $field['id'] }}"
                                 :displayMode="count($choices) <= 5 ? 'badges' : 'dropdown'"
                             />
-                            @if($field['is_encrypted'])
+                            @if($isAutoFilled)
+                                <span class="text-xs text-[var(--ui-primary)] flex items-center gap-1 mt-1">
+                                    @svg('heroicon-o-sparkles', 'w-3 h-3')
+                                    Automatisch ausgefüllt
+                                </span>
+                            @elseif($field['is_encrypted'])
                                 <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mt-1">
                                     @svg('heroicon-o-lock-closed', 'w-3 h-3')
                                     Verschlüsselt
@@ -201,6 +334,9 @@
                         @break
 
                     @default
+                        @php
+                            $isAutoFilled = $extraFieldMeta[$field['id']]['auto_filled'] ?? false;
+                        @endphp
                         <x-ui-input-text
                             :name="'extraFieldValues.' . $field['id']"
                             :label="$field['label']"
@@ -209,6 +345,12 @@
                             wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}"
                             placeholder="Wert eingeben..."
                         />
+                        @if($isAutoFilled)
+                            <span class="text-xs text-[var(--ui-primary)] flex items-center gap-1 mt-1">
+                                @svg('heroicon-o-sparkles', 'w-3 h-3')
+                                Automatisch ausgefüllt
+                            </span>
+                        @endif
                 @endswitch
             </div>
         @endforeach

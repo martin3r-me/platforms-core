@@ -7,6 +7,7 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
+use Platform\Core\Models\CoreLookup;
 use Platform\Core\Traits\HasExtraFields;
 
 class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
@@ -18,7 +19,7 @@ class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'PUT /core/extra-fields - Setzt Extra-Field-Werte für ein beliebiges Model. Nutze core.extra_fields.GET um verfügbare Felder und deren Namen zu sehen.';
+        return 'PUT /core/extra-fields - Setzt Extra-Field-Werte für ein beliebiges Model. Unterstützt text, number, boolean, select, lookup und file Felder. Für lookup-Felder nutze core.extra_fields.GET um gültige Werte zu sehen.';
     }
 
     public function getSchema(): array
@@ -78,15 +79,52 @@ class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
 
             // Build a set of known field names for validation
             $definitions = $model->getExtraFieldsWithLabels();
-            $knownFields = array_column($definitions, 'name');
+            $definitionsByName = [];
+            foreach ($definitions as $def) {
+                $definitionsByName[$def['name']] = $def;
+            }
 
             $updated = [];
             $errors = [];
 
             foreach ($fields as $fieldName => $value) {
-                if (!in_array($fieldName, $knownFields, true)) {
+                if (!isset($definitionsByName[$fieldName])) {
                     $errors[] = "Feld '{$fieldName}' existiert nicht.";
                     continue;
+                }
+
+                $definition = $definitionsByName[$fieldName];
+
+                // Validierung für Lookup-Felder
+                if ($definition['type'] === 'lookup' && $value !== null && $value !== '') {
+                    $lookupId = $definition['options']['lookup_id'] ?? null;
+                    if ($lookupId) {
+                        $lookup = CoreLookup::with('activeValues')->find($lookupId);
+                        if ($lookup) {
+                            $validValues = $lookup->activeValues->pluck('value')->toArray();
+                            $valuesToCheck = is_array($value) ? $value : [$value];
+                            $invalidValues = array_diff($valuesToCheck, $validValues);
+
+                            if (!empty($invalidValues)) {
+                                $errors[] = "Feld '{$fieldName}': Ungültige Werte: " . implode(', ', $invalidValues) . ". Gültige Werte: " . implode(', ', $validValues);
+                                continue;
+                            }
+                        }
+                    }
+                }
+
+                // Validierung für Select-Felder
+                if ($definition['type'] === 'select' && $value !== null && $value !== '') {
+                    $validChoices = $definition['options']['choices'] ?? [];
+                    if (!empty($validChoices)) {
+                        $valuesToCheck = is_array($value) ? $value : [$value];
+                        $invalidValues = array_diff($valuesToCheck, $validChoices);
+
+                        if (!empty($invalidValues)) {
+                            $errors[] = "Feld '{$fieldName}': Ungültige Werte: " . implode(', ', $invalidValues) . ". Gültige Werte: " . implode(', ', $validChoices);
+                            continue;
+                        }
+                    }
                 }
 
                 $model->setExtraField($fieldName, $value);

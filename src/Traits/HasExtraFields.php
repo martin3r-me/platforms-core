@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\CoreExtraFieldDefinition;
 use Platform\Core\Models\CoreExtraFieldValue;
+use Platform\Core\Models\CoreLookup;
 
 trait HasExtraFields
 {
@@ -124,7 +125,8 @@ trait HasExtraFields
         $result = [];
         foreach ($definitions as $definition) {
             $value = $values->get($definition->id);
-            $result[] = [
+
+            $fieldData = [
                 'id' => $definition->id,
                 'name' => $definition->name,
                 'label' => $definition->label,
@@ -134,7 +136,37 @@ trait HasExtraFields
                 'is_mandatory' => $definition->is_mandatory,
                 'is_encrypted' => $definition->is_encrypted,
                 'options' => $definition->options,
+                'verify_by_llm' => $definition->verify_by_llm,
+                'verify_instructions' => $definition->verify_instructions,
+                'auto_fill_source' => $definition->auto_fill_source,
+                'auto_fill_prompt' => $definition->auto_fill_prompt,
             ];
+
+            // Für Lookup-Felder: Verfügbare Optionen hinzufügen
+            if ($definition->type === 'lookup' && isset($definition->options['lookup_id'])) {
+                $lookup = CoreLookup::with('activeValues')->find($definition->options['lookup_id']);
+                if ($lookup) {
+                    $fieldData['lookup'] = [
+                        'id' => $lookup->id,
+                        'name' => $lookup->name,
+                        'label' => $lookup->label,
+                        'choices' => $lookup->activeValues->map(fn($v) => [
+                            'value' => $v->value,
+                            'label' => $v->label,
+                        ])->toArray(),
+                    ];
+                }
+            }
+
+            // Für Select-Felder: Choices als Array formatieren
+            if ($definition->type === 'select' && isset($definition->options['choices'])) {
+                $fieldData['choices'] = array_map(fn($c) => [
+                    'value' => $c,
+                    'label' => $c,
+                ], $definition->options['choices']);
+            }
+
+            $result[] = $fieldData;
         }
 
         return $result;

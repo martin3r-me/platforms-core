@@ -9,10 +9,15 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Platform\Core\Models\CoreExtraFieldDefinition;
 use Platform\Core\Models\CoreExtraFieldValue;
+use Platform\Core\Models\CoreLookup;
+use Platform\Core\Models\CoreLookupValue;
 
 class ModalExtraFields extends Component
 {
     public bool $open = false;
+
+    // Tab System
+    public string $activeTab = 'fields'; // 'fields' | 'lookups'
 
     // Kontext
     public ?string $contextType = null;
@@ -20,6 +25,25 @@ class ModalExtraFields extends Component
 
     // Daten
     public array $definitions = [];
+
+    // Lookups
+    public array $lookups = [];
+    public ?int $editingLookupId = null;
+    public array $newLookup = [
+        'name' => '',
+        'label' => '',
+        'description' => '',
+    ];
+    public array $editLookup = [
+        'label' => '',
+        'description' => '',
+    ];
+
+    // Lookup Values
+    public array $lookupValues = [];
+    public ?int $selectedLookupId = null;
+    public string $newLookupValueText = '';
+    public string $newLookupValueLabel = '';
 
     // Neues Feld Formular
     public array $newField = [
@@ -31,6 +55,11 @@ class ModalExtraFields extends Component
         'is_encrypted' => false,
         'options' => [],
         'is_multiple' => false,
+        'verify_by_llm' => false,
+        'verify_instructions' => '',
+        'auto_fill_source' => '',
+        'auto_fill_prompt' => '',
+        'lookup_id' => null,
     ];
 
     // Bearbeitungs-Modus
@@ -43,6 +72,11 @@ class ModalExtraFields extends Component
         'is_encrypted' => false,
         'options' => [],
         'is_multiple' => false,
+        'verify_by_llm' => false,
+        'verify_instructions' => '',
+        'auto_fill_source' => '',
+        'auto_fill_prompt' => '',
+        'lookup_id' => null,
     ];
 
     // Temporäre Option für Eingabe
@@ -78,11 +112,13 @@ class ModalExtraFields extends Component
         // Reset
         $this->resetForm();
         $this->editingDefinitionId = null;
+        $this->activeTab = 'fields';
 
         // Daten laden
         if ($this->contextType) {
             $this->loadDefinitions();
         }
+        $this->loadLookups();
 
         $this->open = true;
     }
@@ -91,8 +127,9 @@ class ModalExtraFields extends Component
     {
         $this->resetValidation();
         $this->open = false;
-        $this->reset('contextType', 'contextId', 'definitions', 'editingDefinitionId');
+        $this->reset('contextType', 'contextId', 'definitions', 'editingDefinitionId', 'lookups', 'editingLookupId', 'selectedLookupId', 'lookupValues', 'activeTab');
         $this->resetForm();
+        $this->resetLookupForm();
     }
 
     public function loadDefinitions(): void
@@ -143,6 +180,10 @@ class ModalExtraFields extends Component
                         'is_encrypted' => $def->is_encrypted,
                         'is_global' => $def->isGlobal(),
                         'options' => $def->options,
+                        'verify_by_llm' => $def->verify_by_llm,
+                        'verify_instructions' => $def->verify_instructions,
+                        'auto_fill_source' => $def->auto_fill_source,
+                        'auto_fill_prompt' => $def->auto_fill_prompt,
                         'created_at' => $def->created_at?->format('d.m.Y'),
                     ];
                 })
@@ -186,7 +227,7 @@ class ModalExtraFields extends Component
     {
         $rules = [
             'newField.label' => ['required', 'string', 'max:255'],
-            'newField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select,file'],
+            'newField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select,lookup,file'],
             'newField.is_required' => ['boolean'],
             'newField.is_mandatory' => ['boolean'],
             'newField.is_encrypted' => ['boolean'],
@@ -195,6 +236,11 @@ class ModalExtraFields extends Component
         // Select braucht mindestens eine Option
         if ($this->newField['type'] === 'select') {
             $rules['newField.options'] = ['required', 'array', 'min:1'];
+        }
+
+        // Lookup braucht eine Lookup-ID
+        if ($this->newField['type'] === 'lookup') {
+            $rules['newField.lookup_id'] = ['required', 'integer', 'exists:core_lookups,id'];
         }
 
         $this->validate($rules);
@@ -238,6 +284,14 @@ class ModalExtraFields extends Component
                 ];
             }
 
+            // Options für Lookup-Felder
+            if ($this->newField['type'] === 'lookup') {
+                $options = [
+                    'lookup_id' => (int) $this->newField['lookup_id'],
+                    'multiple' => $this->newField['is_multiple'] ?? false,
+                ];
+            }
+
             // Options für File-Felder
             if ($this->newField['type'] === 'file') {
                 $options = [
@@ -258,6 +312,10 @@ class ModalExtraFields extends Component
                 'is_encrypted' => $this->newField['is_encrypted'] ?? false,
                 'order' => $maxOrder + 1,
                 'options' => $options,
+                'verify_by_llm' => $this->newField['type'] === 'file' && ($this->newField['verify_by_llm'] ?? false),
+                'verify_instructions' => $this->newField['type'] === 'file' ? ($this->newField['verify_instructions'] ?? null) : null,
+                'auto_fill_source' => !empty($this->newField['auto_fill_source']) ? $this->newField['auto_fill_source'] : null,
+                'auto_fill_prompt' => !empty($this->newField['auto_fill_prompt']) ? $this->newField['auto_fill_prompt'] : null,
             ]);
 
             // Reset Formular
@@ -294,6 +352,11 @@ class ModalExtraFields extends Component
             'is_encrypted' => $definition['is_encrypted'],
             'options' => $definition['options']['choices'] ?? [],
             'is_multiple' => $definition['options']['multiple'] ?? false,
+            'verify_by_llm' => $definition['verify_by_llm'] ?? false,
+            'verify_instructions' => $definition['verify_instructions'] ?? '',
+            'auto_fill_source' => $definition['auto_fill_source'] ?? '',
+            'auto_fill_prompt' => $definition['auto_fill_prompt'] ?? '',
+            'lookup_id' => $definition['options']['lookup_id'] ?? null,
         ];
         $this->editOptionText = '';
     }
@@ -309,6 +372,11 @@ class ModalExtraFields extends Component
             'is_encrypted' => false,
             'options' => [],
             'is_multiple' => false,
+            'verify_by_llm' => false,
+            'verify_instructions' => '',
+            'auto_fill_source' => '',
+            'auto_fill_prompt' => '',
+            'lookup_id' => null,
         ];
         $this->editOptionText = '';
     }
@@ -321,7 +389,7 @@ class ModalExtraFields extends Component
 
         $rules = [
             'editField.label' => ['required', 'string', 'max:255'],
-            'editField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select,file'],
+            'editField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select,lookup,file'],
             'editField.is_required' => ['boolean'],
             'editField.is_mandatory' => ['boolean'],
             'editField.is_encrypted' => ['boolean'],
@@ -330,6 +398,11 @@ class ModalExtraFields extends Component
         // Select braucht mindestens eine Option
         if ($this->editField['type'] === 'select') {
             $rules['editField.options'] = ['required', 'array', 'min:1'];
+        }
+
+        // Lookup braucht eine Lookup-ID
+        if ($this->editField['type'] === 'lookup') {
+            $rules['editField.lookup_id'] = ['required', 'integer', 'exists:core_lookups,id'];
         }
 
         $this->validate($rules);
@@ -349,6 +422,14 @@ class ModalExtraFields extends Component
                 ];
             }
 
+            // Options für Lookup-Felder
+            if ($this->editField['type'] === 'lookup') {
+                $options = [
+                    'lookup_id' => (int) $this->editField['lookup_id'],
+                    'multiple' => $this->editField['is_multiple'] ?? false,
+                ];
+            }
+
             // Options für File-Felder
             if ($this->editField['type'] === 'file') {
                 $options = [
@@ -363,6 +444,10 @@ class ModalExtraFields extends Component
                 'is_mandatory' => $this->editField['is_mandatory'] ?? false,
                 'is_encrypted' => $this->editField['is_encrypted'] ?? false,
                 'options' => $options,
+                'verify_by_llm' => $this->editField['type'] === 'file' && ($this->editField['verify_by_llm'] ?? false),
+                'verify_instructions' => $this->editField['type'] === 'file' ? ($this->editField['verify_instructions'] ?? null) : null,
+                'auto_fill_source' => !empty($this->editField['auto_fill_source']) ? $this->editField['auto_fill_source'] : null,
+                'auto_fill_prompt' => !empty($this->editField['auto_fill_prompt']) ? $this->editField['auto_fill_prompt'] : null,
             ]);
 
             $this->cancelEditDefinition();
@@ -468,6 +553,11 @@ class ModalExtraFields extends Component
         return CoreExtraFieldDefinition::TYPES;
     }
 
+    public function getAutoFillSourcesProperty(): array
+    {
+        return CoreExtraFieldDefinition::AUTO_FILL_SOURCES;
+    }
+
     protected function resetForm(): void
     {
         $this->newField = [
@@ -479,8 +569,31 @@ class ModalExtraFields extends Component
             'is_encrypted' => false,
             'options' => [],
             'is_multiple' => false,
+            'verify_by_llm' => false,
+            'verify_instructions' => '',
+            'auto_fill_source' => '',
+            'auto_fill_prompt' => '',
+            'lookup_id' => null,
         ];
         $this->newOptionText = '';
+    }
+
+    protected function resetLookupForm(): void
+    {
+        $this->newLookup = [
+            'name' => '',
+            'label' => '',
+            'description' => '',
+        ];
+        $this->editLookup = [
+            'label' => '',
+            'description' => '',
+        ];
+        $this->editingLookupId = null;
+        $this->selectedLookupId = null;
+        $this->lookupValues = [];
+        $this->newLookupValueText = '';
+        $this->newLookupValueLabel = '';
     }
 
     protected function getTeamId(): ?int
@@ -500,6 +613,359 @@ class ModalExtraFields extends Component
         } catch (\Exception $e) {
             return null;
         }
+    }
+
+    // ==========================================
+    // Lookup Management
+    // ==========================================
+
+    public function loadLookups(): void
+    {
+        $teamId = $this->getTeamId();
+        if (!$teamId) {
+            $this->lookups = [];
+            return;
+        }
+
+        try {
+            if (!Schema::hasTable('core_lookups')) {
+                $this->lookups = [];
+                return;
+            }
+
+            $this->lookups = CoreLookup::forTeam($teamId)
+                ->orderBy('label')
+                ->get()
+                ->map(fn($lookup) => [
+                    'id' => $lookup->id,
+                    'name' => $lookup->name,
+                    'label' => $lookup->label,
+                    'description' => $lookup->description,
+                    'is_system' => $lookup->is_system,
+                    'values_count' => $lookup->values()->count(),
+                ])
+                ->toArray();
+        } catch (\Exception $e) {
+            $this->lookups = [];
+        }
+    }
+
+    public function createLookup(): void
+    {
+        $this->validate([
+            'newLookup.label' => ['required', 'string', 'max:255'],
+        ]);
+
+        $teamId = $this->getTeamId();
+        if (!$teamId) {
+            $this->addError('newLookup.label', 'Kein Team-Kontext vorhanden.');
+            return;
+        }
+
+        // Name aus Label generieren
+        $name = Str::slug($this->newLookup['label'], '_');
+
+        // Prüfe ob Name bereits existiert
+        $exists = CoreLookup::forTeam($teamId)->where('name', $name)->exists();
+        if ($exists) {
+            $this->addError('newLookup.label', 'Ein Lookup mit diesem Namen existiert bereits.');
+            return;
+        }
+
+        try {
+            CoreLookup::create([
+                'team_id' => $teamId,
+                'created_by_user_id' => Auth::id(),
+                'name' => $name,
+                'label' => trim($this->newLookup['label']),
+                'description' => trim($this->newLookup['description']) ?: null,
+                'is_system' => false,
+            ]);
+
+            $this->newLookup = ['name' => '', 'label' => '', 'description' => ''];
+            $this->loadLookups();
+
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => 'Lookup erstellt.',
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Fehler beim Erstellen.',
+            ]);
+        }
+    }
+
+    public function startEditLookup(int $lookupId): void
+    {
+        $lookup = collect($this->lookups)->firstWhere('id', $lookupId);
+        if (!$lookup) {
+            return;
+        }
+
+        $this->editingLookupId = $lookupId;
+        $this->editLookup = [
+            'label' => $lookup['label'],
+            'description' => $lookup['description'] ?? '',
+        ];
+    }
+
+    public function cancelEditLookup(): void
+    {
+        $this->editingLookupId = null;
+        $this->editLookup = ['label' => '', 'description' => ''];
+    }
+
+    public function saveEditLookup(): void
+    {
+        if (!$this->editingLookupId) {
+            return;
+        }
+
+        $this->validate([
+            'editLookup.label' => ['required', 'string', 'max:255'],
+        ]);
+
+        try {
+            $lookup = CoreLookup::find($this->editingLookupId);
+            if (!$lookup) {
+                return;
+            }
+
+            $lookup->update([
+                'label' => trim($this->editLookup['label']),
+                'description' => trim($this->editLookup['description']) ?: null,
+            ]);
+
+            $this->cancelEditLookup();
+            $this->loadLookups();
+
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => 'Lookup aktualisiert.',
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Fehler beim Aktualisieren.',
+            ]);
+        }
+    }
+
+    public function deleteLookup(int $lookupId): void
+    {
+        try {
+            $lookup = CoreLookup::find($lookupId);
+            if (!$lookup) {
+                return;
+            }
+
+            if ($lookup->is_system) {
+                $this->dispatch('notify', [
+                    'type' => 'error',
+                    'message' => 'System-Lookups können nicht gelöscht werden.',
+                ]);
+                return;
+            }
+
+            // Prüfe ob Lookup in Verwendung
+            $inUse = CoreExtraFieldDefinition::where('type', 'lookup')
+                ->where('options->lookup_id', $lookupId)
+                ->exists();
+
+            if ($inUse) {
+                $this->dispatch('notify', [
+                    'type' => 'error',
+                    'message' => 'Lookup wird noch verwendet und kann nicht gelöscht werden.',
+                ]);
+                return;
+            }
+
+            $lookup->delete();
+
+            if ($this->selectedLookupId === $lookupId) {
+                $this->selectedLookupId = null;
+                $this->lookupValues = [];
+            }
+
+            $this->loadLookups();
+
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => 'Lookup gelöscht.',
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Fehler beim Löschen.',
+            ]);
+        }
+    }
+
+    // ==========================================
+    // Lookup Values Management
+    // ==========================================
+
+    public function selectLookup(int $lookupId): void
+    {
+        $this->selectedLookupId = $lookupId;
+        $this->loadLookupValues();
+    }
+
+    public function deselectLookup(): void
+    {
+        $this->selectedLookupId = null;
+        $this->lookupValues = [];
+        $this->newLookupValueText = '';
+        $this->newLookupValueLabel = '';
+    }
+
+    public function loadLookupValues(): void
+    {
+        if (!$this->selectedLookupId) {
+            $this->lookupValues = [];
+            return;
+        }
+
+        try {
+            $this->lookupValues = CoreLookupValue::where('lookup_id', $this->selectedLookupId)
+                ->orderBy('order')
+                ->orderBy('label')
+                ->get()
+                ->map(fn($v) => [
+                    'id' => $v->id,
+                    'value' => $v->value,
+                    'label' => $v->label,
+                    'order' => $v->order,
+                    'is_active' => $v->is_active,
+                ])
+                ->toArray();
+        } catch (\Exception $e) {
+            $this->lookupValues = [];
+        }
+    }
+
+    public function addLookupValue(): void
+    {
+        if (!$this->selectedLookupId) {
+            return;
+        }
+
+        $label = trim($this->newLookupValueLabel);
+        $value = trim($this->newLookupValueText) ?: $label;
+
+        if ($label === '') {
+            return;
+        }
+
+        // Prüfe ob Value bereits existiert
+        $exists = CoreLookupValue::where('lookup_id', $this->selectedLookupId)
+            ->where('value', $value)
+            ->exists();
+
+        if ($exists) {
+            $this->addError('newLookupValueText', 'Dieser Wert existiert bereits.');
+            return;
+        }
+
+        try {
+            $maxOrder = CoreLookupValue::where('lookup_id', $this->selectedLookupId)->max('order') ?? 0;
+
+            CoreLookupValue::create([
+                'lookup_id' => $this->selectedLookupId,
+                'value' => $value,
+                'label' => $label,
+                'order' => $maxOrder + 1,
+                'is_active' => true,
+            ]);
+
+            $this->newLookupValueText = '';
+            $this->newLookupValueLabel = '';
+            $this->loadLookupValues();
+            $this->loadLookups(); // Update count
+        } catch (\Exception $e) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Fehler beim Hinzufügen.',
+            ]);
+        }
+    }
+
+    public function toggleLookupValue(int $valueId): void
+    {
+        try {
+            $value = CoreLookupValue::find($valueId);
+            if ($value) {
+                $value->update(['is_active' => !$value->is_active]);
+                $this->loadLookupValues();
+            }
+        } catch (\Exception $e) {
+            // Silent fail
+        }
+    }
+
+    public function deleteLookupValue(int $valueId): void
+    {
+        try {
+            CoreLookupValue::where('id', $valueId)->delete();
+            $this->loadLookupValues();
+            $this->loadLookups(); // Update count
+        } catch (\Exception $e) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Fehler beim Löschen.',
+            ]);
+        }
+    }
+
+    public function moveLookupValueUp(int $valueId): void
+    {
+        $this->moveLookupValue($valueId, -1);
+    }
+
+    public function moveLookupValueDown(int $valueId): void
+    {
+        $this->moveLookupValue($valueId, 1);
+    }
+
+    protected function moveLookupValue(int $valueId, int $direction): void
+    {
+        $values = collect($this->lookupValues);
+        $currentIndex = $values->search(fn($v) => $v['id'] === $valueId);
+
+        if ($currentIndex === false) {
+            return;
+        }
+
+        $newIndex = $currentIndex + $direction;
+        if ($newIndex < 0 || $newIndex >= $values->count()) {
+            return;
+        }
+
+        // Swap order values
+        $currentValue = CoreLookupValue::find($valueId);
+        $swapValue = CoreLookupValue::find($values[$newIndex]['id']);
+
+        if ($currentValue && $swapValue) {
+            $tempOrder = $currentValue->order;
+            $currentValue->update(['order' => $swapValue->order]);
+            $swapValue->update(['order' => $tempOrder]);
+            $this->loadLookupValues();
+        }
+    }
+
+    public function getAvailableLookupsProperty(): array
+    {
+        return $this->lookups;
+    }
+
+    public function getSelectedLookupProperty(): ?array
+    {
+        if (!$this->selectedLookupId) {
+            return null;
+        }
+        return collect($this->lookups)->firstWhere('id', $this->selectedLookupId);
     }
 
     public function render()

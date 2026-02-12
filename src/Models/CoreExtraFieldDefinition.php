@@ -24,6 +24,18 @@ class CoreExtraFieldDefinition extends Model
         'is_encrypted',
         'order',
         'options',
+        'verify_by_llm',
+        'verify_instructions',
+        'auto_fill_source',
+        'auto_fill_prompt',
+    ];
+
+    /**
+     * Available auto-fill sources
+     */
+    public const AUTO_FILL_SOURCES = [
+        'llm' => 'LLM (KI-Analyse)',
+        'websearch' => 'Web-Suche',
     ];
 
     protected $casts = [
@@ -33,6 +45,7 @@ class CoreExtraFieldDefinition extends Model
         'order' => 'integer',
         'options' => 'array',
         'context_id' => 'integer',
+        'verify_by_llm' => 'boolean',
     ];
 
     /**
@@ -43,9 +56,38 @@ class CoreExtraFieldDefinition extends Model
         'number' => 'Zahl',
         'textarea' => 'Mehrzeiliger Text',
         'boolean' => 'Ja/Nein',
-        'select' => 'Auswahl',
+        'select' => 'Auswahl (Freihand)',
+        'lookup' => 'Auswahl (Lookup)',
         'file' => 'Datei',
     ];
+
+    /**
+     * Lookup-Beziehung (für lookup-Felder)
+     */
+    public function lookup(): BelongsTo
+    {
+        $lookupId = $this->options['lookup_id'] ?? null;
+        return $this->belongsTo(CoreLookup::class, 'lookup_id')
+            ->withDefault(fn() => CoreLookup::find($lookupId));
+    }
+
+    /**
+     * Holt die Lookup-Optionen für dieses Feld
+     */
+    public function getLookupOptionsAttribute(): array
+    {
+        if ($this->type !== 'lookup') {
+            return [];
+        }
+
+        $lookupId = $this->options['lookup_id'] ?? null;
+        if (!$lookupId) {
+            return [];
+        }
+
+        $lookup = CoreLookup::find($lookupId);
+        return $lookup ? $lookup->getOptionsArray() : [];
+    }
 
     /**
      * Beziehungen

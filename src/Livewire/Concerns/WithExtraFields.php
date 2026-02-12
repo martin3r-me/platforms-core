@@ -4,6 +4,7 @@ namespace Platform\Core\Livewire\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\On;
+use Platform\Core\Jobs\VerifyExtraFieldValueJob;
 use Platform\Core\Models\CoreExtraFieldDefinition;
 use Platform\Core\Models\CoreExtraFieldValue;
 
@@ -33,6 +34,11 @@ trait WithExtraFields
      * The extra field definitions
      */
     public array $extraFieldDefinitions = [];
+
+    /**
+     * Extra field metadata (verification status, etc.) indexed by definition ID
+     */
+    public array $extraFieldMeta = [];
 
     /**
      * The model that has extra fields
@@ -68,10 +74,16 @@ trait WithExtraFields
             return $def;
         }, $definitions);
 
+        // Load field values with verification metadata
+        $fieldValues = $model->extraFieldValues()->with('definition')->get()->keyBy('definition_id');
+
         // Initialize values array with current values
         $this->extraFieldValues = [];
+        $this->extraFieldMeta = [];
+
         foreach ($this->extraFieldDefinitions as $field) {
             $value = $field['value'];
+            $fieldValue = $fieldValues->get($field['id']);
 
             // Für Mehrfachauswahl muss der Wert ein Array sein
             if ($field['type'] === 'select' && ($field['options']['multiple'] ?? false)) {
@@ -92,6 +104,17 @@ trait WithExtraFields
             }
 
             $this->extraFieldValues[$field['id']] = $value;
+
+            // Load verification and auto-fill metadata
+            if ($fieldValue) {
+                $this->extraFieldMeta[$field['id']] = [
+                    'verification_status' => $fieldValue->verification_status,
+                    'verification_result' => $fieldValue->verification_result,
+                    'verified_at' => $fieldValue->verified_at,
+                    'auto_filled' => $fieldValue->auto_filled,
+                    'auto_filled_at' => $fieldValue->auto_filled_at,
+                ];
+            }
         }
 
         // Store original for dirty checking
@@ -135,8 +158,11 @@ trait WithExtraFields
 
         // Initialize values array
         $this->extraFieldValues = [];
+        $this->extraFieldMeta = [];
+
         foreach ($this->extraFieldDefinitions as $field) {
-            $value = $values->get($field['id'])?->typed_value;
+            $fieldValue = $values->get($field['id']);
+            $value = $fieldValue?->typed_value;
 
             // Für Mehrfachauswahl muss der Wert ein Array sein
             if ($field['type'] === 'select' && ($field['options']['multiple'] ?? false)) {
@@ -157,6 +183,17 @@ trait WithExtraFields
             }
 
             $this->extraFieldValues[$field['id']] = $value;
+
+            // Load verification and auto-fill metadata
+            if ($fieldValue) {
+                $this->extraFieldMeta[$field['id']] = [
+                    'verification_status' => $fieldValue->verification_status,
+                    'verification_result' => $fieldValue->verification_result,
+                    'verified_at' => $fieldValue->verified_at,
+                    'auto_filled' => $fieldValue->auto_filled,
+                    'auto_filled_at' => $fieldValue->auto_filled_at,
+                ];
+            }
         }
 
         // Store original for dirty checking
@@ -232,7 +269,10 @@ trait WithExtraFields
                     $valueRecord->delete();
                 }
             } else {
-                if (!$valueRecord) {
+                $isNewRecord = !$valueRecord;
+                $oldValue = $valueRecord?->typed_value;
+
+                if ($isNewRecord) {
                     $valueRecord = new CoreExtraFieldValue([
                         'definition_id' => $definitionId,
                         'fieldable_type' => $model->getMorphClass(),
@@ -242,6 +282,23 @@ trait WithExtraFields
 
                 $valueRecord->setTypedValue($newValue);
                 $valueRecord->save();
+
+                // Dispatch LLM verification job for file fields with verify_by_llm enabled
+                // Only if value has changed or is new
+                if ($field['type'] === 'file' && ($field['verify_by_llm'] ?? false)) {
+                    $valueChanged = $isNewRecord || $oldValue !== $newValue;
+                    if ($valueChanged) {
+                        $valueRecord->update(['verification_status' => 'pending']);
+                        VerifyExtraFieldValueJob::dispatch($valueRecord->id);
+
+                        // Update local meta
+                        $this->extraFieldMeta[$definitionId] = [
+                            'verification_status' => 'pending',
+                            'verification_result' => null,
+                            'verified_at' => null,
+                        ];
+                    }
+                }
             }
         }
 
@@ -361,6 +418,10 @@ trait WithExtraFields
         $contextType = get_class($this->extraFieldsModel);
         $contextId = $this->extraFieldsModel->id;
 
+        // Feldtitel ermitteln
+        $fieldTitle = collect($this->extraFieldDefinitions)
+            ->firstWhere('id', $fieldId)['label'] ?? null;
+
         $this->dispatch('files', [
             'context_type' => $contextType,
             'context_id' => $contextId,
@@ -369,6 +430,7 @@ trait WithExtraFields
         $this->dispatch('files:picker', [
             'multiple' => $multiple,
             'callback' => 'extrafield',
+            'title' => $fieldTitle,
         ]);
     }
 
@@ -417,5 +479,38 @@ trait WithExtraFields
 
         $this->activeExtraFieldFilePickerId = null;
         $this->activeExtraFieldFilePickerMultiple = false;
+    }
+
+    /**
+     * Retry LLM verification for an extra field
+     */
+    public function retryExtraFieldVerification(int $fieldId): void
+    {
+        $definition = collect($this->extraFieldDefinitions)->firstWhere('id', $fieldId);
+
+        if (!$definition || !($definition['verify_by_llm'] ?? false)) {
+            return;
+        }
+
+        if (!$this->extraFieldsModel) {
+            return;
+        }
+
+        $fieldValue = CoreExtraFieldValue::where('definition_id', $fieldId)
+            ->where('fieldable_type', $this->extraFieldsModel->getMorphClass())
+            ->where('fieldable_id', $this->extraFieldsModel->id)
+            ->first();
+
+        if ($fieldValue) {
+            $fieldValue->update(['verification_status' => 'pending']);
+            VerifyExtraFieldValueJob::dispatch($fieldValue->id);
+
+            // Update local meta
+            $this->extraFieldMeta[$fieldId] = [
+                'verification_status' => 'pending',
+                'verification_result' => null,
+                'verified_at' => null,
+            ];
+        }
     }
 }

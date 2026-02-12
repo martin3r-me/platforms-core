@@ -21,7 +21,24 @@
     </x-slot>
 
     <div>
-        @if($contextType)
+        {{-- Tab Navigation --}}
+        <div class="flex border-b border-[var(--ui-border)]/40 mb-6">
+            <button
+                wire:click="$set('activeTab', 'fields')"
+                class="px-4 py-2 text-sm font-medium transition-colors {{ $activeTab === 'fields' ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}"
+            >
+                Felder
+            </button>
+            <button
+                wire:click="$set('activeTab', 'lookups')"
+                class="px-4 py-2 text-sm font-medium transition-colors {{ $activeTab === 'lookups' ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}"
+            >
+                Lookups
+            </button>
+        </div>
+
+        {{-- Felder Tab --}}
+        @if($activeTab === 'fields' && $contextType)
             <!-- Definitionen -->
             <div class="space-y-6">
                 <!-- Neues Feld erstellen -->
@@ -127,6 +144,44 @@
                         </div>
                     @endif
 
+                    {{-- Lookup-Optionen --}}
+                    @if($newField['type'] === 'lookup')
+                        <div class="mt-4 p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-sm font-medium text-[var(--ui-secondary)]">Lookup auswählen</span>
+                                <x-ui-input-checkbox
+                                    name="newField.is_multiple"
+                                    checkedLabel="Mehrfachauswahl aktiv"
+                                    uncheckedLabel="Mehrfachauswahl aktivieren"
+                                    wire:model="newField.is_multiple"
+                                />
+                            </div>
+
+                            @if(count($this->availableLookups) > 0)
+                                <select
+                                    wire:model="newField.lookup_id"
+                                    class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                >
+                                    <option value="">Bitte wählen...</option>
+                                    @foreach($this->availableLookups as $lookup)
+                                        <option value="{{ $lookup['id'] }}">{{ $lookup['label'] }} ({{ $lookup['values_count'] }} Werte)</option>
+                                    @endforeach
+                                </select>
+                                <p class="text-xs text-[var(--ui-muted)] mt-2">
+                                    Lookups können im Tab "Lookups" verwaltet werden.
+                                </p>
+                            @else
+                                <p class="text-sm text-[var(--ui-muted)]">
+                                    Noch keine Lookups vorhanden. Erstellen Sie zuerst einen Lookup im Tab "Lookups".
+                                </p>
+                            @endif
+
+                            @error('newField.lookup_id')
+                                <p class="mt-2 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    @endif
+
                     {{-- File-Optionen --}}
                     @if($newField['type'] === 'file')
                         <div class="mt-4 p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40">
@@ -136,6 +191,68 @@
                                 uncheckedLabel="Mehrere Dateien erlauben"
                                 wire:model="newField.is_multiple"
                             />
+                        </div>
+
+                        {{-- LLM-Verifikation --}}
+                        <div class="mt-4 p-4 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    wire:model.live="newField.verify_by_llm"
+                                    class="rounded border-[var(--ui-border)]/60 text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]"
+                                />
+                                <span class="text-sm font-medium text-[var(--ui-secondary)]">Durch KI verifizieren</span>
+                            </label>
+
+                            @if($newField['verify_by_llm'])
+                                <div class="mt-3">
+                                    <label class="block text-sm text-[var(--ui-muted)] mb-1">Verifikations-Anweisungen</label>
+                                    <textarea
+                                        wire:model="newField.verify_instructions"
+                                        placeholder="z.B.: Prüfe ob dies ein gültiger Personalausweis ist. Ist er lesbar und nicht abgelaufen?"
+                                        class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                        rows="3"
+                                    ></textarea>
+                                    <p class="text-xs text-[var(--ui-muted)] mt-1">Die KI prüft hochgeladene Bilder nach diesen Anweisungen und markiert sie als verifiziert oder abgelehnt.</p>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
+                    {{-- AutoFill Optionen (für alle Feldtypen außer file) --}}
+                    @if($newField['type'] !== 'file')
+                        <div class="mt-4 p-4 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
+                            <div class="flex items-center gap-4 mb-3">
+                                <span class="text-sm font-medium text-[var(--ui-secondary)]">AutoFill</span>
+                                <select
+                                    wire:model.live="newField.auto_fill_source"
+                                    class="px-3 py-1.5 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                >
+                                    <option value="">Deaktiviert</option>
+                                    @foreach($this->autoFillSources as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            @if(!empty($newField['auto_fill_source']))
+                                <div class="mt-3">
+                                    <label class="block text-sm text-[var(--ui-muted)] mb-1">AutoFill-Anweisungen</label>
+                                    <textarea
+                                        wire:model="newField.auto_fill_prompt"
+                                        placeholder="{{ $newField['auto_fill_source'] === 'websearch' ? 'z.B.: Suche die Firmenadresse und Telefonnummer' : 'z.B.: Analysiere die vorhandenen Daten und schlage einen passenden Wert vor' }}"
+                                        class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                        rows="2"
+                                    ></textarea>
+                                    <p class="text-xs text-[var(--ui-muted)] mt-1">
+                                        @if($newField['auto_fill_source'] === 'websearch')
+                                            Per Scheduler werden leere Felder via Web-Suche automatisch gefüllt.
+                                        @else
+                                            Per Scheduler werden leere Felder via KI-Analyse automatisch gefüllt.
+                                        @endif
+                                    </p>
+                                </div>
+                            @endif
                         </div>
                     @endif
 
@@ -211,8 +328,16 @@
                                                     />
                                                 @else
                                                     <span class="text-sm text-[var(--ui-muted)]">{{ $def['type_label'] }}</span>
-                                                    @if(($def['type'] === 'select' || $def['type'] === 'file') && isset($def['options']['multiple']) && $def['options']['multiple'])
+                                                    @if(($def['type'] === 'select' || $def['type'] === 'file' || $def['type'] === 'lookup') && isset($def['options']['multiple']) && $def['options']['multiple'])
                                                         <span class="ml-1 text-xs text-[var(--ui-primary)]">(Mehrfach)</span>
+                                                    @endif
+                                                    @if($def['type'] === 'lookup' && isset($def['options']['lookup_id']))
+                                                        @php
+                                                            $lookupForDisplay = collect($this->availableLookups)->firstWhere('id', $def['options']['lookup_id']);
+                                                        @endphp
+                                                        @if($lookupForDisplay)
+                                                            <span class="block text-xs text-[var(--ui-muted)]">{{ $lookupForDisplay['label'] }}</span>
+                                                        @endif
                                                     @endif
                                                 @endif
                                             </td>
@@ -369,17 +494,122 @@
                                             </tr>
                                         @endif
 
+                                        {{-- Lookup-Optionen bearbeiten --}}
+                                        @if($editingDefinitionId === $def['id'] && $editField['type'] === 'lookup')
+                                            <tr class="bg-[var(--ui-muted-5)]/30">
+                                                <td colspan="7" class="px-6 py-4">
+                                                    <div class="p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40">
+                                                        <div class="flex items-center justify-between mb-3">
+                                                            <span class="text-sm font-medium text-[var(--ui-secondary)]">Lookup auswählen</span>
+                                                            <x-ui-input-checkbox
+                                                                name="editField.is_multiple"
+                                                                checkedLabel="Mehrfachauswahl aktiv"
+                                                                uncheckedLabel="Mehrfachauswahl aktivieren"
+                                                                wire:model="editField.is_multiple"
+                                                            />
+                                                        </div>
+
+                                                        @if(count($this->availableLookups) > 0)
+                                                            <select
+                                                                wire:model="editField.lookup_id"
+                                                                class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                            >
+                                                                <option value="">Bitte wählen...</option>
+                                                                @foreach($this->availableLookups as $lookup)
+                                                                    <option value="{{ $lookup['id'] }}">{{ $lookup['label'] }} ({{ $lookup['values_count'] }} Werte)</option>
+                                                                @endforeach
+                                                            </select>
+                                                        @else
+                                                            <p class="text-sm text-[var(--ui-muted)]">
+                                                                Noch keine Lookups vorhanden.
+                                                            </p>
+                                                        @endif
+
+                                                        @error('editField.lookup_id')
+                                                            <p class="mt-2 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
+                                                        @enderror
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @endif
+
                                         {{-- File-Optionen bearbeiten --}}
                                         @if($editingDefinitionId === $def['id'] && $editField['type'] === 'file')
                                             <tr class="bg-[var(--ui-muted-5)]/30">
                                                 <td colspan="7" class="px-6 py-4">
-                                                    <div class="p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40">
+                                                    <div class="p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40 space-y-4">
                                                         <x-ui-input-checkbox
                                                             name="editField.is_multiple"
                                                             checkedLabel="Mehrere Dateien erlaubt"
                                                             uncheckedLabel="Mehrere Dateien erlauben"
                                                             wire:model="editField.is_multiple"
                                                         />
+
+                                                        {{-- LLM-Verifikation --}}
+                                                        <div class="pt-3 border-t border-[var(--ui-border)]/40">
+                                                            <label class="flex items-center gap-2 cursor-pointer">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    wire:model.live="editField.verify_by_llm"
+                                                                    class="rounded border-[var(--ui-border)]/60 text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]"
+                                                                />
+                                                                <span class="text-sm font-medium text-[var(--ui-secondary)]">Durch KI verifizieren</span>
+                                                            </label>
+
+                                                            @if($editField['verify_by_llm'])
+                                                                <div class="mt-3">
+                                                                    <label class="block text-sm text-[var(--ui-muted)] mb-1">Verifikations-Anweisungen</label>
+                                                                    <textarea
+                                                                        wire:model="editField.verify_instructions"
+                                                                        placeholder="z.B.: Prüfe ob dies ein gültiger Personalausweis ist. Ist er lesbar und nicht abgelaufen?"
+                                                                        class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                                        rows="3"
+                                                                    ></textarea>
+                                                                    <p class="text-xs text-[var(--ui-muted)] mt-1">Die KI prüft hochgeladene Bilder nach diesen Anweisungen.</p>
+                                                                </div>
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @endif
+
+                                        {{-- AutoFill-Optionen bearbeiten (für alle nicht-file Felder) --}}
+                                        @if($editingDefinitionId === $def['id'] && $editField['type'] !== 'file')
+                                            <tr class="bg-[var(--ui-muted-5)]/30">
+                                                <td colspan="7" class="px-6 py-4">
+                                                    <div class="p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40">
+                                                        <div class="flex items-center gap-4 mb-3">
+                                                            <span class="text-sm font-medium text-[var(--ui-secondary)]">AutoFill</span>
+                                                            <select
+                                                                wire:model.live="editField.auto_fill_source"
+                                                                class="px-3 py-1.5 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                            >
+                                                                <option value="">Deaktiviert</option>
+                                                                @foreach($this->autoFillSources as $value => $label)
+                                                                    <option value="{{ $value }}">{{ $label }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                        </div>
+
+                                                        @if(!empty($editField['auto_fill_source']))
+                                                            <div class="mt-3">
+                                                                <label class="block text-sm text-[var(--ui-muted)] mb-1">AutoFill-Anweisungen</label>
+                                                                <textarea
+                                                                    wire:model="editField.auto_fill_prompt"
+                                                                    placeholder="{{ $editField['auto_fill_source'] === 'websearch' ? 'z.B.: Suche die Firmenadresse und Telefonnummer' : 'z.B.: Analysiere die vorhandenen Daten und schlage einen passenden Wert vor' }}"
+                                                                    class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                                    rows="2"
+                                                                ></textarea>
+                                                                <p class="text-xs text-[var(--ui-muted)] mt-1">
+                                                                    @if($editField['auto_fill_source'] === 'websearch')
+                                                                        Per Scheduler werden leere Felder via Web-Suche automatisch gefüllt.
+                                                                    @else
+                                                                        Per Scheduler werden leere Felder via KI-Analyse automatisch gefüllt.
+                                                                    @endif
+                                                                </p>
+                                                            </div>
+                                                        @endif
                                                     </div>
                                                 </td>
                                             </tr>
@@ -396,15 +626,245 @@
                 </div>
             </div>
 
-        @elseif(!$contextType)
+        @elseif($activeTab === 'fields' && !$contextType)
             <div class="text-center py-12">
                 <p class="text-[var(--ui-muted)]">Kein Kontext ausgewählt.</p>
                 <p class="text-sm text-[var(--ui-muted)] mt-2">Wählen Sie einen Kontext aus, um Extra-Felder zu verwalten.</p>
             </div>
-        @else
-            {{-- contextId ist gesetzt - Modal sollte nicht geöffnet werden, Werte werden inline bearbeitet --}}
-            <div class="text-center py-12">
-                <p class="text-[var(--ui-muted)]">Werte können direkt auf der Detailseite bearbeitet werden.</p>
+
+        {{-- Lookups Tab --}}
+        @elseif($activeTab === 'lookups')
+            <div class="space-y-6">
+                {{-- Neuen Lookup erstellen --}}
+                <div class="p-4 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
+                    <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">
+                        Neuen Lookup erstellen
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <x-ui-input-text
+                            name="newLookup.label"
+                            label="Label"
+                            :required="true"
+                            wire:model="newLookup.label"
+                            placeholder="z.B. Nationalität"
+                        />
+
+                        <x-ui-input-textarea
+                            name="newLookup.description"
+                            label="Beschreibung"
+                            wire:model="newLookup.description"
+                            placeholder="Optionale Beschreibung..."
+                            rows="1"
+                        />
+
+                        <div class="flex items-end">
+                            <button
+                                wire:click="createLookup"
+                                class="px-4 py-2 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors text-sm font-medium"
+                            >
+                                Lookup erstellen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Vorhandene Lookups --}}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {{-- Lookup Liste --}}
+                    <div>
+                        <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">
+                            Vorhandene Lookups
+                        </h4>
+
+                        @if(count($lookups) > 0)
+                            <div class="border border-[var(--ui-border)]/40 divide-y divide-[var(--ui-border)]/40">
+                                @foreach($lookups as $lookup)
+                                    <div
+                                        class="p-3 {{ $selectedLookupId === $lookup['id'] ? 'bg-[var(--ui-primary-5)]' : 'bg-[var(--ui-surface)] hover:bg-[var(--ui-muted-5)]' }} transition-colors cursor-pointer"
+                                        wire:click="selectLookup({{ $lookup['id'] }})"
+                                    >
+                                        @if($editingLookupId === $lookup['id'])
+                                            <div class="space-y-3" wire:click.stop>
+                                                <x-ui-input-text
+                                                    name="editLookup.label"
+                                                    wire:model="editLookup.label"
+                                                    size="sm"
+                                                />
+                                                <x-ui-input-text
+                                                    name="editLookup.description"
+                                                    wire:model="editLookup.description"
+                                                    size="sm"
+                                                    placeholder="Beschreibung..."
+                                                />
+                                                <div class="flex gap-2">
+                                                    <button
+                                                        wire:click="saveEditLookup"
+                                                        class="text-xs px-3 py-1.5 text-white bg-[var(--ui-primary)] hover:bg-[var(--ui-primary)]/90"
+                                                    >
+                                                        Speichern
+                                                    </button>
+                                                    <button
+                                                        wire:click="cancelEditLookup"
+                                                        class="text-xs px-3 py-1.5 text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]"
+                                                    >
+                                                        Abbrechen
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        @else
+                                            <div class="flex items-start justify-between">
+                                                <div>
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $lookup['label'] }}</span>
+                                                        @if($lookup['is_system'])
+                                                            <span class="px-1.5 py-0.5 text-xs bg-[var(--ui-warning-5)] text-[var(--ui-warning)] border border-[var(--ui-warning)]/20">
+                                                                System
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                    <span class="text-xs text-[var(--ui-muted)]">
+                                                        {{ $lookup['name'] }} · {{ $lookup['values_count'] }} Werte
+                                                    </span>
+                                                    @if($lookup['description'])
+                                                        <p class="text-xs text-[var(--ui-muted)] mt-1">{{ $lookup['description'] }}</p>
+                                                    @endif
+                                                </div>
+                                                <div class="flex items-center gap-1" wire:click.stop>
+                                                    <button
+                                                        wire:click="startEditLookup({{ $lookup['id'] }})"
+                                                        class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-primary)]"
+                                                        title="Bearbeiten"
+                                                    >
+                                                        @svg('heroicon-o-pencil', 'w-4 h-4')
+                                                    </button>
+                                                    @if(!$lookup['is_system'])
+                                                        <button
+                                                            wire:click="deleteLookup({{ $lookup['id'] }})"
+                                                            wire:confirm="Lookup und alle Werte wirklich löschen?"
+                                                            class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-danger)]"
+                                                            title="Löschen"
+                                                        >
+                                                            @svg('heroicon-o-trash', 'w-4 h-4')
+                                                        </button>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="text-center py-8 border border-[var(--ui-border)]/40 bg-[var(--ui-muted-5)]">
+                                <p class="text-sm text-[var(--ui-muted)]">Noch keine Lookups vorhanden.</p>
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Lookup Werte --}}
+                    <div>
+                        <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">
+                            @if($this->selectedLookup)
+                                Werte: {{ $this->selectedLookup['label'] }}
+                            @else
+                                Lookup auswählen
+                            @endif
+                        </h4>
+
+                        @if($selectedLookupId)
+                            {{-- Neuen Wert hinzufügen --}}
+                            <div class="p-3 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40 mb-4">
+                                <div class="grid grid-cols-2 gap-2 mb-2">
+                                    <input
+                                        type="text"
+                                        wire:model="newLookupValueLabel"
+                                        wire:keydown.enter.prevent="addLookupValue"
+                                        class="px-3 py-1.5 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                        placeholder="Label (Anzeige)..."
+                                    />
+                                    <input
+                                        type="text"
+                                        wire:model="newLookupValueText"
+                                        wire:keydown.enter.prevent="addLookupValue"
+                                        class="px-3 py-1.5 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                        placeholder="Wert (optional)..."
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    wire:click="addLookupValue"
+                                    class="w-full px-3 py-1.5 bg-[var(--ui-primary)] text-white text-sm hover:bg-[var(--ui-primary)]/90"
+                                >
+                                    Wert hinzufügen
+                                </button>
+                                @error('newLookupValueText')
+                                    <p class="mt-1 text-xs text-[var(--ui-danger)]">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            {{-- Werte Liste --}}
+                            @if(count($lookupValues) > 0)
+                                <div class="border border-[var(--ui-border)]/40 divide-y divide-[var(--ui-border)]/40 max-h-80 overflow-y-auto">
+                                    @foreach($lookupValues as $index => $value)
+                                        <div class="p-2 {{ $value['is_active'] ? 'bg-[var(--ui-surface)]' : 'bg-[var(--ui-muted-5)] opacity-60' }} flex items-center justify-between gap-2">
+                                            <div class="flex-1 min-w-0">
+                                                <span class="text-sm text-[var(--ui-secondary)]">{{ $value['label'] }}</span>
+                                                @if($value['value'] !== $value['label'])
+                                                    <span class="text-xs text-[var(--ui-muted)]">({{ $value['value'] }})</span>
+                                                @endif
+                                            </div>
+                                            <div class="flex items-center gap-1">
+                                                <button
+                                                    wire:click="moveLookupValueUp({{ $value['id'] }})"
+                                                    class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] {{ $index === 0 ? 'opacity-30 cursor-not-allowed' : '' }}"
+                                                    {{ $index === 0 ? 'disabled' : '' }}
+                                                    title="Nach oben"
+                                                >
+                                                    @svg('heroicon-o-chevron-up', 'w-4 h-4')
+                                                </button>
+                                                <button
+                                                    wire:click="moveLookupValueDown({{ $value['id'] }})"
+                                                    class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] {{ $index === count($lookupValues) - 1 ? 'opacity-30 cursor-not-allowed' : '' }}"
+                                                    {{ $index === count($lookupValues) - 1 ? 'disabled' : '' }}
+                                                    title="Nach unten"
+                                                >
+                                                    @svg('heroicon-o-chevron-down', 'w-4 h-4')
+                                                </button>
+                                                <button
+                                                    wire:click="toggleLookupValue({{ $value['id'] }})"
+                                                    class="p-1 {{ $value['is_active'] ? 'text-[var(--ui-success)]' : 'text-[var(--ui-muted)]' }} hover:opacity-70"
+                                                    title="{{ $value['is_active'] ? 'Deaktivieren' : 'Aktivieren' }}"
+                                                >
+                                                    @if($value['is_active'])
+                                                        @svg('heroicon-o-eye', 'w-4 h-4')
+                                                    @else
+                                                        @svg('heroicon-o-eye-slash', 'w-4 h-4')
+                                                    @endif
+                                                </button>
+                                                <button
+                                                    wire:click="deleteLookupValue({{ $value['id'] }})"
+                                                    wire:confirm="Wert wirklich löschen?"
+                                                    class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-danger)]"
+                                                    title="Löschen"
+                                                >
+                                                    @svg('heroicon-o-trash', 'w-4 h-4')
+                                                </button>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="text-center py-6 border border-[var(--ui-border)]/40 bg-[var(--ui-muted-5)]">
+                                    <p class="text-xs text-[var(--ui-muted)]">Noch keine Werte vorhanden.</p>
+                                </div>
+                            @endif
+                        @else
+                            <div class="text-center py-12 border border-[var(--ui-border)]/40 bg-[var(--ui-muted-5)]">
+                                <p class="text-sm text-[var(--ui-muted)]">Wählen Sie einen Lookup aus, um Werte zu verwalten.</p>
+                            </div>
+                        @endif
+                    </div>
+                </div>
             </div>
         @endif
     </div>
