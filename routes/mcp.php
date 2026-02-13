@@ -267,9 +267,12 @@ Route::match(['GET', 'POST'], 'sse', function (\Illuminate\Http\Request $request
 })->name('mcp.sse');
 
 // OAuth-Routes für Claude Desktop (benötigt Laravel Passport)
-// WICHTIG: Zuerst die Discovery-Routes überschreiben, DANN Mcp::oauthRoutes() aufrufen
+// WICHTIG: Zuerst Mcp::oauthRoutes() für den Register-Controller,
+// DANN Discovery überschreiben mit korrekten URLs
+Mcp::oauthRoutes('oauth');
 
-// Eigene OAuth Discovery Routes mit korrekten URLs (inkl. /mcp Prefix)
+// Überschreibe Discovery Routes mit korrekten URLs (inkl. /mcp Prefix)
+// Diese müssen NACH Mcp::oauthRoutes() kommen und denselben Namen haben
 Route::get('.well-known/oauth-authorization-server/{path?}', function () {
     $baseUrl = config('app.url');
 
@@ -294,9 +297,6 @@ Route::get('.well-known/oauth-protected-resource/{path?}', function () {
         'scopes_supported' => ['mcp:use'],
     ]);
 })->name('mcp.oauth.protected-resource');
-
-// OAuth Registration + andere Routes von Laravel MCP (ohne Discovery, da wir die überschrieben haben)
-Mcp::oauthRoutes('oauth');
 
 // Zusätzliche Helper-Routes (ohne Middleware, da öffentlich zugänglich)
 Route::get('info', function () {
