@@ -44,17 +44,9 @@ trait HasApiTokens
      */
     public function createToken(string $name, array $scopes = ['*'], ?\DateTimeInterface $expiresAt = null): PersonalAccessTokenResult
     {
-        $result = app(\Laravel\Passport\PersonalAccessTokenFactory::class)->make(
-            $this->getKey(), $name, $scopes
+        return app(\Laravel\Passport\PersonalAccessTokenFactory::class)->make(
+            $this->getKey(), $name, $scopes, $expiresAt
         );
-
-        // Ablaufdatum setzen falls angegeben
-        if ($expiresAt !== null) {
-            $result->token->expires_at = $expiresAt;
-            $result->token->save();
-        }
-
-        return $result;
     }
 
     /**
