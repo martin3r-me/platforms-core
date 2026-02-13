@@ -2,6 +2,8 @@
 
 namespace Platform\Core\Mcp\Servers;
 
+use Laravel\Mcp\Server\Contracts\Transport;
+
 /**
  * Default MCP Server
  *
@@ -10,30 +12,12 @@ namespace Platform\Core\Mcp\Servers;
  */
 class DefaultMcpServer extends PlatformMcpServer
 {
-    public string $name = 'Platform MCP Server';
+    protected string $name = 'Platform MCP Server';
+    protected string $version = '1.0.0';
+    protected string $instructions = 'Platform MCP Server. Bietet Zugriff auf alle registrierten Tools der Platform.';
 
-    public string $version = '1.0.0';
-
-    public string $instructions = 'Platform MCP Server. Bietet Zugriff auf alle registrierten Tools der Platform.';
-
-    /**
-     * Zusätzliche direkte MCP Tools (optional)
-     *
-     * @var array<int, class-string<\Laravel\Mcp\Server\Tool>>
-     */
-    public array $additionalTools = [];
-
-    /**
-     * Resources (optional)
-     *
-     * @var array<int, class-string<\Laravel\Mcp\Server\Resource>>
-     */
-    public array $resources = [];
-
-    /**
-     * Prompts (optional)
-     *
-     * @var array<int, class-string<\Laravel\Mcp\Server\Prompt>>
-     */
-    public array $prompts = [];
+    public function __construct(Transport $transport)
+    {
+        parent::__construct($transport);
+    }
 }
