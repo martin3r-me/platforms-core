@@ -118,6 +118,12 @@ class CoreServiceProvider extends ServiceProvider
             ->prefix('api')
             ->group(__DIR__.'/../routes/api.php');
 
+        // MCP (Model Context Protocol) Routen registrieren
+        Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
+            ->middleware(['api'])
+            ->prefix('mcp')
+            ->group(__DIR__.'/../routes/mcp.php');
+
         // Command registrieren (nur in der Konsole)
         if ($this->app->runningInConsole()) {
             $this->commands([
