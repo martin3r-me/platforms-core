@@ -44,9 +44,17 @@ trait HasApiTokens
      */
     public function createToken(string $name, array $scopes = ['*'], ?\DateTimeInterface $expiresAt = null): PersonalAccessTokenResult
     {
-        return app(\Laravel\Passport\PersonalAccessTokenFactory::class)->make(
-            $this->getKey(), $name, $scopes, $expiresAt
+        $result = app(\Laravel\Passport\PersonalAccessTokenFactory::class)->make(
+            $this->getKey(), $name, $scopes, $this->getProviderName()
         );
+
+        // Set expiration date if provided
+        if ($expiresAt !== null) {
+            $result->token->expires_at = $expiresAt;
+            $result->token->save();
+        }
+
+        return $result;
     }
 
     /**
@@ -156,5 +164,33 @@ trait HasApiTokens
         $this->accessToken = new TransientToken;
 
         return $this;
+    }
+
+    /**
+     * Get the provider name for the user.
+     *
+     * @return string
+     *
+     * @throws \LogicException
+     */
+    public function getProviderName(): string
+    {
+        // Collect providers from passport-configured guards
+        $guards = collect(config('auth.guards'))->filter(function ($guard) {
+            return ($guard['driver'] ?? null) === 'passport';
+        })->keys()->map(function ($guard) {
+            return config("auth.guards.{$guard}.provider");
+        })->filter()->unique();
+
+        // Find matching provider for this model
+        foreach (config('auth.providers') as $provider => $config) {
+            if ($guards->contains($provider) &&
+                ($config['driver'] ?? null) === 'eloquent' &&
+                $this instanceof ($config['model'] ?? null)) {
+                return $provider;
+            }
+        }
+
+        throw new \LogicException('Unable to determine authentication provider from configuration.');
     }
 }
