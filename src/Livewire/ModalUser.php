@@ -4,6 +4,7 @@ namespace Platform\Core\Livewire;
 
 use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Platform\Integrations\Models\IntegrationConnection;
 use Platform\Integrations\Models\IntegrationsFacebookPage;
 use Platform\Integrations\Models\IntegrationsInstagramAccount;
@@ -91,7 +92,21 @@ class ModalUser extends Component
             default => null,
         };
 
-        $tokenResult = Auth::user()->createToken($this->newTokenName, ['*'], $expiresAt);
+        try {
+            $tokenResult = Auth::user()->createToken($this->newTokenName, ['*'], $expiresAt);
+        } catch (\LogicException $e) {
+            // Passport Keys nicht konfiguriert
+            Log::error('Passport key error beim Token erstellen', [
+                'userId' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'API-Tokens sind derzeit nicht verfügbar. Bitte kontaktiere den Administrator.',
+            ]);
+            return;
+        }
 
         $this->newTokenCreated = $tokenResult->accessToken;
         $this->showNewToken = true;
