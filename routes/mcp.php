@@ -18,14 +18,24 @@ use Illuminate\Support\Facades\Route;
 // Laravel MCP unterstützt SSE über POST mit Accept: text/event-stream Header
 // Cursor sendet sowohl GET als auch POST, daher behandeln wir beide
 Route::match(['GET', 'POST'], 'sse', function (\Illuminate\Http\Request $request) {
-    // Authentifizierung wird über auth:api Middleware gehandhabt
-    // auth:api unterstützt sowohl Sanctum als auch Passport (OAuth) automatisch
-    // User sollte bereits durch Middleware authentifiziert sein
-    if (!auth()->check()) {
-        return response('Unauthorized', 401, [
-            'Content-Type' => 'text/event-stream',
-        ]);
+    // Manuelle Auth-Prüfung mit api Guard (Passport)
+    // Wir nutzen NICHT auth:api Middleware, da diese zu Login redirected statt 401
+    $user = auth('api')->user();
+
+    if (!$user) {
+        // JSON-RPC konforme Fehlerantwort für MCP Clients
+        return response()->json([
+            'jsonrpc' => '2.0',
+            'id' => null,
+            'error' => [
+                'code' => -32001,
+                'message' => 'Unauthorized - Bearer token required',
+            ],
+        ], 401);
     }
+
+    // User für den Request setzen
+    auth()->setUser($user);
 
     // Prüfe, ob Cursor bereits einen Request-Body gesendet hat
     $requestBody = $request->getContent();
@@ -254,7 +264,7 @@ Route::match(['GET', 'POST'], 'sse', function (\Illuminate\Http\Request $request
             ],
         ], 500);
     }
-})->middleware('auth:api')->name('mcp.sse');
+})->name('mcp.sse');
 
 // OAuth-Routes für Claude Desktop (benötigt Laravel Passport)
 Mcp::oauthRoutes('oauth');
