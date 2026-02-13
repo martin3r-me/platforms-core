@@ -267,7 +267,7 @@ Route::match(['GET', 'POST'], 'sse', function (\Illuminate\Http\Request $request
 })->name('mcp.sse');
 
 // OAuth-Routes für Claude Desktop (benötigt Laravel Passport)
-// Mcp::oauthRoutes('oauth'); - ersetzt durch manuelle Routes mit korrekten URLs
+// WICHTIG: Zuerst die Discovery-Routes überschreiben, DANN Mcp::oauthRoutes() aufrufen
 
 // Eigene OAuth Discovery Routes mit korrekten URLs (inkl. /mcp Prefix)
 Route::get('.well-known/oauth-authorization-server/{path?}', function () {
@@ -277,7 +277,7 @@ Route::get('.well-known/oauth-authorization-server/{path?}', function () {
         'issuer' => $baseUrl,
         'authorization_endpoint' => $baseUrl . '/oauth/authorize',
         'token_endpoint' => $baseUrl . '/oauth/token',
-        'registration_endpoint' => $baseUrl . '/mcp/oauth/register', // Korrigiert!
+        'registration_endpoint' => $baseUrl . '/mcp/oauth/register', // Mit /mcp Prefix!
         'response_types_supported' => ['code'],
         'code_challenge_methods_supported' => ['S256'],
         'scopes_supported' => ['mcp:use'],
@@ -295,9 +295,8 @@ Route::get('.well-known/oauth-protected-resource/{path?}', function () {
     ]);
 })->name('mcp.oauth.protected-resource');
 
-// OAuth Client Registration (Dynamic Client Registration)
-Route::post('oauth/register', [\Laravel\Mcp\Http\Controllers\OAuthRegisterController::class, 'register'])
-    ->name('mcp.oauth.register');
+// OAuth Registration + andere Routes von Laravel MCP (ohne Discovery, da wir die überschrieben haben)
+Mcp::oauthRoutes('oauth');
 
 // Zusätzliche Helper-Routes (ohne Middleware, da öffentlich zugänglich)
 Route::get('info', function () {
