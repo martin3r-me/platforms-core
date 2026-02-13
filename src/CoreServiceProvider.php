@@ -563,6 +563,29 @@ class CoreServiceProvider extends ServiceProvider
     }
 
     /**
+     * Register the API guard for Passport authentication.
+     * This allows MCP and other API endpoints to use auth:api middleware.
+     */
+    protected function registerApiGuard(): void
+    {
+        // Only register if Passport is available
+        if (!class_exists(\Laravel\Passport\Passport::class)) {
+            return;
+        }
+
+        // Dynamically add the 'api' guard if not already defined
+        $guards = config('auth.guards', []);
+        if (!isset($guards['api'])) {
+            config([
+                'auth.guards.api' => [
+                    'driver' => 'passport',
+                    'provider' => 'users',
+                ],
+            ]);
+        }
+    }
+
+    /**
      * Register Passport contract bindings for OAuth views.
      */
     protected function registerPassportBindings(): void
@@ -570,6 +593,9 @@ class CoreServiceProvider extends ServiceProvider
         if (!class_exists(\Laravel\Passport\Passport::class)) {
             return;
         }
+
+        // Register API guard for MCP authentication
+        $this->registerApiGuard();
 
         // Custom Client Model für Abwärtskompatibilität (redirect string -> array)
         Passport::useClientModel(\Platform\Core\Models\PassportClient::class);
