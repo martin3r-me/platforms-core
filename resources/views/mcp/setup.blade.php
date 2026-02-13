@@ -245,8 +245,8 @@
     "{{ $serverNameKey ?? 'platform' }}": {
       "url": "{{ $serverUrl }}",
       "oauth": {
-        "authorizationServer": "{{ $baseUrl }}/.well-known/oauth-authorization-server",
-        "protectedResource": "{{ $baseUrl }}/.well-known/oauth-protected-resource"
+        "authorizationServer": "{{ $baseUrl }}/mcp/.well-known/oauth-authorization-server",
+        "protectedResource": "{{ $baseUrl }}/mcp/.well-known/oauth-protected-resource"
       }
     }
   }
