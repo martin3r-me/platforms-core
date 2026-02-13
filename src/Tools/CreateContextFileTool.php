@@ -37,8 +37,8 @@ class CreateContextFileTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'Erstellt eine neue Datei in einem Context. Kann Text-Inhalt direkt speichern (Code, JSON, Markdown, etc.) '
-            . 'oder eine Datei von einer URL abrufen und speichern. Nutze dieses Tool um generierte Inhalte oder '
+        return 'Erstellt eine neue Datei in einem Context. Kann Text-Inhalt direkt speichern (Code, JSON, Markdown, etc.), '
+            . 'binäre Dateien via Base64 hochladen, oder eine Datei von einer URL abrufen und speichern. Nutze dieses Tool um generierte Inhalte oder '
             . 'externe Dateien an ein Context-Objekt (Task, Ticket, etc.) anzuhängen.';
     }
 
@@ -63,9 +63,14 @@ class CreateContextFileTool implements ToolContract
                     'type' => 'string',
                     'description' => 'Der Text-Inhalt der Datei. Nutze dies für Code, JSON, Markdown, CSV, etc. Max. 500KB.',
                 ],
+                'base64_content' => [
+                    'type' => 'string',
+                    'description' => 'Base64-kodierter Inhalt der Datei. Nutze dies für binäre Dateien wie Bilder. '
+                        . 'Kann mit oder ohne Data-URL-Präfix sein (data:image/png;base64,...). Max. 10MB nach Dekodierung.',
+                ],
                 'url' => [
                     'type' => 'string',
-                    'description' => 'Optional: URL zum Abrufen der Datei. Wird verwendet wenn kein content angegeben ist. Max. 10MB.',
+                    'description' => 'Optional: URL zum Abrufen der Datei. Wird verwendet wenn kein content oder base64_content angegeben ist. Max. 10MB.',
                 ],
                 'mime_type' => [
                     'type' => 'string',
@@ -91,6 +96,7 @@ class CreateContextFileTool implements ToolContract
             $contextId = $arguments['context_id'] ?? null;
             $fileName = $arguments['file_name'] ?? null;
             $content = $arguments['content'] ?? null;
+            $base64Content = $arguments['base64_content'] ?? null;
             $url = $arguments['url'] ?? null;
             $mimeType = $arguments['mime_type'] ?? null;
 
@@ -104,12 +110,37 @@ class CreateContextFileTool implements ToolContract
                 return ToolResult::error('file_name ist erforderlich', 'VALIDATION_ERROR');
             }
 
-            // Need either content or url
-            if (!$content && !$url) {
-                return ToolResult::error('Entweder content oder url muss angegeben werden', 'VALIDATION_ERROR');
+            // Need either base64_content, content, or url
+            if (!$base64Content && !$content && !$url) {
+                return ToolResult::error('Entweder base64_content, content oder url muss angegeben werden', 'VALIDATION_ERROR');
             }
 
-            // Get content from URL if no direct content
+            // Track content source for metadata
+            $contentSource = 'content';
+
+            // Priority 1: base64_content (binary data)
+            if ($base64Content) {
+                // Handle data URL format: data:image/png;base64,iVBORw0...
+                if (preg_match('/^data:([^;]+);base64,(.+)$/si', $base64Content, $matches)) {
+                    $mimeType = $mimeType ?? $matches[1];
+                    $decodedContent = base64_decode($matches[2], true);
+                } else {
+                    $decodedContent = base64_decode($base64Content, true);
+                }
+
+                if ($decodedContent === false) {
+                    return ToolResult::error('Ungültiger Base64-Inhalt', 'VALIDATION_ERROR');
+                }
+
+                if (strlen($decodedContent) > self::MAX_URL_FETCH_SIZE) {
+                    return ToolResult::error('Dekodierte Base64-Daten sind zu groß (max. 10MB)', 'FILE_TOO_LARGE');
+                }
+
+                $content = $decodedContent;
+                $contentSource = 'base64';
+            }
+
+            // Priority 3: Get content from URL if no direct content or base64
             if (!$content && $url) {
                 try {
                     $response = Http::timeout(30)->get($url);
@@ -132,13 +163,15 @@ class CreateContextFileTool implements ToolContract
                             $mimeType = explode(';', $mimeType)[0];
                         }
                     }
+
+                    $contentSource = 'url';
                 } catch (\Exception $e) {
                     return ToolResult::error('Fehler beim Abrufen der URL: ' . $e->getMessage(), 'URL_FETCH_ERROR');
                 }
             }
 
-            // Check content size for direct content
-            if (strlen($content) > self::MAX_CONTENT_SIZE && !$url) {
+            // Check content size for direct text content (not base64 or url)
+            if ($contentSource === 'content' && strlen($content) > self::MAX_CONTENT_SIZE) {
                 return ToolResult::error('Content ist zu groß (max. 500KB für direkten Text)', 'CONTENT_TOO_LARGE');
             }
 
@@ -157,6 +190,7 @@ class CreateContextFileTool implements ToolContract
                     (int) $contextId,
                     $user,
                     $team,
+                    $contentSource,
                     $url
                 );
             }
@@ -187,7 +221,7 @@ class CreateContextFileTool implements ToolContract
                 'height' => null,
                 'meta' => [
                     'created_by_tool' => true,
-                    'source' => $url ? 'url' : 'content',
+                    'source' => $contentSource,
                     'source_url' => $url,
                 ],
                 'keep_original' => true,
@@ -203,6 +237,7 @@ class CreateContextFileTool implements ToolContract
                 'url' => Storage::disk($disk)->url($storedFileName),
                 'context_type' => $contextType,
                 'context_id' => $contextId,
+                'source' => $contentSource,
                 'created_at' => $contextFile->created_at->toIso8601String(),
                 'hint' => 'Datei erfolgreich erstellt. Nutze core.context.files.GET um alle Dateien des Contexts zu sehen.',
             ]);
@@ -327,6 +362,7 @@ class CreateContextFileTool implements ToolContract
         int $contextId,
         $user,
         $team,
+        string $contentSource,
         ?string $sourceUrl
     ): ToolResult {
         // Create temporary file for ContextFileService
@@ -370,7 +406,7 @@ class CreateContextFileTool implements ToolContract
                 'context_type' => $contextType,
                 'context_id' => $contextId,
                 'variants_count' => count($result['variants'] ?? []),
-                'source' => $sourceUrl ? 'url' : 'content',
+                'source' => $contentSource,
                 'source_url' => $sourceUrl,
                 'hint' => 'Bild erfolgreich erstellt mit WebP-Konvertierung und ' . count($result['variants'] ?? []) . ' Varianten. Nutze core.context.files.GET um alle Dateien zu sehen.',
             ]);
