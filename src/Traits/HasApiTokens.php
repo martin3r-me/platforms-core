@@ -170,27 +170,18 @@ trait HasApiTokens
      * Get the provider name for the user.
      *
      * @return string
-     *
-     * @throws \LogicException
      */
     public function getProviderName(): string
     {
-        // Collect providers from passport-configured guards
-        $guards = collect(config('auth.guards'))->filter(function ($guard) {
-            return ($guard['driver'] ?? null) === 'passport';
-        })->keys()->map(function ($guard) {
-            return config("auth.guards.{$guard}.provider");
-        })->filter()->unique();
-
-        // Find matching provider for this model
+        // Find the provider that has this model configured
         foreach (config('auth.providers') as $provider => $config) {
-            if ($guards->contains($provider) &&
-                ($config['driver'] ?? null) === 'eloquent' &&
+            if (($config['driver'] ?? null) === 'eloquent' &&
                 $this instanceof ($config['model'] ?? null)) {
                 return $provider;
             }
         }
 
-        throw new \LogicException('Unable to determine authentication provider from configuration.');
+        // Default to 'users' provider
+        return 'users';
     }
 }
