@@ -3,7 +3,6 @@
   "description": "Plattform Core Package",
   "type": "library",
   "require": {
-      "laravel/sanctum": "^4.1",
       "laravel/socialite": "^5.0",
       "socialiteproviders/microsoft": "^4.0|dev-master",
       "openai-php/client": "^0.8.0",

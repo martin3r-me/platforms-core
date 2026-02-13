@@ -8,19 +8,20 @@ use Illuminate\Support\Facades\Hash;
 
 /**
  * Command zum Erstellen von API-Tokens für Endpoint-Services (Nostradamus, Infoniqa)
- * 
+ *
  * Erstellt automatisch einen Service-User, falls keiner existiert.
- * 
+ *
  * Verwendung:
  * php artisan api:token:create-endpoint --name="Nostradamus Token" --show
  */
 class CreateEndpointApiTokenCommand extends Command
 {
-    protected $signature = 'api:token:create-endpoint 
+    protected $signature = 'api:token:create-endpoint
                             {--name= : Name des Tokens (z.B. "Nostradamus Token")}
+                            {--expires= : Ablaufdatum (30_days, 1_year, never)}
                             {--show : Token direkt anzeigen}';
 
-    protected $description = 'Erstellt einen API-Token für Endpoint-Services (erstellt automatisch Service-User)';
+    protected $description = 'Erstellt einen API-Token (Passport) für Endpoint-Services (erstellt automatisch Service-User)';
 
     /**
      * Service-User Email für Endpoint-Zugriffe
@@ -30,6 +31,7 @@ class CreateEndpointApiTokenCommand extends Command
     public function handle(): int
     {
         $tokenName = $this->option('name') ?: 'Endpoint API Token';
+        $expires = $this->option('expires') ?: 'never';
 
         // Service-User erstellen oder finden
         $user = $this->getOrCreateServiceUser();
@@ -39,21 +41,27 @@ class CreateEndpointApiTokenCommand extends Command
             return Command::FAILURE;
         }
 
-        // Token erstellen
-        $token = $user->createToken($tokenName)->plainTextToken;
+        // Ablaufdatum berechnen
+        $expiresAt = $this->calculateExpiresAt($expires);
 
-        $this->info("✓ API-Token erfolgreich erstellt!");
+        // Token erstellen (Passport)
+        $tokenResult = $user->createToken($tokenName, ['*'], $expiresAt);
+        $token = $tokenResult->accessToken;
+
+        $this->info("API-Token erfolgreich erstellt!");
         $this->newLine();
         $this->line("Service-User: {$user->name} ({$user->email})");
         $this->line("Token Name: {$tokenName}");
+        $this->line("Ablaufdatum: " . ($expiresAt ? $expiresAt->format('d.m.Y H:i') : 'Nie'));
         $this->newLine();
 
         if ($this->option('show')) {
             $this->line("Token:");
             $this->line($token);
         } else {
-            $this->warn("⚠ Token wird nur einmal angezeigt!");
-            $this->line("Token: {$token}");
+            $this->warn("Token wird nur einmal angezeigt!");
+            $this->newLine();
+            $this->line($token);
         }
 
         $this->newLine();
@@ -61,6 +69,19 @@ class CreateEndpointApiTokenCommand extends Command
         $this->line("'api_token' => '{$token}',");
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Berechnet das Ablaufdatum basierend auf der Option
+     */
+    protected function calculateExpiresAt(string $expires): ?\DateTimeInterface
+    {
+        return match ($expires) {
+            '30_days' => now()->addDays(30),
+            '1_year' => now()->addYear(),
+            'never' => null,
+            default => null,
+        };
     }
 
     /**
@@ -72,7 +93,7 @@ class CreateEndpointApiTokenCommand extends Command
 
         if (!$user) {
             $this->info('Erstelle Service-User für Endpoint-Zugriffe...');
-            
+
             $user = User::create([
                 'name' => 'API Endpoint Service User',
                 'email' => self::SERVICE_USER_EMAIL,
@@ -83,10 +104,9 @@ class CreateEndpointApiTokenCommand extends Command
             // Personal Team für User erstellen (wie bei normalen Usern)
             \Platform\Core\PlatformCore::createPersonalTeamFor($user);
 
-            $this->info("✓ Service-User erstellt: {$user->email}");
+            $this->info("Service-User erstellt: {$user->email}");
         }
 
         return $user;
     }
 }
-

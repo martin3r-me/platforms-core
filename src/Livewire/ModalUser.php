@@ -15,6 +15,12 @@ class ModalUser extends Component
     public $user = [];
     public $activeTab = 'profile';
 
+    // Token Management Properties
+    public $newTokenName = '';
+    public $newTokenExpiry = 'never';
+    public $newTokenCreated = null;
+    public $showNewToken = false;
+
     protected $listeners = ['open-modal-user' => 'openModal'];
 
     public function mount()
@@ -26,11 +32,15 @@ class ModalUser extends Component
     {
         $this->modalShow = true;
         $this->activeTab = 'profile';
+        $this->resetTokenForm();
     }
 
     public function setTab($tab)
     {
         $this->activeTab = $tab;
+        if ($tab !== 'tokens') {
+            $this->resetTokenForm();
+        }
     }
 
     public function save()
@@ -52,13 +62,96 @@ class ModalUser extends Component
         ]);
     }
 
+    // ========================================
+    // API Token Management
+    // ========================================
+
+    /**
+     * Computed Property: Aktive API-Tokens des Users
+     */
+    public function getApiTokensProperty()
+    {
+        return Auth::user()->activeTokens();
+    }
+
+    /**
+     * Erstellt einen neuen API-Token
+     */
+    public function createApiToken()
+    {
+        $this->validate([
+            'newTokenName' => 'required|string|min:3|max:255',
+            'newTokenExpiry' => 'required|in:30_days,1_year,never',
+        ]);
+
+        $expiresAt = match ($this->newTokenExpiry) {
+            '30_days' => now()->addDays(30),
+            '1_year' => now()->addYear(),
+            'never' => null,
+            default => null,
+        };
+
+        $tokenResult = Auth::user()->createToken($this->newTokenName, ['*'], $expiresAt);
+
+        $this->newTokenCreated = $tokenResult->accessToken;
+        $this->showNewToken = true;
+
+        $this->dispatch('notice', [
+            'type' => 'success',
+            'message' => 'API-Token erfolgreich erstellt!'
+        ]);
+    }
+
+    /**
+     * Widerruft einen Token
+     */
+    public function revokeApiToken($tokenId)
+    {
+        $success = Auth::user()->revokeToken($tokenId);
+
+        if ($success) {
+            $this->dispatch('notice', [
+                'type' => 'success',
+                'message' => 'Token erfolgreich widerrufen.'
+            ]);
+        } else {
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'Token konnte nicht widerrufen werden.'
+            ]);
+        }
+    }
+
+    /**
+     * Schließt die Token-Anzeige und setzt das Formular zurück
+     */
+    public function closeNewTokenDisplay()
+    {
+        $this->resetTokenForm();
+    }
+
+    /**
+     * Setzt das Token-Formular zurück
+     */
+    protected function resetTokenForm()
+    {
+        $this->newTokenName = '';
+        $this->newTokenExpiry = 'never';
+        $this->newTokenCreated = null;
+        $this->showNewToken = false;
+    }
+
+    // ========================================
+    // Meta Integration
+    // ========================================
+
     public function getMetaConnectionProperty()
     {
         $user = Auth::user();
         $metaService = app(MetaIntegrationService::class);
         return $metaService->getConnectionForUser($user);
     }
-    
+
     /**
      * @deprecated Verwende stattdessen getMetaConnectionProperty()
      */

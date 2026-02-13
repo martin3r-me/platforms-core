@@ -2,108 +2,129 @@
 
 namespace Platform\Core\Traits;
 
-use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Passport\Token;
 use Laravel\Passport\TransientToken;
-use Laravel\Sanctum\NewAccessToken;
-use Laravel\Sanctum\PersonalAccessToken;
-use Laravel\Sanctum\Contracts\HasAbilities;
+use Laravel\Passport\PersonalAccessTokenResult;
 
 /**
- * Kombinierter HasApiTokens Trait für Sanctum und Passport.
+ * HasApiTokens Trait für Passport Personal Access Tokens.
  *
- * Löst den Konflikt der $accessToken Property zwischen beiden Paketen.
- * - Passport: Für OAuth2 Server (Third-Party-Clients, Authorization Code Flow)
- * - Sanctum: Für einfache API-Tokens und SPA-Authentifizierung
+ * Bietet Token-Management-Funktionen für User-Models:
+ * - Token erstellen mit optionalem Ablaufdatum
+ * - Aktive Tokens abrufen
+ * - Einzelne oder alle Tokens widerrufen
  */
 trait HasApiTokens
 {
     /**
      * The current access token for the authentication user.
-     * Kompatibel mit beiden Paketen durch dynamische Typisierung.
      *
-     * @var \Laravel\Sanctum\Contracts\HasAbilities|\Laravel\Passport\Token|null
+     * @var \Laravel\Passport\Token|null
      */
     protected $accessToken;
 
-    // ========================================
-    // SANCTUM METHODS
-    // ========================================
-
     /**
-     * Get the access tokens that belong to the model (Sanctum).
+     * Get all of the access tokens for the user.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\MorphMany
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
      */
-    public function tokens(): MorphMany
+    public function tokens(): HasMany
     {
-        // Standardmäßig Sanctum-Tokens zurückgeben
-        return $this->morphMany(PersonalAccessToken::class, 'tokenable');
+        return $this->hasMany(Token::class, 'user_id')->orderBy('created_at', 'desc');
     }
 
     /**
-     * Create a new personal access token for the user (Sanctum).
+     * Create a new personal access token for the user.
      *
      * @param  string  $name
-     * @param  array  $abilities
+     * @param  array  $scopes
      * @param  \DateTimeInterface|null  $expiresAt
-     * @return \Laravel\Sanctum\NewAccessToken
+     * @return \Laravel\Passport\PersonalAccessTokenResult
      */
-    public function createToken(string $name, array $abilities = ['*'], ?\DateTimeInterface $expiresAt = null): NewAccessToken
+    public function createToken(string $name, array $scopes = ['*'], ?\DateTimeInterface $expiresAt = null): PersonalAccessTokenResult
     {
-        $plainTextToken = $this->generateTokenString();
-
-        $token = $this->tokens()->create([
-            'name' => $name,
-            'token' => hash('sha256', $plainTextToken),
-            'abilities' => $abilities,
-            'expires_at' => $expiresAt,
-        ]);
-
-        return new NewAccessToken($token, $token->getKey().'|'.$plainTextToken);
-    }
-
-    /**
-     * Generate the token string.
-     *
-     * @return string
-     */
-    protected function generateTokenString(): string
-    {
-        return sprintf(
-            '%s%s%s',
-            config('sanctum.token_prefix', ''),
-            $tokenEntropy = \Illuminate\Support\Str::random(40),
-            hash('crc32b', $tokenEntropy)
+        $result = app(\Laravel\Passport\PersonalAccessTokenFactory::class)->make(
+            $this->getKey(), $name, $scopes
         );
+
+        // Ablaufdatum setzen falls angegeben
+        if ($expiresAt !== null) {
+            $result->token->expires_at = $expiresAt;
+            $result->token->save();
+        }
+
+        return $result;
     }
 
     /**
-     * Determine if the current API token has a given scope (Sanctum).
+     * Get all active (non-revoked) tokens for the user.
      *
-     * @param  string  $ability
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function activeTokens()
+    {
+        return $this->tokens()
+            ->where('revoked', false)
+            ->get();
+    }
+
+    /**
+     * Revoke a specific token by ID.
+     *
+     * @param  string|int  $tokenId
      * @return bool
      */
-    public function tokenCan(string $ability): bool
+    public function revokeToken($tokenId): bool
     {
-        return $this->accessToken && $this->accessToken->can($ability);
+        $token = $this->tokens()->where('id', $tokenId)->first();
+
+        if (!$token) {
+            return false;
+        }
+
+        $token->revoked = true;
+        return $token->save();
     }
 
     /**
-     * Determine if the current API token is missing a given scope (Sanctum).
+     * Revoke all tokens for this user.
      *
-     * @param  string  $ability
+     * @return int Number of revoked tokens
+     */
+    public function revokeAllTokens(): int
+    {
+        return $this->tokens()
+            ->where('revoked', false)
+            ->update(['revoked' => true]);
+    }
+
+    /**
+     * Determine if the current API token has a given scope.
+     *
+     * @param  string  $scope
      * @return bool
      */
-    public function tokenCant(string $ability): bool
+    public function tokenCan(string $scope): bool
     {
-        return ! $this->tokenCan($ability);
+        return $this->accessToken && $this->accessToken->can($scope);
     }
 
     /**
-     * Get the access token currently associated with the user (Sanctum/Passport).
+     * Determine if the current API token is missing a given scope.
      *
-     * @return \Laravel\Sanctum\Contracts\HasAbilities|\Laravel\Passport\Token|null
+     * @param  string  $scope
+     * @return bool
+     */
+    public function tokenCant(string $scope): bool
+    {
+        return !$this->tokenCan($scope);
+    }
+
+    /**
+     * Get the access token currently associated with the user.
+     *
+     * @return \Laravel\Passport\Token|null
      */
     public function currentAccessToken()
     {
@@ -111,9 +132,9 @@ trait HasApiTokens
     }
 
     /**
-     * Set the current access token for the user (Sanctum/Passport).
+     * Set the current access token for the user.
      *
-     * @param  \Laravel\Sanctum\Contracts\HasAbilities|\Laravel\Passport\Token|null  $accessToken
+     * @param  \Laravel\Passport\Token|null  $accessToken
      * @return $this
      */
     public function withAccessToken($accessToken)
@@ -123,12 +144,8 @@ trait HasApiTokens
         return $this;
     }
 
-    // ========================================
-    // PASSPORT METHODS
-    // ========================================
-
     /**
-     * Get all of the user's registered OAuth clients (Passport).
+     * Get all of the user's registered OAuth clients.
      *
      * @return \Illuminate\Database\Eloquent\Relations\HasMany
      */
@@ -138,53 +155,7 @@ trait HasApiTokens
     }
 
     /**
-     * Get all of the access tokens for the user (Passport).
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function passportTokens()
-    {
-        return $this->hasMany(Token::class, 'user_id')->orderBy('created_at', 'desc');
-    }
-
-    /**
-     * Create a new personal access token for the user (Passport).
-     *
-     * @param  string  $name
-     * @param  array  $scopes
-     * @return \Laravel\Passport\PersonalAccessTokenResult
-     */
-    public function passportCreateToken(string $name, array $scopes = [])
-    {
-        return app(\Laravel\Passport\PersonalAccessTokenFactory::class)->make(
-            $this->getKey(), $name, $scopes
-        );
-    }
-
-    /**
-     * Determine if the current API token has a given scope (Passport).
-     *
-     * @param  string  $scope
-     * @return bool
-     */
-    public function passportTokenCan(string $scope): bool
-    {
-        return $this->accessToken && $this->accessToken->can($scope);
-    }
-
-    /**
-     * Determine if the current API token is missing a given scope (Passport).
-     *
-     * @param  string  $scope
-     * @return bool
-     */
-    public function passportTokenCant(string $scope): bool
-    {
-        return ! $this->passportTokenCan($scope);
-    }
-
-    /**
-     * Create a new transient token for the user (Passport).
+     * Create a new transient token for the user.
      *
      * @return $this
      */

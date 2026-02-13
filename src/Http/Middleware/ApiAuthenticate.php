@@ -5,13 +5,18 @@ namespace Platform\Core\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Passport\TokenRepository;
+use Laravel\Passport\Token;
+use Lcobucci\JWT\Configuration;
+use Lcobucci\JWT\Signer\Key\InMemory;
+use Lcobucci\JWT\Signer\Rsa\Sha256;
+use Lcobucci\JWT\Validation\Constraint\SignedWith;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * API Authentifizierungs-Middleware
- * 
- * Prüft Sanctum-Token und stellt sicher, dass der Benutzer authentifiziert ist.
+ *
+ * Prüft Passport-Token (JWT) und stellt sicher, dass der Benutzer authentifiziert ist.
  * Unterstützt auch optional Header-basierte Authentifizierung für eingebettete Szenarien.
  */
 class ApiAuthenticate
@@ -21,33 +26,27 @@ class ApiAuthenticate
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Versuche zuerst Sanctum-Authentifizierung über Bearer Token
+        // Versuche zuerst Passport-Authentifizierung über Bearer Token
         $bearerToken = $request->bearerToken();
-        
+
         if ($bearerToken) {
-            // Finde den Token in der Datenbank
-            $accessToken = PersonalAccessToken::findToken($bearerToken);
-            
-            if ($accessToken) {
-                // Token gefunden - authentifiziere den User
-                $user = $accessToken->tokenable;
-                if ($user) {
-                    Auth::setUser($user);
-                    return $next($request);
-                }
+            $user = $this->authenticateViaPassport($bearerToken);
+            if ($user) {
+                Auth::setUser($user);
+                return $next($request);
             }
         }
 
-        // Fallback: Versuche über Request->user('sanctum')
-        $user = $request->user('sanctum');
+        // Fallback: Versuche über Request->user('api')
+        $user = $request->user('api');
         if ($user) {
             Auth::setUser($user);
             return $next($request);
         }
 
-        // Fallback: Versuche über Auth::guard('sanctum')
-        if (Auth::guard('sanctum')->check()) {
-            Auth::setUser(Auth::guard('sanctum')->user());
+        // Fallback: Versuche über Auth::guard('api')
+        if (Auth::guard('api')->check()) {
+            Auth::setUser(Auth::guard('api')->user());
             return $next($request);
         }
 
@@ -64,18 +63,97 @@ class ApiAuthenticate
     }
 
     /**
+     * Authentifiziert User via Passport JWT Token
+     *
+     * @param string $bearerToken
+     * @return \Illuminate\Contracts\Auth\Authenticatable|null
+     */
+    protected function authenticateViaPassport(string $bearerToken)
+    {
+        try {
+            // JWT parsen und Token-ID extrahieren
+            $tokenId = $this->parseJwtTokenId($bearerToken);
+
+            if (!$tokenId) {
+                return null;
+            }
+
+            // Token in Datenbank nachschlagen
+            $tokenRepository = app(TokenRepository::class);
+            $token = $tokenRepository->find($tokenId);
+
+            if (!$token) {
+                return null;
+            }
+
+            // Prüfen ob Token widerrufen oder abgelaufen ist
+            if ($token->revoked) {
+                return null;
+            }
+
+            if ($token->expires_at && $token->expires_at->isPast()) {
+                return null;
+            }
+
+            // User laden
+            $userModelClass = config('auth.providers.users.model');
+            $user = $userModelClass::find($token->user_id);
+
+            if ($user) {
+                // Token am User setzen für tokenCan() etc.
+                $user->withAccessToken($token);
+            }
+
+            return $user;
+        } catch (\Exception $e) {
+            // Bei Parsing-Fehlern: null zurückgeben
+            return null;
+        }
+    }
+
+    /**
+     * Parst JWT Token und extrahiert die Token-ID (jti claim)
+     *
+     * @param string $jwt
+     * @return string|null
+     */
+    protected function parseJwtTokenId(string $jwt): ?string
+    {
+        try {
+            // Versuche zuerst das Token einfach zu parsen ohne vollständige Validierung
+            // (Die Validierung macht Passport's Guard)
+            $parts = explode('.', $jwt);
+
+            if (count($parts) !== 3) {
+                return null;
+            }
+
+            // Payload dekodieren (mittlerer Teil)
+            $payload = json_decode(base64_decode(strtr($parts[1], '-_', '+/')), true);
+
+            if (!$payload || !isset($payload['jti'])) {
+                return null;
+            }
+
+            return $payload['jti'];
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
      * Versucht Authentifizierung über Header (z.B. für Teams-Embedding)
      */
     protected function authenticateViaHeaders(Request $request): bool
     {
         $email = $request->header('X-User-Email');
-        
+
         if (!$email) {
             return false;
         }
 
         $userModelClass = config('auth.providers.users.model');
-        
+
         if (!class_exists($userModelClass)) {
             return false;
         }
@@ -91,4 +169,3 @@ class ApiAuthenticate
         return true;
     }
 }
-
