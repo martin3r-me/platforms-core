@@ -3,10 +3,12 @@
 namespace Platform\Core\Livewire\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Platform\Core\Jobs\VerifyExtraFieldValueJob;
 use Platform\Core\Models\CoreExtraFieldDefinition;
 use Platform\Core\Models\CoreExtraFieldValue;
+use Platform\Core\Services\ExtraFieldConditionEvaluator;
 
 /**
  * Trait for Livewire components that need to manage extra field values.
@@ -512,5 +514,130 @@ trait WithExtraFields
                 'verified_at' => null,
             ];
         }
+    }
+
+    // ==========================================
+    // Visibility Evaluation Methods
+    // ==========================================
+
+    /**
+     * Get only the visible extra field definitions based on current values.
+     * This is a computed property that re-evaluates when field values change.
+     */
+    #[Computed]
+    public function visibleExtraFieldDefinitions(): array
+    {
+        if (empty($this->extraFieldDefinitions)) {
+            return [];
+        }
+
+        $evaluator = new ExtraFieldConditionEvaluator();
+        $fieldValuesByName = $this->getFieldValuesByName();
+        $visibleFields = [];
+
+        foreach ($this->extraFieldDefinitions as $field) {
+            if ($this->isFieldVisible($field, $fieldValuesByName, $evaluator)) {
+                $visibleFields[] = $field;
+            }
+        }
+
+        return $visibleFields;
+    }
+
+    /**
+     * Check if a specific field is visible based on current values.
+     *
+     * @param int $fieldId The field definition ID
+     * @return bool
+     */
+    public function isExtraFieldVisible(int $fieldId): bool
+    {
+        $field = collect($this->extraFieldDefinitions)->firstWhere('id', $fieldId);
+        if (!$field) {
+            return false;
+        }
+
+        $evaluator = new ExtraFieldConditionEvaluator();
+        $fieldValuesByName = $this->getFieldValuesByName();
+
+        return $this->isFieldVisible($field, $fieldValuesByName, $evaluator);
+    }
+
+    /**
+     * Check if a field is visible based on its visibility config and current values.
+     */
+    protected function isFieldVisible(array $field, array $fieldValuesByName, ExtraFieldConditionEvaluator $evaluator): bool
+    {
+        $visibility = $field['options']['visibility'] ?? null;
+
+        // If no visibility config or not enabled, field is visible
+        if (!$visibility || !($visibility['enabled'] ?? false)) {
+            return true;
+        }
+
+        return $evaluator->evaluate($visibility, $fieldValuesByName);
+    }
+
+    /**
+     * Build a map of field values indexed by field name.
+     */
+    protected function getFieldValuesByName(): array
+    {
+        $fieldValuesByName = [];
+
+        foreach ($this->extraFieldDefinitions as $field) {
+            $value = $this->extraFieldValues[$field['id']] ?? null;
+            $fieldValuesByName[$field['name']] = $value;
+        }
+
+        return $fieldValuesByName;
+    }
+
+    /**
+     * Get field visibility states as an array.
+     * Useful for passing to Alpine.js for client-side tracking.
+     *
+     * @return array<int, bool> Map of field ID to visibility state
+     */
+    public function getFieldVisibilityStates(): array
+    {
+        $states = [];
+        $evaluator = new ExtraFieldConditionEvaluator();
+        $fieldValuesByName = $this->getFieldValuesByName();
+
+        foreach ($this->extraFieldDefinitions as $field) {
+            $states[$field['id']] = $this->isFieldVisible($field, $fieldValuesByName, $evaluator);
+        }
+
+        return $states;
+    }
+
+    /**
+     * Get a human-readable description of a field's visibility conditions.
+     *
+     * @param int $fieldId The field definition ID
+     * @return string
+     */
+    public function getFieldVisibilityDescription(int $fieldId): string
+    {
+        $field = collect($this->extraFieldDefinitions)->firstWhere('id', $fieldId);
+        if (!$field) {
+            return 'Feld nicht gefunden';
+        }
+
+        $visibility = $field['options']['visibility'] ?? null;
+
+        if (!$visibility || !($visibility['enabled'] ?? false)) {
+            return 'Immer sichtbar';
+        }
+
+        // Build field labels map
+        $fieldLabels = [];
+        foreach ($this->extraFieldDefinitions as $f) {
+            $fieldLabels[$f['name']] = $f['label'];
+        }
+
+        $evaluator = new ExtraFieldConditionEvaluator();
+        return $evaluator->toHumanReadable($visibility, $fieldLabels);
     }
 }

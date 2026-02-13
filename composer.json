@@ -10,7 +10,7 @@
       "wildbit/postmark-php": "^7.0",
       "intervention/image": "^3.11",
       "league/flysystem-aws-s3-v3": "^3.0",
-    "laravel/mcp": "^0.1.1"
+    "laravel/mcp": "^0.5.7"
   },
   "autoload": {
     "psr-4": {

@@ -67,6 +67,7 @@
                     activeWhatsAppChannelId: @entangle('activeWhatsAppChannelId').live,
                     activeThreadId: 1,
                     composeMode: false,
+                    isAtBottom: true,
                     get activeChannelLabel(){
                         return this.activeChannel === 'email' ? 'E-Mail'
                             : (this.activeChannel === 'phone' ? 'Anrufen' : 'WhatsApp');
@@ -82,17 +83,23 @@
                         el.style.height = (next > 0 ? next : 44) + 'px';
                         el.style.overflowY = (el.scrollHeight > maxPx) ? 'auto' : 'hidden';
                     },
-                    scrollToBottom(){
+                    onScroll(el) {
+                        // Bei flex-col-reverse: scrollTop nahe 0 = User ist bei neuesten Nachrichten
+                        this.isAtBottom = el.scrollTop > -50;
+                    },
+                    scrollToBottom(force = false){
+                        if (!force && !this.isAtBottom) return; // Nicht scrollen wenn User hochgescrollt hat
                         this.$nextTick(() => {
                             const el = this.$refs.chatScroll;
                             if (!el) return;
-                            el.scrollTop = el.scrollHeight;
+                            el.scrollTop = 0; // Bei flex-col-reverse: 0 = neueste Nachrichten
+                            this.isAtBottom = true;
                         });
                     },
                     startNewThread(){
                         this.composeMode = true;
                         this.activeThreadId = null;
-                        this.scrollToBottom();
+                        this.scrollToBottom(true);
                         this.$nextTick(() => {
                             // focus the most relevant textarea if present
                             const el = this.activeChannel === 'email'
@@ -104,7 +111,7 @@
                     selectThread(id){
                         this.composeMode = false;
                         this.activeThreadId = id;
-                        this.scrollToBottom();
+                        this.scrollToBottom(true);
                         this.$nextTick(() => {
                             const el = this.activeChannel === 'email'
                                 ? this.$refs.emailBody
@@ -114,11 +121,11 @@
                     },
                     init(){
                         // Ensure scrolling works when switching threads/channels (even if content is swapped)
-                        this.$watch('activeThreadId', () => this.scrollToBottom());
+                        this.$watch('activeThreadId', () => this.scrollToBottom(true));
                         this.$watch('activeChannel', () => {
-                            this.scrollToBottom();
+                            this.scrollToBottom(true);
                         });
-                        this.$watch('tab', () => this.scrollToBottom());
+                        this.$watch('tab', () => this.scrollToBottom(true));
                     }
                 }"
                 @comms:set-tab.window="tab = ($event.detail && $event.detail.tab) ? $event.detail.tab : tab"
@@ -441,7 +448,7 @@
                                     {{-- Right: Chat (3/4 width) --}}
                                     <div class="col-span-3 min-h-0 min-w-0 flex flex-col overflow-hidden">
                                         <div class="flex-1 min-h-0 bg-[var(--ui-surface)] overflow-hidden flex flex-col shadow-sm">
-                                            <div class="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col-reverse" id="chatScroll" x-ref="chatScroll">
+                                            <div class="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col-reverse" id="chatScroll" x-ref="chatScroll" @scroll="onScroll($el)">
                                                 <div id="chatList" class="space-y-4 min-w-0">
                                                     {{-- E-Mail Verlauf (scrollbar wie Chat, aber mail-typisch) --}}
                                                     <div x-show="activeChannel==='email'" class="space-y-3" x-cloak>

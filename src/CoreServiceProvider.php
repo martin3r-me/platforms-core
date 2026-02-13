@@ -380,12 +380,23 @@ class CoreServiceProvider extends ServiceProvider
         }
 
         // Context Files Tools (core.context.files.*)
-        // Diese Tools ermöglichen der LLM, Dateien an Context-Objekten zu entdecken und deren Inhalt abzurufen
+        // Diese Tools ermöglichen der LLM, Dateien an Context-Objekten zu entdecken, lesen, erstellen und löschen
         if (class_exists(\Platform\Core\Tools\GetContextFilesTool::class) && !$registry->has('core.context.files.GET')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\GetContextFilesTool::class)); } catch (\Throwable $e) {}
         }
         if (class_exists(\Platform\Core\Tools\GetContextFileContentTool::class) && !$registry->has('core.context.files.content.GET')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\GetContextFileContentTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\CreateContextFileTool::class) && !$registry->has('core.context.files.CREATE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\CreateContextFileTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\DeleteContextFileTool::class) && !$registry->has('core.context.files.DELETE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\DeleteContextFileTool::class)); } catch (\Throwable $e) {}
+        }
+
+        // Image Generation Tool (core.images.*)
+        if (class_exists(\Platform\Core\Tools\GenerateImageTool::class) && !$registry->has('core.images.GENERATE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\GenerateImageTool::class)); } catch (\Throwable $e) {}
         }
 
         // Extra Fields Tools (core.extra_fields.*)

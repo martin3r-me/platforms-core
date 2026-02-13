@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\CoreExtraFieldDefinition;
 use Platform\Core\Models\CoreExtraFieldValue;
 use Platform\Core\Models\CoreLookup;
+use Platform\Core\Services\ExtraFieldConditionEvaluator;
 
 trait HasExtraFields
 {
@@ -170,6 +171,82 @@ trait HasExtraFields
         }
 
         return $result;
+    }
+
+    /**
+     * Gibt alle sichtbaren Extra Fields mit Labels zurück
+     * Berücksichtigt Visibility-Bedingungen basierend auf aktuellen Werten
+     *
+     * @param array|null $currentValues Optional: Aktuelle Feldwerte zum Evaluieren (z.B. aus Formular)
+     * @return array
+     */
+    public function getVisibleExtraFieldsWithLabels(?array $currentValues = null): array
+    {
+        $allFields = $this->getExtraFieldsWithLabels();
+
+        if (empty($allFields)) {
+            return [];
+        }
+
+        // Build field values map by name
+        $fieldValuesByName = [];
+        foreach ($allFields as $field) {
+            $value = $currentValues[$field['id']] ?? $field['value'];
+            $fieldValuesByName[$field['name']] = $value;
+        }
+
+        $evaluator = new ExtraFieldConditionEvaluator();
+        $visibleFields = [];
+
+        foreach ($allFields as $field) {
+            $visibility = $field['options']['visibility'] ?? null;
+
+            // If no visibility config or not enabled, field is visible
+            if (!$visibility || !($visibility['enabled'] ?? false)) {
+                $visibleFields[] = $field;
+                continue;
+            }
+
+            // Evaluate visibility
+            if ($evaluator->evaluate($visibility, $fieldValuesByName)) {
+                $visibleFields[] = $field;
+            }
+        }
+
+        return $visibleFields;
+    }
+
+    /**
+     * Prüft ob ein Extra Field sichtbar ist basierend auf Bedingungen
+     *
+     * @param string $name Field name
+     * @param array|null $currentValues Optional: Aktuelle Feldwerte zum Evaluieren
+     * @return bool
+     */
+    public function isExtraFieldVisible(string $name, ?array $currentValues = null): bool
+    {
+        $definition = $this->findExtraFieldDefinition($name);
+        if (!$definition) {
+            return false;
+        }
+
+        $visibility = $definition->options['visibility'] ?? null;
+
+        // If no visibility config or not enabled, field is visible
+        if (!$visibility || !($visibility['enabled'] ?? false)) {
+            return true;
+        }
+
+        // Build field values map
+        $allFields = $this->getExtraFieldsWithLabels();
+        $fieldValuesByName = [];
+        foreach ($allFields as $field) {
+            $value = $currentValues[$field['id']] ?? $field['value'];
+            $fieldValuesByName[$field['name']] = $value;
+        }
+
+        $evaluator = new ExtraFieldConditionEvaluator();
+        return $evaluator->evaluate($visibility, $fieldValuesByName);
     }
 
     /**

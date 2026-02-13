@@ -8,6 +8,7 @@
     <x-core-extra-fields-form :definitions="$this->extraFieldDefinitions" />
 
     The wire:model binds to extraFieldValues.{id} from the trait.
+    Supports conditional visibility via Alpine.js.
 --}}
 @props([
     'definitions' => [],
@@ -15,14 +16,154 @@
 ])
 
 @if(count($definitions) > 0)
-    <div {{ $attributes->merge(['class' => 'grid gap-4 ' . match($columns) {
-        1 => 'grid-cols-1',
-        3 => 'grid-cols-1 md:grid-cols-3',
-        4 => 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
-        default => 'grid-cols-1 md:grid-cols-2',
-    }]) }}>
+    @php
+        // Build field map for visibility evaluation
+        $fieldMap = [];
+        foreach ($definitions as $def) {
+            $fieldMap[$def['name']] = [
+                'id' => $def['id'],
+                'type' => $def['type'],
+                'visibility' => $def['options']['visibility'] ?? null,
+            ];
+        }
+    @endphp
+
+    <div
+        x-data="{
+            fieldValues: @entangle('extraFieldValues').live,
+            fieldDefinitions: @js($definitions),
+
+            // Check if a field should be visible
+            isFieldVisible(fieldId) {
+                const field = this.fieldDefinitions.find(f => f.id === fieldId);
+                if (!field) return true;
+
+                const visibility = field.options?.visibility;
+                if (!visibility || !visibility.enabled) return true;
+
+                return this.evaluateVisibility(visibility);
+            },
+
+            // Evaluate visibility configuration
+            evaluateVisibility(config) {
+                if (!config.groups || config.groups.length === 0) return true;
+
+                const mainLogic = (config.logic || 'AND').toUpperCase();
+                const groupResults = config.groups.map(group => this.evaluateGroup(group));
+
+                if (mainLogic === 'OR') {
+                    return groupResults.includes(true);
+                }
+                return !groupResults.includes(false);
+            },
+
+            // Evaluate a condition group
+            evaluateGroup(group) {
+                if (!group.conditions || group.conditions.length === 0) return true;
+
+                const groupLogic = (group.logic || 'AND').toUpperCase();
+                const conditionResults = group.conditions.map(cond => this.evaluateCondition(cond));
+
+                if (groupLogic === 'OR') {
+                    return conditionResults.includes(true);
+                }
+                return !conditionResults.includes(false);
+            },
+
+            // Evaluate a single condition
+            evaluateCondition(condition) {
+                if (!condition.field) return true;
+
+                // Find the field definition by name
+                const targetField = this.fieldDefinitions.find(f => f.name === condition.field);
+                if (!targetField) return true;
+
+                // Get current value
+                const actualValue = this.fieldValues[targetField.id];
+                const expectedValue = condition.value;
+                const operator = condition.operator || 'equals';
+
+                return this.compareValues(actualValue, operator, expectedValue);
+            },
+
+            // Compare values with operator
+            compareValues(actual, operator, expected) {
+                switch (operator) {
+                    case 'equals':
+                        return this.isEqual(actual, expected);
+                    case 'not_equals':
+                        return !this.isEqual(actual, expected);
+                    case 'greater_than':
+                        return parseFloat(actual) > parseFloat(expected);
+                    case 'greater_or_equal':
+                        return parseFloat(actual) >= parseFloat(expected);
+                    case 'less_than':
+                        return parseFloat(actual) < parseFloat(expected);
+                    case 'less_or_equal':
+                        return parseFloat(actual) <= parseFloat(expected);
+                    case 'is_null':
+                        return this.isEmpty(actual);
+                    case 'is_not_null':
+                        return !this.isEmpty(actual);
+                    case 'in':
+                        return this.isIn(actual, expected);
+                    case 'not_in':
+                        return !this.isIn(actual, expected);
+                    case 'contains':
+                        return String(actual || '').toLowerCase().includes(String(expected || '').toLowerCase());
+                    case 'starts_with':
+                        return String(actual || '').toLowerCase().startsWith(String(expected || '').toLowerCase());
+                    case 'ends_with':
+                        return String(actual || '').toLowerCase().endsWith(String(expected || '').toLowerCase());
+                    case 'is_true':
+                        return actual === true || actual === 1 || actual === '1' || String(actual).toLowerCase() === 'true';
+                    case 'is_false':
+                        return actual === false || actual === 0 || actual === '0' || String(actual).toLowerCase() === 'false' || this.isEmpty(actual);
+                    default:
+                        return true;
+                }
+            },
+
+            isEqual(a, b) {
+                if (a === b) return true;
+                if (a === null && b === null) return true;
+                if (typeof a === 'number' && typeof b === 'number') return a === b;
+                if (!isNaN(a) && !isNaN(b)) return parseFloat(a) === parseFloat(b);
+                return String(a || '').toLowerCase() === String(b || '').toLowerCase();
+            },
+
+            isEmpty(value) {
+                if (value === null || value === undefined) return true;
+                if (typeof value === 'string' && value.trim() === '') return true;
+                if (Array.isArray(value) && value.length === 0) return true;
+                return false;
+            },
+
+            isIn(actual, expected) {
+                if (!Array.isArray(expected)) expected = [expected];
+                if (Array.isArray(actual)) {
+                    return actual.some(item => expected.includes(item));
+                }
+                return expected.includes(actual);
+            }
+        }"
+        {{ $attributes->merge(['class' => 'grid gap-4 ' . match($columns) {
+            1 => 'grid-cols-1',
+            3 => 'grid-cols-1 md:grid-cols-3',
+            4 => 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
+            default => 'grid-cols-1 md:grid-cols-2',
+        }]) }}
+    >
         @foreach($definitions as $field)
-            <div>
+            <div
+                x-show="isFieldVisible({{ $field['id'] }})"
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 transform -translate-y-2"
+                x-transition:enter-end="opacity-100 transform translate-y-0"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 transform translate-y-0"
+                x-transition:leave-end="opacity-0 transform -translate-y-2"
+            >
                 @switch($field['type'])
                     @case('textarea')
                         @php

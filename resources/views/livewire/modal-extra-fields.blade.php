@@ -39,6 +39,307 @@
 
         {{-- Felder Tab --}}
         @if($activeTab === 'fields' && $contextType)
+            {{-- Editing Mode: Full-width panel with tabs --}}
+            @if($editingDefinitionId)
+                @php
+                    $editingDef = collect($definitions)->firstWhere('id', $editingDefinitionId);
+                @endphp
+                <div class="space-y-4">
+                    {{-- Edit Header --}}
+                    <div class="flex items-center justify-between pb-4 border-b border-[var(--ui-border)]/40">
+                        <div class="flex items-center gap-3">
+                            <button
+                                type="button"
+                                wire:click="cancelEditDefinition"
+                                class="p-2 text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)] transition-colors"
+                            >
+                                @svg('heroicon-o-arrow-left', 'w-5 h-5')
+                            </button>
+                            <div>
+                                <h4 class="text-lg font-semibold text-[var(--ui-secondary)]">
+                                    Feld bearbeiten: {{ $editingDef['label'] ?? '' }}
+                                </h4>
+                                <span class="text-xs text-[var(--ui-muted)]">{{ $editingDef['name'] ?? '' }}</span>
+                            </div>
+                        </div>
+                        <button
+                            wire:click="saveEditDefinition"
+                            class="px-4 py-2 bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition-colors text-sm font-medium"
+                        >
+                            Speichern
+                        </button>
+                    </div>
+
+                    {{-- Edit Field Tabs --}}
+                    <div class="flex border-b border-[var(--ui-border)]/40">
+                        <button
+                            wire:click="$set('editFieldTab', 'basis')"
+                            class="px-4 py-2 text-sm font-medium transition-colors {{ $editFieldTab === 'basis' ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}"
+                        >
+                            Basis
+                        </button>
+                        @if(in_array($editField['type'], ['select', 'lookup', 'file']))
+                            <button
+                                wire:click="$set('editFieldTab', 'options')"
+                                class="px-4 py-2 text-sm font-medium transition-colors {{ $editFieldTab === 'options' ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}"
+                            >
+                                Optionen
+                            </button>
+                        @endif
+                        <button
+                            wire:click="$set('editFieldTab', 'conditions')"
+                            class="px-4 py-2 text-sm font-medium transition-colors {{ $editFieldTab === 'conditions' ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}"
+                        >
+                            Bedingungen
+                            @if($editField['visibility']['enabled'] ?? false)
+                                <span class="ml-1 inline-flex items-center justify-center w-2 h-2 bg-[var(--ui-primary)] rounded-full"></span>
+                            @endif
+                        </button>
+                        @if($editField['type'] === 'file')
+                            <button
+                                wire:click="$set('editFieldTab', 'verification')"
+                                class="px-4 py-2 text-sm font-medium transition-colors {{ $editFieldTab === 'verification' ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}"
+                            >
+                                KI-Verifikation
+                                @if($editField['verify_by_llm'] ?? false)
+                                    <span class="ml-1 inline-flex items-center justify-center w-2 h-2 bg-[var(--ui-primary)] rounded-full"></span>
+                                @endif
+                            </button>
+                        @endif
+                        @if($editField['type'] !== 'file')
+                            <button
+                                wire:click="$set('editFieldTab', 'autofill')"
+                                class="px-4 py-2 text-sm font-medium transition-colors {{ $editFieldTab === 'autofill' ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}"
+                            >
+                                AutoFill
+                                @if(!empty($editField['auto_fill_source']))
+                                    <span class="ml-1 inline-flex items-center justify-center w-2 h-2 bg-[var(--ui-primary)] rounded-full"></span>
+                                @endif
+                            </button>
+                        @endif
+                    </div>
+
+                    {{-- Tab Content --}}
+                    <div class="p-4 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
+                        {{-- Basis Tab --}}
+                        @if($editFieldTab === 'basis')
+                            <div class="space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <x-ui-input-text
+                                        name="editField.label"
+                                        label="Label"
+                                        :required="true"
+                                        wire:model="editField.label"
+                                    />
+
+                                    <x-ui-input-select
+                                        name="editField.type"
+                                        label="Typ"
+                                        :required="true"
+                                        :options="$this->availableTypes"
+                                        wire:model.live="editField.type"
+                                        displayMode="dropdown"
+                                    />
+                                </div>
+
+                                <div class="flex flex-wrap gap-6 pt-2">
+                                    <x-ui-input-checkbox
+                                        name="editField.is_required"
+                                        checkedLabel="Erforderlich (Fortschritt)"
+                                        uncheckedLabel="Erforderlich (Fortschritt)"
+                                        wire:model="editField.is_required"
+                                    />
+
+                                    <x-ui-input-checkbox
+                                        name="editField.is_mandatory"
+                                        checkedLabel="Pflichtfeld (blockiert Speichern)"
+                                        uncheckedLabel="Pflichtfeld (blockiert Speichern)"
+                                        wire:model="editField.is_mandatory"
+                                    />
+
+                                    <x-ui-input-checkbox
+                                        name="editField.is_encrypted"
+                                        checkedLabel="Verschlüsselt"
+                                        uncheckedLabel="Als verschlüsselt markieren"
+                                        wire:model="editField.is_encrypted"
+                                    />
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- Options Tab (Select, Lookup, File) --}}
+                        @if($editFieldTab === 'options')
+                            @if($editField['type'] === 'select')
+                                <div class="space-y-4">
+                                    <x-ui-input-checkbox
+                                        name="editField.is_multiple"
+                                        checkedLabel="Mehrfachauswahl aktiv"
+                                        uncheckedLabel="Mehrfachauswahl aktivieren"
+                                        wire:model="editField.is_multiple"
+                                    />
+
+                                    <div>
+                                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Auswahloptionen</label>
+                                        <div class="flex gap-2 mb-3">
+                                            <input
+                                                type="text"
+                                                wire:model="editOptionText"
+                                                wire:keydown.enter.prevent="addEditOption"
+                                                class="flex-1 px-3 py-1.5 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                placeholder="Option eingeben..."
+                                            />
+                                            <button
+                                                type="button"
+                                                wire:click="addEditOption"
+                                                class="px-3 py-1.5 bg-[var(--ui-primary)] text-white text-sm hover:bg-[var(--ui-primary)]/90"
+                                            >
+                                                Hinzufügen
+                                            </button>
+                                        </div>
+
+                                        @if(count($editField['options']) > 0)
+                                            <div class="flex flex-wrap gap-2">
+                                                @foreach($editField['options'] as $index => $option)
+                                                    <span class="inline-flex items-center gap-1 px-2 py-1 bg-[var(--ui-surface)] text-sm text-[var(--ui-secondary)] border border-[var(--ui-border)]/40">
+                                                        {{ $option }}
+                                                        <button
+                                                            type="button"
+                                                            wire:click="removeEditOption({{ $index }})"
+                                                            class="text-[var(--ui-muted)] hover:text-[var(--ui-danger)]"
+                                                        >
+                                                            @svg('heroicon-o-x-mark', 'w-3.5 h-3.5')
+                                                        </button>
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        @else
+                                            <p class="text-xs text-[var(--ui-muted)]">Noch keine Optionen hinzugefügt.</p>
+                                        @endif
+
+                                        @error('editField.options')
+                                            <p class="mt-2 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+                                </div>
+                            @elseif($editField['type'] === 'lookup')
+                                <div class="space-y-4">
+                                    <x-ui-input-checkbox
+                                        name="editField.is_multiple"
+                                        checkedLabel="Mehrfachauswahl aktiv"
+                                        uncheckedLabel="Mehrfachauswahl aktivieren"
+                                        wire:model="editField.is_multiple"
+                                    />
+
+                                    @if(count($this->availableLookups) > 0)
+                                        <div>
+                                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Lookup auswählen</label>
+                                            <select
+                                                wire:model="editField.lookup_id"
+                                                class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                            >
+                                                <option value="">Bitte wählen...</option>
+                                                @foreach($this->availableLookups as $lookup)
+                                                    <option value="{{ $lookup['id'] }}">{{ $lookup['label'] }} ({{ $lookup['values_count'] }} Werte)</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    @else
+                                        <p class="text-sm text-[var(--ui-muted)]">
+                                            Noch keine Lookups vorhanden. Erstellen Sie zuerst einen Lookup im Tab "Lookups".
+                                        </p>
+                                    @endif
+
+                                    @error('editField.lookup_id')
+                                        <p class="mt-2 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            @elseif($editField['type'] === 'file')
+                                <x-ui-input-checkbox
+                                    name="editField.is_multiple"
+                                    checkedLabel="Mehrere Dateien erlaubt"
+                                    uncheckedLabel="Mehrere Dateien erlauben"
+                                    wire:model="editField.is_multiple"
+                                />
+                            @endif
+                        @endif
+
+                        {{-- Conditions Tab --}}
+                        @if($editFieldTab === 'conditions')
+                            <x-platform::condition-builder
+                                :visibility="$editField['visibility']"
+                                :availableFields="$this->conditionFields"
+                                :allOperators="$this->allOperators"
+                                :description="$this->visibilityDescription"
+                            />
+                        @endif
+
+                        {{-- Verification Tab (File only) --}}
+                        @if($editFieldTab === 'verification' && $editField['type'] === 'file')
+                            <div class="space-y-4">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        wire:model.live="editField.verify_by_llm"
+                                        class="rounded border-[var(--ui-border)]/60 text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]"
+                                    />
+                                    <span class="text-sm font-medium text-[var(--ui-secondary)]">Durch KI verifizieren</span>
+                                </label>
+
+                                @if($editField['verify_by_llm'])
+                                    <div>
+                                        <label class="block text-sm text-[var(--ui-muted)] mb-1">Verifikations-Anweisungen</label>
+                                        <textarea
+                                            wire:model="editField.verify_instructions"
+                                            placeholder="z.B.: Prüfe ob dies ein gültiger Personalausweis ist. Ist er lesbar und nicht abgelaufen?"
+                                            class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                            rows="3"
+                                        ></textarea>
+                                        <p class="text-xs text-[var(--ui-muted)] mt-1">Die KI prüft hochgeladene Bilder nach diesen Anweisungen.</p>
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
+
+                        {{-- AutoFill Tab (non-file) --}}
+                        @if($editFieldTab === 'autofill' && $editField['type'] !== 'file')
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">AutoFill-Quelle</label>
+                                    <select
+                                        wire:model.live="editField.auto_fill_source"
+                                        class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                    >
+                                        <option value="">Deaktiviert</option>
+                                        @foreach($this->autoFillSources as $value => $label)
+                                            <option value="{{ $value }}">{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                @if(!empty($editField['auto_fill_source']))
+                                    <div>
+                                        <label class="block text-sm text-[var(--ui-muted)] mb-1">AutoFill-Anweisungen</label>
+                                        <textarea
+                                            wire:model="editField.auto_fill_prompt"
+                                            placeholder="{{ $editField['auto_fill_source'] === 'websearch' ? 'z.B.: Suche die Firmenadresse und Telefonnummer' : 'z.B.: Analysiere die vorhandenen Daten und schlage einen passenden Wert vor' }}"
+                                            class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                            rows="2"
+                                        ></textarea>
+                                        <p class="text-xs text-[var(--ui-muted)] mt-1">
+                                            @if($editField['auto_fill_source'] === 'websearch')
+                                                Per Scheduler werden leere Felder via Web-Suche automatisch gefüllt.
+                                            @else
+                                                Per Scheduler werden leere Felder via KI-Analyse automatisch gefüllt.
+                                            @endif
+                                        </p>
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            @else
+            {{-- List Mode --}}
             <!-- Definitionen -->
             <div class="space-y-6">
                 <!-- Neues Feld erstellen -->
@@ -284,13 +585,7 @@
                                             Typ
                                         </th>
                                         <th scope="col" class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                            Erforderl.
-                                        </th>
-                                        <th scope="col" class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                            Pflicht
-                                        </th>
-                                        <th scope="col" class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                            Verschl.
+                                            Status
                                         </th>
                                         <th scope="col" class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
                                             Scope
@@ -304,90 +599,57 @@
                                     @foreach($definitions as $def)
                                         <tr class="hover:bg-[var(--ui-muted-5)]/50 transition-colors">
                                             <td class="whitespace-nowrap py-4 pl-6 pr-3">
-                                                @if($editingDefinitionId === $def['id'])
-                                                    <x-ui-input-text
-                                                        name="editField.label"
-                                                        wire:model="editField.label"
-                                                        size="sm"
-                                                    />
-                                                @else
-                                                    <div>
-                                                        <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $def['label'] }}</span>
-                                                        <span class="block text-xs text-[var(--ui-muted)]">{{ $def['name'] }}</span>
-                                                    </div>
+                                                <div>
+                                                    <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $def['label'] }}</span>
+                                                    <span class="block text-xs text-[var(--ui-muted)]">{{ $def['name'] }}</span>
+                                                </div>
+                                            </td>
+                                            <td class="whitespace-nowrap px-3 py-4">
+                                                <span class="text-sm text-[var(--ui-muted)]">{{ $def['type_label'] }}</span>
+                                                @if(($def['type'] === 'select' || $def['type'] === 'file' || $def['type'] === 'lookup') && isset($def['options']['multiple']) && $def['options']['multiple'])
+                                                    <span class="ml-1 text-xs text-[var(--ui-primary)]">(Mehrfach)</span>
+                                                @endif
+                                                @if($def['type'] === 'lookup' && isset($def['options']['lookup_id']))
+                                                    @php
+                                                        $lookupForDisplay = collect($this->availableLookups)->firstWhere('id', $def['options']['lookup_id']);
+                                                    @endphp
+                                                    @if($lookupForDisplay)
+                                                        <span class="block text-xs text-[var(--ui-muted)]">{{ $lookupForDisplay['label'] }}</span>
+                                                    @endif
                                                 @endif
                                             </td>
                                             <td class="whitespace-nowrap px-3 py-4">
-                                                @if($editingDefinitionId === $def['id'])
-                                                    <x-ui-input-select
-                                                        name="editField.type"
-                                                        :options="$this->availableTypes"
-                                                        wire:model.live="editField.type"
-                                                        size="sm"
-                                                        displayMode="dropdown"
-                                                    />
-                                                @else
-                                                    <span class="text-sm text-[var(--ui-muted)]">{{ $def['type_label'] }}</span>
-                                                    @if(($def['type'] === 'select' || $def['type'] === 'file' || $def['type'] === 'lookup') && isset($def['options']['multiple']) && $def['options']['multiple'])
-                                                        <span class="ml-1 text-xs text-[var(--ui-primary)]">(Mehrfach)</span>
-                                                    @endif
-                                                    @if($def['type'] === 'lookup' && isset($def['options']['lookup_id']))
-                                                        @php
-                                                            $lookupForDisplay = collect($this->availableLookups)->firstWhere('id', $def['options']['lookup_id']);
-                                                        @endphp
-                                                        @if($lookupForDisplay)
-                                                            <span class="block text-xs text-[var(--ui-muted)]">{{ $lookupForDisplay['label'] }}</span>
-                                                        @endif
-                                                    @endif
-                                                @endif
-                                            </td>
-                                            <td class="whitespace-nowrap px-3 py-4 text-center">
-                                                @if($editingDefinitionId === $def['id'])
-                                                    <x-ui-input-checkbox
-                                                        name="editField.is_required"
-                                                        checkedLabel="Ja"
-                                                        uncheckedLabel="Nein"
-                                                        wire:model="editField.is_required"
-                                                    />
-                                                @else
-                                                    @if($def['is_required'])
-                                                        @svg('heroicon-o-check', 'w-5 h-5 text-[var(--ui-success)] mx-auto')
-                                                    @else
-                                                        @svg('heroicon-o-minus', 'w-5 h-5 text-[var(--ui-muted)] mx-auto')
-                                                    @endif
-                                                @endif
-                                            </td>
-                                            <td class="whitespace-nowrap px-3 py-4 text-center">
-                                                @if($editingDefinitionId === $def['id'])
-                                                    <x-ui-input-checkbox
-                                                        name="editField.is_mandatory"
-                                                        checkedLabel="Ja"
-                                                        uncheckedLabel="Nein"
-                                                        wire:model="editField.is_mandatory"
-                                                    />
-                                                @else
+                                                <div class="flex items-center justify-center gap-1.5 flex-wrap">
                                                     @if($def['is_mandatory'])
-                                                        @svg('heroicon-o-check', 'w-5 h-5 text-[var(--ui-danger)] mx-auto')
-                                                    @else
-                                                        @svg('heroicon-o-minus', 'w-5 h-5 text-[var(--ui-muted)] mx-auto')
+                                                        <span class="px-1.5 py-0.5 text-xs bg-[var(--ui-danger-5)] text-[var(--ui-danger)] border border-[var(--ui-danger)]/20" title="Pflichtfeld">
+                                                            Pflicht
+                                                        </span>
+                                                    @elseif($def['is_required'])
+                                                        <span class="px-1.5 py-0.5 text-xs bg-[var(--ui-warning-5)] text-[var(--ui-warning)] border border-[var(--ui-warning)]/20" title="Erforderlich für Fortschritt">
+                                                            Erforderl.
+                                                        </span>
                                                     @endif
-                                                @endif
-                                            </td>
-                                            <td class="whitespace-nowrap px-3 py-4 text-center">
-                                                @if($editingDefinitionId === $def['id'])
-                                                    <x-ui-input-checkbox
-                                                        name="editField.is_encrypted"
-                                                        checkedLabel="Ja"
-                                                        uncheckedLabel="Nein"
-                                                        wire:model="editField.is_encrypted"
-                                                    />
-                                                @else
                                                     @if($def['is_encrypted'] ?? false)
-                                                        @svg('heroicon-o-lock-closed', 'w-5 h-5 text-[var(--ui-warning)] mx-auto')
-                                                    @else
-                                                        @svg('heroicon-o-lock-open', 'w-5 h-5 text-[var(--ui-muted)] mx-auto')
+                                                        <span class="px-1.5 py-0.5 text-xs bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/40" title="Verschlüsselt">
+                                                            @svg('heroicon-o-lock-closed', 'w-3 h-3')
+                                                        </span>
                                                     @endif
-                                                @endif
+                                                    @if($def['has_visibility_conditions'] ?? false)
+                                                        <span class="px-1.5 py-0.5 text-xs bg-[var(--ui-primary-5)] text-[var(--ui-primary)] border border-[var(--ui-primary)]/20" title="Hat Sichtbarkeitsbedingungen">
+                                                            @svg('heroicon-o-eye', 'w-3 h-3')
+                                                        </span>
+                                                    @endif
+                                                    @if($def['verify_by_llm'] ?? false)
+                                                        <span class="px-1.5 py-0.5 text-xs bg-[var(--ui-success-5)] text-[var(--ui-success)] border border-[var(--ui-success)]/20" title="KI-Verifikation">
+                                                            @svg('heroicon-o-sparkles', 'w-3 h-3')
+                                                        </span>
+                                                    @endif
+                                                    @if(!empty($def['auto_fill_source']))
+                                                        <span class="px-1.5 py-0.5 text-xs bg-[var(--ui-info-5)] text-[var(--ui-info)] border border-[var(--ui-info)]/20" title="AutoFill aktiv">
+                                                            @svg('heroicon-o-bolt', 'w-3 h-3')
+                                                        </span>
+                                                    @endif
+                                                </div>
                                             </td>
                                             <td class="whitespace-nowrap px-3 py-4 text-center">
                                                 @if($def['is_global'])
@@ -401,219 +663,23 @@
                                                 @endif
                                             </td>
                                             <td class="whitespace-nowrap px-3 py-4 text-right">
-                                                @if($editingDefinitionId === $def['id'])
-                                                    <div class="flex items-center justify-end gap-2">
-                                                        <button
-                                                            wire:click="saveEditDefinition"
-                                                            class="text-xs px-3 py-1.5 text-white bg-[var(--ui-primary)] hover:bg-[var(--ui-primary)]/90 transition-colors"
-                                                        >
-                                                            Speichern
-                                                        </button>
-                                                        <button
-                                                            wire:click="cancelEditDefinition"
-                                                            class="text-xs px-3 py-1.5 text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)] transition-colors"
-                                                        >
-                                                            Abbrechen
-                                                        </button>
-                                                    </div>
-                                                @else
-                                                    <div class="flex items-center justify-end gap-2">
-                                                        <button
-                                                            wire:click="startEditDefinition({{ $def['id'] }})"
-                                                            class="text-xs px-3 py-1.5 text-[var(--ui-primary)] hover:text-[var(--ui-primary)]/80 hover:bg-[var(--ui-primary-5)] transition-colors"
-                                                        >
-                                                            Bearbeiten
-                                                        </button>
-                                                        <button
-                                                            wire:click="deleteDefinition({{ $def['id'] }})"
-                                                            wire:confirm="Feld und alle zugehörigen Werte wirklich löschen?"
-                                                            class="text-xs px-3 py-1.5 text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 hover:bg-[var(--ui-danger-5)] transition-colors"
-                                                        >
-                                                            Löschen
-                                                        </button>
-                                                    </div>
-                                                @endif
+                                                <div class="flex items-center justify-end gap-2">
+                                                    <button
+                                                        wire:click="startEditDefinition({{ $def['id'] }})"
+                                                        class="text-xs px-3 py-1.5 text-[var(--ui-primary)] hover:text-[var(--ui-primary)]/80 hover:bg-[var(--ui-primary-5)] transition-colors"
+                                                    >
+                                                        Bearbeiten
+                                                    </button>
+                                                    <button
+                                                        wire:click="deleteDefinition({{ $def['id'] }})"
+                                                        wire:confirm="Feld und alle zugehörigen Werte wirklich löschen?"
+                                                        class="text-xs px-3 py-1.5 text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 hover:bg-[var(--ui-danger-5)] transition-colors"
+                                                    >
+                                                        Löschen
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
-                                        {{-- Select-Optionen bearbeiten --}}
-                                        @if($editingDefinitionId === $def['id'] && $editField['type'] === 'select')
-                                            <tr class="bg-[var(--ui-muted-5)]/30">
-                                                <td colspan="7" class="px-6 py-4">
-                                                    <div class="p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40">
-                                                        <div class="flex items-center justify-between mb-3">
-                                                            <span class="text-sm font-medium text-[var(--ui-secondary)]">Auswahloptionen</span>
-                                                            <x-ui-input-checkbox
-                                                                name="editField.is_multiple"
-                                                                checkedLabel="Mehrfachauswahl aktiv"
-                                                                uncheckedLabel="Mehrfachauswahl aktivieren"
-                                                                wire:model="editField.is_multiple"
-                                                            />
-                                                        </div>
-
-                                                        <div class="flex gap-2 mb-3">
-                                                            <input
-                                                                type="text"
-                                                                wire:model="editOptionText"
-                                                                wire:keydown.enter.prevent="addEditOption"
-                                                                class="flex-1 px-3 py-1.5 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                                                placeholder="Option eingeben..."
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                wire:click="addEditOption"
-                                                                class="px-3 py-1.5 bg-[var(--ui-primary)] text-white text-sm hover:bg-[var(--ui-primary)]/90"
-                                                            >
-                                                                Hinzufügen
-                                                            </button>
-                                                        </div>
-
-                                                        @if(count($editField['options']) > 0)
-                                                            <div class="flex flex-wrap gap-2">
-                                                                @foreach($editField['options'] as $index => $option)
-                                                                    <span class="inline-flex items-center gap-1 px-2 py-1 bg-[var(--ui-muted-5)] text-sm text-[var(--ui-secondary)] border border-[var(--ui-border)]/40">
-                                                                        {{ $option }}
-                                                                        <button
-                                                                            type="button"
-                                                                            wire:click="removeEditOption({{ $index }})"
-                                                                            class="text-[var(--ui-muted)] hover:text-[var(--ui-danger)]"
-                                                                        >
-                                                                            @svg('heroicon-o-x-mark', 'w-3.5 h-3.5')
-                                                                        </button>
-                                                                    </span>
-                                                                @endforeach
-                                                            </div>
-                                                        @else
-                                                            <p class="text-xs text-[var(--ui-muted)]">Noch keine Optionen hinzugefügt.</p>
-                                                        @endif
-
-                                                        @error('editField.options')
-                                                            <p class="mt-2 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
-                                                        @enderror
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        @endif
-
-                                        {{-- Lookup-Optionen bearbeiten --}}
-                                        @if($editingDefinitionId === $def['id'] && $editField['type'] === 'lookup')
-                                            <tr class="bg-[var(--ui-muted-5)]/30">
-                                                <td colspan="7" class="px-6 py-4">
-                                                    <div class="p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40">
-                                                        <div class="flex items-center justify-between mb-3">
-                                                            <span class="text-sm font-medium text-[var(--ui-secondary)]">Lookup auswählen</span>
-                                                            <x-ui-input-checkbox
-                                                                name="editField.is_multiple"
-                                                                checkedLabel="Mehrfachauswahl aktiv"
-                                                                uncheckedLabel="Mehrfachauswahl aktivieren"
-                                                                wire:model="editField.is_multiple"
-                                                            />
-                                                        </div>
-
-                                                        @if(count($this->availableLookups) > 0)
-                                                            <select
-                                                                wire:model="editField.lookup_id"
-                                                                class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                                            >
-                                                                <option value="">Bitte wählen...</option>
-                                                                @foreach($this->availableLookups as $lookup)
-                                                                    <option value="{{ $lookup['id'] }}">{{ $lookup['label'] }} ({{ $lookup['values_count'] }} Werte)</option>
-                                                                @endforeach
-                                                            </select>
-                                                        @else
-                                                            <p class="text-sm text-[var(--ui-muted)]">
-                                                                Noch keine Lookups vorhanden.
-                                                            </p>
-                                                        @endif
-
-                                                        @error('editField.lookup_id')
-                                                            <p class="mt-2 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
-                                                        @enderror
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        @endif
-
-                                        {{-- File-Optionen bearbeiten --}}
-                                        @if($editingDefinitionId === $def['id'] && $editField['type'] === 'file')
-                                            <tr class="bg-[var(--ui-muted-5)]/30">
-                                                <td colspan="7" class="px-6 py-4">
-                                                    <div class="p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40 space-y-4">
-                                                        <x-ui-input-checkbox
-                                                            name="editField.is_multiple"
-                                                            checkedLabel="Mehrere Dateien erlaubt"
-                                                            uncheckedLabel="Mehrere Dateien erlauben"
-                                                            wire:model="editField.is_multiple"
-                                                        />
-
-                                                        {{-- LLM-Verifikation --}}
-                                                        <div class="pt-3 border-t border-[var(--ui-border)]/40">
-                                                            <label class="flex items-center gap-2 cursor-pointer">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    wire:model.live="editField.verify_by_llm"
-                                                                    class="rounded border-[var(--ui-border)]/60 text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]"
-                                                                />
-                                                                <span class="text-sm font-medium text-[var(--ui-secondary)]">Durch KI verifizieren</span>
-                                                            </label>
-
-                                                            @if($editField['verify_by_llm'])
-                                                                <div class="mt-3">
-                                                                    <label class="block text-sm text-[var(--ui-muted)] mb-1">Verifikations-Anweisungen</label>
-                                                                    <textarea
-                                                                        wire:model="editField.verify_instructions"
-                                                                        placeholder="z.B.: Prüfe ob dies ein gültiger Personalausweis ist. Ist er lesbar und nicht abgelaufen?"
-                                                                        class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                                                        rows="3"
-                                                                    ></textarea>
-                                                                    <p class="text-xs text-[var(--ui-muted)] mt-1">Die KI prüft hochgeladene Bilder nach diesen Anweisungen.</p>
-                                                                </div>
-                                                            @endif
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        @endif
-
-                                        {{-- AutoFill-Optionen bearbeiten (für alle nicht-file Felder) --}}
-                                        @if($editingDefinitionId === $def['id'] && $editField['type'] !== 'file')
-                                            <tr class="bg-[var(--ui-muted-5)]/30">
-                                                <td colspan="7" class="px-6 py-4">
-                                                    <div class="p-3 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40">
-                                                        <div class="flex items-center gap-4 mb-3">
-                                                            <span class="text-sm font-medium text-[var(--ui-secondary)]">AutoFill</span>
-                                                            <select
-                                                                wire:model.live="editField.auto_fill_source"
-                                                                class="px-3 py-1.5 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                                            >
-                                                                <option value="">Deaktiviert</option>
-                                                                @foreach($this->autoFillSources as $value => $label)
-                                                                    <option value="{{ $value }}">{{ $label }}</option>
-                                                                @endforeach
-                                                            </select>
-                                                        </div>
-
-                                                        @if(!empty($editField['auto_fill_source']))
-                                                            <div class="mt-3">
-                                                                <label class="block text-sm text-[var(--ui-muted)] mb-1">AutoFill-Anweisungen</label>
-                                                                <textarea
-                                                                    wire:model="editField.auto_fill_prompt"
-                                                                    placeholder="{{ $editField['auto_fill_source'] === 'websearch' ? 'z.B.: Suche die Firmenadresse und Telefonnummer' : 'z.B.: Analysiere die vorhandenen Daten und schlage einen passenden Wert vor' }}"
-                                                                    class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
-                                                                    rows="2"
-                                                                ></textarea>
-                                                                <p class="text-xs text-[var(--ui-muted)] mt-1">
-                                                                    @if($editField['auto_fill_source'] === 'websearch')
-                                                                        Per Scheduler werden leere Felder via Web-Suche automatisch gefüllt.
-                                                                    @else
-                                                                        Per Scheduler werden leere Felder via KI-Analyse automatisch gefüllt.
-                                                                    @endif
-                                                                </p>
-                                                            </div>
-                                                        @endif
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        @endif
                                     @endforeach
                                 </tbody>
                             </table>
@@ -625,7 +691,7 @@
                     @endif
                 </div>
             </div>
-
+            @endif
         @elseif($activeTab === 'fields' && !$contextType)
             <div class="text-center py-12">
                 <p class="text-[var(--ui-muted)]">Kein Kontext ausgewählt.</p>

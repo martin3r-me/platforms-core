@@ -11,13 +11,17 @@ use Platform\Core\Models\CoreExtraFieldDefinition;
 use Platform\Core\Models\CoreExtraFieldValue;
 use Platform\Core\Models\CoreLookup;
 use Platform\Core\Models\CoreLookupValue;
+use Platform\Core\Services\ExtraFieldConditionEvaluator;
 
 class ModalExtraFields extends Component
 {
     public bool $open = false;
 
-    // Tab System
+    // Tab System (main modal tabs)
     public string $activeTab = 'fields'; // 'fields' | 'lookups'
+
+    // Edit Field Tab System
+    public string $editFieldTab = 'basis'; // 'basis' | 'options' | 'conditions' | 'verification' | 'autofill'
 
     // Kontext
     public ?string $contextType = null;
@@ -60,6 +64,11 @@ class ModalExtraFields extends Component
         'auto_fill_source' => '',
         'auto_fill_prompt' => '',
         'lookup_id' => null,
+        'visibility' => [
+            'enabled' => false,
+            'logic' => 'AND',
+            'groups' => [],
+        ],
     ];
 
     // Bearbeitungs-Modus
@@ -77,6 +86,11 @@ class ModalExtraFields extends Component
         'auto_fill_source' => '',
         'auto_fill_prompt' => '',
         'lookup_id' => null,
+        'visibility' => [
+            'enabled' => false,
+            'logic' => 'AND',
+            'groups' => [],
+        ],
     ];
 
     // Temporäre Option für Eingabe
@@ -127,7 +141,7 @@ class ModalExtraFields extends Component
     {
         $this->resetValidation();
         $this->open = false;
-        $this->reset('contextType', 'contextId', 'definitions', 'editingDefinitionId', 'lookups', 'editingLookupId', 'selectedLookupId', 'lookupValues', 'activeTab');
+        $this->reset('contextType', 'contextId', 'definitions', 'editingDefinitionId', 'lookups', 'editingLookupId', 'selectedLookupId', 'lookupValues', 'activeTab', 'editFieldTab');
         $this->resetForm();
         $this->resetLookupForm();
     }
@@ -180,6 +194,7 @@ class ModalExtraFields extends Component
                         'is_encrypted' => $def->is_encrypted,
                         'is_global' => $def->isGlobal(),
                         'options' => $def->options,
+                        'has_visibility_conditions' => isset($def->options['visibility']['enabled']) && $def->options['visibility']['enabled'],
                         'verify_by_llm' => $def->verify_by_llm,
                         'verify_instructions' => $def->verify_instructions,
                         'auto_fill_source' => $def->auto_fill_source,
@@ -344,6 +359,11 @@ class ModalExtraFields extends Component
         }
 
         $this->editingDefinitionId = $definitionId;
+        $this->editFieldTab = 'basis';
+
+        // Load visibility config from options
+        $visibility = $definition['options']['visibility'] ?? ExtraFieldConditionEvaluator::createEmptyConfig();
+
         $this->editField = [
             'label' => $definition['label'],
             'type' => $definition['type'],
@@ -357,6 +377,7 @@ class ModalExtraFields extends Component
             'auto_fill_source' => $definition['auto_fill_source'] ?? '',
             'auto_fill_prompt' => $definition['auto_fill_prompt'] ?? '',
             'lookup_id' => $definition['options']['lookup_id'] ?? null,
+            'visibility' => $visibility,
         ];
         $this->editOptionText = '';
     }
@@ -364,6 +385,7 @@ class ModalExtraFields extends Component
     public function cancelEditDefinition(): void
     {
         $this->editingDefinitionId = null;
+        $this->editFieldTab = 'basis';
         $this->editField = [
             'label' => '',
             'type' => 'text',
@@ -377,6 +399,7 @@ class ModalExtraFields extends Component
             'auto_fill_source' => '',
             'auto_fill_prompt' => '',
             'lookup_id' => null,
+            'visibility' => ExtraFieldConditionEvaluator::createEmptyConfig(),
         ];
         $this->editOptionText = '';
     }
@@ -413,28 +436,26 @@ class ModalExtraFields extends Component
                 return;
             }
 
-            // Options für Select-Felder
-            $options = null;
-            if ($this->editField['type'] === 'select') {
-                $options = [
+            // Build options array based on field type
+            $options = match ($this->editField['type']) {
+                'select' => [
                     'choices' => $this->editField['options'],
                     'multiple' => $this->editField['is_multiple'] ?? false,
-                ];
-            }
-
-            // Options für Lookup-Felder
-            if ($this->editField['type'] === 'lookup') {
-                $options = [
+                ],
+                'lookup' => [
                     'lookup_id' => (int) $this->editField['lookup_id'],
                     'multiple' => $this->editField['is_multiple'] ?? false,
-                ];
-            }
-
-            // Options für File-Felder
-            if ($this->editField['type'] === 'file') {
-                $options = [
+                ],
+                'file' => [
                     'multiple' => $this->editField['is_multiple'] ?? false,
-                ];
+                ],
+                default => [],
+            };
+
+            // Add visibility config to all field types if enabled
+            $visibility = $this->editField['visibility'] ?? ExtraFieldConditionEvaluator::createEmptyConfig();
+            if ($visibility['enabled'] ?? false) {
+                $options['visibility'] = $visibility;
             }
 
             $definition->update([
@@ -574,6 +595,7 @@ class ModalExtraFields extends Component
             'auto_fill_source' => '',
             'auto_fill_prompt' => '',
             'lookup_id' => null,
+            'visibility' => ExtraFieldConditionEvaluator::createEmptyConfig(),
         ];
         $this->newOptionText = '';
     }
@@ -966,6 +988,192 @@ class ModalExtraFields extends Component
             return null;
         }
         return collect($this->lookups)->firstWhere('id', $this->selectedLookupId);
+    }
+
+    // ==========================================
+    // Condition Builder Methods
+    // ==========================================
+
+    /**
+     * Get available fields for conditions (excluding the current field being edited)
+     */
+    public function getConditionFieldsProperty(): array
+    {
+        $fields = [];
+        foreach ($this->definitions as $def) {
+            // Exclude the field being edited
+            if ($def['id'] === $this->editingDefinitionId) {
+                continue;
+            }
+
+            $fields[] = [
+                'name' => $def['name'],
+                'label' => $def['label'],
+                'type' => $def['type'],
+            ];
+        }
+        return $fields;
+    }
+
+    /**
+     * Get operators for a specific field type
+     */
+    public function getOperatorsForField(string $fieldName): array
+    {
+        $field = collect($this->definitions)->firstWhere('name', $fieldName);
+        if (!$field) {
+            return [];
+        }
+
+        return ExtraFieldConditionEvaluator::getOperatorsForType($field['type']);
+    }
+
+    /**
+     * Toggle visibility enabled
+     */
+    public function toggleVisibilityEnabled(): void
+    {
+        $this->editField['visibility']['enabled'] = !($this->editField['visibility']['enabled'] ?? false);
+
+        // Initialize with one group if enabling
+        if ($this->editField['visibility']['enabled'] && empty($this->editField['visibility']['groups'])) {
+            $this->addConditionGroup();
+        }
+    }
+
+    /**
+     * Set the main visibility logic
+     */
+    public function setVisibilityLogic(string $logic): void
+    {
+        $this->editField['visibility']['logic'] = $logic;
+    }
+
+    /**
+     * Add a new condition group
+     */
+    public function addConditionGroup(): void
+    {
+        $this->editField['visibility']['groups'][] = ExtraFieldConditionEvaluator::createEmptyGroup();
+    }
+
+    /**
+     * Remove a condition group
+     */
+    public function removeConditionGroup(int $groupIndex): void
+    {
+        unset($this->editField['visibility']['groups'][$groupIndex]);
+        $this->editField['visibility']['groups'] = array_values($this->editField['visibility']['groups']);
+
+        // Disable visibility if no groups left
+        if (empty($this->editField['visibility']['groups'])) {
+            $this->editField['visibility']['enabled'] = false;
+        }
+    }
+
+    /**
+     * Set group logic (AND/OR)
+     */
+    public function setGroupLogic(int $groupIndex, string $logic): void
+    {
+        if (isset($this->editField['visibility']['groups'][$groupIndex])) {
+            $this->editField['visibility']['groups'][$groupIndex]['logic'] = $logic;
+        }
+    }
+
+    /**
+     * Add a condition to a group
+     */
+    public function addCondition(int $groupIndex): void
+    {
+        if (isset($this->editField['visibility']['groups'][$groupIndex])) {
+            $this->editField['visibility']['groups'][$groupIndex]['conditions'][] = ExtraFieldConditionEvaluator::createEmptyCondition();
+        }
+    }
+
+    /**
+     * Remove a condition from a group
+     */
+    public function removeCondition(int $groupIndex, int $conditionIndex): void
+    {
+        if (isset($this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex])) {
+            unset($this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]);
+            $this->editField['visibility']['groups'][$groupIndex]['conditions'] = array_values(
+                $this->editField['visibility']['groups'][$groupIndex]['conditions']
+            );
+        }
+    }
+
+    /**
+     * Update a condition's field
+     */
+    public function updateConditionField(int $groupIndex, int $conditionIndex, string $fieldName): void
+    {
+        if (isset($this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex])) {
+            $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['field'] = $fieldName;
+
+            // Reset operator to first available for this field type
+            $operators = $this->getOperatorsForField($fieldName);
+            if (!empty($operators)) {
+                $firstOperator = array_key_first($operators);
+                $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['operator'] = $firstOperator;
+            }
+
+            // Reset value
+            $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['value'] = null;
+        }
+    }
+
+    /**
+     * Update a condition's operator
+     */
+    public function updateConditionOperator(int $groupIndex, int $conditionIndex, string $operator): void
+    {
+        if (isset($this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex])) {
+            $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['operator'] = $operator;
+
+            // Reset value if operator doesn't require one
+            $operatorMeta = ExtraFieldConditionEvaluator::OPERATORS[$operator] ?? null;
+            if ($operatorMeta && !($operatorMeta['requiresValue'] ?? true)) {
+                $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['value'] = null;
+            }
+        }
+    }
+
+    /**
+     * Update a condition's value
+     */
+    public function updateConditionValue(int $groupIndex, int $conditionIndex, mixed $value): void
+    {
+        if (isset($this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex])) {
+            $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['value'] = $value;
+        }
+    }
+
+    /**
+     * Get human-readable visibility description
+     */
+    public function getVisibilityDescriptionProperty(): string
+    {
+        if (!($this->editField['visibility']['enabled'] ?? false)) {
+            return 'Immer sichtbar';
+        }
+
+        $fieldLabels = [];
+        foreach ($this->definitions as $def) {
+            $fieldLabels[$def['name']] = $def['label'];
+        }
+
+        $evaluator = new ExtraFieldConditionEvaluator();
+        return $evaluator->toHumanReadable($this->editField['visibility'], $fieldLabels);
+    }
+
+    /**
+     * Get all operators for the condition builder
+     */
+    public function getAllOperatorsProperty(): array
+    {
+        return ExtraFieldConditionEvaluator::getAllOperators();
     }
 
     public function render()
