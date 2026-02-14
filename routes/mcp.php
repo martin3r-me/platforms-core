@@ -1,5 +1,6 @@
 <?php
 
+use Platform\Core\Http\Controllers\DynamicClientRegistrationController;
 use Platform\Core\Mcp\Servers\DefaultMcpServer;
 use Laravel\Mcp\Facades\Mcp;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +23,10 @@ Mcp::web('sse', DefaultMcpServer::class)
 
 // OAuth-Routes für Claude Desktop (benötigt Laravel Passport)
 Mcp::oauthRoutes('oauth');
+
+// Dynamic Client Registration (RFC 7591) - für Claude.ai Web Connector
+Route::post('oauth/register', [DynamicClientRegistrationController::class, 'register'])
+    ->name('mcp.oauth.register');
 
 // Überschreibe Discovery Routes mit korrekten URLs (inkl. /mcp Prefix)
 Route::get('.well-known/oauth-authorization-server/{path?}', function () {

@@ -2,6 +2,8 @@
 
 namespace Platform\Core\Passport;
 
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Laravel\Passport\Bridge\ClientRepository as PassportClientRepository;
 use Laravel\Passport\ClientRepository as PassportClientModelRepository;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
@@ -22,6 +24,7 @@ class ClientRepository extends PassportClientRepository
         $record = app(PassportClientModelRepository::class)->findActive($clientIdentifier);
 
         if (! $record) {
+            Log::debug('OAuth: Client not found', ['client_id' => $clientIdentifier]);
             return null;
         }
 
@@ -31,17 +34,76 @@ class ClientRepository extends PassportClientRepository
     /**
      * Validate a client.
      *
-     * Override to handle empty grant_types column.
+     * Override to handle empty grant_types column and provide better error handling.
      */
     public function validateClient($clientIdentifier, $clientSecret, $grantType): bool
     {
         $record = app(PassportClientModelRepository::class)->findActive($clientIdentifier);
 
-        if (! $record || ! $this->handlesGrant($record, $grantType)) {
+        Log::debug('OAuth: Validating client', [
+            'client_id' => $clientIdentifier,
+            'grant_type' => $grantType,
+            'client_found' => $record !== null,
+            'is_confidential' => $record?->confidential(),
+            'has_secret_in_request' => !empty($clientSecret),
+        ]);
+
+        if (! $record) {
+            Log::warning('OAuth: Client not found during validation', ['client_id' => $clientIdentifier]);
             return false;
         }
 
-        return ! $record->confidential() || $this->verifySecret((string) $clientSecret, $record->secret);
+        if (! $this->handlesGrant($record, $grantType)) {
+            Log::warning('OAuth: Client does not handle grant type', [
+                'client_id' => $clientIdentifier,
+                'grant_type' => $grantType,
+            ]);
+            return false;
+        }
+
+        // Public clients (non-confidential) don't need secret verification
+        if (! $record->confidential()) {
+            Log::debug('OAuth: Public client validated successfully', ['client_id' => $clientIdentifier]);
+            return true;
+        }
+
+        // Confidential client - verify secret
+        return $this->verifyClientSecret((string) $clientSecret, $record->secret, $clientIdentifier);
+    }
+
+    /**
+     * Verify the client secret with proper error handling.
+     */
+    protected function verifyClientSecret(string $clientSecret, ?string $storedSecret, string $clientIdentifier): bool
+    {
+        // Empty stored secret for confidential client is invalid
+        if (empty($storedSecret)) {
+            Log::error('OAuth: Confidential client has no stored secret', ['client_id' => $clientIdentifier]);
+            return false;
+        }
+
+        // Empty request secret for confidential client is invalid
+        if (empty($clientSecret)) {
+            Log::warning('OAuth: No secret provided for confidential client', ['client_id' => $clientIdentifier]);
+            return false;
+        }
+
+        try {
+            $valid = Hash::check($clientSecret, $storedSecret);
+
+            Log::debug('OAuth: Secret verification result', [
+                'client_id' => $clientIdentifier,
+                'valid' => $valid,
+            ]);
+
+            return $valid;
+        } catch (\Exception $e) {
+            Log::error('OAuth: Secret verification failed with exception', [
+                'client_id' => $clientIdentifier,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
     }
 
     /**
