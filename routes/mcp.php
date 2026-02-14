@@ -141,55 +141,62 @@ Route::get('debug/tools', function () {
     ]);
 })->name('mcp.debug.tools');
 
-// Debug Endpoint - testet MCP Server Klasse direkt
+// Debug Endpoint - testet ToolContractAdapter direkt
 Route::get('debug/mcp-server', function () {
-    // Simuliere einen Transport für den Test
-    $transport = new class implements \Laravel\Mcp\Server\Contracts\Transport {
-        public function listen(): void {}
-        public function receive(): mixed { return null; }
-        public function send(mixed $message): void {}
-        public function close(): void {}
-    };
-
     try {
-        $server = new \Platform\Core\Mcp\Servers\DefaultMcpServer($transport);
-        $server->boot();
+        $registry = app(\Platform\Core\Tools\ToolRegistry::class);
 
-        // Versuche die Tools zu bekommen (Reflection da protected)
-        $reflection = new \ReflectionClass($server);
-
-        // Suche nach tools Property
-        $toolsProperty = null;
-        $current = $reflection;
-        while ($current) {
-            if ($current->hasProperty('tools')) {
-                $toolsProperty = $current->getProperty('tools');
-                break;
+        // Tools laden falls nötig
+        if (count($registry->all()) === 0) {
+            $coreTools = \Platform\Core\Tools\ToolLoader::loadCoreTools();
+            foreach ($coreTools as $tool) {
+                if (!$registry->has($tool->getName())) {
+                    $registry->register($tool);
+                }
             }
-            $current = $current->getParentClass();
         }
 
-        $tools = [];
-        if ($toolsProperty) {
-            $toolsProperty->setAccessible(true);
-            $tools = $toolsProperty->getValue($server);
+        // Teste ToolContractAdapter mit erstem Tool
+        $allTools = $registry->all();
+        $firstTool = reset($allTools);
+        $adapterTest = null;
+
+        if ($firstTool) {
+            try {
+                $adapter = new \Platform\Core\Mcp\Adapters\ToolContractAdapter($firstTool);
+                $adapterTest = [
+                    'name' => $adapter->name(),
+                    'description' => substr($adapter->description(), 0, 100),
+                    'adapter_class' => get_class($adapter),
+                    'parent_class' => get_parent_class($adapter),
+                ];
+            } catch (\Throwable $e) {
+                $adapterTest = ['error' => $e->getMessage()];
+            }
+        }
+
+        // Prüfe Laravel MCP Server Klasse
+        $serverClass = \Platform\Core\Mcp\Servers\DefaultMcpServer::class;
+        $serverReflection = new \ReflectionClass($serverClass);
+        $parentClasses = [];
+        $current = $serverReflection;
+        while ($parent = $current->getParentClass()) {
+            $parentClasses[] = $parent->getName();
+            $current = $parent;
         }
 
         return response()->json([
-            'server_class' => get_class($server),
-            'server_name' => $server->name ?? 'unknown',
-            'boot_called' => true,
-            'tools_count' => is_array($tools) ? count($tools) : 0,
-            'tools' => is_array($tools) ? array_map(fn($t) => [
-                'class' => get_class($t),
-                'name' => method_exists($t, 'name') ? $t->name() : 'unknown',
-            ], array_slice($tools, 0, 10)) : [],
-            'reflection_classes' => array_map(fn($c) => $c->getName(), class_parents($server) ?: []),
+            'registry_tools_count' => count($allTools),
+            'adapter_test' => $adapterTest,
+            'server_class' => $serverClass,
+            'server_parents' => $parentClasses,
+            'laravel_mcp_server_exists' => class_exists(\Laravel\Mcp\Server::class),
         ]);
     } catch (\Throwable $e) {
         return response()->json([
             'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
         ], 500);
     }
 })->name('mcp.debug.server');
