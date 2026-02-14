@@ -82,7 +82,7 @@
             </div>
             
             {{-- Persönliche Teams am Ende --}}
-            @if($personalTeams->count() > 0)
+            @if(count($personalTeams) > 0)
                 <div class="mt-4 pt-4 border-t border-[var(--ui-border)]/60">
                     <h3 class="text-[0.625rem] font-semibold text-[var(--ui-muted)] mb-2 px-2">Persönlich</h3>
                     <div class="space-y-1">
