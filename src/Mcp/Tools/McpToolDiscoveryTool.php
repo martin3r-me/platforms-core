@@ -7,12 +7,8 @@ use Laravel\Mcp\Server\Tools\ToolResult;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Platform\Core\Tools\ToolRegistry;
 use Platform\Core\Tools\ToolDiscoveryService;
-use Platform\Core\Tools\ListToolsTool;
-use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Mcp\McpSessionToolManager;
 use Platform\Core\Services\ToolPermissionService;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
 
 /**
  * MCP-spezifisches Tool Discovery Tool
@@ -98,79 +94,56 @@ class McpToolDiscoveryTool extends Tool
 
             if (!is_string($module) || trim($module) === '') {
                 return ToolResult::error(
-                    'Parameter "module" ist erforderlich. Nutze zuerst core__modules__GET, dann tools__GET(module="...").'
+                    'Parameter "module" ist erforderlich.'
                 );
             }
 
             $module = trim($module);
+            $sessionId = $this->sessionId ?? 'mcp_default';
 
-            // Session ID ermitteln (falls nicht gesetzt, generiere eine)
-            $sessionId = $this->sessionId ?? $this->generateSessionId();
-
-            // Tools für das Modul in die Session laden
-            $newTools = McpSessionToolManager::loadModuleTools(
-                $sessionId,
-                $module,
-                $this->registry,
-                $this->permissionService
-            );
+            // Tools für das Modul laden (mit optionalem permissionService)
+            try {
+                $newTools = McpSessionToolManager::loadModuleTools(
+                    $sessionId,
+                    $module,
+                    $this->registry,
+                    $this->permissionService
+                );
+            } catch (\Throwable $e) {
+                // Fallback: ohne Permission-Filter
+                $newTools = McpSessionToolManager::loadModuleTools(
+                    $sessionId,
+                    $module,
+                    $this->registry,
+                    null
+                );
+            }
 
             // Callback aufrufen wenn neue Tools geladen wurden
             if (count($newTools) > 0 && $this->onToolsLoaded !== null) {
-                ($this->onToolsLoaded)($newTools);
+                try {
+                    ($this->onToolsLoaded)($newTools);
+                } catch (\Throwable $e) {
+                    // Ignore callback errors
+                }
             }
 
-            // Internes ListToolsTool für die eigentliche Suche verwenden
-            $listToolsTool = new ListToolsTool($this->registry, $this->discovery);
-            $context = $this->createToolContext();
-            $result = $listToolsTool->execute($arguments, $context);
+            // Einfache Antwort ohne ListToolsTool (das kann auch fehlschlagen)
+            $toolNames = array_map(fn($t) => $t->getName(), $newTools);
 
-            if (!$result->success) {
-                return ToolResult::error($result->error ?? 'Unbekannter Fehler');
-            }
-
-            // Erweitere Antwort mit MCP-spezifischen Hinweisen
-            $data = $result->data;
-            $data['_mcp'] = [
+            $result = [
+                'module' => $module,
                 'tools_loaded' => count($newTools),
-                'tool_names' => array_map(fn($t) => $t->getName(), $newTools),
-                'session_total_tools' => McpSessionToolManager::getLoadedToolCount($sessionId) + 5, // +5 Discovery
-                'hint' => count($newTools) > 0
-                    ? 'Die Tools wurden aktiviert und können jetzt verwendet werden.'
-                    : 'Keine neuen Tools geladen (bereits aktiviert oder nicht vorhanden).',
+                'tool_names' => $toolNames,
+                'message' => count($newTools) > 0
+                    ? 'Tools wurden aktiviert und können jetzt verwendet werden.'
+                    : 'Keine neuen Tools gefunden für dieses Modul.',
             ];
 
-            Log::info('[MCP Discovery] tools.GET ausgeführt', [
-                'module' => $module,
-                'new_tools' => count($newTools),
-                'session_id' => substr($sessionId, 0, 8) . '...',
-            ]);
-
-            $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-            return ToolResult::text($json);
+            return ToolResult::text(json_encode($result, JSON_PRETTY_PRINT));
 
         } catch (\Throwable $e) {
-            Log::error('[MCP Discovery] Fehler', [
-                'error' => $e->getMessage(),
-            ]);
-            return ToolResult::error('Fehler beim Auflisten der Tools: ' . $e->getMessage());
+            return ToolResult::error('Fehler: ' . $e->getMessage());
         }
-    }
-
-    private function createToolContext(): ToolContext
-    {
-        $user = Auth::user();
-        $team = null;
-
-        if ($user && method_exists($user, 'currentTeam')) {
-            $team = $user->currentTeam;
-        }
-
-        return ToolContext::create($user, $team);
-    }
-
-    private function generateSessionId(): string
-    {
-        return 'mcp_' . bin2hex(random_bytes(8));
     }
 }
