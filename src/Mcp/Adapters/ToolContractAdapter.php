@@ -25,11 +25,13 @@ class ToolContractAdapter extends Tool
     }
 
     /**
-     * Gibt den Namen des Tools zurück
+     * Gibt den Namen des Tools zurück (MCP-konform mit Underscores statt Punkte)
      */
     public function name(): string
     {
-        return $this->tool->getName();
+        // MCP erfordert Pattern: ^[a-zA-Z0-9_-]{1,64}$
+        // Ersetze Punkte durch doppelte Underscores
+        return str_replace('.', '__', $this->tool->getName());
     }
 
     /**

@@ -57,7 +57,16 @@ class ToolDiscoveryToolContract implements ToolContract
 
     public function getName(): string
     {
+        // MCP-konform mit Underscores (wird in Adapter nochmal konvertiert)
         return 'tools.GET';
+    }
+
+    /**
+     * MCP-konformer Name für direkten Zugriff
+     */
+    public function getMcpName(): string
+    {
+        return 'tools__GET';
     }
 
     public function getDescription(): string
