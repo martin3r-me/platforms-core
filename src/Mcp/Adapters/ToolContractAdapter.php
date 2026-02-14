@@ -6,7 +6,7 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Laravel\Mcp\Server\Tool;
-use Laravel\Mcp\Server\Tools\ToolResult as McpToolResult;
+use Laravel\Mcp\Response;
 use Laravel\Mcp\Request;
 use Laravel\Passport\TokenRepository;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -85,7 +85,7 @@ class ToolContractAdapter extends Tool
     /**
      * Führt das Tool aus und konvertiert das Ergebnis
      */
-    public function handle(Request $request): McpToolResult
+    public function handle(Request $request): Response
     {
         try {
             // Arguments aus MCP Request extrahieren
@@ -100,12 +100,12 @@ class ToolContractAdapter extends Tool
             // Tool ausführen
             $result = $this->tool->execute($arguments, $context);
 
-            // ToolResult zu MCP ToolResult konvertieren
+            // ToolResult zu MCP Response konvertieren
             return $this->convertToolResult($result);
         } catch (\RuntimeException $e) {
-            return McpToolResult::error($e->getMessage());
+            return Response::error($e->getMessage());
         } catch (\Throwable $e) {
-            return McpToolResult::error('Tool execution failed: ' . $e->getMessage());
+            return Response::error('Tool execution failed: ' . $e->getMessage());
         }
     }
 
@@ -229,30 +229,30 @@ class ToolContractAdapter extends Tool
     }
 
     /**
-     * Konvertiert ToolResult zu MCP ToolResult
+     * Konvertiert ToolResult zu MCP Response
      */
-    private function convertToolResult(ToolResult $result): McpToolResult
+    private function convertToolResult(ToolResult $result): Response
     {
         if (!$result->success) {
             $errorMessage = $result->error ?? 'Unknown error';
             if ($result->errorCode) {
                 $errorMessage = "[{$result->errorCode}] {$errorMessage}";
             }
-            return McpToolResult::error($errorMessage);
+            return Response::error($errorMessage);
         }
 
         $data = $result->data;
 
         if (is_array($data) || is_object($data)) {
             $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            return McpToolResult::text($json);
+            return Response::text($json);
         }
 
         if (is_string($data)) {
-            return McpToolResult::text($data);
+            return Response::text($data);
         }
 
-        return McpToolResult::text((string) $data);
+        return Response::text((string) $data);
     }
 
     /**
