@@ -11,7 +11,6 @@
         </div>
         <div class="flex gap-1 mt-4 border-b border-gray-200">
             <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : tab === 'team', 'text-gray-500 hover:text-gray-700' : tab !== 'team' }" @click="tab = 'team'">Team</button>
-            <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : tab === 'create', 'text-gray-500 hover:text-gray-700' : tab !== 'create' }" @click="tab = 'create'">Team erstellen</button>
         </div>
     </x-slot>
 
@@ -180,111 +179,6 @@
                 </div>
             </div>
             @endif
-        </div>
-    </div>
-
-    {{-- Create Team Tab --}}
-    <div class="mt-6" x-show="tab === 'create'" x-cloak>
-        <div class="space-y-6">
-            <div>
-                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Neues Team erstellen</h3>
-                <form wire:submit.prevent="createTeam" class="space-y-4">
-                    <x-ui-input-text
-                        name="newTeamName"
-                        label="Team-Name"
-                        wire:model="newTeamName"
-                        placeholder="z.B. Marketing-Team"
-                        required
-                        :errorKey="'newTeamName'"
-                    />
-
-                    @if(!empty($availableParentTeams) && count($availableParentTeams) > 0)
-                        <div>
-                            <x-ui-input-select
-                                name="newParentTeamId"
-                                label="Parent-Team (optional)"
-                                :options="$availableParentTeams"
-                                :nullable="true"
-                                wire:model="newParentTeamId"
-                            />
-                            <p class="text-xs text-[var(--ui-muted)] mt-2">
-                                Optional: Wähle ein Root-Team als Parent. Kind-Teams erben Zugriff auf root-scoped Module.
-                            </p>
-                        </div>
-                    @endif
-
-                    {{-- Initial Members --}}
-                    @if(!empty($availableUsersForTeam) && count($availableUsersForTeam) > 0)
-                        <div x-data="{ showMembers: false }">
-                            <button type="button" @click="showMembers = !showMembers" class="flex items-center gap-2 text-sm text-[var(--ui-primary)] hover:underline">
-                                @svg('heroicon-o-user-plus', 'w-4 h-4')
-                                <span x-text="showMembers ? 'Mitglieder ausblenden' : 'Mitglieder hinzufügen'"></span>
-                            </button>
-                            <div x-show="showMembers" x-collapse class="mt-4 space-y-3">
-                                <p class="text-sm text-[var(--ui-muted)]">Wähle Mitglieder, die dem neuen Team direkt hinzugefügt werden sollen:</p>
-                                <div class="max-h-48 overflow-y-auto space-y-2 p-3 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                    @foreach($availableUsersForTeam as $availableUser)
-                                        @php
-                                            $isSelected = collect($newInitialMembers)->contains('user_id', $availableUser->id);
-                                            $selectedIndex = false;
-                                            foreach ($newInitialMembers as $idx => $m) {
-                                                if (($m['user_id'] ?? null) == $availableUser->id) {
-                                                    $selectedIndex = $idx;
-                                                    break;
-                                                }
-                                            }
-                                        @endphp
-                                        <div class="flex items-center justify-between p-2 rounded {{ $isSelected ? 'bg-blue-50 border border-blue-200' : '' }}">
-                                            <label class="flex items-center gap-3 cursor-pointer flex-1">
-                                                <input
-                                                    type="checkbox"
-                                                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                    {{ $isSelected ? 'checked' : '' }}
-                                                    wire:click="toggleInitialMember({{ $availableUser->id }})"
-                                                />
-                                                <div class="flex items-center gap-2">
-                                                    @if(!empty($availableUser->avatar))
-                                                        <img src="{{ $availableUser->avatar }}" alt="{{ $availableUser->fullname ?? $availableUser->name }}" class="w-8 h-8 rounded-full object-cover" />
-                                                    @else
-                                                        <div class="w-8 h-8 bg-[var(--ui-primary)] text-[var(--ui-on-primary)] rounded-full flex items-center justify-center text-xs font-semibold">
-                                                            {{ strtoupper(mb_substr(($availableUser->fullname ?? $availableUser->name), 0, 2)) }}
-                                                        </div>
-                                                    @endif
-                                                    <div>
-                                                        <div class="font-medium text-sm text-[var(--ui-secondary)]">{{ $availableUser->fullname ?? $availableUser->name }}</div>
-                                                        @if($availableUser->isAiUser())
-                                                            <span class="text-xs text-purple-600">AI-User</span>
-                                                        @elseif($availableUser->email)
-                                                            <span class="text-xs text-[var(--ui-muted)]">{{ $availableUser->email }}</span>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            </label>
-                                            @if($isSelected && $selectedIndex !== false)
-                                                <select
-                                                    wire:model="newInitialMembers.{{ $selectedIndex }}.role"
-                                                    class="text-xs px-2 py-1 border border-gray-200 rounded bg-white"
-                                                >
-                                                    <option value="admin">Admin</option>
-                                                    <option value="member">Member</option>
-                                                    <option value="viewer">Viewer</option>
-                                                </select>
-                                            @endif
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </div>
-                    @endif
-
-                    <x-ui-button type="submit" variant="primary">
-                        <div class="flex items-center gap-2">
-                            @svg('heroicon-o-plus', 'w-4 h-4')
-                            Team erstellen
-                        </div>
-                    </x-ui-button>
-                </form>
-            </div>
         </div>
     </div>
 
