@@ -106,3 +106,37 @@ Route::get('cursor-config.json', function () {
         ],
     ], 200, [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 })->name('mcp.cursor-config');
+
+// Debug Endpoint - zeigt alle verfügbaren MCP Tools
+Route::get('debug/tools', function () {
+    $registry = app(\Platform\Core\Tools\ToolRegistry::class);
+
+    // Tools laden falls nötig
+    if (count($registry->all()) === 0) {
+        $coreTools = \Platform\Core\Tools\ToolLoader::loadCoreTools();
+        foreach ($coreTools as $tool) {
+            if (!$registry->has($tool->getName())) {
+                $registry->register($tool);
+            }
+        }
+
+        // Module-Tools laden
+        $modulesPath = realpath(__DIR__ . '/../../../modules');
+        if ($modulesPath && is_dir($modulesPath)) {
+            $moduleTools = \Platform\Core\Tools\ToolLoader::loadFromAllModules($modulesPath);
+            foreach ($moduleTools as $tool) {
+                if (!$registry->has($tool->getName())) {
+                    $registry->register($tool);
+                }
+            }
+        }
+    }
+
+    return response()->json([
+        'tool_count' => count($registry->all()),
+        'tools' => collect($registry->all())->map(fn($t) => [
+            'name' => $t->getName(),
+            'description' => substr($t->getDescription(), 0, 100),
+        ])->values(),
+    ]);
+})->name('mcp.debug.tools');

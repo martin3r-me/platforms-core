@@ -95,10 +95,18 @@ class PlatformMcpServer extends Server
             // Alle Tools aus Registry holen und wrappen
             $toolContractTools = $registry->all();
 
+            // Logging für Tool-Discovery Debugging
+            Log::info('[MCP] Server boot - Tools geladen', [
+                'tool_count' => count($toolContractTools),
+                'tools' => collect($toolContractTools)->map(fn($t) => $t->getName())->toArray(),
+            ]);
+
+            $addedCount = 0;
             foreach ($toolContractTools as $toolContract) {
                 try {
                     $adapter = new ToolContractAdapter($toolContract);
                     $this->addTool($adapter);
+                    $addedCount++;
                 } catch (\Throwable $e) {
                     Log::warning("[PlatformMcpServer] Tool-Wrapping fehlgeschlagen", [
                         'tool' => $toolContract->getName(),
@@ -106,6 +114,11 @@ class PlatformMcpServer extends Server
                     ]);
                 }
             }
+
+            Log::info('[MCP] Server boot - Tools zum MCP Server hinzugefügt', [
+                'added_count' => $addedCount,
+                'failed_count' => count($toolContractTools) - $addedCount,
+            ]);
         } catch (\Throwable $e) {
             Log::error("[PlatformMcpServer] ToolRegistry konnte nicht geladen werden", [
                 'error' => $e->getMessage(),
