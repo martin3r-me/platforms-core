@@ -9,6 +9,7 @@ use Platform\Core\Traits\HasApiTokens;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Platform\Core\Models\Module;
 use Platform\Core\Models\CoreAiModel;
+use Platform\Core\Models\PassportClient;
 
 class User extends Authenticatable
 {
@@ -305,5 +306,14 @@ class User extends Authenticatable
     public function whatsappAccounts()
     {
         return $this->hasMany(\Platform\Integrations\Models\IntegrationsWhatsAppAccount::class, 'user_id');
+    }
+
+    /**
+     * OAuth Apps/Clients dieses Users (für Passport)
+     * Wird von Passport's ClientRepository verwendet, wenn Clients mit Owner erstellt werden.
+     */
+    public function oauthApps()
+    {
+        return $this->morphMany(PassportClient::class, 'owner');
     }
 }
