@@ -147,6 +147,26 @@ class ModalTeam extends Component
         $this->availableUsersForTeam = $availableUsers->sortBy('name')->values()->all();
     }
 
+    /**
+     * Toggelt einen User in der Liste der initialen Mitglieder beim Team-Erstellen.
+     */
+    public function toggleInitialMember(int $userId): void
+    {
+        $existingIndex = collect($this->newInitialMembers)->search(fn($m) => ($m['user_id'] ?? null) == $userId);
+
+        if ($existingIndex !== false) {
+            // User entfernen
+            unset($this->newInitialMembers[$existingIndex]);
+            $this->newInitialMembers = array_values($this->newInitialMembers);
+        } else {
+            // User hinzufügen mit Default-Rolle "member"
+            $this->newInitialMembers[] = [
+                'user_id' => $userId,
+                'role' => 'member',
+            ];
+        }
+    }
+
     protected function loadCanAddUsers(): void
     {
         $team = $this->team ?? auth()->user()?->currentTeamRelation;
