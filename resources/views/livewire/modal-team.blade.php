@@ -226,7 +226,13 @@
                                     @foreach($availableUsersForTeam as $availableUser)
                                         @php
                                             $isSelected = collect($newInitialMembers)->contains('user_id', $availableUser->id);
-                                            $selectedIndex = collect($newInitialMembers)->search(fn($m) => $m['user_id'] == $availableUser->id);
+                                            $selectedIndex = false;
+                                            foreach ($newInitialMembers as $idx => $m) {
+                                                if (($m['user_id'] ?? null) == $availableUser->id) {
+                                                    $selectedIndex = $idx;
+                                                    break;
+                                                }
+                                            }
                                         @endphp
                                         <div class="flex items-center justify-between p-2 rounded {{ $isSelected ? 'bg-blue-50 border border-blue-200' : '' }}">
                                             <label class="flex items-center gap-3 cursor-pointer flex-1">
