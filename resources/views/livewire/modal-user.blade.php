@@ -27,6 +27,14 @@
             >
                 API-Tokens
             </button>
+            <button
+                type="button"
+                wire:click="setTab('mcp')"
+                class="px-4 py-2 text-sm font-medium transition-colors border-b-2"
+                :class="$wire.activeTab === 'mcp' ? 'text-[var(--ui-primary)] border-[var(--ui-primary)]' : 'text-[var(--ui-muted)] border-transparent hover:text-[var(--ui-secondary)]'"
+            >
+                MCP Clients
+            </button>
         </nav>
     </div>
 
@@ -218,6 +226,221 @@
                         <div class="p-8 text-center text-[var(--ui-muted)] bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
                             <div class="mb-2">@svg('heroicon-o-key', 'w-8 h-8 mx-auto opacity-50')</div>
                             <p>Noch keine API-Tokens erstellt.</p>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+
+        {{-- Tab: MCP Clients --}}
+        <div x-show="$wire.activeTab === 'mcp'" x-transition>
+            <div class="space-y-6">
+                {{-- Info-Box --}}
+                <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div class="flex items-start gap-3">
+                        @svg('heroicon-o-information-circle', 'w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5')
+                        <div class="text-sm text-blue-700">
+                            <p class="font-medium mb-1">MCP Clients für Claude Code, Cursor & Co.</p>
+                            <p>Mit MCP Clients kannst du KI-Assistenten wie Claude Code oder Cursor mit diesem System verbinden. Der Client nutzt OAuth 2.0 zur sicheren Authentifizierung.</p>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Client erstellen --}}
+                <div class="p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
+                    <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Neuen MCP Client erstellen</h3>
+
+                    @if($showNewMcpClient && $newMcpClientCreated)
+                        {{-- Neuer Client wurde erstellt - Anzeige --}}
+                        <div class="space-y-4">
+                            <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
+                                <div class="flex items-center gap-2 text-green-700 mb-2">
+                                    @svg('heroicon-o-check-circle', 'w-5 h-5')
+                                    <span class="font-medium">MCP Client erfolgreich erstellt!</span>
+                                </div>
+                                <p class="text-sm text-green-600 mb-4">
+                                    @if($newMcpClientSecret)
+                                        Kopiere die Daten jetzt. Das Secret wird nur einmal angezeigt!
+                                    @else
+                                        Kopiere die Client ID. Dieser ist ein Public Client (kein Secret).
+                                    @endif
+                                </p>
+
+                                <div class="space-y-3">
+                                    {{-- Client ID --}}
+                                    <div>
+                                        <label class="block text-xs font-medium text-green-700 mb-1">Client ID</label>
+                                        <div class="relative">
+                                            <input
+                                                type="text"
+                                                readonly
+                                                value="{{ $newMcpClientCreated }}"
+                                                class="w-full p-2 pr-10 text-sm font-mono bg-white border border-green-300 rounded-lg"
+                                            />
+                                            <button
+                                                type="button"
+                                                x-data="{ copied: false }"
+                                                @click="
+                                                    navigator.clipboard.writeText('{{ $newMcpClientCreated }}');
+                                                    copied = true;
+                                                    setTimeout(() => copied = false, 2000);
+                                                "
+                                                class="absolute top-1/2 -translate-y-1/2 right-2 p-1 text-green-600 hover:text-green-800 hover:bg-green-100 rounded transition-colors"
+                                            >
+                                                <template x-if="!copied">
+                                                    @svg('heroicon-o-clipboard', 'w-4 h-4')
+                                                </template>
+                                                <template x-if="copied">
+                                                    @svg('heroicon-o-clipboard-document-check', 'w-4 h-4')
+                                                </template>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {{-- Client Secret (nur bei confidential clients) --}}
+                                    @if($newMcpClientSecret)
+                                        <div>
+                                            <label class="block text-xs font-medium text-green-700 mb-1">Client Secret</label>
+                                            <div class="relative">
+                                                <input
+                                                    type="text"
+                                                    readonly
+                                                    value="{{ $newMcpClientSecret }}"
+                                                    class="w-full p-2 pr-10 text-sm font-mono bg-white border border-green-300 rounded-lg"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    x-data="{ copied: false }"
+                                                    @click="
+                                                        navigator.clipboard.writeText('{{ $newMcpClientSecret }}');
+                                                        copied = true;
+                                                        setTimeout(() => copied = false, 2000);
+                                                    "
+                                                    class="absolute top-1/2 -translate-y-1/2 right-2 p-1 text-green-600 hover:text-green-800 hover:bg-green-100 rounded transition-colors"
+                                                >
+                                                    <template x-if="!copied">
+                                                        @svg('heroicon-o-clipboard', 'w-4 h-4')
+                                                    </template>
+                                                    <template x-if="copied">
+                                                        @svg('heroicon-o-clipboard-document-check', 'w-4 h-4')
+                                                    </template>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    {{-- MCP URL --}}
+                                    <div>
+                                        <label class="block text-xs font-medium text-green-700 mb-1">MCP Server URL</label>
+                                        <div class="relative">
+                                            <input
+                                                type="text"
+                                                readonly
+                                                value="{{ config('app.url') }}/mcp/sse"
+                                                class="w-full p-2 pr-10 text-sm font-mono bg-white border border-green-300 rounded-lg"
+                                            />
+                                            <button
+                                                type="button"
+                                                x-data="{ copied: false }"
+                                                @click="
+                                                    navigator.clipboard.writeText('{{ config('app.url') }}/mcp/sse');
+                                                    copied = true;
+                                                    setTimeout(() => copied = false, 2000);
+                                                "
+                                                class="absolute top-1/2 -translate-y-1/2 right-2 p-1 text-green-600 hover:text-green-800 hover:bg-green-100 rounded transition-colors"
+                                            >
+                                                <template x-if="!copied">
+                                                    @svg('heroicon-o-clipboard', 'w-4 h-4')
+                                                </template>
+                                                <template x-if="copied">
+                                                    @svg('heroicon-o-clipboard-document-check', 'w-4 h-4')
+                                                </template>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <x-ui-button variant="secondary-outline" wire:click="closeNewMcpClientDisplay">
+                                Fertig
+                            </x-ui-button>
+                        </div>
+                    @else
+                        {{-- Formular zum Client erstellen --}}
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <x-ui-input-text
+                                    name="newMcpClientName"
+                                    label="Client-Name"
+                                    wire:model="newMcpClientName"
+                                    placeholder="z.B. Claude Code"
+                                    :errorKey="'newMcpClientName'"
+                                />
+                                <x-ui-input-text
+                                    name="newMcpClientRedirect"
+                                    label="Redirect URI"
+                                    wire:model="newMcpClientRedirect"
+                                    placeholder="http://127.0.0.1"
+                                    :errorKey="'newMcpClientRedirect'"
+                                />
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    id="newMcpClientPublic"
+                                    wire:model="newMcpClientPublic"
+                                    class="w-4 h-4 text-[var(--ui-primary)] border-[var(--ui-border)] rounded focus:ring-[var(--ui-primary)]"
+                                />
+                                <label for="newMcpClientPublic" class="text-sm text-[var(--ui-secondary)]">
+                                    Public Client (kein Secret, für PKCE)
+                                </label>
+                            </div>
+                            <x-ui-button variant="primary" wire:click="createMcpClient">
+                                <div class="flex items-center gap-2">
+                                    @svg('heroicon-o-plus', 'w-4 h-4')
+                                    Client erstellen
+                                </div>
+                            </x-ui-button>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Client-Liste --}}
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Aktive MCP Clients</h3>
+                        <span class="px-3 py-1 text-xs font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] rounded-full">
+                            {{ $this->mcpClients->count() }} Clients
+                        </span>
+                    </div>
+
+                    @if($this->mcpClients->count() > 0)
+                        <div class="space-y-2">
+                            @foreach($this->mcpClients as $client)
+                                <div class="p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div class="min-w-0 flex-1">
+                                            <div class="font-medium text-[var(--ui-secondary)]">{{ $client->name }}</div>
+                                            <div class="mt-1 text-xs text-[var(--ui-muted)] space-y-0.5">
+                                                <div class="font-mono">ID: {{ $client->id }}</div>
+                                                <div>Typ: {{ $client->confidential() ? 'Confidential' : 'Public (PKCE)' }}</div>
+                                                <div>Erstellt: {{ $client->created_at?->format('d.m.Y H:i') ?? '-' }}</div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            wire:click="revokeMcpClient('{{ $client->id }}')"
+                                            wire:confirm="MCP Client wirklich widerrufen? Alle verbundenen Sessions werden beendet."
+                                            class="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                                        >
+                                            Widerrufen
+                                        </button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="p-8 text-center text-[var(--ui-muted)] bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
+                            <div class="mb-2">@svg('heroicon-o-link', 'w-8 h-8 mx-auto opacity-50')</div>
+                            <p>Noch keine MCP Clients erstellt.</p>
                         </div>
                     @endif
                 </div>

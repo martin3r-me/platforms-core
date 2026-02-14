@@ -22,6 +22,14 @@ class ModalUser extends Component
     public $newTokenCreated = null;
     public $showNewToken = false;
 
+    // MCP Client Management Properties
+    public $newMcpClientName = '';
+    public $newMcpClientRedirect = 'http://127.0.0.1';
+    public $newMcpClientPublic = false;
+    public $newMcpClientCreated = null;
+    public $newMcpClientSecret = null;
+    public $showNewMcpClient = false;
+
     protected $listeners = ['open-modal-user' => 'openModal'];
 
     public function mount()
@@ -34,6 +42,7 @@ class ModalUser extends Component
         $this->modalShow = true;
         $this->activeTab = 'profile';
         $this->resetTokenForm();
+        $this->resetMcpClientForm();
     }
 
     public function setTab($tab)
@@ -41,6 +50,9 @@ class ModalUser extends Component
         $this->activeTab = $tab;
         if ($tab !== 'tokens') {
             $this->resetTokenForm();
+        }
+        if ($tab !== 'mcp') {
+            $this->resetMcpClientForm();
         }
     }
 
@@ -154,6 +166,116 @@ class ModalUser extends Component
         $this->newTokenExpiry = 'never';
         $this->newTokenCreated = null;
         $this->showNewToken = false;
+    }
+
+    // ========================================
+    // MCP Client Management
+    // ========================================
+
+    /**
+     * Computed Property: MCP Clients des Users
+     */
+    public function getMcpClientsProperty()
+    {
+        return \Platform\Core\Models\PassportClient::query()
+            ->where('owner_id', Auth::id())
+            ->where('owner_type', get_class(Auth::user()))
+            ->where('revoked', false)
+            ->whereJsonContains('grant_types', 'authorization_code')
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    /**
+     * Erstellt einen neuen MCP Client
+     */
+    public function createMcpClient()
+    {
+        $this->validate([
+            'newMcpClientName' => 'required|string|min:3|max:255',
+            'newMcpClientRedirect' => 'required|url',
+        ]);
+
+        try {
+            $clientRepository = app(\Laravel\Passport\ClientRepository::class);
+
+            $client = $clientRepository->createAuthorizationCodeGrantClient(
+                name: $this->newMcpClientName,
+                redirectUris: [$this->newMcpClientRedirect],
+                confidential: !$this->newMcpClientPublic,
+                user: Auth::user(),
+            );
+
+            $this->newMcpClientCreated = $client->id;
+            $this->newMcpClientSecret = $client->plainSecret;
+            $this->showNewMcpClient = true;
+
+            $this->dispatch('notice', [
+                'type' => 'success',
+                'message' => 'MCP Client erfolgreich erstellt!'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Fehler beim Erstellen des MCP Clients', [
+                'userId' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'MCP Client konnte nicht erstellt werden.',
+            ]);
+        }
+    }
+
+    /**
+     * Widerruft einen MCP Client
+     */
+    public function revokeMcpClient($clientId)
+    {
+        $client = \Platform\Core\Models\PassportClient::query()
+            ->where('id', $clientId)
+            ->where('owner_id', Auth::id())
+            ->where('owner_type', get_class(Auth::user()))
+            ->first();
+
+        if ($client) {
+            $client->revoked = true;
+            $client->save();
+
+            // Tokens des Clients widerrufen
+            $client->tokens()->update(['revoked' => true]);
+
+            $this->dispatch('notice', [
+                'type' => 'success',
+                'message' => 'MCP Client erfolgreich widerrufen.'
+            ]);
+        } else {
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'MCP Client konnte nicht gefunden werden.'
+            ]);
+        }
+    }
+
+    /**
+     * Schließt die MCP Client-Anzeige
+     */
+    public function closeNewMcpClientDisplay()
+    {
+        $this->resetMcpClientForm();
+    }
+
+    /**
+     * Setzt das MCP Client-Formular zurück
+     */
+    protected function resetMcpClientForm()
+    {
+        $this->newMcpClientName = '';
+        $this->newMcpClientRedirect = 'http://127.0.0.1';
+        $this->newMcpClientPublic = false;
+        $this->newMcpClientCreated = null;
+        $this->newMcpClientSecret = null;
+        $this->showNewMcpClient = false;
     }
 
     // ========================================
