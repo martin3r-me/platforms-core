@@ -8,6 +8,7 @@ use Platform\Core\Tools\ToolRegistry;
 use Platform\Core\Services\ToolPermissionService;
 use Platform\Core\Mcp\McpSessionToolManager;
 use Platform\Core\Mcp\Tools\ToolDiscoveryToolContract;
+use Platform\Core\Mcp\Tools\ExecuteToolContract;
 use Platform\Core\Mcp\Adapters\ToolContractAdapter;
 use Illuminate\Support\Facades\Log;
 
@@ -161,6 +162,17 @@ MARKDOWN;
                         ]);
                     }
                 }
+            }
+
+            // Execute-Tool hinzufügen (ermöglicht Ausführung beliebiger Tools)
+            try {
+                $executeTool = new ExecuteToolContract();
+                $adapter = new ToolContractAdapter($executeTool);
+                $this->tools[] = $adapter;
+            } catch (\Throwable $e) {
+                Log::warning("[DiscoveryMcpServer] Execute-Tool konnte nicht hinzugefügt werden", [
+                    'error' => $e->getMessage(),
+                ]);
             }
 
             // 2. Session-Tools laden (falls bereits Tools in der Session sind)
