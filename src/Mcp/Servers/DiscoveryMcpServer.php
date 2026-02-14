@@ -9,7 +9,6 @@ use Platform\Core\Services\ToolPermissionService;
 use Platform\Core\Mcp\McpSessionToolManager;
 use Platform\Core\Mcp\Tools\ToolDiscoveryToolContract;
 use Platform\Core\Mcp\Adapters\ToolContractAdapter;
-use Platform\Core\Mcp\Adapters\ToolDiscoveryAdapter;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -133,21 +132,22 @@ MARKDOWN;
             $discoveryTools = McpSessionToolManager::getDiscoveryTools($registry);
             $discoveryToolNames = McpSessionToolManager::getDiscoveryToolNames();
 
+            // Configure ToolDiscoveryToolContract with static settings
+            ToolDiscoveryToolContract::configure(
+                $this->sessionId,
+                $registry,
+                $permissionService,
+                function(array $newTools) {
+                    $this->addToolsToSession($newTools);
+                }
+            );
+
             foreach ($discoveryTools as $tool) {
-                // tools.GET bekommt Sonderbehandlung mit ToolDiscoveryAdapter
+                // Alle Tools via ToolContractAdapter wrappen (inkl. tools.GET)
                 if ($tool->getName() === 'tools.GET') {
-                    $discoveryTool = new ToolDiscoveryToolContract(
-                        $registry,
-                        $permissionService
-                    );
-                    $discoveryTool->setSessionId($this->sessionId);
-
-                    // Callback für dynamisches Tool-Loading
-                    $discoveryTool->onToolsLoaded(function(array $newTools) {
-                        $this->addToolsToSession($newTools);
-                    });
-
-                    $adapter = new ToolDiscoveryAdapter($discoveryTool);
+                    // Create instance and wrap with adapter
+                    $discoveryTool = new ToolDiscoveryToolContract();
+                    $adapter = new ToolContractAdapter($discoveryTool);
                     $this->tools[] = $adapter;
                 } else {
                     // Normale Discovery-Tools via Adapter

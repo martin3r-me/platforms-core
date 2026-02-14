@@ -16,25 +16,43 @@ use Platform\Core\Services\ToolPermissionService;
  */
 class ToolDiscoveryToolContract implements ToolContract
 {
-    private ?string $sessionId = null;
-    private $onToolsLoaded = null;
+    /**
+     * Static storage for session-specific callbacks
+     * @var array<string, callable>
+     */
+    private static array $callbacks = [];
 
-    public function __construct(
-        private ToolRegistry $registry,
-        private ?ToolPermissionService $permissionService = null
-    ) {
-    }
+    /**
+     * Static session ID (set before tool execution)
+     */
+    private static ?string $currentSessionId = null;
 
-    public function setSessionId(string $sessionId): self
-    {
-        $this->sessionId = $sessionId;
-        return $this;
-    }
+    /**
+     * Static registry reference
+     */
+    private static ?ToolRegistry $staticRegistry = null;
 
-    public function onToolsLoaded(callable $callback): self
-    {
-        $this->onToolsLoaded = $callback;
-        return $this;
+    /**
+     * Static permission service reference
+     */
+    private static ?ToolPermissionService $staticPermissionService = null;
+
+    /**
+     * Configure the tool (call before registering)
+     */
+    public static function configure(
+        string $sessionId,
+        ToolRegistry $registry,
+        ?ToolPermissionService $permissionService = null,
+        ?callable $onToolsLoaded = null
+    ): void {
+        self::$currentSessionId = $sessionId;
+        self::$staticRegistry = $registry;
+        self::$staticPermissionService = $permissionService;
+
+        if ($onToolsLoaded) {
+            self::$callbacks[$sessionId] = $onToolsLoaded;
+        }
     }
 
     public function getName(): string
@@ -76,30 +94,34 @@ class ToolDiscoveryToolContract implements ToolContract
             }
 
             $module = trim($module);
-            $sessionId = $this->sessionId ?? 'mcp_default';
+
+            // Use static configuration or resolve from container
+            $sessionId = self::$currentSessionId ?? 'mcp_default';
+            $registry = self::$staticRegistry ?? app(ToolRegistry::class);
+            $permissionService = self::$staticPermissionService;
 
             // Tools für das Modul laden (mit optionalem permissionService)
             try {
                 $newTools = McpSessionToolManager::loadModuleTools(
                     $sessionId,
                     $module,
-                    $this->registry,
-                    $this->permissionService
+                    $registry,
+                    $permissionService
                 );
             } catch (\Throwable $e) {
                 // Fallback: ohne Permission-Filter
                 $newTools = McpSessionToolManager::loadModuleTools(
                     $sessionId,
                     $module,
-                    $this->registry,
+                    $registry,
                     null
                 );
             }
 
             // Callback aufrufen wenn neue Tools geladen wurden
-            if (count($newTools) > 0 && $this->onToolsLoaded !== null) {
+            if (count($newTools) > 0 && isset(self::$callbacks[$sessionId])) {
                 try {
-                    ($this->onToolsLoaded)($newTools);
+                    (self::$callbacks[$sessionId])($newTools);
                 } catch (\Throwable $e) {
                     // Ignore callback errors
                 }
