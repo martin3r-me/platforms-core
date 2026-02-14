@@ -7,13 +7,17 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Registry\ModuleRegistry;
 use Platform\Core\Models\Module;
+use Platform\Core\Models\Team;
 
 /**
  * Tool zum Abrufen des aktuellen Kontexts
- * 
+ *
  * MCP-Pattern: Das Sprachmodell kann diesen Tool auf Bedarf nutzen,
  * um den aktuellen Kontext (User, Team, Modul, Route) zu erfahren.
  * Statt alles immer mitzuschicken, fragt das Modell bei Bedarf nach.
+ *
+ * Unterstützt optionalen team_id Parameter für cross-team Abfragen.
+ * Der User darf nur Teams abfragen, in denen er Mitglied ist.
  */
 class GetContextTool implements ToolContract
 {
@@ -32,6 +36,10 @@ class GetContextTool implements ToolContract
         return [
             'type' => 'object',
             'properties' => [
+                'team_id' => [
+                    'type' => 'integer',
+                    'description' => 'Optional: ID eines Teams, dessen Kontext (Module, Members) abgerufen werden soll. Der User muss Mitglied dieses Teams sein. Wenn nicht angegeben, wird das aktuelle Team verwendet. Nutze "core.teams.GET" um verfügbare Team-IDs zu sehen.'
+                ],
                 'include_metadata' => [
                     'type' => 'boolean',
                     'description' => 'Optional: Soll auch erweiterte Metadaten (Zeit, Zeitzone, etc.) enthalten sein? Standard: true'
@@ -39,6 +47,10 @@ class GetContextTool implements ToolContract
                 'include_modules' => [
                     'type' => 'boolean',
                     'description' => 'Optional: Soll eine kompakte Modul-Übersicht (allowed_modules/denied_modules) enthalten sein? Standard: true'
+                ],
+                'include_members' => [
+                    'type' => 'boolean',
+                    'description' => 'Optional: Soll eine Liste der Team-Mitglieder enthalten sein? Standard: false'
                 ],
             ],
             'required' => []
@@ -50,40 +62,70 @@ class GetContextTool implements ToolContract
         try {
             $includeMetadata = $arguments['include_metadata'] ?? true;
             $includeModules = $arguments['include_modules'] ?? true;
+            $includeMembers = $arguments['include_members'] ?? false;
+            $requestedTeamId = $arguments['team_id'] ?? null;
+
+            $user = $context->user;
+
+            // Team bestimmen: aus Argumenten oder Context
+            $targetTeam = null;
+            $isCurrentTeam = true;
+
+            if ($requestedTeamId !== null) {
+                // Cross-team Abfrage: Prüfe Mitgliedschaft
+                if (!$user) {
+                    return ToolResult::error('AUTH_ERROR', 'Kein User im Kontext gefunden.');
+                }
+
+                $targetTeam = Team::find($requestedTeamId);
+                if (!$targetTeam) {
+                    return ToolResult::error('TEAM_NOT_FOUND', 'Das angegebene Team wurde nicht gefunden. Nutze das Tool "core.teams.GET" um alle verfügbaren Teams zu sehen.');
+                }
+
+                // Scope/Policy: User darf nur Teams abfragen, in denen er Mitglied ist
+                $userHasAccess = $user->teams()->where('teams.id', $targetTeam->id)->exists();
+                if (!$userHasAccess) {
+                    return ToolResult::error('ACCESS_DENIED', 'Du hast keinen Zugriff auf dieses Team. Nutze das Tool "core.teams.GET" um alle verfügbaren Teams zu sehen.');
+                }
+
+                $isCurrentTeam = $context->team && $context->team->id === $targetTeam->id;
+            } else {
+                $targetTeam = $context->team;
+            }
 
             $result = [
-                'user' => $context->user ? [
-                    'id' => $context->user->id,
-                    'name' => $context->user->name ?? null,
-                    'email' => $context->user->email ?? null,
+                'user' => $user ? [
+                    'id' => $user->id,
+                    'name' => $user->name ?? null,
+                    'email' => $user->email ?? null,
                 ] : null,
-                'team' => $context->team ? [
-                    'id' => $context->team->id,
-                    'name' => $context->team->name ?? null,
+                'team' => $targetTeam ? [
+                    'id' => $targetTeam->id,
+                    'name' => $targetTeam->name ?? null,
+                    'is_current_team' => $isCurrentTeam,
                 ] : null,
             ];
+
+            // best-effort: Team-Scope für hasAccess
+            $baseTeam = $targetTeam
+                ?? ($user?->currentTeamRelation ?? null)
+                ?? ($user?->currentTeam ?? null);
 
             // Modul-Berechtigungen (kompakt)
             if ($includeModules) {
                 $allowed = [];
                 $denied = [];
 
-                $user = $context->user;
-                // best-effort: aktueller Team-Scope für hasAccess
-                $baseTeam = $context->team
-                    ?? ($user?->currentTeamRelation ?? null)
-                    ?? ($user?->currentTeam ?? null);
-
                 $registered = ModuleRegistry::all(); // key => config
-                
+
                 // Pseudo-Module, die immer erlaubt sind (ohne DB-Prüfung)
                 $alwaysAllowed = ['core', 'tools', 'communication'];
-                
+
                 foreach ($registered as $key => $cfg) {
                     if (!is_string($key) || $key === '') {
                         continue;
                     }
-                    
+
                     // Core/Tools/Communication: Immer erlauben (keine DB-Prüfung)
                     if (in_array($key, $alwaysAllowed, true)) {
                         $title = is_array($cfg) ? ($cfg['title'] ?? null) : null;
@@ -94,7 +136,7 @@ class GetContextTool implements ToolContract
                         $allowed[] = $entry;
                         continue;
                     }
-                    
+
                     $title = is_array($cfg) ? ($cfg['title'] ?? null) : null;
 
                     $hasAccess = false;
@@ -104,8 +146,6 @@ class GetContextTool implements ToolContract
                             if ($module) {
                                 $hasAccess = (bool) $module->hasAccess($user, $baseTeam);
                             } else {
-                                // Wenn Modul nicht in DB vorhanden ist, können wir hier keine belastbare Entscheidung treffen.
-                                // Für Transparenz markieren wir es als "denied" (nicht sichtbar), statt es fälschlich zu erlauben.
                                 $hasAccess = false;
                             }
                         }
@@ -124,9 +164,8 @@ class GetContextTool implements ToolContract
                         $denied[] = $entry;
                     }
                 }
-                
+
                 // Communication explizit hinzufügen (falls nicht in ModuleRegistry)
-                // (wird in GetModulesTool auch so gehandhabt)
                 if (!isset($registered['communication'])) {
                     $allowed[] = [
                         'key' => 'communication',
@@ -143,6 +182,21 @@ class GetContextTool implements ToolContract
                         'registered_total' => count($registered),
                     ],
                 ];
+            }
+
+            // Team-Mitglieder (optional)
+            if ($includeMembers && $targetTeam) {
+                $members = $targetTeam->users()->get();
+                $result['members'] = $members->map(function ($member) use ($user) {
+                    return [
+                        'id' => $member->id,
+                        'name' => $member->name,
+                        'email' => $member->email,
+                        'role' => $member->pivot->role ?? null,
+                        'is_current_user' => $user && $user->id === $member->id,
+                    ];
+                })->values()->toArray();
+                $result['member_count'] = count($result['members']);
             }
 
             // Erweiterte Metadaten (wenn verfügbar)
@@ -171,4 +225,3 @@ class GetContextTool implements ToolContract
         }
     }
 }
-

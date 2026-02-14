@@ -26,6 +26,14 @@ class ToolResult
     }
 
     /**
+     * Alias für error() – Backwards-Kompatibilität
+     */
+    public static function failure(string $error, ?string $code = null, array $metadata = []): self
+    {
+        return static::error($error, $code, $metadata);
+    }
+
+    /**
      * Erstellt ein Fehler-Ergebnis
      */
     public static function error(string $error, ?string $code = null, array $metadata = []): self
