@@ -29,6 +29,11 @@ class ModuleFlyout extends Component
     public function loadModules()
     {
         $user = Auth::user();
+        if (!$user) {
+            $this->modules = collect();
+            return;
+        }
+
         $baseTeam = $user->currentTeamRelation; // Basis-Team (nicht dynamisch)
         if (!$baseTeam) {
             $this->modules = collect();
