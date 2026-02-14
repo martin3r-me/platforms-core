@@ -8,7 +8,7 @@ use Platform\Core\Contracts\ToolResult;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Request;
-use Laravel\Passport\TokenRepository;
+use Laravel\Passport\Token;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 /**
@@ -182,8 +182,7 @@ class ToolContractAdapter extends Tool
                 return null;
             }
 
-            $tokenRepository = app(TokenRepository::class);
-            $token = $tokenRepository->find($tokenId);
+            $token = Token::find($tokenId);
 
             if (!$token || $token->revoked) {
                 return null;

@@ -5,7 +5,6 @@ namespace Platform\Core\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Laravel\Passport\TokenRepository;
 use Laravel\Passport\Token;
 use Lcobucci\JWT\Configuration;
 use Lcobucci\JWT\Signer\Key\InMemory;
@@ -78,9 +77,8 @@ class ApiAuthenticate
                 return null;
             }
 
-            // Token in Datenbank nachschlagen
-            $tokenRepository = app(TokenRepository::class);
-            $token = $tokenRepository->find($tokenId);
+            // Token direkt über Model nachschlagen (kompatibel mit allen Passport-Versionen)
+            $token = Token::find($tokenId);
 
             if (!$token) {
                 return null;
