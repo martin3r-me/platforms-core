@@ -2,6 +2,7 @@
 
 use Platform\Core\Http\Controllers\DynamicClientRegistrationController;
 use Platform\Core\Mcp\Servers\DefaultMcpServer;
+use Platform\Core\Mcp\Servers\DiscoveryMcpServer;
 use Laravel\Mcp\Facades\Mcp;
 use Illuminate\Support\Facades\Route;
 
@@ -15,11 +16,16 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-// MCP SSE Endpoint - neue Laravel MCP API
-// Mcp::web() registriert automatisch GET (405) und POST mit korrektem Transport
-Mcp::web('sse', DefaultMcpServer::class)
+// MCP SSE Endpoint - Discovery-basierter Server (empfohlen für Claude.ai)
+// Lädt initial nur 5 Discovery-Tools, weitere Tools werden dynamisch nachgeladen
+Mcp::web('sse', DiscoveryMcpServer::class)
     ->middleware('auth:api')
     ->name('mcp.sse');
+
+// Alternativer Endpoint mit allen Tools (für Clients die Discovery nicht unterstützen)
+Mcp::web('sse-full', DefaultMcpServer::class)
+    ->middleware('auth:api')
+    ->name('mcp.sse.full');
 
 // OAuth-Routes für Claude Desktop (benötigt Laravel Passport)
 Mcp::oauthRoutes('oauth');
@@ -61,16 +67,38 @@ Route::get('info', function () {
 
     return response()->json([
         'servers' => [
-            'default' => [
-                'name' => 'Platform MCP Server',
+            'discovery' => [
+                'name' => 'Platform MCP Server (Discovery)',
                 'version' => '1.0.0',
                 'url' => $baseUrl . '/mcp/sse',
-                'description' => 'Platform MCP Server',
+                'description' => 'Discovery-basierter Server. Lädt initial 5 Tools, weitere via tools.GET.',
                 'authentication' => 'OAuth 2.0 / Bearer Token',
+                'recommended_for' => 'Claude.ai, Claude Desktop',
+                'initial_tools' => [
+                    'core__user__GET',
+                    'core__teams__GET',
+                    'core__context__GET',
+                    'core__modules__GET',
+                    'tools__GET',
+                ],
+            ],
+            'full' => [
+                'name' => 'Platform MCP Server (Full)',
+                'version' => '1.0.0',
+                'url' => $baseUrl . '/mcp/sse-full',
+                'description' => 'Lädt alle Tools sofort. Kann Context Window überlasten.',
+                'authentication' => 'OAuth 2.0 / Bearer Token',
+                'recommended_for' => 'Debugging, lokale Clients',
             ],
         ],
+        'discovery_workflow' => [
+            '1' => 'Verbinde mit /mcp/sse',
+            '2' => 'Rufe core__modules__GET auf um Module zu sehen',
+            '3' => 'Rufe tools__GET(module="...") auf um Tools zu aktivieren',
+            '4' => 'Nutze die aktivierten Tools',
+        ],
         'instructions' => [
-            'claude_desktop' => 'Nutze URL: ' . $baseUrl . '/mcp/sse mit OAuth Client ID',
+            'claude_desktop' => 'Nutze URL: ' . $baseUrl . '/mcp/sse mit OAuth',
             'get_token' => 'Erstelle einen Token mit: php artisan api:token:create --email=your@email.com --name="MCP Token" --show',
         ],
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
