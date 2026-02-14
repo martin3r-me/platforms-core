@@ -7,6 +7,7 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\ToolResult as McpToolResult;
+use Laravel\Mcp\Request;
 use Laravel\Passport\TokenRepository;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 
@@ -84,9 +85,12 @@ class ToolContractAdapter extends Tool
     /**
      * Führt das Tool aus und konvertiert das Ergebnis
      */
-    public function handle(array $arguments): McpToolResult
+    public function handle(Request $request): McpToolResult
     {
         try {
+            // Arguments aus MCP Request extrahieren
+            $arguments = $request->all();
+
             // JSON-Strings in Arrays/Objekte konvertieren (falls nötig)
             $arguments = $this->normalizeArguments($arguments);
 
