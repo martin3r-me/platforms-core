@@ -10,7 +10,7 @@
             </div>
         </div>
         <div class="flex gap-1 mt-4 border-b border-gray-200">
-            <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : tab === 'team', 'text-gray-500 hover:text-gray-700' : tab !== 'team' }" @click="tab = 'team'">Team</button>
+            <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : tab === 'team', 'text-gray-500 hover:text-gray-700' : tab !== 'team' }" x-on:click="tab = 'team'">Team</button>
         </div>
     </x-slot>
 
@@ -30,7 +30,7 @@
                         :nullable="false"
                         wire:model.live="user.current_team_id"
                         x-data
-                        @change="$wire.changeCurrentTeam($event.target.value)"
+                        x-on:change="$wire.changeCurrentTeam($event.target.value)"
                     />
                 @else
                     <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">Nur ein Team vorhanden. Lege unten ein neues Team an.</div>
@@ -103,7 +103,7 @@
                                         :options="['owner' => 'Owner', 'admin' => 'Admin', 'member' => 'Member', 'viewer' => 'Viewer']"
                                         :nullable="false"
                                         x-data
-                                        @change="$wire.updateMemberRole({{ $member->id }}, $event.target.value)"
+                                        x-on:change="$wire.updateMemberRole({{ $member->id }}, $event.target.value)"
                                         wire:model.defer="memberRoles.{{ $member->id }}"
                                     />
 
@@ -163,7 +163,7 @@
                                         <div class="text-xs text-[var(--ui-muted)]">Rolle: {{ ucfirst($inv->role ?? 'member') }}</div>
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <x-ui-button variant="secondary-outline" x-data @click="navigator.clipboard.writeText('{{ url('/invitations/accept/'.$inv->token) }}'); $dispatch('notify', { type: 'success', message: 'Einladungslink kopiert' })">
+                                        <x-ui-button variant="secondary-outline" x-data x-on:click="navigator.clipboard.writeText('{{ url('/invitations/accept/'.$inv->token) }}'); $dispatch('notify', { type: 'success', message: 'Einladungslink kopiert' })">
                                             Link kopieren
                                         </x-ui-button>
                                         <x-ui-button variant="danger" wire:click="revokeInvitation({{ $inv->id }})">
@@ -184,7 +184,7 @@
 
     <x-slot name="footer">
         <div class="flex justify-end">
-            <x-ui-button variant="secondary-outline" @click="modalShow = false">
+            <x-ui-button variant="secondary-outline" x-on:click="modalShow = false">
                 Schließen
             </x-ui-button>
         </div>
