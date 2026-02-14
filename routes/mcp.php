@@ -140,3 +140,56 @@ Route::get('debug/tools', function () {
         ])->values(),
     ]);
 })->name('mcp.debug.tools');
+
+// Debug Endpoint - testet MCP Server Klasse direkt
+Route::get('debug/mcp-server', function () {
+    // Simuliere einen Transport für den Test
+    $transport = new class implements \Laravel\Mcp\Server\Contracts\Transport {
+        public function listen(): void {}
+        public function receive(): mixed { return null; }
+        public function send(mixed $message): void {}
+        public function close(): void {}
+    };
+
+    try {
+        $server = new \Platform\Core\Mcp\Servers\DefaultMcpServer($transport);
+        $server->boot();
+
+        // Versuche die Tools zu bekommen (Reflection da protected)
+        $reflection = new \ReflectionClass($server);
+
+        // Suche nach tools Property
+        $toolsProperty = null;
+        $current = $reflection;
+        while ($current) {
+            if ($current->hasProperty('tools')) {
+                $toolsProperty = $current->getProperty('tools');
+                break;
+            }
+            $current = $current->getParentClass();
+        }
+
+        $tools = [];
+        if ($toolsProperty) {
+            $toolsProperty->setAccessible(true);
+            $tools = $toolsProperty->getValue($server);
+        }
+
+        return response()->json([
+            'server_class' => get_class($server),
+            'server_name' => $server->name ?? 'unknown',
+            'boot_called' => true,
+            'tools_count' => is_array($tools) ? count($tools) : 0,
+            'tools' => is_array($tools) ? array_map(fn($t) => [
+                'class' => get_class($t),
+                'name' => method_exists($t, 'name') ? $t->name() : 'unknown',
+            ], array_slice($tools, 0, 10)) : [],
+            'reflection_classes' => array_map(fn($c) => $c->getName(), class_parents($server) ?: []),
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ], 500);
+    }
+})->name('mcp.debug.server');
