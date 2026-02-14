@@ -105,7 +105,8 @@ class PlatformMcpServer extends Server
             foreach ($toolContractTools as $toolContract) {
                 try {
                     $adapter = new ToolContractAdapter($toolContract);
-                    $this->addTool($adapter);
+                    // Direkt in das tools Array pushen (keine addTool Methode in Laravel MCP)
+                    $this->tools[] = $adapter;
                     $addedCount++;
                 } catch (\Throwable $e) {
                     Log::warning("[PlatformMcpServer] Tool-Wrapping fehlgeschlagen", [
@@ -129,7 +130,7 @@ class PlatformMcpServer extends Server
         foreach ($this->additionalTools as $toolClass) {
             try {
                 if (class_exists($toolClass)) {
-                    $this->addTool($toolClass);
+                    $this->tools[] = $toolClass;
                 }
             } catch (\Throwable $e) {
                 Log::warning("[PlatformMcpServer] MCP Tool hinzufügen fehlgeschlagen", [
