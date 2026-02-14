@@ -5,11 +5,11 @@ namespace Platform\Core\Mcp\Servers;
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Contracts\Transport;
 use Platform\Core\Tools\ToolRegistry;
-use Platform\Core\Tools\ToolDiscoveryService;
 use Platform\Core\Services\ToolPermissionService;
 use Platform\Core\Mcp\McpSessionToolManager;
-use Platform\Core\Mcp\Tools\McpToolDiscoveryTool;
+use Platform\Core\Mcp\Tools\ToolDiscoveryToolContract;
 use Platform\Core\Mcp\Adapters\ToolContractAdapter;
+use Platform\Core\Mcp\Adapters\ToolDiscoveryAdapter;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -122,29 +122,33 @@ MARKDOWN;
 
         try {
             $registry = app(ToolRegistry::class);
-            $discovery = app(ToolDiscoveryService::class);
-            $permissionService = app(ToolPermissionService::class);
+            $permissionService = null;
+            try {
+                $permissionService = app(ToolPermissionService::class);
+            } catch (\Throwable $e) {
+                // Permission service nicht verfügbar
+            }
 
             // 1. Discovery-Tools laden (5 Basis-Tools)
             $discoveryTools = McpSessionToolManager::getDiscoveryTools($registry);
             $discoveryToolNames = McpSessionToolManager::getDiscoveryToolNames();
 
             foreach ($discoveryTools as $tool) {
-                // tools.GET bekommt Sonderbehandlung mit McpToolDiscoveryTool
+                // tools.GET bekommt Sonderbehandlung mit ToolDiscoveryAdapter
                 if ($tool->getName() === 'tools.GET') {
-                    $mcpDiscoveryTool = new McpToolDiscoveryTool(
+                    $discoveryTool = new ToolDiscoveryToolContract(
                         $registry,
-                        $discovery,
                         $permissionService
                     );
-                    $mcpDiscoveryTool->setSessionId($this->sessionId);
+                    $discoveryTool->setSessionId($this->sessionId);
 
                     // Callback für dynamisches Tool-Loading
-                    $mcpDiscoveryTool->onToolsLoaded(function(array $newTools) {
+                    $discoveryTool->onToolsLoaded(function(array $newTools) {
                         $this->addToolsToSession($newTools);
                     });
 
-                    $this->tools[] = $mcpDiscoveryTool;
+                    $adapter = new ToolDiscoveryAdapter($discoveryTool);
+                    $this->tools[] = $adapter;
                 } else {
                     // Normale Discovery-Tools via Adapter
                     try {
