@@ -381,6 +381,11 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register($this->app->make(\Platform\Core\Tools\RemoveTeamUserTool::class)); } catch (\Throwable $e) {}
         }
 
+        // Team-Module: Modul-Aktivierung/Deaktivierung pro Team (LLM-Tool)
+        if (class_exists(\Platform\Core\Tools\ToggleTeamModuleTool::class) && !$registry->has('core.team_modules.PUT')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\ToggleTeamModuleTool::class)); } catch (\Throwable $e) {}
+        }
+
         // Core AI Models (DB Source of Truth): tools for listing/updating models must be discoverable via module=core
         if (class_exists(\Platform\Core\Tools\ListAiModelsTool::class) && !$registry->has('core.ai_models.GET')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\ListAiModelsTool::class)); } catch (\Throwable $e) {}
