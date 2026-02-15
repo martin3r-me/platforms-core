@@ -6,6 +6,7 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Tools\ToolRegistry;
+use Platform\Core\Services\ToolPermissionService;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -86,6 +87,22 @@ class ExecuteToolContract implements ToolContract
             }
 
             $tool = $registry->get($toolName);
+
+            // Berechtigungsprüfung: Hat der User Zugriff auf das Modul?
+            try {
+                $permissionService = app(ToolPermissionService::class);
+                if (!$permissionService->hasAccess($toolName)) {
+                    return ToolResult::failure(
+                        "Kein Zugriff auf Tool '{$toolName}'. Das Modul ist für dein Team nicht freigeschaltet.",
+                        'ACCESS_DENIED'
+                    );
+                }
+            } catch (\Throwable $e) {
+                Log::warning('[MCP Execute] Permission-Check fehlgeschlagen, erlaube Zugriff', [
+                    'tool' => $toolName,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             // Tool ausführen
             Log::info('[MCP Execute] Tool wird ausgeführt', [

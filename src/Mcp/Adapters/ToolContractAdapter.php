@@ -6,11 +6,13 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Mcp\McpSessionTeamManager;
+use Platform\Core\Services\ToolPermissionService;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Request;
 use Laravel\Passport\Token;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Adapter für ToolContract → Laravel MCP Tool
@@ -99,6 +101,25 @@ class ToolContractAdapter extends Tool
 
             // Context aus Request extrahieren
             $context = $this->createContextFromRequest();
+
+            // Berechtigungsprüfung: Hat der User Zugriff auf das Modul?
+            try {
+                $permissionService = app(ToolPermissionService::class);
+                $toolName = $this->tool->getName();
+                if (!$permissionService->hasAccess($toolName)) {
+                    Log::warning('[MCP ToolContractAdapter] Zugriff verweigert', [
+                        'tool' => $toolName,
+                        'user_id' => $context->user?->id,
+                        'team_id' => $context->team?->id,
+                    ]);
+                    return Response::error("Kein Zugriff auf Tool '{$toolName}'. Das Modul ist für dein Team nicht freigeschaltet.");
+                }
+            } catch (\Throwable $e) {
+                Log::warning('[MCP ToolContractAdapter] Permission-Check fehlgeschlagen, erlaube Zugriff', [
+                    'tool' => $this->tool->getName(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             // Tool ausführen
             $result = $this->tool->execute($arguments, $context);
