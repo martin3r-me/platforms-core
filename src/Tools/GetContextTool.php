@@ -5,6 +5,7 @@ namespace Platform\Core\Tools;
 use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
+use Platform\Core\Mcp\McpSessionTeamManager;
 use Platform\Core\Registry\ModuleRegistry;
 use Platform\Core\Models\Module;
 use Platform\Core\Models\Team;
@@ -93,17 +94,35 @@ class GetContextTool implements ToolContract
                 $targetTeam = $context->team;
             }
 
+            // Prüfe ob ein Session-Team-Override aktiv ist
+            $sessionTeamOverride = false;
+            $sessionId = McpSessionTeamManager::resolveSessionId();
+            if ($sessionId) {
+                $sessionTeamOverride = McpSessionTeamManager::hasTeamOverride($sessionId);
+            }
+
+            $teamData = null;
+            if ($targetTeam) {
+                $teamData = [
+                    'id' => $targetTeam->id,
+                    'name' => $targetTeam->name ?? null,
+                    'is_current_team' => $isCurrentTeam,
+                ];
+                // Wenn kein expliziter team_id-Parameter und ein Session-Override aktiv ist,
+                // markiere dies im Response
+                if ($requestedTeamId === null && $sessionTeamOverride) {
+                    $teamData['is_session_override'] = true;
+                    $teamData['info'] = 'Team-Kontext wurde per "core.team.switch" gewechselt. Nutze "core.team.switch" um in ein anderes Team zu wechseln.';
+                }
+            }
+
             $result = [
                 'user' => $user ? [
                     'id' => $user->id,
                     'name' => $user->name ?? null,
                     'email' => $user->email ?? null,
                 ] : null,
-                'team' => $targetTeam ? [
-                    'id' => $targetTeam->id,
-                    'name' => $targetTeam->name ?? null,
-                    'is_current_team' => $isCurrentTeam,
-                ] : null,
+                'team' => $teamData,
             ];
 
             // best-effort: Team-Scope für hasAccess

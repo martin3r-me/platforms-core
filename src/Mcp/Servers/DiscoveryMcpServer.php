@@ -38,6 +38,7 @@ Dieser Server verwendet ein Discovery-System für skalierbare Tool-Verwaltung:
    - `core__teams__GET` - Welche Teams habe ich?
    - `core__context__GET` - Aktueller Kontext
    - `core__modules__GET` - Welche Module gibt es?
+   - `core__team__switch` - Team-Kontext wechseln (Session-basiert)
    - `tools__GET` - Tool Discovery (WICHTIG!)
 
 2. **Weitere Tools aktivieren:**

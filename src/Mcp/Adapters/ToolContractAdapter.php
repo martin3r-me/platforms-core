@@ -5,6 +5,7 @@ namespace Platform\Core\Mcp\Adapters;
 use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
+use Platform\Core\Mcp\McpSessionTeamManager;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Request;
@@ -165,6 +166,15 @@ class ToolContractAdapter extends Tool
         $team = null;
         if (method_exists($user, 'currentTeam')) {
             $team = $user->currentTeam;
+        }
+
+        // Session-Team-Override prüfen (gesetzt durch core.team.switch)
+        $sessionId = McpSessionTeamManager::resolveSessionId();
+        if ($sessionId && McpSessionTeamManager::hasTeamOverride($sessionId)) {
+            $overrideTeam = McpSessionTeamManager::getTeamOverride($sessionId);
+            if ($overrideTeam) {
+                $team = $overrideTeam;
+            }
         }
 
         return ToolContext::create($user, $team);

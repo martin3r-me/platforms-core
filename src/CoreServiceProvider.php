@@ -359,6 +359,9 @@ class CoreServiceProvider extends ServiceProvider
         if (!$registry->has('core.teams.GET')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\ListTeamsTool::class)); } catch (\Throwable $e) {}
         }
+        if (!$registry->has('core.team.switch')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\SwitchTeamContextTool::class)); } catch (\Throwable $e) {}
+        }
 
         // Core: Team erstellen (wird von LLM häufig gebraucht, darf nicht "unsichtbar" sein)
         if (class_exists(\Platform\Core\Tools\CreateTeamTool::class) && !$registry->has('core.teams.POST')) {

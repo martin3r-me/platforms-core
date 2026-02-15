@@ -3,6 +3,7 @@
 namespace Platform\Core\Mcp;
 
 use Platform\Core\Contracts\ToolContract;
+use Platform\Core\Mcp\McpSessionTeamManager;
 use Platform\Core\Tools\ToolRegistry;
 use Platform\Core\Tools\ToolLoader;
 use Platform\Core\Services\ToolPermissionService;
@@ -26,6 +27,7 @@ class McpSessionToolManager
         'core.teams.GET',
         'core.context.GET',
         'core.modules.GET',
+        'core.team.switch',
         'tools.GET',
     ];
 
@@ -214,6 +216,9 @@ class McpSessionToolManager
     public static function clearSession(string $sessionId): void
     {
         unset(self::$sessionTools[$sessionId]);
+
+        // Team-Override für diese Session ebenfalls aufräumen
+        McpSessionTeamManager::clearSession($sessionId);
     }
 
     /**
