@@ -116,6 +116,8 @@ class ListWhatsAppMessagesTool implements ToolContract, ToolMetadataContract
                     'direction' => $m->direction,
                     'body' => $m->body,
                     'message_type' => $m->message_type,
+                    'media_display_type' => $m->media_display_type,
+                    'has_media' => $m->hasMedia(),
                     'status' => $m->status,
                     'sent_at' => $m->sent_at?->toIso8601String(),
                     'delivered_at' => $m->delivered_at?->toIso8601String(),

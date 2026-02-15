@@ -160,6 +160,18 @@ class WhatsAppMetaService
         $messageType = $messageData['type'] ?? 'text';
         $text = $messageData['text']['body'] ?? '';
 
+        // Normalize voice to audio for message_type storage
+        // WhatsApp sends voice notes as type "audio" with voice=true, but some clients send as type "voice"
+        $storedMessageType = $messageType;
+        if ($messageType === 'voice') {
+            $storedMessageType = 'audio';
+        }
+
+        // For media messages without text body, try to get caption
+        if ($text === '' && in_array($messageType, ['image', 'video', 'audio', 'document', 'sticker', 'voice'])) {
+            $text = $messageData[$messageType]['caption'] ?? '';
+        }
+
         // Find or create thread
         $thread = CommsWhatsAppThread::findOrCreateForPhone($channel, $phone);
 
@@ -173,7 +185,7 @@ class WhatsAppMetaService
             'direction' => 'inbound',
             'meta_message_id' => $messageId,
             'body' => $text,
-            'message_type' => $messageType,
+            'message_type' => $storedMessageType,
             'status' => 'received',
             'meta_payload' => $messageData,
             'sent_at' => $timestamp
@@ -182,15 +194,32 @@ class WhatsAppMetaService
         ]);
 
         // Update thread rollups
+        $preview = $text ?: match ($messageType) {
+            'image' => '📷 Bild',
+            'video' => '🎬 Video',
+            'audio', 'voice' => '🎤 Sprachnachricht',
+            'document' => '📄 Dokument',
+            'sticker' => '🏷 Sticker',
+            default => '',
+        };
         $thread->update([
             'last_inbound_at' => $message->sent_at,
-            'last_message_preview' => Str::limit($text, 100),
+            'last_message_preview' => Str::limit($preview, 100),
             'is_unread' => true,
         ]);
 
-        // Process media if present
-        if (in_array($messageType, ['image', 'video', 'audio', 'document'])) {
-            $this->processIncomingMedia($messageData, $message, $channel);
+        // Process media if present (now including sticker and voice)
+        if (in_array($messageType, ['image', 'video', 'audio', 'document', 'sticker', 'voice'])) {
+            try {
+                $attachmentService = app(InboundWhatsAppAttachmentService::class);
+                $attachmentService->processMediaAttachment($messageData, $message, $channel);
+            } catch (\Throwable $e) {
+                Log::error('WhatsApp media processing failed', [
+                    'message_id' => $message->id,
+                    'type' => $messageType,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return $message;
@@ -288,160 +317,6 @@ class WhatsAppMetaService
     }
 
     /**
-     * Process incoming media from a message.
-     */
-    protected function processIncomingMedia(array $messageData, CommsWhatsAppMessage $message, CommsChannel $channel): void
-    {
-        $type = $messageData['type'] ?? null;
-        if (!$type || !isset($messageData[$type])) {
-            return;
-        }
-
-        $mediaBlock = $messageData[$type];
-        if (!is_array($mediaBlock) || !isset($mediaBlock['id'])) {
-            return;
-        }
-
-        $mediaId = $mediaBlock['id'];
-        $mimeType = $mediaBlock['mime_type'] ?? null;
-        $originalFileName = $mediaBlock['filename'] ?? null;
-        $caption = $mediaBlock['caption'] ?? null;
-
-        if (!$mediaId || !$mimeType) {
-            return;
-        }
-
-        $creds = $this->getCredentials($channel);
-
-        $mediaUrl = $this->fetchMediaUrl($mediaId, $creds['access_token']);
-        if (!$mediaUrl) {
-            Log::error("Failed to fetch WhatsApp media URL", ['media_id' => $mediaId]);
-            return;
-        }
-
-        $contextFile = $this->downloadAndStoreMedia(
-            $mediaUrl,
-            $creds['access_token'],
-            $message->thread,
-            $mimeType,
-            $originalFileName
-        );
-
-        if ($contextFile) {
-            $message->addFileReference($contextFile->id, [
-                'role' => 'attachment',
-                'caption' => $caption,
-            ]);
-
-            // Update message body with caption if not already set
-            if ($caption && !$message->body) {
-                $message->update(['body' => $caption]);
-            }
-        }
-    }
-
-    /**
-     * Fetch the download URL for a media file from Meta.
-     */
-    protected function fetchMediaUrl(string $mediaId, string $accessToken): ?string
-    {
-        $url = "https://graph.facebook.com/{$this->apiVersion}/{$mediaId}";
-
-        try {
-            $response = Http::withHeaders([
-                'Authorization' => "Bearer {$accessToken}",
-            ])->get($url);
-
-            if (!$response->successful()) {
-                Log::error("Failed to fetch media URL from Meta", [
-                    'media_id' => $mediaId,
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-                return null;
-            }
-
-            return $response->json()['url'] ?? null;
-        } catch (\Exception $e) {
-            Log::error("Exception fetching media URL", [
-                'media_id' => $mediaId,
-                'exception' => $e->getMessage(),
-            ]);
-            return null;
-        }
-    }
-
-    /**
-     * Download media from Meta and store as ContextFile.
-     */
-    protected function downloadAndStoreMedia(
-        string $mediaUrl,
-        string $accessToken,
-        CommsWhatsAppThread $thread,
-        string $mimeType,
-        ?string $originalFileName,
-    ): ?ContextFile {
-        try {
-            $response = Http::withHeaders([
-                'Authorization' => "Bearer {$accessToken}",
-            ])->get($mediaUrl);
-
-            if (!$response->successful()) {
-                Log::error("Media download failed", ['url' => $mediaUrl, 'status' => $response->status()]);
-                return null;
-            }
-
-            $content = $response->body();
-            $extension = $this->determineExtension($mimeType);
-            $fileName = $originalFileName ?: 'media_' . Str::random(12) . '.' . $extension;
-
-            // Build storage path
-            $storagePath = "whatsapp/{$thread->team_id}/thread_{$thread->id}/" . date('Y-m-d') . "/{$fileName}";
-
-            // Store file
-            $disk = config('filesystems.default', 'local');
-            Storage::disk($disk)->put($storagePath, $content);
-
-            // Get image dimensions if applicable
-            $width = null;
-            $height = null;
-            if (str_starts_with($mimeType, 'image/')) {
-                try {
-                    $imageInfo = getimagesizefromstring($content);
-                    if ($imageInfo) {
-                        $width = $imageInfo[0];
-                        $height = $imageInfo[1];
-                    }
-                } catch (\Exception $e) {
-                    // Ignore
-                }
-            }
-
-            // Create ContextFile
-            return ContextFile::create([
-                'token' => Str::ulid()->toBase32(),
-                'team_id' => $thread->team_id,
-                'context_type' => CommsWhatsAppThread::class,
-                'context_id' => $thread->id,
-                'disk' => $disk,
-                'path' => $storagePath,
-                'file_name' => basename($storagePath),
-                'original_name' => $originalFileName ?: $fileName,
-                'mime_type' => $mimeType,
-                'file_size' => strlen($content),
-                'width' => $width,
-                'height' => $height,
-            ]);
-        } catch (\Exception $e) {
-            Log::error("Exception downloading/storing media", [
-                'url' => $mediaUrl,
-                'exception' => $e->getMessage(),
-            ]);
-            return null;
-        }
-    }
-
-    /**
      * Get credentials from channel's meta or provider connection.
      */
     protected function getCredentials(CommsChannel $channel): array
@@ -516,10 +391,14 @@ class WhatsAppMetaService
      */
     protected function getMediaTypeFromMime(string $mimeType): ?string
     {
+        // Clean MIME type (remove codec info like "; codecs=opus")
+        $cleanMime = trim(strtok($mimeType, ';'));
+
         $typeMap = [
             'image/jpeg' => 'image',
             'image/png' => 'image',
             'image/webp' => 'image',
+            'image/gif' => 'image',
             'video/mp4' => 'video',
             'video/3gp' => 'video',
             'application/pdf' => 'document',
@@ -529,6 +408,8 @@ class WhatsAppMetaService
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'document',
             'application/vnd.ms-powerpoint' => 'document',
             'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'document',
+            'text/plain' => 'document',
+            'application/zip' => 'document',
             'audio/aac' => 'audio',
             'audio/amr' => 'audio',
             'audio/mpeg' => 'audio',
@@ -536,7 +417,7 @@ class WhatsAppMetaService
             'audio/ogg' => 'audio',
         ];
 
-        return $typeMap[$mimeType] ?? null;
+        return $typeMap[$cleanMime] ?? null;
     }
 
     /**

@@ -842,10 +842,12 @@ class ModalComms extends Component
             'direction' => (string) ($m->direction ?? 'outbound'),
             'body' => (string) ($m->body ?? ''),
             'message_type' => (string) ($m->message_type ?? 'text'),
+            'media_display_type' => (string) $m->media_display_type,
             'status' => (string) ($m->status ?? ''),
             'at' => $m->sent_at?->format('H:i') ?: $m->created_at?->format('H:i'),
             'full_at' => $m->sent_at?->format('d.m.Y H:i') ?: $m->created_at?->format('d.m.Y H:i'),
             'sent_by' => $m->sentByUser?->name ?? null,
+            'has_media' => $m->hasMedia(),
             'attachments' => $m->attachments ?? [],
         ])->all();
 

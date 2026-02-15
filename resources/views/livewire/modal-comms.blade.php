@@ -530,6 +530,8 @@
                                                                             $sentBy = (string) ($wm['sent_by'] ?? '');
                                                                             $status = (string) ($wm['status'] ?? '');
                                                                             $messageType = (string) ($wm['message_type'] ?? 'text');
+                                                                            $mediaDisplayType = (string) ($wm['media_display_type'] ?? $messageType);
+                                                                            $hasMedia = (bool) ($wm['has_media'] ?? false);
                                                                             $attachments = $wm['attachments'] ?? [];
                                                                         @endphp
 
@@ -543,23 +545,80 @@
                                                                                         </span>
                                                                                         <span>Extern</span>
                                                                                     </div>
-                                                                                    @if($messageType !== 'text' && !empty($attachments))
-                                                                                        {{-- Media attachment --}}
+                                                                                    @if($hasMedia && !empty($attachments))
+                                                                                        @foreach($attachments as $att)
+                                                                                            @php
+                                                                                                $attUrl = $att['url'] ?? null;
+                                                                                                $attThumb = $att['thumbnail'] ?? $attUrl;
+                                                                                                $attTitle = $att['title'] ?? 'Datei';
+                                                                                                $attCaption = $att['meta']['caption'] ?? null;
+                                                                                            @endphp
+                                                                                            @if($mediaDisplayType === 'image' && $attUrl)
+                                                                                                {{-- Image: inline preview --}}
+                                                                                                <a href="{{ $attUrl }}" target="_blank" class="block my-2">
+                                                                                                    <img src="{{ $attThumb }}" alt="{{ $attTitle }}" class="rounded-xl max-w-full max-h-64 object-cover" loading="lazy" />
+                                                                                                </a>
+                                                                                            @elseif($mediaDisplayType === 'sticker' && $attUrl)
+                                                                                                {{-- Sticker: smaller inline image --}}
+                                                                                                <div class="my-2">
+                                                                                                    <img src="{{ $attUrl }}" alt="Sticker" class="w-32 h-32 object-contain" loading="lazy" />
+                                                                                                </div>
+                                                                                            @elseif($mediaDisplayType === 'video' && $attUrl)
+                                                                                                {{-- Video: HTML5 player --}}
+                                                                                                <div class="my-2">
+                                                                                                    <video controls preload="metadata" class="rounded-xl max-w-full max-h-64">
+                                                                                                        <source src="{{ $attUrl }}" />
+                                                                                                    </video>
+                                                                                                </div>
+                                                                                            @elseif(($mediaDisplayType === 'voice' || $mediaDisplayType === 'audio') && $attUrl)
+                                                                                                {{-- Voice/Audio: HTML5 audio player --}}
+                                                                                                <div class="my-2 flex items-center gap-2">
+                                                                                                    @svg('heroicon-o-microphone', 'w-5 h-5 text-[var(--ui-muted)] shrink-0')
+                                                                                                    <audio controls preload="metadata" class="h-8 w-full min-w-[180px]">
+                                                                                                        <source src="{{ $attUrl }}" />
+                                                                                                    </audio>
+                                                                                                </div>
+                                                                                            @elseif($mediaDisplayType === 'document' && $attUrl)
+                                                                                                {{-- Document: download link --}}
+                                                                                                <a href="{{ $attUrl }}" target="_blank" class="flex items-center gap-3 my-2 px-3 py-2 rounded-xl bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 hover:bg-[var(--ui-muted-10)] transition-colors">
+                                                                                                    <div class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-white border border-[var(--ui-border)]/60 text-[var(--ui-secondary)] shrink-0">
+                                                                                                        @svg('heroicon-o-document-text', 'w-5 h-5')
+                                                                                                    </div>
+                                                                                                    <div class="min-w-0 flex-1">
+                                                                                                        <div class="text-sm font-medium text-[var(--ui-secondary)] truncate">{{ $attTitle }}</div>
+                                                                                                        <div class="text-xs text-[var(--ui-muted)]">Dokument</div>
+                                                                                                    </div>
+                                                                                                    @svg('heroicon-o-arrow-down-tray', 'w-4 h-4 text-[var(--ui-muted)] shrink-0')
+                                                                                                </a>
+                                                                                            @else
+                                                                                                {{-- Fallback: icon with type --}}
+                                                                                                <div class="flex items-center gap-3 my-2">
+                                                                                                    <div class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 text-[var(--ui-secondary)]">
+                                                                                                        @svg('heroicon-o-paper-clip', 'w-5 h-5')
+                                                                                                    </div>
+                                                                                                    <div class="min-w-0">
+                                                                                                        <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">{{ $attTitle }}</div>
+                                                                                                        <div class="text-xs text-[var(--ui-muted)]">{{ ucfirst($mediaDisplayType) }}</div>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            @endif
+                                                                                        @endforeach
+                                                                                    @elseif($hasMedia && empty($attachments))
+                                                                                        {{-- Media without file (processing or failed) --}}
                                                                                         <div class="flex items-center gap-3 my-2">
-                                                                                            <div class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 text-[var(--ui-secondary)]">
-                                                                                                @if($messageType === 'image')
+                                                                                            <div class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 text-[var(--ui-muted)]">
+                                                                                                @if($mediaDisplayType === 'image' || $mediaDisplayType === 'sticker')
                                                                                                     @svg('heroicon-o-photo', 'w-5 h-5')
-                                                                                                @elseif($messageType === 'video')
+                                                                                                @elseif($mediaDisplayType === 'video')
                                                                                                     @svg('heroicon-o-video-camera', 'w-5 h-5')
-                                                                                                @elseif($messageType === 'audio')
+                                                                                                @elseif($mediaDisplayType === 'voice' || $mediaDisplayType === 'audio')
                                                                                                     @svg('heroicon-o-microphone', 'w-5 h-5')
                                                                                                 @else
                                                                                                     @svg('heroicon-o-document-text', 'w-5 h-5')
                                                                                                 @endif
                                                                                             </div>
                                                                                             <div class="min-w-0">
-                                                                                                <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">{{ ucfirst($messageType) }}</div>
-                                                                                                <div class="text-xs text-[var(--ui-muted)]">Anhang</div>
+                                                                                                <div class="text-sm text-[var(--ui-muted)] truncate">{{ ucfirst($mediaDisplayType) }}</div>
                                                                                             </div>
                                                                                         </div>
                                                                                     @endif
@@ -579,6 +638,54 @@
                                                                                             {{ strtoupper(substr($sentBy ?: 'I', 0, 1)) }}{{ strtoupper(substr($sentBy ?: '', -1, 1) ?: '') }}
                                                                                         </span>
                                                                                     </div>
+                                                                                    @if($hasMedia && !empty($attachments))
+                                                                                        @foreach($attachments as $att)
+                                                                                            @php
+                                                                                                $attUrl = $att['url'] ?? null;
+                                                                                                $attThumb = $att['thumbnail'] ?? $attUrl;
+                                                                                                $attTitle = $att['title'] ?? 'Datei';
+                                                                                            @endphp
+                                                                                            @if($mediaDisplayType === 'image' && $attUrl)
+                                                                                                <a href="{{ $attUrl }}" target="_blank" class="block my-2">
+                                                                                                    <img src="{{ $attThumb }}" alt="{{ $attTitle }}" class="rounded-xl max-w-full max-h-64 object-cover" loading="lazy" />
+                                                                                                </a>
+                                                                                            @elseif($mediaDisplayType === 'video' && $attUrl)
+                                                                                                <div class="my-2">
+                                                                                                    <video controls preload="metadata" class="rounded-xl max-w-full max-h-64">
+                                                                                                        <source src="{{ $attUrl }}" />
+                                                                                                    </video>
+                                                                                                </div>
+                                                                                            @elseif(($mediaDisplayType === 'voice' || $mediaDisplayType === 'audio') && $attUrl)
+                                                                                                <div class="my-2 flex items-center gap-2">
+                                                                                                    @svg('heroicon-o-microphone', 'w-5 h-5 text-[var(--ui-muted)] shrink-0')
+                                                                                                    <audio controls preload="metadata" class="h-8 w-full min-w-[180px]">
+                                                                                                        <source src="{{ $attUrl }}" />
+                                                                                                    </audio>
+                                                                                                </div>
+                                                                                            @elseif($mediaDisplayType === 'document' && $attUrl)
+                                                                                                <a href="{{ $attUrl }}" target="_blank" class="flex items-center gap-3 my-2 px-3 py-2 rounded-xl bg-white/60 border border-[var(--ui-border)]/60 hover:bg-white transition-colors">
+                                                                                                    <div class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-white border border-[var(--ui-border)]/60 text-[var(--ui-secondary)] shrink-0">
+                                                                                                        @svg('heroicon-o-document-text', 'w-5 h-5')
+                                                                                                    </div>
+                                                                                                    <div class="min-w-0 flex-1">
+                                                                                                        <div class="text-sm font-medium text-[var(--ui-secondary)] truncate">{{ $attTitle }}</div>
+                                                                                                        <div class="text-xs text-[var(--ui-muted)]">Dokument</div>
+                                                                                                    </div>
+                                                                                                    @svg('heroicon-o-arrow-down-tray', 'w-4 h-4 text-[var(--ui-muted)] shrink-0')
+                                                                                                </a>
+                                                                                            @else
+                                                                                                <div class="flex items-center gap-3 my-2">
+                                                                                                    <div class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white/60 border border-[var(--ui-border)]/60 text-[var(--ui-secondary)]">
+                                                                                                        @svg('heroicon-o-paper-clip', 'w-5 h-5')
+                                                                                                    </div>
+                                                                                                    <div class="min-w-0">
+                                                                                                        <div class="text-sm font-semibold text-[var(--ui-secondary)] truncate">{{ $attTitle }}</div>
+                                                                                                        <div class="text-xs text-[var(--ui-muted)]">{{ ucfirst($mediaDisplayType) }}</div>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            @endif
+                                                                                        @endforeach
+                                                                                    @endif
                                                                                     @if($body)
                                                                                         <div class="text-sm text-[var(--ui-secondary)] whitespace-pre-wrap">{{ $body }}</div>
                                                                                     @endif

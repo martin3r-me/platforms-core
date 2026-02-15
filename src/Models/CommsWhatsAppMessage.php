@@ -77,6 +77,32 @@ class CommsWhatsAppMessage extends Model
      */
     public function hasMedia(): bool
     {
-        return in_array($this->message_type, ['image', 'video', 'audio', 'document']);
+        return in_array($this->message_type, ['image', 'video', 'audio', 'document', 'sticker']);
+    }
+
+    /**
+     * Check if the message is a voice note.
+     */
+    public function isVoice(): bool
+    {
+        if ($this->message_type !== 'audio') {
+            return false;
+        }
+
+        // Check meta_payload for voice flag
+        $payload = $this->meta_payload;
+        return !empty($payload['audio']['voice']);
+    }
+
+    /**
+     * Get the WhatsApp display type for rendering.
+     */
+    public function getMediaDisplayTypeAttribute(): string
+    {
+        if ($this->isVoice()) {
+            return 'voice';
+        }
+
+        return $this->message_type ?? 'text';
     }
 }
