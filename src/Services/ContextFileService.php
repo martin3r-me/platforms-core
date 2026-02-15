@@ -48,14 +48,14 @@ class ContextFileService
         array $options = []
     ): array {
         // User-ID und Team-ID aus Options oder Auth holen (für Commands)
-        $userId = $options['user_id'] ?? null;
+        // user_id darf null sein (z.B. Inbound-Mail ohne authentifizierten User)
+        $userId = array_key_exists('user_id', $options) ? $options['user_id'] : null;
         $teamId = $options['team_id'] ?? null;
-        
-        // Wenn user_id und team_id NICHT beide in Options vorhanden sind, versuche von Auth zu holen
-        // WICHTIG: Verwende is_null() statt empty(), da 0 ein gültiger Wert sein könnte
-        if (is_null($userId) || is_null($teamId)) {
+        $userIdResolved = $userId !== null;
+
+        // Wenn team_id oder user_id NICHT in Options vorhanden, versuche von Auth zu holen
+        if (!$userIdResolved || is_null($teamId)) {
             // Fallback: Versuche von Auth zu holen (für Web-Requests)
-            // WICHTIG: Nur wenn Auth::check() true ist, versuche Auth zu verwenden
             if (Auth::check()) {
                 $user = Auth::user();
                 if ($user) {
@@ -66,16 +66,11 @@ class ContextFileService
                     }
                 }
             }
-            
-            // Wenn immer noch keine user_id oder team_id vorhanden sind, Fehler werfen
-            if (is_null($userId) || is_null($teamId)) {
-                throw new \Exception('Kein User/Team-Kontext vorhanden. Bitte user_id und team_id in options übergeben. user_id: ' . ($userId ?? 'null') . ', team_id: ' . ($teamId ?? 'null'));
+
+            // team_id ist immer erforderlich; user_id darf null sein (z.B. bei Inbound-Mail)
+            if (is_null($teamId)) {
+                throw new \Exception('Kein Team-Kontext vorhanden. Bitte team_id in options übergeben. team_id: null');
             }
-        }
-        
-        // Validierung: Beide müssen vorhanden sein
-        if (is_null($userId) || is_null($teamId)) {
-            throw new \Exception('user_id und team_id müssen beide vorhanden sein. user_id: ' . ($userId ?? 'null') . ', team_id: ' . ($teamId ?? 'null'));
         }
 
         // Token generieren (eindeutig)

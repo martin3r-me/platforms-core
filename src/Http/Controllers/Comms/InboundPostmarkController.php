@@ -10,6 +10,7 @@ use Platform\Core\Models\CommsChannel;
 use Platform\Core\Models\CommsEmailInboundMail;
 use Platform\Core\Models\CommsEmailThread;
 use Platform\Core\Events\CommsInboundReceived;
+use Platform\Core\Services\Comms\InboundMailAttachmentService;
 use Platform\Comms\Services\CommsActivityService;
 
 class InboundPostmarkController extends Controller
@@ -120,6 +121,22 @@ class InboundPostmarkController extends Controller
                     'cid' => $a['ContentID'] ?? null,
                     'inline' => isset($a['ContentID']),
                 ]);
+            }
+
+            // 6b) Anhänge als ContextFiles verarbeiten und an Mail + Kontext-Objekt hängen
+            if (!empty($payload['Attachments'])) {
+                try {
+                    app(InboundMailAttachmentService::class)
+                        ->processAttachments($mail, $thread, $payload['Attachments']);
+                } catch (\Throwable $e) {
+                    Log::error('Inbound mail ContextFile processing failed', [
+                        'mail_id' => $mail->id,
+                        'thread_id' => $thread->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    // Nicht werfen – die Mail wurde bereits persistiert,
+                    // ContextFile-Verarbeitung darf den Gesamtprozess nicht abbrechen
+                }
             }
 
             // 7) Optional: record generic inbound activity (if shared comms is installed)

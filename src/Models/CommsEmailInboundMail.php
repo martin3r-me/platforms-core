@@ -5,9 +5,12 @@ namespace Platform\Core\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Platform\Core\Traits\HasContextFileReferences;
 
 class CommsEmailInboundMail extends Model
 {
+    use HasContextFileReferences;
+
     protected $table = 'comms_email_inbound_mails';
 
     protected $fillable = [
@@ -41,6 +44,14 @@ class CommsEmailInboundMail extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(CommsEmailMailAttachment::class, 'inbound_mail_id');
+    }
+
+    /**
+     * Get context files via ContextFileReferences (polymorphic).
+     */
+    public function getContextFilesAttribute(): array
+    {
+        return $this->getFileReferencesArray();
     }
 }
 
