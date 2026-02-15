@@ -4,6 +4,7 @@ namespace Platform\Core\Tools\DataRead;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Platform\Core\Mcp\McpSessionTeamManager;
 
 class ManifestEntityProvider implements EntityReadProvider
 {
@@ -110,7 +111,15 @@ class ManifestEntityProvider implements EntityReadProvider
         $model = $this->model();
         $q = $model::query();
         if ($this->teamScoped && in_array('team_id', $this->readableFields(), true)) {
-            $teamId = Auth::user()?->currentTeam?->id;
+            // MCP Session-Team-Override berücksichtigen (gesetzt durch core.team.switch)
+            $teamId = null;
+            $sessionId = McpSessionTeamManager::resolveSessionId();
+            if ($sessionId) {
+                $teamId = McpSessionTeamManager::getTeamOverrideId($sessionId);
+            }
+            if (!$teamId) {
+                $teamId = Auth::user()?->currentTeam?->id;
+            }
             if ($teamId) { $q->where('team_id', $teamId); }
         }
         return $q;

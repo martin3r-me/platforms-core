@@ -4,6 +4,7 @@ namespace Platform\Core\Tools\DataRead\Providers;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Platform\Core\Mcp\McpSessionTeamManager;
 use Platform\Core\Tools\DataRead\EntityReadProvider;
 
 class OkrKeyResultProvider implements EntityReadProvider
@@ -22,8 +23,16 @@ class OkrKeyResultProvider implements EntityReadProvider
     {
         $model = $this->model();
         $q = $model::query();
-        $team = Auth::user()?->currentTeam;
-        if ($team) { $q->where('team_id', $team->id); }
+        // MCP Session-Team-Override berücksichtigen (gesetzt durch core.team.switch)
+        $teamId = null;
+        $sessionId = McpSessionTeamManager::resolveSessionId();
+        if ($sessionId) {
+            $teamId = McpSessionTeamManager::getTeamOverrideId($sessionId);
+        }
+        if (!$teamId) {
+            $teamId = Auth::user()?->currentTeam?->id;
+        }
+        if ($teamId) { $q->where('team_id', $teamId); }
         return $q;
     }
 
