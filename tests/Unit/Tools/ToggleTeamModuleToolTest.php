@@ -127,6 +127,10 @@ class ToggleTeamModuleToolTest extends TestCase
         $this->assertTrue(
             $team->modules()->where('module_id', $module->id)->exists()
         );
+
+        // Verify team_id is correctly set in the pivot table
+        $pivot = $team->modules()->where('module_id', $module->id)->first();
+        $this->assertEquals($team->id, $pivot->pivot->team_id);
     }
 
     public function test_owner_can_deactivate_team_module(): void
@@ -138,6 +142,7 @@ class ToggleTeamModuleToolTest extends TestCase
             'role' => null,
             'enabled' => true,
             'guard' => 'web',
+            'team_id' => $team->id,
         ]);
 
         $context = new ToolContext($user, $team);
@@ -210,6 +215,7 @@ class ToggleTeamModuleToolTest extends TestCase
             'role' => null,
             'enabled' => true,
             'guard' => 'web',
+            'team_id' => $team->id,
         ]);
 
         $context = new ToolContext($user, $team);
@@ -231,6 +237,7 @@ class ToggleTeamModuleToolTest extends TestCase
             'role' => null,
             'enabled' => true,
             'guard' => 'web',
+            'team_id' => $team->id,
         ]);
 
         $context = new ToolContext($user, $team);

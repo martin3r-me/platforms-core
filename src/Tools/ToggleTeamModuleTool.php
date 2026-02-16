@@ -124,10 +124,15 @@ class ToggleTeamModuleTool implements ToolContract, ToolMetadataContract
                 $targetTeam = $currentTeam;
             }
 
+            // --- team_id aus Team-Kontext bestimmen ---
+
+            $teamId = $targetTeam->id;
+
             // --- Toggle-Logik ---
 
             $alreadyAssigned = $targetTeam->modules()
                 ->where('module_id', $module->id)
+                ->wherePivot('team_id', $teamId)
                 ->exists();
 
             // Bestimme gewünschten Zustand
@@ -144,6 +149,7 @@ class ToggleTeamModuleTool implements ToolContract, ToolMetadataContract
                     'role' => null,
                     'enabled' => true,
                     'guard' => 'web',
+                    'team_id' => $teamId,
                 ]);
                 $action = 'activated';
             } elseif (!$shouldBeEnabled && $alreadyAssigned) {
@@ -151,6 +157,7 @@ class ToggleTeamModuleTool implements ToolContract, ToolMetadataContract
                     ->where('modulable_id', $targetTeam->id)
                     ->where('modulable_type', Team::class)
                     ->where('module_id', $module->id)
+                    ->where('team_id', $teamId)
                     ->delete();
                 $action = 'deactivated';
             } else {
