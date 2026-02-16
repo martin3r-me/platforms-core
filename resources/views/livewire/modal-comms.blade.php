@@ -145,7 +145,7 @@
                                         @forelse($emailChannels as $c)
                                             <button
                                                 type="button"
-                                                @click="activeChannel = 'email'; activeEmailChannelId = {{ (int) $c['id'] }};"
+                                                @click="activeChannel = 'email'; activeEmailChannelId = {{ intval($c['id']) }};"
                                                 class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1"
                                                 :class="(activeChannel === 'email' && activeEmailChannelId === {{ intval($c['id']) }})
                                                     ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
@@ -153,7 +153,7 @@
                                                 title="E‑Mail Absender"
                                             >
                                                 @svg('heroicon-o-envelope', 'w-4 h-4')
-                                                <span class="font-semibold">{{ (string) ($c['label'] ?? '') }}</span>
+                                                <span class="font-semibold">{{ strval($c['label'] ?? '') }}</span>
                                             </button>
                                         @empty
                                             <div class="text-xs text-[var(--ui-muted)] px-2">
@@ -180,7 +180,7 @@
                                         @forelse($whatsappChannels as $wc)
                                             <button
                                                 type="button"
-                                                @click="activeChannel = 'whatsapp'; activeWhatsAppChannelId = {{ (int) $wc['id'] }};"
+                                                @click="activeChannel = 'whatsapp'; activeWhatsAppChannelId = {{ intval($wc['id']) }};"
                                                 class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1"
                                                 :class="(activeChannel === 'whatsapp' && activeWhatsAppChannelId === {{ intval($wc['id']) }})
                                                     ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
@@ -188,7 +188,7 @@
                                                 title="Kanal: WhatsApp"
                                             >
                                                 @svg('heroicon-o-chat-bubble-left-right', 'w-4 h-4')
-                                                <span class="font-semibold">{{ $wc['name'] ?: 'WhatsApp' }} · {{ (string) ($wc['label'] ?? '') }}</span>
+                                                <span class="font-semibold">{{ $wc['name'] ?: 'WhatsApp' }} · {{ strval($wc['label'] ?? '') }}</span>
                                             </button>
                                         @empty
                                             {{-- Kein WhatsApp Channel verfügbar --}}
@@ -268,7 +268,7 @@
                                                             >
                                                                 <button
                                                                     type="button"
-                                                                    wire:click="setActiveEmailThread({{ (int) $t['id'] }})"
+                                                                    wire:click="setActiveEmailThread({{ intval($t['id']) }})"
                                                                     class="w-full text-left"
                                                                 >
                                                                     <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate">{{ $t['subject'] }}</div>
@@ -284,7 +284,7 @@
                                                                 <div class="mt-2 flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
                                                                     <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-[var(--ui-border)]/60 bg-white">
                                                                         @svg('heroicon-o-chat-bubble-left-ellipsis', 'w-3.5 h-3.5')
-                                                                        <span class="font-semibold">{{ (int) ($t['messages_count'] ?? 0) }}</span>
+                                                                        <span class="font-semibold">{{ intval($t['messages_count'] ?? 0) }}</span>
                                                                     </span>
 
                                                                     @if(!empty($t['last_direction']))
@@ -309,7 +309,7 @@
                                                                                         confirmDelete = true;
                                                                                         setTimeout(() => { confirmDelete = false; }, 2500);
                                                                                     } else {
-                                                                                        $wire.call('deleteEmailThread', {{ (int) $t['id'] }});
+                                                                                        $wire.call('deleteEmailThread', {{ intval($t['id']) }});
                                                                                     }
                                                                                 "
                                                                                 title="Thread löschen"
@@ -348,7 +348,7 @@
                                                             >
                                                                 <button
                                                                     type="button"
-                                                                    wire:click="setActiveWhatsAppThread({{ (int) $wt['id'] }})"
+                                                                    wire:click="setActiveWhatsAppThread({{ intval($wt['id']) }})"
                                                                     class="w-full text-left"
                                                                 >
                                                                     <div class="text-[11px] font-semibold text-[var(--ui-secondary)] truncate flex items-center gap-2">
@@ -367,7 +367,7 @@
                                                                 <div class="mt-2 flex items-center gap-2 text-[10px] text-[var(--ui-muted)]">
                                                                     <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-[var(--ui-border)]/60 bg-white">
                                                                         @svg('heroicon-o-chat-bubble-left-ellipsis', 'w-3.5 h-3.5')
-                                                                        <span class="font-semibold">{{ (int) ($wt['messages_count'] ?? 0) }}</span>
+                                                                        <span class="font-semibold">{{ intval($wt['messages_count'] ?? 0) }}</span>
                                                                     </span>
 
                                                                     @if(!empty($wt['last_direction']))
@@ -392,7 +392,7 @@
                                                                                         confirmDelete = true;
                                                                                         setTimeout(() => { confirmDelete = false; }, 2500);
                                                                                     } else {
-                                                                                        $wire.call('deleteWhatsAppThread', {{ (int) $wt['id'] }});
+                                                                                        $wire.call('deleteWhatsAppThread', {{ intval($wt['id']) }});
                                                                                     }
                                                                                 "
                                                                                 title="Thread löschen"
@@ -1283,7 +1283,7 @@
                                                 <div class="flex items-center gap-2 flex-shrink-0">
                                                     <button
                                                         type="button"
-                                                        wire:click="removeChannel({{ (int) $c['id'] }})"
+                                                        wire:click="removeChannel({{ intval($c['id']) }})"
                                                         class="text-xs px-2 py-1 rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] text-[var(--ui-muted)] hover:text-red-600 hover:border-red-200"
                                                     >
                                                         Löschen
@@ -1429,7 +1429,7 @@
                                                             <div class="flex items-center gap-2 flex-shrink-0">
                                                                 <button
                                                                     type="button"
-                                                                    wire:click="setPostmarkPrimaryDomain({{ (int) $d['id'] }})"
+                                                                    wire:click="setPostmarkPrimaryDomain({{ intval($d['id']) }})"
                                                                     class="text-xs px-2 py-1 rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] disabled:opacity-60"
                                                                     @if(!$this->canManageProviderConnections() || $d['is_primary']) disabled @endif
                                                                 >
@@ -1437,7 +1437,7 @@
                                                                 </button>
                                                                 <button
                                                                     type="button"
-                                                                    wire:click="removePostmarkDomain({{ (int) $d['id'] }})"
+                                                                    wire:click="removePostmarkDomain({{ intval($d['id']) }})"
                                                                     class="text-xs px-2 py-1 rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] text-[var(--ui-muted)] hover:text-red-600 hover:border-red-200 disabled:opacity-60"
                                                                     @if(!$this->canManageProviderConnections()) disabled @endif
                                                                 >
