@@ -977,7 +977,7 @@
                                                                                     <div class="text-xs font-semibold text-[var(--ui-secondary)]">Platzhalter ausfüllen</div>
                                                                                     @for($i = 1; $i <= $whatsappTemplatePreview['variables_count']; $i++)
                                                                                         <div class="flex items-center gap-2">
-                                                                                            <span class="text-xs text-[var(--ui-muted)] font-mono w-10 flex-shrink-0">{{"{{" . $i . "}}"}}</span>
+                                                                                            <span class="text-xs text-[var(--ui-muted)] font-mono w-10 flex-shrink-0">&#123;&#123;{{ $i }}&#125;&#125;</span>
                                                                                             <input
                                                                                                 type="text"
                                                                                                 wire:model.live="whatsappTemplateVariables.{{ $i }}"
