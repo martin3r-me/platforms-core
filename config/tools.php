@@ -142,6 +142,18 @@ return [
         'objective_enabled' => env('TOOLS_MCP_OBJECTIVE_ENABLED', true),
 
         /*
+         * Session-Timeout (Sliding Window):
+         * Bei jedem Tool-Call wird die Session-TTL automatisch verlängert,
+         * damit bei langen Tool-Sequenzen der Kontext (Team, geladene Tools)
+         * nicht still abläuft.
+         *
+         * session_ttl_seconds: Gesamte Session-Dauer (wird bei Aktivität verlängert)
+         * session_warning_seconds: Warnung wenn Session bald abläuft
+         */
+        'session_ttl_seconds' => env('TOOLS_MCP_SESSION_TTL', 28800), // 8 Stunden
+        'session_warning_seconds' => env('TOOLS_MCP_SESSION_WARNING', 1800), // 30 Minuten vor Ablauf
+
+        /*
          * Loose Completion-Gate:
          * Wenn die LLM eine finale Text-Antwort gibt, aber Verifikation noch Issues sieht,
          * geben wir der LLM noch ein paar Recovery-Runden (ohne tool_choice=required).

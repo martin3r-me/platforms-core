@@ -23,22 +23,25 @@ class ToolValidationService
         $errors = [];
         $validatedData = [];
 
+        $properties = $schema['properties'] ?? [];
+
         // Prüfe required fields
         $required = $schema['required'] ?? [];
         foreach ($required as $field) {
             if (!isset($arguments[$field])) {
-                $errors[] = "Feld '{$field}' ist erforderlich";
+                $hint = $this->buildFieldHint($field, $properties[$field] ?? []);
+                $errors[] = "Feld '{$field}' ist erforderlich" . ($hint ? " ({$hint})" : '');
             }
         }
 
         // Validiere alle Properties
-        $properties = $schema['properties'] ?? [];
         foreach ($arguments as $key => $value) {
             if (!isset($properties[$key])) {
                 // Unbekanntes Feld: Prüfe ob additionalProperties erlaubt ist
                 $additionalProperties = $schema['additionalProperties'] ?? true;
                 if (!$additionalProperties) {
-                    $errors[] = "Unbekanntes Feld '{$key}'";
+                    $knownFields = implode(', ', array_keys($properties));
+                    $errors[] = "Unbekanntes Feld '{$key}'. Erlaubte Felder: {$knownFields}";
                 } else {
                     $validatedData[$key] = $value;
                 }
@@ -47,7 +50,7 @@ class ToolValidationService
 
             $property = $properties[$key];
             $validationResult = $this->validateProperty($key, $value, $property);
-            
+
             if ($validationResult['valid']) {
                 $validatedData[$key] = $validationResult['value'];
             } else {
@@ -60,6 +63,21 @@ class ToolValidationService
             'data' => $validatedData,
             'errors' => $errors,
         ];
+    }
+
+    /**
+     * Erzeugt einen Hint-String für ein Feld (Typ, erlaubte Werte)
+     */
+    private function buildFieldHint(string $field, array $property): string
+    {
+        $parts = [];
+        if (isset($property['type'])) {
+            $parts[] = "Typ: {$property['type']}";
+        }
+        if (isset($property['enum']) && is_array($property['enum'])) {
+            $parts[] = 'erlaubte Werte: ' . implode('|', $property['enum']);
+        }
+        return implode(', ', $parts);
     }
 
     /**

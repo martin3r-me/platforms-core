@@ -243,8 +243,13 @@ class ToolExecutor
                 'errors' => $validationResult['errors'],
                 'trace_id' => $traceId
             ]);
+
+            // Strukturierte Fehlermeldung für die LLM: Fehler einzeln auflisten
+            $errorLines = array_map(fn($e) => "- {$e}", $validationResult['errors']);
+            $errorMessage = "Validierung fehlgeschlagen für Tool '{$toolName}':\n" . implode("\n", $errorLines);
+
             return ToolResult::error(
-                'Validierung fehlgeschlagen: ' . implode(', ', $validationResult['errors']),
+                $errorMessage,
                 'VALIDATION_ERROR',
                 ['trace_id' => $traceId, 'errors' => $validationResult['errors']]
             );

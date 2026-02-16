@@ -92,5 +92,21 @@ class ToolTimeoutService
     {
         return (bool)config('tools.timeout.enabled', true);
     }
+
+    /**
+     * Gibt die konfigurierte Session-TTL in Sekunden zurück
+     */
+    public function getSessionTtl(): int
+    {
+        return (int) config('tools.mcp.session_ttl_seconds', 28800);
+    }
+
+    /**
+     * Gibt die Session-Warning-Schwelle in Sekunden zurück
+     */
+    public function getSessionWarningThreshold(): int
+    {
+        return (int) config('tools.mcp.session_warning_seconds', 1800);
+    }
 }
 

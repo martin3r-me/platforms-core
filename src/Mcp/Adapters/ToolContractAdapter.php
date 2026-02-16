@@ -7,6 +7,7 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Mcp\McpSessionTeamManager;
 use Platform\Core\Services\ToolPermissionService;
+use Platform\Core\Services\ToolValidationService;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Request;
@@ -61,6 +62,9 @@ class ToolContractAdapter extends Tool
                 $description = $property['description'] ?? null;
                 $isRequired = in_array($propertyName, $required);
 
+                // Erlaubte Werte (enum) in Description dokumentieren
+                $description = $this->enrichDescriptionWithConstraints($description, $property, $type);
+
                 // Property basierend auf Typ erstellen
                 $prop = match ($type) {
                     'integer' => $schema->integer(),
@@ -88,6 +92,65 @@ class ToolContractAdapter extends Tool
     }
 
     /**
+     * Reichert die Description mit Schema-Constraints an (enum, min/max, pattern)
+     *
+     * Damit sieht die LLM direkt, welche Werte erlaubt sind.
+     */
+    private function enrichDescriptionWithConstraints(?string $description, array $property, string $type): ?string
+    {
+        $parts = [];
+
+        if ($description) {
+            $parts[] = $description;
+        }
+
+        // Enum-Werte dokumentieren (z.B. "Erlaubte Werte: low|normal|high")
+        if (isset($property['enum']) && is_array($property['enum'])) {
+            $enumValues = implode('|', $property['enum']);
+            // Nur anfügen, wenn die Description die Werte nicht bereits enthält
+            if (!$description || !str_contains($description, $enumValues)) {
+                $parts[] = "Erlaubte Werte: {$enumValues}";
+            }
+        }
+
+        // Default-Wert dokumentieren
+        if (isset($property['default']) && !isset($property['enum'])) {
+            $default = is_bool($property['default'])
+                ? ($property['default'] ? 'true' : 'false')
+                : $property['default'];
+            if (!$description || !str_contains($description, 'Standard:') && !str_contains($description, 'Default:')) {
+                $parts[] = "Standard: {$default}";
+            }
+        }
+
+        // Number-Constraints (minimum/maximum)
+        if (($type === 'integer' || $type === 'number') && (isset($property['minimum']) || isset($property['maximum']))) {
+            $range = [];
+            if (isset($property['minimum'])) {
+                $range[] = "min: {$property['minimum']}";
+            }
+            if (isset($property['maximum'])) {
+                $range[] = "max: {$property['maximum']}";
+            }
+            $parts[] = 'Bereich: ' . implode(', ', $range);
+        }
+
+        // String-Constraints (minLength/maxLength)
+        if ($type === 'string' && (isset($property['minLength']) || isset($property['maxLength']))) {
+            $lengths = [];
+            if (isset($property['minLength'])) {
+                $lengths[] = "min. {$property['minLength']} Zeichen";
+            }
+            if (isset($property['maxLength'])) {
+                $lengths[] = "max. {$property['maxLength']} Zeichen";
+            }
+            $parts[] = 'Länge: ' . implode(', ', $lengths);
+        }
+
+        return !empty($parts) ? implode('. ', $parts) : null;
+    }
+
+    /**
      * Führt das Tool aus und konvertiert das Ergebnis
      */
     public function handle(Request $request): Response
@@ -102,10 +165,18 @@ class ToolContractAdapter extends Tool
             // Context aus Request extrahieren
             $context = $this->createContextFromRequest();
 
+            // Session-Aktivität aktualisieren (Sliding Window TTL)
+            // Verhindert, dass der Kontext bei langen Tool-Sequenzen still abläuft
+            $sessionId = McpSessionTeamManager::resolveSessionId();
+            if ($sessionId) {
+                McpSessionTeamManager::touchSession($sessionId);
+            }
+
+            $toolName = $this->tool->getName();
+
             // Berechtigungsprüfung: Hat der User Zugriff auf das Modul?
             try {
                 $permissionService = app(ToolPermissionService::class);
-                $toolName = $this->tool->getName();
                 if (!$permissionService->hasAccess($toolName)) {
                     Log::warning('[MCP ToolContractAdapter] Zugriff verweigert', [
                         'tool' => $toolName,
@@ -121,8 +192,39 @@ class ToolContractAdapter extends Tool
                 ]);
             }
 
+            // Parameter validieren (Fehlermeldungen direkt an die LLM)
+            try {
+                $validationService = app(ToolValidationService::class);
+                $validationResult = $validationService->validate($this->tool, $arguments);
+                if (!$validationResult['valid']) {
+                    $errorLines = array_map(fn($e) => "- {$e}", $validationResult['errors']);
+                    $errorMessage = "[VALIDATION_ERROR] Validierung fehlgeschlagen für Tool '{$toolName}':\n"
+                        . implode("\n", $errorLines);
+                    return Response::error($errorMessage);
+                }
+                // Verwende validierte (normalisierte) Daten
+                $arguments = $validationResult['data'];
+            } catch (\Throwable $e) {
+                // Validation-Service nicht verfügbar – weiter ohne Validierung
+                Log::debug('[MCP ToolContractAdapter] Validation-Service nicht verfügbar', [
+                    'tool' => $toolName,
+                ]);
+            }
+
             // Tool ausführen
             $result = $this->tool->execute($arguments, $context);
+
+            // Session-Timeout-Warnung anhängen, wenn Session bald abläuft
+            if ($sessionId && McpSessionTeamManager::isSessionExpiringSoon($sessionId)) {
+                $secondsLeft = McpSessionTeamManager::getSecondsSinceLastActivity($sessionId);
+                $remainingMin = $secondsLeft !== null
+                    ? round((28800 - $secondsLeft) / 60)
+                    : '?';
+                Log::warning('[MCP ToolContractAdapter] Session läuft bald ab', [
+                    'session_id' => substr($sessionId, 0, 12) . '...',
+                    'remaining_minutes' => $remainingMin,
+                ]);
+            }
 
             // ToolResult zu MCP Response konvertieren
             return $this->convertToolResult($result);
