@@ -24,13 +24,13 @@
     <div class="w-full max-w-md">
       <!-- Logo und Titel -->
       <div class="text-center mb-8">
-        <div class="mx-auto h-12 w-12 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 p-2.5 shadow-lg">
+        <div class="mx-auto h-12 w-12 rounded-xl p-2.5 shadow-lg" style="background-color: var(--ui-primary, #6b7280);">
           <img src="/logo.png" alt="Plattform" class="h-7 w-7 rounded-lg object-contain" />
         </div>
         <h1 class="mt-6 text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Erstellen Sie Ihr Konto</h1>
         <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Starten Sie noch heute</p>
       </div>
-      
+
       <!-- Formular-Karte -->
       <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm py-8 px-6 shadow-2xl rounded-2xl ring-1 ring-gray-200/50 dark:ring-gray-700/50 border border-gray-100/50 dark:border-gray-700/50">
             @if(! $policy->isManualRegistrationAllowed())
@@ -50,8 +50,11 @@
                     </div>
                     @if($policy->isSsoOnly())
                       <div class="mt-4">
-                        <a href="{{ route('azure-sso.login') }}" 
-                           class="w-full inline-flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        <a href="{{ route('azure-sso.login') }}"
+                           class="w-full inline-flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2"
+                           style="background-color: var(--ui-primary, #6b7280); --tw-ring-color: var(--ui-primary, #6b7280);"
+                           onmouseover="this.style.filter='brightness(0.9)'"
+                           onmouseout="this.style.filter=''">
                           Mit Microsoft anmelden
                         </a>
                       </div>
@@ -71,9 +74,11 @@
                     </label>
                     <div class="mt-1">
                       <input wire:model="name" id="name" name="name" type="text" required autocomplete="given-name"
-                             class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm" />
-                      @error('name') 
-                        <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> 
+                             class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none dark:bg-gray-700 dark:text-white sm:text-sm"
+                             onfocus="this.style.borderColor='var(--ui-primary, #6b7280)';this.style.boxShadow='0 0 0 1px var(--ui-primary, #6b7280)'"
+                             onblur="this.style.borderColor='';this.style.boxShadow=''" />
+                      @error('name')
+                        <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                       @enderror
                     </div>
                   </div>
@@ -85,9 +90,11 @@
                     </label>
                     <div class="mt-1">
                       <input wire:model="lastname" id="lastname" name="lastname" type="text" autocomplete="family-name"
-                             class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm" />
-                      @error('lastname') 
-                        <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> 
+                             class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none dark:bg-gray-700 dark:text-white sm:text-sm"
+                             onfocus="this.style.borderColor='var(--ui-primary, #6b7280)';this.style.boxShadow='0 0 0 1px var(--ui-primary, #6b7280)'"
+                             onblur="this.style.borderColor='';this.style.boxShadow=''" />
+                      @error('lastname')
+                        <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                       @enderror
                     </div>
                   </div>
@@ -100,9 +107,11 @@
                   </label>
                   <div class="mt-1">
                     <input wire:model="email" id="email" name="email" type="email" required autocomplete="email"
-                           class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm" />
-                    @error('email') 
-                      <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> 
+                           class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none dark:bg-gray-700 dark:text-white sm:text-sm"
+                           onfocus="this.style.borderColor='var(--ui-primary, #6b7280)';this.style.boxShadow='0 0 0 1px var(--ui-primary, #6b7280)'"
+                           onblur="this.style.borderColor='';this.style.boxShadow=''" />
+                    @error('email')
+                      <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                     @enderror
                   </div>
                 </div>
@@ -114,9 +123,11 @@
                   </label>
                   <div class="mt-1">
                     <input wire:model="username" id="username" name="username" type="text" autocomplete="username"
-                           class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm" />
-                    @error('username') 
-                      <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> 
+                           class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none dark:bg-gray-700 dark:text-white sm:text-sm"
+                           onfocus="this.style.borderColor='var(--ui-primary, #6b7280)';this.style.boxShadow='0 0 0 1px var(--ui-primary, #6b7280)'"
+                           onblur="this.style.borderColor='';this.style.boxShadow=''" />
+                    @error('username')
+                      <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                     @enderror
                   </div>
                 </div>
@@ -129,9 +140,11 @@
                     </label>
                     <div class="mt-1">
                       <input wire:model="password" id="password" name="password" type="password" required autocomplete="new-password"
-                             class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm" />
-                      @error('password') 
-                        <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> 
+                             class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none dark:bg-gray-700 dark:text-white sm:text-sm"
+                             onfocus="this.style.borderColor='var(--ui-primary, #6b7280)';this.style.boxShadow='0 0 0 1px var(--ui-primary, #6b7280)'"
+                             onblur="this.style.borderColor='';this.style.boxShadow=''" />
+                      @error('password')
+                        <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                       @enderror
                     </div>
                   </div>
@@ -143,9 +156,11 @@
                     </label>
                     <div class="mt-1">
                       <input wire:model="password_confirmation" id="password_confirmation" name="password_confirmation" type="password" required autocomplete="new-password"
-                             class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm" />
-                      @error('password_confirmation') 
-                        <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> 
+                             class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none dark:bg-gray-700 dark:text-white sm:text-sm"
+                             onfocus="this.style.borderColor='var(--ui-primary, #6b7280)';this.style.boxShadow='0 0 0 1px var(--ui-primary, #6b7280)'"
+                             onblur="this.style.borderColor='';this.style.boxShadow=''" />
+                      @error('password_confirmation')
+                        <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                       @enderror
                     </div>
                   </div>
@@ -153,7 +168,10 @@
 
                 <div>
                   <button type="submit"
-                          class="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 transform hover:scale-[1.02]">
+                          class="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-all duration-200 transform hover:scale-[1.02]"
+                          style="background-color: var(--ui-primary, #6b7280); --tw-ring-color: var(--ui-primary, #6b7280);"
+                          onmouseover="this.style.filter='brightness(0.9)'"
+                          onmouseout="this.style.filter=''">
                     Konto erstellen
                   </button>
                 </div>
@@ -163,7 +181,9 @@
             <div class="mt-8 text-center">
               <p class="text-sm text-gray-600 dark:text-gray-400">
                 Bereits registriert?
-                <a href="{{ route('login') }}" class="font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
+                <a href="{{ route('login') }}" class="font-semibold transition-colors" style="color: var(--ui-primary, #6b7280);"
+                   onmouseover="this.style.filter='brightness(0.8)'"
+                   onmouseout="this.style.filter=''">
                   Anmelden
                 </a>
               </p>

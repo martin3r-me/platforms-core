@@ -18,7 +18,8 @@
     <x-ui-styles/>
 </head>
 
-<body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-white selection:bg-indigo-100 dark:selection:bg-indigo-900">
+<body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-white" style="--selection-color: var(--ui-primary, #6b7280);">
+<style>::selection { background-color: color-mix(in srgb, var(--ui-primary, #6b7280) 20%, transparent); }</style>
 
     {{ $slot }}
 
