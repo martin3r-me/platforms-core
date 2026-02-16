@@ -173,6 +173,9 @@ class ModalComms extends Component
     /** Whether the current thread has an open 24h messaging window. */
     public bool $whatsappWindowOpen = true;
 
+    /** ISO timestamp when the 24h window expires (null if closed). Used for client-side countdown. */
+    public ?string $whatsappWindowExpiresAt = null;
+
     /** Available WhatsApp templates for the active channel (APPROVED only). */
     public array $whatsappTemplates = [];
 
@@ -838,6 +841,7 @@ class ModalComms extends Component
 
         // Check 24h window and load templates if needed
         $this->whatsappWindowOpen = $thread?->isWindowOpen() ?? false;
+        $this->whatsappWindowExpiresAt = $thread?->windowExpiresAt()?->toIso8601String();
         if (!$this->whatsappWindowOpen) {
             $this->loadWhatsAppTemplates();
         }
@@ -886,6 +890,7 @@ class ModalComms extends Component
 
         // New thread = no prior inbound = window closed → must use templates
         $this->whatsappWindowOpen = false;
+        $this->whatsappWindowExpiresAt = null;
         $this->loadWhatsAppTemplates();
         $this->resetTemplateSelection();
 
@@ -1044,6 +1049,7 @@ class ModalComms extends Component
             'name' => (string) $t->name,
             'language' => (string) $t->language,
             'category' => (string) ($t->category ?? ''),
+            'label' => $t->name . ' (' . $t->language . ')' . ($t->category ? ' — ' . $t->category : ''),
             'components' => $t->components ?? [],
             'body_text' => $this->extractTemplateBodyText($t->components ?? []),
             'variables_count' => $this->countTemplateVariables($t->components ?? []),
@@ -1332,6 +1338,8 @@ class ModalComms extends Component
 
     /**
      * Refresh timelines for polling (only when modal is open).
+     * Also re-checks the WhatsApp 24h window status so the UI can switch
+     * dynamically between template mode and freetext mode.
      */
     public function refreshTimelines(): void
     {
@@ -1342,6 +1350,28 @@ class ModalComms extends Component
         // Only refresh the active timeline
         if ($this->activeWhatsAppThreadId) {
             $this->loadWhatsAppTimeline();
+
+            // Re-check 24h window status: detect opening (inbound reply received)
+            // or closing (24h expired) and switch UI mode accordingly.
+            $thread = CommsWhatsAppThread::query()->whereKey($this->activeWhatsAppThreadId)->first();
+            if ($thread) {
+                $wasOpen = $this->whatsappWindowOpen;
+                $isNowOpen = $thread->isWindowOpen();
+
+                if ($wasOpen !== $isNowOpen) {
+                    $this->whatsappWindowOpen = $isNowOpen;
+                    $this->whatsappWindowExpiresAt = $thread->windowExpiresAt()?->toIso8601String();
+
+                    if (!$isNowOpen) {
+                        // Window just closed → switch to template mode
+                        $this->loadWhatsAppTemplates();
+                        $this->resetTemplateSelection();
+                    } else {
+                        // Window just opened → switch to freetext mode
+                        $this->resetTemplateSelection();
+                    }
+                }
+            }
         }
         if ($this->activeEmailThreadId) {
             $this->loadEmailTimeline();

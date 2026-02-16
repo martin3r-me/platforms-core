@@ -121,4 +121,16 @@ class CommsWhatsAppThread extends Model
 
         return $this->last_inbound_at->greaterThan(now()->subHours(24));
     }
+
+    /**
+     * Get the timestamp when the 24h window expires (null if window is closed).
+     */
+    public function windowExpiresAt(): ?\Illuminate\Support\Carbon
+    {
+        if (!$this->isWindowOpen()) {
+            return null;
+        }
+
+        return $this->last_inbound_at->copy()->addHours(24);
+    }
 }

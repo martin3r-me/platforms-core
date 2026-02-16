@@ -510,9 +510,32 @@
                                                             <span class="truncate">{{ $activeWhatsAppChannelPhone ?? '' }}</span>
                                                             @if($activeWhatsAppThreadId || !$whatsappWindowOpen)
                                                                 @if($whatsappWindowOpen)
-                                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                                    <span
+                                                                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                                                        x-data="{
+                                                                            expiresAt: @js($whatsappWindowExpiresAt),
+                                                                            remaining: '',
+                                                                            interval: null,
+                                                                            update() {
+                                                                                if (!this.expiresAt) { this.remaining = ''; return; }
+                                                                                const diff = new Date(this.expiresAt) - new Date();
+                                                                                if (diff <= 0) { this.remaining = ''; clearInterval(this.interval); return; }
+                                                                                const h = Math.floor(diff / 3600000);
+                                                                                const m = Math.floor((diff % 3600000) / 60000);
+                                                                                this.remaining = h + 'h ' + String(m).padStart(2, '0') + 'min';
+                                                                            },
+                                                                            init() {
+                                                                                this.update();
+                                                                                this.interval = setInterval(() => this.update(), 30000);
+                                                                            },
+                                                                            destroy() { clearInterval(this.interval); }
+                                                                        }"
+                                                                    >
                                                                         @svg('heroicon-o-check-circle', 'w-3 h-3')
-                                                                        Fenster offen
+                                                                        <span>Fenster offen</span>
+                                                                        <template x-if="remaining">
+                                                                            <span class="text-emerald-600" x-text="'· ' + remaining"></span>
+                                                                        </template>
                                                                     </span>
                                                                 @else
                                                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
@@ -933,19 +956,18 @@
                                                                 {{-- Template selection --}}
                                                                 @if(!empty($whatsappTemplates))
                                                                     <div class="space-y-2">
-                                                                        <label class="block text-xs font-semibold text-[var(--ui-secondary)]">Template auswählen</label>
-                                                                        <select
+                                                                        <x-ui-input-select
+                                                                            name="whatsappSelectedTemplateId"
+                                                                            label="Template auswählen"
+                                                                            :options="$whatsappTemplates"
+                                                                            optionValue="id"
+                                                                            optionLabel="label"
+                                                                            :nullable="true"
+                                                                            nullLabel="– Template wählen –"
+                                                                            wire:model.live="whatsappSelectedTemplateId"
+                                                                            x-data
                                                                             x-on:change="$wire.selectWhatsAppTemplate($event.target.value ? Number($event.target.value) : null)"
-                                                                            class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] bg-white"
-                                                                        >
-                                                                            <option value="">-- Template wählen --</option>
-                                                                            @foreach($whatsappTemplates as $tpl)
-                                                                                <option value="{{ $tpl['id'] }}" @if($whatsappSelectedTemplateId === $tpl['id']) selected @endif>
-                                                                                    {{ $tpl['name'] }} ({{ $tpl['language'] }})
-                                                                                    @if($tpl['category']) — {{ $tpl['category'] }} @endif
-                                                                                </option>
-                                                                            @endforeach
-                                                                        </select>
+                                                                        />
                                                                     </div>
 
                                                                     {{-- Template preview & variable inputs --}}
