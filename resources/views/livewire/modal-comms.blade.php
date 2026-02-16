@@ -147,7 +147,7 @@
                                                 type="button"
                                                 @click="activeChannel = 'email'; activeEmailChannelId = {{ (int) $c['id'] }};"
                                                 class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1"
-                                                :class="(activeChannel === 'email' && activeEmailChannelId === {{ (int) $c['id'] }})
+                                                :class="(activeChannel === 'email' && activeEmailChannelId === {{ intval($c['id']) }})
                                                     ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
                                                     : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'"
                                                 title="E‑Mail Absender"
@@ -182,7 +182,7 @@
                                                 type="button"
                                                 @click="activeChannel = 'whatsapp'; activeWhatsAppChannelId = {{ (int) $wc['id'] }};"
                                                 class="px-2 py-1 rounded text-[11px] border transition whitespace-nowrap flex items-center gap-1"
-                                                :class="(activeChannel === 'whatsapp' && activeWhatsAppChannelId === {{ (int) $wc['id'] }})
+                                                :class="(activeChannel === 'whatsapp' && activeWhatsAppChannelId === {{ intval($wc['id']) }})
                                                     ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
                                                     : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)] hover:text-[var(--ui-secondary)]'"
                                                 title="Kanal: WhatsApp"
