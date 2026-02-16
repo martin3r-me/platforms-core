@@ -94,7 +94,7 @@ class ExtraFieldConditionEvaluator
     /**
      * Evaluate a visibility configuration against field values.
      *
-     * @param array $visibilityConfig The visibility configuration from options.visibility
+     * @param array $visibilityConfig The visibility configuration from visibility_config column
      * @param array $fieldValues Current field values indexed by field name
      * @return bool Whether the field should be visible
      */

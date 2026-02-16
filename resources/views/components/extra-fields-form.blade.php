@@ -23,7 +23,7 @@
             $fieldMap[$def['name']] = [
                 'id' => $def['id'],
                 'type' => $def['type'],
-                'visibility' => $def['options']['visibility'] ?? null,
+                'visibility_config' => $def['visibility_config'] ?? null,
             ];
         }
     @endphp
@@ -38,7 +38,7 @@
                 const field = this.fieldDefinitions.find(f => f.id === fieldId);
                 if (!field) return true;
 
-                const visibility = field.options?.visibility;
+                const visibility = field.visibility_config;
                 if (!visibility || !visibility.enabled) return true;
 
                 return this.evaluateVisibility(visibility);

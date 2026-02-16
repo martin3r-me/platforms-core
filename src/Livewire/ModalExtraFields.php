@@ -11,6 +11,7 @@ use Platform\Core\Models\CoreExtraFieldDefinition;
 use Platform\Core\Models\CoreExtraFieldValue;
 use Platform\Core\Models\CoreLookup;
 use Platform\Core\Models\CoreLookupValue;
+use Platform\Core\Services\ExtraFieldCircularDependencyDetector;
 use Platform\Core\Services\ExtraFieldConditionEvaluator;
 
 class ModalExtraFields extends Component
@@ -194,7 +195,8 @@ class ModalExtraFields extends Component
                         'is_encrypted' => $def->is_encrypted,
                         'is_global' => $def->isGlobal(),
                         'options' => $def->options,
-                        'has_visibility_conditions' => isset($def->options['visibility']['enabled']) && $def->options['visibility']['enabled'],
+                        'visibility_config' => $def->visibility_config,
+                        'has_visibility_conditions' => $def->hasVisibilityConditions(),
                         'verify_by_llm' => $def->verify_by_llm,
                         'verify_instructions' => $def->verify_instructions,
                         'auto_fill_source' => $def->auto_fill_source,
@@ -361,8 +363,8 @@ class ModalExtraFields extends Component
         $this->editingDefinitionId = $definitionId;
         $this->editFieldTab = 'basis';
 
-        // Load visibility config from options
-        $visibility = $definition['options']['visibility'] ?? ExtraFieldConditionEvaluator::createEmptyConfig();
+        // Load visibility config from dedicated column
+        $visibility = $definition['visibility_config'] ?? ExtraFieldConditionEvaluator::createEmptyConfig();
 
         $this->editField = [
             'label' => $definition['label'],
@@ -452,10 +454,30 @@ class ModalExtraFields extends Component
                 default => [],
             };
 
-            // Add visibility config to all field types if enabled
+            // Handle visibility config
             $visibility = $this->editField['visibility'] ?? ExtraFieldConditionEvaluator::createEmptyConfig();
-            if ($visibility['enabled'] ?? false) {
-                $options['visibility'] = $visibility;
+            $visibilityConfig = ($visibility['enabled'] ?? false) ? $visibility : null;
+
+            // Check for circular dependencies if visibility is enabled
+            if ($visibilityConfig) {
+                $detector = new ExtraFieldCircularDependencyDetector();
+                $cycle = $detector->detectCycle(
+                    $definition->name,
+                    $visibilityConfig,
+                    $this->definitions
+                );
+
+                if ($cycle !== null) {
+                    $fieldLabels = [];
+                    foreach ($this->definitions as $def) {
+                        $fieldLabels[$def['name']] = $def['label'];
+                    }
+                    $fieldLabels[$definition->name] = trim($this->editField['label']);
+                    $cycleDescription = $detector->describeCycle($cycle, $fieldLabels);
+
+                    $this->addError('editField.visibility', "Zirkuläre Abhängigkeit erkannt: {$cycleDescription}");
+                    return;
+                }
             }
 
             $definition->update([
@@ -465,6 +487,7 @@ class ModalExtraFields extends Component
                 'is_mandatory' => $this->editField['is_mandatory'] ?? false,
                 'is_encrypted' => $this->editField['is_encrypted'] ?? false,
                 'options' => $options,
+                'visibility_config' => $visibilityConfig,
                 'verify_by_llm' => $this->editField['type'] === 'file' && ($this->editField['verify_by_llm'] ?? false),
                 'verify_instructions' => $this->editField['type'] === 'file' ? ($this->editField['verify_instructions'] ?? null) : null,
                 'auto_fill_source' => !empty($this->editField['auto_fill_source']) ? $this->editField['auto_fill_source'] : null,
@@ -1010,6 +1033,7 @@ class ModalExtraFields extends Component
                 'name' => $def['name'],
                 'label' => $def['label'],
                 'type' => $def['type'],
+                'options' => $def['options'] ?? [],
             ];
         }
         return $fields;

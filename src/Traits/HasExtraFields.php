@@ -137,6 +137,7 @@ trait HasExtraFields
                 'is_mandatory' => $definition->is_mandatory,
                 'is_encrypted' => $definition->is_encrypted,
                 'options' => $definition->options,
+                'visibility_config' => $definition->visibility_config,
                 'verify_by_llm' => $definition->verify_by_llm,
                 'verify_instructions' => $definition->verify_instructions,
                 'auto_fill_source' => $definition->auto_fill_source,
@@ -199,7 +200,7 @@ trait HasExtraFields
         $visibleFields = [];
 
         foreach ($allFields as $field) {
-            $visibility = $field['options']['visibility'] ?? null;
+            $visibility = $field['visibility_config'] ?? null;
 
             // If no visibility config or not enabled, field is visible
             if (!$visibility || !($visibility['enabled'] ?? false)) {
@@ -230,7 +231,7 @@ trait HasExtraFields
             return false;
         }
 
-        $visibility = $definition->options['visibility'] ?? null;
+        $visibility = $definition->visibility_config;
 
         // If no visibility config or not enabled, field is visible
         if (!$visibility || !($visibility['enabled'] ?? false)) {

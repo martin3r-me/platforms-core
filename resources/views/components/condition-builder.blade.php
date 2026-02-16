@@ -328,6 +328,15 @@
             @svg('heroicon-o-plus-circle', 'w-5 h-5')
             Neue Bedingungsgruppe hinzufügen
         </button>
+        {{-- Circular Dependency Error --}}
+        @error('editField.visibility')
+            <div class="p-3 bg-[var(--ui-danger-5)] border border-[var(--ui-danger)]/20">
+                <div class="flex items-start gap-2">
+                    @svg('heroicon-o-exclamation-triangle', 'w-4 h-4 text-[var(--ui-danger)] mt-0.5 flex-shrink-0')
+                    <p class="text-sm text-[var(--ui-danger)]">{{ $message }}</p>
+                </div>
+            </div>
+        @enderror
     @else
         {{-- Disabled State Info --}}
         <div class="p-4 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40 text-center">

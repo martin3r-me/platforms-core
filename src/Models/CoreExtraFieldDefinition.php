@@ -24,6 +24,7 @@ class CoreExtraFieldDefinition extends Model
         'is_encrypted',
         'order',
         'options',
+        'visibility_config',
         'verify_by_llm',
         'verify_instructions',
         'auto_fill_source',
@@ -44,6 +45,7 @@ class CoreExtraFieldDefinition extends Model
         'is_encrypted' => 'boolean',
         'order' => 'integer',
         'options' => 'array',
+        'visibility_config' => 'array',
         'context_id' => 'integer',
         'verify_by_llm' => 'boolean',
     ];
@@ -150,5 +152,38 @@ class CoreExtraFieldDefinition extends Model
     public function getTypeLabelAttribute(): string
     {
         return self::TYPES[$this->type] ?? $this->type;
+    }
+
+    /**
+     * Prüft ob dieses Feld Sichtbarkeitsbedingungen hat
+     */
+    public function hasVisibilityConditions(): bool
+    {
+        $config = $this->visibility_config;
+
+        return !empty($config) && ($config['enabled'] ?? false);
+    }
+
+    /**
+     * Gibt die Feld-Namen zurück, von denen dieses Feld abhängt
+     */
+    public function getDependsOnFieldNames(): array
+    {
+        $config = $this->visibility_config;
+
+        if (empty($config) || !($config['enabled'] ?? false)) {
+            return [];
+        }
+
+        $fieldNames = [];
+        foreach ($config['groups'] ?? [] as $group) {
+            foreach ($group['conditions'] ?? [] as $condition) {
+                if (!empty($condition['field'])) {
+                    $fieldNames[] = $condition['field'];
+                }
+            }
+        }
+
+        return array_unique($fieldNames);
     }
 }

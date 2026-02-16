@@ -242,7 +242,10 @@ trait WithExtraFields
     }
 
     /**
-     * Save extra field values to the model
+     * Save extra field values to the model.
+     *
+     * Hidden fields (due to visibility conditions) have their values cleared
+     * to prevent stale data from persisting.
      *
      * @param Model|null $model Optional model to save to (useful when extraFieldsModel is not hydrated)
      */
@@ -254,9 +257,16 @@ trait WithExtraFields
             return;
         }
 
+        // Determine visibility for each field
+        $evaluator = new ExtraFieldConditionEvaluator();
+        $fieldValuesByName = $this->getFieldValuesByName();
+
         foreach ($this->extraFieldDefinitions as $field) {
             $definitionId = $field['id'];
-            $newValue = $this->extraFieldValues[$definitionId] ?? null;
+
+            // If field is hidden, treat as null value (clear stored value)
+            $isVisible = $this->isFieldVisible($field, $fieldValuesByName, $evaluator);
+            $newValue = $isVisible ? ($this->extraFieldValues[$definitionId] ?? null) : null;
 
             // Find or create the value record
             $valueRecord = CoreExtraFieldValue::query()
@@ -334,14 +344,29 @@ trait WithExtraFields
     }
 
     /**
-     * Get validation rules for extra fields
+     * Get validation rules for extra fields.
+     *
+     * Fields that are hidden due to visibility conditions are always nullable
+     * and never required, regardless of their is_mandatory setting.
      */
     public function getExtraFieldValidationRules(): array
     {
         $rules = [];
+        $evaluator = new ExtraFieldConditionEvaluator();
+        $fieldValuesByName = $this->getFieldValuesByName();
 
         foreach ($this->extraFieldDefinitions as $field) {
+            // Check if field is visible based on current values
+            $isVisible = $this->isFieldVisible($field, $fieldValuesByName, $evaluator);
+
             $fieldRules = [];
+
+            if (!$isVisible) {
+                // Hidden fields are always nullable - skip all other validation
+                $fieldRules[] = 'nullable';
+                $rules["extraFieldValues.{$field['id']}"] = $fieldRules;
+                continue;
+            }
 
             if ($field['is_mandatory'] ?? false) {
                 $fieldRules[] = 'required';
@@ -568,7 +593,7 @@ trait WithExtraFields
      */
     protected function isFieldVisible(array $field, array $fieldValuesByName, ExtraFieldConditionEvaluator $evaluator): bool
     {
-        $visibility = $field['options']['visibility'] ?? null;
+        $visibility = $field['visibility_config'] ?? null;
 
         // If no visibility config or not enabled, field is visible
         if (!$visibility || !($visibility['enabled'] ?? false)) {
@@ -625,7 +650,7 @@ trait WithExtraFields
             return 'Feld nicht gefunden';
         }
 
-        $visibility = $field['options']['visibility'] ?? null;
+        $visibility = $field['visibility_config'] ?? null;
 
         if (!$visibility || !($visibility['enabled'] ?? false)) {
             return 'Immer sichtbar';
