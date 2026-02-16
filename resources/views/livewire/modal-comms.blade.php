@@ -1109,7 +1109,7 @@
                                             <x-ui-input-select
                                                 name="newChannel.provider_wa"
                                                 label="Provider"
-                                                :options="['whatsapp_meta' => 'Meta (WhatsApp Business)']"
+                                                :options="['whatsapp_meta' => 'Meta / WhatsApp Business']"
                                                 :nullable="false"
                                                 displayMode="dropdown"
                                                 :disabled="true"
@@ -1119,7 +1119,7 @@
                                             <x-ui-input-select
                                                 name="newChannel.visibility"
                                                 label="Sichtbarkeit"
-                                                :options="['private' => 'privat (nur ich)', 'team' => 'teamweit']"
+                                                :options="['private' => 'privat / nur ich', 'team' => 'teamweit']"
                                                 :nullable="false"
                                                 displayMode="dropdown"
                                                 wire:model.defer="newChannel.visibility"
