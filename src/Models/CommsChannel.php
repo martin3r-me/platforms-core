@@ -50,5 +50,15 @@ class CommsChannel extends Model
     {
         return $this->hasMany(CommsChannelContext::class, 'comms_channel_id');
     }
+
+    public function recruitingPostings()
+    {
+        return $this->belongsToMany(
+            \Platform\Recruiting\Models\RecPosting::class,
+            'rec_posting_comms_channel',
+            'comms_channel_id',
+            'rec_posting_id'
+        )->withTimestamps();
+    }
 }
 
