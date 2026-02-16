@@ -171,6 +171,24 @@ trait HasTags
     }
 
     /**
+     * Kombinierte Tags (Team + persönlich) als flache Collection.
+     * Kann für Eager Loading mit ->with('tags') verwendet werden.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getContextTagsAttribute()
+    {
+        try {
+            if ($this->relationLoaded('tags')) {
+                return $this->getRelation('tags');
+            }
+            return $this->tags()->get();
+        } catch (\Exception $e) {
+            return new \Illuminate\Database\Eloquent\Collection();
+        }
+    }
+
+    /**
      * Holt Team-ID für Tagging (Root-Team, nicht Child-Team)
      *
      * @return int|null
