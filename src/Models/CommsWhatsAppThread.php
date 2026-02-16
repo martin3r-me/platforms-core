@@ -105,4 +105,20 @@ class CommsWhatsAppThread extends Model
             $this->update(['is_unread' => true]);
         }
     }
+
+    /**
+     * Check if the 24h messaging window is open.
+     *
+     * Per Meta WhatsApp Business policy, businesses can send freeform messages
+     * only within 24 hours of the last inbound message from the customer.
+     * Outside this window, only pre-approved templates may be sent.
+     */
+    public function isWindowOpen(): bool
+    {
+        if (!$this->last_inbound_at) {
+            return false;
+        }
+
+        return $this->last_inbound_at->greaterThan(now()->subHours(24));
+    }
 }

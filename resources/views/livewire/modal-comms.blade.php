@@ -508,6 +508,19 @@
                                                                 Kanal: WhatsApp
                                                             </span>
                                                             <span class="truncate">{{ $activeWhatsAppChannelPhone ?? '' }}</span>
+                                                            @if($activeWhatsAppThreadId || !$whatsappWindowOpen)
+                                                                @if($whatsappWindowOpen)
+                                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                                        @svg('heroicon-o-check-circle', 'w-3 h-3')
+                                                                        Fenster offen
+                                                                    </span>
+                                                                @else
+                                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                                                        @svg('heroicon-o-clock', 'w-3 h-3')
+                                                                        Nur Templates
+                                                                    </span>
+                                                                @endif
+                                                            @endif
                                                             @if(!$activeWhatsAppThreadId)
                                                                 <span class="ml-auto text-[10px] text-[var(--ui-muted)]">Neuer Thread</span>
                                                             @endif
@@ -633,6 +646,12 @@
                                                                             <div class="flex justify-end">
                                                                                 <div class="max-w-[85%] rounded-2xl bg-[#dcf8c6] border border-[var(--ui-border)]/60 px-4 py-2">
                                                                                     <div class="flex items-center justify-end gap-2 text-[10px] text-[var(--ui-muted)]">
+                                                                                        @if($messageType === 'template')
+                                                                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--ui-border)]/40 bg-white/50 text-[10px]">
+                                                                                                @svg('heroicon-o-document-text', 'w-3 h-3')
+                                                                                                Template
+                                                                                            </span>
+                                                                                        @endif
                                                                                         <span>{{ $sentBy ?: 'Ich' }}</span>
                                                                                         <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/60 border border-[var(--ui-border)]/60 text-[10px] font-semibold">
                                                                                             {{ strtoupper(substr($sentBy ?: 'I', 0, 1)) }}{{ strtoupper(substr($sentBy ?: '', -1, 1) ?: '') }}
@@ -863,39 +882,140 @@
                                                                 </div>
                                                             @endif
 
-                                                            <div class="flex gap-2 items-end w-full">
-                                                                <button
-                                                                    type="button"
-                                                                    class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] opacity-60 cursor-not-allowed"
-                                                                    title="Anhang (bald verfügbar)"
-                                                                    disabled
-                                                                >
-                                                                    @svg('heroicon-o-paper-clip', 'w-5 h-5')
-                                                                </button>
-                                                                <textarea
-                                                                    x-ref="waBody"
-                                                                    x-init="$nextTick(() => autoGrow($refs.waBody))"
-                                                                    @input="autoGrow($event.target)"
-                                                                    @focus="autoGrow($event.target)"
-                                                                    @keydown.enter="if(!$event.shiftKey){ $event.preventDefault(); $wire.sendWhatsApp(); }"
-                                                                    rows="1"
-                                                                    wire:model="whatsappCompose.body"
-                                                                    class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
-                                                                    placeholder="Nachricht…"
-                                                                ></textarea>
-                                                                <x-ui-button
-                                                                    variant="primary"
-                                                                    size="md"
-                                                                    wire:click="sendWhatsApp"
-                                                                    wire:loading.attr="disabled"
-                                                                    wire:loading.class="animate-pulse"
-                                                                    wire:target="sendWhatsApp"
-                                                                    class="h-10 self-end"
-                                                                >
-                                                                    <span wire:loading.remove wire:target="sendWhatsApp">Senden</span>
-                                                                    <span wire:loading wire:target="sendWhatsApp">Sende…</span>
-                                                                </x-ui-button>
-                                                            </div>
+                                                            @if($whatsappWindowOpen)
+                                                                {{-- OPEN WINDOW: Normal freetext compose --}}
+                                                                <div class="flex gap-2 items-end w-full">
+                                                                    <button
+                                                                        type="button"
+                                                                        class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] opacity-60 cursor-not-allowed"
+                                                                        title="Anhang (bald verfügbar)"
+                                                                        disabled
+                                                                    >
+                                                                        @svg('heroicon-o-paper-clip', 'w-5 h-5')
+                                                                    </button>
+                                                                    <textarea
+                                                                        x-ref="waBody"
+                                                                        x-init="$nextTick(() => autoGrow($refs.waBody))"
+                                                                        @input="autoGrow($event.target)"
+                                                                        @focus="autoGrow($event.target)"
+                                                                        @keydown.enter="if(!$event.shiftKey){ $event.preventDefault(); $wire.sendWhatsApp(); }"
+                                                                        rows="1"
+                                                                        wire:model="whatsappCompose.body"
+                                                                        class="flex-1 px-4 py-2 border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
+                                                                        placeholder="Nachricht…"
+                                                                    ></textarea>
+                                                                    <x-ui-button
+                                                                        variant="primary"
+                                                                        size="md"
+                                                                        wire:click="sendWhatsApp"
+                                                                        wire:loading.attr="disabled"
+                                                                        wire:loading.class="animate-pulse"
+                                                                        wire:target="sendWhatsApp"
+                                                                        class="h-10 self-end"
+                                                                    >
+                                                                        <span wire:loading.remove wire:target="sendWhatsApp">Senden</span>
+                                                                        <span wire:loading wire:target="sendWhatsApp">Sende…</span>
+                                                                    </x-ui-button>
+                                                                </div>
+                                                            @else
+                                                                {{-- CLOSED WINDOW: Template selection mode --}}
+                                                                <div class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
+                                                                    <div class="flex items-start gap-2">
+                                                                        @svg('heroicon-o-clock', 'w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5')
+                                                                        <div class="text-xs text-amber-800">
+                                                                            <span class="font-semibold">24-Stunden-Fenster geschlossen.</span>
+                                                                            Seit der letzten eingehenden Nachricht sind mehr als 24 Stunden vergangen.
+                                                                            Gemäß Meta-Richtlinien können nur noch vorab genehmigte Templates versendet werden.
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {{-- Template selection --}}
+                                                                @if(!empty($whatsappTemplates))
+                                                                    <div class="space-y-2">
+                                                                        <label class="block text-xs font-semibold text-[var(--ui-secondary)]">Template auswählen</label>
+                                                                        <select
+                                                                            x-on:change="$wire.selectWhatsAppTemplate($event.target.value ? Number($event.target.value) : null)"
+                                                                            class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] bg-white"
+                                                                        >
+                                                                            <option value="">-- Template wählen --</option>
+                                                                            @foreach($whatsappTemplates as $tpl)
+                                                                                <option value="{{ $tpl['id'] }}" @if($whatsappSelectedTemplateId === $tpl['id']) selected @endif>
+                                                                                    {{ $tpl['name'] }} ({{ $tpl['language'] }})
+                                                                                    @if($tpl['category']) — {{ $tpl['category'] }} @endif
+                                                                                </option>
+                                                                            @endforeach
+                                                                        </select>
+                                                                    </div>
+
+                                                                    {{-- Template preview & variable inputs --}}
+                                                                    @if(!empty($whatsappTemplatePreview))
+                                                                        <div class="rounded-lg border border-[var(--ui-border)]/60 bg-white p-3 space-y-3">
+                                                                            <div class="flex items-center gap-2">
+                                                                                @svg('heroicon-o-document-text', 'w-4 h-4 text-[var(--ui-primary)]')
+                                                                                <span class="text-xs font-semibold text-[var(--ui-secondary)]">
+                                                                                    {{ $whatsappTemplatePreview['name'] ?? '' }}
+                                                                                </span>
+                                                                                <span class="text-[10px] text-[var(--ui-muted)] px-1.5 py-0.5 rounded-full border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
+                                                                                    {{ $whatsappTemplatePreview['language'] ?? '' }}
+                                                                                </span>
+                                                                                @if(!empty($whatsappTemplatePreview['category']))
+                                                                                    <span class="text-[10px] text-[var(--ui-muted)] px-1.5 py-0.5 rounded-full border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
+                                                                                        {{ $whatsappTemplatePreview['category'] }}
+                                                                                    </span>
+                                                                                @endif
+                                                                            </div>
+
+                                                                            {{-- Template body preview --}}
+                                                                            <div class="rounded-lg bg-[#dcf8c6] border border-[var(--ui-border)]/30 px-3 py-2">
+                                                                                <div class="text-sm text-[var(--ui-secondary)] whitespace-pre-wrap">{{ $this->getTemplatePreviewText() }}</div>
+                                                                            </div>
+
+                                                                            {{-- Variable inputs --}}
+                                                                            @if(($whatsappTemplatePreview['variables_count'] ?? 0) > 0)
+                                                                                <div class="space-y-2">
+                                                                                    <div class="text-xs font-semibold text-[var(--ui-secondary)]">Platzhalter ausfüllen</div>
+                                                                                    @for($i = 1; $i <= $whatsappTemplatePreview['variables_count']; $i++)
+                                                                                        <div class="flex items-center gap-2">
+                                                                                            <span class="text-xs text-[var(--ui-muted)] font-mono w-10 flex-shrink-0">{{"{{" . $i . "}}"}}</span>
+                                                                                            <input
+                                                                                                type="text"
+                                                                                                wire:model.live="whatsappTemplateVariables.{{ $i }}"
+                                                                                                class="flex-1 px-3 py-1.5 border border-[var(--ui-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+                                                                                                placeholder="Wert für Variable {{ $i }}…"
+                                                                                            />
+                                                                                        </div>
+                                                                                    @endfor
+                                                                                </div>
+                                                                            @endif
+                                                                        </div>
+
+                                                                        {{-- Send template button --}}
+                                                                        <div class="flex justify-end">
+                                                                            <x-ui-button
+                                                                                variant="primary"
+                                                                                size="md"
+                                                                                wire:click="sendWhatsAppTemplate"
+                                                                                wire:loading.attr="disabled"
+                                                                                wire:loading.class="animate-pulse"
+                                                                                wire:target="sendWhatsAppTemplate"
+                                                                                class="h-10"
+                                                                            >
+                                                                                <span wire:loading.remove wire:target="sendWhatsAppTemplate">Template senden</span>
+                                                                                <span wire:loading wire:target="sendWhatsAppTemplate">Sende…</span>
+                                                                            </x-ui-button>
+                                                                        </div>
+                                                                    @endif
+                                                                @else
+                                                                    <div class="rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-bg)] px-3 py-2">
+                                                                        <div class="text-xs text-[var(--ui-muted)]">
+                                                                            Keine genehmigten Templates für diesen WhatsApp-Kanal verfügbar.
+                                                                            Bitte erstelle und genehmige Templates in der Meta Business Suite.
+                                                                        </div>
+                                                                    </div>
+                                                                @endif
+                                                            @endif
+
                                                             @error('whatsappCompose.body')
                                                                 <div class="mt-1 text-sm text-[color:var(--ui-danger)]">{{ $message }}</div>
                                                             @enderror

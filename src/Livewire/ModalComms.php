@@ -21,6 +21,7 @@ use Platform\Core\Services\Comms\WhatsAppChannelSyncService;
 use Platform\Core\Models\CommsWhatsAppThread;
 use Platform\Core\Models\CommsWhatsAppMessage;
 use Platform\Integrations\Models\IntegrationsWhatsAppAccount;
+use Platform\Integrations\Models\IntegrationsWhatsAppTemplate;
 
 /**
  * UI-only Comms v2 shell (no data, no logic).
@@ -167,6 +168,22 @@ class ModalComms extends Component
     ];
 
     public ?string $whatsappMessage = null;
+
+    // --- WhatsApp Template (24h-Window) ---
+    /** Whether the current thread has an open 24h messaging window. */
+    public bool $whatsappWindowOpen = true;
+
+    /** Available WhatsApp templates for the active channel (APPROVED only). */
+    public array $whatsappTemplates = [];
+
+    /** Currently selected template ID for sending. */
+    public ?int $whatsappSelectedTemplateId = null;
+
+    /** Preview data of the selected template (name, body text, components). */
+    public array $whatsappTemplatePreview = [];
+
+    /** Template variable values keyed by placeholder index (1-based). */
+    public array $whatsappTemplateVariables = [];
 
     // Debug WhatsApp Tab
     public array $debugWhatsAppAccounts = [];
@@ -819,6 +836,13 @@ class ModalComms extends Component
             $this->whatsappCompose['to'] = (string) $thread->remote_phone_number;
         }
 
+        // Check 24h window and load templates if needed
+        $this->whatsappWindowOpen = $thread?->isWindowOpen() ?? false;
+        if (!$this->whatsappWindowOpen) {
+            $this->loadWhatsAppTemplates();
+        }
+        $this->resetTemplateSelection();
+
         // Mark thread as read
         $thread?->markAsRead();
 
@@ -860,6 +884,11 @@ class ModalComms extends Component
         $this->whatsappTimeline = [];
         $this->whatsappCompose['body'] = '';
 
+        // New thread = no prior inbound = window closed → must use templates
+        $this->whatsappWindowOpen = false;
+        $this->loadWhatsAppTemplates();
+        $this->resetTemplateSelection();
+
         // Prefill from context if available
         if ($this->hasContext()) {
             // Try to get phone from context recipients
@@ -889,6 +918,12 @@ class ModalComms extends Component
 
         if (!$this->activeWhatsAppChannelId) {
             $this->whatsappMessage = '⛔️ Kein WhatsApp Kanal ausgewählt.';
+            return;
+        }
+
+        // If window is closed, delegate to template sending
+        if (!$this->whatsappWindowOpen) {
+            $this->sendWhatsAppTemplate();
             return;
         }
 
@@ -971,6 +1006,270 @@ class ModalComms extends Component
 
         $this->whatsappMessage = '✅ Nachricht gesendet.';
         $this->dispatch('comms:scroll-bottom');
+    }
+
+    // -------------------------------------------------------------------------
+    // WhatsApp Template Methods (24h Window)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Load approved WhatsApp templates for the active channel from the integrations module.
+     */
+    public function loadWhatsAppTemplates(): void
+    {
+        $this->whatsappTemplates = [];
+
+        if (!$this->activeWhatsAppChannelId) {
+            return;
+        }
+
+        $channel = CommsChannel::query()->whereKey($this->activeWhatsAppChannelId)->first();
+        if (!$channel) {
+            return;
+        }
+
+        $accountId = $channel->meta['integrations_whatsapp_account_id'] ?? null;
+        if (!$accountId) {
+            return;
+        }
+
+        $templates = IntegrationsWhatsAppTemplate::query()
+            ->where('whatsapp_account_id', $accountId)
+            ->where('status', 'APPROVED')
+            ->orderBy('name')
+            ->get();
+
+        $this->whatsappTemplates = $templates->map(fn (IntegrationsWhatsAppTemplate $t) => [
+            'id' => (int) $t->id,
+            'name' => (string) $t->name,
+            'language' => (string) $t->language,
+            'category' => (string) ($t->category ?? ''),
+            'components' => $t->components ?? [],
+            'body_text' => $this->extractTemplateBodyText($t->components ?? []),
+            'variables_count' => $this->countTemplateVariables($t->components ?? []),
+        ])->all();
+    }
+
+    /**
+     * Select a template and prepare preview with variable inputs.
+     */
+    public function selectWhatsAppTemplate(?int $templateId): void
+    {
+        $this->whatsappSelectedTemplateId = $templateId;
+        $this->whatsappTemplatePreview = [];
+        $this->whatsappTemplateVariables = [];
+
+        if (!$templateId) {
+            return;
+        }
+
+        // Find template in loaded list
+        foreach ($this->whatsappTemplates as $t) {
+            if ((int) $t['id'] === $templateId) {
+                $bodyText = (string) ($t['body_text'] ?? '');
+                $variablesCount = (int) ($t['variables_count'] ?? 0);
+
+                $this->whatsappTemplatePreview = [
+                    'id' => $t['id'],
+                    'name' => $t['name'],
+                    'language' => $t['language'],
+                    'category' => $t['category'],
+                    'body_text' => $bodyText,
+                    'components' => $t['components'],
+                    'variables_count' => $variablesCount,
+                ];
+
+                // Initialize variable slots (1-based index matching {{1}}, {{2}}, etc.)
+                for ($i = 1; $i <= $variablesCount; $i++) {
+                    $this->whatsappTemplateVariables[$i] = '';
+                }
+
+                break;
+            }
+        }
+    }
+
+    /**
+     * Reset template selection state.
+     */
+    private function resetTemplateSelection(): void
+    {
+        $this->whatsappSelectedTemplateId = null;
+        $this->whatsappTemplatePreview = [];
+        $this->whatsappTemplateVariables = [];
+    }
+
+    /**
+     * Send the selected WhatsApp template message.
+     */
+    public function sendWhatsAppTemplate(): void
+    {
+        $this->whatsappMessage = null;
+        $wasNewThread = !$this->activeWhatsAppThreadId;
+
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+        if (!$user || !$team) {
+            $this->whatsappMessage = '⛔️ Kein Team-Kontext gefunden.';
+            return;
+        }
+
+        if (!$this->activeWhatsAppChannelId) {
+            $this->whatsappMessage = '⛔️ Kein WhatsApp Kanal ausgewählt.';
+            return;
+        }
+
+        if (!$this->whatsappSelectedTemplateId) {
+            $this->whatsappMessage = '⛔️ Bitte ein Template auswählen.';
+            return;
+        }
+
+        $preview = $this->whatsappTemplatePreview;
+        if (empty($preview)) {
+            $this->whatsappMessage = '⛔️ Template-Daten nicht gefunden.';
+            return;
+        }
+
+        // Validate all template variables are filled
+        $variablesCount = (int) ($preview['variables_count'] ?? 0);
+        for ($i = 1; $i <= $variablesCount; $i++) {
+            if (trim((string) ($this->whatsappTemplateVariables[$i] ?? '')) === '') {
+                $this->whatsappMessage = "⛔️ Bitte alle Platzhalter ausfüllen (Variable {$i} fehlt).";
+                return;
+            }
+        }
+
+        $channel = CommsChannel::query()
+            ->whereKey($this->activeWhatsAppChannelId)
+            ->where('type', 'whatsapp')
+            ->where('provider', 'whatsapp_meta')
+            ->where('is_active', true)
+            ->first();
+
+        if (!$channel) {
+            $this->whatsappMessage = '⛔️ WhatsApp Kanal nicht gefunden.';
+            return;
+        }
+
+        $to = (string) ($this->whatsappCompose['to'] ?? '');
+
+        // For existing threads, resolve "to" from thread
+        if ($this->activeWhatsAppThreadId && trim($to) === '') {
+            $thread = CommsWhatsAppThread::query()->whereKey($this->activeWhatsAppThreadId)->first();
+            if ($thread?->remote_phone_number) {
+                $to = (string) $thread->remote_phone_number;
+            }
+            $this->whatsappCompose['to'] = $to;
+        }
+
+        if (trim($to) === '') {
+            $this->whatsappMessage = '⛔️ Kein Empfänger angegeben.';
+            return;
+        }
+
+        // Build Meta API components array with filled variables
+        $components = [];
+        if ($variablesCount > 0) {
+            $parameters = [];
+            for ($i = 1; $i <= $variablesCount; $i++) {
+                $parameters[] = [
+                    'type' => 'text',
+                    'text' => (string) ($this->whatsappTemplateVariables[$i] ?? ''),
+                ];
+            }
+            $components[] = [
+                'type' => 'body',
+                'parameters' => $parameters,
+            ];
+        }
+
+        try {
+            /** @var WhatsAppMetaService $svc */
+            $svc = app(WhatsAppMetaService::class);
+            $message = $svc->sendTemplate(
+                $channel,
+                $to,
+                (string) $preview['name'],
+                $components,
+                (string) ($preview['language'] ?? 'de'),
+                $user
+            );
+        } catch (\Throwable $e) {
+            $this->whatsappMessage = '⛔️ Template-Versand fehlgeschlagen: ' . $e->getMessage();
+            return;
+        }
+
+        // Reset compose state
+        $this->resetTemplateSelection();
+        if ($wasNewThread) {
+            $this->whatsappCompose['to'] = '';
+        }
+
+        // Link new thread to context if applicable
+        if ($wasNewThread && $this->hasContext() && $message?->thread) {
+            $newThread = $message->thread;
+            if ($newThread && !$newThread->context_model) {
+                $newThread->update([
+                    'context_model' => $this->contextModel,
+                    'context_model_id' => $this->contextModelId,
+                ]);
+            }
+        }
+
+        // Refresh threads & select the thread for the sent message
+        $this->loadWhatsAppThreads();
+        if ($message?->thread) {
+            $this->setActiveWhatsAppThread((int) $message->thread->id);
+        } elseif ($this->activeWhatsAppThreadId) {
+            $this->loadWhatsAppTimeline();
+        }
+
+        $this->whatsappMessage = '✅ Template-Nachricht gesendet.';
+        $this->dispatch('comms:scroll-bottom');
+    }
+
+    /**
+     * Extract the body text from a template's components array.
+     */
+    private function extractTemplateBodyText(array $components): string
+    {
+        foreach ($components as $component) {
+            if (strtolower((string) ($component['type'] ?? '')) === 'body') {
+                return (string) ($component['text'] ?? '');
+            }
+        }
+        return '';
+    }
+
+    /**
+     * Count the number of {{N}} placeholders in a template's body.
+     */
+    private function countTemplateVariables(array $components): int
+    {
+        $bodyText = $this->extractTemplateBodyText($components);
+        if ($bodyText === '') {
+            return 0;
+        }
+        preg_match_all('/\{\{(\d+)\}\}/', $bodyText, $matches);
+        return !empty($matches[1]) ? (int) max($matches[1]) : 0;
+    }
+
+    /**
+     * Get the template body text with variables replaced by their filled values.
+     */
+    public function getTemplatePreviewText(): string
+    {
+        $bodyText = (string) ($this->whatsappTemplatePreview['body_text'] ?? '');
+        if ($bodyText === '') {
+            return '';
+        }
+
+        foreach ($this->whatsappTemplateVariables as $index => $value) {
+            $replacement = trim((string) $value) !== '' ? (string) $value : "{{" . $index . "}}";
+            $bodyText = str_replace("{{" . $index . "}}", $replacement, $bodyText);
+        }
+
+        return $bodyText;
     }
 
     public function deleteWhatsAppThread(int $threadId): void
