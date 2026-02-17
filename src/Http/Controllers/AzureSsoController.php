@@ -167,8 +167,14 @@ class AzureSsoController extends Controller
                 'azure_id' => $azureId,
             ]);
 
-            if ($isNewUser) {
-                \Log::info('Azure SSO: Creating personal team for new user', ['user_id' => $user->id]);
+            // Persönliches Team sicherstellen - für neue UND bestehende User
+            $hasPersonalTeam = $user->teams()->where('personal_team', true)->exists();
+
+            if (!$hasPersonalTeam) {
+                \Log::info('Azure SSO: Creating personal team for user', [
+                    'user_id' => $user->id,
+                    'is_new_user' => $isNewUser,
+                ]);
                 try {
                     PlatformCore::createPersonalTeamFor($user);
                     \Log::info('Azure SSO: Personal team created successfully', ['user_id' => $user->id]);
