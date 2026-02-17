@@ -122,11 +122,20 @@ class User extends Authenticatable
             if ($user->type !== 'ai_user') {
                 $user->team_id = null;
                 // Normale User müssen email und password haben - nur beim Erstellen validieren
+                // Ausnahme: SSO-User (mit azure_id) benötigen kein Passwort
                 if (!$user->exists) {
-                    if (!$user->email || !$user->password) {
+                    $isSsoUser = !empty($user->azure_id);
+
+                    if (!$user->email) {
                         throw \Illuminate\Validation\ValidationException::withMessages([
                             'email' => 'Email ist für normale User erforderlich.',
-                            'password' => 'Passwort ist für normale User erforderlich.',
+                        ]);
+                    }
+
+                    // Passwort nur für Nicht-SSO-User erforderlich
+                    if (!$isSsoUser && !$user->password) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'password' => 'Passwort ist für normale User erforderlich (außer bei SSO-Login).',
                         ]);
                     }
                 }
