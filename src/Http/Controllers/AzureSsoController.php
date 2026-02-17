@@ -96,153 +96,187 @@ class AzureSsoController extends Controller
                 ->with('error', 'Azure SSO konnte nicht abgeschlossen werden (Token-Exchange).');
         }
 
-        $azureId = $azureUser->getId();
-        $name    = $azureUser->getName() ?: ($azureUser->user['name'] ?? null);
-        $email   = $azureUser->getEmail()
-                   ?: ($azureUser->user['preferred_username'] ?? $azureUser->user['upn'] ?? null);
-        $avatar  = $azureUser->getAvatar();
+        // User processing - wrapped in try-catch to catch any exceptions
+        try {
+            $azureId = $azureUser->getId();
+            $name    = $azureUser->getName() ?: ($azureUser->user['name'] ?? null);
+            $email   = $azureUser->getEmail()
+                       ?: ($azureUser->user['preferred_username'] ?? $azureUser->user['upn'] ?? null);
+            $avatar  = $azureUser->getAvatar();
 
-        $userModelClass = config('azure-sso.user_model') ?: config('auth.providers.users.model');
+            \Log::info('Azure SSO: Extracted user data', [
+                'azure_id' => $azureId,
+                'name' => $name,
+                'email' => $email,
+                'has_avatar' => !empty($avatar),
+            ]);
 
-        // Bestehenden Nutzer anhand azure_id ODER email finden (bevorzugt azure_id)
-        $user = $userModelClass::query()
-            ->when($azureId, fn($q) => $q->where('azure_id', $azureId))
-            ->when(!$azureId && $email, fn($q) => $q->orWhere('email', $email))
-            ->first();
+            $userModelClass = config('azure-sso.user_model') ?: config('auth.providers.users.model');
 
-        // Wenn kein Nutzer per azure_id gefunden wurde, aber eine Email existiert,
-        // versuche den Nutzer strikt per Email zu finden (Unique-Constraint beachten)
-        if (! $user && $email) {
-            $user = $userModelClass::query()->where('email', $email)->first();
-        }
+            \Log::info('Azure SSO: Looking up user', [
+                'model_class' => $userModelClass,
+                'azure_id' => $azureId,
+                'email' => $email,
+            ]);
 
-        if (! $user) {
-            $user = new $userModelClass();
-        }
+            // Bestehenden Nutzer anhand azure_id ODER email finden (bevorzugt azure_id)
+            $user = $userModelClass::query()
+                ->when($azureId, fn($q) => $q->where('azure_id', $azureId))
+                ->when(!$azureId && $email, fn($q) => $q->orWhere('email', $email))
+                ->first();
 
-        $isNewUser = ! $user->exists;
-
-        // azure_id immer setzen, um zukünftige Logins stabil zu verknüpfen
-        $user->azure_id = $azureId;
-        if ($name || ! $user->name) {
-            $user->name = $name ?: ($email ?? 'Azure User');
-        }
-        // Email nur setzen, wenn leer oder identisch, um Duplicate-Key zu vermeiden
-        if ($email) {
-            if (! $user->email || $user->email === $email) {
-                $user->email = $email;
+            // Wenn kein Nutzer per azure_id gefunden wurde, aber eine Email existiert,
+            // versuche den Nutzer strikt per Email zu finden (Unique-Constraint beachten)
+            if (! $user && $email) {
+                $user = $userModelClass::query()->where('email', $email)->first();
             }
-        }
-        if ($avatar) {
-            $user->avatar = $avatar;
-        }
 
-        $user->save();
+            \Log::info('Azure SSO: User lookup result', [
+                'found' => $user !== null,
+                'user_id' => $user?->id,
+                'is_new' => !$user,
+            ]);
 
-        \Log::info('Azure SSO: User resolved', [
-            'user_id' => $user->id,
-            'email' => $user->email,
-            'is_new_user' => $isNewUser,
-            'azure_id' => $azureId,
-        ]);
+            if (! $user) {
+                $user = new $userModelClass();
+            }
 
-        if ($isNewUser) {
-            \Log::info('Azure SSO: Creating personal team for new user', ['user_id' => $user->id]);
+            $isNewUser = ! $user->exists;
+
+            // azure_id immer setzen, um zukünftige Logins stabil zu verknüpfen
+            $user->azure_id = $azureId;
+            if ($name || ! $user->name) {
+                $user->name = $name ?: ($email ?? 'Azure User');
+            }
+            // Email nur setzen, wenn leer oder identisch, um Duplicate-Key zu vermeiden
+            if ($email) {
+                if (! $user->email || $user->email === $email) {
+                    $user->email = $email;
+                }
+            }
+            if ($avatar) {
+                $user->avatar = $avatar;
+            }
+
+            $user->save();
+
+            \Log::info('Azure SSO: User resolved', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'is_new_user' => $isNewUser,
+                'azure_id' => $azureId,
+            ]);
+
+            if ($isNewUser) {
+                \Log::info('Azure SSO: Creating personal team for new user', ['user_id' => $user->id]);
+                try {
+                    PlatformCore::createPersonalTeamFor($user);
+                    \Log::info('Azure SSO: Personal team created successfully', ['user_id' => $user->id]);
+                } catch (\Throwable $e) {
+                    \Log::error('Azure SSO: Failed to create personal team', [
+                        'user_id' => $user->id,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+                }
+            }
+
+            Auth::login($user, true);
+            \Log::info('Azure SSO: User logged in', ['user_id' => $user->id, 'session_id' => session()->getId()]);
+
+            // Token aus Socialite Provider holen und speichern
             try {
-                PlatformCore::createPersonalTeamFor($user);
-                \Log::info('Azure SSO: Personal team created successfully', ['user_id' => $user->id]);
+                $token = $azureUser->token ?? null;
+
+                // Refresh Token kann auf verschiedene Weise zurückgegeben werden
+                // Socialite gibt den Refresh Token manchmal nicht direkt zurück,
+                // daher versuchen wir mehrere Wege
+                $refreshToken = null;
+
+                // 1. Direktes Property
+                if (isset($azureUser->refreshToken)) {
+                    $refreshToken = $azureUser->refreshToken;
+                }
+                // 2. Alternative Property-Name
+                elseif (isset($azureUser->refresh_token)) {
+                    $refreshToken = $azureUser->refresh_token;
+                }
+                // 3. Getter-Methode
+                elseif (method_exists($azureUser, 'getRefreshToken')) {
+                    $refreshToken = $azureUser->getRefreshToken();
+                }
+                // 4. Aus Token-Response extrahieren (falls verfügbar)
+                elseif (method_exists($azureUser, 'accessTokenResponse')) {
+                    $tokenResponse = $azureUser->accessTokenResponse;
+                    $refreshToken = $tokenResponse['refresh_token'] ?? null;
+                }
+
+                $expiresIn = $azureUser->expiresIn ?? 3600; // Default: 1 Stunde
+
+                if ($token) {
+                    session(['microsoft_access_token_' . $user->id => $token]);
+
+                    // Scopes aus dem Token extrahieren (falls verfügbar)
+                    // Socialite gibt die Scopes nicht direkt zurück, daher verwenden wir die angeforderten Scopes
+                    $scopes = [
+                        'User.Read',
+                        'Calendars.ReadWrite',
+                        'Calendars.ReadWrite.Shared',
+                    ];
+
+                    // Log für Debugging
+                    if (!$refreshToken) {
+                        \Log::warning('Azure SSO: No refresh token received. User may need to re-authenticate.', [
+                            'user_id' => $user->id,
+                            'email' => $email,
+                            'has_token' => !empty($token),
+                        ]);
+                    } else {
+                        \Log::info('Azure SSO: Refresh token received successfully', [
+                            'user_id' => $user->id,
+                            'email' => $email,
+                        ]);
+                    }
+
+                    $this->saveMicrosoftToken($user, $token, $refreshToken, $expiresIn, $scopes);
+                }
             } catch (\Throwable $e) {
-                \Log::error('Azure SSO: Failed to create personal team', [
+                \Log::warning('Failed to save Azure SSO token', [
                     'user_id' => $user->id,
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString(),
                 ]);
             }
-        }
 
-        Auth::login($user, true);
-        \Log::info('Azure SSO: User logged in', ['user_id' => $user->id, 'session_id' => session()->getId()]);
+            // Offene Teameinladungen automatisch akzeptieren
+            app(TeamInvitationService::class)->acceptAllForUser($user);
 
-        // Token aus Socialite Provider holen und speichern
-        try {
-            $token = $azureUser->token ?? null;
-            
-            // Refresh Token kann auf verschiedene Weise zurückgegeben werden
-            // Socialite gibt den Refresh Token manchmal nicht direkt zurück,
-            // daher versuchen wir mehrere Wege
-            $refreshToken = null;
-            
-            // 1. Direktes Property
-            if (isset($azureUser->refreshToken)) {
-                $refreshToken = $azureUser->refreshToken;
-            }
-            // 2. Alternative Property-Name
-            elseif (isset($azureUser->refresh_token)) {
-                $refreshToken = $azureUser->refresh_token;
-            }
-            // 3. Getter-Methode
-            elseif (method_exists($azureUser, 'getRefreshToken')) {
-                $refreshToken = $azureUser->getRefreshToken();
-            }
-            // 4. Aus Token-Response extrahieren (falls verfügbar)
-            elseif (method_exists($azureUser, 'accessTokenResponse')) {
-                $tokenResponse = $azureUser->accessTokenResponse;
-                $refreshToken = $tokenResponse['refresh_token'] ?? null;
-            }
-            
-            $expiresIn = $azureUser->expiresIn ?? 3600; // Default: 1 Stunde
-            
-            if ($token) {
-                session(['microsoft_access_token_' . $user->id => $token]);
-                
-                // Scopes aus dem Token extrahieren (falls verfügbar)
-                // Socialite gibt die Scopes nicht direkt zurück, daher verwenden wir die angeforderten Scopes
-                $scopes = [
-                    'User.Read',
-                    'Calendars.ReadWrite',
-                    'Calendars.ReadWrite.Shared',
-                ];
-                
-                // Log für Debugging
-                if (!$refreshToken) {
-                    \Log::warning('Azure SSO: No refresh token received. User may need to re-authenticate.', [
-                        'user_id' => $user->id,
-                        'email' => $email,
-                        'has_token' => !empty($token),
-                    ]);
-                } else {
-                    \Log::info('Azure SSO: Refresh token received successfully', [
-                        'user_id' => $user->id,
-                        'email' => $email,
-                    ]);
-                }
-                
-                $this->saveMicrosoftToken($user, $token, $refreshToken, $expiresIn, $scopes);
-            }
-        } catch (\Throwable $e) {
-            \Log::warning('Failed to save Azure SSO token', [
+            // 3. Log post-login redirect
+            $redirectTo = config('azure-sso.post_login_redirect', '/');
+            $intendedUrl = redirect()->intended($redirectTo)->getTargetUrl();
+
+            \Log::info('Azure SSO: Login complete, redirecting', [
                 'user_id' => $user->id,
-                'error' => $e->getMessage(),
+                'email' => $user->email,
+                'configured_redirect' => $redirectTo,
+                'actual_redirect' => $intendedUrl,
+                'session_id' => session()->getId(),
+            ]);
+
+            return redirect()->intended($redirectTo);
+
+        } catch (\Throwable $e) {
+            \Log::error('Azure SSO: User processing failed', [
+                'message' => $e->getMessage(),
+                'class' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
+            return redirect()->route('azure-sso.login')
+                ->with('error', 'SSO Login fehlgeschlagen: ' . $e->getMessage());
         }
-
-        // Offene Teameinladungen automatisch akzeptieren
-        app(TeamInvitationService::class)->acceptAllForUser($user);
-
-        // 3. Log post-login redirect
-        $redirectTo = config('azure-sso.post_login_redirect', '/');
-        $intendedUrl = redirect()->intended($redirectTo)->getTargetUrl();
-
-        \Log::info('Azure SSO: Login complete, redirecting', [
-            'user_id' => $user->id,
-            'email' => $user->email,
-            'configured_redirect' => $redirectTo,
-            'actual_redirect' => $intendedUrl,
-            'session_id' => session()->getId(),
-        ]);
-
-        return redirect()->intended($redirectTo);
     }
 
     public function logout(Request $request)
