@@ -386,6 +386,11 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register($this->app->make(\Platform\Core\Tools\ToggleTeamModuleTool::class)); } catch (\Throwable $e) {}
         }
 
+        // Bulk-Modul-Freischaltung: Mehrere Module gleichzeitig für einen User aktivieren/deaktivieren
+        if (class_exists(\Platform\Core\Tools\BulkToggleModuleTool::class) && !$registry->has('core.modules.bulk_PUT')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\BulkToggleModuleTool::class)); } catch (\Throwable $e) {}
+        }
+
         // Core AI Models (DB Source of Truth): tools for listing/updating models must be discoverable via module=core
         if (class_exists(\Platform\Core\Tools\ListAiModelsTool::class) && !$registry->has('core.ai_models.GET')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\ListAiModelsTool::class)); } catch (\Throwable $e) {}

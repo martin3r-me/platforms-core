@@ -236,7 +236,7 @@ class ToggleModuleTool implements ToolContract, ToolMetadataContract
             'idempotent' => true,
             'confirmation_required' => false,
             'side_effects' => ['updates'],
-            'related_tools' => ['core.modules.GET', 'core.context.GET', 'core.teams.GET', 'core.team.switch'],
+            'related_tools' => ['core.modules.GET', 'core.modules.bulk_PUT', 'core.context.GET', 'core.teams.GET', 'core.team.switch'],
         ];
     }
 }
