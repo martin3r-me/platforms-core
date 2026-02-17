@@ -66,17 +66,6 @@ class AzureSsoController extends Controller
                    ?: ($azureUser->user['preferred_username'] ?? $azureUser->user['upn'] ?? null);
         $avatar  = $azureUser->getAvatar();
 
-        if (! $policy->isEmailAllowed($email)) {
-            \Log::warning('SSO denied by policy: email not allowed', ['email' => $email]);
-            return redirect()->route('azure-sso.login')->with('error', 'Zugriff verweigert.');
-        }
-
-        $tenant = config('services.microsoft.tenant');
-        if (! $policy->isTenantAllowed($tenant)) {
-            \Log::warning('SSO denied by policy: tenant not allowed', ['tenant' => $tenant]);
-            return redirect()->route('azure-sso.login')->with('error', 'Zugriff verweigert.');
-        }
-
         $userModelClass = config('azure-sso.user_model') ?: config('auth.providers.users.model');
 
         // Bestehenden Nutzer anhand azure_id ODER email finden (bevorzugt azure_id)
