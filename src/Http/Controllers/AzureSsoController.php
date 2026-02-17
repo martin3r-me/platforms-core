@@ -43,8 +43,10 @@ class AzureSsoController extends Controller
     public function redirectToProvider()
     {
         \Log::debug('Azure SSO redirect', [
-            'tenant'   => config('azure-sso.tenant') ?? config('azure-sso.tenant_id'),
+            'tenant' => config('azure-sso.tenant') ?? config('azure-sso.tenant_id'),
             'redirect' => config('azure-sso.redirect'),
+            'client_id' => config('services.microsoft.client_id'),
+            'post_login_redirect' => config('azure-sso.post_login_redirect'),
         ]);
 
         return $this->redirectProvider()->redirect();
@@ -52,6 +54,17 @@ class AzureSsoController extends Controller
 
     public function handleProviderCallback(Request $request)
     {
+        // 1. Log callback entry
+        \Log::info('Azure SSO callback received', [
+            'url' => $request->fullUrl(),
+            'has_code' => $request->has('code'),
+            'has_error' => $request->has('error'),
+            'has_state' => $request->has('state'),
+            'all_params' => $request->query(),
+            'session_id' => session()->getId(),
+            'intended_url' => session()->get('url.intended'),
+        ]);
+
         /** @var AuthAccessPolicy $policy */
         $policy = app(AuthAccessPolicy::class);
 
@@ -61,12 +74,23 @@ class AzureSsoController extends Controller
                 ->with('error', $request->input('error_description', 'Azure SSO error'));
         }
 
+        // 2. Token exchange
+        \Log::info('Azure SSO: Starting token exchange');
+
         try {
             $azureUser = $this->callbackProvider()->user();
+
+            \Log::info('Azure SSO: Token exchange successful', [
+                'azure_id' => $azureUser->getId(),
+                'email' => $azureUser->getEmail(),
+                'has_token' => !empty($azureUser->token),
+                'has_refresh_token' => !empty($azureUser->refreshToken),
+            ]);
         } catch (\Throwable $e) {
             \Log::error('Azure SSO token exchange failed', [
                 'message' => $e->getMessage(),
-                'class'   => get_class($e),
+                'class' => get_class($e),
+                'trace' => $e->getTraceAsString(),
             ]);
             return redirect()->route('azure-sso.login')
                 ->with('error', 'Azure SSO konnte nicht abgeschlossen werden (Token-Exchange).');
@@ -115,11 +139,29 @@ class AzureSsoController extends Controller
 
         $user->save();
 
+        \Log::info('Azure SSO: User resolved', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'is_new_user' => $isNewUser,
+            'azure_id' => $azureId,
+        ]);
+
         if ($isNewUser) {
-            PlatformCore::createPersonalTeamFor($user);
+            \Log::info('Azure SSO: Creating personal team for new user', ['user_id' => $user->id]);
+            try {
+                PlatformCore::createPersonalTeamFor($user);
+                \Log::info('Azure SSO: Personal team created successfully', ['user_id' => $user->id]);
+            } catch (\Throwable $e) {
+                \Log::error('Azure SSO: Failed to create personal team', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+            }
         }
 
         Auth::login($user, true);
+        \Log::info('Azure SSO: User logged in', ['user_id' => $user->id, 'session_id' => session()->getId()]);
 
         // Token aus Socialite Provider holen und speichern
         try {
@@ -188,7 +230,19 @@ class AzureSsoController extends Controller
         // Offene Teameinladungen automatisch akzeptieren
         app(TeamInvitationService::class)->acceptAllForUser($user);
 
-        return redirect()->intended(config('azure-sso.post_login_redirect', '/'));
+        // 3. Log post-login redirect
+        $redirectTo = config('azure-sso.post_login_redirect', '/');
+        $intendedUrl = redirect()->intended($redirectTo)->getTargetUrl();
+
+        \Log::info('Azure SSO: Login complete, redirecting', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'configured_redirect' => $redirectTo,
+            'actual_redirect' => $intendedUrl,
+            'session_id' => session()->getId(),
+        ]);
+
+        return redirect()->intended($redirectTo);
     }
 
     public function logout(Request $request)
