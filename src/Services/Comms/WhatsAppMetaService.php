@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Platform\Core\Models\CommsChannel;
+use Platform\Core\Models\CommsWhatsAppConversationThread;
 use Platform\Core\Models\CommsWhatsAppMessage;
 use Platform\Core\Models\CommsWhatsAppThread;
 use Platform\Core\Models\ContextFile;
@@ -180,9 +181,13 @@ class WhatsAppMetaService
             return CommsWhatsAppMessage::query()->where('meta_message_id', $messageId)->first();
         }
 
+        // Resolve active conversation thread (if any)
+        $activeConversationThread = CommsWhatsAppConversationThread::findActiveForThread($thread->id);
+
         // Create the message
         $message = $thread->messages()->create([
             'direction' => 'inbound',
+            'conversation_thread_id' => $activeConversationThread?->id,
             'meta_message_id' => $messageId,
             'body' => $text,
             'message_type' => $storedMessageType,
@@ -282,11 +287,15 @@ class WhatsAppMetaService
 
         $thread = CommsWhatsAppThread::findOrCreateForPhone($channel, $phone);
 
+        // Resolve active conversation thread (if any)
+        $activeConversationThread = CommsWhatsAppConversationThread::findActiveForThread($thread->id);
+
         $messageId = $responseData['messages'][0]['id'] ?? null;
         $status = $response->successful() ? 'sent' : 'failed';
 
         $message = $thread->messages()->create([
             'direction' => 'outbound',
+            'conversation_thread_id' => $activeConversationThread?->id,
             'meta_message_id' => $messageId,
             'body' => $body,
             'message_type' => $messageType,

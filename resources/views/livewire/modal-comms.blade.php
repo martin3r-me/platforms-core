@@ -503,7 +503,7 @@
 
                                                     {{-- WhatsApp Verlauf (typische Bubbles) --}}
                                                     <div x-show="activeChannel==='whatsapp'" class="space-y-3" x-cloak>
-                                                        <div class="text-xs text-[var(--ui-muted)] flex items-center gap-2">
+                                                        <div class="text-xs text-[var(--ui-muted)] flex items-center gap-2 flex-wrap">
                                                             <span class="px-2 py-1 rounded border border-[var(--ui-border)]/60 bg-[var(--ui-bg)]">
                                                                 Kanal: WhatsApp
                                                             </span>
@@ -548,6 +548,135 @@
                                                                 <span class="ml-auto text-[10px] text-[var(--ui-muted)]">Neuer Thread</span>
                                                             @endif
                                                         </div>
+
+                                                        {{-- Conversation Thread Selector (Pseudo-Threads) --}}
+                                                        @if($activeWhatsAppThreadId && !empty($conversationThreads))
+                                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                                <button
+                                                                    type="button"
+                                                                    wire:click="setActiveConversationThread(null)"
+                                                                    class="px-2 py-1 rounded-full text-[10px] font-medium border transition
+                                                                        {{ !$activeConversationThreadId
+                                                                            ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
+                                                                            : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)]/60 hover:text-[var(--ui-secondary)]' }}"
+                                                                >
+                                                                    Alle
+                                                                </button>
+                                                                @foreach($conversationThreads as $ct)
+                                                                    <button
+                                                                        type="button"
+                                                                        wire:click="setActiveConversationThread({{ intval($ct['id']) }})"
+                                                                        class="px-2 py-1 rounded-full text-[10px] font-medium border transition inline-flex items-center gap-1
+                                                                            {{ (int) $activeConversationThreadId === (int) $ct['id']
+                                                                                ? 'bg-[var(--ui-primary)] text-white border-[var(--ui-primary)]'
+                                                                                : ($ct['is_active']
+                                                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                                                                    : 'bg-[var(--ui-bg)] text-[var(--ui-muted)] border-[var(--ui-border)]/60 hover:text-[var(--ui-secondary)]') }}"
+                                                                        title="{{ $ct['started_at'] }}{{ $ct['ended_at'] ? ' – ' . $ct['ended_at'] : ' (aktiv)' }}"
+                                                                    >
+                                                                        @if($ct['is_active'])
+                                                                            <span class="w-1.5 h-1.5 rounded-full {{ (int) $activeConversationThreadId === (int) $ct['id'] ? 'bg-white' : 'bg-emerald-500' }}"></span>
+                                                                        @endif
+                                                                        {{ $ct['label'] }}
+                                                                        <span class="{{ (int) $activeConversationThreadId === (int) $ct['id'] ? 'text-white/70' : 'text-[var(--ui-muted)]' }}">({{ $ct['messages_count'] }})</span>
+                                                                    </button>
+                                                                @endforeach
+
+                                                                {{-- New conversation thread button with inline input --}}
+                                                                <div x-data="{ showInput: false }" class="inline-flex items-center gap-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        x-show="!showInput"
+                                                                        @click="showInput = true; $nextTick(() => $refs.convLabel.focus())"
+                                                                        class="px-2 py-1 rounded-full text-[10px] font-medium border border-dashed border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-secondary)]/40 transition inline-flex items-center gap-1"
+                                                                        title="Neuen Konversations-Thread starten"
+                                                                    >
+                                                                        @svg('heroicon-o-plus', 'w-3 h-3')
+                                                                        Neu
+                                                                    </button>
+                                                                    <div x-show="showInput" x-cloak class="inline-flex items-center gap-1">
+                                                                        <input
+                                                                            type="text"
+                                                                            x-ref="convLabel"
+                                                                            wire:model="newConversationThreadLabel"
+                                                                            @keydown.enter="$wire.startNewConversationThread(); showInput = false;"
+                                                                            @keydown.escape="showInput = false"
+                                                                            class="px-2 py-1 text-[11px] border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--ui-primary)] w-28"
+                                                                            placeholder="z.B. Onboarding"
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            wire:click="startNewConversationThread"
+                                                                            @click="showInput = false"
+                                                                            class="px-2 py-1 rounded text-[10px] font-semibold bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition"
+                                                                        >
+                                                                            OK
+                                                                        </button>
+                                                                        <button type="button" @click="showInput = false" class="text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]">
+                                                                            @svg('heroicon-o-x-mark', 'w-3 h-3')
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        @elseif($activeWhatsAppThreadId && empty($conversationThreads))
+                                                            {{-- No conversation threads yet - show subtle start button --}}
+                                                            <div x-data="{ showInput: false }">
+                                                                <button
+                                                                    type="button"
+                                                                    x-show="!showInput"
+                                                                    @click="showInput = true; $nextTick(() => $refs.convLabelFirst.focus())"
+                                                                    class="px-2 py-1 rounded text-[10px] font-medium border border-dashed border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-secondary)]/40 transition inline-flex items-center gap-1"
+                                                                    title="Konversation in logische Abschnitte unterteilen"
+                                                                >
+                                                                    @svg('heroicon-o-chat-bubble-bottom-center-text', 'w-3.5 h-3.5')
+                                                                    Konversation unterteilen
+                                                                </button>
+                                                                <div x-show="showInput" x-cloak class="inline-flex items-center gap-1">
+                                                                    <input
+                                                                        type="text"
+                                                                        x-ref="convLabelFirst"
+                                                                        wire:model="newConversationThreadLabel"
+                                                                        @keydown.enter="$wire.startNewConversationThread(); showInput = false;"
+                                                                        @keydown.escape="showInput = false"
+                                                                        class="px-2 py-1 text-[11px] border border-[var(--ui-border)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--ui-primary)] w-36"
+                                                                        placeholder="Label (z.B. Bewerbung)"
+                                                                    />
+                                                                    <button
+                                                                        type="button"
+                                                                        wire:click="startNewConversationThread"
+                                                                        @click="showInput = false"
+                                                                        class="px-2 py-1 rounded text-[10px] font-semibold bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90 transition"
+                                                                    >
+                                                                        Starten
+                                                                    </button>
+                                                                    <button type="button" @click="showInput = false" class="text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]">
+                                                                        @svg('heroicon-o-x-mark', 'w-3 h-3')
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        @endif
+
+                                                        {{-- Read-only indicator when viewing archived conversation thread --}}
+                                                        @if($viewingConversationHistory && $activeConversationThreadId)
+                                                            <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 flex items-center gap-2">
+                                                                @svg('heroicon-o-archive-box', 'w-4 h-4 text-amber-600 flex-shrink-0')
+                                                                <span class="text-[11px] text-amber-800 font-medium">
+                                                                    Archivierter Thread (nur lesen)
+                                                                    @php
+                                                                        $archivedLabel = '';
+                                                                        foreach ($conversationThreads as $ct) {
+                                                                            if ((int) $ct['id'] === (int) $activeConversationThreadId) {
+                                                                                $archivedLabel = $ct['label'];
+                                                                                break;
+                                                                            }
+                                                                        }
+                                                                    @endphp
+                                                                    @if($archivedLabel)
+                                                                        – {{ $archivedLabel }}
+                                                                    @endif
+                                                                </span>
+                                                            </div>
+                                                        @endif
 
                                                         @if(!$activeWhatsAppChannelId)
                                                             <div class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
@@ -893,6 +1022,13 @@
                                                     </template>
                                                     <template x-if="activeChannel==='whatsapp'">
                                                         <div class="w-full space-y-2">
+                                                            @if($viewingConversationHistory)
+                                                                {{-- Read-only mode for archived conversation threads --}}
+                                                                <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60">
+                                                                    @svg('heroicon-o-lock-closed', 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
+                                                                    <span class="text-xs text-[var(--ui-muted)]">Dieser Konversations-Thread ist archiviert. Wechsle zum aktiven Thread, um Nachrichten zu senden.</span>
+                                                                </div>
+                                                            @else
                                                             {{-- New thread: show To field --}}
                                                             @if(!$activeWhatsAppThreadId)
                                                                 <div class="grid grid-cols-1">
@@ -1037,6 +1173,7 @@
                                                                     </div>
                                                                 @endif
                                                             @endif
+                                                            @endif {{-- end @else viewingConversationHistory --}}
 
                                                             @error('whatsappCompose.body')
                                                                 <div class="mt-1 text-sm text-[color:var(--ui-danger)]">{{ $message }}</div>

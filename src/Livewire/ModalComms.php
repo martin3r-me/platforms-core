@@ -20,6 +20,7 @@ use Platform\Core\Services\Comms\WhatsAppMetaService;
 use Platform\Core\Services\Comms\WhatsAppChannelSyncService;
 use Platform\Core\Models\CommsWhatsAppThread;
 use Platform\Core\Models\CommsWhatsAppMessage;
+use Platform\Core\Models\CommsWhatsAppConversationThread;
 use Platform\Integrations\Models\IntegrationsWhatsAppAccount;
 use Platform\Integrations\Models\IntegrationsWhatsAppTemplate;
 
@@ -168,6 +169,17 @@ class ModalComms extends Component
     ];
 
     public ?string $whatsappMessage = null;
+
+    // --- WhatsApp Conversation Threads (Pseudo-Threads) ---
+    /** @var array<int, array<string, mixed>> */
+    public array $conversationThreads = [];
+    public ?int $activeConversationThreadId = null;
+
+    /** Whether we are viewing a historical (closed) conversation thread in read-only mode. */
+    public bool $viewingConversationHistory = false;
+
+    /** Label for the new conversation thread input. */
+    public string $newConversationThreadLabel = '';
 
     // --- WhatsApp Template (24h-Window) ---
     /** Whether the current thread has an open 24h messaging window. */
@@ -673,6 +685,10 @@ class ModalComms extends Component
         $this->whatsappChannels = [];
         $this->whatsappThreads = [];
         $this->whatsappTimeline = [];
+        $this->conversationThreads = [];
+        $this->activeConversationThreadId = null;
+        $this->viewingConversationHistory = false;
+        $this->newConversationThreadLabel = '';
 
         $user = Auth::user();
         $team = $user?->currentTeam;
@@ -831,6 +847,15 @@ class ModalComms extends Component
     public function setActiveWhatsAppThread(int $threadId): void
     {
         $this->activeWhatsAppThreadId = $threadId;
+        $this->viewingConversationHistory = false;
+
+        // Load conversation threads for this WhatsApp thread
+        $this->loadConversationThreads();
+
+        // Set active conversation thread to the currently active one (if any)
+        $activeConvThread = CommsWhatsAppConversationThread::findActiveForThread($threadId);
+        $this->activeConversationThreadId = $activeConvThread?->id;
+
         $this->loadWhatsAppTimeline();
 
         // Pre-fill "to" from thread phone number
@@ -860,8 +885,15 @@ class ModalComms extends Component
             return;
         }
 
-        $messages = CommsWhatsAppMessage::query()
-            ->where('comms_whatsapp_thread_id', $this->activeWhatsAppThreadId)
+        $query = CommsWhatsAppMessage::query()
+            ->where('comms_whatsapp_thread_id', $this->activeWhatsAppThreadId);
+
+        // Filter by active conversation thread if one is selected
+        if ($this->activeConversationThreadId) {
+            $query->where('conversation_thread_id', $this->activeConversationThreadId);
+        }
+
+        $messages = $query
             ->orderByRaw('COALESCE(sent_at, created_at) ASC')
             ->get();
 
@@ -882,11 +914,116 @@ class ModalComms extends Component
         $this->dispatch('comms:scroll-bottom');
     }
 
+    // -------------------------------------------------------------------------
+    // WhatsApp Conversation Thread (Pseudo-Thread) Methods
+    // -------------------------------------------------------------------------
+
+    /**
+     * Load all conversation threads for the active WhatsApp thread.
+     */
+    public function loadConversationThreads(): void
+    {
+        $this->conversationThreads = [];
+
+        if (!$this->activeWhatsAppThreadId) {
+            return;
+        }
+
+        $threads = CommsWhatsAppConversationThread::query()
+            ->where('comms_whatsapp_thread_id', $this->activeWhatsAppThreadId)
+            ->withCount('messages')
+            ->orderByDesc('started_at')
+            ->get();
+
+        $this->conversationThreads = $threads->map(fn (CommsWhatsAppConversationThread $ct) => [
+            'id' => (int) $ct->id,
+            'uuid' => (string) $ct->uuid,
+            'label' => (string) $ct->label,
+            'started_at' => $ct->started_at?->format('d.m.Y H:i'),
+            'ended_at' => $ct->ended_at?->format('d.m.Y H:i'),
+            'is_active' => $ct->isActive(),
+            'messages_count' => (int) ($ct->messages_count ?? 0),
+            'created_by' => $ct->createdBy?->name ?? null,
+        ])->all();
+    }
+
+    /**
+     * Start a new conversation thread for the active WhatsApp thread.
+     * Closes any currently active conversation thread.
+     */
+    public function startNewConversationThread(): void
+    {
+        $this->whatsappMessage = null;
+
+        if (!$this->activeWhatsAppThreadId) {
+            $this->whatsappMessage = 'Bitte zuerst einen WhatsApp Thread auswählen.';
+            return;
+        }
+
+        $label = trim($this->newConversationThreadLabel);
+        if ($label === '') {
+            $this->whatsappMessage = 'Bitte ein Label für den neuen Konversations-Thread eingeben.';
+            return;
+        }
+
+        $user = Auth::user();
+        $team = $user?->currentTeam;
+        if (!$user || !$team) {
+            $this->whatsappMessage = 'Kein Team-Kontext gefunden.';
+            return;
+        }
+
+        $rootTeam = method_exists($team, 'getRootTeam') ? $team->getRootTeam() : $team;
+
+        $conversationThread = CommsWhatsAppConversationThread::startNew(
+            $this->activeWhatsAppThreadId,
+            $rootTeam->id,
+            $label,
+            $user->id,
+        );
+
+        $this->activeConversationThreadId = (int) $conversationThread->id;
+        $this->viewingConversationHistory = false;
+        $this->newConversationThreadLabel = '';
+
+        $this->loadConversationThreads();
+        $this->loadWhatsAppTimeline();
+
+        $this->whatsappMessage = 'Neuer Konversations-Thread gestartet: ' . $label;
+        $this->dispatch('comms:scroll-bottom');
+    }
+
+    /**
+     * Switch to a specific conversation thread (for viewing history or active thread).
+     */
+    public function setActiveConversationThread(?int $conversationThreadId): void
+    {
+        if ($conversationThreadId === null) {
+            // "Alle Nachrichten" mode - no filter
+            $this->activeConversationThreadId = null;
+            $this->viewingConversationHistory = false;
+        } else {
+            $ct = CommsWhatsAppConversationThread::query()->whereKey($conversationThreadId)->first();
+            if (!$ct) {
+                return;
+            }
+            $this->activeConversationThreadId = (int) $ct->id;
+            $this->viewingConversationHistory = !$ct->isActive();
+        }
+
+        $this->loadWhatsAppTimeline();
+        $this->dispatch('comms:scroll-bottom');
+    }
+
     public function startNewWhatsAppThread(): void
     {
         $this->activeWhatsAppThreadId = null;
         $this->whatsappTimeline = [];
         $this->whatsappCompose['body'] = '';
+        $this->conversationThreads = [];
+        $this->activeConversationThreadId = null;
+        $this->viewingConversationHistory = false;
+        $this->newConversationThreadLabel = '';
 
         // New thread = no prior inbound = window closed → must use templates
         $this->whatsappWindowOpen = false;

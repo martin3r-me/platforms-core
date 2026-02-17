@@ -7,6 +7,7 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\CommsChannel;
+use Platform\Core\Models\CommsWhatsAppConversationThread;
 use Platform\Core\Models\CommsWhatsAppMessage;
 use Platform\Core\Models\CommsWhatsAppThread;
 use Platform\Core\Tools\Concerns\HasStandardGetOperations;
@@ -24,7 +25,7 @@ class ListWhatsAppMessagesTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /comms/whatsapp_messages – Nachrichten einer WhatsApp-Konversation abrufen. Benötigt thread_id. Optional: include_attachments=true für Datei-Anhänge.';
+        return 'GET /comms/whatsapp_messages – Nachrichten einer WhatsApp-Konversation abrufen. Benötigt thread_id. Optional: conversation_thread_id zum Filtern nach Pseudo-Thread, include_attachments=true für Datei-Anhänge.';
     }
 
     public function getSchema(): array
@@ -40,6 +41,10 @@ class ListWhatsAppMessagesTool implements ToolContract, ToolMetadataContract
                     'thread_id' => [
                         'type' => 'integer',
                         'description' => 'ERFORDERLICH: WhatsApp-Thread-ID.',
+                    ],
+                    'conversation_thread_id' => [
+                        'type' => 'integer',
+                        'description' => 'Optional: Nur Nachrichten eines bestimmten Konversations-Threads (Pseudo-Thread). Nutze core.comms.whatsapp_threads.GET um aktive/vergangene Konversations-Threads zu sehen.',
                     ],
                     'include_attachments' => [
                         'type' => 'boolean',
@@ -98,6 +103,12 @@ class ListWhatsAppMessagesTool implements ToolContract, ToolMetadataContract
                 ->where('comms_whatsapp_thread_id', $threadId)
                 ->with('sentByUser:id,first_name,last_name,email');
 
+            // Filter by conversation thread (pseudo-thread)
+            $conversationThreadId = isset($arguments['conversation_thread_id']) ? (int) $arguments['conversation_thread_id'] : null;
+            if ($conversationThreadId) {
+                $query->where('conversation_thread_id', $conversationThreadId);
+            }
+
             $this->applyStandardFilters($query, $arguments, [
                 'direction', 'message_type', 'status', 'created_at', 'sent_at',
             ]);
@@ -113,6 +124,7 @@ class ListWhatsAppMessagesTool implements ToolContract, ToolMetadataContract
                 $item = [
                     'id' => (int) $m->id,
                     'thread_id' => (int) $m->comms_whatsapp_thread_id,
+                    'conversation_thread_id' => $m->conversation_thread_id ? (int) $m->conversation_thread_id : null,
                     'direction' => $m->direction,
                     'body' => $m->body,
                     'message_type' => $m->message_type,
@@ -147,11 +159,17 @@ class ListWhatsAppMessagesTool implements ToolContract, ToolMetadataContract
             })->values()->toArray();
 
             // Thread info for context
+            $activeConvThread = CommsWhatsAppConversationThread::findActiveForThread($thread->id);
             $threadInfo = [
                 'id' => (int) $thread->id,
                 'comms_channel_id' => (int) $thread->comms_channel_id,
                 'remote_phone_number' => $thread->remote_phone_number,
                 'is_unread' => (bool) $thread->is_unread,
+                'active_conversation_thread' => $activeConvThread ? [
+                    'id' => (int) $activeConvThread->id,
+                    'label' => $activeConvThread->label,
+                    'started_at' => $activeConvThread->started_at?->toIso8601String(),
+                ] : null,
             ];
 
             return ToolResult::success([

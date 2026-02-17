@@ -7,6 +7,7 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\CommsChannel;
+use Platform\Core\Models\CommsWhatsAppConversationThread;
 use Platform\Core\Models\CommsWhatsAppThread;
 use Platform\Core\Tools\Concerns\HasStandardGetOperations;
 use Platform\Core\Tools\Comms\Concerns\ResolvesCommsRootTeam;
@@ -143,7 +144,10 @@ class ListWhatsAppThreadsTool implements ToolContract, ToolMetadataContract
                 $lastIsInbound = $t->last_inbound_at && (!$t->last_outbound_at || $t->last_inbound_at->greaterThanOrEqualTo($t->last_outbound_at));
                 $lastAt = $lastIsInbound ? $t->last_inbound_at : ($t->last_outbound_at ?: $t->updated_at);
 
-                return [
+                // Active conversation thread (pseudo-thread)
+                $activeConvThread = CommsWhatsAppConversationThread::findActiveForThread($t->id);
+
+                $item = [
                     'id' => (int) $t->id,
                     'comms_channel_id' => (int) $t->comms_channel_id,
                     'token' => (string) $t->token,
@@ -156,7 +160,14 @@ class ListWhatsAppThreadsTool implements ToolContract, ToolMetadataContract
                     'context_model' => $t->context_model,
                     'context_model_id' => $t->context_model_id ? (int) $t->context_model_id : null,
                     'updated_at' => $t->updated_at?->toIso8601String(),
+                    'active_conversation_thread' => $activeConvThread ? [
+                        'id' => (int) $activeConvThread->id,
+                        'label' => $activeConvThread->label,
+                        'started_at' => $activeConvThread->started_at?->toIso8601String(),
+                    ] : null,
                 ];
+
+                return $item;
             })->values()->toArray();
 
             return ToolResult::success([

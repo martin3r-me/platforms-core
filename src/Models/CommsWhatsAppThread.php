@@ -51,6 +51,19 @@ class CommsWhatsAppThread extends Model
         return $this->hasMany(CommsWhatsAppMessage::class, 'comms_whatsapp_thread_id');
     }
 
+    public function conversationThreads(): HasMany
+    {
+        return $this->hasMany(CommsWhatsAppConversationThread::class, 'comms_whatsapp_thread_id');
+    }
+
+    /**
+     * Get the currently active conversation thread (ended_at IS NULL).
+     */
+    public function activeConversationThread(): ?CommsWhatsAppConversationThread
+    {
+        return CommsWhatsAppConversationThread::findActiveForThread($this->id);
+    }
+
     public function contact(): MorphTo
     {
         return $this->morphTo('contact', 'contact_type', 'contact_id');

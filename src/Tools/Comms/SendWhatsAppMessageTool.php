@@ -195,6 +195,7 @@ class SendWhatsAppMessageTool implements ToolContract, ToolMetadataContract
                 'whatsapp_message' => [
                     'id' => (int) $message->id,
                     'thread_id' => (int) $message->comms_whatsapp_thread_id,
+                    'conversation_thread_id' => $message->conversation_thread_id ? (int) $message->conversation_thread_id : null,
                     'direction' => $message->direction,
                     'status' => $message->status,
                     'message_type' => $message->message_type,

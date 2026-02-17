@@ -14,6 +14,7 @@ class CommsWhatsAppMessage extends Model
 
     protected $fillable = [
         'comms_whatsapp_thread_id',
+        'conversation_thread_id',
         'direction',
         'meta_message_id',
         'body',
@@ -41,6 +42,11 @@ class CommsWhatsAppMessage extends Model
     public function thread(): BelongsTo
     {
         return $this->belongsTo(CommsWhatsAppThread::class, 'comms_whatsapp_thread_id');
+    }
+
+    public function conversationThread(): BelongsTo
+    {
+        return $this->belongsTo(CommsWhatsAppConversationThread::class, 'conversation_thread_id');
     }
 
     public function sentByUser(): BelongsTo
