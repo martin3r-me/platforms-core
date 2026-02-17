@@ -242,6 +242,10 @@
                             $fileIds = is_array($fileIds) ? $fileIds : ($fileIds ? [$fileIds] : []);
                             $verificationStatus = $extraFieldMeta[$field['id']]['verification_status'] ?? null;
                             $verificationResult = $extraFieldMeta[$field['id']]['verification_result'] ?? null;
+
+                            // Kontext aus dem Extra-Feld-Model bestimmen (via public Methods)
+                            $efContextType = method_exists($this, 'getExtraFieldContextType') ? $this->getExtraFieldContextType() : null;
+                            $efContextId = method_exists($this, 'getExtraFieldContextId') ? $this->getExtraFieldContextId() : null;
                         @endphp
                         <div>
                             <x-ui-label
@@ -250,57 +254,34 @@
                                 class="mb-2"
                             />
 
-                            {{-- Datei-Vorschau --}}
-                            @if(count($fileIds) > 0)
-                                <div class="flex flex-wrap gap-2 mb-2">
-                                    @foreach($fileIds as $fileId)
-                                        @php
-                                            $file = \Platform\Core\Models\ContextFile::find($fileId);
-                                        @endphp
-                                        @if($file)
-                                            <div class="relative group">
-                                                @if($file->isImage())
-                                                    <img
-                                                        src="{{ $file->thumbnail?->url ?? $file->url }}"
-                                                        alt="{{ $file->original_name }}"
-                                                        class="w-16 h-16 object-cover border border-[var(--ui-border)]/40"
-                                                    />
-                                                @else
-                                                    <div class="w-16 h-16 flex items-center justify-center bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
-                                                        @svg('heroicon-o-document', 'w-6 h-6 text-[var(--ui-muted)]')
-                                                    </div>
-                                                @endif
-                                                <button
-                                                    type="button"
-                                                    wire:click="removeExtraFieldFile({{ $field['id'] }}, {{ $fileId }})"
-                                                    class="absolute -top-1 -right-1 w-5 h-5 bg-[var(--ui-danger)] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                                >
-                                                    @svg('heroicon-o-x-mark', 'w-3 h-3')
-                                                </button>
-                                                <span class="block text-xs text-[var(--ui-muted)] truncate max-w-[4rem]" title="{{ $file->original_name }}">
-                                                    {{ $file->original_name }}
-                                                </span>
-                                            </div>
-                                        @endif
-                                    @endforeach
-                                </div>
+                            {{-- Inline File-Upload Komponente (Kontext = Extra-Feld selbst) --}}
+                            @if($efContextType && $efContextId)
+                                <livewire:core.inline-file-upload
+                                    :context-type="$efContextType"
+                                    :context-id="$efContextId"
+                                    :multiple="$isMultiple"
+                                    :field-id="$field['id']"
+                                    :show-label="false"
+                                    :existing-file-ids="$fileIds"
+                                    :key="'ef-upload-' . $field['id'] . '-' . $efContextId"
+                                />
+                            @else
+                                {{-- Fallback: Datei-Auswahl Button (wenn kein Kontext vorhanden) --}}
+                                <button
+                                    type="button"
+                                    wire:click="openExtraFieldFilePicker({{ $field['id'] }}, {{ $isMultiple ? 'true' : 'false' }})"
+                                    class="px-3 py-1.5 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] hover:bg-[var(--ui-muted-5)] transition-colors flex items-center gap-2 rounded-lg"
+                                >
+                                    @svg('heroicon-o-paper-clip', 'w-4 h-4')
+                                    {{ $isMultiple ? 'Dateien auswählen' : 'Datei auswählen' }}
+                                </button>
                             @endif
-
-                            {{-- Datei-Auswahl Button --}}
-                            <button
-                                type="button"
-                                wire:click="openExtraFieldFilePicker({{ $field['id'] }}, {{ $isMultiple ? 'true' : 'false' }})"
-                                class="px-3 py-1.5 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] hover:bg-[var(--ui-muted-5)] transition-colors flex items-center gap-2"
-                            >
-                                @svg('heroicon-o-paper-clip', 'w-4 h-4')
-                                {{ $isMultiple ? 'Dateien auswählen' : 'Datei auswählen' }}
-                            </button>
 
                             {{-- LLM Verification Status --}}
                             @if($field['type'] === 'file' && ($field['verify_by_llm'] ?? false) && $verificationStatus)
                                 <div class="flex items-center gap-2 mt-2 flex-wrap">
                                     {{-- Status Badge --}}
-                                    <span class="px-2 py-0.5 text-xs rounded {{ match($verificationStatus) {
+                                    <span class="px-2 py-0.5 text-xs rounded-lg {{ match($verificationStatus) {
                                         'verified' => 'bg-green-100 text-green-800',
                                         'rejected' => 'bg-red-100 text-red-800',
                                         'verifying' => 'bg-yellow-100 text-yellow-800 animate-pulse',

@@ -478,7 +478,7 @@ trait WithExtraFields
     }
 
     /**
-     * Listener für File-Picker Callback
+     * Listener für File-Picker Callback (Modal-basierter Upload)
      */
     #[On('files:selected')]
     public function handleExtraFieldFileSelected(array $payload): void
@@ -506,6 +506,28 @@ trait WithExtraFields
 
         $this->activeExtraFieldFilePickerId = null;
         $this->activeExtraFieldFilePickerMultiple = false;
+    }
+
+    /**
+     * Listener für Inline File-Upload Komponente.
+     * Synchronisiert Datei-IDs aus der Inline-Komponente in die Extra-Feld-Werte.
+     */
+    #[On('inline-file-upload:changed')]
+    public function handleInlineFileUploadChanged(array $payload): void
+    {
+        $fieldId = $payload['field_id'] ?? null;
+        if (!$fieldId) {
+            return;
+        }
+
+        // Prüfe ob dieses Feld zu unseren Definitionen gehört
+        $field = collect($this->extraFieldDefinitions)->firstWhere('id', $fieldId);
+        if (!$field || $field['type'] !== 'file') {
+            return;
+        }
+
+        // Wert übernehmen
+        $this->extraFieldValues[$fieldId] = $payload['value'] ?? null;
     }
 
     /**
@@ -539,6 +561,28 @@ trait WithExtraFields
                 'verified_at' => null,
             ];
         }
+    }
+
+    // ==========================================
+    // Extra Field Context for Inline Components
+    // ==========================================
+
+    /**
+     * Gibt den Kontext-Typ des Extra-Feld-Models zurück.
+     * Wird von der Inline File-Upload Komponente benötigt.
+     */
+    public function getExtraFieldContextType(): ?string
+    {
+        return $this->extraFieldsModel ? get_class($this->extraFieldsModel) : null;
+    }
+
+    /**
+     * Gibt die Kontext-ID des Extra-Feld-Models zurück.
+     * Wird von der Inline File-Upload Komponente benötigt.
+     */
+    public function getExtraFieldContextId(): ?int
+    {
+        return $this->extraFieldsModel?->id;
     }
 
     // ==========================================
