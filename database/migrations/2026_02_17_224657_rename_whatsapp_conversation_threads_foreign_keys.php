@@ -37,20 +37,10 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('comms_whatsapp_conversation_threads', function (Blueprint $table) {
-            $table->dropForeign('wa_conv_threads_thread_id_fk');
-            $table->dropForeign('wa_conv_threads_created_by_fk');
-
-            $table->foreign('comms_whatsapp_thread_id')
-                ->references('id')
-                ->on('comms_whatsapp_threads')
-                ->cascadeOnDelete();
-
-            $table->foreign('created_by_user_id')
-                ->references('id')
-                ->on('users')
-                ->nullOnDelete();
-        });
+        // Cannot rollback to the old long FK names (> 64 chars)
+        // Just drop the short-named FKs - the create migration's down() will handle the rest
+        $this->dropForeignKeyIfExists('comms_whatsapp_conversation_threads', 'wa_conv_threads_thread_id_fk');
+        $this->dropForeignKeyIfExists('comms_whatsapp_conversation_threads', 'wa_conv_threads_created_by_fk');
     }
 
     private function dropForeignKeyIfExists(string $table, string $foreignKey): void
