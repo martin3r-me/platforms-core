@@ -25,6 +25,11 @@ class InlineTags extends Component
     public array $tagSuggestions = [];
     public bool $showSuggestions = false;
 
+    // Tag-Browser: Alle verfügbaren Tags durchblättern (Multi-Select)
+    public bool $showTagBrowser = false;
+    public array $availableTags = [];
+    public string $browserSearch = '';
+
     // Inline-Edit: Tag bearbeiten
     public ?int $editingTagId = null;
     public string $editTagLabel = '';
@@ -33,6 +38,15 @@ class InlineTags extends Component
     // Farb-Picker
     public bool $showColorPicker = false;
     public ?string $newColor = null;
+
+    // Premium-Farbpalette
+    public array $colorPresets = [
+        '#3B82F6', '#6366F1', '#8B5CF6', '#A855F7',
+        '#EC4899', '#F43F5E', '#EF4444', '#F97316',
+        '#F59E0B', '#EAB308', '#84CC16', '#22C55E',
+        '#10B981', '#14B8A6', '#06B6D4', '#0EA5E9',
+        '#64748B', '#78716C', '#1E293B', '#0F172A',
+    ];
 
     public function mount(?string $contextType = null, ?int $contextId = null): void
     {
@@ -175,6 +189,122 @@ class InlineTags extends Component
         } catch (\Exception $e) {
             $this->tagSuggestions = [];
         }
+    }
+
+    // === Tag-Browser: Multi-Select ===
+
+    public function openTagBrowser(): void
+    {
+        $this->showTagBrowser = true;
+        $this->browserSearch = '';
+        $this->loadAvailableTags();
+    }
+
+    public function closeTagBrowser(): void
+    {
+        $this->showTagBrowser = false;
+        $this->browserSearch = '';
+        $this->availableTags = [];
+    }
+
+    public function updatedBrowserSearch(): void
+    {
+        $this->loadAvailableTags();
+    }
+
+    public function loadAvailableTags(): void
+    {
+        $this->availableTags = [];
+
+        try {
+            if (!Schema::hasTable('tags')) {
+                return;
+            }
+
+            $user = Auth::user();
+            if (!$user) {
+                return;
+            }
+
+            $assignedIds = collect($this->assignedTags)->pluck('id')->toArray();
+
+            $query = Tag::query()
+                ->availableForUser($user)
+                ->orderBy('label');
+
+            if (!empty($this->browserSearch)) {
+                $query->where(function ($q) {
+                    $q->where('label', 'like', '%' . $this->browserSearch . '%')
+                      ->orWhere('name', 'like', '%' . $this->browserSearch . '%');
+                });
+            }
+
+            $this->availableTags = $query
+                ->limit(30)
+                ->get()
+                ->map(fn($tag) => [
+                    'id' => $tag->id,
+                    'label' => $tag->label,
+                    'name' => $tag->name,
+                    'color' => $tag->color,
+                    'is_team_tag' => $tag->isTeamTag(),
+                    'is_assigned' => in_array($tag->id, $assignedIds),
+                ])
+                ->toArray();
+        } catch (\Exception $e) {
+            $this->availableTags = [];
+        }
+    }
+
+    public function toggleTag(int $tagId): void
+    {
+        if (!$this->contextType || !$this->contextId) {
+            return;
+        }
+
+        $context = $this->contextType::find($this->contextId);
+        if (!$context) {
+            return;
+        }
+
+        $tag = Tag::find($tagId);
+        if (!$tag) {
+            return;
+        }
+
+        $assignedIds = collect($this->assignedTags)->pluck('id')->toArray();
+
+        if (in_array($tagId, $assignedIds)) {
+            // Tag entfernen
+            if (method_exists($context, 'untag')) {
+                $context->untag($tag, false);
+            }
+        } else {
+            // Tag hinzufügen
+            if (method_exists($context, 'tag')) {
+                $context->tag($tag, false);
+            }
+        }
+
+        $this->loadAssignedTags();
+        $this->loadAvailableTags();
+    }
+
+    public function createAndAddTagFromBrowser(): void
+    {
+        if (empty(trim($this->browserSearch))) {
+            return;
+        }
+
+        // Temporär den tagInput setzen, createAndAddTag nutzen, dann zurücksetzen
+        $originalInput = $this->tagInput;
+        $this->tagInput = $this->browserSearch;
+        $this->createAndAddTag();
+        $this->tagInput = $originalInput;
+
+        // Browser aktualisieren statt schliessen
+        $this->browserSearch = '';
+        $this->loadAvailableTags();
     }
 
     public function addTag(int $tagId): void
@@ -389,6 +519,14 @@ class InlineTags extends Component
     {
         $this->showColorPicker = !$this->showColorPicker;
         $this->newColor = $this->contextColor;
+        if ($this->showColorPicker) {
+            $this->showTagBrowser = false;
+        }
+    }
+
+    public function selectPresetColor(string $color): void
+    {
+        $this->newColor = $color;
     }
 
     public function setColor(): void
