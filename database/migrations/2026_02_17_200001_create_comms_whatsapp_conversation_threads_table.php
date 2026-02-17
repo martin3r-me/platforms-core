@@ -8,12 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('comms_whatsapp_conversation_threads')) {
+            return; // Table already exists, skip creation
+        }
+
         Schema::create('comms_whatsapp_conversation_threads', function (Blueprint $table) {
             $table->id();
             $table->uuid('uuid')->unique();
             $table->foreignId('comms_whatsapp_thread_id')
                 ->constrained('comms_whatsapp_threads')
-                ->cascadeOnDelete();
+                ->cascadeOnDelete()
+                ->name('wa_conv_threads_thread_id_fk');
             $table->foreignId('team_id')
                 ->constrained('teams')
                 ->cascadeOnDelete();
@@ -23,7 +28,8 @@ return new class extends Migration
             $table->foreignId('created_by_user_id')
                 ->nullable()
                 ->constrained('users')
-                ->nullOnDelete();
+                ->nullOnDelete()
+                ->name('wa_conv_threads_created_by_fk');
             $table->timestamps();
 
             // Only one active conversation thread per WhatsApp thread (ended_at IS NULL)
