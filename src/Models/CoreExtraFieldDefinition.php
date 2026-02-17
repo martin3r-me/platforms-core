@@ -64,6 +64,48 @@ class CoreExtraFieldDefinition extends Model
     ];
 
     /**
+     * Beschreibungen und Icons für Feldtypen
+     */
+    public const TYPE_DESCRIPTIONS = [
+        'text' => [
+            'icon' => 'heroicon-o-bars-3-bottom-left',
+            'description' => 'Einzeiliges Textfeld für kurze Eingaben wie Namen, Titel oder Referenznummern.',
+        ],
+        'number' => [
+            'icon' => 'heroicon-o-calculator',
+            'description' => 'Numerisches Feld für Zahlen, Beträge oder Mengenangaben.',
+        ],
+        'textarea' => [
+            'icon' => 'heroicon-o-document-text',
+            'description' => 'Mehrzeiliges Textfeld für längere Beschreibungen, Notizen oder Kommentare.',
+        ],
+        'boolean' => [
+            'icon' => 'heroicon-o-check-circle',
+            'description' => 'Einfacher Ja/Nein-Schalter für Status-Flags oder Bestätigungen.',
+        ],
+        'select' => [
+            'icon' => 'heroicon-o-list-bullet',
+            'description' => 'Dropdown mit frei definierbaren Auswahloptionen. Ideal für Kategorien oder Status-Werte.',
+        ],
+        'lookup' => [
+            'icon' => 'heroicon-o-book-open',
+            'description' => 'Dropdown basierend auf einer zentral verwalteten Lookup-Tabelle. Änderungen am Lookup gelten für alle Felder.',
+        ],
+        'file' => [
+            'icon' => 'heroicon-o-paper-clip',
+            'description' => 'Datei-Upload für Dokumente, Bilder oder andere Anhänge. Optional mit KI-Verifikation.',
+        ],
+    ];
+
+    /**
+     * Beschreibungen für AutoFill-Quellen
+     */
+    public const AUTO_FILL_SOURCE_DESCRIPTIONS = [
+        'llm' => 'Die KI analysiert vorhandene Daten des Eintrags und füllt das Feld automatisch aus.',
+        'websearch' => 'Über eine Web-Suche werden relevante Informationen gefunden und in das Feld eingetragen.',
+    ];
+
+    /**
      * Lookup-Beziehung (für lookup-Felder)
      */
     public function lookup(): BelongsTo

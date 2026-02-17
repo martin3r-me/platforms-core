@@ -602,6 +602,16 @@ class ModalExtraFields extends Component
         return CoreExtraFieldDefinition::AUTO_FILL_SOURCES;
     }
 
+    public function getTypeDescriptionsProperty(): array
+    {
+        return CoreExtraFieldDefinition::TYPE_DESCRIPTIONS;
+    }
+
+    public function getAutoFillSourceDescriptionsProperty(): array
+    {
+        return CoreExtraFieldDefinition::AUTO_FILL_SOURCE_DESCRIPTIONS;
+    }
+
     protected function resetForm(): void
     {
         $this->newField = [
