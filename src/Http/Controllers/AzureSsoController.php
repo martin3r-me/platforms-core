@@ -25,7 +25,7 @@ class AzureSsoController extends Controller
                 'https://graph.microsoft.com/Calendars.ReadWrite',
                 'https://graph.microsoft.com/Calendars.ReadWrite.Shared',
             ])
-            ->with(['response_mode' => 'query']);
+            ->with(['response_mode' => 'query', 'prompt' => 'select_account']);
     }
 
     public function redirectToProvider()
