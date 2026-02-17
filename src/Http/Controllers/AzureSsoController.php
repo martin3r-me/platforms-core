@@ -12,13 +12,16 @@ use Platform\Core\Services\TeamInvitationService;
 
 class AzureSsoController extends Controller
 {
-    protected function provider()
+    /**
+     * Provider für den initialen Redirect (mit prompt=select_account für Account-Auswahl)
+     */
+    protected function redirectProvider()
     {
         return Socialite::driver('azure-tenant')
             ->stateless()
             ->scopes([
-                'openid', 
-                'profile', 
+                'openid',
+                'profile',
                 'email',
                 'offline_access', // WICHTIG: Benötigt für Refresh Token
                 'https://graph.microsoft.com/User.Read',
@@ -28,6 +31,15 @@ class AzureSsoController extends Controller
             ->with(['response_mode' => 'query', 'prompt' => 'select_account']);
     }
 
+    /**
+     * Provider für den Callback/Token-Exchange (OHNE prompt, sonst startet Microsoft neuen Auth-Flow)
+     */
+    protected function callbackProvider()
+    {
+        return Socialite::driver('azure-tenant')
+            ->stateless();
+    }
+
     public function redirectToProvider()
     {
         \Log::debug('Azure SSO redirect', [
@@ -35,7 +47,7 @@ class AzureSsoController extends Controller
             'redirect' => config('azure-sso.redirect'),
         ]);
 
-        return $this->provider()->redirect();
+        return $this->redirectProvider()->redirect();
     }
 
     public function handleProviderCallback(Request $request)
@@ -50,7 +62,7 @@ class AzureSsoController extends Controller
         }
 
         try {
-            $azureUser = $this->provider()->user();
+            $azureUser = $this->callbackProvider()->user();
         } catch (\Throwable $e) {
             \Log::error('Azure SSO token exchange failed', [
                 'message' => $e->getMessage(),
