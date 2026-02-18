@@ -160,7 +160,25 @@ class WhatsAppWebhookController extends Controller
         $messageId = $statusData['id'] ?? '[unknown]';
         $status = $statusData['status'] ?? '[unknown]';
 
-        Log::debug("WhatsApp status update: {$messageId} -> {$status}");
+        // Log with error details for failed status
+        if ($status === 'failed') {
+            $errors = $statusData['errors'] ?? [];
+            $errorInfo = [];
+            foreach ($errors as $error) {
+                $errorInfo[] = sprintf(
+                    '[%s] %s',
+                    $error['code'] ?? 'unknown',
+                    $error['message'] ?? 'No message'
+                );
+            }
+            Log::warning("WhatsApp message failed: {$messageId}", [
+                'errors' => $errorInfo,
+                'recipient_id' => $statusData['recipient_id'] ?? null,
+                'raw_errors' => $errors,
+            ]);
+        } else {
+            Log::debug("WhatsApp status update: {$messageId} -> {$status}");
+        }
 
         try {
             $this->whatsAppService->updateMessageStatus($statusData);

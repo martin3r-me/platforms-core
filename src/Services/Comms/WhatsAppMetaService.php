@@ -257,6 +257,14 @@ class WhatsAppMetaService
             'status_updated_at' => $timestamp ? \Carbon\Carbon::createFromTimestamp($timestamp) : now(),
         ];
 
+        // Store error details for failed messages
+        if ($status === 'failed' && !empty($statusData['errors'])) {
+            $updates['meta_payload'] = array_merge(
+                $message->meta_payload ?? [],
+                ['errors' => $statusData['errors']]
+            );
+        }
+
         if ($status === 'sent' && !$message->sent_at) {
             $updates['sent_at'] = $updates['status_updated_at'];
         }
