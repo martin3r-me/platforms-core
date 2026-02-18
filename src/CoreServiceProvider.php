@@ -92,18 +92,10 @@ class CoreServiceProvider extends ServiceProvider
         $this->registerToolEventListeners();
 
         // WhatsApp Channel Sync Listener registrieren
-        $this->registerWhatsAppChannelSyncListener();
-
         // Livewire-Komponenten registrieren (mit Präfix "core")
         $this->registerLivewireComponents();
 
         // Routes registrieren
-        // Comms Webhooks (no auth, no module guard)
-        Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
-            // Important: webhooks must not run through CSRF (419). We authenticate via BasicAuth/HMAC instead.
-            ->middleware(['api'])
-            ->group(__DIR__.'/../routes/comms-webhooks.php');
-
         Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
             ->middleware(['web', 'detect.module.guard'])
             ->group(__DIR__.'/../routes/guest.php');
@@ -208,6 +200,9 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(\Platform\Core\Tools\ToolRegistry::class);
         $this->app->singleton(\Platform\Core\Tools\ToolExecutor::class);
         
+        // Contact Resolution Registry (für CRM, HCM, etc.)
+        $this->app->singleton(\Platform\Core\Services\Comms\ContactResolverRegistry::class);
+
         // Versionierung & Audit Services
         $this->app->singleton(\Platform\Core\Services\ModelVersioningService::class);
         $this->app->singleton(\Platform\Core\Services\UndoService::class);
@@ -453,42 +448,7 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register($this->app->make(\Platform\Core\Tools\ListExtraFieldEntitiesTool::class)); } catch (\Throwable $e) {}
         }
 
-        // Communication Tools (core.comms.*)
-        // Diese Tools müssen immer registriert sein, damit sie via tools.GET(module="communication") gefunden werden
-        // Hinweis: communication.overview.GET wurde entfernt (verursachte Loops) - nutze direkt core.comms.overview.GET
-        if (class_exists(\Platform\Core\Tools\Comms\CommsOverviewTool::class) && !$registry->has('core.comms.overview.GET')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\CommsOverviewTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Comms\ListChannelsTool::class) && !$registry->has('core.comms.channels.GET')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\ListChannelsTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Comms\CreateChannelTool::class) && !$registry->has('core.comms.channels.POST')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\CreateChannelTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Comms\UpdateChannelTool::class) && !$registry->has('core.comms.channels.PUT')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\UpdateChannelTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Comms\DeleteChannelTool::class) && !$registry->has('core.comms.channels.DELETE')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\DeleteChannelTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Comms\ListEmailThreadsTool::class) && !$registry->has('core.comms.email_threads.GET')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\ListEmailThreadsTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Comms\CreateEmailThreadTool::class) && !$registry->has('core.comms.email_threads.POST')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\CreateEmailThreadTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Comms\UpdateEmailThreadTool::class) && !$registry->has('core.comms.email_threads.PUT')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\UpdateEmailThreadTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Comms\DeleteEmailThreadTool::class) && !$registry->has('core.comms.email_threads.DELETE')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\DeleteEmailThreadTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Comms\ListEmailMessagesTool::class) && !$registry->has('core.comms.email_messages.GET')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\ListEmailMessagesTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Comms\SendEmailMessageTool::class) && !$registry->has('core.comms.email_messages.POST')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Comms\SendEmailMessageTool::class)); } catch (\Throwable $e) {}
-        }
+        // Communication Tools moved to CRM module (crm.comms.*)
     }
 
 
@@ -664,21 +624,4 @@ class CoreServiceProvider extends ServiceProvider
         }
     }
 
-    /**
-     * Register WhatsApp Channel Sync Listener
-     *
-     * Synchronisiert WhatsApp-Accounts aus Integrations zu CommsChannels
-     */
-    protected function registerWhatsAppChannelSyncListener(): void
-    {
-        // Nur registrieren wenn das Integrations-Modul verfügbar ist
-        if (!class_exists(\Platform\Integrations\Events\WhatsAppAccountsSynced::class)) {
-            return;
-        }
-
-        \Illuminate\Support\Facades\Event::listen(
-            \Platform\Integrations\Events\WhatsAppAccountsSynced::class,
-            \Platform\Core\Listeners\SyncWhatsAppChannelsListener::class
-        );
-    }
 }
