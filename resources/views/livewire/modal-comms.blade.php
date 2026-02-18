@@ -1101,8 +1101,6 @@
                                                                             :nullable="true"
                                                                             nullLabel="– Template wählen –"
                                                                             wire:model.live="whatsappSelectedTemplateId"
-                                                                            x-data
-                                                                            x-on:change="$wire.selectWhatsAppTemplate($event.target.value ? Number($event.target.value) : null)"
                                                                         />
                                                                     </div>
 
