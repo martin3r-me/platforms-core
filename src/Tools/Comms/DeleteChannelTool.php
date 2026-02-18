@@ -90,7 +90,7 @@ class DeleteChannelTool implements ToolContract, ToolMetadataContract
 
             $id = (int) $channel->id;
             $sender = (string) $channel->sender_identifier;
-            $channel->delete();
+            $channel->forceDelete();
 
             return ToolResult::success([
                 'channel_id' => $id,

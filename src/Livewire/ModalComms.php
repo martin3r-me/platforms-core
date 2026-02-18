@@ -1935,7 +1935,7 @@ class ModalComms extends Component
             }
         }
 
-        $channel->delete();
+        $channel->forceDelete();
         $this->loadChannels();
         $this->channelsMessage = '✅ Kanal entfernt.';
     }
