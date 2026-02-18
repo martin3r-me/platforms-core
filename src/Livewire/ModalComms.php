@@ -1235,9 +1235,9 @@ class ModalComms extends Component
     /**
      * Livewire updated hook: automatically call selectWhatsAppTemplate when the model changes.
      */
-    public function updatedWhatsappSelectedTemplateId(?int $value): void
+    public function updatedWhatsappSelectedTemplateId($value): void
     {
-        $this->selectWhatsAppTemplate($value);
+        $this->selectWhatsAppTemplate($value ? (int) $value : null);
     }
 
     /**
