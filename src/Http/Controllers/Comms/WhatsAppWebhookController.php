@@ -189,15 +189,24 @@ class WhatsAppWebhookController extends Controller
         }
 
         // Fallback: search in provider connection credentials
-        return CommsChannel::query()
+        // Note: credentials is encrypted, so we can't use whereJsonContains in SQL
+        // Instead, we load all active WhatsApp channels and check in PHP
+        $channels = CommsChannel::query()
             ->where('type', 'whatsapp')
             ->where('provider', 'whatsapp_meta')
             ->where('is_active', true)
-            ->whereHas('providerConnection', function ($query) use ($phoneNumberId) {
-                $query->whereJsonContains('credentials->phone_number_id', $phoneNumberId);
-            })
+            ->whereHas('providerConnection')
             ->with('providerConnection')
-            ->first();
+            ->get();
+
+        foreach ($channels as $channel) {
+            $credentials = $channel->providerConnection->credentials ?? [];
+            if (($credentials['phone_number_id'] ?? null) === $phoneNumberId) {
+                return $channel;
+            }
+        }
+
+        return null;
     }
 
     /**
