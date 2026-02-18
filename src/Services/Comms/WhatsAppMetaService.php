@@ -257,12 +257,28 @@ class WhatsAppMetaService
             'status_updated_at' => $timestamp ? \Carbon\Carbon::createFromTimestamp($timestamp) : now(),
         ];
 
-        // Store error details for failed messages
-        if ($status === 'failed' && !empty($statusData['errors'])) {
-            $updates['meta_payload'] = array_merge(
-                $message->meta_payload ?? [],
-                ['errors' => $statusData['errors']]
-            );
+        // Store error details for failed messages and log with context
+        if ($status === 'failed') {
+            if (!empty($statusData['errors'])) {
+                $updates['meta_payload'] = array_merge(
+                    $message->meta_payload ?? [],
+                    ['errors' => $statusData['errors']]
+                );
+            }
+
+            // Log with full message context for debugging
+            Log::warning("WhatsApp message delivery failed", [
+                'meta_message_id' => $messageId,
+                'message_id' => $message->id,
+                'direction' => $message->direction,
+                'message_type' => $message->message_type,
+                'template_name' => $message->template_name,
+                'template_params' => $message->template_params,
+                'recipient' => $message->thread?->phone_number,
+                'body_preview' => Str::limit($message->body, 100),
+                'original_api_response' => $message->meta_payload['error'] ?? $message->meta_payload['messages'] ?? null,
+                'webhook_errors' => $statusData['errors'] ?? [],
+            ]);
         }
 
         if ($status === 'sent' && !$message->sent_at) {
