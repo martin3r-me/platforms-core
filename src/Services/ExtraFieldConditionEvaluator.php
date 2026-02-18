@@ -2,6 +2,8 @@
 
 namespace Platform\Core\Services;
 
+use Platform\Core\Models\CoreLookup;
+
 /**
  * Evaluates visibility conditions for extra fields.
  *
@@ -62,6 +64,16 @@ class ExtraFieldConditionEvaluator
         'not_in' => [
             'label' => 'Keiner von',
             'types' => ['select', 'lookup'],
+            'requiresValue' => true,
+        ],
+        'is_in' => [
+            'label' => 'Ist in Liste',
+            'types' => ['text', 'number', 'select', 'lookup'],
+            'requiresValue' => true,
+        ],
+        'is_not_in' => [
+            'label' => 'Ist nicht in Liste',
+            'types' => ['text', 'number', 'select', 'lookup'],
             'requiresValue' => true,
         ],
         'contains' => [
@@ -168,6 +180,12 @@ class ExtraFieldConditionEvaluator
 
         $actualValue = $fieldValues[$fieldName] ?? null;
 
+        // For is_in/is_not_in operators, resolve the comparison list
+        if (in_array($operator, ['is_in', 'is_not_in'])) {
+            $comparisonList = $this->resolveComparisonList($condition);
+            return $this->compareValues($actualValue, $operator, $comparisonList);
+        }
+
         return $this->compareValues($actualValue, $operator, $expectedValue);
     }
 
@@ -187,6 +205,8 @@ class ExtraFieldConditionEvaluator
             'is_not_null' => !$this->isEmpty($actual),
             'in' => $this->isIn($actual, $expected),
             'not_in' => !$this->isIn($actual, $expected),
+            'is_in' => $this->isIn($actual, $expected),
+            'is_not_in' => !$this->isIn($actual, $expected),
             'contains' => is_string($actual) && is_string($expected) && str_contains(strtolower($actual), strtolower($expected)),
             'starts_with' => is_string($actual) && is_string($expected) && str_starts_with(strtolower($actual), strtolower($expected)),
             'ends_with' => is_string($actual) && is_string($expected) && str_ends_with(strtolower($actual), strtolower($expected)),
@@ -296,6 +316,37 @@ class ExtraFieldConditionEvaluator
     }
 
     /**
+     * Resolve the comparison list for is_in/is_not_in operators.
+     *
+     * Supports two sources:
+     * - 'lookup': Values from a CoreLookup reference
+     * - 'manual': Manually entered list of values
+     */
+    protected function resolveComparisonList(array $condition): array
+    {
+        $source = $condition['list_source'] ?? 'manual';
+        $values = $condition['value'] ?? [];
+
+        if ($source === 'lookup') {
+            $lookupId = $condition['list_lookup_id'] ?? null;
+            if ($lookupId) {
+                $lookup = CoreLookup::with('activeValues')->find($lookupId);
+                if ($lookup) {
+                    return $lookup->activeValues->pluck('value')->all();
+                }
+            }
+            return [];
+        }
+
+        // Manual values
+        if (is_array($values)) {
+            return $values;
+        }
+
+        return $values ? [$values] : [];
+    }
+
+    /**
      * Convert a visibility configuration to a human-readable string.
      *
      * @param array $visibilityConfig The visibility configuration
@@ -382,6 +433,29 @@ class ExtraFieldConditionEvaluator
 
         if (!$requiresValue) {
             return "\"{$fieldLabel}\" {$operatorLabel}";
+        }
+
+        // Special handling for is_in/is_not_in operators
+        if (in_array($operator, ['is_in', 'is_not_in'])) {
+            $source = $condition['list_source'] ?? 'manual';
+            if ($source === 'lookup') {
+                $lookupId = $condition['list_lookup_id'] ?? null;
+                $lookupName = 'Lookup';
+                if ($lookupId) {
+                    $lookup = CoreLookup::find($lookupId);
+                    if ($lookup) {
+                        $lookupName = $lookup->label;
+                    }
+                }
+                return "\"{$fieldLabel}\" {$operatorLabel} \"{$lookupName}\"";
+            }
+            // Manual list
+            if (is_array($value)) {
+                $valueStr = '[' . implode(', ', $value) . ']';
+            } else {
+                $valueStr = (string) ($value ?? '');
+            }
+            return "\"{$fieldLabel}\" {$operatorLabel} \"{$valueStr}\"";
         }
 
         if (is_array($value)) {

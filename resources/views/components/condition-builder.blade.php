@@ -169,6 +169,107 @@
 
                                 {{-- Value Input (conditionally shown) --}}
                                 @if($requiresValue && $selectedFieldName)
+                                    @if(in_array($selectedOperator, ['is_in', 'is_not_in']))
+                                        {{-- is_in / is_not_in: Source selection + value list --}}
+                                        @php
+                                            $listSource = $condition['list_source'] ?? 'manual';
+                                            $listLookupId = $condition['list_lookup_id'] ?? null;
+                                            $manualValues = is_array($condition['value'] ?? null) ? $condition['value'] : [];
+                                            $availableLookups = $this->availableLookupsForCondition ?? [];
+                                        @endphp
+                                        <div class="flex-1 min-w-0">
+                                            <label class="block text-xs text-[var(--ui-muted)] mb-1">Vergleichsliste</label>
+
+                                            {{-- Source selector: Lookup / Manual --}}
+                                            <div class="flex gap-1 mb-2">
+                                                <button
+                                                    type="button"
+                                                    wire:click="updateConditionListSource({{ $groupIndex }}, {{ $conditionIndex }}, 'lookup')"
+                                                    class="px-2 py-1 text-xs font-medium transition-colors {{ $listSource === 'lookup' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-surface)] text-[var(--ui-muted)] border border-[var(--ui-border)]/40 hover:bg-[var(--ui-muted-5)]' }}"
+                                                >
+                                                    Lookup
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    wire:click="updateConditionListSource({{ $groupIndex }}, {{ $conditionIndex }}, 'manual')"
+                                                    class="px-2 py-1 text-xs font-medium transition-colors {{ $listSource === 'manual' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-surface)] text-[var(--ui-muted)] border border-[var(--ui-border)]/40 hover:bg-[var(--ui-muted-5)]' }}"
+                                                >
+                                                    Manuelle Liste
+                                                </button>
+                                            </div>
+
+                                            @if($listSource === 'lookup')
+                                                {{-- Lookup selection --}}
+                                                <select
+                                                    wire:change="updateConditionListLookup({{ $groupIndex }}, {{ $conditionIndex }}, $event.target.value)"
+                                                    class="w-full px-2 py-1.5 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--ui-primary)]"
+                                                >
+                                                    <option value="">Lookup wählen...</option>
+                                                    @foreach($availableLookups as $lookup)
+                                                        <option value="{{ $lookup['id'] }}" @selected($listLookupId == $lookup['id'])>
+                                                            {{ $lookup['label'] }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+
+                                                @if($listLookupId)
+                                                    @php
+                                                        $selectedLookup = \Platform\Core\Models\CoreLookup::with('activeValues')->find($listLookupId);
+                                                        $lookupEntries = $selectedLookup ? $selectedLookup->activeValues : collect();
+                                                    @endphp
+                                                    @if($lookupEntries->isNotEmpty())
+                                                        <div class="mt-1 flex flex-wrap gap-1">
+                                                            @foreach($lookupEntries as $entry)
+                                                                <span class="inline-flex items-center px-1.5 py-0.5 text-xs bg-[var(--ui-primary-5)] text-[var(--ui-primary)] border border-[var(--ui-primary)]/20">
+                                                                    {{ $entry->label }}
+                                                                </span>
+                                                            @endforeach
+                                                        </div>
+                                                    @endif
+                                                @endif
+                                            @else
+                                                {{-- Manual value entry --}}
+                                                <div
+                                                    x-data="{ newValue: '' }"
+                                                    class="space-y-1"
+                                                >
+                                                    <div class="flex gap-1">
+                                                        <input
+                                                            type="text"
+                                                            x-model="newValue"
+                                                            x-on:keydown.enter.prevent="if (newValue.trim()) { $wire.addConditionListValue({{ $groupIndex }}, {{ $conditionIndex }}, newValue.trim()); newValue = ''; }"
+                                                            class="flex-1 px-2 py-1.5 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--ui-primary)]"
+                                                            placeholder="Wert eingeben + Enter..."
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            x-on:click="if (newValue.trim()) { $wire.addConditionListValue({{ $groupIndex }}, {{ $conditionIndex }}, newValue.trim()); newValue = ''; }"
+                                                            class="px-2 py-1.5 text-sm bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary-hover)] transition-colors"
+                                                        >
+                                                            @svg('heroicon-o-plus', 'w-4 h-4')
+                                                        </button>
+                                                    </div>
+
+                                                    @if(!empty($manualValues))
+                                                        <div class="flex flex-wrap gap-1">
+                                                            @foreach($manualValues as $vi => $mv)
+                                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] border border-[var(--ui-border)]/40">
+                                                                    {{ $mv }}
+                                                                    <button
+                                                                        type="button"
+                                                                        wire:click="removeConditionListValue({{ $groupIndex }}, {{ $conditionIndex }}, {{ $vi }})"
+                                                                        class="text-[var(--ui-muted)] hover:text-[var(--ui-danger)] transition-colors"
+                                                                    >
+                                                                        @svg('heroicon-o-x-mark', 'w-3 h-3')
+                                                                    </button>
+                                                                </span>
+                                                            @endforeach
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @else
                                     <div class="flex-1 min-w-0">
                                         <label class="block text-xs text-[var(--ui-muted)] mb-1">Wert</label>
                                         @if($selectedFieldType === 'boolean')
@@ -267,6 +368,7 @@
                                             />
                                         @endif
                                     </div>
+                                    @endif
                                 @endif
 
                                 {{-- Remove Condition Button --}}

@@ -1171,6 +1171,17 @@ class ModalExtraFields extends Component
             if ($operatorMeta && !($operatorMeta['requiresValue'] ?? true)) {
                 $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['value'] = null;
             }
+
+            // Initialize list_source fields for is_in/is_not_in operators
+            if (in_array($operator, ['is_in', 'is_not_in'])) {
+                $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['list_source'] = $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['list_source'] ?? 'manual';
+                $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['list_lookup_id'] = $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['list_lookup_id'] ?? null;
+                $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['value'] = $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['value'] ?? [];
+            } else {
+                // Clean up list-specific fields when switching away from is_in/is_not_in
+                unset($this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['list_source']);
+                unset($this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['list_lookup_id']);
+            }
         }
     }
 
@@ -1182,6 +1193,86 @@ class ModalExtraFields extends Component
         if (isset($this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex])) {
             $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['value'] = $value;
         }
+    }
+
+    /**
+     * Update the list source for is_in/is_not_in conditions
+     */
+    public function updateConditionListSource(int $groupIndex, int $conditionIndex, string $source): void
+    {
+        if (isset($this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex])) {
+            $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['list_source'] = $source;
+            // Reset values when switching source
+            $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['value'] = [];
+            $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['list_lookup_id'] = null;
+        }
+    }
+
+    /**
+     * Update the lookup ID for is_in/is_not_in conditions with lookup source
+     */
+    public function updateConditionListLookup(int $groupIndex, int $conditionIndex, mixed $lookupId): void
+    {
+        if (isset($this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex])) {
+            $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['list_lookup_id'] = $lookupId ? (int) $lookupId : null;
+            // Clear manual values when using lookup
+            $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['value'] = [];
+        }
+    }
+
+    /**
+     * Add a manual value to an is_in/is_not_in condition's list
+     */
+    public function addConditionListValue(int $groupIndex, int $conditionIndex, string $value): void
+    {
+        if (isset($this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex])) {
+            $value = trim($value);
+            if ($value === '') {
+                return;
+            }
+            $currentValues = $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['value'] ?? [];
+            if (!is_array($currentValues)) {
+                $currentValues = [];
+            }
+            if (!in_array($value, $currentValues)) {
+                $currentValues[] = $value;
+            }
+            $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['value'] = $currentValues;
+        }
+    }
+
+    /**
+     * Remove a manual value from an is_in/is_not_in condition's list
+     */
+    public function removeConditionListValue(int $groupIndex, int $conditionIndex, int $valueIndex): void
+    {
+        if (isset($this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['value'][$valueIndex])) {
+            unset($this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['value'][$valueIndex]);
+            $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['value'] = array_values(
+                $this->editField['visibility']['groups'][$groupIndex]['conditions'][$conditionIndex]['value']
+            );
+        }
+    }
+
+    /**
+     * Get all available lookups for the current team (for is_in/is_not_in source selection)
+     */
+    public function getAvailableLookupsForConditionProperty(): array
+    {
+        $teamId = $this->getTeamId();
+        if (!$teamId) {
+            return [];
+        }
+
+        return CoreLookup::where('team_id', $teamId)
+            ->orderBy('label')
+            ->get()
+            ->map(fn ($lookup) => [
+                'id' => $lookup->id,
+                'label' => $lookup->label,
+                'name' => $lookup->name,
+            ])
+            ->all();
     }
 
     /**

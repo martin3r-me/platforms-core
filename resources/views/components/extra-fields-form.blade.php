@@ -26,6 +26,32 @@
                 'visibility_config' => $def['visibility_config'] ?? null,
             ];
         }
+
+        // Pre-resolve lookup values for is_in/is_not_in conditions (client-side evaluation)
+        $lookupCache = [];
+        foreach ($definitions as &$def) {
+            $vc = $def['visibility_config'] ?? null;
+            if (!$vc || !($vc['enabled'] ?? false)) continue;
+            foreach ($vc['groups'] ?? [] as $gi => $group) {
+                foreach ($group['conditions'] ?? [] as $ci => $condition) {
+                    if (in_array($condition['operator'] ?? '', ['is_in', 'is_not_in'])) {
+                        $source = $condition['list_source'] ?? 'manual';
+                        if ($source === 'lookup') {
+                            $lookupId = $condition['list_lookup_id'] ?? null;
+                            if ($lookupId) {
+                                if (!isset($lookupCache[$lookupId])) {
+                                    $lookup = \Platform\Core\Models\CoreLookup::with('activeValues')->find($lookupId);
+                                    $lookupCache[$lookupId] = $lookup ? $lookup->activeValues->pluck('value')->all() : [];
+                                }
+                                // Store resolved values directly in the config for client-side use
+                                $def['visibility_config']['groups'][$gi]['conditions'][$ci]['_resolved_list'] = $lookupCache[$lookupId];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        unset($def); // break reference
     @endphp
 
     <div
@@ -80,9 +106,21 @@
 
                 // Get current value
                 const actualValue = this.fieldValues[targetField.id];
-                const expectedValue = condition.value;
                 const operator = condition.operator || 'equals';
 
+                // For is_in/is_not_in, resolve the comparison list
+                if (operator === 'is_in' || operator === 'is_not_in') {
+                    let comparisonList;
+                    const source = condition.list_source || 'manual';
+                    if (source === 'lookup' && condition._resolved_list) {
+                        comparisonList = condition._resolved_list;
+                    } else {
+                        comparisonList = Array.isArray(condition.value) ? condition.value : (condition.value ? [condition.value] : []);
+                    }
+                    return this.compareValues(actualValue, operator, comparisonList);
+                }
+
+                const expectedValue = condition.value;
                 return this.compareValues(actualValue, operator, expectedValue);
             },
 
@@ -108,6 +146,10 @@
                     case 'in':
                         return this.isIn(actual, expected);
                     case 'not_in':
+                        return !this.isIn(actual, expected);
+                    case 'is_in':
+                        return this.isIn(actual, expected);
+                    case 'is_not_in':
                         return !this.isIn(actual, expected);
                     case 'contains':
                         return String(actual || '').toLowerCase().includes(String(expected || '').toLowerCase());
