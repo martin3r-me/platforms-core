@@ -62,9 +62,26 @@ class GetExtraFieldsTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', "Model {$modelType} unterstützt keine Extra-Fields.");
             }
 
+            // Context-Scoping: Wenn context_model gesetzt, nur dieses Model erlauben
+            $contextModel = $context->metadata['context_model'] ?? null;
+            $contextModelId = $context->metadata['context_model_id'] ?? null;
+            if ($contextModel && $contextModelId) {
+                $contextClass = Relation::getMorphedModel($contextModel) ?? $contextModel;
+                if ($modelClass !== $contextClass || (int)$modelId !== (int)$contextModelId) {
+                    return ToolResult::error('ACCESS_DENIED', "Zugriff nur auf das aktuelle Kontext-Model erlaubt ({$contextModel} #{$contextModelId}).");
+                }
+            }
+
             $model = $modelClass::find($modelId);
             if (!$model) {
                 return ToolResult::error('NOT_FOUND', "Model {$modelType} #{$modelId} nicht gefunden.");
+            }
+
+            // Team-Scoping: Wenn kein context_model, prüfe team_id
+            if (!$contextModel && isset($model->team_id) && $context->team) {
+                if ((int)$model->team_id !== (int)$context->team->id) {
+                    return ToolResult::error('ACCESS_DENIED', "Model gehört nicht zum aktuellen Team.");
+                }
             }
 
             $fields = $model->getExtraFieldsWithLabels();
