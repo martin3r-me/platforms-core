@@ -63,6 +63,31 @@ class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', 'fields muss ein nicht-leeres Objekt sein.');
             }
 
+            // Normalize array format to key-value format
+            // Supports: [{"name": "field", "value": 123}] or [{"id": 3, "value": 123}] or [{"field_id": 3, "value": 123}]
+            if (array_is_list($fields)) {
+                $normalizedFields = [];
+                foreach ($fields as $item) {
+                    if (!is_array($item)) continue;
+
+                    $fieldName = $item['name'] ?? $item['key'] ?? null;
+                    $value = $item['value'] ?? $item['number'] ?? $item['number_value'] ?? null;
+
+                    // If no name but has id/field_id, we need to resolve it from definitions
+                    if (!$fieldName && isset($item['id'])) {
+                        $fieldName = '__id_' . $item['id'];
+                    }
+                    if (!$fieldName && isset($item['field_id'])) {
+                        $fieldName = '__id_' . $item['field_id'];
+                    }
+
+                    if ($fieldName) {
+                        $normalizedFields[$fieldName] = $value;
+                    }
+                }
+                $fields = $normalizedFields;
+            }
+
             $modelClass = Relation::getMorphedModel($modelType);
             if (!$modelClass || !class_exists($modelClass)) {
                 return ToolResult::error('VALIDATION_ERROR', "Unbekannter model_type: {$modelType}");
@@ -93,9 +118,29 @@ class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
             // Build a set of known field names for validation
             $definitions = $model->getExtraFieldsWithLabels();
             $definitionsByName = [];
+            $definitionsById = [];
             foreach ($definitions as $def) {
                 $definitionsByName[$def['name']] = $def;
+                if (isset($def['id'])) {
+                    $definitionsById[$def['id']] = $def;
+                }
             }
+
+            // Resolve __id_X placeholders to actual field names
+            $resolvedFields = [];
+            foreach ($fields as $fieldName => $value) {
+                if (str_starts_with($fieldName, '__id_')) {
+                    $fieldId = (int) substr($fieldName, 5);
+                    if (isset($definitionsById[$fieldId])) {
+                        $resolvedFields[$definitionsById[$fieldId]['name']] = $value;
+                    } else {
+                        $resolvedFields[$fieldName] = $value; // Keep for error message
+                    }
+                } else {
+                    $resolvedFields[$fieldName] = $value;
+                }
+            }
+            $fields = $resolvedFields;
 
             $updated = [];
             $errors = [];
