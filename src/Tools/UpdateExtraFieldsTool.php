@@ -185,13 +185,34 @@ class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
                     }
                 }
 
-                $model->setExtraField($fieldName, $value);
-                $savedValue = $model->getExtraField($fieldName);
-                $expectNull = ($value === null || $value === '');
-                if ($expectNull ? $savedValue === null : $savedValue !== null) {
+                // Save directly via CoreExtraFieldValue (like UI does)
+                // This works for inherited definitions (e.g., Position -> Applicant)
+                $definitionId = $definition['id'];
+
+                $valueRecord = \Platform\Core\Models\CoreExtraFieldValue::query()
+                    ->where('definition_id', $definitionId)
+                    ->where('fieldable_type', $model->getMorphClass())
+                    ->where('fieldable_id', $model->id)
+                    ->first();
+
+                if ($value === null || $value === '') {
+                    // Delete if empty
+                    if ($valueRecord) {
+                        $valueRecord->delete();
+                    }
                     $updated[] = $fieldName;
                 } else {
-                    $errors[] = "Feld '{$fieldName}' konnte nicht gespeichert werden (Definition nicht gefunden oder Kontext-Fehler).";
+                    if (!$valueRecord) {
+                        $valueRecord = new \Platform\Core\Models\CoreExtraFieldValue([
+                            'definition_id' => $definitionId,
+                            'fieldable_type' => $model->getMorphClass(),
+                            'fieldable_id' => $model->id,
+                        ]);
+                    }
+
+                    $valueRecord->setTypedValue($value);
+                    $valueRecord->save();
+                    $updated[] = $fieldName;
                 }
             }
 
