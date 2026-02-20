@@ -55,6 +55,17 @@ class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
             $modelId = (int)($arguments['model_id'] ?? 0);
             $fields = $arguments['fields'] ?? [];
 
+            // Auto-resolve from context when available (prevents LLM from guessing wrong morph keys)
+            $ctxModel = $context->metadata['context_model'] ?? null;
+            $ctxModelId = $context->metadata['context_model_id'] ?? null;
+            if ($ctxModel && $ctxModelId) {
+                $ctxClass = Relation::getMorphedModel($ctxModel) ?? (class_exists($ctxModel) ? $ctxModel : null);
+                if ($ctxClass && class_exists($ctxClass)) {
+                    $modelType = array_search($ctxClass, Relation::morphMap()) ?: $ctxModel;
+                    $modelId = (int)$ctxModelId;
+                }
+            }
+
             if ($modelType === '' || $modelId <= 0) {
                 return ToolResult::error('VALIDATION_ERROR', 'model_type und model_id sind erforderlich.');
             }

@@ -49,6 +49,17 @@ class GetExtraFieldsTool implements ToolContract, ToolMetadataContract
             $modelType = (string)($arguments['model_type'] ?? '');
             $modelId = (int)($arguments['model_id'] ?? 0);
 
+            // Auto-resolve from context when available (prevents LLM from guessing wrong morph keys)
+            $ctxModel = $context->metadata['context_model'] ?? null;
+            $ctxModelId = $context->metadata['context_model_id'] ?? null;
+            if ($ctxModel && $ctxModelId) {
+                $ctxClass = Relation::getMorphedModel($ctxModel) ?? (class_exists($ctxModel) ? $ctxModel : null);
+                if ($ctxClass && class_exists($ctxClass)) {
+                    $modelType = array_search($ctxClass, Relation::morphMap()) ?: $ctxModel;
+                    $modelId = (int)$ctxModelId;
+                }
+            }
+
             if ($modelType === '' || $modelId <= 0) {
                 return ToolResult::error('VALIDATION_ERROR', 'model_type und model_id sind erforderlich.');
             }
@@ -63,12 +74,10 @@ class GetExtraFieldsTool implements ToolContract, ToolMetadataContract
             }
 
             // Context-Scoping: Wenn context_model gesetzt, nur dieses Model erlauben
-            $contextModel = $context->metadata['context_model'] ?? null;
-            $contextModelId = $context->metadata['context_model_id'] ?? null;
-            if ($contextModel && $contextModelId) {
-                $contextClass = Relation::getMorphedModel($contextModel) ?? $contextModel;
-                if ($modelClass !== $contextClass || (int)$modelId !== (int)$contextModelId) {
-                    return ToolResult::error('ACCESS_DENIED', "Zugriff nur auf das aktuelle Kontext-Model erlaubt ({$contextModel} #{$contextModelId}).");
+            if ($ctxModel && $ctxModelId) {
+                $contextClass = Relation::getMorphedModel($ctxModel) ?? $ctxModel;
+                if ($modelClass !== $contextClass || (int)$modelId !== (int)$ctxModelId) {
+                    return ToolResult::error('ACCESS_DENIED', "Zugriff nur auf das aktuelle Kontext-Model erlaubt ({$ctxModel} #{$ctxModelId}).");
                 }
             }
 
