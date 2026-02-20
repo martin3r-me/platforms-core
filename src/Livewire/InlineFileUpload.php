@@ -65,6 +65,9 @@ class InlineFileUpload extends Component
     // UI State
     public bool $showDropZone = false;
 
+    // Missing files tracking
+    public array $missingFileIds = [];
+
     public function mount(
         ?string $contextType = null,
         ?int $contextId = null,
@@ -248,6 +251,8 @@ class InlineFileUpload extends Component
      */
     protected function loadUploadedFiles(): void
     {
+        $this->missingFileIds = [];
+
         if (empty($this->uploadedFileIds)) {
             $this->uploadedFilesData = [];
             return;
@@ -258,13 +263,16 @@ class InlineFileUpload extends Component
             ->get()
             ->keyBy('id');
 
-        // Reihenfolge beibehalten
+        // Track missing files and build data array
+        $validFileIds = [];
         $this->uploadedFilesData = collect($this->uploadedFileIds)
-            ->map(function ($id) use ($files) {
+            ->map(function ($id) use ($files, &$validFileIds) {
                 $file = $files->get($id);
                 if (!$file) {
+                    $this->missingFileIds[] = $id;
                     return null;
                 }
+                $validFileIds[] = $id;
                 return [
                     'id' => $file->id,
                     'original_name' => $file->original_name,
@@ -280,6 +288,12 @@ class InlineFileUpload extends Component
             ->filter()
             ->values()
             ->toArray();
+
+        // Auto-clean invalid file IDs and notify parent
+        if (!empty($this->missingFileIds)) {
+            $this->uploadedFileIds = $validFileIds;
+            $this->emitValueChanged();
+        }
     }
 
     /**

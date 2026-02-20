@@ -185,6 +185,22 @@ class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
                     }
                 }
 
+                // Validierung für File-Felder: Prüfe ob Datei-IDs existieren
+                if ($definition['type'] === 'file' && $value !== null && $value !== '') {
+                    $fileIds = is_array($value) ? $value : [$value];
+                    $fileIds = array_filter($fileIds, fn($id) => is_numeric($id) && (int)$id > 0);
+
+                    if (!empty($fileIds)) {
+                        $existingFileIds = \Platform\Core\Models\ContextFile::whereIn('id', $fileIds)->pluck('id')->toArray();
+                        $missingIds = array_diff($fileIds, $existingFileIds);
+
+                        if (!empty($missingIds)) {
+                            $errors[] = "Feld '{$fieldName}': Datei-IDs nicht gefunden: " . implode(', ', $missingIds);
+                            continue;
+                        }
+                    }
+                }
+
                 // Save directly via CoreExtraFieldValue (like UI does)
                 // This works for inherited definitions (e.g., Position -> Applicant)
                 $definitionId = $definition['id'];

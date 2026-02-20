@@ -250,6 +250,16 @@
         </button>
     @endif
 
+    {{-- Warnung: Fehlende Dateien --}}
+    @if(count($missingFileIds) > 0)
+        <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+            @svg('heroicon-o-exclamation-triangle', 'w-4 h-4 text-amber-600 flex-shrink-0')
+            <span class="text-xs text-amber-700">
+                {{ count($missingFileIds) }} Datei(en) nicht gefunden und entfernt.
+            </span>
+        </div>
+    @endif
+
     {{-- Fehler-Anzeige --}}
     @error('pendingFiles.*')
         <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--ui-danger)]/5 border border-[var(--ui-danger)]/20">
