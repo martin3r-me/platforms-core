@@ -301,6 +301,12 @@ class AiToolLoopRunner
                     ];
                 }
 
+                // Notify caller about tool results (for logging/debugging)
+                $onToolResult = $options['on_tool_result'] ?? null;
+                if (is_callable($onToolResult)) {
+                    $onToolResult($canonical, $args, $toolArray);
+                }
+
                 // Dynamic tool loading: after tools.GET, allow the model to "expand" its tool set.
                 try {
                     if ($canonical === 'tools.GET') {
