@@ -62,6 +62,14 @@ class AiToolLoopRunner
         // Important: start from discovery-only tool set, then allow tools.GET to expand.
         $this->openAi->resetDynamicallyLoadedTools();
 
+        // Autonomous agents (AutoPilot) preload all needed tools and should not
+        // expose discovery tools (core.teams.GET etc.) that can confuse the LLM.
+        $skipDiscovery = !empty($options['skip_discovery_tools']);
+        if ($skipDiscovery) {
+            $this->openAi->setSkipDiscoveryTools(true);
+        }
+
+        try {
         $preloadTools = $options['preload_tools'] ?? [];
         if (!empty($preloadTools) && is_array($preloadTools)) {
             $this->openAi->loadToolsDynamically($preloadTools);
@@ -355,6 +363,13 @@ class AiToolLoopRunner
             'last_tool_calls' => $lastToolCalls,
             'all_tool_call_names' => $allToolCallNames,
         ];
+
+        } finally {
+            // Always reset the flag so subsequent non-autonomous calls get discovery tools again.
+            if ($skipDiscovery) {
+                $this->openAi->setSkipDiscoveryTools(false);
+            }
+        }
     }
 }
 

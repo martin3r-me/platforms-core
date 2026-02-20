@@ -1631,6 +1631,19 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
     private array $dynamicallyLoadedTools = [];
 
     /**
+     * When true, discovery tools (core.teams.GET, core.user.GET, etc.) are excluded
+     * from the tool set. Used by autonomous agents (AutoPilot) that preload all needed
+     * tools and don't need discovery – prevents the LLM from calling core.teams.GET
+     * and getting confused about team access.
+     */
+    private bool $skipDiscoveryTools = false;
+
+    public function setSkipDiscoveryTools(bool $skip = true): void
+    {
+        $this->skipDiscoveryTools = $skip;
+    }
+
+    /**
      * Letzter Tool-Count für Erkennung von Tool-Änderungen bei Continuations.
      * OpenAI Responses API mit previous_response_id erlaubt KEINE Tool-Änderungen.
      * Wenn sich die Tool-Anzahl ändert, muss ein neuer Chain gestartet werden.
@@ -1859,8 +1872,8 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
                         'tools.GET',           // Tool-Discovery (ZENTRAL!)
                     ]);
                     
-                    // NUR Discovery-Tools senden.
-                    if ($isDiscoveryTool) {
+                    // NUR Discovery-Tools senden (sofern nicht unterdrückt).
+                    if ($isDiscoveryTool && !$this->skipDiscoveryTools) {
                         try {
                             $toolDef = $this->convertToolToOpenAiFormat($tool);
                             if ($toolDef) {
