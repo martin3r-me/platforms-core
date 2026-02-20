@@ -2,6 +2,7 @@
 
 namespace Platform\Core\Livewire;
 
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Platform\Core\Models\ContextFile;
@@ -111,8 +112,14 @@ class InlineContextFiles extends Component
             return;
         }
 
+        $contextVariants = $this->getContextTypeVariants();
+
         $this->contextFiles = ContextFile::query()
-            ->where('context_type', $this->contextType)
+            ->where(function ($q) use ($contextVariants) {
+                foreach ($contextVariants as $variant) {
+                    $q->orWhere('context_type', $variant);
+                }
+            })
             ->where('context_id', $this->contextId)
             ->with(['variants', 'user'])
             ->orderByDesc('created_at')
@@ -137,6 +144,41 @@ class InlineContextFiles extends Component
                 ];
             })
             ->toArray();
+    }
+
+    /**
+     * Get both morph alias and full class name variants for context_type queries.
+     */
+    protected function getContextTypeVariants(): array
+    {
+        if (!$this->contextType) {
+            return [];
+        }
+
+        $variants = [$this->contextType];
+
+        // Also match the short class name (e.g. "RecApplicant") used by LLM tools
+        $shortName = class_basename($this->contextType);
+        if ($shortName !== $this->contextType) {
+            $variants[] = $shortName;
+        }
+
+        if (!str_contains($this->contextType, '\\')) {
+            // Morph alias given — resolve full class
+            $fullClass = Relation::getMorphedModel($this->contextType);
+            if ($fullClass && $fullClass !== $this->contextType) {
+                $variants[] = $fullClass;
+            }
+        } else {
+            // Full class given — resolve morph alias
+            $morphMap = Relation::morphMap();
+            $alias = array_search($this->contextType, $morphMap, true);
+            if ($alias !== false) {
+                $variants[] = $alias;
+            }
+        }
+
+        return array_unique($variants);
     }
 
     public function formatFileSize(int $bytes): string
