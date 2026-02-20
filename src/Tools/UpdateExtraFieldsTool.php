@@ -204,6 +204,23 @@ class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
 
             if (!empty($errors)) {
                 $result['warnings'] = $errors;
+
+                // Provide guidance: show available field names and correct format
+                $availableFields = array_map(fn($d) => [
+                    'name' => $d['name'],
+                    'type' => $d['type'],
+                    'label' => $d['label'] ?? $d['name'],
+                ], $definitions);
+
+                $result['hint'] = 'Nutze core.extra_fields.GET um verfügbare Felder zu sehen. Format: {"fields": {"feldname": wert}}';
+                $result['available_fields'] = $availableFields;
+                $result['example'] = [
+                    'model_type' => $modelType,
+                    'model_id' => $modelId,
+                    'fields' => count($availableFields) > 0
+                        ? [$availableFields[0]['name'] => $availableFields[0]['type'] === 'number' ? 123 : 'wert']
+                        : ['feldname' => 'wert'],
+                ];
             }
 
             return ToolResult::success($result);
