@@ -7,6 +7,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Platform\Core\Traits\HasApiTokens;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Platform\Core\Mcp\McpSessionTeamManager;
 use Platform\Core\Models\Module;
 use Platform\Core\Models\CoreAiModel;
 use Platform\Core\Models\PassportClient;
@@ -60,25 +61,49 @@ class User extends Authenticatable
     }
 
     /**
-     * Dynamisches currentTeam Attribute - gibt je nach Modul das richtige Team zurück.
-     * 
+     * Dynamisches currentTeam Attribute - gibt je nach Kontext das richtige Team zurück.
+     *
+     * Reihenfolge:
+     * 1. MCP Session-Team-Override (gesetzt durch core.team.switch) – hat Vorrang,
+     *    damit Policies im MCP-/Tool-Kontext das richtige Team sehen.
+     * 2. UI-Basis-Team (current_team_id aus der DB)
+     *
+     * Danach wird ggf. der Modul-Scope berücksichtigt:
      * - Für root-scoped Module (scope_type = 'parent'): Gibt das Root-Team zurück
      * - Für team-spezifische Module (scope_type = 'single'): Gibt das aktuelle Team zurück
-     * 
+     *
      * @return Team|null
      */
     public function currentTeam(): Attribute
     {
         return Attribute::make(
             get: function () {
-                $baseTeam = $this->currentTeamRelation;
+                // 1. MCP Session-Team-Override prüfen (höchste Priorität)
+                //    Damit Policies im Tool-Kontext das vom LLM-Client gewählte Team sehen.
+                //    Verwende $this->id statt auth()->user()->id, damit der Override
+                //    auch korrekt greift wenn Gate::forUser() einen expliziten User setzt.
+                $baseTeam = null;
+                try {
+                    $sessionId = $this->id ? ('mcp_user_' . $this->id) : null;
+                    if ($sessionId && McpSessionTeamManager::hasTeamOverride($sessionId)) {
+                        $baseTeam = McpSessionTeamManager::getTeamOverride($sessionId);
+                    }
+                } catch (\Throwable $e) {
+                    // MCP nicht verfügbar – kein Override
+                }
+
+                // 2. Fallback: UI-Basis-Team (current_team_id)
+                if (!$baseTeam) {
+                    $baseTeam = $this->currentTeamRelation;
+                }
+
                 if (!$baseTeam) {
                     return null;
                 }
 
                 // Versuche Modul-Key aus aktueller Route zu extrahieren
                 $moduleKey = request()->segment(1);
-                
+
                 // Wenn kein Modul-Key oder leer, verwende Basis-Team
                 if (empty($moduleKey)) {
                     return $baseTeam;
@@ -86,7 +111,7 @@ class User extends Authenticatable
 
                 // Modul finden und Scope-Type prüfen
                 $module = Module::where('key', $moduleKey)->first();
-                
+
                 // Wenn Modul nicht gefunden oder team-spezifisch, verwende Basis-Team
                 if (!$module || $module->isTeamScoped()) {
                     return $baseTeam;
