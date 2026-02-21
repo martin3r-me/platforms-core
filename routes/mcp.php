@@ -75,9 +75,9 @@ Route::get('info', function () {
                 'authentication' => 'OAuth 2.0 / Bearer Token',
                 'recommended_for' => 'Claude.ai, Claude Desktop',
                 'initial_tools' => [
+                    'core__context__GET (IMMER ZUERST aufrufen!)',
                     'core__user__GET',
                     'core__teams__GET',
-                    'core__context__GET',
                     'core__modules__GET',
                     'tools__GET',
                 ],
@@ -93,9 +93,10 @@ Route::get('info', function () {
         ],
         'discovery_workflow' => [
             '1' => 'Verbinde mit /mcp/sse',
-            '2' => 'Rufe core__modules__GET auf um Module zu sehen',
-            '3' => 'Rufe tools__GET(module="...") auf um Tools zu aktivieren',
-            '4' => 'Nutze die aktivierten Tools',
+            '2' => 'Rufe core__context__GET auf um den aktiven Team-Kontext zu erhalten (PFLICHT!)',
+            '3' => 'Rufe core__modules__GET auf um verfügbare Module zu sehen',
+            '4' => 'Rufe tools__GET(module="...") auf um Tools zu aktivieren',
+            '5' => 'Nutze die aktivierten Tools',
         ],
         'instructions' => [
             'claude_desktop' => 'Nutze URL: ' . $baseUrl . '/mcp/sse mit OAuth',

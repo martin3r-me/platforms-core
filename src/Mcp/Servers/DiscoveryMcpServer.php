@@ -29,14 +29,18 @@ class DiscoveryMcpServer extends Server
     protected string $instructions = <<<'MARKDOWN'
 Platform MCP Server. Bietet Zugriff auf alle registrierten Tools der Platform.
 
+## PFLICHT: Erster Call
+
+**IMMER `core__context__GET` als allerersten Call ausführen**, bevor irgendein anderes Tool genutzt wird. Dieses Tool liefert den aktiven UI-Team-Kontext des Users und stellt sicher, dass alle folgenden Operationen im richtigen Team laufen. Ohne diesen initialen Call besteht das Risiko, dass Tools im falschen Team-Kontext ausgeführt werden.
+
 ## Tool Discovery
 
 Dieser Server verwendet ein Discovery-System für skalierbare Tool-Verwaltung:
 
 1. **Initial verfügbare Tools:**
+   - `core__context__GET` - **IMMER ZUERST aufrufen!** Aktiver Team-Kontext
    - `core__user__GET` - Wer bin ich? (User-Info)
    - `core__teams__GET` - Welche Teams habe ich?
-   - `core__context__GET` - Aktueller Kontext
    - `core__modules__GET` - Welche Module gibt es?
    - `core__team__switch` - Team-Kontext wechseln (Session-basiert)
    - `tools__GET` - Tool Discovery (WICHTIG!)
@@ -46,7 +50,8 @@ Dieser Server verwendet ein Discovery-System für skalierbare Tool-Verwaltung:
    Beispiel: `tools__GET(module="planner")` aktiviert alle Planner-Tools.
 
 3. **Workflow:**
-   - Zuerst `core__modules__GET` aufrufen um verfügbare Module zu sehen
+   - **Zuerst `core__context__GET` aufrufen** um den aktiven Team-Kontext zu erhalten
+   - Dann `core__modules__GET` aufrufen um verfügbare Module zu sehen
    - Dann `tools__GET(module="...")` für benötigte Module
    - Die Tools sind danach verfügbar und können verwendet werden
 

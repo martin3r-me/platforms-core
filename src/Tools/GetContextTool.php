@@ -13,9 +13,10 @@ use Platform\Core\Models\Team;
 /**
  * Tool zum Abrufen des aktuellen Kontexts
  *
- * MCP-Pattern: Das Sprachmodell kann diesen Tool auf Bedarf nutzen,
- * um den aktuellen Kontext (User, Team, Modul, Route) zu erfahren.
- * Statt alles immer mitzuschicken, fragt das Modell bei Bedarf nach.
+ * PFLICHT-EINSTIEGSPUNKT: Dieses Tool MUSS als allererster Call jeder
+ * MCP-Session ausgeführt werden, bevor irgendein anderes Tool genutzt wird.
+ * Es liefert den aktiven UI-Team-Kontext des Users (is_current_team: true)
+ * und stellt sicher, dass alle folgenden Operationen im richtigen Team laufen.
  *
  * Unterstützt optionalen team_id Parameter für cross-team Abfragen.
  * Der User darf nur Teams abfragen, in denen er Mitglied ist.
@@ -29,7 +30,7 @@ class GetContextTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'Gibt den aktuellen Kontext zurück (User, Team, Modul, Route, URL). Nutze dieses Tool, wenn du Informationen über den aktuellen Kontext benötigst. Rufe dieses Tool automatisch auf, wenn der Nutzer nach seinem aktuellen Kontext fragt oder wenn du wissen musst, in welchem Modul/Team der Nutzer sich befindet.';
+        return 'WICHTIG: Dieses Tool IMMER als allerersten Call ausführen, bevor andere Tools genutzt werden. Gibt den aktuellen Kontext zurück (User, Team, Modul, Route, URL) und liefert den aktiven UI-Team-Kontext des Users (is_current_team: true). Ohne diesen initialen Call besteht das Risiko, dass Operationen im falschen Team-Kontext ausgeführt werden. Auch aufrufen, wenn der Nutzer nach seinem aktuellen Kontext fragt oder wenn du wissen musst, in welchem Modul/Team der Nutzer sich befindet.';
     }
 
     public function getSchema(): array
