@@ -209,7 +209,7 @@
                 @switch($field['type'])
                     @case('textarea')
                         @php
-                            $isAutoFilled = $extraFieldMeta[$field['id']]['auto_filled'] ?? false;
+                            $isAutoFilled = $this->extraFieldMeta[$field['id']]['auto_filled'] ?? false;
                         @endphp
                         <x-ui-input-textarea
                             :name="'extraFieldValues.' . $field['id']"
@@ -230,7 +230,7 @@
 
                     @case('number')
                         @php
-                            $isAutoFilled = $extraFieldMeta[$field['id']]['auto_filled'] ?? false;
+                            $isAutoFilled = $this->extraFieldMeta[$field['id']]['auto_filled'] ?? false;
                         @endphp
                         <x-ui-input-number
                             :name="'extraFieldValues.' . $field['id']"
@@ -280,10 +280,10 @@
                     @case('file')
                         @php
                             $isMultiple = $field['options']['multiple'] ?? false;
-                            $fileIds = $extraFieldValues[$field['id']] ?? ($isMultiple ? [] : null);
+                            $fileIds = $this->extraFieldValues[$field['id']] ?? ($isMultiple ? [] : null);
                             $fileIds = is_array($fileIds) ? $fileIds : ($fileIds ? [$fileIds] : []);
-                            $verificationStatus = $extraFieldMeta[$field['id']]['verification_status'] ?? null;
-                            $verificationResult = $extraFieldMeta[$field['id']]['verification_result'] ?? null;
+                            $verificationStatus = $this->extraFieldMeta[$field['id']]['verification_status'] ?? null;
+                            $verificationResult = $this->extraFieldMeta[$field['id']]['verification_result'] ?? null;
 
                             // Kontext aus dem Extra-Feld-Model bestimmen (via public Methods)
                             $efContextType = method_exists($this, 'getExtraFieldContextType') ? $this->getExtraFieldContextType() : null;
@@ -376,7 +376,7 @@
                             $isMultiple = $field['options']['multiple'] ?? false;
                             $lookup = $lookupId ? \Platform\Core\Models\CoreLookup::find($lookupId) : null;
                             $lookupOptions = $lookup ? $lookup->getOptionsArray() : [];
-                            $isAutoFilled = $extraFieldMeta[$field['id']]['auto_filled'] ?? false;
+                            $isAutoFilled = $this->extraFieldMeta[$field['id']]['auto_filled'] ?? false;
                         @endphp
                         @if($isMultiple)
                             {{-- Mehrfachauswahl mit Checkboxen --}}
@@ -441,7 +441,7 @@
                             $choices = $field['options']['choices'] ?? [];
                             $isMultiple = $field['options']['multiple'] ?? false;
                             $selectOptions = array_combine($choices, $choices);
-                            $isAutoFilled = $extraFieldMeta[$field['id']]['auto_filled'] ?? false;
+                            $isAutoFilled = $this->extraFieldMeta[$field['id']]['auto_filled'] ?? false;
                         @endphp
                         @if($isMultiple)
                             {{-- Mehrfachauswahl mit Checkboxen --}}
@@ -499,7 +499,7 @@
 
                     @default
                         @php
-                            $isAutoFilled = $extraFieldMeta[$field['id']]['auto_filled'] ?? false;
+                            $isAutoFilled = $this->extraFieldMeta[$field['id']]['auto_filled'] ?? false;
                         @endphp
                         <x-ui-input-text
                             :name="'extraFieldValues.' . $field['id']"
