@@ -95,6 +95,11 @@ class CoreServiceProvider extends ServiceProvider
         // Livewire-Komponenten registrieren (mit Präfix "core")
         $this->registerLivewireComponents();
 
+        // Public Routes (keine Auth nötig)
+        Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
+            ->middleware(['web'])
+            ->group(__DIR__.'/../routes/public.php');
+
         // Routes registrieren
         Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
             ->middleware(['web', 'detect.module.guard'])
