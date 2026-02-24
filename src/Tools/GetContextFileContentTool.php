@@ -121,7 +121,7 @@ class GetContextFileContentTool implements ToolContract
                 // Add thumbnail URL if available
                 $thumbnail = $file->thumbnail;
                 if ($thumbnail) {
-                    $result['thumbnail_url'] = Storage::disk($thumbnail->disk)->url($thumbnail->path);
+                    $result['thumbnail_url'] = $thumbnail->url;
                 }
             } else {
                 // Binary file - return URL for download

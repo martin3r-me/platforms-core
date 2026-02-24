@@ -83,7 +83,7 @@ class VerifyExtraFieldValueJob implements ShouldQueue
                     $content[] = [
                         'type' => 'image_url',
                         'image_url' => [
-                            'url' => $file->url,
+                            'url' => $file->getUrlForExternalService(15),
                             'detail' => 'high',
                         ],
                     ];

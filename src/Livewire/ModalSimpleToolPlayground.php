@@ -491,6 +491,7 @@ class ModalSimpleToolPlayground extends Component
                     'width' => $result['width'] ?? null,
                     'height' => $result['height'] ?? null,
                     'is_image' => str_starts_with($result['mime_type'], 'image/'),
+                    'variants_status' => $result['variants_status'] ?? 'none',
                 ];
             } catch (\Exception $e) {
                 $this->dispatch('notify', [
@@ -567,6 +568,7 @@ class ModalSimpleToolPlayground extends Component
                     'height' => $file->height,
                     'is_image' => $file->isImage(),
                     'thumbnail' => $file->thumbnail?->url ?? null,
+                    'variants_status' => $file->variants_status ?? 'complete',
                 ];
             })
             ->toArray();

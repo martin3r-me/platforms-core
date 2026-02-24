@@ -234,7 +234,7 @@ class CreateContextFileTool implements ToolContract
                 'mime_type' => $mimeType,
                 'size' => strlen($content),
                 'size_human' => $this->humanFileSize(strlen($content)),
-                'url' => Storage::disk($disk)->url($storedFileName),
+                'url' => $contextFile->url,
                 'context_type' => $contextType,
                 'context_id' => $contextId,
                 'source' => $contentSource,

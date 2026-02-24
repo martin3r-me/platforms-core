@@ -5,7 +5,7 @@ namespace Platform\Core\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\Storage;
+use Platform\Core\Services\ContextFileService;
 
 class ContextFile extends Model
 {
@@ -25,6 +25,7 @@ class ContextFile extends Model
         'height',
         'keep_original',
         'meta',
+        'variants_status',
     ];
 
     protected $casts = [
@@ -60,26 +61,20 @@ class ContextFile extends Model
 
     public function getUrlAttribute(): string
     {
-        try {
-            $url = Storage::disk($this->disk)->url($this->path);
-            // Falls URL leer oder ungültig, verwende Route
-            if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
-                return route('core.context-files.show', ['token' => $this->token]);
-            }
-            return $url;
-        } catch (\Exception $e) {
-            // Fallback: Route verwenden
-            return route('core.context-files.show', ['token' => $this->token]);
-        }
+        return ContextFileService::generateUrl($this->disk, $this->path, $this->token, 'core.context-files.show', 60);
     }
 
     public function getDownloadUrlAttribute(): string
     {
-        $url = $this->url;
-        $originalName = urlencode($this->original_name);
-        // Wenn URL bereits Query-Parameter hat, verwende &, sonst ?
-        $separator = str_contains($url, '?') ? '&' : '?';
-        return "{$url}{$separator}download={$originalName}";
+        return ContextFileService::generateDownloadUrl($this->disk, $this->path, $this->token, $this->original_name, 5);
+    }
+
+    /**
+     * URL for external services (e.g. OpenAI Vision) with shorter TTL.
+     */
+    public function getUrlForExternalService(int $ttl = 15): string
+    {
+        return ContextFileService::generateUrl($this->disk, $this->path, $this->token, 'core.context-files.show', $ttl);
     }
 
     public function isImage(): bool

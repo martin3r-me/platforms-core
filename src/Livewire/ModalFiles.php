@@ -348,12 +348,18 @@ class ModalFiles extends Component
 
     public function deleteFile(int $fileId): void
     {
+        $teamId = Auth::user()?->currentTeamRelation?->id;
+        if (!$teamId) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Kein Team-Kontext.']);
+            return;
+        }
+
         $service = app(ContextFileService::class);
-        
+
         try {
-            $service->delete($fileId);
+            $service->delete($fileId, $teamId);
             $this->loadFiles();
-            
+
             $this->dispatch('notify', [
                 'type' => 'success',
                 'message' => 'Datei gelöscht.',
@@ -403,6 +409,7 @@ class ModalFiles extends Component
                             'height' => $v->height,
                         ]];
                     })->toArray(),
+                    'variants_status' => $file->variants_status ?? 'complete',
                     'created_at' => $file->created_at->diffForHumans(),
                     'uploaded_by' => $file->user->name ?? 'Unbekannt',
                 ];

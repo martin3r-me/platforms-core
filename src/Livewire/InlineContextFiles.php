@@ -3,6 +3,7 @@
 namespace Platform\Core\Livewire;
 
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Platform\Core\Models\ContextFile;
@@ -87,10 +88,16 @@ class InlineContextFiles extends Component
 
     public function deleteFile(int $fileId): void
     {
+        $teamId = Auth::user()?->currentTeamRelation?->id;
+        if (!$teamId) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Kein Team-Kontext.']);
+            return;
+        }
+
         $service = app(ContextFileService::class);
 
         try {
-            $service->delete($fileId);
+            $service->delete($fileId, $teamId);
             $this->loadFiles();
 
             $this->dispatch('notify', [
@@ -139,6 +146,7 @@ class InlineContextFiles extends Component
                     'thumbnail' => $file->variants()->where('variant_type', 'thumbnail_4_3')->first()?->url
                         ?? $file->variants()->where('variant_type', 'like', 'thumbnail_%')->first()?->url
                         ?? null,
+                    'variants_status' => $file->variants_status ?? 'complete',
                     'created_at' => $file->created_at->diffForHumans(),
                     'uploaded_by' => $file->user->name ?? 'Unbekannt',
                 ];

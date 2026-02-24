@@ -283,6 +283,7 @@ class InlineFileUpload extends Component
                     'thumbnail_url' => $file->thumbnail?->url ?? ($file->isImage() ? $file->url : null),
                     'width' => $file->width,
                     'height' => $file->height,
+                    'variants_status' => $file->variants_status ?? 'complete',
                 ];
             })
             ->filter()

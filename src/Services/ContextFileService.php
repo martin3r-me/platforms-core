@@ -4,6 +4,7 @@ namespace Platform\Core\Services;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
@@ -30,6 +31,40 @@ class ContextFileService
         // Falls S3 oder anderer Cloud-Storage gewünscht, kann das über ENV gesetzt werden
         $this->disk = config('filesystems.default', 'public');
         $this->imageManager = new ImageManager(new Driver());
+    }
+
+    /**
+     * Generates a URL for a file (presigned for S3, signed route for local).
+     */
+    public static function generateUrl(string $disk, string $path, string $token, string $routeName, int $ttlMinutes = 60): string
+    {
+        $storage = Storage::disk($disk);
+
+        if ($storage->providesTemporaryUrls()) {
+            return $storage->temporaryUrl($path, now()->addMinutes($ttlMinutes));
+        }
+
+        return URL::temporarySignedRoute($routeName, now()->addMinutes($ttlMinutes), ['token' => $token]);
+    }
+
+    /**
+     * Generates a download URL for a file (presigned for S3, signed route for local).
+     */
+    public static function generateDownloadUrl(string $disk, string $path, string $token, string $originalName, int $ttlMinutes = 5): string
+    {
+        $storage = Storage::disk($disk);
+
+        if ($storage->providesTemporaryUrls()) {
+            return $storage->temporaryUrl($path, now()->addMinutes($ttlMinutes), [
+                'ResponseContentDisposition' => 'attachment; filename="' . $originalName . '"',
+            ]);
+        }
+
+        return URL::temporarySignedRoute(
+            'core.context-files.show',
+            now()->addMinutes($ttlMinutes),
+            ['token' => $token, 'download' => $originalName]
+        );
     }
 
     /**
@@ -144,21 +179,13 @@ class ContextFileService
             'keep_original' => $options['keep_original'] ?? false,
         ]);
 
-        $variants = [];
+        $variantsStatus = 'none';
 
-        // Bildvarianten generieren (wenn Bild und gewünscht)
-        // WICHTIG: Varianten werden IMMER generiert (keepOriginal wird ignoriert, da wir alle Varianten brauchen)
+        // Bildvarianten asynchron generieren (wenn Bild und gewünscht)
         if ($isImage && ($options['generate_variants'] ?? true)) {
-            try {
-                $variants = $this->generateImageVariants($contextFile);
-            } catch (\Exception $e) {
-                // Log Fehler, aber nicht werfen (Haupt-Upload war erfolgreich)
-                \Log::error('[ContextFileService] Fehler bei Varianten-Generierung', [
-                    'context_file_id' => $contextFile->id,
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                ]);
-            }
+            $contextFile->update(['variants_status' => 'pending']);
+            $variantsStatus = 'pending';
+            \Platform\Core\Jobs\GenerateImageVariantsJob::dispatch($contextFile->id);
         }
 
         return [
@@ -166,12 +193,13 @@ class ContextFileService
             'token' => $token,
             'path' => $path,
             'original_name' => $file->getClientOriginalName(),
-            'url' => Storage::disk($this->disk)->url($path),
+            'url' => self::generateUrl($this->disk, $path, $token, 'core.context-files.show'),
             'mime_type' => $mimeType,
             'file_size' => $fileSize,
             'width' => $width,
             'height' => $height,
-            'variants' => $variants,
+            'variants' => [],
+            'variants_status' => $variantsStatus,
         ];
     }
 
@@ -181,7 +209,7 @@ class ContextFileService
      * Seitenverhältnisse: 4:3, 16:9, 1:1, 9:16, 3:1, original
      * Größen pro Seitenverhältnis: thumbnail, medium, large
      */
-    protected function generateImageVariants(\Platform\Core\Models\ContextFile $contextFile, bool $keepOriginal = false): array
+    public function generateImageVariants(\Platform\Core\Models\ContextFile $contextFile, bool $keepOriginal = false): array
     {
         $variants = [];
         $webpEncoder = new WebpEncoder(90);
@@ -238,6 +266,19 @@ class ContextFileService
             foreach ($sizes as $sizeName => $dimensions) {
                 [$width, $height] = $dimensions;
 
+                // Upscale Guard: Skip variants that would be larger than the original
+                $isOriginalVariant = ($aspectRatio === 'original');
+                $targetWidth = $width;
+                $targetHeight = $height;
+
+                if ($isOriginalVariant && $targetHeight === null) {
+                    $targetHeight = (int) round($originalHeight * ($targetWidth / $originalWidth));
+                }
+
+                if ($targetWidth > $originalWidth || ($targetHeight !== null && $targetHeight > $originalHeight)) {
+                    continue;
+                }
+
                 try {
                     // Bild neu lesen (jede Variante braucht frisches Original)
                     $variantImage = $this->imageManager->read($originalContent);
@@ -248,8 +289,6 @@ class ContextFileService
 
                     // Verarbeitung basierend auf Seitenverhältnis und Bild-Orientierung
                     // IMMER flächiges Bild ohne Padding - passenden Ausschnitt wählen
-                    $isOriginalVariant = ($aspectRatio === 'original');
-                    
                     if ($isOriginalVariant) {
                         // Original-Verhältnis: Proportional skalieren (behält Seitenverhältnis)
                         $variantImage->scaleDown($width, $height);
@@ -301,7 +340,7 @@ class ContextFileService
                     // In Variants-Array speichern
                     $variants["{$sizeName}_{$aspectRatio}"] = [
                         'token' => $variantToken,
-                        'url' => Storage::disk($this->disk)->url($variantPath),
+                        'url' => self::generateUrl($this->disk, $variantPath, $variantToken, 'core.context-files.variant'),
                         'width' => $actualWidth,
                         'height' => $actualHeight,
                     ];
@@ -318,7 +357,7 @@ class ContextFileService
         \Log::info("[ContextFileService] Varianten-Generierung abgeschlossen", [
             'context_file_id' => $contextFile->id,
             'variants_generated' => count($variants),
-            'expected' => 18, // 6 Seitenverhältnisse × 3 Größen
+            'expected' => count($aspectRatios) * count(reset($aspectRatios)),
         ]);
 
         return $variants;
@@ -335,9 +374,13 @@ class ContextFileService
     /**
      * Löscht eine Context-Datei
      */
-    public function delete(int $contextFileId): void
+    public function delete(int $contextFileId, ?int $teamId = null): void
     {
         $contextFile = \Platform\Core\Models\ContextFile::findOrFail($contextFileId);
+
+        if ($teamId !== null) {
+            abort_if($contextFile->team_id !== $teamId, 403, 'Keine Berechtigung für diese Datei');
+        }
 
         // Varianten löschen
         foreach ($contextFile->variants as $variant) {
@@ -358,12 +401,14 @@ class ContextFileService
     public function getDownloadUrl(int $contextFileId): string
     {
         $contextFile = \Platform\Core\Models\ContextFile::findOrFail($contextFileId);
-        
-        // URL mit Original-Dateinamen als Query-Parameter
-        $url = Storage::disk($contextFile->disk)->url($contextFile->path);
-        $originalName = urlencode($contextFile->original_name);
-        
-        return "{$url}?download={$originalName}";
+
+        return self::generateDownloadUrl(
+            $contextFile->disk,
+            $contextFile->path,
+            $contextFile->token,
+            $contextFile->original_name,
+            5
+        );
     }
 }
 

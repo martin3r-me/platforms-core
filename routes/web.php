@@ -30,27 +30,29 @@ Route::get('/invitations/accept/{token}', [TeamInvitationController::class, 'acc
 
 // (Teams Tab Test-Routen entfernt)
 
-// Context Files - Datei-Zugriff
-Route::get('/context-files/{token}', function (string $token) {
+// Context Files - Datei-Zugriff (signed URL required)
+Route::get('/context-files/{token}', function (Request $request, string $token) {
+    abort_unless($request->hasValidSignature(), 403, 'Ungültige oder abgelaufene URL');
+
     $file = \Platform\Core\Models\ContextFile::where('token', $token)->firstOrFail();
-    
+
     // Prüfe ob Datei existiert
     if (!\Illuminate\Support\Facades\Storage::disk($file->disk)->exists($file->path)) {
         abort(404, 'Datei nicht gefunden');
     }
-    
+
     // Prüfe ob Download-Parameter gesetzt ist
-    if (request()->has('download')) {
+    if ($request->has('download')) {
         return \Illuminate\Support\Facades\Storage::disk($file->disk)->download(
             $file->path,
             $file->original_name
         );
     }
-    
+
     // Ansonsten: Datei anzeigen
     $fileContent = \Illuminate\Support\Facades\Storage::disk($file->disk)->get($file->path);
     $mimeType = $file->mime_type;
-    
+
     return response($fileContent, 200, [
         'Content-Type' => $mimeType,
         'Cache-Control' => 'public, max-age=3600',
@@ -58,18 +60,20 @@ Route::get('/context-files/{token}', function (string $token) {
     ]);
 })->name('core.context-files.show');
 
-// Context File Variants - Varianten-Zugriff
-Route::get('/context-files/variants/{token}', function (string $token) {
+// Context File Variants - Varianten-Zugriff (signed URL required)
+Route::get('/context-files/variants/{token}', function (Request $request, string $token) {
+    abort_unless($request->hasValidSignature(), 403, 'Ungültige oder abgelaufene URL');
+
     $variant = \Platform\Core\Models\ContextFileVariant::where('token', $token)->firstOrFail();
-    
+
     // Prüfe ob Variante existiert
     if (!\Illuminate\Support\Facades\Storage::disk($variant->disk)->exists($variant->path)) {
         abort(404, 'Variante nicht gefunden');
     }
-    
+
     // Variante anzeigen
     $fileContent = \Illuminate\Support\Facades\Storage::disk($variant->disk)->get($variant->path);
-    
+
     return response($fileContent, 200, [
         'Content-Type' => 'image/webp',
         'Cache-Control' => 'public, max-age=3600',
@@ -319,6 +323,7 @@ Route::middleware(['web', 'auth'])->group(function () {
                     'width' => $result['width'] ?? null,
                     'height' => $result['height'] ?? null,
                     'is_image' => str_starts_with($result['mime_type'], 'image/'),
+                    'variants_status' => $result['variants_status'] ?? 'none',
                 ],
             ]);
         } catch (\Exception $e) {
