@@ -5,6 +5,7 @@ namespace Platform\Core\Livewire\Concerns;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
+use Platform\Core\Contracts\InheritsExtraFields;
 use Platform\Core\Jobs\VerifyExtraFieldValueJob;
 use Platform\Core\Models\CoreExtraFieldDefinition;
 use Platform\Core\Models\CoreExtraFieldValue;
@@ -69,12 +70,8 @@ trait WithExtraFields
     {
         $this->extraFieldsModel = $model;
 
-        // Load definitions and mark as own (not inherited)
-        $definitions = $model->getExtraFieldsWithLabels();
-        $this->extraFieldDefinitions = array_map(function ($def) {
-            $def['is_inherited'] = false;
-            return $def;
-        }, $definitions);
+        // Load definitions (is_inherited flag is set automatically by the trait)
+        $this->extraFieldDefinitions = $model->getExtraFieldsWithLabels();
 
         // Load field values with verification metadata
         $fieldValues = $model->extraFieldValues()->with('definition')->get()->keyBy('definition_id');
@@ -127,11 +124,22 @@ trait WithExtraFields
      * Load extra field values with inherited definitions from parent model.
      * Also loads own definitions specific to the model itself.
      *
+     * If the model implements InheritsExtraFields, delegates to loadExtraFieldValues()
+     * since the trait handles inheritance automatically.
+     *
      * @param Model $model The model to load values for (e.g., Ticket)
      * @param Model $parentModel The parent model with definitions (e.g., Board)
      */
     public function loadExtraFieldValuesFromParent(Model $model, Model $parentModel): void
     {
+        // If the model implements InheritsExtraFields, the trait handles
+        // parent-definition merging automatically — just delegate.
+        if ($model instanceof InheritsExtraFields) {
+            $this->loadExtraFieldValues($model);
+            return;
+        }
+
+        // Legacy path for models that don't implement InheritsExtraFields yet
         $this->extraFieldsModel = $model;
         $this->extraFieldsParentModel = $parentModel;
 
@@ -211,8 +219,14 @@ trait WithExtraFields
             return;
         }
 
-        // If we have a parent model, reload both sources
-        if ($this->extraFieldsParentModel) {
+        // Clear definitions cache so the trait re-fetches
+        $this->extraFieldsModel->clearExtraFieldDefinitionsCache();
+
+        // If model implements InheritsExtraFields or has no legacy parent, use trait directly
+        if ($this->extraFieldsModel instanceof InheritsExtraFields || !$this->extraFieldsParentModel) {
+            $this->extraFieldDefinitions = $this->extraFieldsModel->getExtraFieldsWithLabels();
+        } else {
+            // Legacy path: manual parent merge for models without InheritsExtraFields
             $parentDefinitions = $this->extraFieldsParentModel->getExtraFieldsWithLabels();
             $ownDefinitions = $this->extraFieldsModel->getExtraFieldsWithLabels();
 
@@ -227,9 +241,6 @@ trait WithExtraFields
             }, $ownDefinitions);
 
             $this->extraFieldDefinitions = array_merge($parentDefinitions, $ownDefinitions);
-        } else {
-            // No parent - just load own definitions
-            $this->extraFieldDefinitions = $this->extraFieldsModel->getExtraFieldsWithLabels();
         }
 
         // Add any new definitions to values array

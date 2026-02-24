@@ -5,6 +5,7 @@ namespace Platform\Core\Traits;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Platform\Core\Contracts\InheritsExtraFields;
 use Platform\Core\Models\CoreExtraFieldDefinition;
 use Platform\Core\Models\CoreExtraFieldValue;
 use Platform\Core\Models\CoreLookup;
@@ -12,6 +13,16 @@ use Platform\Core\Services\ExtraFieldConditionEvaluator;
 
 trait HasExtraFields
 {
+    /**
+     * Static stack to guard against circular inheritance references.
+     */
+    protected static array $extraFieldInheritanceStack = [];
+
+    /**
+     * Request-level cache for definitions (keyed by class + id).
+     */
+    protected static array $extraFieldDefinitionsCache = [];
+
     /**
      * Alle Extra Field Werte dieser Entity
      */
@@ -21,28 +32,82 @@ trait HasExtraFields
     }
 
     /**
-     * Lädt alle verfügbaren Extra Field Definitionen für diese Entity
+     * Lädt alle verfügbaren Extra Field Definitionen für diese Entity.
      *
-     * Phase 1:
      * 1. Definitionen für dieses konkrete Objekt (context_id = $this->id)
      * 2. + Definitionen für den Typ (context_id = null) → gilt für ALLE dieses Typs
+     * 3. + Geerbte Definitionen von Parents (via InheritsExtraFields Contract)
      *
-     * Phase 2 (später):
-     * 3. + Geerbte Definitionen von Parent (via Inheritance-Mapping)
+     * Bei Name-Konflikten: Child-Definition gewinnt über Parent-Definition.
      */
     public function getExtraFieldDefinitions(): Collection
     {
+        $cacheKey = get_class($this) . ':' . ($this->id ?? 'new');
+
+        if (isset(static::$extraFieldDefinitionsCache[$cacheKey])) {
+            return static::$extraFieldDefinitionsCache[$cacheKey];
+        }
+
         $teamId = $this->getTeamIdForExtraFields();
         if (!$teamId) {
             return collect();
         }
 
-        return CoreExtraFieldDefinition::query()
+        // Own definitions (instance-specific + type-global)
+        $ownDefinitions = CoreExtraFieldDefinition::query()
             ->forTeam($teamId)
             ->forContext(get_class($this), $this->id)
             ->orderBy('order')
             ->orderBy('label')
             ->get();
+
+        // Inherited definitions from parents (if contract is implemented)
+        if ($this instanceof InheritsExtraFields) {
+            $inheritanceKey = get_class($this) . ':' . $this->id;
+
+            // Circular reference guard
+            if (in_array($inheritanceKey, static::$extraFieldInheritanceStack)) {
+                return static::$extraFieldDefinitionsCache[$cacheKey] = $ownDefinitions;
+            }
+
+            static::$extraFieldInheritanceStack[] = $inheritanceKey;
+
+            try {
+                $parentDefinitions = collect();
+
+                foreach ($this->extraFieldParents() as $parent) {
+                    if (method_exists($parent, 'getExtraFieldDefinitions')) {
+                        $parentDefinitions = $parentDefinitions->merge($parent->getExtraFieldDefinitions());
+                    }
+                }
+
+                // Merge: Child wins on name conflicts
+                $ownNames = $ownDefinitions->pluck('name')->toArray();
+                $inheritedDefinitions = $parentDefinitions->filter(
+                    fn ($def) => !in_array($def->name, $ownNames)
+                );
+
+                // Deduplicate inherited definitions by name (first parent wins)
+                $inheritedDefinitions = $inheritedDefinitions->unique('name');
+
+                $ownDefinitions = $inheritedDefinitions->merge($ownDefinitions)
+                    ->sortBy(['order', 'label'])
+                    ->values();
+            } finally {
+                array_pop(static::$extraFieldInheritanceStack);
+            }
+        }
+
+        return static::$extraFieldDefinitionsCache[$cacheKey] = $ownDefinitions;
+    }
+
+    /**
+     * Clears the request-level definitions cache for this instance.
+     */
+    public function clearExtraFieldDefinitionsCache(): void
+    {
+        $cacheKey = get_class($this) . ':' . ($this->id ?? 'new');
+        unset(static::$extraFieldDefinitionsCache[$cacheKey]);
     }
 
     /**
@@ -127,6 +192,9 @@ trait HasExtraFields
         foreach ($definitions as $definition) {
             $value = $values->get($definition->id);
 
+            // A definition is inherited if its context_type differs from this model's class
+            $isInherited = $definition->context_type !== get_class($this);
+
             $fieldData = [
                 'id' => $definition->id,
                 'name' => $definition->name,
@@ -136,6 +204,7 @@ trait HasExtraFields
                 'is_required' => $definition->is_required,
                 'is_mandatory' => $definition->is_mandatory,
                 'is_encrypted' => $definition->is_encrypted,
+                'is_inherited' => $isInherited,
                 'options' => $definition->options,
                 'visibility_config' => $definition->visibility_config,
                 'verify_by_llm' => $definition->verify_by_llm,
@@ -251,20 +320,12 @@ trait HasExtraFields
     }
 
     /**
-     * Sucht eine Extra Field Definition anhand des Namens
+     * Sucht eine Extra Field Definition anhand des Namens.
+     * Nutzt getExtraFieldDefinitions() um auch geerbte Definitionen zu finden.
      */
     protected function findExtraFieldDefinition(string $name): ?CoreExtraFieldDefinition
     {
-        $teamId = $this->getTeamIdForExtraFields();
-        if (!$teamId) {
-            return null;
-        }
-
-        return CoreExtraFieldDefinition::query()
-            ->forTeam($teamId)
-            ->forContext(get_class($this), $this->id)
-            ->where('name', $name)
-            ->first();
+        return $this->getExtraFieldDefinitions()->firstWhere('name', $name);
     }
 
     /**
