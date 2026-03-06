@@ -20,6 +20,12 @@ use Platform\Core\Contracts\CrmContactOptionsProviderInterface;
 use Platform\Core\Services\NullCrmContactOptionsProvider;
 use Platform\Core\Contracts\CrmCompanyContactsProviderInterface;
 use Platform\Core\Services\NullCrmCompanyContactsProvider;
+use Platform\Core\Contracts\CanvasResolverInterface;
+use Platform\Core\Contracts\CanvasOptionsProviderInterface;
+use Platform\Core\Contracts\CanvasForContextProviderInterface;
+use Platform\Core\Services\NullCanvasResolver;
+use Platform\Core\Services\NullCanvasOptionsProvider;
+use Platform\Core\Services\NullCanvasForContextProvider;
 use Platform\Core\Services\IntelligentAgent;
 use Platform\Core\Services\AgentOrchestrator;
 use Platform\Core\Contracts\CounterKeyResultSyncer;
@@ -183,6 +189,17 @@ class CoreServiceProvider extends ServiceProvider
         });
         $this->app->singleton(CrmCompanyContactsProviderInterface::class, function () {
             return new NullCrmCompanyContactsProvider();
+        });
+
+        // Default-Canvas-Resolver binden (können vom Project-Canvas-Modul überschrieben werden)
+        $this->app->singleton(CanvasResolverInterface::class, function () {
+            return new NullCanvasResolver();
+        });
+        $this->app->singleton(CanvasOptionsProviderInterface::class, function () {
+            return new NullCanvasOptionsProvider();
+        });
+        $this->app->singleton(CanvasForContextProviderInterface::class, function () {
+            return new NullCanvasForContextProvider();
         });
 
         // AI Agent Services entfernt – kommen in separates Modul
