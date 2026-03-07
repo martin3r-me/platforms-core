@@ -489,6 +489,20 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register($this->app->make(\Platform\Core\Tools\ListExtraFieldEntitiesTool::class)); } catch (\Throwable $e) {}
         }
 
+        // Document Service Tools (core.documents.*)
+        if (class_exists(\Platform\Core\Tools\ListDocumentTemplatesTool::class) && !$registry->has('core.documents.templates.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\ListDocumentTemplatesTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\CreateDocumentTool::class) && !$registry->has('core.documents.CREATE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\CreateDocumentTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\GetDocumentTool::class) && !$registry->has('core.documents.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\GetDocumentTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\ExportDocumentTool::class) && !$registry->has('core.documents.EXPORT')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\ExportDocumentTool::class)); } catch (\Throwable $e) {}
+        }
+
         // Communication Tools moved to CRM module (crm.comms.*)
     }
 
