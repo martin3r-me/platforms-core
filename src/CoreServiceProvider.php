@@ -493,11 +493,23 @@ class CoreServiceProvider extends ServiceProvider
         if (class_exists(\Platform\Core\Tools\ListDocumentTemplatesTool::class) && !$registry->has('core.documents.templates.GET')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\ListDocumentTemplatesTool::class)); } catch (\Throwable $e) {}
         }
+        if (class_exists(\Platform\Core\Tools\ManageDocumentTemplateTool::class) && !$registry->has('core.documents.templates.MANAGE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\ManageDocumentTemplateTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\ListDocumentsTool::class) && !$registry->has('core.documents.LIST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\ListDocumentsTool::class)); } catch (\Throwable $e) {}
+        }
         if (class_exists(\Platform\Core\Tools\CreateDocumentTool::class) && !$registry->has('core.documents.CREATE')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\CreateDocumentTool::class)); } catch (\Throwable $e) {}
         }
         if (class_exists(\Platform\Core\Tools\GetDocumentTool::class) && !$registry->has('core.documents.GET')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\GetDocumentTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\UpdateDocumentTool::class) && !$registry->has('core.documents.UPDATE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\UpdateDocumentTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\DeleteDocumentTool::class) && !$registry->has('core.documents.DELETE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\DeleteDocumentTool::class)); } catch (\Throwable $e) {}
         }
         if (class_exists(\Platform\Core\Tools\ExportDocumentTool::class) && !$registry->has('core.documents.EXPORT')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\ExportDocumentTool::class)); } catch (\Throwable $e) {}
