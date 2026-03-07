@@ -20,6 +20,8 @@ use Platform\Core\Contracts\CrmContactOptionsProviderInterface;
 use Platform\Core\Services\NullCrmContactOptionsProvider;
 use Platform\Core\Contracts\CrmCompanyContactsProviderInterface;
 use Platform\Core\Services\NullCrmCompanyContactsProvider;
+use Platform\Core\Contracts\CrmContactLinkManagerInterface;
+use Platform\Core\Services\NullCrmContactLinkManager;
 use Platform\Core\Contracts\CanvasResolverInterface;
 use Platform\Core\Contracts\CanvasOptionsProviderInterface;
 use Platform\Core\Contracts\CanvasForContextProviderInterface;
@@ -189,6 +191,9 @@ class CoreServiceProvider extends ServiceProvider
         });
         $this->app->singleton(CrmCompanyContactsProviderInterface::class, function () {
             return new NullCrmCompanyContactsProvider();
+        });
+        $this->app->singleton(CrmContactLinkManagerInterface::class, function () {
+            return new NullCrmContactLinkManager();
         });
 
         // Default-Canvas-Resolver binden (können vom Project-Canvas-Modul überschrieben werden)
