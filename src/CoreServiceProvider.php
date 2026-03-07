@@ -515,6 +515,17 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register($this->app->make(\Platform\Core\Tools\ExportDocumentTool::class)); } catch (\Throwable $e) {}
         }
 
+        // Document Folder Tools (core.documents.folders.*, core.documents.MOVE)
+        if (class_exists(\Platform\Core\Tools\ListDocumentFoldersTool::class) && !$registry->has('core.documents.folders.LIST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\ListDocumentFoldersTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\ManageDocumentFolderTool::class) && !$registry->has('core.documents.folders.MANAGE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\ManageDocumentFolderTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\MoveDocumentTool::class) && !$registry->has('core.documents.MOVE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\MoveDocumentTool::class)); } catch (\Throwable $e) {}
+        }
+
         // Communication Tools moved to CRM module (crm.comms.*)
     }
 

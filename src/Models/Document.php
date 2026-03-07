@@ -11,6 +11,7 @@ class Document extends Model
 {
     protected $fillable = [
         'team_id',
+        'document_folder_id',
         'document_template_id',
         'template_key',
         'title',
@@ -30,6 +31,11 @@ class Document extends Model
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    public function folder(): BelongsTo
+    {
+        return $this->belongsTo(DocumentFolder::class, 'document_folder_id');
     }
 
     public function template(): BelongsTo

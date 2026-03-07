@@ -27,6 +27,7 @@ class DocumentService
         int $teamId,
         ?int $userId = null,
         array $meta = [],
+        ?int $folderId = null,
     ): Document {
         $template = $this->templateRegistry->resolve($templateKey, $teamId);
 
@@ -41,6 +42,7 @@ class DocumentService
 
         return Document::create([
             'team_id' => $teamId,
+            'document_folder_id' => $folderId,
             'document_template_id' => $template->exists ? $template->id : null,
             'template_key' => $templateKey,
             'title' => $title,

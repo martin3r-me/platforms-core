@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Platform\Core\Livewire\Public\PublicExtraFieldForm;
 use Platform\Core\Models\Document;
+use Platform\Core\Models\DocumentFolder;
 use Platform\Core\Services\ContextFileService;
 use Platform\Core\Services\Documents\DocumentTemplateRegistry;
 
@@ -59,3 +60,24 @@ Route::get('/documents/{token}', function (Request $request, string $token) {
         'htmlPreview' => $htmlPreview,
     ]);
 })->name('core.documents.share');
+
+// Document folder share link (public, no auth)
+Route::get('/documents/folder/{token}', function (Request $request, string $token) {
+    $folder = DocumentFolder::where('share_token', $token)->firstOrFail();
+
+    $subfolders = DocumentFolder::where('parent_id', $folder->id)
+        ->where('team_id', $folder->team_id)
+        ->orderBy('name')
+        ->get();
+
+    $documents = Document::where('document_folder_id', $folder->id)
+        ->where('team_id', $folder->team_id)
+        ->orderByDesc('created_at')
+        ->get();
+
+    return view('platform::documents.folder-share', [
+        'folder' => $folder,
+        'subfolders' => $subfolders,
+        'documents' => $documents,
+    ]);
+})->name('core.documents.folder.share');

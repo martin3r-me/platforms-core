@@ -27,6 +27,10 @@ class ListDocumentsTool implements ToolContract
         return [
             'type' => 'object',
             'properties' => [
+                'folder_id' => [
+                    'type' => 'integer',
+                    'description' => 'Filter nach Ordner-ID. 0 = nur Schreibtisch-Dokumente (ohne Ordner).',
+                ],
                 'template_key' => [
                     'type' => 'string',
                     'description' => 'Filter nach Template-Key (z.B. "report", "letter", "table-report")',
@@ -66,6 +70,15 @@ class ListDocumentsTool implements ToolContract
             $query = Document::where('team_id', $team->id)
                 ->orderByDesc('created_at');
 
+            if (array_key_exists('folder_id', $arguments)) {
+                $folderId = (int) $arguments['folder_id'];
+                if ($folderId === 0) {
+                    $query->whereNull('document_folder_id');
+                } else {
+                    $query->where('document_folder_id', $folderId);
+                }
+            }
+
             if (!empty($arguments['template_key'])) {
                 $query->where('template_key', $arguments['template_key']);
             }
@@ -86,6 +99,7 @@ class ListDocumentsTool implements ToolContract
                     'id' => $doc->id,
                     'title' => $doc->title,
                     'template_key' => $doc->template_key,
+                    'folder_id' => $doc->document_folder_id,
                     'status' => $doc->status,
                     'has_output' => $doc->output_context_file_id !== null,
                     'share_url' => $doc->share_url,

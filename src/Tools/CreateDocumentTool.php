@@ -59,6 +59,10 @@ class CreateDocumentTool implements ToolContract
                         ],
                     ],
                 ],
+                'folder_id' => [
+                    'type' => 'integer',
+                    'description' => 'Optional: Ordner-ID zum Einsortieren. Ohne folder_id landet das Dokument auf dem Schreibtisch.',
+                ],
                 'auto_render' => [
                     'type' => 'boolean',
                     'description' => 'Standard: true. PDF wird sofort asynchron gerendert. Bei false nur Draft (kann später mit core.documents.EXPORT gerendert werden).',
@@ -91,6 +95,7 @@ class CreateDocumentTool implements ToolContract
             $templateKey = $arguments['template_key'];
             $title = $arguments['title'];
             $data = $arguments['data'] ?? [];
+            $folderId = ($arguments['folder_id'] ?? null) ?: null;
             $autoRender = $arguments['auto_render'] ?? true;
             $rendererOptions = $arguments['renderer_options'] ?? [];
 
@@ -103,6 +108,8 @@ class CreateDocumentTool implements ToolContract
                 $data,
                 $team->id,
                 $context->user->id,
+                meta: [],
+                folderId: $folderId,
             );
 
             $result = [
