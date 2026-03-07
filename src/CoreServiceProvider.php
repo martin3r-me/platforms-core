@@ -33,6 +33,10 @@ use Platform\Core\Services\AgentOrchestrator;
 use Platform\Core\Contracts\CounterKeyResultSyncer;
 use Platform\Core\Services\NullCounterKeyResultSyncer;
 use Platform\Core\Registry\ModuleRegistry;
+use Platform\Core\Contracts\DocumentRendererContract;
+use Platform\Core\Services\Documents\PdfRenderer;
+use Platform\Core\Services\Documents\DocumentTemplateRegistry;
+use Platform\Core\Services\Documents\DocumentService;
 use Laravel\Passport\Passport;
 
 // Command-Klasse importieren!
@@ -238,6 +242,16 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(\Platform\Core\Services\ToolExecutionContextService::class);
         $this->app->singleton(\Platform\Core\Services\IntentionVerificationService::class);
         
+        // Document Service bindings
+        $this->app->singleton(DocumentRendererContract::class, PdfRenderer::class);
+        $this->app->singleton(DocumentTemplateRegistry::class);
+        $this->app->singleton(DocumentService::class, function ($app) {
+            return new DocumentService(
+                $app->make(DocumentTemplateRegistry::class),
+                $app->make(DocumentRendererContract::class),
+            );
+        });
+
         $this->app->singleton(\Platform\Core\Tools\ToolOrchestrator::class, function ($app) {
             return new \Platform\Core\Tools\ToolOrchestrator(
                 $app->make(\Platform\Core\Tools\ToolExecutor::class),

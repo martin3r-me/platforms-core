@@ -1,7 +1,61 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
 use Platform\Core\Livewire\Public\PublicExtraFieldForm;
+use Platform\Core\Models\Document;
+use Platform\Core\Services\ContextFileService;
+use Platform\Core\Services\Documents\DocumentTemplateRegistry;
 
 Route::get('/form/{token}', PublicExtraFieldForm::class)
     ->name('core.public.extra-field-form');
+
+// Document share link (public, no auth)
+Route::get('/documents/{token}', function (Request $request, string $token) {
+    $document = Document::with(['template', 'outputFile'])
+        ->where('share_token', $token)
+        ->firstOrFail();
+
+    $viewUrl = null;
+    $downloadUrl = null;
+    $htmlPreview = null;
+
+    if ($document->outputFile) {
+        $viewUrl = ContextFileService::generateUrl(
+            $document->outputFile->disk,
+            $document->outputFile->path,
+            $document->outputFile->token,
+            'core.context-files.show',
+            60,
+        );
+        $downloadUrl = ContextFileService::generateDownloadUrl(
+            $document->outputFile->disk,
+            $document->outputFile->path,
+            $document->outputFile->token,
+            $document->outputFile->original_name,
+            5,
+        );
+    }
+
+    // HTML preview fallback: render template to HTML (works without Chromium)
+    if (!$viewUrl && $document->data) {
+        try {
+            $registry = app(DocumentTemplateRegistry::class);
+            $template = $document->template
+                ?? $registry->resolve($document->template_key, $document->team_id);
+
+            if ($template) {
+                $htmlPreview = $registry->renderToHtml($template, $document->data);
+            }
+        } catch (\Throwable $e) {
+            // Silent — show empty state if rendering fails
+        }
+    }
+
+    return view('platform::documents.share', [
+        'document' => $document,
+        'viewUrl' => $viewUrl,
+        'downloadUrl' => $downloadUrl,
+        'htmlPreview' => $htmlPreview,
+    ]);
+})->name('core.documents.share');
