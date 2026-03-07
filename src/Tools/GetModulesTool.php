@@ -54,7 +54,7 @@ class GetModulesTool implements ToolContract
                     'core' => [
                         'key' => 'core',
                         'title' => 'Core',
-                        'description' => 'System-/Plattform-Tools (Discovery, Context, Teams, AI-Modelle, Chat).',
+                        'description' => 'System-/Plattform-Tools (Discovery, Context, Teams, AI-Modelle, Chat, Dokumente/PDF-Generierung, Dateien/ContextFiles, Extra-Fields).',
                     ],
                 ], $modules);
             }
