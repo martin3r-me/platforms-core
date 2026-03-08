@@ -13,7 +13,7 @@ Route::get('/form/{token}', PublicExtraFieldForm::class)
 
 // Document share link (public, no auth)
 Route::get('/documents/{token}', function (Request $request, string $token) {
-    $document = Document::with(['template', 'outputFile'])
+    $document = Document::with(['template', 'outputFile', 'exports' => fn($q) => $q->latest()->limit(1)])
         ->where('share_token', $token)
         ->firstOrFail();
 
@@ -39,6 +39,7 @@ Route::get('/documents/{token}', function (Request $request, string $token) {
     }
 
     // HTML preview fallback: render template to HTML (works without Chromium)
+    $renderError = null;
     if (!$viewUrl && $document->data) {
         try {
             $registry = app(DocumentTemplateRegistry::class);
@@ -49,8 +50,14 @@ Route::get('/documents/{token}', function (Request $request, string $token) {
                 $htmlPreview = $registry->renderToHtml($template, $document->data);
             }
         } catch (\Throwable $e) {
-            // Silent — show empty state if rendering fails
+            $renderError = $e->getMessage();
         }
+    }
+
+    // Get error from latest export if rendering failed
+    if (!$renderError && $document->status === 'failed') {
+        $lastExport = $document->exports->first();
+        $renderError = $lastExport?->error_message;
     }
 
     return view('platform::documents.share', [
@@ -58,6 +65,7 @@ Route::get('/documents/{token}', function (Request $request, string $token) {
         'viewUrl' => $viewUrl,
         'downloadUrl' => $downloadUrl,
         'htmlPreview' => $htmlPreview,
+        'renderError' => $renderError,
     ]);
 })->name('core.documents.share');
 

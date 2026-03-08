@@ -176,8 +176,20 @@
         @elseif($document->status === 'failed')
             <div class="empty-state">
                 <h2>Rendering fehlgeschlagen</h2>
-                <p>Beim Generieren des PDFs ist ein Fehler aufgetreten.</p>
+                @if(!empty($renderError))
+                    <pre style="margin: 16px auto; max-width: 700px; text-align: left; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 16px; font-size: 12px; color: #991b1b; overflow-x: auto; white-space: pre-wrap; word-break: break-word;">{{ $renderError }}</pre>
+                @else
+                    <p>Beim Generieren des PDFs ist ein Fehler aufgetreten.</p>
+                @endif
             </div>
+            @if(!empty($htmlPreview))
+                <div style="margin-top: 16px;">
+                    <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px; text-align: center;">HTML-Vorschau (PDF-Rendering fehlgeschlagen)</div>
+                    <div class="html-preview">
+                        {!! $htmlPreview !!}
+                    </div>
+                </div>
+            @endif
         @else
             <div class="empty-state">
                 <h2>Dokument wird vorbereitet...</h2>
