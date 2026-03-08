@@ -16,10 +16,14 @@ class GetDocumentTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'Gibt Details zu einem Dokument zurück oder listet Dokumente des Teams auf. '
-            . 'Mit document_id: Einzelnes Dokument mit Status, Daten und Download-URL (wenn gerendert). '
-            . 'Ohne document_id: Liste aller Dokumente mit Filtern. '
-            . 'Typischer Workflow nach core.documents.CREATE: Rufe dieses Tool mit document_id auf um zu prüfen, ob das PDF fertig gerendert ist und die Download-URL abzurufen.';
+        return 'Liest ein Dokument inkl. des vollständigen html_content. '
+            . 'Mit document_id: Gibt das Dokument zurück — data enthält ALLE Template-Felder inkl. html_content (den kompletten HTML-Body). '
+            . 'WICHTIG: Nutze dieses Tool BEVOR du core.documents.PATCH oder core.documents.UPDATE aufrufst, um den aktuellen Stand zu kennen. '
+            . 'Mit include_data:false: Nur Metadaten ohne html_content (spart Tokens wenn du nur Status/URLs brauchst). '
+            . 'Ohne document_id: Liste aller Dokumente (ohne Content). '
+            . "\n"
+            . 'EDIT-WORKFLOW: 1) GET (Content lesen) → 2) PATCH (gezielte Änderungen) → 3) EXPORT (PDF rendern). '
+            . 'Für Status-Check nach EXPORT: GET mit include_data:false.';
     }
 
     public function getSchema(): array
@@ -29,7 +33,11 @@ class GetDocumentTool implements ToolContract
             'properties' => [
                 'document_id' => [
                     'type' => 'integer',
-                    'description' => 'ID eines bestimmten Dokuments. Gibt Details inkl. Download-URL zurück.',
+                    'description' => 'ID eines bestimmten Dokuments. Gibt Details inkl. data.html_content und Download-URL zurück.',
+                ],
+                'include_data' => [
+                    'type' => 'boolean',
+                    'description' => 'Standard: true. Bei false wird data (inkl. html_content) nicht zurückgegeben — spart Tokens wenn du nur Status, URLs oder Metadaten brauchst.',
                 ],
                 'template_key' => [
                     'type' => 'string',
@@ -62,7 +70,8 @@ class GetDocumentTool implements ToolContract
 
             // Single document
             if (!empty($arguments['document_id'])) {
-                return $this->getOne((int) $arguments['document_id'], $team->id);
+                $includeData = $arguments['include_data'] ?? true;
+                return $this->getOne((int) $arguments['document_id'], $team->id, $includeData);
             }
 
             // List documents
@@ -72,7 +81,7 @@ class GetDocumentTool implements ToolContract
         }
     }
 
-    private function getOne(int $documentId, int $teamId): ToolResult
+    private function getOne(int $documentId, int $teamId, bool $includeData = true): ToolResult
     {
         $document = Document::with(['template', 'outputFile', 'exports', 'teamTags'])
             ->where('id', $documentId)
@@ -89,7 +98,6 @@ class GetDocumentTool implements ToolContract
             'template_key' => $document->template_key,
             'template_name' => $document->template?->name,
             'status' => $document->status,
-            'data' => $document->data,
             'share_url' => $document->share_url,
             'tags' => $document->teamTags->map(fn($t) => [
                 'id' => $t->id,
@@ -100,6 +108,13 @@ class GetDocumentTool implements ToolContract
             'created_at' => $document->created_at?->toIso8601String(),
             'updated_at' => $document->updated_at?->toIso8601String(),
         ];
+
+        if ($includeData) {
+            $result['data'] = $document->data;
+        } else {
+            $result['data_excluded'] = true;
+            $result['content_length'] = mb_strlen($document->data['html_content'] ?? '');
+        }
 
         // Output URLs if rendered (signed, time-limited)
         if ($document->outputFile) {

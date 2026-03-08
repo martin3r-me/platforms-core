@@ -528,6 +528,15 @@ class CoreServiceProvider extends ServiceProvider
         if (class_exists(\Platform\Core\Tools\TagDocumentTool::class) && !$registry->has('core.documents.TAG')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\TagDocumentTool::class)); } catch (\Throwable $e) {}
         }
+        if (class_exists(\Platform\Core\Tools\AppendDocumentTool::class) && !$registry->has('core.documents.APPEND')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\AppendDocumentTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\PatchDocumentTool::class) && !$registry->has('core.documents.PATCH')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\PatchDocumentTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\SnapshotDocumentTool::class) && !$registry->has('core.documents.SNAPSHOT')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\SnapshotDocumentTool::class)); } catch (\Throwable $e) {}
+        }
 
         // Communication Tools moved to CRM module (crm.comms.*)
     }

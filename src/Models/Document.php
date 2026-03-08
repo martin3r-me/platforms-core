@@ -55,6 +55,11 @@ class Document extends Model
         return $this->hasMany(DocumentExport::class);
     }
 
+    public function snapshots(): HasMany
+    {
+        return $this->hasMany(DocumentSnapshot::class);
+    }
+
     public function createdByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');

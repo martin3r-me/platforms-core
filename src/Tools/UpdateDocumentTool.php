@@ -16,9 +16,11 @@ class UpdateDocumentTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'Aktualisiert ein bestehendes Dokument (Titel, Daten, Metadaten). '
-            . 'Wenn sich data ändert, kann das Dokument anschließend mit core.documents.EXPORT neu gerendert werden. '
-            . 'Nur die übergebenen Felder werden geändert — nicht übergebene bleiben unverändert.';
+        return 'Aktualisiert ein bestehendes Dokument. '
+            . 'data wird GEMERGT (nicht ersetzt): Übergib nur die geänderten Keys, z.B. data:{subtitle:"Neu"} — html_content bleibt unangetastet. '
+            . 'Für gezielte Textänderungen innerhalb von html_content: Nutze core.documents.PATCH (search/replace) statt den gesamten Content hier zu übergeben. '
+            . 'Für Anhänge an html_content: Nutze core.documents.APPEND. '
+            . 'Nach data-Änderung: core.documents.EXPORT zum Neu-Rendern.';
     }
 
     public function getSchema(): array
@@ -36,7 +38,7 @@ class UpdateDocumentTool implements ToolContract
                 ],
                 'data' => [
                     'type' => 'object',
-                    'description' => 'Neue Template-Daten (ersetzt die bestehenden komplett). Nach Änderung: core.documents.EXPORT zum Neu-Rendern.',
+                    'description' => 'Template-Daten (wird mit bestehenden Daten GEMERGT). Nur geänderte Keys übergeben — Rest bleibt erhalten. Beispiel: {subtitle:"Neu"} ändert nur subtitle, html_content bleibt.',
                 ],
                 'template_key' => [
                     'type' => 'string',
@@ -78,7 +80,8 @@ class UpdateDocumentTool implements ToolContract
             }
 
             if (array_key_exists('data', $arguments)) {
-                $updates['data'] = $arguments['data'];
+                $existing = $document->data ?? [];
+                $updates['data'] = array_merge($existing, $arguments['data']);
                 $changed[] = 'data';
             }
 

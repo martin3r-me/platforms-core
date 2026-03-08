@@ -33,7 +33,14 @@ class CreateDocumentTool implements ToolContract
             . 'HTML-CONTENT TIPPS: '
             . 'Nutze semantisches HTML: h1-h3, p, ul/ol, table (th+td), hr. '
             . 'Tabellen werden automatisch gestylt. Für Zahlenkolumnen: class="number" auf th/td. '
-            . 'Seitenumbruch: <div class="page-break"></div>. ';
+            . 'Seitenumbruch: <div class="page-break"></div>. '
+            . "\n\n"
+            . 'NACH DEM ERSTELLEN — Bearbeitungs-Tools: '
+            . 'core.documents.GET — Aktuellen html_content lesen. '
+            . 'core.documents.PATCH — Gezielte Search/Replace-Änderungen (token-effizient). '
+            . 'core.documents.APPEND — Content ans Ende anhängen. '
+            . 'core.documents.UPDATE — Metadaten ändern (data wird gemergt, nicht ersetzt). '
+            . 'core.documents.SNAPSHOT — Versionsstand sichern vor größeren Änderungen.';
     }
 
     public function getSchema(): array
