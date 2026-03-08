@@ -6,9 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
+use Platform\Core\Traits\HasTags;
 
 class Document extends Model
 {
+    use HasTags;
     protected $fillable = [
         'team_id',
         'document_folder_id',

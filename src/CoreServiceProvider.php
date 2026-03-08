@@ -525,6 +525,9 @@ class CoreServiceProvider extends ServiceProvider
         if (class_exists(\Platform\Core\Tools\MoveDocumentTool::class) && !$registry->has('core.documents.MOVE')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\MoveDocumentTool::class)); } catch (\Throwable $e) {}
         }
+        if (class_exists(\Platform\Core\Tools\TagDocumentTool::class) && !$registry->has('core.documents.TAG')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\TagDocumentTool::class)); } catch (\Throwable $e) {}
+        }
 
         // Communication Tools moved to CRM module (crm.comms.*)
     }

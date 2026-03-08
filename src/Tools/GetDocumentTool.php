@@ -74,7 +74,7 @@ class GetDocumentTool implements ToolContract
 
     private function getOne(int $documentId, int $teamId): ToolResult
     {
-        $document = Document::with(['template', 'outputFile', 'exports'])
+        $document = Document::with(['template', 'outputFile', 'exports', 'teamTags'])
             ->where('id', $documentId)
             ->where('team_id', $teamId)
             ->first();
@@ -91,6 +91,12 @@ class GetDocumentTool implements ToolContract
             'status' => $document->status,
             'data' => $document->data,
             'share_url' => $document->share_url,
+            'tags' => $document->teamTags->map(fn($t) => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'label' => $t->label,
+                'color' => $t->color,
+            ])->toArray(),
             'created_at' => $document->created_at?->toIso8601String(),
             'updated_at' => $document->updated_at?->toIso8601String(),
         ];

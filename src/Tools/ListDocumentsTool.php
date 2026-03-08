@@ -39,6 +39,10 @@ class ListDocumentsTool implements ToolContract
                     'type' => 'string',
                     'description' => 'Filter nach Status: draft, rendered, failed',
                 ],
+                'tag' => [
+                    'type' => 'string',
+                    'description' => 'Filter nach Tag-Name (z.B. "wichtig", "q1-2026"). Zeigt nur Dokumente mit diesem Tag.',
+                ],
                 'search' => [
                     'type' => 'string',
                     'description' => 'Suche im Titel (partial match)',
@@ -87,12 +91,19 @@ class ListDocumentsTool implements ToolContract
                 $query->where('status', $arguments['status']);
             }
 
+            if (!empty($arguments['tag'])) {
+                $tagName = $arguments['tag'];
+                $query->whereHas('teamTags', function ($q) use ($tagName) {
+                    $q->where('name', $tagName)->orWhere('label', $tagName);
+                });
+            }
+
             if (!empty($arguments['search'])) {
                 $query->where('title', 'LIKE', '%' . $arguments['search'] . '%');
             }
 
             $total = $query->count();
-            $documents = $query->skip($offset)->take($limit)->get();
+            $documents = $query->with('teamTags')->skip($offset)->take($limit)->get();
 
             return ToolResult::success([
                 'documents' => $documents->map(fn($doc) => [
@@ -102,6 +113,7 @@ class ListDocumentsTool implements ToolContract
                     'folder_id' => $doc->document_folder_id,
                     'status' => $doc->status,
                     'has_output' => $doc->output_context_file_id !== null,
+                    'tags' => $doc->teamTags->map(fn($t) => $t->label)->toArray(),
                     'share_url' => $doc->share_url,
                     'created_at' => $doc->created_at?->toIso8601String(),
                 ])->toArray(),
