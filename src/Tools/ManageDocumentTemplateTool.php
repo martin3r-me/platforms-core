@@ -18,8 +18,17 @@ class ManageDocumentTemplateTool implements ToolContract
     {
         return 'Erstellt oder aktualisiert ein Dokument-Template für das aktuelle Team. '
             . 'Team-Templates überschreiben System-Defaults mit dem gleichen Key. '
-            . 'Übergib content als HTML/Blade-String — das wird als DB-Template gespeichert. '
-            . 'Variablen in content: {{ $html_content }}, {{ $title }}, etc. (Blade-Syntax). '
+            . "\n\n"
+            . 'CONTENT: Du lieferst nur den BODY-HTML (Blade-Syntax). '
+            . 'Das System wrappt automatisch mit Base-Layout (CSS für Tabellen, Typografie, Print, KPI-Cards). '
+            . 'Variablen: {{ $var }} (escaped), {!! $var !!} (raw HTML), @if/@foreach etc. '
+            . 'Standard-Variable ist immer $html_content — der Haupt-Body den die LLM beim Erstellen generiert. '
+            . "\n\n"
+            . 'STYLES: Eigene CSS-Klassen in meta.styles ablegen — werden automatisch im <head> eingefügt. '
+            . 'Basis-CSS ist immer da: table, th/td, h1-h3, p, .kpi-grid/.kpi-card, .page-break, .text-right, .bold, etc. '
+            . "\n\n"
+            . 'BEISPIEL content: "@if(!empty($kunde))<p>Kunde: {{ $kunde }}</p>@endif<div class=\"content-body\">{!! $html_content !!}</div>" '
+            . "\n\n"
             . 'Mit action: "delete" kann ein Team-Template gelöscht werden (System-Defaults sind nicht löschbar).';
     }
 
@@ -50,7 +59,7 @@ class ManageDocumentTemplateTool implements ToolContract
                 ],
                 'content' => [
                     'type' => 'string',
-                    'description' => 'HTML/Blade-Template als String. Variablen: {{ $html_content }}, {{ $title }}, {!! $html_content !!} (unescaped HTML). Kann die volle _layout.blade.php Struktur inkl. CSS enthalten.',
+                    'description' => 'Nur BODY-HTML (Blade-Syntax). Das Base-Layout (CSS, Doctype, Print-Styles) wird automatisch drum herum gewrappt. Nutze {!! $html_content !!} für den Haupt-Body, {{ $var }} für escaped Variablen, @if/@foreach für Logik.',
                 ],
                 'schema' => [
                     'type' => 'object',

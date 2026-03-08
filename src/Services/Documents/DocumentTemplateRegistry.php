@@ -73,6 +73,12 @@ class DocumentTemplateRegistry
 
     /**
      * Render a template to HTML with the given data.
+     *
+     * DB content templates: body is rendered via Blade::render(), then auto-wrapped
+     * in the base layout (_base.blade.php) with all CSS (typography, tables, print).
+     * The LLM only needs to provide body HTML — no full document structure needed.
+     *
+     * Blade view templates: rendered directly via View::make() (legacy/fallback).
      */
     public function renderToHtml(DocumentTemplate $template, array $data): string
     {
@@ -81,14 +87,34 @@ class DocumentTemplateRegistry
 
         // DB content (team override or system default with content)
         if ($template->content) {
-            return Blade::render($template->content, $mergedData);
+            // Render the body template (Blade syntax: {{ $var }}, {!! $html !!}, @if etc.)
+            $bodyHtml = Blade::render($template->content, $mergedData);
+
+            // Extract custom styles from template meta
+            $customStyles = $template->meta['styles'] ?? '';
+
+            // Wrap in base layout (CSS, print styles, document structure)
+            return $this->wrapInLayout($bodyHtml, $mergedData['title'] ?? 'Dokument', $customStyles);
         }
 
-        // Blade view (system templates)
+        // Blade view (system templates / legacy fallback)
         if ($template->blade_view) {
             return View::make($template->blade_view, $mergedData)->render();
         }
 
         throw new \RuntimeException("Template '{$template->key}' has neither content nor blade_view.");
+    }
+
+    /**
+     * Wrap body HTML in the base document layout.
+     * Provides: doctype, charset, print CSS, table styles, typography, utility classes.
+     */
+    protected function wrapInLayout(string $bodyHtml, string $title, string $customStyles = ''): string
+    {
+        return View::make('platform::documents._base', [
+            'title' => $title,
+            'bodyHtml' => $bodyHtml,
+            'customStyles' => $customStyles,
+        ])->render();
     }
 }
