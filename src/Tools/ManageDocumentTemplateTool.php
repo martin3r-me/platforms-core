@@ -19,17 +19,33 @@ class ManageDocumentTemplateTool implements ToolContract
         return 'Erstellt oder aktualisiert ein Dokument-Template für das aktuelle Team. '
             . 'Team-Templates überschreiben System-Defaults mit dem gleichen Key. '
             . "\n\n"
-            . 'CONTENT: Du lieferst nur den BODY-HTML (Blade-Syntax). '
-            . 'Das System wrappt automatisch mit Base-Layout (CSS für Tabellen, Typografie, Print, KPI-Cards). '
-            . 'Variablen: {{ $var }} (escaped), {!! $var !!} (raw HTML), @if/@foreach etc. '
-            . 'Standard-Variable ist immer $html_content — der Haupt-Body den die LLM beim Erstellen generiert. '
+            . '## So funktioniert es '
+            . "\n"
+            . 'Du lieferst nur den BODY-HTML in "content" (Blade-Syntax). '
+            . 'Das System wrappt automatisch mit Base-Layout: CSS für Tabellen, Typografie, Print, KPI-Cards, Brief-Layout. '
             . "\n\n"
-            . 'STYLES: Eigene CSS-Klassen in meta.styles ablegen — werden automatisch im <head> eingefügt. '
-            . 'Basis-CSS ist immer da: table, th/td, h1-h3, p, .kpi-grid/.kpi-card, .page-break, .text-right, .bold, etc. '
+            . '## Verfügbare Felder '
+            . "\n"
+            . '- content: BODY-HTML (Blade). Wichtigstes Feld! Nutze {!! $html_content !!} für den Haupt-Body. '
+            . "\n"
+            . '- styles: Eigenes CSS (wird im <head> eingefügt). Basis-CSS ist immer da (table, h1-h3, .kpi-grid, .page-break, etc.). '
+            . "\n"
+            . '- schema: JSON-Schema der Template-Daten — hilft der LLM beim Ausfüllen. '
+            . "\n"
+            . '- default_data: Standard-Werte die automatisch gemergt werden. '
+            . "\n"
+            . '- header_html: HTML für den Dokumenten-Header (z.B. Logo, Firmenname). '
+            . "\n"
+            . '- footer_html: HTML für den Dokumenten-Footer (z.B. Seitenzahl, Disclaimer). '
             . "\n\n"
-            . 'BEISPIEL content: "@if(!empty($kunde))<p>Kunde: {{ $kunde }}</p>@endif<div class=\"content-body\">{!! $html_content !!}</div>" '
+            . '## Beispiel '
+            . "\n"
+            . 'action: "create", key: "meeting-protocol", name: "Protokoll", '
+            . 'content: "<h2>{{ $meeting_title }}</h2>{!! $html_content !!}", '
+            . 'styles: ".meta { color: #666; }", '
+            . 'schema: { properties: { html_content: { type: "string" }, meeting_title: { type: "string" } }, required: ["html_content"] } '
             . "\n\n"
-            . 'Mit action: "delete" kann ein Team-Template gelöscht werden (System-Defaults sind nicht löschbar).';
+            . 'Mit action: "delete" kann ein Team-Template gelöscht werden (System-Defaults nicht löschbar).';
     }
 
     public function getSchema(): array
@@ -39,39 +55,51 @@ class ManageDocumentTemplateTool implements ToolContract
             'properties' => [
                 'action' => [
                     'type' => 'string',
-                    'description' => 'Aktion: "create" (neues Template), "update" (bestehendes ändern), "delete" (Team-Template löschen). Standard: "create".',
+                    'description' => 'Aktion: "create", "update", "delete". Standard: "create".',
                 ],
                 'template_id' => [
                     'type' => 'integer',
-                    'description' => 'Für update/delete: ID des Templates',
+                    'description' => 'Für update/delete: ID des Templates.',
                 ],
                 'key' => [
                     'type' => 'string',
-                    'description' => 'Template-Key (z.B. "invoice", "offer"). Bei create required. Muss unique pro Team sein.',
+                    'description' => 'Template-Key (z.B. "invoice", "protocol"). Bei create required. Unique pro Team.',
                 ],
                 'name' => [
                     'type' => 'string',
-                    'description' => 'Anzeigename (z.B. "Rechnung", "Angebot")',
+                    'description' => 'Anzeigename (z.B. "Rechnung", "Protokoll").',
                 ],
                 'description' => [
                     'type' => 'string',
-                    'description' => 'Beschreibung des Templates und seiner Felder',
+                    'description' => 'Beschreibung — was das Template tut, welche Felder es erwartet.',
                 ],
                 'content' => [
                     'type' => 'string',
-                    'description' => 'Nur BODY-HTML (Blade-Syntax). Das Base-Layout (CSS, Doctype, Print-Styles) wird automatisch drum herum gewrappt. Nutze {!! $html_content !!} für den Haupt-Body, {{ $var }} für escaped Variablen, @if/@foreach für Logik.',
+                    'description' => 'BODY-HTML (Blade-Syntax). Nur der Body — Layout+CSS wird automatisch gewrappt. Nutze {!! $html_content !!} für raw HTML, {{ $var }} für escaped, @if/@foreach für Logik.',
+                ],
+                'styles' => [
+                    'type' => 'string',
+                    'description' => 'Eigenes CSS das im <head> eingefügt wird. Basis-CSS ist immer da: table, th/td, h1-h3, p, .kpi-grid/.kpi-card, .page-break, .text-right, .bold, .sender-block, .recipient-block, .closing-block, .signature-block.',
+                ],
+                'header_html' => [
+                    'type' => 'string',
+                    'description' => 'HTML für den Dokumenten-Header (z.B. Logo, Firmenname). Wird von Browsershot als Header auf jeder Seite gedruckt.',
+                ],
+                'footer_html' => [
+                    'type' => 'string',
+                    'description' => 'HTML für den Dokumenten-Footer (z.B. Seitenzahl, Disclaimer). Wird von Browsershot als Footer auf jeder Seite gedruckt.',
                 ],
                 'schema' => [
                     'type' => 'object',
-                    'description' => 'JSON-Schema für die Template-Daten (properties, required). Hilft der LLM beim Ausfüllen.',
+                    'description' => 'JSON-Schema der Template-Daten: { properties: { field: { type, description } }, required: [...] }. Hilft der LLM die richtigen Daten zu liefern.',
                 ],
                 'default_data' => [
                     'type' => 'object',
-                    'description' => 'Standard-Daten die automatisch gemergt werden (z.B. closing: "Mit freundlichen Grüßen")',
+                    'description' => 'Standard-Daten die automatisch gemergt werden wenn ein Dokument erstellt wird (z.B. { closing: "Mit freundlichen Grüßen" }).',
                 ],
                 'meta' => [
                     'type' => 'object',
-                    'description' => 'Metadaten: paper config (format, margins), header_html, footer_html',
+                    'description' => 'Weitere Metadaten: paper config (format, margins). Styles/header/footer können auch direkt als Top-Level-Parameter übergeben werden.',
                 ],
             ],
             'required' => ['action'],
@@ -86,6 +114,9 @@ class ManageDocumentTemplateTool implements ToolContract
                 return ToolResult::error('Kein Team-Kontext verfügbar', 'NO_TEAM');
             }
 
+            // Merge top-level shortcuts into meta
+            $arguments = $this->mergeShortcutsIntoMeta($arguments);
+
             $action = $arguments['action'] ?? 'create';
 
             return match ($action) {
@@ -97,6 +128,28 @@ class ManageDocumentTemplateTool implements ToolContract
         } catch (\Throwable $e) {
             return ToolResult::error('Fehler: ' . $e->getMessage(), 'EXECUTION_ERROR');
         }
+    }
+
+    /**
+     * Merge top-level shortcut fields (styles, header_html, footer_html) into meta.
+     */
+    private function mergeShortcutsIntoMeta(array $arguments): array
+    {
+        $shortcuts = ['styles', 'header_html', 'footer_html'];
+        $meta = $arguments['meta'] ?? [];
+
+        foreach ($shortcuts as $key) {
+            if (array_key_exists($key, $arguments) && $arguments[$key] !== null) {
+                $meta[$key] = $arguments[$key];
+                unset($arguments[$key]);
+            }
+        }
+
+        if (!empty($meta)) {
+            $arguments['meta'] = $meta;
+        }
+
+        return $arguments;
     }
 
     private function createTemplate(array $arguments, int $teamId, int $userId): ToolResult
@@ -134,6 +187,11 @@ class ManageDocumentTemplateTool implements ToolContract
             'id' => $template->id,
             'key' => $template->key,
             'name' => $template->name,
+            'has_content' => !empty($template->content),
+            'has_styles' => !empty($template->meta['styles'] ?? null),
+            'has_schema' => !empty($template->schema),
+            'has_header' => !empty($template->meta['header_html'] ?? null),
+            'has_footer' => !empty($template->meta['footer_html'] ?? null),
             'action' => 'created',
             'hint' => "Template erstellt. Nutze core.documents.CREATE mit template_key: '{$template->key}' um Dokumente damit zu erstellen.",
         ]);
@@ -150,7 +208,13 @@ class ManageDocumentTemplateTool implements ToolContract
             ->first();
 
         if (!$template) {
-            return ToolResult::error('Template nicht gefunden oder kein Zugriff. System-Defaults können nicht bearbeitet werden — erstelle stattdessen ein Team-Override mit dem gleichen Key.', 'NOT_FOUND');
+            return ToolResult::error(
+                'Template nicht gefunden oder kein Zugriff. '
+                . 'System-Defaults (team_id=null) können nicht direkt bearbeitet werden — '
+                . 'erstelle stattdessen ein Team-Template mit dem gleichen Key (action: "create"), '
+                . 'das überschreibt automatisch den System-Default.',
+                'NOT_FOUND'
+            );
         }
 
         $updates = [];
@@ -164,17 +228,26 @@ class ManageDocumentTemplateTool implements ToolContract
         }
 
         if (empty($updates)) {
-            return ToolResult::error('Keine Änderungen übergeben.', 'NO_CHANGES');
+            return ToolResult::error(
+                'Keine erkannten Änderungen. Erlaubte Felder: content, styles, header_html, footer_html, schema, default_data, name, description, meta.',
+                'NO_CHANGES'
+            );
         }
 
         $template->update($updates);
+        $template->refresh();
 
         return ToolResult::success([
             'id' => $template->id,
             'key' => $template->key,
             'name' => $template->name,
-            'action' => 'updated',
             'changed' => $changed,
+            'has_content' => !empty($template->content),
+            'has_styles' => !empty($template->meta['styles'] ?? null),
+            'has_schema' => !empty($template->schema),
+            'has_header' => !empty($template->meta['header_html'] ?? null),
+            'has_footer' => !empty($template->meta['footer_html'] ?? null),
+            'action' => 'updated',
         ]);
     }
 

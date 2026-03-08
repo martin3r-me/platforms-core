@@ -78,14 +78,19 @@ class ListDocumentTemplatesTool implements ToolContract
 
     private function formatTemplate($template, bool $includeSchema): array
     {
+        $meta = $template->meta ?? [];
+
         $result = [
             'id' => $template->id,
             'key' => $template->key,
             'name' => $template->name,
             'description' => $template->description,
             'is_system_default' => $template->is_system_default,
-            'has_blade_view' => !empty($template->blade_view),
-            'has_db_content' => !empty($template->content),
+            'is_editable' => $template->team_id !== null,
+            'has_content' => !empty($template->content),
+            'has_styles' => !empty($meta['styles'] ?? null),
+            'has_header' => !empty($meta['header_html'] ?? null),
+            'has_footer' => !empty($meta['footer_html'] ?? null),
         ];
 
         if ($template->default_data) {
@@ -94,6 +99,18 @@ class ListDocumentTemplatesTool implements ToolContract
 
         if ($includeSchema && $template->schema) {
             $result['schema'] = $template->schema;
+        }
+
+        // Show content preview for include_schema (so LLM can see what the template looks like)
+        if ($includeSchema && $template->content) {
+            $content = $template->content;
+            $result['content_preview'] = mb_strlen($content) > 500
+                ? mb_substr($content, 0, 500) . '...'
+                : $content;
+        }
+
+        if ($includeSchema && !empty($meta['styles'])) {
+            $result['styles'] = $meta['styles'];
         }
 
         return $result;
