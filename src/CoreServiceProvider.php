@@ -234,6 +234,9 @@ class CoreServiceProvider extends ServiceProvider
         // Contact Resolution Registry (für CRM, HCM, etc.)
         $this->app->singleton(\Platform\Core\Services\Comms\ContactResolverRegistry::class);
 
+        // MS Teams Graph Service (outbound messaging)
+        $this->app->singleton(\Platform\Core\Services\TeamsGraphService::class);
+
         // Versionierung & Audit Services
         $this->app->singleton(\Platform\Core\Services\ModelVersioningService::class);
         $this->app->singleton(\Platform\Core\Services\UndoService::class);
@@ -536,6 +539,14 @@ class CoreServiceProvider extends ServiceProvider
         }
         if (class_exists(\Platform\Core\Tools\SnapshotDocumentTool::class) && !$registry->has('core.documents.SNAPSHOT')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\SnapshotDocumentTool::class)); } catch (\Throwable $e) {}
+        }
+
+        // MS Teams Communication Tools (core.comms.teams.*)
+        if (class_exists(\Platform\Core\Tools\ListTeamsChannelsTool::class) && !$registry->has('core.comms.teams.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\ListTeamsChannelsTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\SendTeamsMessageTool::class) && !$registry->has('core.comms.teams_messages.POST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\SendTeamsMessageTool::class)); } catch (\Throwable $e) {}
         }
 
         // Communication Tools moved to CRM module (crm.comms.*)
