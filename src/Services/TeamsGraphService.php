@@ -65,8 +65,10 @@ class TeamsGraphService
                 'Calendars.ReadWrite.Shared',
                 'Team.ReadBasic.All',
                 'Channel.ReadBasic.All',
+                'ChannelMessage.Read.All',
                 'ChannelMessage.Send',
                 'Chat.ReadWrite',
+                'ChatMessage.Read',
                 'ChatMessage.Send',
             ];
 
@@ -217,23 +219,29 @@ class TeamsGraphService
      * Nachricht in einen Channel senden.
      * POST /teams/{team-id}/channels/{channel-id}/messages — Scope: ChannelMessage.Send
      */
-    public function sendChannelMessage(User $user, string $teamId, string $channelId, string $content, string $contentType = 'html'): ?array
+    public function sendChannelMessage(User $user, string $teamId, string $channelId, string $content, string $contentType = 'html', ?array $attachments = null): ?array
     {
         $token = $this->getAccessToken($user);
         if (!$token) {
             return null;
         }
 
+        $payload = [
+            'body' => [
+                'contentType' => $contentType,
+                'content' => $content,
+            ],
+        ];
+
+        if ($attachments) {
+            $payload['attachments'] = $attachments;
+        }
+
         try {
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $token,
                 'Content-Type' => 'application/json',
-            ])->post("{$this->baseUrl}/teams/{$teamId}/channels/{$channelId}/messages", [
-                'body' => [
-                    'contentType' => $contentType,
-                    'content' => $content,
-                ],
-            ]);
+            ])->post("{$this->baseUrl}/teams/{$teamId}/channels/{$channelId}/messages", $payload);
 
             if (!$response->successful()) {
                 Log::error('TeamsGraph: Failed to send channel message', [
@@ -274,6 +282,7 @@ class TeamsGraphService
                 'Authorization' => 'Bearer ' . $token,
             ])->get("{$this->baseUrl}/me/chats", [
                 '$top' => $limit,
+                '$expand' => 'members',
                 '$orderby' => 'lastMessagePreview/createdDateTime desc',
             ]);
 
@@ -300,23 +309,29 @@ class TeamsGraphService
      * Nachricht in einen Chat senden.
      * POST /chats/{chat-id}/messages — Scope: ChatMessage.Send
      */
-    public function sendChatMessage(User $user, string $chatId, string $content, string $contentType = 'html'): ?array
+    public function sendChatMessage(User $user, string $chatId, string $content, string $contentType = 'html', ?array $attachments = null): ?array
     {
         $token = $this->getAccessToken($user);
         if (!$token) {
             return null;
         }
 
+        $payload = [
+            'body' => [
+                'contentType' => $contentType,
+                'content' => $content,
+            ],
+        ];
+
+        if ($attachments) {
+            $payload['attachments'] = $attachments;
+        }
+
         try {
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $token,
                 'Content-Type' => 'application/json',
-            ])->post("{$this->baseUrl}/chats/{$chatId}/messages", [
-                'body' => [
-                    'contentType' => $contentType,
-                    'content' => $content,
-                ],
-            ]);
+            ])->post("{$this->baseUrl}/chats/{$chatId}/messages", $payload);
 
             if (!$response->successful()) {
                 Log::error('TeamsGraph: Failed to send chat message', [
@@ -333,6 +348,87 @@ class TeamsGraphService
             Log::error('TeamsGraph: Exception sending chat message', [
                 'user_id' => $user->id,
                 'chat_id' => $chatId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Nachrichten aus einem Chat lesen.
+     * GET /chats/{chat-id}/messages — Scope: ChatMessage.Read / Chat.ReadWrite
+     */
+    public function getChatMessages(User $user, string $chatId, int $limit = 20): ?array
+    {
+        $token = $this->getAccessToken($user);
+        if (!$token) {
+            return null;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $token,
+            ])->get("{$this->baseUrl}/chats/{$chatId}/messages", [
+                '$top' => $limit,
+                '$orderby' => 'createdDateTime desc',
+            ]);
+
+            if (!$response->successful()) {
+                Log::error('TeamsGraph: Failed to get chat messages', [
+                    'user_id' => $user->id,
+                    'chat_id' => $chatId,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return null;
+            }
+
+            return $response->json('value', []);
+        } catch (\Throwable $e) {
+            Log::error('TeamsGraph: Exception getting chat messages', [
+                'user_id' => $user->id,
+                'chat_id' => $chatId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Nachrichten aus einem Channel lesen.
+     * GET /teams/{team-id}/channels/{channel-id}/messages — Scope: ChannelMessage.Read.All
+     */
+    public function getChannelMessages(User $user, string $teamId, string $channelId, int $limit = 20): ?array
+    {
+        $token = $this->getAccessToken($user);
+        if (!$token) {
+            return null;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $token,
+            ])->get("{$this->baseUrl}/teams/{$teamId}/channels/{$channelId}/messages", [
+                '$top' => $limit,
+            ]);
+
+            if (!$response->successful()) {
+                Log::error('TeamsGraph: Failed to get channel messages', [
+                    'user_id' => $user->id,
+                    'team_id' => $teamId,
+                    'channel_id' => $channelId,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return null;
+            }
+
+            return $response->json('value', []);
+        } catch (\Throwable $e) {
+            Log::error('TeamsGraph: Exception getting channel messages', [
+                'user_id' => $user->id,
+                'team_id' => $teamId,
+                'channel_id' => $channelId,
                 'error' => $e->getMessage(),
             ]);
             return null;

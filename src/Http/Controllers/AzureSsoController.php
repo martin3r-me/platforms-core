@@ -29,8 +29,10 @@ class AzureSsoController extends Controller
                 'https://graph.microsoft.com/Calendars.ReadWrite.Shared',
                 'https://graph.microsoft.com/Team.ReadBasic.All',
                 'https://graph.microsoft.com/Channel.ReadBasic.All',
+                'https://graph.microsoft.com/ChannelMessage.Read.All',
                 'https://graph.microsoft.com/ChannelMessage.Send',
                 'https://graph.microsoft.com/Chat.ReadWrite',
+                'https://graph.microsoft.com/ChatMessage.Read',
                 'https://graph.microsoft.com/ChatMessage.Send',
             ])
             ->with(['response_mode' => 'query', 'prompt' => 'select_account']);
@@ -235,8 +237,10 @@ class AzureSsoController extends Controller
                         'Calendars.ReadWrite.Shared',
                         'Team.ReadBasic.All',
                         'Channel.ReadBasic.All',
+                        'ChannelMessage.Read.All',
                         'ChannelMessage.Send',
                         'Chat.ReadWrite',
+                        'ChatMessage.Read',
                         'ChatMessage.Send',
                     ];
 
@@ -326,8 +330,10 @@ class AzureSsoController extends Controller
                 'Calendars.ReadWrite.Shared',
                 'Team.ReadBasic.All',
                 'Channel.ReadBasic.All',
+                'ChannelMessage.Read.All',
                 'ChannelMessage.Send',
                 'Chat.ReadWrite',
+                'ChatMessage.Read',
                 'ChatMessage.Send',
             ];
 

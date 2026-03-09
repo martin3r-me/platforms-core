@@ -29,7 +29,13 @@ class SendTeamsMessageTool implements ToolContract
             . '1) Use core.comms.teams.GET to discover teams/channels/chats. '
             . '2) Use this tool to send the message. '
             . "\n\n"
-            . 'CONTENT: message supports HTML (default) or plain text via content_type parameter.';
+            . 'CONTENT: message supports HTML (default) or plain text via content_type parameter. '
+            . "\n\n"
+            . 'ADAPTIVE CARDS: '
+            . 'Pass an Adaptive Card JSON object in the adaptive_card parameter. '
+            . 'The card will be sent as an attachment. The message field serves as fallback text. '
+            . 'Card schema: https://adaptivecards.io/schemas/adaptive-card.json (version 1.4). '
+            . 'Example card body: {"type":"AdaptiveCard","body":[{"type":"TextBlock","text":"Hello","weight":"Bolder"}],"$schema":"http://adaptivecards.io/schemas/adaptive-card.json","version":"1.4"}';
     }
 
     public function getSchema(): array
@@ -60,12 +66,16 @@ class SendTeamsMessageTool implements ToolContract
                 ],
                 'message' => [
                     'type' => 'string',
-                    'description' => 'Message content to send.',
+                    'description' => 'Message content (HTML or text). When adaptive_card is set, this is the fallback text.',
                 ],
                 'content_type' => [
                     'type' => 'string',
                     'enum' => ['text', 'html'],
                     'description' => 'Content type: "html" (default) or "text".',
+                ],
+                'adaptive_card' => [
+                    'type' => 'object',
+                    'description' => 'Optional Adaptive Card JSON object. Will be sent as attachment. Must include type, body, $schema, version fields.',
                 ],
             ],
             'required' => ['target_type', 'message'],
@@ -77,6 +87,7 @@ class SendTeamsMessageTool implements ToolContract
         $targetType = $arguments['target_type'] ?? null;
         $message = $arguments['message'] ?? null;
         $contentType = $arguments['content_type'] ?? 'html';
+        $adaptiveCard = $arguments['adaptive_card'] ?? null;
         $user = $context->user;
 
         if (!$user) {
@@ -87,24 +98,44 @@ class SendTeamsMessageTool implements ToolContract
             return ToolResult::error('message ist erforderlich.', 'VALIDATION_ERROR');
         }
 
+        // Build attachments and body content for Adaptive Card
+        $attachments = null;
+        $bodyContent = $message;
+
+        if ($adaptiveCard) {
+            $cardJson = is_string($adaptiveCard) ? $adaptiveCard : json_encode($adaptiveCard);
+
+            $attachments = [
+                [
+                    'id' => '1',
+                    'contentType' => 'application/vnd.microsoft.card.adaptive',
+                    'content' => $cardJson,
+                ],
+            ];
+
+            // CRITICAL: Body must reference the attachment, otherwise Teams ignores the card
+            $bodyContent = '<attachment id="1"></attachment>';
+            $contentType = 'html';
+        }
+
         $service = app(TeamsGraphService::class);
 
         switch ($targetType) {
             case 'channel':
-                return $this->sendToChannel($arguments, $user, $service, $message, $contentType, $context);
+                return $this->sendToChannel($arguments, $user, $service, $bodyContent, $contentType, $attachments, $context);
 
             case 'chat':
-                return $this->sendToChat($arguments, $user, $service, $message, $contentType, $context);
+                return $this->sendToChat($arguments, $user, $service, $bodyContent, $contentType, $attachments, $context);
 
             case 'dm':
-                return $this->sendDm($arguments, $user, $service, $message, $contentType, $context);
+                return $this->sendDm($arguments, $user, $service, $bodyContent, $contentType, $attachments, $context);
 
             default:
                 return ToolResult::error("Unbekannter target_type: {$targetType}. Erlaubt: channel, chat, dm.", 'VALIDATION_ERROR');
         }
     }
 
-    private function sendToChannel(array $arguments, $user, TeamsGraphService $service, string $message, string $contentType, ToolContext $context): ToolResult
+    private function sendToChannel(array $arguments, $user, TeamsGraphService $service, string $message, string $contentType, ?array $attachments, ToolContext $context): ToolResult
     {
         $teamId = $arguments['team_id'] ?? null;
         $channelId = $arguments['channel_id'] ?? null;
@@ -113,7 +144,7 @@ class SendTeamsMessageTool implements ToolContract
             return ToolResult::error('team_id und channel_id sind erforderlich für target_type=channel.', 'VALIDATION_ERROR');
         }
 
-        $result = $service->sendChannelMessage($user, $teamId, $channelId, $message, $contentType);
+        $result = $service->sendChannelMessage($user, $teamId, $channelId, $message, $contentType, $attachments);
 
         if ($result === null) {
             return ToolResult::error(
@@ -127,6 +158,7 @@ class SendTeamsMessageTool implements ToolContract
             'team_id' => $context->team?->id,
             'target' => "teams:{$teamId}:{$channelId}",
             'message_id' => $result['id'] ?? null,
+            'has_card' => $attachments !== null,
         ]);
 
         return ToolResult::success([
@@ -138,7 +170,7 @@ class SendTeamsMessageTool implements ToolContract
         ]);
     }
 
-    private function sendToChat(array $arguments, $user, TeamsGraphService $service, string $message, string $contentType, ToolContext $context): ToolResult
+    private function sendToChat(array $arguments, $user, TeamsGraphService $service, string $message, string $contentType, ?array $attachments, ToolContext $context): ToolResult
     {
         $chatId = $arguments['chat_id'] ?? null;
 
@@ -146,7 +178,7 @@ class SendTeamsMessageTool implements ToolContract
             return ToolResult::error('chat_id ist erforderlich für target_type=chat.', 'VALIDATION_ERROR');
         }
 
-        $result = $service->sendChatMessage($user, $chatId, $message, $contentType);
+        $result = $service->sendChatMessage($user, $chatId, $message, $contentType, $attachments);
 
         if ($result === null) {
             return ToolResult::error(
@@ -160,6 +192,7 @@ class SendTeamsMessageTool implements ToolContract
             'team_id' => $context->team?->id,
             'target' => "teams:chat:{$chatId}",
             'message_id' => $result['id'] ?? null,
+            'has_card' => $attachments !== null,
         ]);
 
         return ToolResult::success([
@@ -171,7 +204,7 @@ class SendTeamsMessageTool implements ToolContract
         ]);
     }
 
-    private function sendDm(array $arguments, $user, TeamsGraphService $service, string $message, string $contentType, ToolContext $context): ToolResult
+    private function sendDm(array $arguments, $user, TeamsGraphService $service, string $message, string $contentType, ?array $attachments, ToolContext $context): ToolResult
     {
         $recipientEmail = $arguments['recipient_email'] ?? null;
 
@@ -194,7 +227,7 @@ class SendTeamsMessageTool implements ToolContract
         }
 
         // 2. Send message to the chat
-        $result = $service->sendChatMessage($user, $chatId, $message, $contentType);
+        $result = $service->sendChatMessage($user, $chatId, $message, $contentType, $attachments);
 
         if ($result === null) {
             return ToolResult::error(
@@ -209,6 +242,7 @@ class SendTeamsMessageTool implements ToolContract
             'target' => "teams:chat:{$chatId}",
             'recipient' => $recipientEmail,
             'message_id' => $result['id'] ?? null,
+            'has_card' => $attachments !== null,
         ]);
 
         return ToolResult::success([
