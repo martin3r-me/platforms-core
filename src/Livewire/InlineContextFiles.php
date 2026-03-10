@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Platform\Core\Models\ContextFile;
+use Platform\Core\Models\ContextFileReference;
 use Platform\Core\Services\ContextFileService;
 
 class InlineContextFiles extends Component
@@ -121,7 +122,8 @@ class InlineContextFiles extends Component
 
         $contextVariants = $this->getContextTypeVariants();
 
-        $this->contextFiles = ContextFile::query()
+        // Direct context files
+        $directFiles = ContextFile::query()
             ->where(function ($q) use ($contextVariants) {
                 foreach ($contextVariants as $variant) {
                     $q->orWhere('context_type', $variant);
@@ -130,7 +132,27 @@ class InlineContextFiles extends Component
             ->where('context_id', $this->contextId)
             ->with(['variants', 'user'])
             ->orderByDesc('created_at')
-            ->get()
+            ->get();
+
+        // Files linked via ContextFileReference
+        $referencedFileIds = ContextFileReference::query()
+            ->where(function ($q) use ($contextVariants) {
+                foreach ($contextVariants as $variant) {
+                    $q->orWhere('reference_type', $variant);
+                }
+            })
+            ->where('reference_id', $this->contextId)
+            ->whereNotNull('context_file_id')
+            ->pluck('context_file_id');
+
+        $referencedFiles = ContextFile::query()
+            ->whereIn('id', $referencedFileIds)
+            ->whereNotIn('id', $directFiles->pluck('id'))
+            ->with(['variants', 'user'])
+            ->orderByDesc('created_at')
+            ->get();
+
+        $this->contextFiles = $directFiles->merge($referencedFiles)
             ->map(function ($file) {
                 return [
                     'id' => $file->id,
