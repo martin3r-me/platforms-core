@@ -407,6 +407,11 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register($this->app->make(\Platform\Core\Tools\CreateTeamTool::class)); } catch (\Throwable $e) {}
         }
 
+        // Core: Team löschen (destructive, confirm=true erforderlich)
+        if (class_exists(\Platform\Core\Tools\DeleteTeamTool::class) && !$registry->has('core.teams.DELETE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\DeleteTeamTool::class)); } catch (\Throwable $e) {}
+        }
+
         // Optional (nice-to-have): team members
         if (class_exists(\Platform\Core\Tools\ListTeamUsersTool::class) && !$registry->has('core.teams.users.GET')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\ListTeamUsersTool::class)); } catch (\Throwable $e) {}
@@ -436,6 +441,22 @@ class CoreServiceProvider extends ServiceProvider
         }
         if (class_exists(\Platform\Core\Tools\UpdateAiModelTool::class) && !$registry->has('core.ai_models.PUT')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\UpdateAiModelTool::class)); } catch (\Throwable $e) {}
+        }
+
+        // Checkins (core.checkins.*)
+        if (class_exists(\Platform\Core\Tools\Checkins\ListCheckinsTool::class) && !$registry->has('core.checkins.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Checkins\ListCheckinsTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Checkins\CreateCheckinTool::class) && !$registry->has('core.checkins.POST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Checkins\CreateCheckinTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Checkins\UpdateCheckinTool::class) && !$registry->has('core.checkins.PUT')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Checkins\UpdateCheckinTool::class)); } catch (\Throwable $e) {}
+        }
+
+        // Log-Einsicht (Admin/Debug)
+        if (class_exists(\Platform\Core\Tools\GetLogTool::class) && !$registry->has('core.log.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\GetLogTool::class)); } catch (\Throwable $e) {}
         }
 
         // Context Files Tools (core.context.files.*)
