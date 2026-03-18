@@ -36,11 +36,18 @@ use Platform\Core\Models\Team;
  * - tags (Tags)
  * - colorables (Farbzuordnungen)
  * - context_files (Kontextdateien)
- * - modulables (Modul-Zuordnungen)
+ * - invoices + invoice_items (Rechnungen)
+ * - team_billable_usages (Nutzungsdaten)
  * - Kind-Teams (parent_team_id cascadeOnDelete) – werden rekursiv mitgelöscht!
+ *
+ * Nulled on Delete (DB-Constraint nullOnDelete):
+ * - core_chats.team_id (Chat-Verläufe bleiben erhalten, Team-Referenz wird null)
+ * - core_command_runs.team_id (Command-Logs bleiben erhalten)
+ * - users.current_team_id (User fällt auf Personal Team zurück)
  *
  * Manuell bereinigt (kein DB-Cascade):
  * - team_user Pivot-Einträge (Mitgliedschaften)
+ * - modulables Pivot-Einträge (Modul-Zuordnungen)
  *
  * Audit-Log:
  * - Jede Tool-Ausführung wird automatisch über ToolExecution protokolliert.
@@ -59,7 +66,7 @@ class DeleteTeamTool implements ToolContract, ToolMetadataContract
         return 'DELETE /core/teams/{id} – Löscht ein Team unwiderruflich (confirm=true ERFORDERLICH). '
             . 'ACHTUNG: Kaskadierende Löschung! Alle zugehörigen Daten werden mitgelöscht: '
             . 'Einladungen, Kanäle, E-Mail-Threads, WhatsApp-Threads, Extra-Felder, Lookups, Tags, '
-            . 'Kontextdateien, AI-Model-Configs, Zähler, Kind-Teams (rekursiv!) und Modul-Zuordnungen. '
+            . 'Kontextdateien, Rechnungen, Nutzungsdaten, AI-Model-Configs, Zähler, Kind-Teams (rekursiv!) und Modul-Zuordnungen. '
             . 'Schutz: Persönliche Teams und Root-Teams mit Kind-Teams können nicht gelöscht werden. '
             . 'Berechtigung: Nur Parent-Team-Owner (bei Kind-Teams) oder Team-Owner (bei Root-Teams).';
     }
