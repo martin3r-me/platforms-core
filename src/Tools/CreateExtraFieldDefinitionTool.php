@@ -20,7 +20,7 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
 
     public function getDescription(): string
     {
-        return 'POST /core/extra-fields/definitions - Erstellt eine neue Extra-Field-Definition für ein Model. Unterstützte Typen: text, number, textarea, boolean, select, lookup, file, phone, regex.';
+        return 'POST /core/extra-fields/definitions - Erstellt eine neue Extra-Field-Definition für ein Model. Unterstützte Typen: text, number, textarea, boolean, select, lookup, file, phone, regex, address.';
     }
 
     public function getSchema(): array
@@ -46,7 +46,7 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                 ],
                 'type' => [
                     'type' => 'string',
-                    'enum' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'file', 'phone', 'regex'],
+                    'enum' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'file', 'phone', 'regex', 'address'],
                     'description' => 'Feldtyp.',
                 ],
                 'is_required' => [

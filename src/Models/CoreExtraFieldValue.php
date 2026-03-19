@@ -109,6 +109,7 @@ class CoreExtraFieldValue extends Model
             'select' => $this->decodeSelectValue($value),
             'file' => $this->decodeFileValue($value),
             'phone' => $this->decodePhoneValue($value),
+            'address' => $this->decodePhoneValue($value),
             default => $value,
         };
     }
@@ -132,6 +133,7 @@ class CoreExtraFieldValue extends Model
             'select' => is_array($value) ? json_encode($value) : (string) $value,
             'file' => is_array($value) ? json_encode($value) : (string) $value,
             'phone' => is_array($value) ? json_encode($value) : (string) $value,
+            'address' => is_array($value) ? json_encode($value) : (string) $value,
             default => (string) $value,
         };
 

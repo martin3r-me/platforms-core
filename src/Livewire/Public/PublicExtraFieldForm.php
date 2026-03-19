@@ -97,6 +97,8 @@ class PublicExtraFieldForm extends Component
             // Phone-Felder: gefüllt wenn e164 vorhanden (= erfolgreich validiert)
             if ($field['type'] === 'phone') {
                 $isFilled = is_array($value) && !empty($value['e164'] ?? null);
+            } elseif ($field['type'] === 'address') {
+                $isFilled = is_array($value) && !empty($value['street'] ?? null) && !empty($value['city'] ?? null);
             } else {
                 $isFilled = $value !== null && $value !== '' && $value !== [];
             }

@@ -117,6 +117,22 @@ trait WithExtraFields
                 }
             }
 
+            // Für Address-Felder: Array normalisieren
+            if ($field['type'] === 'address') {
+                if (is_array($value)) {
+                    $value = [
+                        'street' => $value['street'] ?? '',
+                        'street2' => $value['street2'] ?? '',
+                        'zip' => $value['zip'] ?? '',
+                        'city' => $value['city'] ?? '',
+                        'state' => $value['state'] ?? '',
+                        'country' => $value['country'] ?? 'DE',
+                    ];
+                } else {
+                    $value = ['street' => '', 'street2' => '', 'zip' => '', 'city' => '', 'state' => '', 'country' => 'DE'];
+                }
+            }
+
             $this->extraFieldValues[$field['id']] = $value;
 
             // Load verification and auto-fill metadata
@@ -219,6 +235,22 @@ trait WithExtraFields
                 }
             }
 
+            // Für Address-Felder: Array normalisieren
+            if ($field['type'] === 'address') {
+                if (is_array($value)) {
+                    $value = [
+                        'street' => $value['street'] ?? '',
+                        'street2' => $value['street2'] ?? '',
+                        'zip' => $value['zip'] ?? '',
+                        'city' => $value['city'] ?? '',
+                        'state' => $value['state'] ?? '',
+                        'country' => $value['country'] ?? 'DE',
+                    ];
+                } else {
+                    $value = ['street' => '', 'street2' => '', 'zip' => '', 'city' => '', 'state' => '', 'country' => 'DE'];
+                }
+            }
+
             $this->extraFieldValues[$field['id']] = $value;
 
             // Load verification and auto-fill metadata
@@ -305,6 +337,16 @@ trait WithExtraFields
             // If field is hidden, treat as null value (clear stored value)
             $isVisible = $this->isFieldVisible($field, $fieldValuesByName, $evaluator);
             $newValue = $isVisible ? ($this->extraFieldValues[$definitionId] ?? null) : null;
+
+            // Address-Felder: Leere Adresse als null behandeln
+            if ($field['type'] === 'address' && is_array($newValue)) {
+                $hasContent = !empty(trim($newValue['street'] ?? ''))
+                    || !empty(trim($newValue['zip'] ?? ''))
+                    || !empty(trim($newValue['city'] ?? ''));
+                if (!$hasContent) {
+                    $newValue = null;
+                }
+            }
 
             // Phone-Felder: Formatieren und validieren
             if ($field['type'] === 'phone' && is_array($newValue)) {
@@ -478,6 +520,23 @@ trait WithExtraFields
                         $fieldRules[] = 'regex:/' . $pattern . '/';
                     }
                     break;
+                case 'address':
+                    $fieldRules = ['nullable', 'array'];
+                    $rules["extraFieldValues.{$field['id']}"] = $fieldRules;
+                    if ($field['is_mandatory'] ?? false) {
+                        $rules["extraFieldValues.{$field['id']}.street"] = ['required', 'string', 'max:255'];
+                        $rules["extraFieldValues.{$field['id']}.zip"] = ['required', 'string', 'max:20'];
+                        $rules["extraFieldValues.{$field['id']}.city"] = ['required', 'string', 'max:255'];
+                        $rules["extraFieldValues.{$field['id']}.country"] = ['required', 'string', 'size:2'];
+                    } else {
+                        $rules["extraFieldValues.{$field['id']}.street"] = ['nullable', 'string', 'max:255'];
+                        $rules["extraFieldValues.{$field['id']}.zip"] = ['nullable', 'string', 'max:20'];
+                        $rules["extraFieldValues.{$field['id']}.city"] = ['nullable', 'string', 'max:255'];
+                        $rules["extraFieldValues.{$field['id']}.country"] = ['nullable', 'string', 'size:2'];
+                    }
+                    $rules["extraFieldValues.{$field['id']}.street2"] = ['nullable', 'string', 'max:255'];
+                    $rules["extraFieldValues.{$field['id']}.state"] = ['nullable', 'string', 'max:255'];
+                    continue 2;
             }
 
             $rules["extraFieldValues.{$field['id']}"] = $fieldRules;
@@ -498,6 +557,12 @@ trait WithExtraFields
             $messages["extraFieldValues.{$field['id']}.numeric"] = "Das Feld \"{$field['label']}\" muss eine Zahl sein.";
             $messages["extraFieldValues.{$field['id']}.string"] = "Das Feld \"{$field['label']}\" muss ein Text sein.";
             $messages["extraFieldValues.{$field['id']}.raw.required"] = "Das Feld \"{$field['label']}\" ist ein Pflichtfeld.";
+            if ($field['type'] === 'address') {
+                $messages["extraFieldValues.{$field['id']}.street.required"] = "Straße ist ein Pflichtfeld.";
+                $messages["extraFieldValues.{$field['id']}.zip.required"] = "PLZ ist ein Pflichtfeld.";
+                $messages["extraFieldValues.{$field['id']}.city.required"] = "Ort ist ein Pflichtfeld.";
+                $messages["extraFieldValues.{$field['id']}.country.required"] = "Land ist ein Pflichtfeld.";
+            }
             if ($field['type'] === 'regex') {
                 $customError = $field['options']['pattern_error'] ?? null;
                 $patternDesc = $field['options']['pattern_description'] ?? null;

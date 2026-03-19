@@ -252,7 +252,7 @@ class ModalExtraFields extends Component
     {
         $rules = [
             'newField.label' => ['required', 'string', 'max:255'],
-            'newField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select,lookup,file,phone,regex'],
+            'newField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select,lookup,file,phone,regex,address'],
             'newField.is_required' => ['boolean'],
             'newField.is_mandatory' => ['boolean'],
             'newField.is_encrypted' => ['boolean'],
@@ -450,7 +450,7 @@ class ModalExtraFields extends Component
 
         $rules = [
             'editField.label' => ['required', 'string', 'max:255'],
-            'editField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select,lookup,file,phone,regex'],
+            'editField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select,lookup,file,phone,regex,address'],
             'editField.is_required' => ['boolean'],
             'editField.is_mandatory' => ['boolean'],
             'editField.is_encrypted' => ['boolean'],

@@ -64,6 +64,7 @@ class CoreExtraFieldDefinition extends Model
         'file' => 'Datei',
         'phone' => 'Telefonnummer',
         'regex' => 'Text (Muster)',
+        'address' => 'Adresse',
     ];
 
     /**
@@ -105,6 +106,10 @@ class CoreExtraFieldDefinition extends Model
         'regex' => [
             'icon' => 'heroicon-o-code-bracket',
             'description' => 'Textfeld mit Validierung gegen ein reguläres Ausdrucksmuster (z.B. PLZ, IBAN, Steuernummer).',
+        ],
+        'address' => [
+            'icon' => 'heroicon-o-map-pin',
+            'description' => 'Strukturiertes Adressfeld mit Straße, PLZ, Ort, Bundesland und Land.',
         ],
     ];
 

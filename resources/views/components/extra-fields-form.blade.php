@@ -522,6 +522,90 @@
                         @endif
                         @break
 
+                    @case('address')
+                        @php
+                            $countries = \Platform\Core\Models\CoreExtraFieldDefinition::PHONE_COUNTRIES;
+                            $hint = $field['description'] ?? null;
+                        @endphp
+                        <div class="md:col-span-2">
+                            <x-ui-label
+                                :text="$field['label']"
+                                :required="$field['is_mandatory'] || $field['is_required']"
+                                class="mb-1"
+                            />
+                            @if($hint)
+                                <p class="text-xs text-[var(--ui-muted)] mb-2">{{ $hint }}</p>
+                            @else
+                                <div class="mb-1"></div>
+                            @endif
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {{-- Straße (volle Breite) --}}
+                                <div class="md:col-span-2">
+                                    <x-ui-input-text
+                                        :name="'extraFieldValues.' . $field['id'] . '.street'"
+                                        label="Straße + Hausnummer"
+                                        wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}.street"
+                                        placeholder="Musterstraße 1"
+                                    />
+                                </div>
+                                {{-- Adresszusatz (volle Breite) --}}
+                                <div class="md:col-span-2">
+                                    <x-ui-input-text
+                                        :name="'extraFieldValues.' . $field['id'] . '.street2'"
+                                        label="Adresszusatz"
+                                        wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}.street2"
+                                        placeholder="z.B. Hinterhaus, 3. OG"
+                                    />
+                                </div>
+                                {{-- PLZ --}}
+                                <div>
+                                    <x-ui-input-text
+                                        :name="'extraFieldValues.' . $field['id'] . '.zip'"
+                                        label="PLZ"
+                                        wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}.zip"
+                                        placeholder="12345"
+                                    />
+                                </div>
+                                {{-- Ort --}}
+                                <div>
+                                    <x-ui-input-text
+                                        :name="'extraFieldValues.' . $field['id'] . '.city'"
+                                        label="Ort"
+                                        wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}.city"
+                                        placeholder="Berlin"
+                                    />
+                                </div>
+                                {{-- Bundesland --}}
+                                <div>
+                                    <x-ui-input-text
+                                        :name="'extraFieldValues.' . $field['id'] . '.state'"
+                                        label="Bundesland / Region"
+                                        wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}.state"
+                                        placeholder="z.B. Berlin, Bayern"
+                                    />
+                                </div>
+                                {{-- Land --}}
+                                <div>
+                                    <label class="block text-xs font-medium text-[var(--ui-muted)] mb-1">Land</label>
+                                    <select
+                                        wire:model.live="extraFieldValues.{{ $field['id'] }}.country"
+                                        class="w-full rounded-lg border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] px-3 py-2 text-sm text-[var(--ui-text)] focus:border-[var(--ui-primary)] focus:ring-1 focus:ring-[var(--ui-primary)] outline-none"
+                                    >
+                                        @foreach($countries as $code => $info)
+                                            <option value="{{ $code }}">{{ $info['flag'] }} {{ $info['name'] }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                            @if($field['is_encrypted'])
+                                <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mt-2">
+                                    @svg('heroicon-o-lock-closed', 'w-3 h-3')
+                                    Verschlüsselt
+                                </span>
+                            @endif
+                        </div>
+                        @break
+
                     @case('regex')
                         @php
                             $isAutoFilled = $this->extraFieldMeta[$field['id']]['auto_filled'] ?? false;

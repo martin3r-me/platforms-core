@@ -431,6 +431,54 @@
                                         @endif
                                         @break
 
+                                    @case('address')
+                                        @php
+                                            $countries = \Platform\Core\Models\CoreExtraFieldDefinition::PHONE_COUNTRIES;
+                                        @endphp
+                                        <div class="space-y-3">
+                                            {{-- Straße --}}
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-500 mb-1">Straße + Hausnummer @if($isRequired)<span class="text-rose-500">*</span>@endif</label>
+                                                <input type="text" wire:model="extraFieldValues.{{ $fieldId }}.street" placeholder="Musterstraße 1" class="applicant-input">
+                                                @error("extraFieldValues.{$fieldId}.street") <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                                            </div>
+                                            {{-- Adresszusatz --}}
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-500 mb-1">Adresszusatz</label>
+                                                <input type="text" wire:model="extraFieldValues.{{ $fieldId }}.street2" placeholder="z.B. Hinterhaus, 3. OG" class="applicant-input">
+                                            </div>
+                                            {{-- PLZ + Ort --}}
+                                            <div class="grid grid-cols-3 gap-3">
+                                                <div class="col-span-1">
+                                                    <label class="block text-xs font-medium text-gray-500 mb-1">PLZ @if($isRequired)<span class="text-rose-500">*</span>@endif</label>
+                                                    <input type="text" wire:model="extraFieldValues.{{ $fieldId }}.zip" placeholder="12345" class="applicant-input">
+                                                    @error("extraFieldValues.{$fieldId}.zip") <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                                                </div>
+                                                <div class="col-span-2">
+                                                    <label class="block text-xs font-medium text-gray-500 mb-1">Ort @if($isRequired)<span class="text-rose-500">*</span>@endif</label>
+                                                    <input type="text" wire:model="extraFieldValues.{{ $fieldId }}.city" placeholder="Berlin" class="applicant-input">
+                                                    @error("extraFieldValues.{$fieldId}.city") <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                                                </div>
+                                            </div>
+                                            {{-- Bundesland + Land --}}
+                                            <div class="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label class="block text-xs font-medium text-gray-500 mb-1">Bundesland / Region</label>
+                                                    <input type="text" wire:model="extraFieldValues.{{ $fieldId }}.state" placeholder="z.B. Bayern" class="applicant-input">
+                                                </div>
+                                                <div>
+                                                    <label class="block text-xs font-medium text-gray-500 mb-1">Land @if($isRequired)<span class="text-rose-500">*</span>@endif</label>
+                                                    <select wire:model="extraFieldValues.{{ $fieldId }}.country" class="applicant-input">
+                                                        @foreach($countries as $code => $info)
+                                                            <option value="{{ $code }}">{{ $info['flag'] }} {{ $info['name'] }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                    @error("extraFieldValues.{$fieldId}.country") <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                                                </div>
+                                            </div>
+                                        </div>
+                                        @break
+
                                     @case('regex')
                                         @php $patternDescription = $options['pattern_description'] ?? null; @endphp
                                         <input
@@ -556,6 +604,9 @@
                                 @enderror
                                 @error("extraFieldValues.{$fieldId}.raw")
                                     <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                                @error("extraFieldValues.{$fieldId}.street")
+                                    {{-- Handled inline for address --}}
                                 @enderror
                             </div>
                         @endforeach
