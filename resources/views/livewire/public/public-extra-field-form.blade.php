@@ -267,8 +267,8 @@
                                 @endif
                                 @php
                                     $hints = [];
-                                    if ($isRequired && empty($field['description'])) $hints[] = 'Pflichtfeld';
-                                    if (($options['multiple'] ?? false) && in_array($fieldType, ['select', 'lookup'])) $hints[] = 'Mehrfachauswahl möglich';
+                                    if ($isRequired) $hints[] = 'Pflichtfeld';
+                                    if (($options['multiple'] ?? false) && in_array($fieldType, ['select', 'lookup', 'file'])) $hints[] = 'Mehrfachauswahl möglich';
                                     if ($field['is_encrypted'] ?? false) $hints[] = 'Verschlüsselt gespeichert';
                                     if ($fieldType === 'phone') $hints[] = 'Bitte wählen Sie die Ländervorwahl und geben Sie Ihre Nummer ein';
                                 @endphp
