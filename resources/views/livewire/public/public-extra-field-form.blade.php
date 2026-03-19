@@ -243,7 +243,7 @@
                                 $fieldId = $field['id'];
                                 $fieldType = $field['type'];
                                 $fieldLabel = $field['label'];
-                                $isRequired = $field['is_mandatory'] ?? false;
+                                $isRequired = ($field['is_mandatory'] ?? false) || ($field['is_required'] ?? false);
                                 $options = $field['options'] ?? [];
                             @endphp
 
