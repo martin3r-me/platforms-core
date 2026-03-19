@@ -283,17 +283,20 @@
                                 </div>
 
                                 {{-- Description --}}
-                                @if(!empty($field['description']))
-                                    <p class="text-[13px] text-gray-400 mb-2.5 leading-relaxed">{{ $field['description'] }}</p>
+                                @php
+                                    $fieldDescription = $field['description'] ?? $options['description'] ?? null;
+                                @endphp
+                                @if(!empty($fieldDescription))
+                                    <p class="text-[13px] text-gray-400 mb-2.5 leading-relaxed">{{ $fieldDescription }}</p>
                                 @endif
 
                                 {{-- Regex format hint --}}
-                                @if($fieldType === 'regex' && ($options['pattern_description'] ?? null))
+                                @if(($fieldType === 'regex' && ($options['pattern_description'] ?? null)) || ($fieldType === 'text' && ($options['regex'] ?? null) && ($options['regex_message'] ?? null)))
                                     <div class="flex items-center gap-1.5 mb-2.5">
                                         <svg class="w-3.5 h-3.5 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                         </svg>
-                                        <span class="text-xs text-amber-600 font-medium">Format: {{ $options['pattern_description'] }}</span>
+                                        <span class="text-xs text-amber-600 font-medium">{{ $options['pattern_description'] ?? $options['regex_message'] ?? '' }}</span>
                                     </div>
                                 @endif
 
@@ -305,12 +308,49 @@
                                 @switch($fieldType)
                                     {{-- ─── Text ─── --}}
                                     @case('text')
-                                        <input
-                                            type="text"
-                                            wire:model="extraFieldValues.{{ $fieldId }}"
-                                            placeholder="{{ $options['placeholder'] ?? 'Eingabe...' }}"
-                                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                                        >
+                                        @php
+                                            $textRegex = $options['regex'] ?? null;
+                                            $textRegexMsg = $options['regex_message'] ?? 'Eingabe entspricht nicht dem erwarteten Format.';
+                                        @endphp
+                                        @if($textRegex)
+                                            <div
+                                                x-data="{
+                                                    value: @entangle('extraFieldValues.' . $fieldId).live,
+                                                    pattern: {{ json_encode($textRegex) }},
+                                                    touched: false,
+                                                    get isValid() {
+                                                        if (!this.touched || !this.value || !this.pattern) return true;
+                                                        try { return new RegExp(this.pattern).test(this.value); } catch(e) { return true; }
+                                                    }
+                                                }"
+                                            >
+                                                <input
+                                                    type="text"
+                                                    x-model="value"
+                                                    x-on:blur="touched = true"
+                                                    wire:model.live.debounce.500ms="extraFieldValues.{{ $fieldId }}"
+                                                    placeholder="{{ $options['placeholder'] ?? 'Eingabe...' }}"
+                                                    :class="!isValid
+                                                        ? 'w-full px-4 py-3 bg-red-50 border-2 border-red-300 rounded-xl text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 focus:ring-2 focus:ring-red-100'
+                                                        : 'w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'"
+                                                >
+                                                <template x-if="!isValid">
+                                                    <p class="mt-1.5 text-sm text-red-500 flex items-center gap-1.5">
+                                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                        </svg>
+                                                        {{ $textRegexMsg }}
+                                                    </p>
+                                                </template>
+                                            </div>
+                                        @else
+                                            <input
+                                                type="text"
+                                                wire:model="extraFieldValues.{{ $fieldId }}"
+                                                placeholder="{{ $options['placeholder'] ?? 'Eingabe...' }}"
+                                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                                            >
+                                        @endif
                                         @break
 
                                     {{-- ─── Textarea ─── --}}

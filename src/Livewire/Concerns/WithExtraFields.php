@@ -479,6 +479,14 @@ trait WithExtraFields
                     $fieldRules[] = 'numeric';
                     break;
                 case 'text':
+                    $fieldRules[] = 'string';
+                    $fieldRules[] = 'max:65535';
+                    // Text fields can have an inline regex in options
+                    $optionsRegex = $field['options']['regex'] ?? null;
+                    if ($optionsRegex) {
+                        $fieldRules[] = 'regex:/' . $optionsRegex . '/';
+                    }
+                    break;
                 case 'textarea':
                     $fieldRules[] = 'string';
                     $fieldRules[] = 'max:65535';
@@ -569,6 +577,15 @@ trait WithExtraFields
                 $messages["extraFieldValues.{$field['id']}.regex"] = $customError
                     ?: ($patternDesc
                         ? "Das Feld \"{$field['label']}\" entspricht nicht dem erwarteten Format: {$patternDesc}"
+                        : "Das Feld \"{$field['label']}\" entspricht nicht dem erwarteten Format.");
+            }
+            // Text fields with options.regex also need custom messages
+            if ($field['type'] === 'text' && ($field['options']['regex'] ?? null)) {
+                $customError = $field['options']['regex_message'] ?? null;
+                $desc = $field['options']['description'] ?? null;
+                $messages["extraFieldValues.{$field['id']}.regex"] = $customError
+                    ?: ($desc
+                        ? "Das Feld \"{$field['label']}\" entspricht nicht dem erwarteten Format."
                         : "Das Feld \"{$field['label']}\" entspricht nicht dem erwarteten Format.");
             }
         }
