@@ -124,11 +124,14 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
             // Name aus Label generieren
             $name = Str::slug($label, '_');
 
-            // Uniqueness-Check
+            // context_type muss der volle Klassenname sein (wie Livewire/Trait es erwarten)
+            $contextType = $modelClass;
             $contextId = $modelId ?: null;
+
+            // Uniqueness-Check
             $exists = CoreExtraFieldDefinition::query()
                 ->forTeam($teamId)
-                ->forContext($modelType, $contextId)
+                ->forContext($contextType, $contextId)
                 ->where('name', $name)
                 ->exists();
 
@@ -139,7 +142,7 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
             // Höchste order ermitteln
             $maxOrder = CoreExtraFieldDefinition::query()
                 ->forTeam($teamId)
-                ->forContext($modelType, $contextId)
+                ->forContext($contextType, $contextId)
                 ->max('order') ?? 0;
 
             // Options aufbauen
@@ -163,7 +166,7 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
             $definition = CoreExtraFieldDefinition::create([
                 'team_id' => $teamId,
                 'created_by_user_id' => $context->user?->id,
-                'context_type' => $modelType,
+                'context_type' => $contextType,
                 'context_id' => $contextId,
                 'name' => $name,
                 'label' => $label,
@@ -180,6 +183,7 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                 'name' => $definition->name,
                 'label' => $definition->label,
                 'type' => $definition->type,
+                'model_type' => $modelType,
                 'context_type' => $definition->context_type,
                 'context_id' => $definition->context_id,
                 'is_required' => $definition->is_required,
