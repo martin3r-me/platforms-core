@@ -87,7 +87,7 @@ class GetExtraFieldsTool implements ToolContract, ToolMetadataContract
             }
 
             // Team-Scoping: Wenn kein context_model, prüfe team_id
-            if (!$contextModel && isset($model->team_id) && $context->team) {
+            if (!$ctxModel && isset($model->team_id) && $context->team) {
                 if ((int)$model->team_id !== (int)$context->team->id) {
                     return ToolResult::error('ACCESS_DENIED', "Model gehört nicht zum aktuellen Team.");
                 }

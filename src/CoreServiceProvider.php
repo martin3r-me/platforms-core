@@ -487,6 +487,17 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register($this->app->make(\Platform\Core\Tools\UpdateExtraFieldsTool::class)); } catch (\Throwable $e) {}
         }
 
+        // Extra Fields: Definition CRUD Tools (core.extra_fields.definitions.*)
+        if (class_exists(\Platform\Core\Tools\CreateExtraFieldDefinitionTool::class) && !$registry->has('core.extra_fields.definitions.POST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\CreateExtraFieldDefinitionTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\UpdateExtraFieldDefinitionTool::class) && !$registry->has('core.extra_fields.definitions.PUT')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\UpdateExtraFieldDefinitionTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\DeleteExtraFieldDefinitionTool::class) && !$registry->has('core.extra_fields.definitions.DELETE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\DeleteExtraFieldDefinitionTool::class)); } catch (\Throwable $e) {}
+        }
+
         // Extra Fields: Lookup Tools (core.extra_fields.lookups.*)
         // Ermöglichen der LLM, zentrale Auswahllisten für Extra-Felder zu verwalten
         if (class_exists(\Platform\Core\Tools\ListLookupsTool::class) && !$registry->has('core.extra_fields.lookups.LIST')) {
