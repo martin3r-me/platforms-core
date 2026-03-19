@@ -271,6 +271,7 @@
                                     if (($options['multiple'] ?? false) && in_array($fieldType, ['select', 'lookup', 'file'])) $hints[] = 'Mehrfachauswahl möglich';
                                     if ($field['is_encrypted'] ?? false) $hints[] = 'Verschlüsselt gespeichert';
                                     if ($fieldType === 'phone') $hints[] = 'Bitte wählen Sie die Ländervorwahl und geben Sie Ihre Nummer ein';
+                                    if ($fieldType === 'regex' && ($options['pattern_description'] ?? null)) $hints[] = 'Format: ' . $options['pattern_description'];
                                 @endphp
                                 @if(!empty($hints))
                                     <p class="text-xs text-gray-400 mb-2">{{ implode(' · ', $hints) }}</p>
@@ -473,16 +474,32 @@
                                         @break
 
                                     @case('regex')
-                                        @php $patternDescription = $options['pattern_description'] ?? null; @endphp
-                                        <input
-                                            type="text"
-                                            wire:model="extraFieldValues.{{ $fieldId }}"
-                                            placeholder="{{ $patternDescription ?? ($options['placeholder'] ?? '') }}"
-                                            class="applicant-input"
+                                        @php
+                                            $patternDescription = $options['pattern_description'] ?? null;
+                                            $patternError = $options['pattern_error'] ?? null;
+                                            $pattern = $options['pattern'] ?? null;
+                                        @endphp
+                                        <div
+                                            x-data="{
+                                                value: @entangle('extraFieldValues.' . $fieldId).live,
+                                                pattern: {{ json_encode($pattern) }},
+                                                get isValid() {
+                                                    if (!this.value || !this.pattern) return true;
+                                                    try { return new RegExp(this.pattern).test(this.value); } catch(e) { return true; }
+                                                }
+                                            }"
                                         >
-                                        @if($patternDescription)
-                                            <p class="text-xs text-gray-400 mt-1">Format: {{ $patternDescription }}</p>
-                                        @endif
+                                            <input
+                                                type="text"
+                                                x-model="value"
+                                                wire:model.live.debounce.500ms="extraFieldValues.{{ $fieldId }}"
+                                                placeholder="{{ $patternDescription ?? ($options['placeholder'] ?? '') }}"
+                                                :class="value && !isValid ? 'applicant-input applicant-input-error' : 'applicant-input'"
+                                            >
+                                            <template x-if="value && !isValid">
+                                                <p class="mt-1 text-sm text-red-500">{{ $patternError ?? 'Eingabe entspricht nicht dem erwarteten Format.' }}</p>
+                                            </template>
+                                        </div>
                                         @break
 
                                     @case('phone')
@@ -752,6 +769,11 @@
         border-color: #6366f1;
         box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
         background: white;
+    }
+
+    .applicant-input-error {
+        border-color: #ef4444 !important;
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
     }
 
     /* ── Option Cards ── */
