@@ -497,6 +497,9 @@ class CoreServiceProvider extends ServiceProvider
         if (class_exists(\Platform\Core\Tools\DeleteExtraFieldDefinitionTool::class) && !$registry->has('core.extra_fields.definitions.DELETE')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\DeleteExtraFieldDefinitionTool::class)); } catch (\Throwable $e) {}
         }
+        if (class_exists(\Platform\Core\Tools\ReorderExtraFieldDefinitionsTool::class) && !$registry->has('core.extra_fields.definitions.reorder')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\ReorderExtraFieldDefinitionsTool::class)); } catch (\Throwable $e) {}
+        }
 
         // Extra Fields: Lookup Tools (core.extra_fields.lookups.*)
         // Ermöglichen der LLM, zentrale Auswahllisten für Extra-Felder zu verwalten
