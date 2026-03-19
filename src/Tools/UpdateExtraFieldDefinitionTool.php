@@ -57,11 +57,14 @@ class UpdateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                 ],
                 'visibility_config' => [
                     'type' => 'object',
-                    'description' => 'Bedingte Sichtbarkeit. Struktur: {enabled: true, logic: "AND"|"OR", groups: [{logic: "AND"|"OR", conditions: [{field: "feldname", operator: "...", value: ...}]}]}. '
-                        . 'Operatoren: equals, not_equals, greater_than, greater_or_equal, less_than, less_or_equal, is_null, is_not_null, contains, starts_with, ends_with, is_true, is_false, is_in, is_not_in. '
-                        . 'Bei is_in/is_not_in: value ist ein Array, optional list_source ("manual"|"lookup") und list_lookup_id. '
-                        . 'field referenziert den technischen Namen (Slug) eines anderen Extra-Fields im selben Kontext. '
-                        . '{enabled: false} entfernt alle Bedingungen.',
+                    'description' => 'Bedingte Sichtbarkeit. EXAKTES Format (kein anderes wird akzeptiert): '
+                        . '{"enabled": true, "logic": "AND", "groups": [{"logic": "AND", "conditions": [{"field": "feldname_slug", "operator": "is_false", "value": null}]}]}. '
+                        . 'Beispiel: Feld nur sichtbar wenn "eu_burger" = Nein: {"enabled": true, "logic": "AND", "groups": [{"logic": "AND", "conditions": [{"field": "eu_burger", "operator": "is_false", "value": null}]}]}. '
+                        . 'Operatoren: equals/not_equals (value: string), greater_than/greater_or_equal/less_than/less_or_equal (value: number), '
+                        . 'is_null/is_not_null/is_true/is_false (value: null), contains/starts_with/ends_with (value: string), '
+                        . 'is_in/is_not_in (value: ["a","b"], optional list_source: "manual"|"lookup", list_lookup_id: int). '
+                        . 'field = technischer Name (Slug) eines ANDEREN Extra-Fields im selben Kontext. '
+                        . '{"enabled": false} entfernt alle Bedingungen.',
                 ],
                 'order' => [
                     'type' => 'integer',
