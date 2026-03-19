@@ -256,12 +256,23 @@
                                 x-transition:leave-start="opacity-100 translate-y-0"
                                 x-transition:leave-end="opacity-0 -translate-y-2"
                             >
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <label class="block text-sm font-semibold text-gray-700 mb-1">
                                     {{ $fieldLabel }}
                                     @if($isRequired)
                                         <span class="text-rose-500 ml-0.5">*</span>
                                     @endif
                                 </label>
+                                @php
+                                    $hints = [];
+                                    if ($isRequired) $hints[] = 'Pflichtfeld';
+                                    if (($options['multiple'] ?? false) && in_array($fieldType, ['select', 'lookup'])) $hints[] = 'Mehrfachauswahl möglich';
+                                    if ($field['is_encrypted'] ?? false) $hints[] = 'Verschlüsselt gespeichert';
+                                @endphp
+                                @if(!empty($hints))
+                                    <p class="text-xs text-gray-400 mb-2">{{ implode(' · ', $hints) }}</p>
+                                @else
+                                    <div class="mb-2"></div>
+                                @endif
 
                                 @switch($fieldType)
                                     @case('text')

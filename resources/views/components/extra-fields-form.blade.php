@@ -293,8 +293,13 @@
                             <x-ui-label
                                 :text="$field['label']"
                                 :required="$field['is_mandatory'] || $field['is_required']"
-                                class="mb-2"
+                                class="mb-1"
                             />
+                            @if($isMultiple)
+                                <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mb-2">Mehrere Dateien möglich</span>
+                            @else
+                                <div class="mb-2"></div>
+                            @endif
 
                             {{-- Inline File-Upload Komponente (Kontext = Extra-Feld selbst) --}}
                             @if($efContextType && $efContextId)
@@ -384,8 +389,9 @@
                                 <x-ui-label
                                     :text="$field['label']"
                                     :required="$field['is_mandatory'] || $field['is_required']"
-                                    class="mb-2"
+                                    class="mb-1"
                                 />
+                                <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mb-2">Mehrfachauswahl möglich</span>
                                 @if($field['is_encrypted'])
                                     <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mb-2">
                                         @svg('heroicon-o-lock-closed', 'w-3 h-3')
@@ -449,8 +455,9 @@
                                 <x-ui-label
                                     :text="$field['label']"
                                     :required="$field['is_mandatory'] || $field['is_required']"
-                                    class="mb-2"
+                                    class="mb-1"
                                 />
+                                <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mb-2">Mehrfachauswahl möglich</span>
                                 @if($field['is_encrypted'])
                                     <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mb-2">
                                         @svg('heroicon-o-lock-closed', 'w-3 h-3')
