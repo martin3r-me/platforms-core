@@ -9,6 +9,7 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\CoreExtraFieldDefinition;
+use Platform\Core\Services\ExtraFieldConditionEvaluator;
 use Platform\Core\Traits\HasExtraFields;
 
 class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContract
@@ -64,6 +65,13 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                 'options' => [
                     'type' => 'object',
                     'description' => 'Optional: Typ-spezifische Optionen. Select: {choices: ["A","B"], multiple: bool}. Lookup: {lookup_id: int, multiple: bool}. File: {multiple: bool}. Regex: {pattern: "regex", pattern_description: "Beschreibung", pattern_error: "Fehlermeldung"}.',
+                ],
+                'visibility_config' => [
+                    'type' => 'object',
+                    'description' => 'Optional: Bedingte Sichtbarkeit. Struktur: {enabled: true, logic: "AND"|"OR", groups: [{logic: "AND"|"OR", conditions: [{field: "feldname", operator: "...", value: ...}]}]}. '
+                        . 'Operatoren: equals, not_equals, greater_than, greater_or_equal, less_than, less_or_equal, is_null, is_not_null, contains, starts_with, ends_with, is_true, is_false, is_in, is_not_in. '
+                        . 'Bei is_in/is_not_in: value ist ein Array, optional list_source ("manual"|"lookup") und list_lookup_id. '
+                        . 'field referenziert den technischen Namen (Slug) eines anderen Extra-Fields im selben Kontext.',
                 ],
                 'team_id' => [
                     'type' => 'integer',
@@ -194,6 +202,19 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                 $fieldOptions['placeholder'] = $placeholder;
             }
 
+            // Visibility Config validieren
+            $visibilityConfig = null;
+            if (isset($arguments['visibility_config']) && is_array($arguments['visibility_config'])) {
+                $vc = $arguments['visibility_config'];
+                if ($vc['enabled'] ?? false) {
+                    $validationError = $this->validateVisibilityConfig($vc, $contextType, $contextId, $teamId);
+                    if ($validationError) {
+                        return ToolResult::error('VALIDATION_ERROR', $validationError);
+                    }
+                    $visibilityConfig = $vc;
+                }
+            }
+
             $description = isset($arguments['description']) ? trim((string)$arguments['description']) : null;
 
             $definition = CoreExtraFieldDefinition::create([
@@ -210,6 +231,7 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                 'is_encrypted' => false,
                 'order' => $maxOrder + 1,
                 'options' => $fieldOptions,
+                'visibility_config' => $visibilityConfig,
             ]);
 
             return ToolResult::success([
@@ -224,12 +246,73 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                 'is_mandatory' => $definition->is_mandatory,
                 'order' => $definition->order,
                 'options' => $definition->options,
+                'visibility_config' => $definition->visibility_config,
                 'team_id' => $definition->team_id,
                 'message' => "Extra-Field-Definition '{$definition->label}' ({$definition->type}) erstellt.",
             ]);
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Erstellen der Definition: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Validate a visibility config structure.
+     */
+    protected function validateVisibilityConfig(array $config, string $contextType, ?int $contextId, int $teamId): ?string
+    {
+        $logic = $config['logic'] ?? 'AND';
+        if (!in_array(strtoupper($logic), ['AND', 'OR'])) {
+            return "Ungültige Hauptlogik: '{$logic}'. Erlaubt: AND, OR.";
+        }
+
+        $groups = $config['groups'] ?? [];
+        if (empty($groups)) {
+            return 'visibility_config.groups darf nicht leer sein wenn enabled=true.';
+        }
+
+        // Lade existierende Feld-Namen im Kontext
+        $existingFields = CoreExtraFieldDefinition::query()
+            ->forTeam($teamId)
+            ->forContext($contextType, $contextId)
+            ->pluck('name')
+            ->all();
+
+        $validOperators = array_keys(ExtraFieldConditionEvaluator::OPERATORS);
+
+        foreach ($groups as $gi => $group) {
+            $groupLogic = $group['logic'] ?? 'AND';
+            if (!in_array(strtoupper($groupLogic), ['AND', 'OR'])) {
+                return "Ungültige Gruppenlogik in Gruppe {$gi}: '{$groupLogic}'.";
+            }
+
+            $conditions = $group['conditions'] ?? [];
+            if (empty($conditions)) {
+                return "Gruppe {$gi} hat keine Bedingungen.";
+            }
+
+            foreach ($conditions as $ci => $condition) {
+                $field = $condition['field'] ?? null;
+                if (empty($field)) {
+                    return "Bedingung {$ci} in Gruppe {$gi}: field ist erforderlich.";
+                }
+
+                if (!in_array($field, $existingFields)) {
+                    return "Bedingung {$ci} in Gruppe {$gi}: Unbekanntes Feld '{$field}'. Verfügbar: " . implode(', ', $existingFields);
+                }
+
+                $operator = $condition['operator'] ?? 'equals';
+                if (!in_array($operator, $validOperators)) {
+                    return "Bedingung {$ci} in Gruppe {$gi}: Ungültiger Operator '{$operator}'. Erlaubt: " . implode(', ', $validOperators);
+                }
+
+                $requiresValue = ExtraFieldConditionEvaluator::OPERATORS[$operator]['requiresValue'] ?? true;
+                if ($requiresValue && !array_key_exists('value', $condition)) {
+                    return "Bedingung {$ci} in Gruppe {$gi}: Operator '{$operator}' benötigt einen value.";
+                }
+            }
+        }
+
+        return null;
     }
 
     public function getMetadata(): array
