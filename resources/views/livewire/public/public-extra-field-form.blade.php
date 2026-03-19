@@ -261,27 +261,20 @@
                                     @if($isRequired)
                                         <span class="text-rose-500 ml-0.5">*</span>
                                     @endif
-                                    @if(!empty($field['description']))
-                                        <span class="inline-block relative group ml-1 align-middle">
-                                            <svg class="w-4 h-4 text-gray-400 inline cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                            </svg>
-                                            <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-xs font-normal text-white bg-gray-900 rounded-lg shadow-lg whitespace-normal max-w-xs opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                                {{ $field['description'] }}
-                                            </span>
-                                        </span>
-                                    @endif
                                 </label>
+                                @if(!empty($field['description']))
+                                    <p class="text-sm text-gray-500 mb-2">{{ $field['description'] }}</p>
+                                @endif
                                 @php
                                     $hints = [];
-                                    if ($isRequired) $hints[] = 'Pflichtfeld';
+                                    if ($isRequired && empty($field['description'])) $hints[] = 'Pflichtfeld';
                                     if (($options['multiple'] ?? false) && in_array($fieldType, ['select', 'lookup'])) $hints[] = 'Mehrfachauswahl möglich';
                                     if ($field['is_encrypted'] ?? false) $hints[] = 'Verschlüsselt gespeichert';
                                     if ($fieldType === 'phone') $hints[] = 'Bitte wählen Sie die Ländervorwahl und geben Sie Ihre Nummer ein';
                                 @endphp
                                 @if(!empty($hints))
                                     <p class="text-xs text-gray-400 mb-2">{{ implode(' · ', $hints) }}</p>
-                                @else
+                                @elseif(empty($field['description']))
                                     <div class="mb-2"></div>
                                 @endif
 
@@ -597,6 +590,14 @@
                                             @endif
                                         </div>
                                         @break
+
+                                    @default
+                                        <input
+                                            type="text"
+                                            wire:model="extraFieldValues.{{ $fieldId }}"
+                                            placeholder="{{ $options['placeholder'] ?? '' }}"
+                                            class="applicant-input"
+                                        >
                                 @endswitch
 
                                 @error("extraFieldValues.{$fieldId}")
