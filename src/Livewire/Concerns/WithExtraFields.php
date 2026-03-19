@@ -390,6 +390,7 @@ trait WithExtraFields
                         'fieldable_type' => $model->getMorphClass(),
                         'fieldable_id' => $model->id,
                     ]);
+                    $valueRecord->setRelation('definition', CoreExtraFieldDefinition::find($definitionId));
                 }
 
                 $valueRecord->setTypedValue($newValue);

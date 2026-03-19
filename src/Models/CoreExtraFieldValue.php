@@ -134,7 +134,7 @@ class CoreExtraFieldValue extends Model
             'file' => is_array($value) ? json_encode($value) : (string) $value,
             'phone' => is_array($value) ? json_encode($value) : (string) $value,
             'address' => is_array($value) ? json_encode($value) : (string) $value,
-            default => (string) $value,
+            default => is_array($value) ? json_encode($value) : (string) $value,
         };
 
         if ($stringValue === null) {
