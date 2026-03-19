@@ -18,6 +18,7 @@ class CoreExtraFieldDefinition extends Model
         'context_id',
         'name',
         'label',
+        'description',
         'type',
         'is_required',
         'is_mandatory',
@@ -61,6 +62,8 @@ class CoreExtraFieldDefinition extends Model
         'select' => 'Auswahl (Freihand)',
         'lookup' => 'Auswahl (Lookup)',
         'file' => 'Datei',
+        'phone' => 'Telefonnummer',
+        'regex' => 'Text (Muster)',
     ];
 
     /**
@@ -95,6 +98,47 @@ class CoreExtraFieldDefinition extends Model
             'icon' => 'heroicon-o-paper-clip',
             'description' => 'Datei-Upload für Dokumente, Bilder oder andere Anhänge. Optional mit KI-Verifikation.',
         ],
+        'phone' => [
+            'icon' => 'heroicon-o-phone',
+            'description' => 'Telefonnummer mit Ländervorwahl-Auswahl und automatischer Validierung/Formatierung.',
+        ],
+        'regex' => [
+            'icon' => 'heroicon-o-code-bracket',
+            'description' => 'Textfeld mit Validierung gegen ein reguläres Ausdrucksmuster (z.B. PLZ, IBAN, Steuernummer).',
+        ],
+    ];
+
+    /**
+     * Verfügbare Länder für Phone-Felder (ISO 3166-1 alpha-2 + Vorwahl)
+     */
+    public const PHONE_COUNTRIES = [
+        'DE' => ['name' => 'Deutschland', 'dial' => '+49', 'flag' => '🇩🇪'],
+        'AT' => ['name' => 'Österreich', 'dial' => '+43', 'flag' => '🇦🇹'],
+        'CH' => ['name' => 'Schweiz', 'dial' => '+41', 'flag' => '🇨🇭'],
+        'NL' => ['name' => 'Niederlande', 'dial' => '+31', 'flag' => '🇳🇱'],
+        'BE' => ['name' => 'Belgien', 'dial' => '+32', 'flag' => '🇧🇪'],
+        'LU' => ['name' => 'Luxemburg', 'dial' => '+352', 'flag' => '🇱🇺'],
+        'FR' => ['name' => 'Frankreich', 'dial' => '+33', 'flag' => '🇫🇷'],
+        'IT' => ['name' => 'Italien', 'dial' => '+39', 'flag' => '🇮🇹'],
+        'ES' => ['name' => 'Spanien', 'dial' => '+34', 'flag' => '🇪🇸'],
+        'PT' => ['name' => 'Portugal', 'dial' => '+351', 'flag' => '🇵🇹'],
+        'GB' => ['name' => 'Vereinigtes Königreich', 'dial' => '+44', 'flag' => '🇬🇧'],
+        'IE' => ['name' => 'Irland', 'dial' => '+353', 'flag' => '🇮🇪'],
+        'DK' => ['name' => 'Dänemark', 'dial' => '+45', 'flag' => '🇩🇰'],
+        'SE' => ['name' => 'Schweden', 'dial' => '+46', 'flag' => '🇸🇪'],
+        'NO' => ['name' => 'Norwegen', 'dial' => '+47', 'flag' => '🇳🇴'],
+        'FI' => ['name' => 'Finnland', 'dial' => '+358', 'flag' => '🇫🇮'],
+        'PL' => ['name' => 'Polen', 'dial' => '+48', 'flag' => '🇵🇱'],
+        'CZ' => ['name' => 'Tschechien', 'dial' => '+420', 'flag' => '🇨🇿'],
+        'SK' => ['name' => 'Slowakei', 'dial' => '+421', 'flag' => '🇸🇰'],
+        'HU' => ['name' => 'Ungarn', 'dial' => '+36', 'flag' => '🇭🇺'],
+        'RO' => ['name' => 'Rumänien', 'dial' => '+40', 'flag' => '🇷🇴'],
+        'BG' => ['name' => 'Bulgarien', 'dial' => '+359', 'flag' => '🇧🇬'],
+        'HR' => ['name' => 'Kroatien', 'dial' => '+385', 'flag' => '🇭🇷'],
+        'SI' => ['name' => 'Slowenien', 'dial' => '+386', 'flag' => '🇸🇮'],
+        'GR' => ['name' => 'Griechenland', 'dial' => '+30', 'flag' => '🇬🇷'],
+        'TR' => ['name' => 'Türkei', 'dial' => '+90', 'flag' => '🇹🇷'],
+        'US' => ['name' => 'USA', 'dial' => '+1', 'flag' => '🇺🇸'],
     ];
 
     /**

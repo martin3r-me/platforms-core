@@ -199,6 +199,7 @@ trait HasExtraFields
                 'id' => $definition->id,
                 'name' => $definition->name,
                 'label' => $definition->label,
+                'description' => $definition->description,
                 'type' => $definition->type,
                 'value' => $value?->typed_value,
                 'is_required' => $definition->is_required,

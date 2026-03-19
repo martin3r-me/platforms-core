@@ -20,7 +20,7 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
 
     public function getDescription(): string
     {
-        return 'POST /core/extra-fields/definitions - Erstellt eine neue Extra-Field-Definition für ein Model. Unterstützte Typen: text, number, textarea, boolean, select, lookup, file.';
+        return 'POST /core/extra-fields/definitions - Erstellt eine neue Extra-Field-Definition für ein Model. Unterstützte Typen: text, number, textarea, boolean, select, lookup, file, phone, regex.';
     }
 
     public function getSchema(): array
@@ -40,9 +40,13 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                     'type' => 'string',
                     'description' => 'Anzeige-Label des Feldes (z.B. "Geburtsdatum").',
                 ],
+                'description' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Beschreibungstext / Hilfetext für das Feld. Wird als Tooltip oder Hinweis angezeigt.',
+                ],
                 'type' => [
                     'type' => 'string',
-                    'enum' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'file'],
+                    'enum' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'file', 'phone', 'regex'],
                     'description' => 'Feldtyp.',
                 ],
                 'is_required' => [
@@ -55,7 +59,7 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                 ],
                 'options' => [
                     'type' => 'object',
-                    'description' => 'Optional: Typ-spezifische Optionen. Select: {choices: ["A","B"], multiple: bool}. Lookup: {lookup_id: int, multiple: bool}. File: {multiple: bool}.',
+                    'description' => 'Optional: Typ-spezifische Optionen. Select: {choices: ["A","B"], multiple: bool}. Lookup: {lookup_id: int, multiple: bool}. File: {multiple: bool}. Regex: {pattern: "regex", pattern_description: "Beschreibung", pattern_error: "Fehlermeldung"}.',
                 ],
                 'team_id' => [
                     'type' => 'integer',
@@ -121,6 +125,16 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                 }
             }
 
+            if ($type === 'regex') {
+                $pattern = $options['pattern'] ?? '';
+                if (empty($pattern)) {
+                    return ToolResult::error('VALIDATION_ERROR', 'Regex-Felder benötigen options.pattern.');
+                }
+                if (@preg_match('/' . $pattern . '/', '') === false) {
+                    return ToolResult::error('VALIDATION_ERROR', 'Ungültiges reguläres Ausdrucksmuster in options.pattern.');
+                }
+            }
+
             // Name aus Label generieren
             $name = Str::slug($label, '_');
 
@@ -161,7 +175,15 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                 $fieldOptions = [
                     'multiple' => (bool)($options['multiple'] ?? false),
                 ];
+            } elseif ($type === 'regex') {
+                $fieldOptions = [
+                    'pattern' => (string)$options['pattern'],
+                    'pattern_description' => isset($options['pattern_description']) ? trim((string)$options['pattern_description']) ?: null : null,
+                    'pattern_error' => isset($options['pattern_error']) ? trim((string)$options['pattern_error']) ?: null : null,
+                ];
             }
+
+            $description = isset($arguments['description']) ? trim((string)$arguments['description']) : null;
 
             $definition = CoreExtraFieldDefinition::create([
                 'team_id' => $teamId,
@@ -170,6 +192,7 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                 'context_id' => $contextId,
                 'name' => $name,
                 'label' => $label,
+                'description' => $description ?: null,
                 'type' => $type,
                 'is_required' => $isRequired,
                 'is_mandatory' => $isMandatory,

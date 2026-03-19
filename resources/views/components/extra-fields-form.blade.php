@@ -210,12 +210,16 @@
                     @case('textarea')
                         @php
                             $isAutoFilled = $this->extraFieldMeta[$field['id']]['auto_filled'] ?? false;
+                            $hint = collect(array_filter([
+                                $field['description'] ?? null,
+                                $field['is_encrypted'] ? 'Verschlüsselt' : null,
+                            ]))->implode(' · ') ?: null;
                         @endphp
                         <x-ui-input-textarea
                             :name="'extraFieldValues.' . $field['id']"
                             :label="$field['label']"
                             :required="$field['is_mandatory'] || $field['is_required']"
-                            :hint="$field['is_encrypted'] ? 'Verschlüsselt' : null"
+                            :hint="$hint"
                             wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}"
                             rows="3"
                             placeholder="Wert eingeben..."
@@ -231,11 +235,13 @@
                     @case('number')
                         @php
                             $isAutoFilled = $this->extraFieldMeta[$field['id']]['auto_filled'] ?? false;
+                            $hint = $field['description'] ?? null;
                         @endphp
                         <x-ui-input-number
                             :name="'extraFieldValues.' . $field['id']"
                             :label="$field['label']"
                             :required="$field['is_mandatory'] || $field['is_required']"
+                            :hint="$hint"
                             wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}"
                             step="any"
                             placeholder="Wert eingeben..."
@@ -258,8 +264,13 @@
                             <x-ui-label
                                 :text="$field['label']"
                                 :required="$field['is_mandatory'] || $field['is_required']"
-                                class="mb-2"
+                                class="mb-1"
                             />
+                            @if(!empty($field['description']))
+                                <p class="text-xs text-[var(--ui-muted)] mb-2">{{ $field['description'] }}</p>
+                            @else
+                                <div class="mb-1"></div>
+                            @endif
                             <x-ui-input-select
                                 :name="'extraFieldValues.' . $field['id']"
                                 :options="['1' => 'Ja', '0' => 'Nein']"
@@ -288,6 +299,11 @@
                             // Kontext aus dem Extra-Feld-Model bestimmen (via public Methods)
                             $efContextType = method_exists($this, 'getExtraFieldContextType') ? $this->getExtraFieldContextType() : null;
                             $efContextId = method_exists($this, 'getExtraFieldContextId') ? $this->getExtraFieldContextId() : null;
+
+                            $fileHints = array_filter([
+                                $field['description'] ?? null,
+                                $isMultiple ? 'Mehrere Dateien möglich' : null,
+                            ]);
                         @endphp
                         <div>
                             <x-ui-label
@@ -295,8 +311,8 @@
                                 :required="$field['is_mandatory'] || $field['is_required']"
                                 class="mb-1"
                             />
-                            @if($isMultiple)
-                                <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mb-2">Mehrere Dateien möglich</span>
+                            @if(!empty($fileHints))
+                                <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mb-2">{{ implode(' · ', $fileHints) }}</span>
                             @else
                                 <div class="mb-2"></div>
                             @endif
@@ -391,13 +407,14 @@
                                     :required="$field['is_mandatory'] || $field['is_required']"
                                     class="mb-1"
                                 />
-                                <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mb-2">Mehrfachauswahl möglich</span>
-                                @if($field['is_encrypted'])
-                                    <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mb-2">
-                                        @svg('heroicon-o-lock-closed', 'w-3 h-3')
-                                        Verschlüsselt
-                                    </span>
-                                @endif
+                                @php
+                                    $lookupHints = array_filter([
+                                        $field['description'] ?? null,
+                                        'Mehrfachauswahl möglich',
+                                        $field['is_encrypted'] ? 'Verschlüsselt' : null,
+                                    ]);
+                                @endphp
+                                <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mb-2">{{ implode(' · ', $lookupHints) }}</span>
                                 @if(count($lookupOptions) > 0)
                                     <div class="flex flex-wrap gap-2">
                                         @foreach($lookupOptions as $value => $label)
@@ -457,13 +474,14 @@
                                     :required="$field['is_mandatory'] || $field['is_required']"
                                     class="mb-1"
                                 />
-                                <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mb-2">Mehrfachauswahl möglich</span>
-                                @if($field['is_encrypted'])
-                                    <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mb-2">
-                                        @svg('heroicon-o-lock-closed', 'w-3 h-3')
-                                        Verschlüsselt
-                                    </span>
-                                @endif
+                                @php
+                                    $selectHints = array_filter([
+                                        $field['description'] ?? null,
+                                        'Mehrfachauswahl möglich',
+                                        $field['is_encrypted'] ? 'Verschlüsselt' : null,
+                                    ]);
+                                @endphp
+                                <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mb-2">{{ implode(' · ', $selectHints) }}</span>
                                 <div class="flex flex-wrap gap-2">
                                     @foreach($choices as $choice)
                                         <label class="inline-flex items-center gap-2 px-3 py-1.5 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40 cursor-pointer hover:bg-[var(--ui-muted-5)] transition-colors">
@@ -504,15 +522,91 @@
                         @endif
                         @break
 
-                    @default
+                    @case('regex')
                         @php
                             $isAutoFilled = $this->extraFieldMeta[$field['id']]['auto_filled'] ?? false;
+                            $patternDescription = $field['options']['pattern_description'] ?? null;
+                            $hint = collect(array_filter([
+                                $field['description'] ?? null,
+                                $patternDescription ? 'Format: ' . $patternDescription : null,
+                                $field['is_encrypted'] ? 'Verschlüsselt' : null,
+                            ]))->implode(' · ') ?: null;
                         @endphp
                         <x-ui-input-text
                             :name="'extraFieldValues.' . $field['id']"
                             :label="$field['label']"
                             :required="$field['is_mandatory'] || $field['is_required']"
-                            :hint="$field['is_encrypted'] ? 'Verschlüsselt' : null"
+                            :hint="$hint"
+                            wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}"
+                            placeholder="Wert eingeben..."
+                        />
+                        @if($isAutoFilled)
+                            <span class="text-xs text-[var(--ui-primary)] flex items-center gap-1 mt-1">
+                                @svg('heroicon-o-sparkles', 'w-3 h-3')
+                                Automatisch ausgefüllt
+                            </span>
+                        @endif
+                        @break
+
+                    @case('phone')
+                        @php
+                            $phoneCountries = \Platform\Core\Models\CoreExtraFieldDefinition::PHONE_COUNTRIES;
+                            $hint = $field['description'] ?? null;
+                        @endphp
+                        <div>
+                            <x-ui-label
+                                :text="$field['label']"
+                                :required="$field['is_mandatory'] || $field['is_required']"
+                                class="mb-1"
+                            />
+                            @if($hint)
+                                <p class="text-xs text-[var(--ui-muted)] mb-2">{{ $hint }}</p>
+                            @else
+                                <div class="mb-1"></div>
+                            @endif
+                            <div class="grid grid-cols-3 gap-2">
+                                <select
+                                    wire:model.live="extraFieldValues.{{ $field['id'] }}.country"
+                                    class="col-span-1 w-full rounded-lg border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] px-2 py-2 text-sm text-[var(--ui-text)] focus:border-[var(--ui-primary)] focus:ring-1 focus:ring-[var(--ui-primary)] outline-none"
+                                >
+                                    @foreach($phoneCountries as $code => $info)
+                                        <option value="{{ $code }}">{{ $info['flag'] }} {{ $code }} ({{ $info['dial'] }})</option>
+                                    @endforeach
+                                </select>
+                                <div class="col-span-2">
+                                    <x-ui-input-text
+                                        :name="'extraFieldValues.' . $field['id'] . '.raw'"
+                                        wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}.raw"
+                                        placeholder="z.B. 0151 1234567"
+                                        type="tel"
+                                    />
+                                </div>
+                            </div>
+                            @error("extraFieldValues.{$field['id']}.raw")
+                                <p class="mt-1 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
+                            @enderror
+                            @if($field['is_encrypted'])
+                                <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mt-1">
+                                    @svg('heroicon-o-lock-closed', 'w-3 h-3')
+                                    Verschlüsselt
+                                </span>
+                            @endif
+                        </div>
+                        @break
+
+                    @default
+                        @php
+                            $isAutoFilled = $this->extraFieldMeta[$field['id']]['auto_filled'] ?? false;
+                            $hint = collect(array_filter([
+                                $field['description'] ?? null,
+                                $field['is_encrypted'] ? 'Verschlüsselt' : null,
+                            ]))->implode(' · ') ?: null;
+                        @endphp
+                        <x-ui-input-text
+                            :name="'extraFieldValues.' . $field['id']"
+                            :label="$field['label']"
+                            :required="$field['is_mandatory'] || $field['is_required']"
+                            :hint="$hint"
                             wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}"
                             placeholder="Wert eingeben..."
                         />

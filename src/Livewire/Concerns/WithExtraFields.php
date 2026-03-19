@@ -5,6 +5,9 @@ namespace Platform\Core\Livewire\Concerns;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
+use libphonenumber\NumberParseException;
+use libphonenumber\PhoneNumberFormat;
+use libphonenumber\PhoneNumberUtil;
 use Platform\Core\Contracts\InheritsExtraFields;
 use Platform\Core\Jobs\VerifyExtraFieldValueJob;
 use Platform\Core\Models\CoreExtraFieldDefinition;
@@ -102,6 +105,18 @@ trait WithExtraFields
                 }
             }
 
+            // Für Phone-Felder: Array normalisieren
+            if ($field['type'] === 'phone') {
+                if (is_array($value)) {
+                    $value = [
+                        'raw' => $value['raw'] ?? '',
+                        'country' => $value['country'] ?? 'DE',
+                    ];
+                } else {
+                    $value = ['raw' => '', 'country' => 'DE'];
+                }
+            }
+
             $this->extraFieldValues[$field['id']] = $value;
 
             // Load verification and auto-fill metadata
@@ -192,6 +207,18 @@ trait WithExtraFields
                 }
             }
 
+            // Für Phone-Felder: Array normalisieren
+            if ($field['type'] === 'phone') {
+                if (is_array($value)) {
+                    $value = [
+                        'raw' => $value['raw'] ?? '',
+                        'country' => $value['country'] ?? 'DE',
+                    ];
+                } else {
+                    $value = ['raw' => '', 'country' => 'DE'];
+                }
+            }
+
             $this->extraFieldValues[$field['id']] = $value;
 
             // Load verification and auto-fill metadata
@@ -278,6 +305,26 @@ trait WithExtraFields
             // If field is hidden, treat as null value (clear stored value)
             $isVisible = $this->isFieldVisible($field, $fieldValuesByName, $evaluator);
             $newValue = $isVisible ? ($this->extraFieldValues[$definitionId] ?? null) : null;
+
+            // Phone-Felder: Formatieren und validieren
+            if ($field['type'] === 'phone' && is_array($newValue)) {
+                $rawInput = trim($newValue['raw'] ?? '');
+                if ($rawInput !== '') {
+                    $formatted = $this->formatPhoneValue($newValue);
+                    if ($formatted === null) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            "extraFieldValues.{$definitionId}.raw" => 'Ungültige Telefonnummer.',
+                        ]);
+                    }
+                    $newValue = $formatted;
+                    $this->extraFieldValues[$definitionId] = [
+                        'raw' => $formatted['raw'] ?? '',
+                        'country' => $formatted['country'] ?? 'DE',
+                    ];
+                } else {
+                    $newValue = null;
+                }
+            }
 
             // Find or create the value record
             $valueRecord = CoreExtraFieldValue::query()
@@ -416,6 +463,21 @@ trait WithExtraFields
                         $fieldRules[] = 'integer';
                     }
                     break;
+                case 'phone':
+                    $fieldRules = ['nullable', 'array'];
+                    $rules["extraFieldValues.{$field['id']}"] = $fieldRules;
+                    if ($field['is_mandatory'] ?? false) {
+                        $rules["extraFieldValues.{$field['id']}.raw"] = ['required', 'string'];
+                    }
+                    continue 2;
+                case 'regex':
+                    $fieldRules[] = 'string';
+                    $fieldRules[] = 'max:65535';
+                    $pattern = $field['options']['pattern'] ?? null;
+                    if ($pattern) {
+                        $fieldRules[] = 'regex:/' . $pattern . '/';
+                    }
+                    break;
             }
 
             $rules["extraFieldValues.{$field['id']}"] = $fieldRules;
@@ -435,6 +497,15 @@ trait WithExtraFields
             $messages["extraFieldValues.{$field['id']}.required"] = "Das Feld \"{$field['label']}\" ist ein Pflichtfeld.";
             $messages["extraFieldValues.{$field['id']}.numeric"] = "Das Feld \"{$field['label']}\" muss eine Zahl sein.";
             $messages["extraFieldValues.{$field['id']}.string"] = "Das Feld \"{$field['label']}\" muss ein Text sein.";
+            $messages["extraFieldValues.{$field['id']}.raw.required"] = "Das Feld \"{$field['label']}\" ist ein Pflichtfeld.";
+            if ($field['type'] === 'regex') {
+                $customError = $field['options']['pattern_error'] ?? null;
+                $patternDesc = $field['options']['pattern_description'] ?? null;
+                $messages["extraFieldValues.{$field['id']}.regex"] = $customError
+                    ?: ($patternDesc
+                        ? "Das Feld \"{$field['label']}\" entspricht nicht dem erwarteten Format: {$patternDesc}"
+                        : "Das Feld \"{$field['label']}\" entspricht nicht dem erwarteten Format.");
+            }
         }
 
         return $messages;
@@ -656,6 +727,38 @@ trait WithExtraFields
         }
 
         return $evaluator->evaluate($visibility, $fieldValuesByName);
+    }
+
+    /**
+     * Formatiert und validiert einen Phone-Wert via libphonenumber.
+     * Gibt das vollständige JSON-Objekt zurück oder null bei ungültiger Nummer.
+     */
+    protected function formatPhoneValue(array $phoneData): ?array
+    {
+        $raw = trim($phoneData['raw'] ?? '');
+        $country = $phoneData['country'] ?? 'DE';
+
+        if ($raw === '') {
+            return null;
+        }
+
+        try {
+            $phoneUtil = PhoneNumberUtil::getInstance();
+            $phoneNumber = $phoneUtil->parse($raw, $country);
+
+            if (!$phoneUtil->isValidNumber($phoneNumber)) {
+                return null;
+            }
+
+            return [
+                'raw' => $raw,
+                'country' => $phoneUtil->getRegionCodeForNumber($phoneNumber) ?: $country,
+                'e164' => $phoneUtil->format($phoneNumber, PhoneNumberFormat::E164),
+                'international' => $phoneUtil->format($phoneNumber, PhoneNumberFormat::INTERNATIONAL),
+            ];
+        } catch (NumberParseException) {
+            return null;
+        }
     }
 
     /**

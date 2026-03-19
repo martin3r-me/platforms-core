@@ -152,6 +152,14 @@
                                         wire:model="editField.label"
                                     />
 
+                                    <x-ui-input-text
+                                        name="editField.description"
+                                        label="Beschreibung"
+                                        wire:model="editField.description"
+                                        placeholder="Hilfetext für das Feld"
+                                        hint="Optional: Wird als Tooltip angezeigt"
+                                    />
+
                                     <x-ui-input-select
                                         name="editField.type"
                                         label="Feldtyp"
@@ -345,6 +353,43 @@
                                         </span>
                                     </div>
                                 </div>
+                            @elseif($editField['type'] === 'regex')
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Regex-Pattern <span class="text-[var(--ui-danger)]">*</span></label>
+                                        <input
+                                            type="text"
+                                            wire:model="editField.regex_pattern"
+                                            class="w-full px-3 py-2 text-sm font-mono border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent transition-shadow"
+                                            placeholder="z.B. ^\d{5}$ für 5-stellige PLZ"
+                                        />
+                                        @error('editField.regex_pattern')
+                                            <p class="mt-1 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Format-Beschreibung</label>
+                                        <input
+                                            type="text"
+                                            wire:model="editField.regex_description"
+                                            class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent transition-shadow"
+                                            placeholder="z.B. 5-stellige Postleitzahl"
+                                        />
+                                        <p class="text-xs text-[var(--ui-muted)] mt-1">Wird dem Benutzer als Hinweis angezeigt.</p>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Benutzerdefinierte Fehlermeldung</label>
+                                        <input
+                                            type="text"
+                                            wire:model="editField.regex_error"
+                                            class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent transition-shadow"
+                                            placeholder="z.B. Bitte geben Sie eine gültige 5-stellige PLZ ein"
+                                        />
+                                        <p class="text-xs text-[var(--ui-muted)] mt-1">Optional. Wird bei Validierungsfehler angezeigt.</p>
+                                    </div>
+                                </div>
                             @endif
                         @endif
 
@@ -480,6 +525,14 @@
                             :required="true"
                             wire:model="newField.label"
                             placeholder="z.B. Gehaltsvorstellung"
+                        />
+
+                        <x-ui-input-text
+                            name="newField.description"
+                            label="Beschreibung"
+                            wire:model="newField.description"
+                            placeholder="Hilfetext für das Feld"
+                            hint="Optional: Wird als Tooltip angezeigt"
                         />
 
                         <x-ui-input-select
@@ -666,6 +719,51 @@
                             @error('newField.lookup_id')
                                 <p class="mt-2 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
                             @enderror
+                        </div>
+                    @endif
+
+                    {{-- Regex-Optionen --}}
+                    @if($newField['type'] === 'regex')
+                        <div class="mt-5 p-5 bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/30 rounded-lg space-y-4">
+                            <div>
+                                <span class="text-sm font-medium text-[var(--ui-secondary)]">Muster-Konfiguration</span>
+                                <p class="text-xs text-[var(--ui-muted)] mt-0.5">Definieren Sie das reguläre Ausdrucksmuster (ohne Begrenzer).</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Regex-Pattern <span class="text-[var(--ui-danger)]">*</span></label>
+                                <input
+                                    type="text"
+                                    wire:model="newField.regex_pattern"
+                                    class="w-full px-3 py-2 text-sm font-mono border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent transition-shadow"
+                                    placeholder="z.B. ^\d{5}$ für 5-stellige PLZ"
+                                />
+                                @error('newField.regex_pattern')
+                                    <p class="mt-1 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Format-Beschreibung</label>
+                                <input
+                                    type="text"
+                                    wire:model="newField.regex_description"
+                                    class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent transition-shadow"
+                                    placeholder="z.B. 5-stellige Postleitzahl"
+                                />
+                                <p class="text-xs text-[var(--ui-muted)] mt-1">Wird dem Benutzer als Hinweis angezeigt.</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Benutzerdefinierte Fehlermeldung</label>
+                                <input
+                                    type="text"
+                                    wire:model="newField.regex_error"
+                                    class="w-full px-3 py-2 text-sm border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent transition-shadow"
+                                    placeholder="z.B. Bitte geben Sie eine gültige 5-stellige PLZ ein"
+                                />
+                                <p class="text-xs text-[var(--ui-muted)] mt-1">Optional. Wird bei Validierungsfehler angezeigt.</p>
+                            </div>
                         </div>
                     @endif
 

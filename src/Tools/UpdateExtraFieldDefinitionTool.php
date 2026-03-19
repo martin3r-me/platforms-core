@@ -33,6 +33,10 @@ class UpdateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                     'type' => 'string',
                     'description' => 'Neues Anzeige-Label. Der technische Name (Slug) bleibt unverändert.',
                 ],
+                'description' => [
+                    'type' => 'string',
+                    'description' => 'Beschreibungstext / Hilfetext für das Feld. Leerer String löscht die Beschreibung.',
+                ],
                 'is_required' => [
                     'type' => 'boolean',
                     'description' => 'Pflichtfeld?',
@@ -89,6 +93,12 @@ class UpdateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                     $definition->label = $label;
                     $updated[] = 'label';
                 }
+            }
+
+            if (array_key_exists('description', $arguments)) {
+                $desc = trim((string)($arguments['description'] ?? ''));
+                $definition->description = $desc !== '' ? $desc : null;
+                $updated[] = 'description';
             }
 
             if (isset($arguments['is_required'])) {

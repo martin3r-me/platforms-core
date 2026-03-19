@@ -94,7 +94,12 @@ class PublicExtraFieldForm extends Component
         foreach ($this->extraFieldDefinitions as $field) {
             $this->totalFields++;
             $value = $this->extraFieldValues[$field['id']] ?? null;
-            $isFilled = $value !== null && $value !== '' && $value !== [];
+            // Phone-Felder: gefüllt wenn e164 vorhanden (= erfolgreich validiert)
+            if ($field['type'] === 'phone') {
+                $isFilled = is_array($value) && !empty($value['e164'] ?? null);
+            } else {
+                $isFilled = $value !== null && $value !== '' && $value !== [];
+            }
 
             if ($isFilled) {
                 $this->filledFields++;
@@ -240,7 +245,11 @@ class PublicExtraFieldForm extends Component
 
         foreach ($allDefinitions as $field) {
             $this->totalFields++;
-            $isFilled = $field['value'] !== null && $field['value'] !== '' && $field['value'] !== [];
+            if ($field['type'] === 'phone') {
+                $isFilled = is_array($field['value']) && !empty($field['value']['e164'] ?? null);
+            } else {
+                $isFilled = $field['value'] !== null && $field['value'] !== '' && $field['value'] !== [];
+            }
             if ($isFilled) {
                 $this->filledFields++;
             } else {

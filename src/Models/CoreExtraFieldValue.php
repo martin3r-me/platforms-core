@@ -108,6 +108,7 @@ class CoreExtraFieldValue extends Model
             'text', 'textarea' => (string) $value,
             'select' => $this->decodeSelectValue($value),
             'file' => $this->decodeFileValue($value),
+            'phone' => $this->decodePhoneValue($value),
             default => $value,
         };
     }
@@ -130,6 +131,7 @@ class CoreExtraFieldValue extends Model
             'text', 'textarea' => (string) $value,
             'select' => is_array($value) ? json_encode($value) : (string) $value,
             'file' => is_array($value) ? json_encode($value) : (string) $value,
+            'phone' => is_array($value) ? json_encode($value) : (string) $value,
             default => (string) $value,
         };
 
@@ -210,6 +212,21 @@ class CoreExtraFieldValue extends Model
 
         // Einzelne File-ID
         return (int) $value;
+    }
+
+    /**
+     * Dekodiert Phone-Werte (JSON-Objekt mit raw, country, e164, international)
+     */
+    protected function decodePhoneValue(string $value): mixed
+    {
+        if (str_starts_with($value, '{') && str_ends_with($value, '}')) {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return $value;
     }
 
     /**

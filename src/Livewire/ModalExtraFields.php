@@ -54,6 +54,7 @@ class ModalExtraFields extends Component
     public array $newField = [
         'name' => '',
         'label' => '',
+        'description' => '',
         'type' => 'text',
         'is_required' => false,
         'is_mandatory' => false,
@@ -65,6 +66,9 @@ class ModalExtraFields extends Component
         'auto_fill_source' => '',
         'auto_fill_prompt' => '',
         'lookup_id' => null,
+        'regex_pattern' => '',
+        'regex_description' => '',
+        'regex_error' => '',
         'visibility' => [
             'enabled' => false,
             'logic' => 'AND',
@@ -76,6 +80,7 @@ class ModalExtraFields extends Component
     public ?int $editingDefinitionId = null;
     public array $editField = [
         'label' => '',
+        'description' => '',
         'type' => 'text',
         'is_required' => false,
         'is_mandatory' => false,
@@ -87,6 +92,9 @@ class ModalExtraFields extends Component
         'auto_fill_source' => '',
         'auto_fill_prompt' => '',
         'lookup_id' => null,
+        'regex_pattern' => '',
+        'regex_description' => '',
+        'regex_error' => '',
         'visibility' => [
             'enabled' => false,
             'logic' => 'AND',
@@ -244,7 +252,7 @@ class ModalExtraFields extends Component
     {
         $rules = [
             'newField.label' => ['required', 'string', 'max:255'],
-            'newField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select,lookup,file'],
+            'newField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select,lookup,file,phone,regex'],
             'newField.is_required' => ['boolean'],
             'newField.is_mandatory' => ['boolean'],
             'newField.is_encrypted' => ['boolean'],
@@ -258,6 +266,11 @@ class ModalExtraFields extends Component
         // Lookup braucht eine Lookup-ID
         if ($this->newField['type'] === 'lookup') {
             $rules['newField.lookup_id'] = ['required', 'integer', 'exists:core_lookups,id'];
+        }
+
+        // Regex braucht ein Pattern
+        if ($this->newField['type'] === 'regex') {
+            $rules['newField.regex_pattern'] = ['required', 'string', 'max:500'];
         }
 
         $this->validate($rules);
@@ -316,6 +329,20 @@ class ModalExtraFields extends Component
                 ];
             }
 
+            // Options für Regex-Felder
+            if ($this->newField['type'] === 'regex') {
+                $pattern = trim($this->newField['regex_pattern'] ?? '');
+                if (@preg_match('/' . $pattern . '/', '') === false) {
+                    $this->addError('newField.regex_pattern', 'Ungültiges reguläres Ausdrucksmuster.');
+                    return;
+                }
+                $options = [
+                    'pattern' => $pattern,
+                    'pattern_description' => trim($this->newField['regex_description'] ?? '') ?: null,
+                    'pattern_error' => trim($this->newField['regex_error'] ?? '') ?: null,
+                ];
+            }
+
             CoreExtraFieldDefinition::create([
                 'team_id' => $teamId,
                 'created_by_user_id' => $user->id,
@@ -323,6 +350,7 @@ class ModalExtraFields extends Component
                 'context_id' => $this->contextId, // Spezifisch für diesen Kontext (oder null für global)
                 'name' => $name,
                 'label' => trim($this->newField['label']),
+                'description' => !empty($this->newField['description']) ? trim($this->newField['description']) : null,
                 'type' => $this->newField['type'],
                 'is_required' => $this->newField['is_required'] ?? false,
                 'is_mandatory' => $this->newField['is_mandatory'] ?? false,
@@ -368,6 +396,7 @@ class ModalExtraFields extends Component
 
         $this->editField = [
             'label' => $definition['label'],
+            'description' => $definition['description'] ?? '',
             'type' => $definition['type'],
             'is_required' => $definition['is_required'],
             'is_mandatory' => $definition['is_mandatory'],
@@ -379,6 +408,9 @@ class ModalExtraFields extends Component
             'auto_fill_source' => $definition['auto_fill_source'] ?? '',
             'auto_fill_prompt' => $definition['auto_fill_prompt'] ?? '',
             'lookup_id' => $definition['options']['lookup_id'] ?? null,
+            'regex_pattern' => $definition['options']['pattern'] ?? '',
+            'regex_description' => $definition['options']['pattern_description'] ?? '',
+            'regex_error' => $definition['options']['pattern_error'] ?? '',
             'visibility' => $visibility,
         ];
         $this->editOptionText = '';
@@ -390,6 +422,7 @@ class ModalExtraFields extends Component
         $this->editFieldTab = 'basis';
         $this->editField = [
             'label' => '',
+            'description' => '',
             'type' => 'text',
             'is_required' => false,
             'is_mandatory' => false,
@@ -401,6 +434,9 @@ class ModalExtraFields extends Component
             'auto_fill_source' => '',
             'auto_fill_prompt' => '',
             'lookup_id' => null,
+            'regex_pattern' => '',
+            'regex_description' => '',
+            'regex_error' => '',
             'visibility' => ExtraFieldConditionEvaluator::createEmptyConfig(),
         ];
         $this->editOptionText = '';
@@ -414,7 +450,7 @@ class ModalExtraFields extends Component
 
         $rules = [
             'editField.label' => ['required', 'string', 'max:255'],
-            'editField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select,lookup,file'],
+            'editField.type' => ['required', 'string', 'in:text,number,textarea,boolean,select,lookup,file,phone,regex'],
             'editField.is_required' => ['boolean'],
             'editField.is_mandatory' => ['boolean'],
             'editField.is_encrypted' => ['boolean'],
@@ -430,6 +466,11 @@ class ModalExtraFields extends Component
             $rules['editField.lookup_id'] = ['required', 'integer', 'exists:core_lookups,id'];
         }
 
+        // Regex braucht ein Pattern
+        if ($this->editField['type'] === 'regex') {
+            $rules['editField.regex_pattern'] = ['required', 'string', 'max:500'];
+        }
+
         $this->validate($rules);
 
         try {
@@ -439,6 +480,13 @@ class ModalExtraFields extends Component
             }
 
             // Build options array based on field type
+            if ($this->editField['type'] === 'regex') {
+                $pattern = trim($this->editField['regex_pattern'] ?? '');
+                if (@preg_match('/' . $pattern . '/', '') === false) {
+                    $this->addError('editField.regex_pattern', 'Ungültiges reguläres Ausdrucksmuster.');
+                    return;
+                }
+            }
             $options = match ($this->editField['type']) {
                 'select' => [
                     'choices' => $this->editField['options'],
@@ -450,6 +498,11 @@ class ModalExtraFields extends Component
                 ],
                 'file' => [
                     'multiple' => $this->editField['is_multiple'] ?? false,
+                ],
+                'regex' => [
+                    'pattern' => trim($this->editField['regex_pattern'] ?? ''),
+                    'pattern_description' => trim($this->editField['regex_description'] ?? '') ?: null,
+                    'pattern_error' => trim($this->editField['regex_error'] ?? '') ?: null,
                 ],
                 default => [],
             };
@@ -482,6 +535,7 @@ class ModalExtraFields extends Component
 
             $definition->update([
                 'label' => trim($this->editField['label']),
+                'description' => !empty($this->editField['description']) ? trim($this->editField['description']) : null,
                 'type' => $this->editField['type'],
                 'is_required' => $this->editField['is_required'] ?? false,
                 'is_mandatory' => $this->editField['is_mandatory'] ?? false,
@@ -617,6 +671,7 @@ class ModalExtraFields extends Component
         $this->newField = [
             'name' => '',
             'label' => '',
+            'description' => '',
             'type' => 'text',
             'is_required' => false,
             'is_mandatory' => false,
@@ -628,6 +683,9 @@ class ModalExtraFields extends Component
             'auto_fill_source' => '',
             'auto_fill_prompt' => '',
             'lookup_id' => null,
+            'regex_pattern' => '',
+            'regex_description' => '',
+            'regex_error' => '',
             'visibility' => ExtraFieldConditionEvaluator::createEmptyConfig(),
         ];
         $this->newOptionText = '';
