@@ -145,9 +145,25 @@ class UpdateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                 $updated[] = 'placeholder';
             }
 
-            if (isset($arguments['visibility_config']) && is_array($arguments['visibility_config'])) {
+            if (isset($arguments['visibility_config'])) {
                 $vc = $arguments['visibility_config'];
-                if ($vc['enabled'] ?? false) {
+
+                // Handle JSON string input (MCP servers may pass nested objects as strings)
+                if (is_string($vc)) {
+                    $vc = json_decode($vc, true);
+                }
+
+                if (!is_array($vc)) {
+                    return ToolResult::error('VALIDATION_ERROR', 'visibility_config muss ein Objekt sein. Erhalten: ' . gettype($arguments['visibility_config']));
+                }
+
+                // Handle string booleans for enabled
+                $enabled = $vc['enabled'] ?? false;
+                if (is_string($enabled)) {
+                    $enabled = in_array(strtolower($enabled), ['true', '1', 'yes'], true);
+                }
+
+                if ($enabled) {
                     // Validate structure
                     $validationError = $this->validateVisibilityConfig($vc, $definition);
                     if ($validationError) {

@@ -207,14 +207,28 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
 
             // Visibility Config validieren
             $visibilityConfig = null;
-            if (isset($arguments['visibility_config']) && is_array($arguments['visibility_config'])) {
+            if (isset($arguments['visibility_config'])) {
                 $vc = $arguments['visibility_config'];
-                if ($vc['enabled'] ?? false) {
-                    $validationError = $this->validateVisibilityConfig($vc, $contextType, $contextId, $teamId);
-                    if ($validationError) {
-                        return ToolResult::error('VALIDATION_ERROR', $validationError);
+
+                // Handle JSON string input (MCP servers may pass nested objects as strings)
+                if (is_string($vc)) {
+                    $vc = json_decode($vc, true);
+                }
+
+                if (is_array($vc)) {
+                    // Handle string booleans for enabled
+                    $enabled = $vc['enabled'] ?? false;
+                    if (is_string($enabled)) {
+                        $enabled = in_array(strtolower($enabled), ['true', '1', 'yes'], true);
                     }
-                    $visibilityConfig = $vc;
+
+                    if ($enabled) {
+                        $validationError = $this->validateVisibilityConfig($vc, $contextType, $contextId, $teamId);
+                        if ($validationError) {
+                            return ToolResult::error('VALIDATION_ERROR', $validationError);
+                        }
+                        $visibilityConfig = $vc;
+                    }
                 }
             }
 
