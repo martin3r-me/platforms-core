@@ -222,7 +222,7 @@
                             :hint="$hint"
                             wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}"
                             rows="3"
-                            placeholder="Wert eingeben..."
+                            placeholder="{{ $field['options']['placeholder'] ?? 'Wert eingeben...' }}"
                         />
                         @if($isAutoFilled)
                             <span class="text-xs text-[var(--ui-primary)] flex items-center gap-1 mt-1">
@@ -244,7 +244,7 @@
                             :hint="$hint"
                             wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}"
                             step="any"
-                            placeholder="Wert eingeben..."
+                            placeholder="{{ $field['options']['placeholder'] ?? 'Wert eingeben...' }}"
                         />
                         @if($isAutoFilled)
                             <span class="text-xs text-[var(--ui-primary)] flex items-center gap-1 mt-1">
@@ -622,7 +622,7 @@
                             :required="$field['is_mandatory'] || $field['is_required']"
                             :hint="$hint"
                             wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}"
-                            placeholder="Wert eingeben..."
+                            placeholder="{{ $field['options']['placeholder'] ?? 'Wert eingeben...' }}"
                         />
                         @if($isAutoFilled)
                             <span class="text-xs text-[var(--ui-primary)] flex items-center gap-1 mt-1">
@@ -692,7 +692,7 @@
                             :required="$field['is_mandatory'] || $field['is_required']"
                             :hint="$hint"
                             wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}"
-                            placeholder="Wert eingeben..."
+                            placeholder="{{ $field['options']['placeholder'] ?? 'Wert eingeben...' }}"
                         />
                         @if($isAutoFilled)
                             <span class="text-xs text-[var(--ui-primary)] flex items-center gap-1 mt-1">

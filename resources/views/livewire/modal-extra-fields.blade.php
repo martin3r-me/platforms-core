@@ -168,6 +168,16 @@
                                         wire:model.live="editField.type"
                                         displayMode="dropdown"
                                     />
+
+                                    @if(in_array($editField['type'], ['text', 'number', 'textarea', 'regex']))
+                                        <x-ui-input-text
+                                            name="editField.placeholder"
+                                            label="Platzhaltertext"
+                                            wire:model="editField.placeholder"
+                                            placeholder="z.B. Bitte eingeben..."
+                                            hint="Optional: Wird im leeren Eingabefeld angezeigt"
+                                        />
+                                    @endif
                                 </div>
 
                                 {{-- Feldtyp-Beschreibung --}}
@@ -543,6 +553,16 @@
                             wire:model.live="newField.type"
                             displayMode="dropdown"
                         />
+
+                        @if(in_array($newField['type'], ['text', 'number', 'textarea', 'regex']))
+                            <x-ui-input-text
+                                name="newField.placeholder"
+                                label="Platzhaltertext"
+                                wire:model="newField.placeholder"
+                                placeholder="z.B. Bitte eingeben..."
+                                hint="Optional: Wird im leeren Eingabefeld angezeigt"
+                            />
+                        @endif
 
                         <div class="flex items-end gap-4 flex-wrap">
                             <div class="flex items-start gap-2">

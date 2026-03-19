@@ -45,6 +45,10 @@ class UpdateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                     'type' => 'boolean',
                     'description' => 'Muss-Feld (nicht löschbar)?',
                 ],
+                'placeholder' => [
+                    'type' => 'string',
+                    'description' => 'Platzhaltertext für das Eingabefeld. Nur für text, number, textarea, regex. Leerer String entfernt den Placeholder.',
+                ],
                 'options' => [
                     'type' => 'object',
                     'description' => 'Typ-spezifische Optionen (überschreibt komplett). Select: {choices, multiple}. Lookup: {lookup_id, multiple}. File: {multiple}.',
@@ -114,6 +118,18 @@ class UpdateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
             if (isset($arguments['options'])) {
                 $definition->options = $arguments['options'];
                 $updated[] = 'options';
+            }
+
+            if (array_key_exists('placeholder', $arguments)) {
+                $placeholder = trim((string)($arguments['placeholder'] ?? ''));
+                $currentOptions = $definition->options ?? [];
+                if ($placeholder !== '') {
+                    $currentOptions['placeholder'] = $placeholder;
+                } else {
+                    unset($currentOptions['placeholder']);
+                }
+                $definition->options = $currentOptions ?: null;
+                $updated[] = 'placeholder';
             }
 
             if (isset($arguments['order'])) {

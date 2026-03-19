@@ -69,6 +69,7 @@ class ModalExtraFields extends Component
         'regex_pattern' => '',
         'regex_description' => '',
         'regex_error' => '',
+        'placeholder' => '',
         'visibility' => [
             'enabled' => false,
             'logic' => 'AND',
@@ -95,6 +96,7 @@ class ModalExtraFields extends Component
         'regex_pattern' => '',
         'regex_description' => '',
         'regex_error' => '',
+        'placeholder' => '',
         'visibility' => [
             'enabled' => false,
             'logic' => 'AND',
@@ -343,6 +345,13 @@ class ModalExtraFields extends Component
                 ];
             }
 
+            // Placeholder in Options mergen (für text, number, textarea, regex)
+            $placeholder = trim($this->newField['placeholder'] ?? '');
+            if ($placeholder !== '' && in_array($this->newField['type'], ['text', 'number', 'textarea', 'regex'])) {
+                $options = $options ?? [];
+                $options['placeholder'] = $placeholder;
+            }
+
             CoreExtraFieldDefinition::create([
                 'team_id' => $teamId,
                 'created_by_user_id' => $user->id,
@@ -411,6 +420,7 @@ class ModalExtraFields extends Component
             'regex_pattern' => $definition['options']['pattern'] ?? '',
             'regex_description' => $definition['options']['pattern_description'] ?? '',
             'regex_error' => $definition['options']['pattern_error'] ?? '',
+            'placeholder' => $definition['options']['placeholder'] ?? '',
             'visibility' => $visibility,
         ];
         $this->editOptionText = '';
@@ -437,6 +447,7 @@ class ModalExtraFields extends Component
             'regex_pattern' => '',
             'regex_description' => '',
             'regex_error' => '',
+            'placeholder' => '',
             'visibility' => ExtraFieldConditionEvaluator::createEmptyConfig(),
         ];
         $this->editOptionText = '';
@@ -506,6 +517,12 @@ class ModalExtraFields extends Component
                 ],
                 default => [],
             };
+
+            // Placeholder in Options mergen (für text, number, textarea, regex)
+            $placeholder = trim($this->editField['placeholder'] ?? '');
+            if ($placeholder !== '' && in_array($this->editField['type'], ['text', 'number', 'textarea', 'regex'])) {
+                $options['placeholder'] = $placeholder;
+            }
 
             // Handle visibility config
             $visibility = $this->editField['visibility'] ?? ExtraFieldConditionEvaluator::createEmptyConfig();
@@ -686,6 +703,7 @@ class ModalExtraFields extends Component
             'regex_pattern' => '',
             'regex_description' => '',
             'regex_error' => '',
+            'placeholder' => '',
             'visibility' => ExtraFieldConditionEvaluator::createEmptyConfig(),
         ];
         $this->newOptionText = '';

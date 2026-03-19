@@ -57,6 +57,10 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                     'type' => 'boolean',
                     'description' => 'Optional: Muss-Feld (nicht löschbar)? Default: false.',
                 ],
+                'placeholder' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Platzhaltertext, der im leeren Eingabefeld angezeigt wird. Nur für text, number, textarea, regex.',
+                ],
                 'options' => [
                     'type' => 'object',
                     'description' => 'Optional: Typ-spezifische Optionen. Select: {choices: ["A","B"], multiple: bool}. Lookup: {lookup_id: int, multiple: bool}. File: {multiple: bool}. Regex: {pattern: "regex", pattern_description: "Beschreibung", pattern_error: "Fehlermeldung"}.',
@@ -181,6 +185,13 @@ class CreateExtraFieldDefinitionTool implements ToolContract, ToolMetadataContra
                     'pattern_description' => isset($options['pattern_description']) ? trim((string)$options['pattern_description']) ?: null : null,
                     'pattern_error' => isset($options['pattern_error']) ? trim((string)$options['pattern_error']) ?: null : null,
                 ];
+            }
+
+            // Placeholder in Options mergen
+            $placeholder = isset($arguments['placeholder']) ? trim((string)$arguments['placeholder']) : '';
+            if ($placeholder !== '' && in_array($type, ['text', 'number', 'textarea', 'regex'])) {
+                $fieldOptions = $fieldOptions ?? [];
+                $fieldOptions['placeholder'] = $placeholder;
             }
 
             $description = isset($arguments['description']) ? trim((string)$arguments['description']) : null;
