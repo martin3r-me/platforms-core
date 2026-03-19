@@ -1,4 +1,4 @@
-<div class="applicant-wrap min-h-screen relative overflow-hidden">
+<div class="min-h-screen relative overflow-hidden font-[system-ui,-apple-system,'Segoe_UI',Roboto,sans-serif]">
 
     {{-- Background --}}
     @php
@@ -6,7 +6,7 @@
         $bgImage = !empty($bgFiles) ? basename($bgFiles[array_rand($bgFiles)]) : null;
     @endphp
     <div class="fixed inset-0 -z-10" aria-hidden="true">
-        <div class="applicant-bg"></div>
+        <div class="fixed inset-0 bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460]"></div>
         @if($bgImage)
             <img src="{{ asset('images/bg-images/' . $bgImage) }}"
                  class="absolute inset-0 w-full h-full object-cover"
@@ -19,9 +19,9 @@
     {{-- Loading --}}
     @if($state === 'loading')
         <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="applicant-card w-full max-w-md p-10 text-center">
-                <div class="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-6">
-                    <svg class="animate-spin w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24">
+            <div class="bg-white rounded-3xl border border-black/[0.06] shadow-2xl w-full max-w-md p-10 text-center">
+                <div class="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center mx-auto mb-6">
+                    <svg class="animate-spin w-8 h-8 text-indigo-500" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                     </svg>
@@ -33,7 +33,7 @@
     {{-- Not Found --}}
     @elseif($state === 'notFound')
         <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="applicant-card w-full max-w-md p-10 text-center">
+            <div class="bg-white rounded-3xl border border-black/[0.06] shadow-2xl w-full max-w-md p-10 text-center">
                 <div class="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-6">
                     <svg class="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/>
@@ -47,7 +47,7 @@
     {{-- Not Active --}}
     @elseif($state === 'notActive')
         <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="applicant-card w-full max-w-md p-10 text-center">
+            <div class="bg-white rounded-3xl border border-black/[0.06] shadow-2xl w-full max-w-md p-10 text-center">
                 <div class="w-20 h-20 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-6">
                     <svg class="w-10 h-10 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
@@ -62,7 +62,7 @@
     @elseif($state === 'form')
         {{-- Header --}}
         <header class="sticky top-0 z-50">
-            <div class="applicant-header-glass">
+            <div class="bg-black/60 backdrop-blur-[30px] border-b border-white/[0.06]">
                 <div class="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
                     <div class="flex items-center gap-3 min-w-0">
                         <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
@@ -80,24 +80,17 @@
                         @endif
                     </div>
                 </div>
-
-                {{-- Progress Bar --}}
                 @if($totalFields > 0)
                     <div class="h-0.5 bg-white/5">
-                        <div
-                            class="h-full transition-all duration-700 ease-out applicant-progress"
-                            style="width: {{ $totalFields > 0 ? round(($filledFields / $totalFields) * 100) : 0 }}%"
-                        ></div>
+                        <div class="h-full transition-all duration-700 ease-out bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500 shadow-[0_0_12px_rgba(99,102,241,0.5)]"
+                             style="width: {{ round(($filledFields / $totalFields) * 100) }}%"></div>
                     </div>
                 @endif
             </div>
         </header>
 
         @php
-            // Pre-resolve lookup values for visibility conditions (client-side evaluation)
             $lookupCache = [];
-
-            // Resolve lookups for ALL field definitions (needed for condition evaluation on filled fields)
             $allDefsForJs = $allFieldDefinitions;
             foreach ($allDefsForJs as &$def) {
                 $vc = $def['visibility_config'] ?? null;
@@ -121,13 +114,11 @@
                 }
             }
             unset($def);
-
-            // Build the filtered form definitions from allDefsForJs (same IDs as extraFieldDefinitions)
             $formFieldIds = collect($extraFieldDefinitions)->pluck('id')->all();
             $defsForJs = array_values(array_filter($allDefsForJs, fn($d) => in_array($d['id'], $formFieldIds)));
         @endphp
 
-        <main class="max-w-3xl mx-auto px-6 py-8">
+        <main class="max-w-3xl mx-auto px-4 sm:px-6 py-8">
             <form wire:submit="save"
                 x-data="{
                     fieldValues: @entangle('extraFieldValues').live,
@@ -228,16 +219,24 @@
                         if (!Array.isArray(expected)) expected = [expected];
                         if (Array.isArray(actual)) return actual.some(item => expected.includes(item));
                         return expected.includes(actual);
+                    },
+
+                    toggleMulti(fieldId, value) {
+                        let v = this.fieldValues[fieldId] || [];
+                        if (!Array.isArray(v)) v = [];
+                        const idx = v.indexOf(value);
+                        if (idx > -1) { v.splice(idx, 1); } else { v.push(value); }
+                        $wire.set('extraFieldValues.' + fieldId, [...v]);
                     }
                 }"
             >
-                <div class="applicant-card p-8">
+                <div class="bg-white rounded-3xl border border-black/[0.06] shadow-2xl p-6 sm:p-8">
                     <div class="mb-8">
-                        <h2 class="text-xl font-bold text-gray-900 mb-2">Offene Felder</h2>
-                        <p class="text-gray-500">Bitte füllen Sie die folgenden Felder aus.</p>
+                        <h2 class="text-xl font-bold text-gray-900 mb-1">Offene Felder</h2>
+                        <p class="text-sm text-gray-400">Bitte füllen Sie die folgenden Felder aus.</p>
                     </div>
 
-                    <div class="space-y-6">
+                    <div class="space-y-7">
                         @foreach($extraFieldDefinitions as $field)
                             @php
                                 $fieldId = $field['id'];
@@ -256,226 +255,341 @@
                                 x-transition:leave-start="opacity-100 translate-y-0"
                                 x-transition:leave-end="opacity-0 -translate-y-2"
                             >
-                                <label class="block text-sm font-semibold text-gray-700 mb-1">
-                                    {{ $fieldLabel }}
-                                    @if($isRequired)
-                                        <span class="text-rose-500 ml-0.5">*</span>
+                                {{-- Label --}}
+                                <div class="flex items-start justify-between gap-2 mb-1.5">
+                                    <label class="block text-sm font-semibold text-gray-800">
+                                        {{ $fieldLabel }}
+                                        @if($isRequired)
+                                            <span class="text-red-400 ml-0.5">*</span>
+                                        @endif
+                                    </label>
+                                    @php
+                                        $badges = [];
+                                        if ($isRequired) $badges[] = ['label' => 'Pflichtfeld', 'color' => 'red'];
+                                        if (($options['multiple'] ?? false) && in_array($fieldType, ['select', 'lookup', 'file'])) $badges[] = ['label' => 'Mehrfachauswahl', 'color' => 'indigo'];
+                                        if ($field['is_encrypted'] ?? false) $badges[] = ['label' => 'Verschlüsselt', 'color' => 'gray'];
+                                    @endphp
+                                    @if(!empty($badges))
+                                        <div class="flex items-center gap-1.5 flex-shrink-0">
+                                            @foreach($badges as $badge)
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase
+                                                    {{ $badge['color'] === 'red' ? 'bg-red-50 text-red-500' : '' }}
+                                                    {{ $badge['color'] === 'indigo' ? 'bg-indigo-50 text-indigo-500' : '' }}
+                                                    {{ $badge['color'] === 'gray' ? 'bg-gray-100 text-gray-500' : '' }}
+                                                ">{{ $badge['label'] }}</span>
+                                            @endforeach
+                                        </div>
                                     @endif
-                                </label>
+                                </div>
+
+                                {{-- Description --}}
                                 @if(!empty($field['description']))
-                                    <p class="text-sm text-gray-500 mb-2">{{ $field['description'] }}</p>
+                                    <p class="text-[13px] text-gray-400 mb-2.5 leading-relaxed">{{ $field['description'] }}</p>
                                 @endif
-                                @php
-                                    $hints = [];
-                                    if ($isRequired) $hints[] = 'Pflichtfeld';
-                                    if (($options['multiple'] ?? false) && in_array($fieldType, ['select', 'lookup', 'file'])) $hints[] = 'Mehrfachauswahl möglich';
-                                    if ($field['is_encrypted'] ?? false) $hints[] = 'Verschlüsselt gespeichert';
-                                    if ($fieldType === 'phone') $hints[] = 'Bitte wählen Sie die Ländervorwahl und geben Sie Ihre Nummer ein';
-                                    if ($fieldType === 'regex' && ($options['pattern_description'] ?? null)) $hints[] = 'Format: ' . $options['pattern_description'];
-                                @endphp
-                                @if(!empty($hints))
-                                    <p class="text-xs text-gray-400 mb-2">{{ implode(' · ', $hints) }}</p>
-                                @elseif(empty($field['description']))
-                                    <div class="mb-2"></div>
+
+                                {{-- Regex format hint --}}
+                                @if($fieldType === 'regex' && ($options['pattern_description'] ?? null))
+                                    <div class="flex items-center gap-1.5 mb-2.5">
+                                        <svg class="w-3.5 h-3.5 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                        <span class="text-xs text-amber-600 font-medium">Format: {{ $options['pattern_description'] }}</span>
+                                    </div>
+                                @endif
+
+                                {{-- Phone hint --}}
+                                @if($fieldType === 'phone')
+                                    <p class="text-xs text-gray-400 mb-2.5">Ländervorwahl wählen und Nummer eingeben</p>
                                 @endif
 
                                 @switch($fieldType)
+                                    {{-- ─── Text ─── --}}
                                     @case('text')
                                         <input
                                             type="text"
                                             wire:model="extraFieldValues.{{ $fieldId }}"
-                                            placeholder="{{ $options['placeholder'] ?? '' }}"
-                                            class="applicant-input"
+                                            placeholder="{{ $options['placeholder'] ?? 'Eingabe...' }}"
+                                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                                         >
                                         @break
 
+                                    {{-- ─── Textarea ─── --}}
                                     @case('textarea')
                                         <textarea
                                             wire:model="extraFieldValues.{{ $fieldId }}"
                                             rows="{{ $options['rows'] ?? 4 }}"
-                                            placeholder="{{ $options['placeholder'] ?? '' }}"
-                                            class="applicant-input resize-y"
+                                            placeholder="{{ $options['placeholder'] ?? 'Eingabe...' }}"
+                                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 resize-y"
                                         ></textarea>
                                         @break
 
+                                    {{-- ─── Number ─── --}}
                                     @case('number')
                                         <input
                                             type="number"
                                             wire:model="extraFieldValues.{{ $fieldId }}"
-                                            placeholder="{{ $options['placeholder'] ?? '' }}"
+                                            placeholder="{{ $options['placeholder'] ?? '0' }}"
                                             @if(isset($options['min'])) min="{{ $options['min'] }}" @endif
                                             @if(isset($options['max'])) max="{{ $options['max'] }}" @endif
                                             @if(isset($options['step'])) step="{{ $options['step'] }}" @endif
-                                            class="applicant-input"
+                                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                                         >
                                         @break
 
+                                    {{-- ─── Date ─── --}}
                                     @case('date')
                                         <input
                                             type="date"
                                             wire:model="extraFieldValues.{{ $fieldId }}"
-                                            class="applicant-input"
+                                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 outline-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                                         >
                                         @break
 
+                                    {{-- ─── Boolean (Badge Style) ─── --}}
                                     @case('boolean')
-                                        <div class="grid grid-cols-2 gap-3">
+                                        <div class="flex gap-2">
                                             <button
                                                 type="button"
                                                 wire:click="$set('extraFieldValues.{{ $fieldId }}', '1')"
-                                                class="applicant-bool-card {{ ($extraFieldValues[$fieldId] ?? null) === '1' ? 'applicant-option-active' : '' }}"
+                                                class="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200
+                                                    {{ ($extraFieldValues[$fieldId] ?? null) === '1'
+                                                        ? 'bg-emerald-500 text-white border-2 border-emerald-500 shadow-lg shadow-emerald-500/20 scale-[1.02]'
+                                                        : 'bg-gray-50 text-gray-500 border border-gray-200 hover:border-gray-300 hover:bg-gray-100' }}"
                                             >
-                                                <svg class="w-8 h-8 {{ ($extraFieldValues[$fieldId] ?? null) === '1' ? 'text-emerald-500' : 'text-gray-300' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                                 </svg>
-                                                <span class="text-sm font-semibold {{ ($extraFieldValues[$fieldId] ?? null) === '1' ? 'text-gray-900' : 'text-gray-400' }}">Ja</span>
+                                                Ja
                                             </button>
                                             <button
                                                 type="button"
                                                 wire:click="$set('extraFieldValues.{{ $fieldId }}', '0')"
-                                                class="applicant-bool-card {{ ($extraFieldValues[$fieldId] ?? null) === '0' ? 'applicant-option-active' : '' }}"
+                                                class="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200
+                                                    {{ ($extraFieldValues[$fieldId] ?? null) === '0'
+                                                        ? 'bg-red-500 text-white border-2 border-red-500 shadow-lg shadow-red-500/20 scale-[1.02]'
+                                                        : 'bg-gray-50 text-gray-500 border border-gray-200 hover:border-gray-300 hover:bg-gray-100' }}"
                                             >
-                                                <svg class="w-8 h-8 {{ ($extraFieldValues[$fieldId] ?? null) === '0' ? 'text-rose-500' : 'text-gray-300' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                                 </svg>
-                                                <span class="text-sm font-semibold {{ ($extraFieldValues[$fieldId] ?? null) === '0' ? 'text-gray-900' : 'text-gray-400' }}">Nein</span>
+                                                Nein
                                             </button>
                                         </div>
                                         @break
 
+                                    {{-- ─── Select ─── --}}
                                     @case('select')
                                         @php
                                             $isMultiple = $options['multiple'] ?? false;
                                             $choices = $options['choices'] ?? [];
+                                            $useBadges = count($choices) <= 6;
                                         @endphp
-                                        @if($isMultiple)
-                                            <div class="space-y-2">
+                                        @if($useBadges)
+                                            {{-- Badge mode --}}
+                                            <div class="flex flex-wrap gap-2">
                                                 @foreach($choices as $choice)
                                                     @php
-                                                        $currentVal = $extraFieldValues[$fieldId] ?? [];
-                                                        $isSelected = is_array($currentVal) && in_array($choice, $currentVal);
+                                                        $currentVal = $extraFieldValues[$fieldId] ?? ($isMultiple ? [] : null);
+                                                        $isSelected = $isMultiple
+                                                            ? (is_array($currentVal) && in_array($choice, $currentVal))
+                                                            : ($currentVal === $choice);
                                                     @endphp
                                                     <button
                                                         type="button"
-                                                        wire:click="$js('
-                                                            let v = $wire.extraFieldValues[{{ $fieldId }}] || [];
-                                                            const idx = v.indexOf({{ json_encode($choice) }});
-                                                            if (idx > -1) { v.splice(idx, 1); } else { v.push({{ json_encode($choice) }}); }
-                                                            $wire.set(\"extraFieldValues.{{ $fieldId }}\", [...v]);
-                                                        ')"
-                                                        class="applicant-option-card {{ $isSelected ? 'applicant-option-active' : '' }}"
+                                                        @if($isMultiple)
+                                                            x-on:click="toggleMulti({{ $fieldId }}, {{ json_encode($choice) }})"
+                                                        @else
+                                                            wire:click="$set('extraFieldValues.{{ $fieldId }}', {{ json_encode($choice) }})"
+                                                        @endif
+                                                        class="px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200
+                                                            {{ $isSelected
+                                                                ? 'bg-indigo-500 text-white border-2 border-indigo-500 shadow-lg shadow-indigo-500/20 scale-[1.02]'
+                                                                : 'bg-gray-50 text-gray-600 border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600' }}"
                                                     >
-                                                        <span class="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 border {{ $isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300' }}">
-                                                            @if($isSelected)
-                                                                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                                                            @endif
-                                                        </span>
-                                                        <span class="text-sm font-medium text-gray-700">{{ $choice }}</span>
+                                                        @if($isMultiple && $isSelected)
+                                                            <svg class="w-3.5 h-3.5 inline mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                                                        @endif
+                                                        {{ $choice }}
                                                     </button>
                                                 @endforeach
                                             </div>
                                         @else
-                                            <select wire:model="extraFieldValues.{{ $fieldId }}" class="applicant-input">
-                                                <option value="">— Bitte wählen —</option>
-                                                @foreach($choices as $choice)
-                                                    <option value="{{ $choice }}">{{ $choice }}</option>
-                                                @endforeach
-                                            </select>
+                                            {{-- Dropdown mode --}}
+                                            @if($isMultiple)
+                                                <div class="space-y-1.5">
+                                                    @foreach($choices as $choice)
+                                                        @php
+                                                            $currentVal = $extraFieldValues[$fieldId] ?? [];
+                                                            $isSelected = is_array($currentVal) && in_array($choice, $currentVal);
+                                                        @endphp
+                                                        <label class="flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all duration-200
+                                                            {{ $isSelected
+                                                                ? 'bg-indigo-50 border-indigo-200'
+                                                                : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300' }}">
+                                                            <input
+                                                                type="checkbox"
+                                                                value="{{ $choice }}"
+                                                                @checked($isSelected)
+                                                                x-on:change="toggleMulti({{ $fieldId }}, {{ json_encode($choice) }})"
+                                                                class="w-4 h-4 rounded border-gray-300 text-indigo-500 focus:ring-indigo-400"
+                                                            >
+                                                            <span class="text-sm {{ $isSelected ? 'text-indigo-700 font-medium' : 'text-gray-600' }}">{{ $choice }}</span>
+                                                        </label>
+                                                    @endforeach
+                                                </div>
+                                            @else
+                                                <div class="relative">
+                                                    <select
+                                                        wire:model="extraFieldValues.{{ $fieldId }}"
+                                                        class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 outline-none appearance-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 pr-10"
+                                                    >
+                                                        <option value="">Bitte wählen...</option>
+                                                        @foreach($choices as $choice)
+                                                            <option value="{{ $choice }}">{{ $choice }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                    <svg class="w-5 h-5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                                    </svg>
+                                                </div>
+                                            @endif
                                         @endif
                                         @break
 
+                                    {{-- ─── Lookup ─── --}}
                                     @case('lookup')
                                         @php
                                             $isMultiple = $options['multiple'] ?? false;
                                             $lookupChoices = $field['lookup']['choices'] ?? [];
+                                            $useBadges = count($lookupChoices) <= 6;
                                         @endphp
-                                        @if($isMultiple)
-                                            <div class="space-y-2">
+                                        @if($useBadges)
+                                            <div class="flex flex-wrap gap-2">
                                                 @foreach($lookupChoices as $choice)
                                                     @php
-                                                        $currentVal = $extraFieldValues[$fieldId] ?? [];
-                                                        $isSelected = is_array($currentVal) && in_array($choice['value'], $currentVal);
+                                                        $currentVal = $extraFieldValues[$fieldId] ?? ($isMultiple ? [] : null);
+                                                        $isSelected = $isMultiple
+                                                            ? (is_array($currentVal) && in_array($choice['value'], $currentVal))
+                                                            : ($currentVal === $choice['value']);
                                                     @endphp
                                                     <button
                                                         type="button"
-                                                        wire:click="$js('
-                                                            let v = $wire.extraFieldValues[{{ $fieldId }}] || [];
-                                                            const idx = v.indexOf({{ json_encode($choice['value']) }});
-                                                            if (idx > -1) { v.splice(idx, 1); } else { v.push({{ json_encode($choice['value']) }}); }
-                                                            $wire.set(\"extraFieldValues.{{ $fieldId }}\", [...v]);
-                                                        ')"
-                                                        class="applicant-option-card {{ $isSelected ? 'applicant-option-active' : '' }}"
+                                                        @if($isMultiple)
+                                                            x-on:click="toggleMulti({{ $fieldId }}, {{ json_encode($choice['value']) }})"
+                                                        @else
+                                                            wire:click="$set('extraFieldValues.{{ $fieldId }}', {{ json_encode($choice['value']) }})"
+                                                        @endif
+                                                        class="px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200
+                                                            {{ $isSelected
+                                                                ? 'bg-indigo-500 text-white border-2 border-indigo-500 shadow-lg shadow-indigo-500/20 scale-[1.02]'
+                                                                : 'bg-gray-50 text-gray-600 border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600' }}"
                                                     >
-                                                        <span class="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 border {{ $isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300' }}">
-                                                            @if($isSelected)
-                                                                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                                                            @endif
-                                                        </span>
-                                                        <span class="text-sm font-medium text-gray-700">{{ $choice['label'] }}</span>
+                                                        @if($isMultiple && $isSelected)
+                                                            <svg class="w-3.5 h-3.5 inline mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                                                        @endif
+                                                        {{ $choice['label'] }}
                                                     </button>
                                                 @endforeach
                                             </div>
                                         @else
-                                            <select wire:model="extraFieldValues.{{ $fieldId }}" class="applicant-input">
-                                                <option value="">— Bitte wählen —</option>
-                                                @foreach($lookupChoices as $choice)
-                                                    <option value="{{ $choice['value'] }}">{{ $choice['label'] }}</option>
-                                                @endforeach
-                                            </select>
+                                            @if($isMultiple)
+                                                <div class="space-y-1.5">
+                                                    @foreach($lookupChoices as $choice)
+                                                        @php
+                                                            $currentVal = $extraFieldValues[$fieldId] ?? [];
+                                                            $isSelected = is_array($currentVal) && in_array($choice['value'], $currentVal);
+                                                        @endphp
+                                                        <label class="flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all duration-200
+                                                            {{ $isSelected
+                                                                ? 'bg-indigo-50 border-indigo-200'
+                                                                : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300' }}">
+                                                            <input
+                                                                type="checkbox"
+                                                                value="{{ $choice['value'] }}"
+                                                                @checked($isSelected)
+                                                                x-on:change="toggleMulti({{ $fieldId }}, {{ json_encode($choice['value']) }})"
+                                                                class="w-4 h-4 rounded border-gray-300 text-indigo-500 focus:ring-indigo-400"
+                                                            >
+                                                            <span class="text-sm {{ $isSelected ? 'text-indigo-700 font-medium' : 'text-gray-600' }}">{{ $choice['label'] }}</span>
+                                                        </label>
+                                                    @endforeach
+                                                </div>
+                                            @else
+                                                <div class="relative">
+                                                    <select
+                                                        wire:model="extraFieldValues.{{ $fieldId }}"
+                                                        class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 outline-none appearance-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 pr-10"
+                                                    >
+                                                        <option value="">Bitte wählen...</option>
+                                                        @foreach($lookupChoices as $choice)
+                                                            <option value="{{ $choice['value'] }}">{{ $choice['label'] }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                    <svg class="w-5 h-5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                                    </svg>
+                                                </div>
+                                            @endif
                                         @endif
                                         @break
 
+                                    {{-- ─── Address ─── --}}
                                     @case('address')
-                                        @php
-                                            $countries = \Platform\Core\Models\CoreExtraFieldDefinition::PHONE_COUNTRIES;
-                                        @endphp
-                                        <div class="space-y-3">
-                                            {{-- Straße --}}
+                                        @php $countries = \Platform\Core\Models\CoreExtraFieldDefinition::PHONE_COUNTRIES; @endphp
+                                        <div class="bg-gray-50 rounded-2xl border border-gray-200 p-4 space-y-3">
                                             <div>
-                                                <label class="block text-xs font-medium text-gray-500 mb-1">Straße + Hausnummer @if($isRequired)<span class="text-rose-500">*</span>@endif</label>
-                                                <input type="text" wire:model="extraFieldValues.{{ $fieldId }}.street" placeholder="Musterstraße 1" class="applicant-input">
-                                                @error("extraFieldValues.{$fieldId}.street") <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                                                <label class="block text-xs font-medium text-gray-500 mb-1">Straße + Hausnummer @if($isRequired)<span class="text-red-400">*</span>@endif</label>
+                                                <input type="text" wire:model="extraFieldValues.{{ $fieldId }}.street" placeholder="Musterstraße 1"
+                                                       class="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+                                                @error("extraFieldValues.{$fieldId}.street") <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                             </div>
-                                            {{-- Adresszusatz --}}
                                             <div>
                                                 <label class="block text-xs font-medium text-gray-500 mb-1">Adresszusatz</label>
-                                                <input type="text" wire:model="extraFieldValues.{{ $fieldId }}.street2" placeholder="z.B. Hinterhaus, 3. OG" class="applicant-input">
+                                                <input type="text" wire:model="extraFieldValues.{{ $fieldId }}.street2" placeholder="z.B. Hinterhaus, 3. OG"
+                                                       class="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
                                             </div>
-                                            {{-- PLZ + Ort --}}
                                             <div class="grid grid-cols-3 gap-3">
-                                                <div class="col-span-1">
-                                                    <label class="block text-xs font-medium text-gray-500 mb-1">PLZ @if($isRequired)<span class="text-rose-500">*</span>@endif</label>
-                                                    <input type="text" wire:model="extraFieldValues.{{ $fieldId }}.zip" placeholder="12345" class="applicant-input">
-                                                    @error("extraFieldValues.{$fieldId}.zip") <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                                                <div>
+                                                    <label class="block text-xs font-medium text-gray-500 mb-1">PLZ @if($isRequired)<span class="text-red-400">*</span>@endif</label>
+                                                    <input type="text" wire:model="extraFieldValues.{{ $fieldId }}.zip" placeholder="12345"
+                                                           class="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+                                                    @error("extraFieldValues.{$fieldId}.zip") <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                                 </div>
                                                 <div class="col-span-2">
-                                                    <label class="block text-xs font-medium text-gray-500 mb-1">Ort @if($isRequired)<span class="text-rose-500">*</span>@endif</label>
-                                                    <input type="text" wire:model="extraFieldValues.{{ $fieldId }}.city" placeholder="Berlin" class="applicant-input">
-                                                    @error("extraFieldValues.{$fieldId}.city") <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                                                    <label class="block text-xs font-medium text-gray-500 mb-1">Ort @if($isRequired)<span class="text-red-400">*</span>@endif</label>
+                                                    <input type="text" wire:model="extraFieldValues.{{ $fieldId }}.city" placeholder="Berlin"
+                                                           class="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+                                                    @error("extraFieldValues.{$fieldId}.city") <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                                 </div>
                                             </div>
-                                            {{-- Bundesland + Land --}}
                                             <div class="grid grid-cols-2 gap-3">
                                                 <div>
-                                                    <label class="block text-xs font-medium text-gray-500 mb-1">Bundesland / Region</label>
-                                                    <input type="text" wire:model="extraFieldValues.{{ $fieldId }}.state" placeholder="z.B. Bayern" class="applicant-input">
+                                                    <label class="block text-xs font-medium text-gray-500 mb-1">Bundesland</label>
+                                                    <input type="text" wire:model="extraFieldValues.{{ $fieldId }}.state" placeholder="z.B. Bayern"
+                                                           class="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
                                                 </div>
                                                 <div>
-                                                    <label class="block text-xs font-medium text-gray-500 mb-1">Land @if($isRequired)<span class="text-rose-500">*</span>@endif</label>
-                                                    <select wire:model="extraFieldValues.{{ $fieldId }}.country" class="applicant-input">
-                                                        @foreach($countries as $code => $info)
-                                                            <option value="{{ $code }}">{{ $info['flag'] }} {{ $info['name'] }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                    @error("extraFieldValues.{$fieldId}.country") <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                                                    <label class="block text-xs font-medium text-gray-500 mb-1">Land @if($isRequired)<span class="text-red-400">*</span>@endif</label>
+                                                    <div class="relative">
+                                                        <select wire:model="extraFieldValues.{{ $fieldId }}.country"
+                                                                class="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 outline-none appearance-none transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 pr-8">
+                                                            @foreach($countries as $code => $info)
+                                                                <option value="{{ $code }}">{{ $info['flag'] }} {{ $info['name'] }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                        <svg class="w-4 h-4 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                                        </svg>
+                                                    </div>
+                                                    @error("extraFieldValues.{$fieldId}.country") <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                                 </div>
                                             </div>
                                         </div>
                                         @break
 
+                                    {{-- ─── Regex ─── --}}
                                     @case('regex')
                                         @php
-                                            $patternDescription = $options['pattern_description'] ?? null;
                                             $patternError = $options['pattern_error'] ?? null;
                                             $pattern = $options['pattern'] ?? null;
                                         @endphp
@@ -483,8 +597,9 @@
                                             x-data="{
                                                 value: @entangle('extraFieldValues.' . $fieldId).live,
                                                 pattern: {{ json_encode($pattern) }},
+                                                touched: false,
                                                 get isValid() {
-                                                    if (!this.value || !this.pattern) return true;
+                                                    if (!this.touched || !this.value || !this.pattern) return true;
                                                     try { return new RegExp(this.pattern).test(this.value); } catch(e) { return true; }
                                                 }
                                             }"
@@ -492,39 +607,51 @@
                                             <input
                                                 type="text"
                                                 x-model="value"
+                                                x-on:blur="touched = true"
                                                 wire:model.live.debounce.500ms="extraFieldValues.{{ $fieldId }}"
-                                                placeholder="{{ $patternDescription ?? ($options['placeholder'] ?? '') }}"
-                                                :class="value && !isValid ? 'applicant-input applicant-input-error' : 'applicant-input'"
+                                                placeholder="{{ $options['pattern_description'] ?? ($options['placeholder'] ?? 'Eingabe...') }}"
+                                                :class="!isValid
+                                                    ? 'w-full px-4 py-3 bg-red-50 border-2 border-red-300 rounded-xl text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 focus:ring-2 focus:ring-red-100'
+                                                    : 'w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'"
                                             >
-                                            <template x-if="value && !isValid">
-                                                <p class="mt-1 text-sm text-red-500">{{ $patternError ?? 'Eingabe entspricht nicht dem erwarteten Format.' }}</p>
+                                            <template x-if="!isValid">
+                                                <p class="mt-1.5 text-sm text-red-500 flex items-center gap-1.5">
+                                                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                    </svg>
+                                                    {{ $patternError ?? 'Eingabe entspricht nicht dem erwarteten Format.' }}
+                                                </p>
                                             </template>
                                         </div>
                                         @break
 
+                                    {{-- ─── Phone ─── --}}
                                     @case('phone')
-                                        @php
-                                            $phoneCountries = \Platform\Core\Models\CoreExtraFieldDefinition::PHONE_COUNTRIES;
-                                            $phoneValue = $extraFieldValues[$fieldId] ?? ['raw' => '', 'country' => 'DE'];
-                                        @endphp
-                                        <div class="grid grid-cols-3 gap-3">
-                                            <select
-                                                wire:model="extraFieldValues.{{ $fieldId }}.country"
-                                                class="applicant-input col-span-1"
-                                            >
-                                                @foreach($phoneCountries as $code => $info)
-                                                    <option value="{{ $code }}">{{ $info['flag'] }} {{ $code }} ({{ $info['dial'] }})</option>
-                                                @endforeach
-                                            </select>
+                                        @php $phoneCountries = \Platform\Core\Models\CoreExtraFieldDefinition::PHONE_COUNTRIES; @endphp
+                                        <div class="flex gap-2">
+                                            <div class="relative flex-shrink-0 w-[130px]">
+                                                <select
+                                                    wire:model="extraFieldValues.{{ $fieldId }}.country"
+                                                    class="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 outline-none appearance-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 pr-7"
+                                                >
+                                                    @foreach($phoneCountries as $code => $info)
+                                                        <option value="{{ $code }}">{{ $info['flag'] }} {{ $info['dial'] }}</option>
+                                                    @endforeach
+                                                </select>
+                                                <svg class="w-4 h-4 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                                </svg>
+                                            </div>
                                             <input
                                                 type="tel"
                                                 wire:model="extraFieldValues.{{ $fieldId }}.raw"
                                                 placeholder="z.B. 0151 1234567"
-                                                class="applicant-input col-span-2"
+                                                class="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                                             >
                                         </div>
                                         @break
 
+                                    {{-- ─── File ─── --}}
                                     @case('file')
                                         @php
                                             $isMultiple = $options['multiple'] ?? false;
@@ -532,7 +659,6 @@
                                             $currentFileIds = is_array($currentFileIds) ? $currentFileIds : ($currentFileIds ? [$currentFileIds] : []);
                                         @endphp
                                         <div>
-                                            {{-- Uploaded files preview --}}
                                             @if(!empty($currentFileIds))
                                                 <div class="space-y-2 mb-3">
                                                     @foreach($currentFileIds as $fileId_item)
@@ -542,8 +668,8 @@
                                                                 @if($fileData['is_image'] && $fileData['thumbnail_url'])
                                                                     <img src="{{ $fileData['thumbnail_url'] }}" alt="" class="w-10 h-10 rounded-lg object-cover flex-shrink-0">
                                                                 @else
-                                                                    <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-                                                                        <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <div class="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                                                                        <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
                                                                         </svg>
                                                                     </div>
@@ -567,29 +693,27 @@
                                                 </div>
                                             @endif
 
-                                            {{-- Upload zone --}}
                                             @if($isMultiple || empty($currentFileIds))
                                                 <div
                                                     x-data="{ dragging: false }"
                                                     x-on:dragover.prevent="dragging = true"
                                                     x-on:dragleave.prevent="dragging = false"
                                                     x-on:drop.prevent="dragging = false; $refs.fileInput{{ $fieldId }}.files = $event.dataTransfer.files; $refs.fileInput{{ $fieldId }}.dispatchEvent(new Event('change'))"
-                                                    class="relative"
                                                 >
                                                     <label
-                                                        :class="dragging ? 'border-blue-400 bg-blue-50/50' : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'"
-                                                        class="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all"
+                                                        :class="dragging ? 'border-indigo-400 bg-indigo-50/50' : 'border-gray-300 hover:border-indigo-300 hover:bg-indigo-50/30'"
+                                                        class="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all duration-200"
                                                     >
                                                         <div wire:loading.remove wire:target="pendingFileUploads.{{ $fieldId }}">
                                                             <svg class="w-8 h-8 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                                                             </svg>
                                                             <p class="text-sm text-gray-500 text-center">
-                                                                <span class="font-medium text-blue-600">Datei auswählen</span> oder hierher ziehen
+                                                                <span class="font-semibold text-indigo-500">Datei auswählen</span> oder hierher ziehen
                                                             </p>
                                                         </div>
                                                         <div wire:loading wire:target="pendingFileUploads.{{ $fieldId }}" class="flex flex-col items-center">
-                                                            <svg class="animate-spin w-6 h-6 text-blue-500 mb-2" fill="none" viewBox="0 0 24 24">
+                                                            <svg class="animate-spin w-6 h-6 text-indigo-500 mb-2" fill="none" viewBox="0 0 24 24">
                                                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                                                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                                                             </svg>
@@ -608,20 +732,28 @@
                                         </div>
                                         @break
 
+                                    {{-- ─── Fallback ─── --}}
                                     @default
                                         <input
                                             type="text"
                                             wire:model="extraFieldValues.{{ $fieldId }}"
-                                            placeholder="{{ $options['placeholder'] ?? '' }}"
-                                            class="applicant-input"
+                                            placeholder="{{ $options['placeholder'] ?? 'Eingabe...' }}"
+                                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                                         >
                                 @endswitch
 
+                                {{-- Error messages --}}
                                 @error("extraFieldValues.{$fieldId}")
-                                    <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                                    <p class="mt-1.5 text-sm text-red-500 flex items-center gap-1.5">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        {{ $message }}
+                                    </p>
                                 @enderror
                                 @error("extraFieldValues.{$fieldId}.raw")
-                                    <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                                    <p class="mt-1.5 text-sm text-red-500 flex items-center gap-1.5">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        {{ $message }}
+                                    </p>
                                 @enderror
                                 @error("extraFieldValues.{$fieldId}.street")
                                     {{-- Handled inline for address --}}
@@ -630,12 +762,12 @@
                         @endforeach
                     </div>
 
-                    {{-- Actions --}}
-                    <div class="mt-8 flex justify-end">
+                    {{-- Submit --}}
+                    <div class="mt-10 flex justify-end">
                         <button
                             type="submit"
                             wire:loading.attr="disabled"
-                            class="applicant-btn-primary"
+                            class="px-7 py-3 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <span wire:loading.remove wire:target="save">Speichern</span>
                             <span wire:loading wire:target="save" class="inline-flex items-center gap-2">
@@ -655,7 +787,7 @@
     {{-- Saved --}}
     @elseif($state === 'saved')
         <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="applicant-card w-full max-w-md p-10 text-center">
+            <div class="bg-white rounded-3xl border border-black/[0.06] shadow-2xl w-full max-w-md p-10 text-center">
                 <div class="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-6">
                     <svg class="w-10 h-10 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -670,8 +802,8 @@
                             <span class="text-sm font-medium text-gray-600">Fortschritt</span>
                             <span class="text-sm font-semibold text-gray-900">{{ $filledFields }}/{{ $totalFields }}</span>
                         </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2.5">
-                            <div class="bg-blue-600 h-2.5 rounded-full transition-all" style="width: {{ round(($filledFields / $totalFields) * 100) }}%"></div>
+                        <div class="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                            <div class="bg-gradient-to-r from-blue-500 to-indigo-500 h-2.5 rounded-full transition-all" style="width: {{ round(($filledFields / $totalFields) * 100) }}%"></div>
                         </div>
                     </div>
                 @endif
@@ -680,7 +812,7 @@
                     <button
                         wire:click="continueEditing"
                         wire:loading.attr="disabled"
-                        class="applicant-btn-primary"
+                        class="px-7 py-3 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/25 disabled:opacity-50"
                     >
                         <span wire:loading.remove wire:target="continueEditing">Weiter bearbeiten</span>
                         <span wire:loading wire:target="continueEditing" class="inline-flex items-center gap-2">
@@ -694,7 +826,7 @@
     {{-- Completed --}}
     @elseif($state === 'completed')
         <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="applicant-card w-full max-w-md p-10 text-center">
+            <div class="bg-white rounded-3xl border border-black/[0.06] shadow-2xl w-full max-w-md p-10 text-center">
                 <div class="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-6">
                     <svg class="w-10 h-10 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -706,144 +838,3 @@
         </div>
     @endif
 </div>
-
-<style>
-    /* ═══════════════════════════════════════════
-       Public Form Styles — White Card Design
-       ═══════════════════════════════════════════ */
-
-    .applicant-wrap {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    }
-
-    /* ── Background ── */
-    .applicant-bg {
-        position: fixed;
-        inset: 0;
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-        z-index: -10;
-    }
-
-    /* ── White Content Card ── */
-    .applicant-card {
-        background: white;
-        border-radius: 24px;
-        border: 1px solid rgba(0, 0, 0, 0.06);
-        box-shadow:
-            0 4px 6px -1px rgba(0, 0, 0, 0.05),
-            0 25px 50px -12px rgba(0, 0, 0, 0.15);
-    }
-
-    /* ── Glass Header ── */
-    .applicant-header-glass {
-        background: rgba(15, 10, 26, 0.6);
-        backdrop-filter: blur(30px);
-        -webkit-backdrop-filter: blur(30px);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    }
-
-    /* ── Progress Bar ── */
-    .applicant-progress {
-        background: linear-gradient(90deg, #3b82f6, #6366f1, #8b5cf6);
-        box-shadow: 0 0 12px rgba(99, 102, 241, 0.5);
-    }
-
-    /* ── Form Inputs ── */
-    .applicant-input {
-        width: 100%;
-        padding: 14px 18px;
-        background: white;
-        border: 1px solid #d1d5db;
-        border-radius: 14px;
-        color: #111827;
-        font-size: 15px;
-        outline: none;
-        transition: all 0.2s ease;
-    }
-
-    .applicant-input::placeholder {
-        color: #9ca3af;
-    }
-
-    .applicant-input:focus {
-        border-color: #6366f1;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        background: white;
-    }
-
-    .applicant-input-error {
-        border-color: #ef4444 !important;
-        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
-    }
-
-    /* ── Option Cards ── */
-    .applicant-option-card {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 14px 18px;
-        border-radius: 14px;
-        border: 1px solid #e5e7eb;
-        background: white;
-        text-align: left;
-        transition: all 0.2s ease;
-        cursor: pointer;
-    }
-
-    .applicant-option-card:hover {
-        background: #f9fafb;
-        border-color: #d1d5db;
-    }
-
-    .applicant-option-active {
-        background: rgba(99, 102, 241, 0.05) !important;
-        border-color: rgba(99, 102, 241, 0.4) !important;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08);
-    }
-
-    /* ── Boolean Cards ── */
-    .applicant-bool-card {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        padding: 32px 24px;
-        border-radius: 18px;
-        border: 1px solid #e5e7eb;
-        background: white;
-        transition: all 0.2s ease;
-        cursor: pointer;
-    }
-
-    .applicant-bool-card:hover {
-        background: #f9fafb;
-        border-color: #d1d5db;
-    }
-
-    /* ── Buttons ── */
-    .applicant-btn-primary {
-        padding: 12px 28px;
-        background: #6366f1;
-        color: white;
-        font-size: 14px;
-        font-weight: 600;
-        border-radius: 14px;
-        transition: all 0.2s ease;
-    }
-
-    .applicant-btn-primary:hover {
-        background: #4f46e5;
-        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
-    }
-
-    .applicant-btn-primary:disabled {
-        opacity: 0.5;
-    }
-
-    /* Date input icon */
-    .applicant-input[type="date"]::-webkit-calendar-picker-indicator {
-        filter: none;
-    }
-</style>
