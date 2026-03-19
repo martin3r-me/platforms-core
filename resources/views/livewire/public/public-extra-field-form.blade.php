@@ -327,7 +327,7 @@
                                                 <input
                                                     type="text"
                                                     x-model="value"
-                                                    x-on:blur="touched = true"
+                                                    x-on:input="touched = true"
                                                     wire:model.live.debounce.500ms="extraFieldValues.{{ $fieldId }}"
                                                     placeholder="{{ $options['placeholder'] ?? 'Eingabe...' }}"
                                                     :class="!isValid
@@ -647,7 +647,7 @@
                                             <input
                                                 type="text"
                                                 x-model="value"
-                                                x-on:blur="touched = true"
+                                                x-on:input="touched = true"
                                                 wire:model.live.debounce.500ms="extraFieldValues.{{ $fieldId }}"
                                                 placeholder="{{ $options['pattern_description'] ?? ($options['placeholder'] ?? 'Eingabe...') }}"
                                                 :class="!isValid
