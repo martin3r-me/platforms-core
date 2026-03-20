@@ -5,9 +5,9 @@ namespace Platform\Core\Mcp\Adapters;
 use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
-use Platform\Core\Mcp\McpSessionTeamManager;
 use Platform\Core\Services\ToolPermissionService;
 use Platform\Core\Services\ToolValidationService;
+use Platform\Core\Models\McpSession;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Request;
@@ -23,8 +23,21 @@ use Illuminate\Support\Facades\Log;
  */
 class ToolContractAdapter extends Tool
 {
+    /**
+     * Aktives Team für den aktuellen MCP Request-Scope.
+     * Wird vor Tool-Ausführung gesetzt und danach zurückgesetzt.
+     * Erlaubt Providern (teamScopedQuery etc.) das MCP-Team zu nutzen.
+     */
+    private static ?int $activeTeamId = null;
+
+    public static function getActiveTeamId(): ?int
+    {
+        return self::$activeTeamId;
+    }
+
     public function __construct(
-        private ToolContract $tool
+        private ToolContract $tool,
+        private ?string $mcpSessionId = null,
     ) {
     }
 
@@ -165,13 +178,6 @@ class ToolContractAdapter extends Tool
             // Context aus Request extrahieren
             $context = $this->createContextFromRequest();
 
-            // Session-Aktivität aktualisieren (Sliding Window TTL)
-            // Verhindert, dass der Kontext bei langen Tool-Sequenzen still abläuft
-            $sessionId = McpSessionTeamManager::resolveSessionId();
-            if ($sessionId) {
-                McpSessionTeamManager::touchSession($sessionId);
-            }
-
             $toolName = $this->tool->getName();
 
             // Berechtigungsprüfung: Hat der User Zugriff auf das Modul?
@@ -211,19 +217,15 @@ class ToolContractAdapter extends Tool
                 ]);
             }
 
-            // Tool ausführen
-            $result = $this->tool->execute($arguments, $context);
+            // Aktives Team für Provider setzen (Request-Scope)
+            $previousTeamId = self::$activeTeamId;
+            self::$activeTeamId = $context->team?->id;
 
-            // Session-Timeout-Warnung anhängen, wenn Session bald abläuft
-            if ($sessionId && McpSessionTeamManager::isSessionExpiringSoon($sessionId)) {
-                $secondsLeft = McpSessionTeamManager::getSecondsSinceLastActivity($sessionId);
-                $remainingMin = $secondsLeft !== null
-                    ? round((28800 - $secondsLeft) / 60)
-                    : '?';
-                Log::warning('[MCP ToolContractAdapter] Session läuft bald ab', [
-                    'session_id' => substr($sessionId, 0, 12) . '...',
-                    'remaining_minutes' => $remainingMin,
-                ]);
+            try {
+                // Tool ausführen
+                $result = $this->tool->execute($arguments, $context);
+            } finally {
+                self::$activeTeamId = $previousTeamId;
             }
 
             // ToolResult zu MCP Response konvertieren
@@ -286,21 +288,32 @@ class ToolContractAdapter extends Tool
             throw new \RuntimeException('Invalid MCP_AUTH_TOKEN.');
         }
 
+        // MCP-Kontext: Team aus mcp_sessions Tabelle, Fallback auf current_team_id
         $team = null;
-        if (method_exists($user, 'currentTeam')) {
-            $team = $user->currentTeam;
-        }
+        $metadata = [];
 
-        // Session-Team-Override prüfen (gesetzt durch core.team.switch)
-        $sessionId = McpSessionTeamManager::resolveSessionId();
-        if ($sessionId && McpSessionTeamManager::hasTeamOverride($sessionId)) {
-            $overrideTeam = McpSessionTeamManager::getTeamOverride($sessionId);
-            if ($overrideTeam) {
-                $team = $overrideTeam;
+        if ($this->mcpSessionId) {
+            $metadata['mcp_session_id'] = $this->mcpSessionId;
+
+            try {
+                $mcpSession = McpSession::find($this->mcpSessionId);
+                if ($mcpSession && $mcpSession->team_id) {
+                    $team = $mcpSession->team;
+                    $mcpSession->update(['last_activity_at' => now()]);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('[MCP ToolContractAdapter] McpSession-Lookup fehlgeschlagen', [
+                    'session_id' => $this->mcpSessionId,
+                    'error' => $e->getMessage(),
+                ]);
             }
         }
 
-        return ToolContext::create($user, $team);
+        if (!$team && method_exists($user, 'currentTeam')) {
+            $team = $user->currentTeam;
+        }
+
+        return ToolContext::create($user, $team, $metadata);
     }
 
     /**

@@ -5,6 +5,7 @@ namespace Platform\Core\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Platform\Core\Models\Team;
 
 class CoreChatThread extends Model
 {
@@ -12,6 +13,7 @@ class CoreChatThread extends Model
 
     protected $fillable = [
         'core_chat_id',
+        'team_id',
         'title',
         'status',
         'meta',
@@ -40,6 +42,11 @@ class CoreChatThread extends Model
     public function chat(): BelongsTo
     {
         return $this->belongsTo(CoreChat::class, 'core_chat_id');
+    }
+
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class);
     }
 
     public function messages(): HasMany

@@ -529,7 +529,9 @@ class SimpleToolController extends Controller
                 $openAiService = app(OpenAiService::class);
                 $executor = app(ToolExecutor::class);
                 $nameMapper = app(ToolNameMapper::class);
-                $context = ToolContext::fromAuth();
+                // Thread-basiertes Team für Playground (Thread behält sein Team)
+                $threadTeam = $thread?->team ?? $request->user()?->currentTeam;
+                $context = ToolContext::create($request->user(), $threadTeam);
                 $openAiService->resetDynamicallyLoadedTools();
 
                 // Initialisiere Messages mit Historie (nur role+content)

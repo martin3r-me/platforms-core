@@ -7,7 +7,6 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Platform\Core\Traits\HasApiTokens;
 use Illuminate\Database\Eloquent\Casts\Attribute;
-use Platform\Core\Mcp\McpSessionTeamManager;
 use Platform\Core\Models\Module;
 use Platform\Core\Models\CoreAiModel;
 use Platform\Core\Models\PassportClient;
@@ -52,8 +51,7 @@ class User extends Authenticatable
     }
 
     /**
-     * Basis-Relationship für das aktuelle Team (für DB-Zugriffe).
-     * Wird intern von currentTeam Attribute verwendet.
+     * Basis-Relationship für das aktuelle UI-Team (current_team_id).
      */
     public function currentTeamRelation()
     {
@@ -61,14 +59,12 @@ class User extends Authenticatable
     }
 
     /**
-     * Dynamisches currentTeam Attribute - gibt je nach Kontext das richtige Team zurück.
+     * Dynamisches currentTeam Attribute - gibt das UI-Team zurück.
      *
-     * Reihenfolge:
-     * 1. MCP Session-Team-Override (gesetzt durch core.team.switch) – hat Vorrang,
-     *    damit Policies im MCP-/Tool-Kontext das richtige Team sehen.
-     * 2. UI-Basis-Team (current_team_id aus der DB)
+     * Verwendet ausschließlich current_team_id (DB). Der MCP-Kontext
+     * wird separat über mcp_sessions aufgelöst und beeinflusst die UI nicht.
      *
-     * Danach wird ggf. der Modul-Scope berücksichtigt:
+     * Modul-Scope wird berücksichtigt:
      * - Für root-scoped Module (scope_type = 'parent'): Gibt das Root-Team zurück
      * - Für team-spezifische Module (scope_type = 'single'): Gibt das aktuelle Team zurück
      *
@@ -78,24 +74,7 @@ class User extends Authenticatable
     {
         return Attribute::make(
             get: function () {
-                // 1. MCP Session-Team-Override prüfen (höchste Priorität)
-                //    Damit Policies im Tool-Kontext das vom LLM-Client gewählte Team sehen.
-                //    Verwende $this->id statt auth()->user()->id, damit der Override
-                //    auch korrekt greift wenn Gate::forUser() einen expliziten User setzt.
-                $baseTeam = null;
-                try {
-                    $sessionId = $this->id ? ('mcp_user_' . $this->id) : null;
-                    if ($sessionId && McpSessionTeamManager::hasTeamOverride($sessionId)) {
-                        $baseTeam = McpSessionTeamManager::getTeamOverride($sessionId);
-                    }
-                } catch (\Throwable $e) {
-                    // MCP nicht verfügbar – kein Override
-                }
-
-                // 2. Fallback: UI-Basis-Team (current_team_id)
-                if (!$baseTeam) {
-                    $baseTeam = $this->currentTeamRelation;
-                }
+                $baseTeam = $this->currentTeamRelation;
 
                 if (!$baseTeam) {
                     return null;

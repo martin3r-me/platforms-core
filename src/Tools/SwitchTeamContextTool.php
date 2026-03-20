@@ -6,7 +6,7 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
-use Platform\Core\Mcp\McpSessionTeamManager;
+use Platform\Core\Models\McpSession;
 use Platform\Core\Models\Team;
 
 /**
@@ -75,18 +75,24 @@ class SwitchTeamContextTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('ACCESS_DENIED', 'Du bist kein Mitglied des Teams "' . $targetTeam->name . '" (ID: ' . $teamId . '). Du kannst nur in Teams wechseln, in denen du Mitglied bist. Nutze "core.teams.GET" um deine Teams zu sehen.');
             }
 
-            // Session-ID ermitteln
-            $sessionId = McpSessionTeamManager::resolveSessionId();
+            // Session ID aus Metadata lesen
+            $sessionId = $context->metadata['mcp_session_id'] ?? null;
             if (!$sessionId) {
-                return ToolResult::error('SESSION_ERROR', 'Konnte keine MCP-Session ermitteln. Ist der User authentifiziert?');
+                return ToolResult::error('SESSION_ERROR', 'Keine MCP-Session gefunden. Team-Switch ist nur im MCP-Kontext möglich.');
             }
 
-            // Vorheriges Team für Response merken
+            // Vorheriges MCP-Team für Response merken
             $previousTeam = $context->team;
-            $previousTeamOverrideId = McpSessionTeamManager::getTeamOverrideId($sessionId);
+            $mcpSession = McpSession::find($sessionId);
+            $hadPreviousOverride = $mcpSession && $mcpSession->team_id !== null;
 
-            // Team-Override setzen
-            McpSessionTeamManager::setTeamOverride($sessionId, $targetTeam->id);
+            // Team-ID auf der MCP-Session setzen (persistent, pro Verbindung)
+            if ($mcpSession) {
+                $mcpSession->update(['team_id' => $targetTeam->id, 'last_activity_at' => now()]);
+            } else {
+                McpSession::findOrCreateForSession($sessionId, $user->id);
+                McpSession::where('id', $sessionId)->update(['team_id' => $targetTeam->id]);
+            }
 
             // Membership-Rolle abrufen
             $membership = $user->teams()->where('teams.id', $targetTeam->id)->first();
@@ -102,7 +108,7 @@ class SwitchTeamContextTool implements ToolContract, ToolMetadataContract
                 'previous_team' => $previousTeam ? [
                     'id' => $previousTeam->id,
                     'name' => $previousTeam->name,
-                    'was_override' => $previousTeamOverrideId !== null,
+                    'was_override' => $hadPreviousOverride,
                 ] : null,
                 'info' => 'Alle nachfolgenden Tool-Calls arbeiten jetzt im Kontext des Teams "' . $targetTeam->name . '". Der UI-Kontext des Users bleibt unverändert.',
             ]);

@@ -5,7 +5,7 @@ namespace Platform\Core\Tools;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
-use Platform\Core\Mcp\McpSessionTeamManager;
+use Platform\Core\Mcp\Adapters\ToolContractAdapter;
 use Platform\Core\Tools\DataRead\ProviderRegistry;
 
 class CoreWriteProxy
@@ -124,15 +124,8 @@ class CoreWriteProxy
     private function injectScope($provider, array $payload, bool $injectUser = true): array
     {
         $fields = method_exists($provider, 'readableFields') ? $provider->readableFields() : [];
-        // MCP Session-Team-Override berücksichtigen (gesetzt durch core.team.switch)
-        $teamId = null;
-        $sessionId = McpSessionTeamManager::resolveSessionId();
-        if ($sessionId) {
-            $teamId = McpSessionTeamManager::getTeamOverrideId($sessionId);
-        }
-        if (!$teamId) {
-            $teamId = auth()->user()?->currentTeam?->id;
-        }
+        $user = auth()->user();
+        $teamId = ToolContractAdapter::getActiveTeamId() ?? $user?->currentTeam?->id;
         if ($teamId && in_array('team_id', $fields, true)) { $payload['team_id'] = $teamId; }
         if ($injectUser) {
             $userId = auth()->id();

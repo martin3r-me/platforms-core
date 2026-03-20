@@ -3,8 +3,9 @@
 namespace Platform\Core\Services;
 
 use Illuminate\Support\Facades\Auth;
-use Platform\Core\Mcp\McpSessionTeamManager;
+use Platform\Core\Mcp\Adapters\ToolContractAdapter;
 use Platform\Core\Models\Module;
+use Platform\Core\Models\Team;
 use Platform\Core\Registry\ModuleRegistry;
 
 /**
@@ -65,17 +66,9 @@ class ToolPermissionService
             return true;
         }
         
-        // MCP Session-Team-Override berücksichtigen (gesetzt durch core.team.switch)
-        $baseTeam = null;
-        $sessionId = McpSessionTeamManager::resolveSessionId();
-        if ($sessionId && McpSessionTeamManager::hasTeamOverride($sessionId)) {
-            $baseTeam = McpSessionTeamManager::getTeamOverride($sessionId);
-        }
-
-        // Fallback: UI-Kontext des Users
-        if (!$baseTeam) {
-            $baseTeam = $user->currentTeamRelation;
-        }
+        // MCP-Kontext: Team aus ToolContractAdapter (Session-basiert), Fallback: UI-Kontext
+        $mcpTeamId = ToolContractAdapter::getActiveTeamId();
+        $baseTeam = $mcpTeamId ? Team::find($mcpTeamId) : $user->currentTeamRelation;
 
         if (!$baseTeam) {
             return false; // Kein Team = kein Zugriff

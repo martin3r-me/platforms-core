@@ -189,6 +189,7 @@ class ModalSimpleToolPlayground extends Component
                 'title' => 'Thread ' . ($chat->threads()->count() + 1),
                 'status' => 'open',
                 'started_at' => now(),
+                'team_id' => $user->current_team_id,
             ]);
         }
 
@@ -206,10 +207,12 @@ class ModalSimpleToolPlayground extends Component
             return;
         }
 
+        $user = Auth::user();
         $thread = $chat->threads()->create([
             'title' => 'Thread ' . ($chat->threads()->count() + 1),
             'status' => 'open',
             'started_at' => now(),
+            'team_id' => $user?->current_team_id,
         ]);
 
         $this->activeThreadId = $thread->id;
@@ -334,10 +337,12 @@ class ModalSimpleToolPlayground extends Component
             ->first();
 
         if (!$next) {
+            $user = Auth::user();
             $next = $chat->threads()->create([
                 'title' => 'Thread ' . ($chat->threads()->count() + 1),
                 'status' => 'open',
                 'started_at' => now(),
+                'team_id' => $user?->current_team_id,
             ]);
         }
 

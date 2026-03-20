@@ -5,9 +5,9 @@ namespace Platform\Core\Tools;
 use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
-use Platform\Core\Mcp\McpSessionTeamManager;
 use Platform\Core\Registry\ModuleRegistry;
 use Platform\Core\Models\Module;
+use Platform\Core\Models\McpSession;
 use Platform\Core\Models\Team;
 
 /**
@@ -95,11 +95,12 @@ class GetContextTool implements ToolContract
                 $targetTeam = $context->team;
             }
 
-            // Prüfe ob ein Session-Team-Override aktiv ist
-            $sessionTeamOverride = false;
-            $sessionId = McpSessionTeamManager::resolveSessionId();
-            if ($sessionId) {
-                $sessionTeamOverride = McpSessionTeamManager::hasTeamOverride($sessionId);
+            // Prüfe ob ein MCP-Team-Override aktiv ist (team_id in mcp_sessions)
+            $mcpSessionId = $context->metadata['mcp_session_id'] ?? null;
+            $mcpTeamOverride = false;
+            if ($mcpSessionId) {
+                $mcpSession = McpSession::find($mcpSessionId);
+                $mcpTeamOverride = $mcpSession && $mcpSession->team_id !== null;
             }
 
             $teamData = null;
@@ -109,11 +110,11 @@ class GetContextTool implements ToolContract
                     'name' => $targetTeam->name ?? null,
                     'is_current_team' => $isCurrentTeam,
                 ];
-                // Wenn kein expliziter team_id-Parameter und ein Session-Override aktiv ist,
+                // Wenn kein expliziter team_id-Parameter und ein MCP-Override aktiv ist,
                 // markiere dies im Response
-                if ($requestedTeamId === null && $sessionTeamOverride) {
-                    $teamData['is_session_override'] = true;
-                    $teamData['info'] = 'Team-Kontext wurde per "core.team.switch" gewechselt. Nutze "core.team.switch" um in ein anderes Team zu wechseln.';
+                if ($requestedTeamId === null && $mcpTeamOverride) {
+                    $teamData['is_mcp_override'] = true;
+                    $teamData['info'] = 'MCP-Team-Kontext wurde per "core.team.switch" gesetzt. Nutze "core.team.switch" um in ein anderes Team zu wechseln.';
                 }
             }
 

@@ -10,7 +10,9 @@ use Platform\Core\Mcp\McpSessionToolManager;
 use Platform\Core\Mcp\Tools\ToolDiscoveryToolContract;
 use Platform\Core\Mcp\Tools\ExecuteToolContract;
 use Platform\Core\Mcp\Adapters\ToolContractAdapter;
+use Platform\Core\Models\McpSession;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Discovery-basierter MCP Server
@@ -84,31 +86,35 @@ MARKDOWN;
     }
 
     /**
-     * Ermittelt eine stabile Session-ID
+     * Ermittelt eine unique Session-ID pro SSE-Verbindung
      *
-     * Verwendet User-ID wenn authentifiziert, sonst Transport Session ID,
-     * sonst eine generierte ID.
+     * Generiert eine UUID und persistiert sie in der mcp_sessions Tabelle,
+     * damit jede Verbindung ihren eigenen Team-Kontext hat.
      */
     private function resolveSessionId(): string
     {
-        // 1. Versuche User-basierte Session (stabil über Requests)
+        // Versuche Transport Session ID (stabil für SSE-Verbindungen)
+        $transportSessionId = $this->transport->sessionId();
+        if ($transportSessionId) {
+            $sessionId = 'mcp_' . $transportSessionId;
+        } else {
+            // Fallback: UUID pro Verbindung
+            $sessionId = 'mcp_' . Str::uuid()->toString();
+        }
+
+        // Session in DB persistieren
         try {
             $user = auth()->user();
             if ($user && $user->id) {
-                return 'mcp_user_' . $user->id;
+                McpSession::findOrCreateForSession($sessionId, $user->id);
             }
         } catch (\Throwable $e) {
-            // Auth nicht verfügbar
+            Log::warning('[DiscoveryMcpServer] McpSession konnte nicht erstellt werden', [
+                'error' => $e->getMessage(),
+            ]);
         }
 
-        // 2. Transport Session ID
-        $transportSessionId = $this->transport->sessionId();
-        if ($transportSessionId) {
-            return 'mcp_transport_' . $transportSessionId;
-        }
-
-        // 3. Fallback: Request-basierte ID (nicht ideal, aber besser als nichts)
-        return 'mcp_' . bin2hex(random_bytes(8));
+        return $sessionId;
     }
 
     /**
@@ -154,12 +160,12 @@ MARKDOWN;
                 if ($tool->getName() === 'tools.GET') {
                     // Create instance and wrap with adapter
                     $discoveryTool = new ToolDiscoveryToolContract();
-                    $adapter = new ToolContractAdapter($discoveryTool);
+                    $adapter = new ToolContractAdapter($discoveryTool, $this->sessionId);
                     $this->tools[] = $adapter;
                 } else {
                     // Normale Discovery-Tools via Adapter
                     try {
-                        $adapter = new ToolContractAdapter($tool);
+                        $adapter = new ToolContractAdapter($tool, $this->sessionId);
                         $this->tools[] = $adapter;
                     } catch (\Throwable $e) {
                         Log::warning("[DiscoveryMcpServer] Discovery-Tool Wrapping fehlgeschlagen", [
@@ -173,7 +179,7 @@ MARKDOWN;
             // Execute-Tool hinzufügen (ermöglicht Ausführung beliebiger Tools)
             try {
                 $executeTool = new ExecuteToolContract();
-                $adapter = new ToolContractAdapter($executeTool);
+                $adapter = new ToolContractAdapter($executeTool, $this->sessionId);
                 $this->tools[] = $adapter;
             } catch (\Throwable $e) {
                 Log::warning("[DiscoveryMcpServer] Execute-Tool konnte nicht hinzugefügt werden", [
@@ -190,7 +196,7 @@ MARKDOWN;
                 }
 
                 try {
-                    $adapter = new ToolContractAdapter($tool);
+                    $adapter = new ToolContractAdapter($tool, $this->sessionId);
                     $this->tools[] = $adapter;
                 } catch (\Throwable $e) {
                     Log::warning("[DiscoveryMcpServer] Session-Tool Wrapping fehlgeschlagen", [
@@ -230,7 +236,7 @@ MARKDOWN;
     {
         foreach ($newTools as $tool) {
             try {
-                $adapter = new ToolContractAdapter($tool);
+                $adapter = new ToolContractAdapter($tool, $this->sessionId);
                 $this->tools[] = $adapter;
 
                 Log::debug("[DiscoveryMcpServer] Tool zur Session hinzugefügt", [
