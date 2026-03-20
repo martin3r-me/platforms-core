@@ -239,6 +239,11 @@ class PublicExtraFieldForm extends Component
             $model->save();
         }
 
+        // AutoPilot: check if all required fields are now complete
+        if (method_exists($model, 'checkAutoPilotCompletion')) {
+            $model->checkAutoPilotCompletion();
+        }
+
         // Recount filled fields
         $this->filledFields = 0;
         $allDefinitions = $model->getExtraFieldsWithLabels();
