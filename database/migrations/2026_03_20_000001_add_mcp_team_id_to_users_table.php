@@ -8,33 +8,23 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // MCP Sessions: pro SSE-Verbindung ein eigener Team-Kontext
-        Schema::create('mcp_sessions', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('team_id')->nullable()->constrained('teams')->nullOnDelete();
-            $table->timestamp('last_activity_at')->nullable();
-            $table->timestamps();
-
-            $table->index('user_id');
-        });
-
-        // Playground: jeder Thread gehört zu einem Team
-        Schema::table('core_chat_threads', function (Blueprint $table) {
-            $table->foreignId('team_id')
-                ->nullable()
-                ->after('core_chat_id')
-                ->constrained('teams')
-                ->nullOnDelete();
-        });
+        if (!Schema::hasColumn('users', 'mcp_team_id')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->foreignId('mcp_team_id')
+                    ->nullable()
+                    ->after('current_team_id')
+                    ->constrained('teams')
+                    ->nullOnDelete();
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('core_chat_threads', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('team_id');
-        });
-
-        Schema::dropIfExists('mcp_sessions');
+        if (Schema::hasColumn('users', 'mcp_team_id')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->dropConstrainedForeignId('mcp_team_id');
+            });
+        }
     }
 };
