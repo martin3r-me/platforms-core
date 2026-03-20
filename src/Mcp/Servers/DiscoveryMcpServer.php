@@ -86,25 +86,37 @@ MARKDOWN;
     }
 
     /**
-     * Ermittelt eine unique Session-ID pro SSE-Verbindung
+     * Ermittelt eine stabile Session-ID pro Verbindung
      *
-     * Generiert eine UUID und persistiert sie in der mcp_sessions Tabelle,
-     * damit jede Verbindung ihren eigenen Team-Kontext hat.
+     * Priorität: Transport Session ID > User-basiert > UUID Fallback
+     * Persistiert in mcp_sessions Tabelle (wenn verfügbar).
      */
     private function resolveSessionId(): string
     {
-        // Versuche Transport Session ID (stabil für SSE-Verbindungen)
+        // 1. Transport Session ID (stabil für SSE-Verbindungen)
         $transportSessionId = $this->transport->sessionId();
         if ($transportSessionId) {
             $sessionId = 'mcp_' . $transportSessionId;
         } else {
-            // Fallback: UUID pro Verbindung
+            // 2. User-basiert (stabil über HTTP Requests)
+            try {
+                $user = auth()->user();
+                if ($user && $user->id) {
+                    $sessionId = 'mcp_user_' . $user->id;
+                }
+            } catch (\Throwable $e) {
+                // Auth nicht verfügbar
+            }
+        }
+
+        // 3. Fallback: UUID
+        if (!isset($sessionId)) {
             $sessionId = 'mcp_' . Str::uuid()->toString();
         }
 
-        // Session in DB persistieren
+        // Session in DB persistieren (graceful wenn Tabelle noch nicht existiert)
         try {
-            $user = auth()->user();
+            $user = $user ?? auth()->user();
             if ($user && $user->id) {
                 McpSession::findOrCreateForSession($sessionId, $user->id);
             }
