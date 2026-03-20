@@ -48,9 +48,8 @@ class McpSession extends Model
     /**
      * Aktualisiert den Aktivitäts-Timestamp (Sliding Window).
      */
-    public function touch(): bool
+    public function touchActivity(): void
     {
-        $this->last_activity_at = now();
-        return $this->save();
+        $this->update(['last_activity_at' => now()]);
     }
 }
