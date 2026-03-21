@@ -88,7 +88,7 @@ trait WithExtraFields
             $fieldValue = $fieldValues->get($field['id']);
 
             // Für Mehrfachauswahl muss der Wert ein Array sein
-            if ($field['type'] === 'select' && ($field['options']['multiple'] ?? false)) {
+            if (in_array($field['type'], ['select', 'lookup']) && ($field['options']['multiple'] ?? false)) {
                 if ($value === null) {
                     $value = [];
                 } elseif (!is_array($value)) {
@@ -206,7 +206,7 @@ trait WithExtraFields
             $value = $fieldValue?->typed_value;
 
             // Für Mehrfachauswahl muss der Wert ein Array sein
-            if ($field['type'] === 'select' && ($field['options']['multiple'] ?? false)) {
+            if (in_array($field['type'], ['select', 'lookup']) && ($field['options']['multiple'] ?? false)) {
                 if ($value === null) {
                     $value = [];
                 } elseif (!is_array($value)) {

@@ -19,7 +19,7 @@ class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'PUT /core/extra-fields - Setzt Extra-Field-Werte für ein beliebiges Model. Unterstützt text, number, boolean, select, lookup und file Felder. Für lookup-Felder nutze core.extra_fields.GET um gültige Werte zu sehen.';
+        return 'PUT /core/extra-fields - Setzt Extra-Field-Werte für ein beliebiges Model. Unterstützt text, number, textarea, boolean, select, lookup, file, phone, regex und address Felder. Für lookup-Felder nutze core.extra_fields.GET um gültige Werte zu sehen.';
     }
 
     public function getSchema(): array

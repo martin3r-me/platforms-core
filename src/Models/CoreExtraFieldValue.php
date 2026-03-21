@@ -105,11 +105,11 @@ class CoreExtraFieldValue extends Model
         return match ($type) {
             'number' => is_numeric($value) ? (float) $value : null,
             'boolean' => in_array($value, ['1', 'true'], true),
-            'text', 'textarea' => (string) $value,
+            'text', 'textarea', 'regex' => (string) $value,
             'select', 'lookup' => $this->decodeSelectValue($value),
             'file' => $this->decodeFileValue($value),
             'phone' => $this->decodePhoneValue($value),
-            'address' => $this->decodePhoneValue($value),
+            'address' => $this->decodeAddressValue($value),
             default => $value,
         };
     }
@@ -129,7 +129,7 @@ class CoreExtraFieldValue extends Model
         $stringValue = match ($type) {
             'number' => is_numeric($value) ? (string) $value : null,
             'boolean' => $this->normalizeBooleanForStorage($value),
-            'text', 'textarea' => (string) $value,
+            'text', 'textarea', 'regex' => (string) $value,
             'select', 'lookup' => is_array($value) ? json_encode($value) : (string) $value,
             'file' => is_array($value) ? json_encode($value) : (string) $value,
             'phone' => is_array($value) ? json_encode($value) : (string) $value,
@@ -220,6 +220,18 @@ class CoreExtraFieldValue extends Model
      * Dekodiert Phone-Werte (JSON-Objekt mit raw, country, e164, international)
      */
     protected function decodePhoneValue(string $value): mixed
+    {
+        if (str_starts_with($value, '{') && str_ends_with($value, '}')) {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return $value;
+    }
+
+    protected function decodeAddressValue(string $value): mixed
     {
         if (str_starts_with($value, '{') && str_ends_with($value, '}')) {
             $decoded = json_decode($value, true);
