@@ -499,11 +499,21 @@ trait WithExtraFields
                     $isMultiple = $field['options']['multiple'] ?? false;
                     if ($isMultiple) {
                         $fieldRules[] = 'array';
+                        if ($field['is_mandatory'] ?? false) {
+                            $fieldRules[] = 'min:1';
+                        }
                     } else {
                         $choices = $field['options']['choices'] ?? [];
                         if (!empty($choices)) {
                             $fieldRules[] = 'in:' . implode(',', $choices);
                         }
+                    }
+                    break;
+                case 'lookup':
+                    $isMultiple = $field['options']['multiple'] ?? false;
+                    $fieldRules[] = 'array';
+                    if (($field['is_mandatory'] ?? false) && $isMultiple) {
+                        $fieldRules[] = 'min:1';
                     }
                     break;
                 case 'file':
