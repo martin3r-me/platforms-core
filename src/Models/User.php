@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Platform\Core\Models\Module;
 use Platform\Core\Models\CoreAiModel;
 use Platform\Core\Models\PassportClient;
+use Platform\Core\Services\TeamContext;
 
 class User extends Authenticatable
 {
@@ -74,6 +75,11 @@ class User extends Authenticatable
     {
         return Attribute::make(
             get: function () {
+                // MCP/Playground Override: temporärer Team-Kontext (kein DB-Write)
+                if (TeamContext::hasOverride()) {
+                    return TeamContext::getOverrideTeam();
+                }
+
                 $baseTeam = $this->currentTeamRelation;
 
                 if (!$baseTeam) {

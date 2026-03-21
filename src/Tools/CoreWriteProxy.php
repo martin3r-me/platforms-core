@@ -5,7 +5,6 @@ namespace Platform\Core\Tools;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
-use Platform\Core\Mcp\Adapters\ToolContractAdapter;
 use Platform\Core\Tools\DataRead\ProviderRegistry;
 
 class CoreWriteProxy
@@ -125,7 +124,7 @@ class CoreWriteProxy
     {
         $fields = method_exists($provider, 'readableFields') ? $provider->readableFields() : [];
         $user = auth()->user();
-        $teamId = ToolContractAdapter::getActiveTeamId() ?? $user?->currentTeam?->id;
+        $teamId = $user?->currentTeam?->id;
         if ($teamId && in_array('team_id', $fields, true)) { $payload['team_id'] = $teamId; }
         if ($injectUser) {
             $userId = auth()->id();

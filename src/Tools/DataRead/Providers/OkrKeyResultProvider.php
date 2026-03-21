@@ -4,7 +4,6 @@ namespace Platform\Core\Tools\DataRead\Providers;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
-use Platform\Core\Mcp\Adapters\ToolContractAdapter;
 use Platform\Core\Tools\DataRead\EntityReadProvider;
 
 class OkrKeyResultProvider implements EntityReadProvider
@@ -24,7 +23,7 @@ class OkrKeyResultProvider implements EntityReadProvider
         $model = $this->model();
         $q = $model::query();
         $user = Auth::user();
-        $teamId = ToolContractAdapter::getActiveTeamId() ?? $user?->currentTeam?->id;
+        $teamId = $user?->currentTeam?->id;
         if ($teamId) { $q->where('team_id', $teamId); }
         return $q;
     }

@@ -7,6 +7,7 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Services\ToolPermissionService;
 use Platform\Core\Services\ToolValidationService;
+use Platform\Core\Services\TeamContext;
 use Platform\Core\Models\McpSession;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Response;
@@ -23,18 +24,6 @@ use Illuminate\Support\Facades\Log;
  */
 class ToolContractAdapter extends Tool
 {
-    /**
-     * Aktives Team für den aktuellen MCP Request-Scope.
-     * Wird vor Tool-Ausführung gesetzt und danach zurückgesetzt.
-     * Erlaubt Providern (teamScopedQuery etc.) das MCP-Team zu nutzen.
-     */
-    private static ?int $activeTeamId = null;
-
-    public static function getActiveTeamId(): ?int
-    {
-        return self::$activeTeamId;
-    }
-
     public function __construct(
         private ToolContract $tool,
         private ?string $mcpSessionId = null,
@@ -217,15 +206,14 @@ class ToolContractAdapter extends Tool
                 ]);
             }
 
-            // Aktives Team für Provider setzen (Request-Scope)
-            $previousTeamId = self::$activeTeamId;
-            self::$activeTeamId = $context->team?->id;
+            // TeamContext setzen: User::currentTeam liefert automatisch das MCP-Team
+            TeamContext::setTeam($context->team);
 
             try {
                 // Tool ausführen
                 $result = $this->tool->execute($arguments, $context);
             } finally {
-                self::$activeTeamId = $previousTeamId;
+                TeamContext::clear();
             }
 
             // ToolResult zu MCP Response konvertieren

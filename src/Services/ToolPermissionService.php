@@ -3,9 +3,7 @@
 namespace Platform\Core\Services;
 
 use Illuminate\Support\Facades\Auth;
-use Platform\Core\Mcp\Adapters\ToolContractAdapter;
 use Platform\Core\Models\Module;
-use Platform\Core\Models\Team;
 use Platform\Core\Registry\ModuleRegistry;
 
 /**
@@ -66,9 +64,8 @@ class ToolPermissionService
             return true;
         }
         
-        // MCP-Kontext: Team aus ToolContractAdapter (Session-basiert), Fallback: UI-Kontext
-        $mcpTeamId = ToolContractAdapter::getActiveTeamId();
-        $baseTeam = $mcpTeamId ? Team::find($mcpTeamId) : $user->currentTeamRelation;
+        // Team aus currentTeam (prüft automatisch TeamContext-Override für MCP/Playground)
+        $baseTeam = $user->currentTeam;
 
         if (!$baseTeam) {
             return false; // Kein Team = kein Zugriff

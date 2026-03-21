@@ -17,6 +17,7 @@ use Platform\Core\Models\CoreAiProvider;
 use Platform\Core\Models\CoreChat;
 use Platform\Core\Models\CoreChatThread;
 use Platform\Core\Models\CoreChatMessage;
+use Platform\Core\Services\TeamContext;
 
 /**
  * Minimaler Tool Controller
@@ -532,6 +533,8 @@ class SimpleToolController extends Controller
                 // Thread-basiertes Team für Playground (Thread behält sein Team)
                 $threadTeam = $thread?->team ?? $request->user()?->currentTeam;
                 $context = ToolContext::create($request->user(), $threadTeam);
+                // TeamContext setzen: User::currentTeam liefert automatisch das Thread-Team
+                TeamContext::setTeam($threadTeam);
                 $openAiService->resetDynamicallyLoadedTools();
 
                 // Initialisiere Messages mit Historie (nur role+content)

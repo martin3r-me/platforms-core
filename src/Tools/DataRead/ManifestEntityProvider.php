@@ -4,7 +4,6 @@ namespace Platform\Core\Tools\DataRead;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
-use Platform\Core\Mcp\Adapters\ToolContractAdapter;
 
 class ManifestEntityProvider implements EntityReadProvider
 {
@@ -112,7 +111,7 @@ class ManifestEntityProvider implements EntityReadProvider
         $q = $model::query();
         if ($this->teamScoped && in_array('team_id', $this->readableFields(), true)) {
             $user = Auth::user();
-            $teamId = ToolContractAdapter::getActiveTeamId() ?? $user?->currentTeam?->id;
+            $teamId = $user?->currentTeam?->id;
             if ($teamId) { $q->where('team_id', $teamId); }
         }
         return $q;
