@@ -95,14 +95,18 @@ MARKDOWN;
     {
         // 1. Transport Session ID (stabil für SSE-Verbindungen)
         $transportSessionId = $this->transport->sessionId();
+        $source = 'unknown';
+
         if ($transportSessionId) {
             $sessionId = 'mcp_' . $transportSessionId;
+            $source = 'transport';
         } else {
             // 2. User-basiert (stabil über HTTP Requests)
             try {
                 $user = auth()->user();
                 if ($user && $user->id) {
                     $sessionId = 'mcp_user_' . $user->id;
+                    $source = 'user_fallback';
                 }
             } catch (\Throwable $e) {
                 // Auth nicht verfügbar
@@ -112,7 +116,14 @@ MARKDOWN;
         // 3. Fallback: UUID
         if (!isset($sessionId)) {
             $sessionId = 'mcp_' . Str::uuid()->toString();
+            $source = 'uuid_fallback';
         }
+
+        Log::info('[MCP Session] Session-ID resolved', [
+            'session_id' => substr($sessionId, 0, 20) . '...',
+            'source' => $source,
+            'has_transport_id' => (bool) $transportSessionId,
+        ]);
 
         // Session in DB persistieren (graceful wenn Tabelle noch nicht existiert)
         try {
