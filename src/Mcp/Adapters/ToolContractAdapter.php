@@ -169,55 +169,56 @@ class ToolContractAdapter extends Tool
 
             $toolName = $this->tool->getName();
 
-            // Berechtigungsprüfung: Hat der User Zugriff auf das Modul?
-            try {
-                $permissionService = app(ToolPermissionService::class);
-                if (!$permissionService->hasAccess($toolName)) {
-                    Log::warning('[MCP ToolContractAdapter] Zugriff verweigert', [
-                        'tool' => $toolName,
-                        'user_id' => $context->user?->id,
-                        'team_id' => $context->team?->id,
-                    ]);
-                    return Response::error("Kein Zugriff auf Tool '{$toolName}'. Das Modul ist für dein Team nicht freigeschaltet.");
-                }
-            } catch (\Throwable $e) {
-                Log::warning('[MCP ToolContractAdapter] Permission-Check fehlgeschlagen, erlaube Zugriff', [
-                    'tool' => $this->tool->getName(),
-                    'error' => $e->getMessage(),
-                ]);
-            }
-
-            // Parameter validieren (Fehlermeldungen direkt an die LLM)
-            try {
-                $validationService = app(ToolValidationService::class);
-                $validationResult = $validationService->validate($this->tool, $arguments);
-                if (!$validationResult['valid']) {
-                    $errorLines = array_map(fn($e) => "- {$e}", $validationResult['errors']);
-                    $errorMessage = "[VALIDATION_ERROR] Validierung fehlgeschlagen für Tool '{$toolName}':\n"
-                        . implode("\n", $errorLines);
-                    return Response::error($errorMessage);
-                }
-                // Verwende validierte (normalisierte) Daten
-                $arguments = $validationResult['data'];
-            } catch (\Throwable $e) {
-                // Validation-Service nicht verfügbar – weiter ohne Validierung
-                Log::debug('[MCP ToolContractAdapter] Validation-Service nicht verfügbar', [
-                    'tool' => $toolName,
-                ]);
-            }
-
-            // TeamContext setzen: User::currentTeam liefert automatisch das MCP-Team
+            // TeamContext SOFORT setzen: User::currentTeam liefert ab hier das MCP-Team.
+            // Muss VOR Permission-Check stehen, damit hasAccess() das richtige Team prüft.
             TeamContext::setTeam($context->team);
 
             try {
+                // Berechtigungsprüfung: Hat der User Zugriff auf das Modul?
+                try {
+                    $permissionService = app(ToolPermissionService::class);
+                    if (!$permissionService->hasAccess($toolName)) {
+                        Log::warning('[MCP ToolContractAdapter] Zugriff verweigert', [
+                            'tool' => $toolName,
+                            'user_id' => $context->user?->id,
+                            'team_id' => $context->team?->id,
+                        ]);
+                        return Response::error("Kein Zugriff auf Tool '{$toolName}'. Das Modul ist für dein Team nicht freigeschaltet.");
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('[MCP ToolContractAdapter] Permission-Check fehlgeschlagen, erlaube Zugriff', [
+                        'tool' => $this->tool->getName(),
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+
+                // Parameter validieren (Fehlermeldungen direkt an die LLM)
+                try {
+                    $validationService = app(ToolValidationService::class);
+                    $validationResult = $validationService->validate($this->tool, $arguments);
+                    if (!$validationResult['valid']) {
+                        $errorLines = array_map(fn($e) => "- {$e}", $validationResult['errors']);
+                        $errorMessage = "[VALIDATION_ERROR] Validierung fehlgeschlagen für Tool '{$toolName}':\n"
+                            . implode("\n", $errorLines);
+                        return Response::error($errorMessage);
+                    }
+                    // Verwende validierte (normalisierte) Daten
+                    $arguments = $validationResult['data'];
+                } catch (\Throwable $e) {
+                    // Validation-Service nicht verfügbar – weiter ohne Validierung
+                    Log::debug('[MCP ToolContractAdapter] Validation-Service nicht verfügbar', [
+                        'tool' => $toolName,
+                    ]);
+                }
+
                 // Tool ausführen
                 $result = $this->tool->execute($arguments, $context);
+
+                // ToolResult zu MCP Response konvertieren
+                return $this->convertToolResult($result);
             } finally {
                 TeamContext::clear();
             }
-
-            // ToolResult zu MCP Response konvertieren
-            return $this->convertToolResult($result);
         } catch (\RuntimeException $e) {
             return Response::error($e->getMessage());
         } catch (\Throwable $e) {
