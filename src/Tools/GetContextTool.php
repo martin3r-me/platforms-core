@@ -103,6 +103,9 @@ class GetContextTool implements ToolContract
                 $mcpTeamOverride = $mcpSession && $mcpSession->team_id !== null;
             }
 
+            // Team-Source aus Metadata ermitteln
+            $teamSource = $context->metadata['team_source'] ?? null;
+
             $teamData = null;
             if ($targetTeam) {
                 $teamData = [
@@ -115,6 +118,11 @@ class GetContextTool implements ToolContract
                 if ($requestedTeamId === null && $mcpTeamOverride) {
                     $teamData['is_mcp_override'] = true;
                     $teamData['info'] = 'MCP-Team-Kontext wurde per "core.team.switch" gesetzt. Nutze "core.team.switch" um in ein anderes Team zu wechseln.';
+                }
+                // Session-Info für Observability
+                if ($mcpSessionId) {
+                    $teamData['session_id'] = substr($mcpSessionId, 0, 12) . '...';
+                    $teamData['session_source'] = $teamSource ?? ($mcpTeamOverride ? 'mcp_session' : 'user_current');
                 }
             }
 

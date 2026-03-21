@@ -169,6 +169,14 @@ class ToolContractAdapter extends Tool
 
             $toolName = $this->tool->getName();
 
+            // Logging: Jeder Tool-Call mit Session + Team + User
+            Log::info('[MCP Tool] ' . $toolName, [
+                'session' => $this->mcpSessionId ? substr($this->mcpSessionId, 0, 12) . '...' : null,
+                'team_id' => $context->team?->id,
+                'team_name' => $context->team?->name,
+                'user_id' => $context->user?->id,
+            ]);
+
             // TeamContext SOFORT setzen: User::currentTeam liefert ab hier das MCP-Team.
             // Muss VOR Permission-Check stehen, damit hasAccess() das richtige Team prüft.
             TeamContext::setTeam($context->team);
@@ -279,6 +287,7 @@ class ToolContractAdapter extends Tool
 
         // MCP-Kontext: Team aus mcp_sessions Tabelle, Fallback auf current_team_id
         $team = null;
+        $teamSource = 'none';
         $metadata = [];
 
         if ($this->mcpSessionId) {
@@ -288,6 +297,7 @@ class ToolContractAdapter extends Tool
                 $mcpSession = McpSession::find($this->mcpSessionId);
                 if ($mcpSession && $mcpSession->team_id) {
                     $team = $mcpSession->team;
+                    $teamSource = 'mcp_session';
                     $mcpSession->update(['last_activity_at' => now()]);
                 }
             } catch (\Throwable $e) {
@@ -300,7 +310,16 @@ class ToolContractAdapter extends Tool
 
         if (!$team && method_exists($user, 'currentTeam')) {
             $team = $user->currentTeam;
+            $teamSource = 'user_current';
         }
+
+        $metadata['team_source'] = $teamSource;
+
+        Log::debug('[MCP Context]', [
+            'session' => $this->mcpSessionId ? substr($this->mcpSessionId, 0, 12) . '...' : null,
+            'team_source' => $teamSource,
+            'team_id' => $team?->id,
+        ]);
 
         return ToolContext::create($user, $team, $metadata);
     }

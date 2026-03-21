@@ -3,6 +3,7 @@
 namespace Platform\Core\Services;
 
 use Platform\Core\Models\Team;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Request-scoped Team-Override für MCP/Playground-Kontext.
@@ -26,6 +27,7 @@ class TeamContext
     {
         self::$overrideTeamId = $teamId;
         self::$overrideTeam = null; // Lazy-load bei Bedarf
+        Log::debug('[TeamContext] SET', ['team_id' => $teamId]);
     }
 
     /**
@@ -35,6 +37,7 @@ class TeamContext
     {
         self::$overrideTeamId = $team?->id;
         self::$overrideTeam = $team;
+        Log::debug('[TeamContext] SET', ['team_id' => $team?->id, 'team_name' => $team?->name]);
     }
 
     /**
@@ -68,6 +71,7 @@ class TeamContext
     {
         self::$overrideTeamId = null;
         self::$overrideTeam = null;
+        Log::debug('[TeamContext] CLEAR');
     }
 
     /**

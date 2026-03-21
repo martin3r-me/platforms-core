@@ -8,6 +8,7 @@ use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\McpSession;
 use Platform\Core\Models\Team;
+use Illuminate\Support\Facades\Log;
 
 /**
  * LLM Tool zum Wechseln des aktiven Team-Kontexts
@@ -97,6 +98,13 @@ class SwitchTeamContextTool implements ToolContract, ToolMetadataContract
             // Membership-Rolle abrufen
             $membership = $user->teams()->where('teams.id', $targetTeam->id)->first();
             $role = $membership?->pivot?->role ?? null;
+
+            Log::info('[MCP Switch]', [
+                'session' => $sessionId ? substr($sessionId, 0, 12) . '...' : null,
+                'user_id' => $user->id,
+                'from_team' => $previousTeam ? "{$previousTeam->id} ({$previousTeam->name})" : 'none',
+                'to_team' => "{$targetTeam->id} ({$targetTeam->name})",
+            ]);
 
             return ToolResult::success([
                 'message' => 'Team-Kontext erfolgreich gewechselt zu "' . $targetTeam->name . '".',

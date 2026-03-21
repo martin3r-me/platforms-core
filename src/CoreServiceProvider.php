@@ -299,7 +299,8 @@ class CoreServiceProvider extends ServiceProvider
                 $registry->has('core.modules.GET') &&
                 $registry->has('core.context.GET') &&
                 $registry->has('core.user.GET') &&
-                $registry->has('core.teams.GET');
+                $registry->has('core.teams.GET') &&
+                $registry->has('core.session.debug');
             
             // 1. Auto-Discovery: Lade Tools automatisch aus Core (und Module nur, wenn Registry leer ist)
             try {
@@ -400,6 +401,9 @@ class CoreServiceProvider extends ServiceProvider
         }
         if (!$registry->has('core.team.switch')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\SwitchTeamContextTool::class)); } catch (\Throwable $e) {}
+        }
+        if (!$registry->has('core.session.debug')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\SessionDebugTool::class)); } catch (\Throwable $e) {}
         }
 
         // Core: Team erstellen (wird von LLM häufig gebraucht, darf nicht "unsichtbar" sein)
