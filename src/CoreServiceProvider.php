@@ -609,6 +609,11 @@ class CoreServiceProvider extends ServiceProvider
             \Platform\Core\Tools\Obsidian\UpdateFileTool::class => 'obsidian.files.PUT',
             \Platform\Core\Tools\Obsidian\DeleteFileTool::class => 'obsidian.files.DELETE',
             \Platform\Core\Tools\Obsidian\MoveFileTool::class => 'obsidian.files.MOVE',
+            \Platform\Core\Tools\Obsidian\AppendFileTool::class => 'obsidian.files.APPEND',
+            \Platform\Core\Tools\Obsidian\SearchFilesTool::class => 'obsidian.files.SEARCH',
+            \Platform\Core\Tools\Obsidian\CreateFolderTool::class => 'obsidian.folders.POST',
+            \Platform\Core\Tools\Obsidian\FrontmatterTool::class => 'obsidian.files.FRONTMATTER',
+            \Platform\Core\Tools\Obsidian\BatchReadTool::class => 'obsidian.files.BATCH_READ',
         ];
         foreach ($obsidianTools as $class => $name) {
             if (class_exists($class) && !$registry->has($name)) {

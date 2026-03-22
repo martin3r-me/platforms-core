@@ -9,7 +9,7 @@ use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\ObsidianVault;
 use Platform\Core\Services\ObsidianStorageService;
 
-class ListFilesTool implements ToolContract, ToolMetadataContract
+class CreateFolderTool implements ToolContract, ToolMetadataContract
 {
     public function __construct(
         private ObsidianStorageService $storage
@@ -17,12 +17,12 @@ class ListFilesTool implements ToolContract, ToolMetadataContract
 
     public function getName(): string
     {
-        return 'obsidian.files.GET';
+        return 'obsidian.folders.POST';
     }
 
     public function getDescription(): string
     {
-        return 'GET /obsidian/files - Listet Dateien und Ordner in einem Vault-Pfad auf. Mit recursive=true wird die gesamte Verzeichnisstruktur zurückgegeben.';
+        return 'POST /obsidian/folders - Erstellt einen neuen Ordner im Vault. Unterstützt verschachtelte Pfade (z.B. "02_businesses/BANKETT.DIGITAL/notes").';
     }
 
     public function getSchema(): array
@@ -36,14 +36,10 @@ class ListFilesTool implements ToolContract, ToolMetadataContract
                 ],
                 'path' => [
                     'type' => 'string',
-                    'description' => 'Pfad im Vault (relativ). Standard: "/" (Root).',
-                ],
-                'recursive' => [
-                    'type' => 'boolean',
-                    'description' => 'Wenn true, werden ALLE Dateien und Ordner rekursiv aufgelistet (gesamte Struktur). Standard: false.',
+                    'description' => 'Ordnerpfad (z.B. "02_businesses/BANKETT.DIGITAL"). Erstellt auch Eltern-Ordner automatisch.',
                 ],
             ],
-            'required' => ['vault_id'],
+            'required' => ['vault_id', 'path'],
         ];
     }
 
@@ -58,19 +54,17 @@ class ListFilesTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('Vault nicht gefunden.', 'NOT_FOUND');
             }
 
-            $path = (string) ($arguments['path'] ?? '/');
-            $recursive = (bool) ($arguments['recursive'] ?? false);
+            $path = (string) ($arguments['path'] ?? '');
+            if (trim($path) === '') {
+                return ToolResult::error('path ist erforderlich.', 'VALIDATION_ERROR');
+            }
 
-            $items = $recursive
-                ? $this->storage->listFilesRecursive($vault, $path)
-                : $this->storage->listFiles($vault, $path);
+            $this->storage->createFolder($vault, $path);
 
             return ToolResult::success([
                 'vault_id' => $vault->id,
                 'path' => $path,
-                'recursive' => $recursive,
-                'items' => $items,
-                'count' => count($items),
+                'message' => "Ordner erstellt: {$path}",
             ]);
         } catch (\InvalidArgumentException $e) {
             return ToolResult::error($e->getMessage(), 'VALIDATION_ERROR');
@@ -82,12 +76,12 @@ class ListFilesTool implements ToolContract, ToolMetadataContract
     public function getMetadata(): array
     {
         return [
-            'category' => 'query',
-            'tags' => ['obsidian', 'files', 'list'],
-            'read_only' => true,
+            'category' => 'action',
+            'tags' => ['obsidian', 'folders', 'create', 'directory'],
+            'read_only' => false,
             'requires_auth' => true,
             'requires_team' => false,
-            'risk_level' => 'safe',
+            'risk_level' => 'write',
             'idempotent' => true,
         ];
     }
