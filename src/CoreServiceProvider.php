@@ -100,6 +100,12 @@ class CoreServiceProvider extends ServiceProvider
         // Konfigurationen veröffentlichen
         // Agent-Config Publishes entfernt – Agent ausgelagert
 
+        // Policies registrieren
+        \Illuminate\Support\Facades\Gate::policy(
+            \Platform\Core\Models\ObsidianVault::class,
+            \Platform\Core\Policies\ObsidianVaultPolicy::class
+        );
+
         // Event-Listener für Tools registrieren
         $this->registerToolEventListeners();
 
@@ -589,6 +595,26 @@ class CoreServiceProvider extends ServiceProvider
         }
 
         // Communication Tools moved to CRM module (crm.comms.*)
+
+        // Obsidian Vault Tools (obsidian.vaults.*, obsidian.files.*)
+        $obsidianTools = [
+            \Platform\Core\Tools\Obsidian\ListVaultsTool::class => 'obsidian.vaults.GET',
+            \Platform\Core\Tools\Obsidian\CreateVaultTool::class => 'obsidian.vaults.POST',
+            \Platform\Core\Tools\Obsidian\UpdateVaultTool::class => 'obsidian.vaults.PUT',
+            \Platform\Core\Tools\Obsidian\DeleteVaultTool::class => 'obsidian.vaults.DELETE',
+            \Platform\Core\Tools\Obsidian\TestConnectionTool::class => 'obsidian.vaults.TEST',
+            \Platform\Core\Tools\Obsidian\ListFilesTool::class => 'obsidian.files.GET',
+            \Platform\Core\Tools\Obsidian\ReadFileTool::class => 'obsidian.files.READ',
+            \Platform\Core\Tools\Obsidian\WriteFileTool::class => 'obsidian.files.POST',
+            \Platform\Core\Tools\Obsidian\UpdateFileTool::class => 'obsidian.files.PUT',
+            \Platform\Core\Tools\Obsidian\DeleteFileTool::class => 'obsidian.files.DELETE',
+            \Platform\Core\Tools\Obsidian\MoveFileTool::class => 'obsidian.files.MOVE',
+        ];
+        foreach ($obsidianTools as $class => $name) {
+            if (class_exists($class) && !$registry->has($name)) {
+                try { $registry->register($this->app->make($class)); } catch (\Throwable $e) {}
+            }
+        }
     }
 
 

@@ -335,4 +335,9 @@ class User extends Authenticatable
     {
         return $this->morphMany(PassportClient::class, 'owner');
     }
+
+    public function obsidianVaults(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\Platform\Core\Models\ObsidianVault::class);
+    }
 }

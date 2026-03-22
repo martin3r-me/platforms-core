@@ -99,8 +99,12 @@ class ListToolsTool implements ToolContract
                 if ($module === 'communication') {
                     $filteredTools = array_filter($filteredTools, function($tool) {
                         $toolName = $tool->getName();
-                        return str_starts_with($toolName, 'communication.') 
+                        return str_starts_with($toolName, 'communication.')
                             || str_starts_with($toolName, 'core.comms.');
+                    });
+                } elseif ($module === 'obsidian') {
+                    $filteredTools = array_filter($filteredTools, function($tool) {
+                        return str_starts_with($tool->getName(), 'obsidian.');
                     });
                 } else {
                     $filteredTools = array_filter($filteredTools, function($tool) use ($module) {
