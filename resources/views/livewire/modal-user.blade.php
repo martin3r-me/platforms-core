@@ -35,6 +35,14 @@
             >
                 MCP Clients
             </button>
+            <button
+                type="button"
+                wire:click="setTab('obsidian')"
+                class="px-4 py-2 text-sm font-medium transition-colors border-b-2"
+                :class="$wire.activeTab === 'obsidian' ? 'text-[var(--ui-primary)] border-[var(--ui-primary)]' : 'text-[var(--ui-muted)] border-transparent hover:text-[var(--ui-secondary)]'"
+            >
+                Obsidian
+            </button>
         </nav>
     </div>
 
@@ -441,6 +449,187 @@
                         <div class="p-8 text-center text-[var(--ui-muted)] bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
                             <div class="mb-2">@svg('heroicon-o-link', 'w-8 h-8 mx-auto opacity-50')</div>
                             <p>Noch keine MCP Clients erstellt.</p>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+
+        {{-- Tab: Obsidian Vaults --}}
+        <div x-show="$wire.activeTab === 'obsidian'" x-transition>
+            <div class="space-y-6">
+                {{-- Info-Box --}}
+                <div class="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div class="flex items-start gap-3">
+                        @svg('heroicon-o-cloud', 'w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5')
+                        <div class="text-sm text-purple-700">
+                            <p class="font-medium mb-1">Obsidian Vault Verbindungen</p>
+                            <p>Verbinde deine Obsidian Vaults via S3-kompatiblem Storage (AWS S3, Cloudflare R2, MinIO, Wasabi). Nutze das Plugin "Remotely Save" in Obsidian, um deinen Vault mit dem Bucket zu synchronisieren.</p>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Vault erstellen/bearbeiten --}}
+                @if($showVaultForm)
+                    <div class="p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
+                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">
+                            {{ $editingVaultId ? 'Vault bearbeiten' : 'Neuen Vault anlegen' }}
+                        </h3>
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <x-ui-input-text
+                                    name="vaultForm.name"
+                                    label="Name"
+                                    wire:model="vaultForm.name"
+                                    placeholder="z.B. Work, Personal"
+                                    :errorKey="'vaultForm.name'"
+                                />
+                                <div>
+                                    <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1.5">Driver</label>
+                                    <select
+                                        wire:model="vaultForm.driver"
+                                        class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
+                                    >
+                                        <option value="s3">AWS S3</option>
+                                        <option value="r2">Cloudflare R2</option>
+                                        <option value="minio">MinIO</option>
+                                        <option value="wasabi">Wasabi</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <x-ui-input-text
+                                    name="vaultForm.bucket"
+                                    label="Bucket"
+                                    wire:model="vaultForm.bucket"
+                                    placeholder="my-obsidian-bucket"
+                                    :errorKey="'vaultForm.bucket'"
+                                />
+                                <x-ui-input-text
+                                    name="vaultForm.region"
+                                    label="Region"
+                                    wire:model="vaultForm.region"
+                                    placeholder="eu-central-1 (optional)"
+                                />
+                            </div>
+                            <x-ui-input-text
+                                name="vaultForm.endpoint"
+                                label="Custom Endpoint"
+                                wire:model="vaultForm.endpoint"
+                                placeholder="https://... (optional, für R2/MinIO/Wasabi)"
+                            />
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <x-ui-input-text
+                                    name="vaultForm.access_key"
+                                    label="Access Key"
+                                    wire:model="vaultForm.access_key"
+                                    placeholder="AKIA..."
+                                    :errorKey="'vaultForm.access_key'"
+                                />
+                                <div>
+                                    <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1.5">Secret Key</label>
+                                    <input
+                                        type="password"
+                                        wire:model="vaultForm.secret_key"
+                                        placeholder="••••••••"
+                                        class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
+                                    />
+                                    @error('vaultForm.secret_key')
+                                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            </div>
+                            <x-ui-input-text
+                                name="vaultForm.prefix"
+                                label="Prefix / Subfolder"
+                                wire:model="vaultForm.prefix"
+                                placeholder="obsidian/ (optional)"
+                            />
+                            <div class="flex gap-2">
+                                <x-ui-button variant="primary" wire:click="saveVault">
+                                    <div class="flex items-center gap-2">
+                                        @svg('heroicon-o-check', 'w-4 h-4')
+                                        {{ $editingVaultId ? 'Speichern' : 'Vault anlegen' }}
+                                    </div>
+                                </x-ui-button>
+                                <x-ui-button variant="secondary-outline" wire:click="cancelVaultForm">
+                                    Abbrechen
+                                </x-ui-button>
+                            </div>
+                        </div>
+                    </div>
+                @else
+                    <div>
+                        <x-ui-button variant="primary" wire:click="showCreateVault">
+                            <div class="flex items-center gap-2">
+                                @svg('heroicon-o-plus', 'w-4 h-4')
+                                Vault anlegen
+                            </div>
+                        </x-ui-button>
+                    </div>
+                @endif
+
+                {{-- Vault-Liste --}}
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Deine Vaults</h3>
+                        <span class="px-3 py-1 text-xs font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] rounded-full">
+                            {{ $this->obsidianVaults->count() }} {{ $this->obsidianVaults->count() === 1 ? 'Vault' : 'Vaults' }}
+                        </span>
+                    </div>
+
+                    @if($this->obsidianVaults->count() > 0)
+                        <div class="space-y-2">
+                            @foreach($this->obsidianVaults as $vault)
+                                <div class="p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div class="min-w-0 flex-1">
+                                            <div class="font-medium text-[var(--ui-secondary)]">{{ $vault->name }}</div>
+                                            <div class="mt-1 text-xs text-[var(--ui-muted)] space-y-0.5">
+                                                <div>Driver: {{ strtoupper($vault->driver) }} &middot; Bucket: {{ $vault->bucket }}</div>
+                                                @if($vault->region)
+                                                    <div>Region: {{ $vault->region }}</div>
+                                                @endif
+                                                @if($vault->prefix)
+                                                    <div>Prefix: {{ $vault->prefix }}</div>
+                                                @endif
+                                                @if(isset($vaultTestResults[$vault->id]))
+                                                    <div class="{{ $vaultTestResults[$vault->id] ? 'text-green-600' : 'text-red-600' }}">
+                                                        {{ $vaultTestResults[$vault->id] ? 'Verbindung OK' : 'Verbindung fehlgeschlagen' }}
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-1">
+                                            <button
+                                                wire:click="testVaultConnection({{ $vault->id }})"
+                                                class="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                                title="Verbindung testen"
+                                            >
+                                                Test
+                                            </button>
+                                            <button
+                                                wire:click="editVault({{ $vault->id }})"
+                                                class="px-3 py-1.5 text-xs font-medium text-[var(--ui-secondary)] bg-[var(--ui-muted-5)] rounded-lg hover:bg-[var(--ui-border)]/60 transition-colors"
+                                            >
+                                                Bearbeiten
+                                            </button>
+                                            <button
+                                                wire:click="deleteVault({{ $vault->id }})"
+                                                wire:confirm="Vault wirklich löschen? Die S3-Inhalte bleiben erhalten."
+                                                class="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                                            >
+                                                Löschen
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="p-8 text-center text-[var(--ui-muted)] bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
+                            <div class="mb-2">@svg('heroicon-o-cloud', 'w-8 h-8 mx-auto opacity-50')</div>
+                            <p>Noch keine Obsidian Vaults konfiguriert.</p>
                         </div>
                     @endif
                 </div>

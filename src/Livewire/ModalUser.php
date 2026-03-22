@@ -30,6 +30,21 @@ class ModalUser extends Component
     public $newMcpClientSecret = null;
     public $showNewMcpClient = false;
 
+    // Obsidian Vault Properties
+    public $vaultForm = [
+        'name' => '',
+        'driver' => 's3',
+        'bucket' => '',
+        'region' => '',
+        'endpoint' => '',
+        'access_key' => '',
+        'secret_key' => '',
+        'prefix' => '',
+    ];
+    public $editingVaultId = null;
+    public $showVaultForm = false;
+    public $vaultTestResults = [];
+
     protected $listeners = ['open-modal-user' => 'openModal'];
 
     public function mount()
@@ -53,6 +68,9 @@ class ModalUser extends Component
         }
         if ($tab !== 'mcp') {
             $this->resetMcpClientForm();
+        }
+        if ($tab !== 'obsidian') {
+            $this->resetVaultForm();
         }
     }
 
@@ -276,6 +294,149 @@ class ModalUser extends Component
         $this->newMcpClientCreated = null;
         $this->newMcpClientSecret = null;
         $this->showNewMcpClient = false;
+    }
+
+    // ========================================
+    // Obsidian Vault Management
+    // ========================================
+
+    public function getObsidianVaultsProperty()
+    {
+        return \Platform\Core\Models\ObsidianVault::where('user_id', Auth::id())
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function showCreateVault()
+    {
+        $this->resetVaultForm();
+        $this->showVaultForm = true;
+    }
+
+    public function editVault($vaultId)
+    {
+        $vault = \Platform\Core\Models\ObsidianVault::where('id', $vaultId)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if (! $vault) {
+            return;
+        }
+
+        $this->editingVaultId = $vault->id;
+        $this->vaultForm = [
+            'name' => $vault->name,
+            'driver' => $vault->driver,
+            'bucket' => $vault->bucket,
+            'region' => $vault->region ?? '',
+            'endpoint' => $vault->endpoint ?? '',
+            'access_key' => $vault->access_key,
+            'secret_key' => $vault->secret_key,
+            'prefix' => $vault->prefix ?? '',
+        ];
+        $this->showVaultForm = true;
+    }
+
+    public function saveVault()
+    {
+        $this->validate([
+            'vaultForm.name' => 'required|string|max:255',
+            'vaultForm.bucket' => 'required|string|max:255',
+            'vaultForm.access_key' => 'required|string',
+            'vaultForm.secret_key' => 'required|string',
+            'vaultForm.driver' => 'required|string|in:s3,r2,minio,wasabi',
+        ]);
+
+        $data = [
+            'name' => $this->vaultForm['name'],
+            'driver' => $this->vaultForm['driver'],
+            'bucket' => $this->vaultForm['bucket'],
+            'region' => $this->vaultForm['region'] ?: null,
+            'endpoint' => $this->vaultForm['endpoint'] ?: null,
+            'access_key' => $this->vaultForm['access_key'],
+            'secret_key' => $this->vaultForm['secret_key'],
+            'prefix' => $this->vaultForm['prefix'] ?: null,
+        ];
+
+        if ($this->editingVaultId) {
+            $vault = \Platform\Core\Models\ObsidianVault::where('id', $this->editingVaultId)
+                ->where('user_id', Auth::id())
+                ->first();
+
+            if ($vault) {
+                $vault->update($data);
+                $vault->slug = \Illuminate\Support\Str::slug($data['name']);
+                $vault->save();
+            }
+        } else {
+            $vault = new \Platform\Core\Models\ObsidianVault($data);
+            $vault->user_id = Auth::id();
+            $vault->save();
+        }
+
+        $this->resetVaultForm();
+
+        $this->dispatch('notice', [
+            'type' => 'success',
+            'message' => $this->editingVaultId ? 'Vault aktualisiert.' : 'Vault erstellt.',
+        ]);
+    }
+
+    public function deleteVault($vaultId)
+    {
+        \Platform\Core\Models\ObsidianVault::where('id', $vaultId)
+            ->where('user_id', Auth::id())
+            ->delete();
+
+        $this->dispatch('notice', [
+            'type' => 'success',
+            'message' => 'Vault gelöscht.',
+        ]);
+    }
+
+    public function testVaultConnection($vaultId)
+    {
+        $vault = \Platform\Core\Models\ObsidianVault::where('id', $vaultId)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if (! $vault) {
+            return;
+        }
+
+        $storage = app(\Platform\Core\Services\ObsidianStorageService::class);
+        $connected = $storage->testConnection($vault);
+
+        $this->vaultTestResults[$vaultId] = $connected;
+
+        $this->dispatch('notice', [
+            'type' => $connected ? 'success' : 'error',
+            'message' => $connected
+                ? "Verbindung zu \"{$vault->name}\" erfolgreich."
+                : "Verbindung zu \"{$vault->name}\" fehlgeschlagen.",
+        ]);
+    }
+
+    public function cancelVaultForm()
+    {
+        $this->resetVaultForm();
+    }
+
+    protected function resetVaultForm()
+    {
+        $this->vaultForm = [
+            'name' => '',
+            'driver' => 's3',
+            'bucket' => '',
+            'region' => '',
+            'endpoint' => '',
+            'access_key' => '',
+            'secret_key' => '',
+            'prefix' => '',
+        ];
+        $this->editingVaultId = null;
+        $this->showVaultForm = false;
+        $this->vaultTestResults = [];
     }
 
     // ========================================
