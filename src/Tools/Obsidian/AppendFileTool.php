@@ -22,7 +22,7 @@ class AppendFileTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'APPEND /obsidian/files - Hängt Inhalt an eine Datei an. Optional: unter einer bestimmten Markdown-Überschrift einfügen (heading Parameter). Erstellt die Datei falls sie nicht existiert.';
+        return 'APPEND /obsidian/files - Hängt Inhalt an eine Datei an. Mit section-Parameter gezielt unter eine Überschrift einfügen (z.B. section="## Primary Target"). Ohne section wird ans Dateiende angehängt. Erstellt die Datei falls sie nicht existiert.';
     }
 
     public function getSchema(): array
@@ -36,15 +36,15 @@ class AppendFileTool implements ToolContract, ToolMetadataContract
                 ],
                 'path' => [
                     'type' => 'string',
-                    'description' => 'Dateipfad im Vault (z.B. "daily/2026-03-22.md").',
+                    'description' => 'Dateipfad im Vault (z.B. "01_dailies/2026-03-22.md").',
                 ],
                 'content' => [
                     'type' => 'string',
                     'description' => 'Der anzuhängende Inhalt.',
                 ],
-                'heading' => [
+                'section' => [
                     'type' => 'string',
-                    'description' => 'Optional: Überschrift unter der eingefügt werden soll (z.B. "Notes", "Action Items"). Wird vor der nächsten gleichwertigen Überschrift eingefügt. Ohne heading wird ans Dateiende angehängt.',
+                    'description' => 'Optional: Überschrift unter der eingefügt werden soll (z.B. "Primary Target", "Action Items", "Notes"). Wird vor der nächsten gleichwertigen Überschrift eingefügt. Ohne section wird ans Dateiende angehängt.',
                 ],
             ],
             'required' => ['vault_id', 'path', 'content'],
@@ -68,17 +68,17 @@ class AppendFileTool implements ToolContract, ToolMetadataContract
             }
 
             $content = (string) ($arguments['content'] ?? '');
-            $heading = isset($arguments['heading']) ? trim((string) $arguments['heading']) : null;
+            $section = isset($arguments['section']) ? trim((string) $arguments['section']) : null;
 
-            if ($heading !== null && $heading !== '') {
-                $newContent = $this->storage->insertUnderHeading($vault, $path, $heading, $content);
+            if ($section !== null && $section !== '') {
+                $newContent = $this->storage->insertUnderHeading($vault, $path, $section, $content);
 
                 return ToolResult::success([
                     'vault_id' => $vault->id,
                     'path' => $path,
-                    'heading' => $heading,
+                    'section' => $section,
                     'size' => strlen($newContent),
-                    'message' => "Inhalt unter \"{$heading}\" in {$path} eingefügt.",
+                    'message' => "Inhalt unter \"{$section}\" in {$path} eingefügt.",
                 ]);
             }
 

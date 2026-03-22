@@ -614,6 +614,7 @@ class CoreServiceProvider extends ServiceProvider
             \Platform\Core\Tools\Obsidian\CreateFolderTool::class => 'obsidian.folders.POST',
             \Platform\Core\Tools\Obsidian\FrontmatterTool::class => 'obsidian.files.FRONTMATTER',
             \Platform\Core\Tools\Obsidian\BatchReadTool::class => 'obsidian.files.BATCH_READ',
+            \Platform\Core\Tools\Obsidian\PatchFileTool::class => 'obsidian.files.PATCH',
         ];
         foreach ($obsidianTools as $class => $name) {
             if (class_exists($class) && !$registry->has($name)) {
