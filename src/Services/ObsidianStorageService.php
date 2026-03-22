@@ -150,24 +150,43 @@ class ObsidianStorageService
             ? $this->readFile($vault, $path)
             : '';
 
-        // Find the heading line and insert after it (before the next heading of same or higher level)
-        $headingPattern = '/^(#{1,6})\s+' . preg_quote($heading, '/') . '\s*$/m';
+        // Normalize line endings to \n for reliable regex matching
+        $existing = str_replace("\r\n", "\n", $existing);
+        $existing = str_replace("\r", "\n", $existing);
 
-        if (preg_match($headingPattern, $existing, $matches, PREG_OFFSET_MATCH)) {
-            $headingLevel = strlen($matches[1][0]);
-            $insertPos = $matches[0][1] + strlen($matches[0][0]);
+        // Split into lines for reliable heading search
+        $lines = explode("\n", $existing);
+        $headingLineIndex = null;
+        $headingLevel = null;
+        $quotedHeading = preg_quote($heading, '/');
 
-            // Find the next heading of same or higher level
-            $rest = substr($existing, $insertPos);
-            $nextHeadingPattern = '/^#{1,' . $headingLevel . '}\s+/m';
-
-            if (preg_match($nextHeadingPattern, $rest, $nextMatch, PREG_OFFSET_MATCH)) {
-                $insertPos += $nextMatch[0][1];
-                $newContent = substr($existing, 0, $insertPos) . "\n" . $content . "\n" . substr($existing, $insertPos);
-            } else {
-                // No next heading — append at end
-                $newContent = $existing . "\n" . $content . "\n";
+        foreach ($lines as $i => $line) {
+            if (preg_match('/^(#{1,6})\s+' . $quotedHeading . '\s*$/', $line, $m)) {
+                $headingLineIndex = $i;
+                $headingLevel = strlen($m[1]);
+                break;
             }
+        }
+
+        if ($headingLineIndex !== null) {
+            // Find next heading of same or higher level
+            $insertBeforeIndex = null;
+            for ($i = $headingLineIndex + 1; $i < count($lines); $i++) {
+                if (preg_match('/^#{1,' . $headingLevel . '}\s+/', $lines[$i])) {
+                    $insertBeforeIndex = $i;
+                    break;
+                }
+            }
+
+            if ($insertBeforeIndex !== null) {
+                // Insert before the next heading
+                array_splice($lines, $insertBeforeIndex, 0, [$content]);
+            } else {
+                // No next heading — append content after last line
+                $lines[] = $content;
+            }
+
+            $newContent = implode("\n", $lines);
         } else {
             // Heading not found — append at end with heading
             $newContent = $existing . "\n## " . $heading . "\n" . $content . "\n";
@@ -245,8 +264,24 @@ class ObsidianStorageService
     {
         $content = $this->readFile($vault, $path);
 
-        if (! str_starts_with($content, '---')) {
-            return null;
+        // Strip BOM if present
+        if (str_starts_with($content, "\xEF\xBB\xBF")) {
+            $content = substr($content, 3);
+        }
+
+        // Normalize line endings
+        $content = str_replace("\r\n", "\n", $content);
+        $content = str_replace("\r", "\n", $content);
+
+        $content = ltrim($content);
+
+        if (! str_starts_with($content, "---\n") && ! str_starts_with($content, "---\r")) {
+            // Also handle --- as the entire first line (edge case: file is only frontmatter)
+            if ($content === '---' || str_starts_with($content, "---\n")) {
+                // ok
+            } else {
+                return null;
+            }
         }
 
         $endPos = strpos($content, "\n---", 3);
@@ -254,15 +289,55 @@ class ObsidianStorageService
             return null;
         }
 
-        $yaml = substr($content, 3, $endPos - 3);
+        // Extract the YAML between the two --- delimiters
+        $yaml = substr($content, 4, $endPos - 4); // 4 = strlen("---\n")
 
         try {
             $parsed = \Symfony\Component\Yaml\Yaml::parse(trim($yaml));
 
             return is_array($parsed) ? $parsed : null;
         } catch (\Throwable) {
-            return null;
+            // Fallback: simple key: value parsing for basic frontmatter
+            return $this->parseSimpleFrontmatter($yaml);
         }
+    }
+
+    /**
+     * Fallback parser for simple YAML frontmatter when Symfony YAML is not available.
+     */
+    private function parseSimpleFrontmatter(string $yaml): ?array
+    {
+        $result = [];
+        $lines = explode("\n", trim($yaml));
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+            $colonPos = strpos($line, ':');
+            if ($colonPos === false) {
+                continue;
+            }
+            $key = trim(substr($line, 0, $colonPos));
+            $value = trim(substr($line, $colonPos + 1));
+
+            // Handle arrays in [a, b, c] format
+            if (str_starts_with($value, '[') && str_ends_with($value, ']')) {
+                $value = array_map('trim', explode(',', substr($value, 1, -1)));
+            }
+            // Handle quoted strings
+            elseif ((str_starts_with($value, '"') && str_ends_with($value, '"'))
+                || (str_starts_with($value, "'") && str_ends_with($value, "'"))) {
+                $value = substr($value, 1, -1);
+            }
+
+            if ($key !== '') {
+                $result[$key] = $value;
+            }
+        }
+
+        return ! empty($result) ? $result : null;
     }
 
     /**
