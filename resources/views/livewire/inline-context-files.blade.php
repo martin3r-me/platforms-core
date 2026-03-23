@@ -2,16 +2,7 @@
     x-data="{
         lightboxOpen: false,
         lightboxIndex: 0,
-        lightboxFiles: [],
-        init() {
-            this.lightboxFiles = Array.from($el.querySelectorAll('[data-lightbox-url]')).map(el => ({
-                url: el.dataset.lightboxUrl,
-                name: el.dataset.lightboxName,
-                size: el.dataset.lightboxSize,
-                date: el.dataset.lightboxDate,
-                type: el.dataset.lightboxType,
-            }));
-        },
+        lightboxFiles: @js(collect($contextFiles)->filter(fn($f) => $f['is_image'] || str_ends_with(strtolower($f['original_name']), '.pdf') || ($f['mime_type'] ?? '') === 'application/pdf')->values()->map(fn($f) => ['url' => $f['url'], 'name' => $f['original_name'], 'size' => $f['file_size'], 'date' => $f['created_at'], 'type' => $f['is_image'] ? 'image' : 'pdf'])->all()),
         openLightbox(index) {
             this.lightboxIndex = index;
             this.lightboxOpen = true;
