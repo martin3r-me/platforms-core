@@ -99,6 +99,10 @@ class PublicExtraFieldForm extends Component
                 $isFilled = is_array($value) && !empty($value['e164'] ?? null);
             } elseif ($field['type'] === 'address') {
                 $isFilled = is_array($value) && !empty($value['street'] ?? null) && !empty($value['city'] ?? null);
+            } elseif ($field['type'] === 'date') {
+                $isFilled = is_array($value)
+                    ? (($value['day'] ?? '') !== '' && ($value['month'] ?? '') !== '' && ($value['year'] ?? '') !== '')
+                    : ($value !== null && $value !== '');
             } else {
                 $isFilled = $value !== null && $value !== '' && $value !== [];
             }
@@ -254,6 +258,8 @@ class PublicExtraFieldForm extends Component
             $this->totalFields++;
             if ($field['type'] === 'phone') {
                 $isFilled = is_array($field['value']) && !empty($field['value']['e164'] ?? null);
+            } elseif ($field['type'] === 'date') {
+                $isFilled = $field['value'] !== null && $field['value'] !== '';
             } else {
                 $isFilled = $field['value'] !== null && $field['value'] !== '' && $field['value'] !== [];
             }

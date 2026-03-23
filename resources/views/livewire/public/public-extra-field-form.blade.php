@@ -376,13 +376,58 @@
                                         >
                                         @break
 
-                                    {{-- ─── Date ─── --}}
+                                    {{-- ─── Date (3 Selects) ─── --}}
                                     @case('date')
-                                        <input
-                                            type="date"
-                                            wire:model="extraFieldValues.{{ $fieldId }}"
-                                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 outline-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                                        >
+                                        @php
+                                            $currentYear = (int) date('Y');
+                                            $yearRange = $options['year_range'] ?? \Platform\Core\Models\CoreExtraFieldDefinition::DATE_YEAR_RANGE_DEFAULT;
+                                            $months = [
+                                                1 => 'Januar', 2 => 'Februar', 3 => 'März', 4 => 'April',
+                                                5 => 'Mai', 6 => 'Juni', 7 => 'Juli', 8 => 'August',
+                                                9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Dezember',
+                                            ];
+                                        @endphp
+                                        <div class="grid grid-cols-3 gap-2">
+                                            <div class="relative">
+                                                <select
+                                                    wire:model.live="extraFieldValues.{{ $fieldId }}.day"
+                                                    class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 outline-none appearance-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 pr-8"
+                                                >
+                                                    <option value="">Tag</option>
+                                                    @for($d = 1; $d <= 31; $d++)
+                                                        <option value="{{ $d }}">{{ $d }}</option>
+                                                    @endfor
+                                                </select>
+                                                <svg class="w-4 h-4 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                            </div>
+                                            <div class="relative">
+                                                <select
+                                                    wire:model.live="extraFieldValues.{{ $fieldId }}.month"
+                                                    class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 outline-none appearance-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 pr-8"
+                                                >
+                                                    <option value="">Monat</option>
+                                                    @foreach($months as $num => $name)
+                                                        <option value="{{ $num }}">{{ $name }}</option>
+                                                    @endforeach
+                                                </select>
+                                                <svg class="w-4 h-4 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                            </div>
+                                            <div class="relative">
+                                                <select
+                                                    wire:model.live="extraFieldValues.{{ $fieldId }}.year"
+                                                    class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 outline-none appearance-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 pr-8"
+                                                >
+                                                    <option value="">Jahr</option>
+                                                    @for($y = $currentYear; $y >= $currentYear - $yearRange; $y--)
+                                                        <option value="{{ $y }}">{{ $y }}</option>
+                                                    @endfor
+                                                </select>
+                                                <svg class="w-4 h-4 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                            </div>
+                                        </div>
+                                        @error("extraFieldValues.{$fieldId}.day") <p class="mt-1.5 text-sm text-red-500">{{ $message }}</p> @enderror
+                                        @error("extraFieldValues.{$fieldId}.month") <p class="mt-1.5 text-sm text-red-500">{{ $message }}</p> @enderror
+                                        @error("extraFieldValues.{$fieldId}.year") <p class="mt-1.5 text-sm text-red-500">{{ $message }}</p> @enderror
                                         @break
 
                                     {{-- ─── Boolean (Badge Style) ─── --}}
