@@ -750,6 +750,31 @@
                         </div>
                         @break
 
+                    @case('email')
+                        @php
+                            $isAutoFilled = $this->extraFieldMeta[$field['id']]['auto_filled'] ?? false;
+                            $hint = collect(array_filter([
+                                $field['description'] ?? null,
+                                $field['is_encrypted'] ? 'Verschlüsselt' : null,
+                            ]))->implode(' · ') ?: null;
+                        @endphp
+                        <x-ui-input-text
+                            :name="'extraFieldValues.' . $field['id']"
+                            :label="$field['label']"
+                            :required="$field['is_mandatory'] || $field['is_required']"
+                            :hint="$hint"
+                            wire:model.live.debounce.500ms="extraFieldValues.{{ $field['id'] }}"
+                            type="email"
+                            placeholder="{{ $field['options']['placeholder'] ?? 'E-Mail-Adresse eingeben...' }}"
+                        />
+                        @if($isAutoFilled)
+                            <span class="text-xs text-[var(--ui-primary)] flex items-center gap-1 mt-1">
+                                @svg('heroicon-o-sparkles', 'w-3 h-3')
+                                Automatisch ausgefüllt
+                            </span>
+                        @endif
+                        @break
+
                     @default
                         @php
                             $isAutoFilled = $this->extraFieldMeta[$field['id']]['auto_filled'] ?? false;

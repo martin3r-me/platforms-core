@@ -66,6 +66,7 @@ class CoreExtraFieldDefinition extends Model
         'regex' => 'Text (Muster)',
         'address' => 'Adresse',
         'date' => 'Datum',
+        'email' => 'E-Mail-Adresse',
     ];
 
     /**
@@ -120,6 +121,10 @@ class CoreExtraFieldDefinition extends Model
         'date' => [
             'icon' => 'heroicon-o-calendar-days',
             'description' => 'Datumsfeld mit Tag, Monat und Jahr als einzelne Auswahlfelder.',
+        ],
+        'email' => [
+            'icon' => 'heroicon-o-envelope',
+            'description' => 'E-Mail-Adresse mit automatischer Formatvalidierung.',
         ],
     ];
 

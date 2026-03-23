@@ -817,6 +817,16 @@
                                         </div>
                                         @break
 
+                                    {{-- ─── Email ─── --}}
+                                    @case('email')
+                                        <input
+                                            type="email"
+                                            wire:model="extraFieldValues.{{ $fieldId }}"
+                                            placeholder="{{ $options['placeholder'] ?? 'E-Mail-Adresse eingeben...' }}"
+                                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                                        >
+                                        @break
+
                                     {{-- ─── Fallback ─── --}}
                                     @default
                                         <input

@@ -586,6 +586,11 @@ trait WithExtraFields
                         $fieldRules[] = 'regex:/' . $pattern . '/';
                     }
                     break;
+                case 'email':
+                    $fieldRules[] = 'string';
+                    $fieldRules[] = 'email';
+                    $fieldRules[] = 'max:255';
+                    break;
                 case 'date':
                     $fieldRules = ['nullable', 'array'];
                     $rules["extraFieldValues.{$field['id']}"] = $fieldRules;
@@ -637,6 +642,7 @@ trait WithExtraFields
             $messages["extraFieldValues.{$field['id']}.numeric"] = "Das Feld \"{$field['label']}\" muss eine Zahl sein.";
             $messages["extraFieldValues.{$field['id']}.string"] = "Das Feld \"{$field['label']}\" muss ein Text sein.";
             $messages["extraFieldValues.{$field['id']}.raw.required"] = "Das Feld \"{$field['label']}\" ist ein Pflichtfeld.";
+            $messages["extraFieldValues.{$field['id']}.email"] = "Das Feld \"{$field['label']}\" muss eine gültige E-Mail-Adresse sein.";
             if ($field['type'] === 'date') {
                 $messages["extraFieldValues.{$field['id']}.day.required"] = "Tag ist ein Pflichtfeld.";
                 $messages["extraFieldValues.{$field['id']}.day.between"] = "Tag muss zwischen 1 und 31 liegen.";

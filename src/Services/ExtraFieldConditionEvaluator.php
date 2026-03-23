@@ -18,12 +18,12 @@ class ExtraFieldConditionEvaluator
     public const OPERATORS = [
         'equals' => [
             'label' => 'Gleich',
-            'types' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'date'],
+            'types' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'date', 'email'],
             'requiresValue' => true,
         ],
         'not_equals' => [
             'label' => 'Ungleich',
-            'types' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'date'],
+            'types' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'date', 'email'],
             'requiresValue' => true,
         ],
         'greater_than' => [
@@ -48,12 +48,12 @@ class ExtraFieldConditionEvaluator
         ],
         'is_null' => [
             'label' => 'Ist leer',
-            'types' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'file', 'date'],
+            'types' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'file', 'date', 'email'],
             'requiresValue' => false,
         ],
         'is_not_null' => [
             'label' => 'Ist nicht leer',
-            'types' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'file', 'date'],
+            'types' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'file', 'date', 'email'],
             'requiresValue' => false,
         ],
         'in' => [
@@ -78,17 +78,17 @@ class ExtraFieldConditionEvaluator
         ],
         'contains' => [
             'label' => 'Enthält',
-            'types' => ['text', 'textarea'],
+            'types' => ['text', 'textarea', 'email'],
             'requiresValue' => true,
         ],
         'starts_with' => [
             'label' => 'Beginnt mit',
-            'types' => ['text', 'textarea'],
+            'types' => ['text', 'textarea', 'email'],
             'requiresValue' => true,
         ],
         'ends_with' => [
             'label' => 'Endet mit',
-            'types' => ['text', 'textarea'],
+            'types' => ['text', 'textarea', 'email'],
             'requiresValue' => true,
         ],
         'is_true' => [
