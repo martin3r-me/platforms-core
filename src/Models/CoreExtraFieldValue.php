@@ -105,7 +105,7 @@ class CoreExtraFieldValue extends Model
         return match ($type) {
             'number' => is_numeric($value) ? (float) $value : null,
             'boolean' => in_array($value, ['1', 'true'], true),
-            'text', 'textarea', 'regex' => (string) $value,
+            'text', 'textarea', 'regex', 'date' => (string) $value,
             'select', 'lookup' => $this->decodeSelectValue($value),
             'file' => $this->decodeFileValue($value),
             'phone' => $this->decodePhoneValue($value),
@@ -129,7 +129,7 @@ class CoreExtraFieldValue extends Model
         $stringValue = match ($type) {
             'number' => is_numeric($value) ? (string) $value : null,
             'boolean' => $this->normalizeBooleanForStorage($value),
-            'text', 'textarea', 'regex' => (string) $value,
+            'text', 'textarea', 'regex', 'date' => (string) $value,
             'select', 'lookup' => is_array($value) ? json_encode($value) : (string) $value,
             'file' => is_array($value) ? json_encode($value) : (string) $value,
             'phone' => is_array($value) ? json_encode($value) : (string) $value,

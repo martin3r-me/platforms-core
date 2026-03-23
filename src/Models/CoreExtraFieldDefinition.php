@@ -65,7 +65,13 @@ class CoreExtraFieldDefinition extends Model
         'phone' => 'Telefonnummer',
         'regex' => 'Text (Muster)',
         'address' => 'Adresse',
+        'date' => 'Datum',
     ];
+
+    /**
+     * Standard Jahr-Range für Datums-Felder (Jahre zurück von heute)
+     */
+    public const DATE_YEAR_RANGE_DEFAULT = 100;
 
     /**
      * Beschreibungen und Icons für Feldtypen
@@ -110,6 +116,10 @@ class CoreExtraFieldDefinition extends Model
         'address' => [
             'icon' => 'heroicon-o-map-pin',
             'description' => 'Strukturiertes Adressfeld mit Straße, PLZ, Ort, Bundesland und Land.',
+        ],
+        'date' => [
+            'icon' => 'heroicon-o-calendar-days',
+            'description' => 'Datumsfeld mit Tag, Monat und Jahr als einzelne Auswahlfelder.',
         ],
     ];
 

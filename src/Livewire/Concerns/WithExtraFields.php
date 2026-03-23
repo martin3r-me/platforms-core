@@ -133,6 +133,20 @@ trait WithExtraFields
                 }
             }
 
+            // Für Date-Felder: Y-m-d String in Array aufsplitten
+            if ($field['type'] === 'date') {
+                if (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+                    $parts = explode('-', $value);
+                    $value = [
+                        'year' => (int) $parts[0],
+                        'month' => (int) $parts[1],
+                        'day' => (int) $parts[2],
+                    ];
+                } else {
+                    $value = ['day' => '', 'month' => '', 'year' => ''];
+                }
+            }
+
             $this->extraFieldValues[$field['id']] = $value;
 
             // Load verification and auto-fill metadata
@@ -251,6 +265,20 @@ trait WithExtraFields
                 }
             }
 
+            // Für Date-Felder: Y-m-d String in Array aufsplitten
+            if ($field['type'] === 'date') {
+                if (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+                    $parts = explode('-', $value);
+                    $value = [
+                        'year' => (int) $parts[0],
+                        'month' => (int) $parts[1],
+                        'day' => (int) $parts[2],
+                    ];
+                } else {
+                    $value = ['day' => '', 'month' => '', 'year' => ''];
+                }
+            }
+
             $this->extraFieldValues[$field['id']] = $value;
 
             // Load verification and auto-fill metadata
@@ -344,6 +372,23 @@ trait WithExtraFields
                     || !empty(trim($newValue['zip'] ?? ''))
                     || !empty(trim($newValue['city'] ?? ''));
                 if (!$hasContent) {
+                    $newValue = null;
+                }
+            }
+
+            // Date-Felder: Array zu Y-m-d String zusammenbauen
+            if ($field['type'] === 'date' && is_array($newValue)) {
+                $day = $newValue['day'] ?? '';
+                $month = $newValue['month'] ?? '';
+                $year = $newValue['year'] ?? '';
+                if ($day !== '' && $month !== '' && $year !== '') {
+                    if (!checkdate((int) $month, (int) $day, (int) $year)) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            "extraFieldValues.{$definitionId}.day" => 'Ungültiges Datum.',
+                        ]);
+                    }
+                    $newValue = sprintf('%04d-%02d-%02d', (int) $year, (int) $month, (int) $day);
+                } else {
                     $newValue = null;
                 }
             }
@@ -541,6 +586,20 @@ trait WithExtraFields
                         $fieldRules[] = 'regex:/' . $pattern . '/';
                     }
                     break;
+                case 'date':
+                    $fieldRules = ['nullable', 'array'];
+                    $rules["extraFieldValues.{$field['id']}"] = $fieldRules;
+                    $currentYear = (int) date('Y');
+                    if ($field['is_mandatory'] ?? false) {
+                        $rules["extraFieldValues.{$field['id']}.day"] = ['required', 'integer', 'between:1,31'];
+                        $rules["extraFieldValues.{$field['id']}.month"] = ['required', 'integer', 'between:1,12'];
+                        $rules["extraFieldValues.{$field['id']}.year"] = ['required', 'integer', 'between:1900,' . $currentYear];
+                    } else {
+                        $rules["extraFieldValues.{$field['id']}.day"] = ['nullable', 'integer', 'between:1,31'];
+                        $rules["extraFieldValues.{$field['id']}.month"] = ['nullable', 'integer', 'between:1,12'];
+                        $rules["extraFieldValues.{$field['id']}.year"] = ['nullable', 'integer', 'between:1900,' . $currentYear];
+                    }
+                    continue 2;
                 case 'address':
                     $fieldRules = ['nullable', 'array'];
                     $rules["extraFieldValues.{$field['id']}"] = $fieldRules;
@@ -578,6 +637,14 @@ trait WithExtraFields
             $messages["extraFieldValues.{$field['id']}.numeric"] = "Das Feld \"{$field['label']}\" muss eine Zahl sein.";
             $messages["extraFieldValues.{$field['id']}.string"] = "Das Feld \"{$field['label']}\" muss ein Text sein.";
             $messages["extraFieldValues.{$field['id']}.raw.required"] = "Das Feld \"{$field['label']}\" ist ein Pflichtfeld.";
+            if ($field['type'] === 'date') {
+                $messages["extraFieldValues.{$field['id']}.day.required"] = "Tag ist ein Pflichtfeld.";
+                $messages["extraFieldValues.{$field['id']}.day.between"] = "Tag muss zwischen 1 und 31 liegen.";
+                $messages["extraFieldValues.{$field['id']}.month.required"] = "Monat ist ein Pflichtfeld.";
+                $messages["extraFieldValues.{$field['id']}.month.between"] = "Monat muss zwischen 1 und 12 liegen.";
+                $messages["extraFieldValues.{$field['id']}.year.required"] = "Jahr ist ein Pflichtfeld.";
+                $messages["extraFieldValues.{$field['id']}.year.between"] = "Jahr muss zwischen 1900 und " . date('Y') . " liegen.";
+            }
             if ($field['type'] === 'address') {
                 $messages["extraFieldValues.{$field['id']}.street.required"] = "Straße ist ein Pflichtfeld.";
                 $messages["extraFieldValues.{$field['id']}.zip.required"] = "PLZ ist ein Pflichtfeld.";

@@ -522,6 +522,78 @@
                         @endif
                         @break
 
+                    @case('date')
+                        @php
+                            $hint = $field['description'] ?? null;
+                            $currentYear = (int) date('Y');
+                            $yearRange = $field['options']['year_range'] ?? \Platform\Core\Models\CoreExtraFieldDefinition::DATE_YEAR_RANGE_DEFAULT;
+                            $months = [
+                                1 => 'Januar', 2 => 'Februar', 3 => 'März', 4 => 'April',
+                                5 => 'Mai', 6 => 'Juni', 7 => 'Juli', 8 => 'August',
+                                9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Dezember',
+                            ];
+                        @endphp
+                        <div>
+                            <x-ui-label
+                                :text="$field['label']"
+                                :required="$field['is_mandatory'] || $field['is_required']"
+                                class="mb-1"
+                            />
+                            @if($hint)
+                                <p class="text-xs text-[var(--ui-muted)] mb-2">{{ $hint }}</p>
+                            @else
+                                <div class="mb-1"></div>
+                            @endif
+                            <div class="grid grid-cols-3 gap-2">
+                                {{-- Tag --}}
+                                <select
+                                    wire:model.live="extraFieldValues.{{ $field['id'] }}.day"
+                                    class="w-full rounded-lg border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] px-3 py-2 text-sm text-[var(--ui-text)] focus:border-[var(--ui-primary)] focus:ring-1 focus:ring-[var(--ui-primary)] outline-none"
+                                >
+                                    <option value="">Tag</option>
+                                    @for($d = 1; $d <= 31; $d++)
+                                        <option value="{{ $d }}">{{ $d }}</option>
+                                    @endfor
+                                </select>
+                                {{-- Monat --}}
+                                <select
+                                    wire:model.live="extraFieldValues.{{ $field['id'] }}.month"
+                                    class="w-full rounded-lg border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] px-3 py-2 text-sm text-[var(--ui-text)] focus:border-[var(--ui-primary)] focus:ring-1 focus:ring-[var(--ui-primary)] outline-none"
+                                >
+                                    <option value="">Monat</option>
+                                    @foreach($months as $num => $name)
+                                        <option value="{{ $num }}">{{ $name }}</option>
+                                    @endforeach
+                                </select>
+                                {{-- Jahr --}}
+                                <select
+                                    wire:model.live="extraFieldValues.{{ $field['id'] }}.year"
+                                    class="w-full rounded-lg border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] px-3 py-2 text-sm text-[var(--ui-text)] focus:border-[var(--ui-primary)] focus:ring-1 focus:ring-[var(--ui-primary)] outline-none"
+                                >
+                                    <option value="">Jahr</option>
+                                    @for($y = $currentYear; $y >= $currentYear - $yearRange; $y--)
+                                        <option value="{{ $y }}">{{ $y }}</option>
+                                    @endfor
+                                </select>
+                            </div>
+                            @error("extraFieldValues.{$field['id']}.day")
+                                <p class="mt-1 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
+                            @enderror
+                            @error("extraFieldValues.{$field['id']}.month")
+                                <p class="mt-1 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
+                            @enderror
+                            @error("extraFieldValues.{$field['id']}.year")
+                                <p class="mt-1 text-sm text-[var(--ui-danger)]">{{ $message }}</p>
+                            @enderror
+                            @if($field['is_encrypted'])
+                                <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1 mt-1">
+                                    @svg('heroicon-o-lock-closed', 'w-3 h-3')
+                                    Verschlüsselt
+                                </span>
+                            @endif
+                        </div>
+                        @break
+
                     @case('address')
                         @php
                             $countries = \Platform\Core\Models\CoreExtraFieldDefinition::PHONE_COUNTRIES;

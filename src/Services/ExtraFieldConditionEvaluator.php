@@ -18,12 +18,12 @@ class ExtraFieldConditionEvaluator
     public const OPERATORS = [
         'equals' => [
             'label' => 'Gleich',
-            'types' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup'],
+            'types' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'date'],
             'requiresValue' => true,
         ],
         'not_equals' => [
             'label' => 'Ungleich',
-            'types' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup'],
+            'types' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'date'],
             'requiresValue' => true,
         ],
         'greater_than' => [
@@ -48,12 +48,12 @@ class ExtraFieldConditionEvaluator
         ],
         'is_null' => [
             'label' => 'Ist leer',
-            'types' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'file'],
+            'types' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'file', 'date'],
             'requiresValue' => false,
         ],
         'is_not_null' => [
             'label' => 'Ist nicht leer',
-            'types' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'file'],
+            'types' => ['text', 'number', 'textarea', 'boolean', 'select', 'lookup', 'file', 'date'],
             'requiresValue' => false,
         ],
         'in' => [
