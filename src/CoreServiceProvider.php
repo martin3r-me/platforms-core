@@ -243,6 +243,9 @@ class CoreServiceProvider extends ServiceProvider
         // MS Teams Graph Service (outbound messaging)
         $this->app->singleton(\Platform\Core\Services\TeamsGraphService::class);
 
+        // Entity Link Service (Cross-Module Verknüpfungen)
+        $this->app->singleton(\Platform\Core\Services\EntityLinkService::class);
+
         // Versionierung & Audit Services
         $this->app->singleton(\Platform\Core\Services\ModelVersioningService::class);
         $this->app->singleton(\Platform\Core\Services\UndoService::class);
