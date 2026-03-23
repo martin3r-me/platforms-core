@@ -511,9 +511,11 @@ trait WithExtraFields
                     break;
                 case 'lookup':
                     $isMultiple = $field['options']['multiple'] ?? false;
-                    $fieldRules[] = 'array';
-                    if (($field['is_mandatory'] ?? false) && $isMultiple) {
-                        $fieldRules[] = 'min:1';
+                    if ($isMultiple) {
+                        $fieldRules[] = 'array';
+                        if ($field['is_mandatory'] ?? false) {
+                            $fieldRules[] = 'min:1';
+                        }
                     }
                     break;
                 case 'file':
