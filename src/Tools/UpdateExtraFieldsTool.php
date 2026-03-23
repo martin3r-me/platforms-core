@@ -9,6 +9,8 @@ use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\CoreLookup;
 use Platform\Core\Traits\HasExtraFields;
+use libphonenumber\PhoneNumberUtil;
+use libphonenumber\PhoneNumberFormat;
 
 class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
 {
@@ -37,7 +39,14 @@ class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
                 ],
                 'fields' => [
                     'type' => 'object',
-                    'description' => 'Key-Value-Paare der zu setzenden Extra-Fields. Key = field name, Value = neuer Wert. Für boolean-Felder: true/false oder "Ja"/"Nein". Für select-Felder mit Mehrfachauswahl: Array von Strings. Nutze null oder "" um einen Wert zu löschen.',
+                    'description' => 'Key-Value-Paare der zu setzenden Extra-Fields. Key = field name, Value = neuer Wert. '
+                        . 'Für boolean-Felder: true/false oder "Ja"/"Nein". '
+                        . 'Für select-Felder mit Mehrfachauswahl: Array von Strings. '
+                        . 'Für phone-Felder: Einfach die Telefonnummer als String übergeben (z.B. "+49 170 1234567") — wird automatisch normalisiert und validiert. '
+                        . 'Für email-Felder: E-Mail-Adresse als String (z.B. "user@example.com"). '
+                        . 'Für address-Felder: Objekt mit {street, zip, city, country} (z.B. {"street": "Musterstr. 1", "zip": "10115", "city": "Berlin", "country": "DE"}). '
+                        . 'Für date-Felder: Datum als String im Format YYYY-MM-DD (z.B. "1990-05-15"). '
+                        . 'Nutze null oder "" um einen Wert zu löschen.',
                 ],
                 'team_id' => [
                     'type' => 'integer',
@@ -212,6 +221,11 @@ class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
                     }
                 }
 
+                // Normalize phone values: accept plain string and convert to structured format
+                if ($definition['type'] === 'phone' && $value !== null && $value !== '') {
+                    $value = $this->normalizePhoneValue($value);
+                }
+
                 // Save directly via CoreExtraFieldValue (like UI does)
                 // This works for inherited definitions (e.g., Position -> Applicant)
                 $definitionId = $definition['id'];
@@ -275,6 +289,51 @@ class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Aktualisieren der Extra-Fields: ' . $e->getMessage());
         }
+    }
+
+    private function normalizePhoneValue(mixed $value): array
+    {
+        // Already structured
+        if (is_array($value) && isset($value['e164'])) {
+            return $value;
+        }
+
+        // Extract raw string
+        $raw = is_array($value) ? ($value['raw'] ?? $value['number'] ?? $value['phone'] ?? '') : (string) $value;
+        $raw = trim($raw);
+
+        if ($raw === '') {
+            return ['raw' => '', 'country' => 'DE', 'e164' => '', 'international' => ''];
+        }
+
+        // Try to parse with libphonenumber
+        try {
+            $phoneUtil = PhoneNumberUtil::getInstance();
+            $parsed = $phoneUtil->parse($raw, 'DE');
+
+            if ($phoneUtil->isValidNumber($parsed)) {
+                $e164 = $phoneUtil->format($parsed, PhoneNumberFormat::E164);
+                $international = $phoneUtil->format($parsed, PhoneNumberFormat::INTERNATIONAL);
+                $regionCode = $phoneUtil->getRegionCodeForNumber($parsed) ?: 'DE';
+
+                return [
+                    'raw' => $raw,
+                    'country' => $regionCode,
+                    'e164' => $e164,
+                    'international' => $international,
+                ];
+            }
+        } catch (\Throwable $e) {
+            // Parsing failed — store as-is with raw
+        }
+
+        // Fallback: store raw value
+        return [
+            'raw' => $raw,
+            'country' => 'DE',
+            'e164' => preg_replace('/[^+0-9]/', '', $raw),
+            'international' => $raw,
+        ];
     }
 
     private function checkAccess(string $modelClass, int $modelId, ToolContext $context): ?ToolResult

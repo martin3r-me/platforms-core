@@ -248,6 +248,11 @@ class PublicExtraFieldForm extends Component
             $model->checkAutoPilotCompletion();
         }
 
+        // Sync extra field values to linked CRM contact
+        if (method_exists($model, 'syncExtraFieldsToCrmContact')) {
+            $model->syncExtraFieldsToCrmContact();
+        }
+
         // Recount filled fields
         $this->filledFields = 0;
         $allDefinitions = $model->getExtraFieldsWithLabels();
