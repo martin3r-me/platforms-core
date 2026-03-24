@@ -27,9 +27,10 @@ class ModuleRouter
         $baseHost = $parsed['host'] ?? 'localhost';
 
         // Dynamische Middleware
-        $middlewares = ['web', 'detect.module.guard', 'check.module.permission'];
+        $middlewares = ['web', 'detect.module.guard'];
         if ($requireAuth) {
             $middlewares[] = "auth:{$guard}";
+            $middlewares[] = 'check.module.permission';
         }
 
         $routeGroup = Route::middleware($middlewares);
