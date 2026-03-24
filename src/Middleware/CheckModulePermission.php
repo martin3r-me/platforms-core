@@ -20,6 +20,11 @@ class CheckModulePermission
             'module_key' => $moduleKey,
         ]);
 
+        // Skip permission check for unauthenticated users (public routes)
+        if (!$user) {
+            return $next($request);
+        }
+
         if (!$moduleKey) {
             Log::warning('CheckModulePermission: Kein Modul-Kontext erkannt.', [
                 'user_id' => $user?->id,
