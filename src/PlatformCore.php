@@ -113,6 +113,7 @@ class PlatformCore
             'finance'  => ['label' => 'Finanzen & Verwaltung', 'order' => 4],
             'hr'       => ['label' => 'Personal & QM', 'order' => 5],
             'tools'    => ['label' => 'Support & Tools', 'order' => 6],
+            'admin'    => ['label' => 'Administration', 'order' => 7],
             'other'    => ['label' => 'Sonstige', 'order' => 99],
         ];
     }
