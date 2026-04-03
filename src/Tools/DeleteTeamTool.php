@@ -20,7 +20,7 @@ use Platform\Core\Models\Team;
  * - Nur der Owner des Parent-Teams (bei Kind-Teams) oder der Team-Owner (bei Root-Teams) darf löschen.
  * - Persönliche Teams (personal_team=true) können NICHT gelöscht werden.
  * - Root-Teams mit Kind-Teams können NICHT gelöscht werden (Kind-Teams zuerst löschen).
- * - Teams mit aktiver Zahlungsmethode (Mollie) erfordern explizite force-Bestätigung.
+ * - Teams mit aktiver Zahlungsmethode (Mollie) werden mit Warning geloggt, aber nicht blockiert.
  *
  * Kaskadierende Löschung (DB-Constraints cascadeOnDelete):
  * - team_invitations (Einladungen)
@@ -67,7 +67,7 @@ class DeleteTeamTool implements ToolContract, ToolMetadataContract
             . 'ACHTUNG: Kaskadierende Löschung! Alle zugehörigen Daten werden mitgelöscht: '
             . 'Einladungen, Kanäle, E-Mail-Threads, WhatsApp-Threads, Extra-Felder, Lookups, Tags, '
             . 'Kontextdateien, Rechnungen, Nutzungsdaten, AI-Model-Configs, Zähler, Kind-Teams (rekursiv!) und Modul-Zuordnungen. '
-            . 'Schutz: Persönliche Teams und Root-Teams mit Kind-Teams können nicht gelöscht werden. '
+            . 'Schutz: Persönliche Teams und Root-Teams mit Kind-Teams können nicht gelöscht werden. Teams mit Mollie-Billing werden mit Warning geloggt. '
             . 'Berechtigung: Nur Parent-Team-Owner (bei Kind-Teams) oder Team-Owner (bei Root-Teams).';
     }
 
@@ -135,13 +135,16 @@ class DeleteTeamTool implements ToolContract, ToolMetadataContract
                 );
             }
 
-            // ── Schutz: Teams mit aktiver Zahlungsmethode ───────────
-            if (!empty($team->mollie_customer_id) || !empty($team->mollie_payment_method_id)) {
-                return ToolResult::error(
-                    'HAS_BILLING',
-                    'Das Team hat eine aktive Zahlungsmethode (Mollie) konfiguriert. '
-                    . 'Bitte entferne zuerst die Zahlungsmethode oder kontaktiere den Administrator, bevor das Team gelöscht werden kann.'
-                );
+            // ── Hinweis: Teams mit aktiver Zahlungsmethode ──────────
+            $hasBilling = !empty($team->mollie_customer_id) || !empty($team->mollie_payment_method_id);
+            if ($hasBilling) {
+                Log::warning('[DeleteTeamTool] Team mit aktiver Mollie-Zahlungsmethode wird gelöscht', [
+                    'team_id' => $teamId,
+                    'team_name' => $team->name,
+                    'mollie_customer_id' => $team->mollie_customer_id,
+                    'mollie_payment_method_id' => $team->mollie_payment_method_id,
+                    'deleted_by_user_id' => (int) $context->user->id,
+                ]);
             }
 
             // ── Berechtigungs-Check ─────────────────────────────────
@@ -158,6 +161,7 @@ class DeleteTeamTool implements ToolContract, ToolMetadataContract
                 'parent_team_id' => $team->parent_team_id ? (int) $team->parent_team_id : null,
                 'personal_team' => (bool) $team->personal_team,
                 'member_count' => $team->users()->count(),
+                'mollie_customer_id' => $team->mollie_customer_id,
                 'created_at' => $team->created_at?->toIso8601String(),
             ];
 
@@ -180,11 +184,19 @@ class DeleteTeamTool implements ToolContract, ToolMetadataContract
                 $team->delete();
             });
 
-            return ToolResult::success([
+            $result = [
                 'deleted_team' => $teamData,
                 'message' => "Team '{$teamData['name']}' (ID: {$teamData['id']}) wurde unwiderruflich gelöscht.",
                 'cascade_info' => 'Alle zugehörigen Daten (Einladungen, Kanäle, Threads, Extra-Felder, Lookups, Tags, Kontextdateien, AI-Configs, Zähler, Modul-Zuordnungen) wurden kaskadierend mitgelöscht.',
-            ]);
+            ];
+
+            if ($hasBilling) {
+                $result['billing_warning'] = 'Das Team hatte eine aktive Mollie-Zahlungsmethode. '
+                    . 'Mollie-Customer-ID: ' . ($teamData['mollie_customer_id'] ?? 'n/a') . '. '
+                    . 'Ggf. muss die Zahlungsmethode in Mollie manuell bereinigt werden.';
+            }
+
+            return ToolResult::success($result);
         } catch (\Throwable $e) {
             Log::error('[DeleteTeamTool] Fehler beim Löschen', [
                 'team_id' => $arguments['team_id'] ?? null,
