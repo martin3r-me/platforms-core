@@ -43,6 +43,14 @@
             >
                 Obsidian
             </button>
+            <button
+                type="button"
+                wire:click="setTab('notifications')"
+                class="px-4 py-2 text-sm font-medium transition-colors border-b-2"
+                :class="$wire.activeTab === 'notifications' ? 'text-[var(--ui-primary)] border-[var(--ui-primary)]' : 'text-[var(--ui-muted)] border-transparent hover:text-[var(--ui-secondary)]'"
+            >
+                Benachrichtigungen
+            </button>
         </nav>
     </div>
 
@@ -633,6 +641,169 @@
                         </div>
                     @endif
                 </div>
+            </div>
+        </div>
+
+        {{-- Tab: Benachrichtigungen --}}
+        <div x-show="$wire.activeTab === 'notifications'" x-transition>
+            <div class="space-y-6">
+
+                {{-- Abschnitt A: Kanäle konfigurieren --}}
+                <div>
+                    <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Benachrichtigungs-Kanäle</h3>
+                    <div class="space-y-4">
+
+                        {{-- Pushover --}}
+                        <div class="p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-medium text-[var(--ui-secondary)]">Pushover</span>
+                                    @if($this->pushoverChannel?->is_active)
+                                        <span class="px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full">Verbunden</span>
+                                    @endif
+                                </div>
+                                @if($this->pushoverChannel)
+                                    <button
+                                        wire:click="removePushover"
+                                        wire:confirm="Pushover-Verbindung wirklich entfernen?"
+                                        class="text-xs text-red-600 hover:text-red-800"
+                                    >
+                                        Entfernen
+                                    </button>
+                                @endif
+                            </div>
+                            <div class="flex gap-2">
+                                <div class="flex-1">
+                                    <input
+                                        type="text"
+                                        wire:model="pushoverUserKey"
+                                        placeholder="Pushover User Key"
+                                        class="w-full px-3 py-2 text-sm border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
+                                    />
+                                    @error('pushoverUserKey')
+                                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                                <x-ui-button variant="secondary-outline" wire:click="savePushoverKey">
+                                    Speichern
+                                </x-ui-button>
+                                @if($this->pushoverChannel)
+                                    <x-ui-button variant="secondary-outline" wire:click="testPushover">
+                                        Test
+                                    </x-ui-button>
+                                @endif
+                            </div>
+                            @if($this->pushoverChannel?->last_tested_at)
+                                <div class="mt-2 text-xs text-[var(--ui-muted)]">
+                                    Letzter Test: {{ $this->pushoverChannel->last_tested_at->format('d.m.Y H:i') }}
+                                    @if($this->pushoverChannel->last_error)
+                                        <span class="text-red-600">- {{ $this->pushoverChannel->last_error }}</span>
+                                    @endif
+                                </div>
+                            @endif
+                        </div>
+
+                        {{-- MS Teams Webhook --}}
+                        <div class="p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-medium text-[var(--ui-secondary)]">MS Teams Webhook</span>
+                                    @if($this->teamsChannel?->is_active)
+                                        <span class="px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full">Verbunden</span>
+                                    @endif
+                                </div>
+                                @if($this->teamsChannel)
+                                    <button
+                                        wire:click="removeTeamsWebhook"
+                                        wire:confirm="Teams Webhook wirklich entfernen?"
+                                        class="text-xs text-red-600 hover:text-red-800"
+                                    >
+                                        Entfernen
+                                    </button>
+                                @endif
+                            </div>
+                            <div class="flex gap-2">
+                                <div class="flex-1">
+                                    <input
+                                        type="url"
+                                        wire:model="teamsWebhookUrl"
+                                        placeholder="https://outlook.office.com/webhook/..."
+                                        class="w-full px-3 py-2 text-sm border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
+                                    />
+                                    @error('teamsWebhookUrl')
+                                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                                <x-ui-button variant="secondary-outline" wire:click="saveTeamsWebhook">
+                                    Speichern
+                                </x-ui-button>
+                                @if($this->teamsChannel)
+                                    <x-ui-button variant="secondary-outline" wire:click="testTeamsWebhook">
+                                        Test
+                                    </x-ui-button>
+                                @endif
+                            </div>
+                            @if($this->teamsChannel?->last_tested_at)
+                                <div class="mt-2 text-xs text-[var(--ui-muted)]">
+                                    Letzter Test: {{ $this->teamsChannel->last_tested_at->format('d.m.Y H:i') }}
+                                    @if($this->teamsChannel->last_error)
+                                        <span class="text-red-600">- {{ $this->teamsChannel->last_error }}</span>
+                                    @endif
+                                </div>
+                            @endif
+                        </div>
+
+                    </div>
+                </div>
+
+                {{-- Abschnitt B: Preferences pro Notification-Typ --}}
+                @if(count($this->notificationTypes) > 0)
+                    <div>
+                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Benachrichtigungs-Einstellungen</h3>
+                        <p class="text-sm text-[var(--ui-muted)] mb-4">Wähle pro Benachrichtigungstyp, über welche Kanäle du informiert werden möchtest.</p>
+
+                        <div class="space-y-6">
+                            @foreach($this->notificationTypes as $group => $types)
+                                <div>
+                                    <h4 class="text-sm font-semibold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">{{ ucfirst($group) }}</h4>
+                                    <div class="space-y-2">
+                                        @foreach($types as $typeKey => $typeConfig)
+                                            <div class="p-3 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
+                                                <div class="flex items-center justify-between">
+                                                    <div class="min-w-0 flex-1">
+                                                        <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $typeConfig['label'] }}</div>
+                                                        @if($typeConfig['description'])
+                                                            <div class="text-xs text-[var(--ui-muted)]">{{ $typeConfig['description'] }}</div>
+                                                        @endif
+                                                    </div>
+                                                    <div class="flex items-center gap-3 ml-4">
+                                                        @foreach($this->notificationChannels as $channelKey => $channel)
+                                                            <label class="flex items-center gap-1.5 cursor-pointer" title="{{ $channel->label() }}">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    wire:click="toggleNotificationPreference('{{ $typeKey }}', '{{ $channelKey }}')"
+                                                                    @checked($notificationPreferences[$typeKey][$channelKey] ?? false)
+                                                                    class="w-4 h-4 text-[var(--ui-primary)] border-[var(--ui-border)] rounded focus:ring-[var(--ui-primary)]"
+                                                                />
+                                                                <span class="text-xs text-[var(--ui-muted)]">{{ $channel->label() }}</span>
+                                                            </label>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @else
+                    <div class="p-8 text-center text-[var(--ui-muted)] bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
+                        <div class="mb-2">@svg('heroicon-o-bell', 'w-8 h-8 mx-auto opacity-50')</div>
+                        <p>Noch keine Benachrichtigungstypen registriert.</p>
+                    </div>
+                @endif
+
             </div>
         </div>
 

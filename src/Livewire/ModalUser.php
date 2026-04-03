@@ -9,6 +9,12 @@ use Platform\Integrations\Models\IntegrationConnection;
 use Platform\Integrations\Models\IntegrationsFacebookPage;
 use Platform\Integrations\Models\IntegrationsInstagramAccount;
 use Platform\Integrations\Services\MetaIntegrationService;
+use Platform\Notifications\Channels\PushoverChannel;
+use Platform\Notifications\Channels\TeamsWebhookChannel;
+use Platform\Notifications\Models\NotificationPreference;
+use Platform\Notifications\Models\UserNotificationChannel;
+use Platform\Notifications\NotificationChannelRegistry;
+use Platform\Notifications\NotificationTypeRegistry;
 
 class ModalUser extends Component
 {
@@ -45,6 +51,11 @@ class ModalUser extends Component
     public $showVaultForm = false;
     public $vaultTestResults = [];
 
+    // Notification Channel Properties
+    public $pushoverUserKey = '';
+    public $teamsWebhookUrl = '';
+    public $notificationPreferences = [];
+
     protected $listeners = ['open-modal-user' => 'openModal'];
 
     public function mount()
@@ -71,6 +82,9 @@ class ModalUser extends Component
         }
         if ($tab !== 'obsidian') {
             $this->resetVaultForm();
+        }
+        if ($tab === 'notifications') {
+            $this->loadNotificationSettings();
         }
     }
 
@@ -437,6 +451,211 @@ class ModalUser extends Component
         $this->editingVaultId = null;
         $this->showVaultForm = false;
         $this->vaultTestResults = [];
+    }
+
+    // ========================================
+    // Notification Settings
+    // ========================================
+
+    public function loadNotificationSettings(): void
+    {
+        $userId = Auth::id();
+
+        // Load existing channel configs
+        $pushover = UserNotificationChannel::where('user_id', $userId)
+            ->where('channel', 'pushover')
+            ->first();
+        $this->pushoverUserKey = $pushover?->credentials['user_key'] ?? '';
+
+        $teams = UserNotificationChannel::where('user_id', $userId)
+            ->where('channel', 'teams_webhook')
+            ->first();
+        $this->teamsWebhookUrl = $teams?->credentials['webhook_url'] ?? '';
+
+        // Load preferences
+        $this->loadNotificationPreferences();
+    }
+
+    protected function loadNotificationPreferences(): void
+    {
+        $userId = Auth::id();
+        $prefs = NotificationPreference::where('user_id', $userId)->get();
+
+        $this->notificationPreferences = [];
+
+        foreach (NotificationTypeRegistry::all() as $typeKey => $typeConfig) {
+            foreach (NotificationChannelRegistry::all() as $channelKey => $channel) {
+                $pref = $prefs->first(fn ($p) => $p->notification_type === $typeKey && $p->channel === $channelKey);
+
+                if ($pref) {
+                    $this->notificationPreferences[$typeKey][$channelKey] = $pref->enabled;
+                } else {
+                    // Default from type config
+                    $this->notificationPreferences[$typeKey][$channelKey] = in_array($channelKey, $typeConfig['default_channels']);
+                }
+            }
+        }
+    }
+
+    public function getNotificationTypesProperty(): array
+    {
+        return NotificationTypeRegistry::grouped();
+    }
+
+    public function getNotificationChannelsProperty(): array
+    {
+        return NotificationChannelRegistry::all();
+    }
+
+    public function getPushoverChannelProperty(): ?UserNotificationChannel
+    {
+        return UserNotificationChannel::where('user_id', Auth::id())
+            ->where('channel', 'pushover')
+            ->first();
+    }
+
+    public function getTeamsChannelProperty(): ?UserNotificationChannel
+    {
+        return UserNotificationChannel::where('user_id', Auth::id())
+            ->where('channel', 'teams_webhook')
+            ->first();
+    }
+
+    public function savePushoverKey(): void
+    {
+        $this->validate([
+            'pushoverUserKey' => 'required|string|min:10',
+        ]);
+
+        UserNotificationChannel::updateOrCreate(
+            ['user_id' => Auth::id(), 'channel' => 'pushover'],
+            [
+                'label'       => 'Pushover',
+                'credentials' => ['user_key' => $this->pushoverUserKey],
+                'is_active'   => true,
+            ]
+        );
+
+        $this->dispatch('notice', [
+            'type' => 'success',
+            'message' => 'Pushover-Key gespeichert.',
+        ]);
+    }
+
+    public function testPushover(): void
+    {
+        $config = UserNotificationChannel::where('user_id', Auth::id())
+            ->where('channel', 'pushover')
+            ->first();
+
+        if (! $config) {
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'Bitte zuerst den Pushover User Key speichern.',
+            ]);
+
+            return;
+        }
+
+        $success = PushoverChannel::test($config);
+
+        $this->dispatch('notice', [
+            'type' => $success ? 'success' : 'error',
+            'message' => $success
+                ? 'Testbenachrichtigung gesendet!'
+                : 'Verbindung fehlgeschlagen: ' . ($config->fresh()->last_error ?? 'Unbekannter Fehler'),
+        ]);
+    }
+
+    public function removePushover(): void
+    {
+        UserNotificationChannel::where('user_id', Auth::id())
+            ->where('channel', 'pushover')
+            ->delete();
+
+        $this->pushoverUserKey = '';
+
+        $this->dispatch('notice', [
+            'type' => 'success',
+            'message' => 'Pushover-Verbindung entfernt.',
+        ]);
+    }
+
+    public function saveTeamsWebhook(): void
+    {
+        $this->validate([
+            'teamsWebhookUrl' => 'required|url',
+        ]);
+
+        UserNotificationChannel::updateOrCreate(
+            ['user_id' => Auth::id(), 'channel' => 'teams_webhook'],
+            [
+                'label'       => 'MS Teams',
+                'credentials' => ['webhook_url' => $this->teamsWebhookUrl],
+                'is_active'   => true,
+            ]
+        );
+
+        $this->dispatch('notice', [
+            'type' => 'success',
+            'message' => 'Teams Webhook gespeichert.',
+        ]);
+    }
+
+    public function testTeamsWebhook(): void
+    {
+        $config = UserNotificationChannel::where('user_id', Auth::id())
+            ->where('channel', 'teams_webhook')
+            ->first();
+
+        if (! $config) {
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'Bitte zuerst die Webhook-URL speichern.',
+            ]);
+
+            return;
+        }
+
+        $success = TeamsWebhookChannel::test($config);
+
+        $this->dispatch('notice', [
+            'type' => $success ? 'success' : 'error',
+            'message' => $success
+                ? 'Testbenachrichtigung gesendet!'
+                : 'Verbindung fehlgeschlagen: ' . ($config->fresh()->last_error ?? 'Unbekannter Fehler'),
+        ]);
+    }
+
+    public function removeTeamsWebhook(): void
+    {
+        UserNotificationChannel::where('user_id', Auth::id())
+            ->where('channel', 'teams_webhook')
+            ->delete();
+
+        $this->teamsWebhookUrl = '';
+
+        $this->dispatch('notice', [
+            'type' => 'success',
+            'message' => 'Teams Webhook entfernt.',
+        ]);
+    }
+
+    public function toggleNotificationPreference(string $type, string $channel): void
+    {
+        $current = $this->notificationPreferences[$type][$channel] ?? false;
+        $this->notificationPreferences[$type][$channel] = ! $current;
+
+        NotificationPreference::updateOrCreate(
+            [
+                'user_id'           => Auth::id(),
+                'notification_type' => $type,
+                'channel'           => $channel,
+            ],
+            [
+                'enabled' => ! $current,
+            ]
+        );
     }
 
     // ========================================
