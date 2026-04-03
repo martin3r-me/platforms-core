@@ -101,6 +101,22 @@ class PlatformCore
             ->toArray();
     }
 
+    /**
+     * Definiert die verfügbaren Modul-Gruppen mit Label und Sortierung.
+     */
+    public static function getModuleGroups(): array
+    {
+        return [
+            'planning' => ['label' => 'Projekte & Planung', 'order' => 1],
+            'content'  => ['label' => 'Kommunikation & Content', 'order' => 2],
+            'sales'    => ['label' => 'Vertrieb & Kunden', 'order' => 3],
+            'finance'  => ['label' => 'Finanzen & Verwaltung', 'order' => 4],
+            'hr'       => ['label' => 'Personal & QM', 'order' => 5],
+            'tools'    => ['label' => 'Support & Tools', 'order' => 6],
+            'other'    => ['label' => 'Sonstige', 'order' => 99],
+        ];
+    }
+
     public static function getVisibleModules(): array
     {
         $currentGuard = auth()->getDefaultDriver() ?? 'web';

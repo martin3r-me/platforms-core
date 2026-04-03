@@ -11,6 +11,7 @@ class ModuleFlyout extends Component
 {
     public $show = false;
     public $modules = [];
+    public $groupedModules = [];
     public $currentModule;
 
     #[On('open-module-flyout')]
@@ -80,6 +81,29 @@ class ModuleFlyout extends Component
         })->sortBy(function($module) {
             return $module['title'] ?? $module['label'] ?? '';
         })->values();
+
+        // Gruppierung aufbauen
+        $groups = PlatformCore::getModuleGroups();
+        $grouped = [];
+
+        foreach ($this->modules as $module) {
+            $groupKey = $module['group'] ?? 'other';
+            $grouped[$groupKey][] = $module;
+        }
+
+        // Nach Gruppen-Order sortieren
+        uksort($grouped, function ($a, $b) use ($groups) {
+            $orderA = $groups[$a]['order'] ?? 999;
+            $orderB = $groups[$b]['order'] ?? 999;
+            return $orderA <=> $orderB;
+        });
+
+        $this->groupedModules = collect($grouped)->map(function ($modules, $groupKey) use ($groups) {
+            return [
+                'label'   => $groups[$groupKey]['label'] ?? ucfirst($groupKey),
+                'modules' => $modules,
+            ];
+        })->toArray();
     }
 
     public function loadCurrentModule()
