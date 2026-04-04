@@ -19,7 +19,6 @@ function init() {
     }
 
     window.Pusher = Pusher;
-    Pusher.logToConsole = true;
     window.Echo = new Echo({
         broadcaster: 'reverb',
         key: key,
