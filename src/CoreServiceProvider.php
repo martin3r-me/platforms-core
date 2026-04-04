@@ -641,6 +641,20 @@ class CoreServiceProvider extends ServiceProvider
                 try { $registry->register($this->app->make($class)); } catch (\Throwable $e) {}
             }
         }
+
+        // Terminal Tools (terminal.channels.*, terminal.messages.*, terminal.members.*)
+        $terminalTools = [
+            \Platform\Core\Tools\Terminal\ListTerminalChannelsTool::class => 'terminal.channels.GET',
+            \Platform\Core\Tools\Terminal\CreateTerminalChannelTool::class => 'terminal.channels.POST',
+            \Platform\Core\Tools\Terminal\GetTerminalMessagesTool::class => 'terminal.messages.GET',
+            \Platform\Core\Tools\Terminal\SendTerminalMessageTool::class => 'terminal.messages.POST',
+            \Platform\Core\Tools\Terminal\ManageTerminalMembersTool::class => 'terminal.members.POST',
+        ];
+        foreach ($terminalTools as $class => $name) {
+            if (class_exists($class) && !$registry->has($name)) {
+                try { $registry->register($this->app->make($class)); } catch (\Throwable $e) {}
+            }
+        }
     }
 
 
