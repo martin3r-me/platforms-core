@@ -51,7 +51,8 @@ export function tiptapEditor({
               if (mentionActive) return false;
 
               event.preventDefault();
-              this.submit();
+              // Defer submit entirely out of ProseMirror's dispatch cycle
+              setTimeout(() => this.submit(), 0);
               return true;
             }
             return false;
@@ -124,21 +125,17 @@ export function tiptapEditor({
       const text = this.editor.getText();
       const json = this.editor.getJSON();
 
-      // Defer clear to next event-loop tick — avoids "mismatched transaction"
-      // when called from handleKeyDown (Enter key), because ProseMirror needs
-      // the full dispatch cycle to finish before we can apply a new transaction.
-      setTimeout(() => {
-        this.editor.commands.clearContent(true);
-        this.isEmpty = true;
-        this.editor.commands.focus();
-        this.$nextTick(() => this._autoResize());
-      }, 0);
+      this.editor.commands.clearContent(true);
+      this.isEmpty = true;
 
       if (typeof onSubmit === 'function') {
         onSubmit(html, text, json);
       } else {
         console.log('tiptapEditor.submit:', { html, text });
       }
+
+      this.editor.commands.focus();
+      this.$nextTick(() => this._autoResize());
     },
 
     destroy() {
