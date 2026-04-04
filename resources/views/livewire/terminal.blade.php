@@ -5,7 +5,6 @@
   class="w-full flex-shrink-0"
   wire:key="terminal-root"
 >
-  <!-- Status bar — always visible -->
   @php
     $allChannels = collect($this->channels['dms'])->map(fn($c) => array_merge($c, ['_type' => 'dm']))
       ->merge(collect($this->channels['channels'])->map(fn($c) => array_merge($c, ['_type' => 'channel'])))
@@ -13,30 +12,36 @@
       ->sortByDesc('unread');
     $totalUnread = $allChannels->sum('unread');
   @endphp
+
+  <!-- Single terminal container — status bar always peeks out -->
   <div
-    class="w-full border-t border-indigo-500/20 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 cursor-pointer select-none group/bar"
-    @click="toggle()"
-    wire:key="terminal-statusbar"
+    class="w-full border-t border-[var(--ui-border)]/60 bg-[var(--ui-surface)]/95 backdrop-blur overflow-hidden flex flex-col transition-all duration-200 ease-out"
+    x-bind:style="open ? 'height: 20rem; max-height: 50vh' : 'height: 36px'"
+    wire:key="terminal-slide"
   >
-    <div class="h-9 px-3 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+    <!-- Status bar — always visible (36px), clickable to toggle -->
+    <div
+      class="h-9 flex-shrink-0 px-3 flex items-center gap-1.5 overflow-x-auto scrollbar-none cursor-pointer select-none group/bar border-b border-[var(--ui-border)]/40"
+      @click="toggle()"
+      wire:key="terminal-statusbar"
+    >
       {{-- Terminal icon + unread badge --}}
       <div class="flex items-center gap-1.5 mr-1 flex-shrink-0">
-        <svg class="w-3.5 h-3.5 text-indigo-400 group-hover/bar:text-indigo-300 transition" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 014.25 2h11.5A2.25 2.25 0 0118 4.25v8.5A2.25 2.25 0 0115.75 15h-3.105a3.501 3.501 0 001.1 1.677A.75.75 0 0113.26 18H6.74a.75.75 0 01-.484-1.323A3.501 3.501 0 007.355 15H4.25A2.25 2.25 0 012 12.75v-8.5zm1.5 0a.75.75 0 01.75-.75h11.5a.75.75 0 01.75.75v7.5a.75.75 0 01-.75.75H4.25a.75.75 0 01-.75-.75v-7.5z" clip-rule="evenodd"/></svg>
+        <svg class="w-3.5 h-3.5 text-[var(--ui-muted)] group-hover/bar:text-[var(--ui-primary)] transition" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 014.25 2h11.5A2.25 2.25 0 0118 4.25v8.5A2.25 2.25 0 0115.75 15h-3.105a3.501 3.501 0 001.1 1.677A.75.75 0 0113.26 18H6.74a.75.75 0 01-.484-1.323A3.501 3.501 0 007.355 15H4.25A2.25 2.25 0 012 12.75v-8.5zm1.5 0a.75.75 0 01.75-.75h11.5a.75.75 0 01.75.75v7.5a.75.75 0 01-.75.75H4.25a.75.75 0 01-.75-.75v-7.5z" clip-rule="evenodd"/></svg>
         @if($totalUnread > 0)
           <span class="min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">{{ $totalUnread > 99 ? '99+' : $totalUnread }}</span>
         @endif
       </div>
 
-      <div class="w-px h-4 bg-white/10 flex-shrink-0"></div>
+      @if($allChannels->isNotEmpty())
+        <div class="w-px h-4 bg-[var(--ui-border)]/40 flex-shrink-0"></div>
+      @endif
 
-      {{-- Channel pills --}}
-      @forelse($allChannels as $preview)
-        <div class="flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] flex-shrink-0 transition
-          {{ $preview['unread'] > 0
-            ? 'bg-indigo-500/20 text-indigo-200 font-semibold ring-1 ring-indigo-400/30'
-            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5' }}">
+      {{-- Unread channel pills --}}
+      @foreach($allChannels as $preview)
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] flex-shrink-0 bg-[var(--ui-primary-5)] text-[var(--ui-primary)] font-semibold">
           @if($preview['_type'] === 'dm')
-            <div class="w-4 h-4 rounded-full {{ $preview['unread'] > 0 ? 'bg-emerald-500/30 ring-1 ring-emerald-400/40' : 'bg-white/10' }} flex items-center justify-center text-[8px] font-bold flex-shrink-0 overflow-hidden {{ $preview['unread'] > 0 ? 'text-emerald-300' : 'text-slate-400' }}">
+            <div class="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center text-[8px] font-bold flex-shrink-0 overflow-hidden text-emerald-600">
               @if(! empty($preview['avatar']))
                 <img src="{{ $preview['avatar'] }}" alt="" class="w-full h-full object-cover">
               @else
@@ -44,42 +49,24 @@
               @endif
             </div>
           @else
-            <span class="text-[10px] {{ $preview['unread'] > 0 ? 'text-amber-400' : '' }}">{{ $preview['icon'] ?? '#' }}</span>
+            <span class="text-[10px] text-amber-500">{{ $preview['icon'] ?? '#' }}</span>
           @endif
           <span class="truncate max-w-[80px]">{{ $preview['name'] }}</span>
-          @if($preview['unread'] > 0)
-            <span class="min-w-[14px] h-[14px] px-0.5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">{{ $preview['unread'] > 9 ? '9+' : $preview['unread'] }}</span>
-          @endif
-          @if($preview['last_message'] && $preview['unread'] > 0)
-            <span class="text-[10px] text-slate-400 truncate max-w-[120px] hidden sm:inline">{{ $preview['last_message'] }}</span>
+          <span class="min-w-[14px] h-[14px] px-0.5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">{{ $preview['unread'] > 9 ? '9+' : $preview['unread'] }}</span>
+          @if($preview['last_message'])
+            <span class="text-[10px] text-[var(--ui-muted)] truncate max-w-[120px] hidden sm:inline font-normal">{{ $preview['last_message'] }}</span>
           @endif
         </div>
-      @empty
-        <span class="text-[11px] text-slate-500">Keine Unterhaltungen</span>
-      @endforelse
+      @endforeach
 
       {{-- Chevron --}}
-      <div class="ml-auto flex-shrink-0 text-slate-500 group-hover/bar:text-slate-300 transition">
+      <div class="ml-auto flex-shrink-0 text-[var(--ui-muted)] group-hover/bar:text-[var(--ui-body-color)] transition">
         <svg class="w-3 h-3 transition-transform duration-200" :class="open ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clip-rule="evenodd" />
         </svg>
       </div>
     </div>
-  </div>
 
-  <!-- Slide container (terminal panel) -->
-  <div
-    x-show="open"
-    x-transition:enter="transition ease-out duration-200"
-    x-transition:enter-start="opacity-0 translate-y-4"
-    x-transition:enter-end="opacity-100 translate-y-0"
-    x-transition:leave="transition ease-in duration-150"
-    x-transition:leave-start="opacity-100 translate-y-0"
-    x-transition:leave-end="opacity-0 translate-y-4"
-    class="w-full border-t border-[var(--ui-border)]/60 bg-[var(--ui-surface)]/95 backdrop-blur overflow-hidden flex flex-col"
-    style="height: 20rem; max-height: 50vh;"
-    wire:key="terminal-slide"
-  >
     <!-- Panel Content: Sidebar + Main -->
     <div class="flex-1 min-h-0 flex"
          wire:key="terminal-content">
