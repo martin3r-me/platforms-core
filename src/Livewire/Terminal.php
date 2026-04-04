@@ -275,22 +275,11 @@ class Terminal extends Component
 
         // Broadcast via WebSocket (for real-time updates to other users)
         try {
-            TerminalMessageSent::dispatch($channel->id, [
-                'id' => $message->id,
-                'user_id' => $message->user_id,
-                'user_name' => auth()->user()->name ?? 'Unbekannt',
-                'user_avatar' => auth()->user()->avatar,
-                'user_initials' => $this->initials(auth()->user()->name ?? '?'),
-                'body_html' => $message->body_html,
-                'body_plain' => $message->body_plain,
-                'type' => $message->type,
-                'reply_count' => 0,
-                'has_mentions' => $message->has_mentions,
-                'reactions' => [],
-                'time' => $message->created_at->format('H:i'),
-                'date' => $message->created_at->translatedFormat('d. M Y'),
-                'is_mine' => false,
-            ], auth()->id());
+            TerminalMessageSent::dispatch(
+                $channel->id,
+                $message->id,
+                auth()->id(),
+            );
         } catch (\Throwable $e) {
             \Log::warning('Terminal broadcast failed: '.$e->getMessage());
         }

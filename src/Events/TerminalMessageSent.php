@@ -13,7 +13,7 @@ class TerminalMessageSent implements ShouldBroadcastNow
 
     public function __construct(
         public int $channelId,
-        public array $message,
+        public int $messageId,
         public int $senderId,
     ) {}
 
