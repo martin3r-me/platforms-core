@@ -2,7 +2,7 @@
   x-data="terminalShell()"
   x-init="init()"
   x-on:toggle-terminal.window="toggle()"
-  class="w-full"
+  class="w-full flex-shrink-0"
   wire:key="terminal-root"
 >
   <!-- Always-visible strip (15px) — click to toggle -->
@@ -11,19 +11,19 @@
     @click="toggle()"
     wire:key="terminal-strip"
   >
-    <div class="flex items-center gap-4 text-[9px] font-mono text-[var(--ui-muted)] truncate w-full">
-      <span class="flex items-center gap-1">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
+    <div class="flex items-center gap-5 text-[11px] font-mono text-[var(--ui-muted)] truncate w-full">
+      <span class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
         Anna M. — Statusbericht verschickt
         <span class="opacity-60">14:32</span>
       </span>
-      <span class="flex items-center gap-1">
-        <span class="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block"></span>
+      <span class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-blue-400 inline-block"></span>
         Tom K. — Neues Ticket erstellt
         <span class="opacity-60">13:15</span>
       </span>
-      <span class="flex items-center gap-1">
-        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span>
+      <span class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
         Lisa R. — Kommentar hinzugefügt
         <span class="opacity-60">11:48</span>
       </span>
