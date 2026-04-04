@@ -616,15 +616,24 @@ class Terminal extends Component
 
     // ── Echo Listeners (WebSocket real-time updates) ───────────
 
-    #[On('echo-private:terminal.channel.{channelId},message.sent')]
+    public function getListeners(): array
+    {
+        $listeners = [];
+
+        if ($this->channelId) {
+            $listeners["echo-private:terminal.channel.{$this->channelId},message.sent"] = 'onMessageReceived';
+            $listeners["echo-private:terminal.channel.{$this->channelId},reaction.toggled"] = 'onReactionToggled';
+        }
+
+        return $listeners;
+    }
+
     public function onMessageReceived(array $payload = []): void
     {
-        // Invalidate computed properties so Livewire re-renders with fresh data
         unset($this->messages);
         unset($this->channels);
     }
 
-    #[On('echo-private:terminal.channel.{channelId},reaction.toggled')]
     public function onReactionToggled(array $payload = []): void
     {
         unset($this->messages);
