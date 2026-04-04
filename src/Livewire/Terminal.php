@@ -10,6 +10,7 @@ use Platform\Core\Models\TerminalChannelMember;
 use Platform\Core\Models\TerminalMention;
 use Platform\Core\Models\TerminalMessage;
 use Platform\Core\Models\TerminalReaction;
+use Platform\Core\Models\User;
 
 /**
  * Terminal UI shell with messaging, DMs, group channels, and context awareness.
@@ -218,6 +219,95 @@ class Terminal extends Component
 
         // Mark as read for sender
         $this->markAsRead($message->id);
+
+        // Dispatch notifications
+        $this->dispatchNotifications($channel, $message, $mentionUserIds);
+    }
+
+    protected function dispatchNotifications(TerminalChannel $channel, TerminalMessage $message, array $mentionUserIds = []): void
+    {
+        if (! class_exists(\Platform\Notifications\NotificationDispatcher::class)) {
+            return;
+        }
+
+        $dispatcher = app(\Platform\Notifications\NotificationDispatcher::class);
+        $senderId = auth()->id();
+        $senderName = auth()->user()->name ?? 'Unbekannt';
+        $plainText = \Illuminate\Support\Str::limit($message->body_plain ?? strip_tags($message->body_html), 100);
+
+        // 1. @Mention notifications — always sent regardless of channel notification_preference
+        if (! empty($mentionUserIds)) {
+            $mentionRecipients = User::whereIn('id', array_diff(array_unique($mentionUserIds), [$senderId]))->get();
+
+            if ($mentionRecipients->isNotEmpty()) {
+                $dispatcher->dispatch('terminal.mention', [
+                    'title'          => "{$senderName} hat dich erwähnt",
+                    'message'        => $plainText,
+                    'notice_type'    => 'toast',
+                    'team_id'        => $channel->team_id,
+                    'noticable_type' => TerminalMessage::class,
+                    'noticable_id'   => $message->id,
+                    'metadata'       => ['channel_id' => $channel->id],
+                ], $mentionRecipients);
+            }
+        }
+
+        // 2. Channel-member notifications based on notification_preference
+        $members = TerminalChannelMember::where('channel_id', $channel->id)
+            ->where('user_id', '!=', $senderId)
+            ->get();
+
+        $alreadyNotified = array_unique($mentionUserIds);
+        $dmRecipients = collect();
+        $channelRecipients = collect();
+
+        foreach ($members as $member) {
+            // Skip users already notified via @mention
+            if (in_array($member->user_id, $alreadyNotified)) {
+                continue;
+            }
+
+            if ($member->notification_preference === 'none') {
+                continue;
+            }
+
+            // 'mentions' = only notify on @mention (already handled above)
+            if ($member->notification_preference === 'mentions') {
+                continue;
+            }
+
+            // 'all' = notify on every message
+            if ($channel->isDm()) {
+                $dmRecipients->push($member->user_id);
+            } else {
+                $channelRecipients->push($member->user_id);
+            }
+        }
+
+        if ($dmRecipients->isNotEmpty()) {
+            $dispatcher->dispatch('terminal.dm', [
+                'title'          => "Nachricht von {$senderName}",
+                'message'        => $plainText,
+                'notice_type'    => 'toast',
+                'team_id'        => $channel->team_id,
+                'noticable_type' => TerminalMessage::class,
+                'noticable_id'   => $message->id,
+                'metadata'       => ['channel_id' => $channel->id],
+            ], User::whereIn('id', $dmRecipients)->get());
+        }
+
+        if ($channelRecipients->isNotEmpty()) {
+            $channelName = $channel->name ?? 'Channel';
+            $dispatcher->dispatch('terminal.channel_message', [
+                'title'          => "{$senderName} in #{$channelName}",
+                'message'        => $plainText,
+                'notice_type'    => 'toast',
+                'team_id'        => $channel->team_id,
+                'noticable_type' => TerminalMessage::class,
+                'noticable_id'   => $message->id,
+                'metadata'       => ['channel_id' => $channel->id],
+            ], User::whereIn('id', $channelRecipients)->get());
+        }
     }
 
     // ── Reactions ──────────────────────────────────────────────

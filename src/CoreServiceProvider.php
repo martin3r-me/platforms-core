@@ -113,6 +113,9 @@ class CoreServiceProvider extends ServiceProvider
             \Platform\Core\Policies\ObsidianVaultPolicy::class
         );
 
+        // Terminal Notification Types registrieren
+        $this->registerTerminalNotificationTypes();
+
         // Event-Listener für Tools registrieren
         $this->registerToolEventListeners();
 
@@ -783,6 +786,34 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Http\Responses\Passport\DenyAuthorizationResponse::class
             );
         }
+    }
+
+    protected function registerTerminalNotificationTypes(): void
+    {
+        if (! class_exists(\Platform\Notifications\NotificationTypeRegistry::class)) {
+            return;
+        }
+
+        \Platform\Notifications\NotificationTypeRegistry::register('terminal.mention', [
+            'label'            => 'Terminal: @Erwähnung',
+            'description'      => 'Du wurdest in einer Nachricht erwähnt.',
+            'group'            => 'terminal',
+            'default_channels' => ['database'],
+        ]);
+
+        \Platform\Notifications\NotificationTypeRegistry::register('terminal.dm', [
+            'label'            => 'Terminal: Direktnachricht',
+            'description'      => 'Du hast eine neue Direktnachricht erhalten.',
+            'group'            => 'terminal',
+            'default_channels' => ['database'],
+        ]);
+
+        \Platform\Notifications\NotificationTypeRegistry::register('terminal.channel_message', [
+            'label'            => 'Terminal: Channel-Nachricht',
+            'description'      => 'Neue Nachricht in einem Channel, dem du angehörst.',
+            'group'            => 'terminal',
+            'default_channels' => ['database'],
+        ]);
     }
 
     protected function loadModuleServiceProviders(): void
