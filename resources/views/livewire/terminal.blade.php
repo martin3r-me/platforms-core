@@ -7,7 +7,7 @@
 >
   <!-- Always-visible strip (15px) — click to toggle -->
   <div
-    class="h-[25px] w-full bg-[var(--ui-surface)]/95 backdrop-blur border-t border-[var(--ui-border)]/60 flex items-center px-3 cursor-pointer select-none hover:bg-[var(--ui-surface)]"
+    class="h-[50px] w-full bg-[var(--ui-surface)]/95 backdrop-blur border-t border-[var(--ui-border)]/60 flex items-center px-3 cursor-pointer select-none hover:bg-[var(--ui-surface)]"
     @click="toggle()"
     wire:key="terminal-strip"
   >
@@ -48,7 +48,7 @@
          wire:key="terminal-content">
 
       <!-- Sidebar (200px) -->
-      <div class="w-[200px] flex-shrink-0 border-r border-[var(--ui-border)]/60 overflow-y-auto py-2" wire:key="terminal-sidebar">
+      <div class="w-[240px] flex-shrink-0 border-r border-[var(--ui-border)]/60 overflow-y-auto overscroll-contain py-2" wire:key="terminal-sidebar">
 
         <!-- Chats Section -->
         <div class="px-2 mb-3" x-data="{ chatsOpen: true }">
@@ -122,7 +122,7 @@
         </div>
 
         <!-- Messages -->
-        <div class="flex-1 min-h-0 overflow-y-auto px-3 py-3 text-xs" x-ref="body">
+        <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-3 text-xs" x-ref="body">
           <div class="space-y-3">
             <div class="flex gap-2">
               <div class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px] font-semibold flex-shrink-0">AM</div>
