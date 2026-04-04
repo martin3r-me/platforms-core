@@ -3,6 +3,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Mention from '@tiptap/extension-mention';
 import Placeholder from '@tiptap/extension-placeholder';
 import { createMentionSuggestion } from './mention-suggestion.js';
+import { createFloatingToolbar } from './floating-toolbar.js';
 
 /**
  * Alpine.js `tiptapEditor` component.
@@ -18,15 +19,16 @@ export function tiptapEditor({
   fetchUsers = null,
   fetchContexts = null,
   onSubmit = null,
+  toolbar = true,
 } = {}) {
   return {
     editor: null,
     isEmpty: true,
+    _destroyToolbar: null,
 
     init() {
       const extensions = [
         StarterKit.configure({
-          // Only keep essentials for a chat input
           heading: false,
           codeBlock: false,
           blockquote: false,
@@ -50,10 +52,8 @@ export function tiptapEditor({
             class: 'tiptap-editor',
           },
           handleKeyDown: (view, event) => {
-            // Enter without shift → submit
             if (event.key === 'Enter' && !event.shiftKey) {
-              // Don't submit if mention dropdown is active
-              const mentionActive = document.querySelector('.mention-dropdown');
+              const mentionActive = document.querySelector('.tippy-box .mention-dropdown');
               if (mentionActive) return false;
 
               event.preventDefault();
@@ -69,6 +69,10 @@ export function tiptapEditor({
       });
 
       this.isEmpty = this.editor.isEmpty;
+
+      if (toolbar) {
+        this._destroyToolbar = createFloatingToolbar(this.editor);
+      }
     },
 
     submit() {
@@ -90,6 +94,10 @@ export function tiptapEditor({
     },
 
     destroy() {
+      if (this._destroyToolbar) {
+        this._destroyToolbar();
+        this._destroyToolbar = null;
+      }
       if (this.editor) {
         this.editor.destroy();
         this.editor = null;

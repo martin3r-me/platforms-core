@@ -42,7 +42,6 @@ export function createMentionSuggestion(fetchUsers) {
           console.warn('fetchUsers failed, using defaults:', e);
         }
       }
-      // Fallback to dummy data
       const q = query.toLowerCase();
       return DUMMY_USERS.filter(u => u.label.toLowerCase().includes(q)).slice(0, 5);
     },
@@ -56,14 +55,11 @@ export function createMentionSuggestion(fetchUsers) {
       function updateDropdown() {
         if (!container) return;
         container.innerHTML = renderDropdown(items, selectedIndex);
-        // Attach click handlers
         container.querySelectorAll('.mention-dropdown-item').forEach(el => {
           el.addEventListener('mousedown', (e) => {
             e.preventDefault();
             const idx = parseInt(el.dataset.index, 10);
-            if (items[idx]) {
-              selectItem(idx);
-            }
+            if (items[idx]) selectItem(idx);
           });
         });
       }
@@ -102,8 +98,8 @@ export function createMentionSuggestion(fetchUsers) {
           items = props.items;
           selectedIndex = 0;
           updateDropdown();
-          if (popup && popup[0]) {
-            popup[0].setProps({ getReferenceClientRect: props.clientRect });
+          if (popup) {
+            popup.setProps({ getReferenceClientRect: props.clientRect });
           }
         },
 
@@ -123,15 +119,15 @@ export function createMentionSuggestion(fetchUsers) {
             return true;
           }
           if (event.key === 'Escape') {
-            if (popup && popup[0]) popup[0].hide();
+            if (popup) popup.hide();
             return true;
           }
           return false;
         },
 
         onExit: () => {
-          if (popup && popup[0]) {
-            popup[0].destroy();
+          if (popup) {
+            popup.destroy();
           }
           popup = null;
           container = null;

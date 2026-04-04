@@ -8,6 +8,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Mention from '@tiptap/extension-mention';
 import Placeholder from '@tiptap/extension-placeholder';
 import { createMentionSuggestion } from './mention-suggestion.js';
+import { createFloatingToolbar } from './floating-toolbar.js';
 import { tiptapEditor } from './alpine-integration.js';
 
 // Inject editor styles into <head>
@@ -48,5 +49,6 @@ export {
   Mention,
   Placeholder,
   createMentionSuggestion,
+  createFloatingToolbar,
   tiptapEditor,
 };
