@@ -38,7 +38,7 @@
   <!-- Slide container -->
   <div
     class="w-full border-t border-[var(--ui-border)]/60 bg-[var(--ui-surface)]/95 backdrop-blur overflow-hidden transition-[height] duration-300 ease-out flex flex-col"
-    x-bind:style="open ? 'height: 20rem' : 'height: 0px'"
+    x-bind:style="open ? 'height: 20rem; max-height: 50vh' : 'height: 0px'"
     style="height: 0px;"
     wire:key="terminal-slide"
   >
@@ -182,6 +182,7 @@
             <div class="flex-1 min-w-0 rounded-md border border-[var(--ui-border)]/60 focus-within:border-[var(--ui-primary)]/40 transition-[border-color]">
               <div x-ref="editorEl"></div>
             </div>
+            <div x-ref="emojiSlot" class="flex-shrink-0"></div>
             <button
               type="button"
               @click="submit()"

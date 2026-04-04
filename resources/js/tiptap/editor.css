@@ -1,27 +1,31 @@
 /* Tiptap Editor Styles — injected at runtime via JS */
 
-.tiptap-editor {
-  outline: none;
+/* ProseMirror / Editor container */
+.tiptap-editor,
+.ProseMirror.tiptap-editor {
+  outline: none !important;
   font-size: 14px;
   line-height: 1.4;
   color: var(--ui-secondary);
   min-height: 34px;
-  max-height: 120px;
-  overflow-y: auto;
   padding: 6px 10px;
   word-break: break-word;
+  overflow-y: hidden;
 }
 
-.tiptap-editor p {
-  margin: 0;
+.tiptap-editor p,
+.ProseMirror p {
+  margin: 0 !important;
 }
 
-.tiptap-editor p + p {
-  margin-top: 0.25em;
+.tiptap-editor p + p,
+.ProseMirror p + p {
+  margin-top: 0.25em !important;
 }
 
 /* Placeholder */
-.tiptap-editor p.is-editor-empty:first-child::before {
+.tiptap-editor p.is-editor-empty:first-child::before,
+.ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
   color: var(--ui-muted);
@@ -29,8 +33,44 @@
   height: 0;
 }
 
+/* === Inline formatting — override Tailwind preflight === */
+.tiptap-editor strong,
+.tiptap-editor b,
+.ProseMirror strong,
+.ProseMirror b {
+  font-weight: 700 !important;
+}
+
+.tiptap-editor em,
+.tiptap-editor i,
+.ProseMirror em,
+.ProseMirror i {
+  font-style: italic !important;
+}
+
+.tiptap-editor s,
+.tiptap-editor del,
+.tiptap-editor strike,
+.ProseMirror s,
+.ProseMirror del,
+.ProseMirror strike {
+  text-decoration: line-through !important;
+}
+
+.tiptap-editor code,
+.ProseMirror code {
+  background: var(--ui-muted-5, rgba(107,114,128,0.08)) !important;
+  border: 1px solid var(--ui-border, #e5e7eb) !important;
+  border-radius: 3px !important;
+  padding: 1px 4px !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-size: 0.85em !important;
+  color: var(--ui-danger, #dc2626) !important;
+}
+
 /* Mention pills */
-.tiptap-editor .mention {
+.tiptap-editor .mention,
+.ProseMirror .mention {
   display: inline-flex;
   align-items: center;
   background: var(--ui-primary-10, rgba(59,130,246,0.1));
@@ -44,9 +84,10 @@
   user-select: all;
 }
 
-/* Mention dropdown */
+/* === Tippy global z-index === */
 .tippy-box { z-index: 9999 !important; }
 
+/* Mention dropdown */
 .mention-dropdown {
   background: var(--ui-bg, #fff);
   border: 1px solid var(--ui-border, #e5e7eb);
@@ -94,24 +135,7 @@
   text-align: center;
 }
 
-/* Inline formatting — !important to override Tailwind preflight reset */
-.tiptap-editor strong,
-.tiptap-editor b { font-weight: 700 !important; }
-.tiptap-editor em,
-.tiptap-editor i { font-style: italic !important; }
-.tiptap-editor s,
-.tiptap-editor del { text-decoration: line-through !important; }
-.tiptap-editor code {
-  background: var(--ui-muted-5, rgba(107,114,128,0.05)) !important;
-  border: 1px solid var(--ui-border, #e5e7eb) !important;
-  border-radius: 3px !important;
-  padding: 0 3px !important;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
-  font-size: 0.9em !important;
-  color: var(--ui-danger, #dc2626) !important;
-}
-
-/* Floating toolbar */
+/* === Floating toolbar === */
 .floating-toolbar {
   display: flex;
   align-items: center;
@@ -136,13 +160,99 @@
   font-size: 13px;
   cursor: pointer;
   transition: background 0.1s, color 0.1s;
+  line-height: 1;
 }
 
 .floating-toolbar-btn:hover {
-  background: var(--ui-muted-5, rgba(107,114,128,0.05));
+  background: var(--ui-muted-5, rgba(107,114,128,0.08));
 }
 
 .floating-toolbar-btn.is-active {
   background: var(--ui-primary-10, rgba(59,130,246,0.1));
   color: var(--ui-primary);
+}
+
+/* === Emoji picker === */
+.emoji-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.1s;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.emoji-picker-trigger:hover {
+  background: var(--ui-muted-5, rgba(107,114,128,0.08));
+}
+
+.emoji-picker {
+  width: 280px;
+}
+
+.emoji-picker-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px 4px 0;
+  border-bottom: 1px solid var(--ui-border, #e5e7eb);
+}
+
+.emoji-picker-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  border: none;
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.1s;
+  opacity: 0.6;
+}
+
+.emoji-picker-tab:hover {
+  opacity: 1;
+  background: var(--ui-muted-5, rgba(107,114,128,0.05));
+}
+
+.emoji-picker-tab.is-active {
+  opacity: 1;
+  background: var(--ui-primary-5, rgba(59,130,246,0.05));
+  border-bottom: 2px solid var(--ui-primary);
+}
+
+.emoji-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2px;
+  padding: 6px 4px;
+}
+
+.emoji-picker-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+  transition: background 0.1s, transform 0.1s;
+  line-height: 1;
+}
+
+.emoji-picker-emoji:hover {
+  background: var(--ui-muted-5, rgba(107,114,128,0.08));
+  transform: scale(1.15);
 }

@@ -9,6 +9,7 @@ import Mention from '@tiptap/extension-mention';
 import Placeholder from '@tiptap/extension-placeholder';
 import { createMentionSuggestion } from './mention-suggestion.js';
 import { createFloatingToolbar } from './floating-toolbar.js';
+import { createEmojiPicker } from './emoji-picker.js';
 import { tiptapEditor } from './alpine-integration.js';
 
 // Inject editor styles into <head>
@@ -50,5 +51,6 @@ export {
   Placeholder,
   createMentionSuggestion,
   createFloatingToolbar,
+  createEmojiPicker,
   tiptapEditor,
 };
