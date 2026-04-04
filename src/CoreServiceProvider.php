@@ -651,6 +651,7 @@ class CoreServiceProvider extends ServiceProvider
             \Platform\Core\Tools\Terminal\ManageTerminalMembersTool::class => 'terminal.members.POST',
             \Platform\Core\Tools\Terminal\DeleteTerminalMessageTool::class => 'terminal.messages.DELETE',
             \Platform\Core\Tools\Terminal\UpdateTerminalChannelTool::class => 'terminal.channels.PATCH',
+            \Platform\Core\Tools\Terminal\DeleteTerminalChannelTool::class => 'terminal.channels.DELETE',
         ];
         foreach ($terminalTools as $class => $name) {
             if (class_exists($class) && !$registry->has($name)) {

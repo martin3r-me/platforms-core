@@ -17,9 +17,10 @@ class CreateTerminalChannelTool implements ToolContract
 
     public function getDescription(): string
     {
-        return 'Erstellt einen neuen Terminal-Channel (Gruppenchat). '
-            . 'Der aktuelle User wird automatisch als Owner eingetragen. '
-            . 'Optional können direkt Mitglieder hinzugefügt werden.';
+        return 'Erstellt einen neuen Terminal-Channel (Gruppenchat) oder eine DM. '
+            . 'Für Channels: name ist erforderlich, User wird Owner. '
+            . 'Für DMs: type="dm" und target_user_id setzen. '
+            . 'DMs werden dedupliziert (existierende DM wird zurückgegeben).';
     }
 
     public function getSchema(): array
@@ -27,9 +28,14 @@ class CreateTerminalChannelTool implements ToolContract
         return [
             'type' => 'object',
             'properties' => [
+                'type' => [
+                    'type' => 'string',
+                    'enum' => ['channel', 'dm'],
+                    'description' => 'Typ: "channel" (Gruppenchat, Standard) oder "dm" (Direktnachricht).',
+                ],
                 'name' => [
                     'type' => 'string',
-                    'description' => 'Name des Channels (z.B. "general", "projekt-alpha").',
+                    'description' => 'Name des Channels (erforderlich für type=channel, ignoriert bei DMs).',
                 ],
                 'description' => [
                     'type' => 'string',
@@ -39,13 +45,17 @@ class CreateTerminalChannelTool implements ToolContract
                     'type' => 'string',
                     'description' => 'Optional: Emoji-Icon für den Channel (z.B. "🚀").',
                 ],
+                'target_user_id' => [
+                    'type' => 'integer',
+                    'description' => 'User-ID des DM-Partners (erforderlich für type=dm).',
+                ],
                 'member_ids' => [
                     'type' => 'array',
                     'items' => ['type' => 'integer'],
-                    'description' => 'Optional: User-IDs von Team-Mitgliedern, die direkt hinzugefügt werden sollen.',
+                    'description' => 'Optional: User-IDs für Channels (ignoriert bei DMs).',
                 ],
             ],
-            'required' => ['name'],
+            'required' => [],
         ];
     }
 
@@ -58,9 +68,65 @@ class CreateTerminalChannelTool implements ToolContract
             return ToolResult::error('User und Team-Kontext erforderlich.', 'NO_CONTEXT');
         }
 
+        $type = $arguments['type'] ?? 'channel';
+
+        if ($type === 'dm') {
+            return $this->createDm($arguments, $user, $team);
+        }
+
+        return $this->createChannel($arguments, $user, $team);
+    }
+
+    private function createDm(array $arguments, $user, $team): ToolResult
+    {
+        $targetUserId = $arguments['target_user_id'] ?? null;
+        if (! $targetUserId) {
+            return ToolResult::error('target_user_id ist erforderlich für type=dm.', 'VALIDATION_ERROR');
+        }
+
+        if ((int) $targetUserId === $user->id) {
+            return ToolResult::error('Du kannst keine DM an dich selbst senden.', 'VALIDATION_ERROR');
+        }
+
+        $userIds = [$user->id, (int) $targetUserId];
+        $hash = TerminalChannel::makeParticipantHash($userIds);
+
+        // Find existing DM
+        $channel = TerminalChannel::where('team_id', $team->id)
+            ->where('participant_hash', $hash)
+            ->first();
+
+        $wasExisting = (bool) $channel;
+
+        if (! $channel) {
+            $channel = TerminalChannel::create([
+                'team_id' => $team->id,
+                'type' => 'dm',
+                'participant_hash' => $hash,
+            ]);
+
+            foreach ($userIds as $uid) {
+                TerminalChannelMember::create([
+                    'channel_id' => $channel->id,
+                    'user_id' => $uid,
+                    'role' => 'member',
+                ]);
+            }
+        }
+
+        return ToolResult::success([
+            'channel_id' => $channel->id,
+            'type' => 'dm',
+            'target_user_id' => (int) $targetUserId,
+            'was_existing' => $wasExisting,
+        ]);
+    }
+
+    private function createChannel(array $arguments, $user, $team): ToolResult
+    {
         $name = trim($arguments['name'] ?? '');
         if (empty($name)) {
-            return ToolResult::error('name ist erforderlich.', 'VALIDATION_ERROR');
+            return ToolResult::error('name ist erforderlich für type=channel.', 'VALIDATION_ERROR');
         }
 
         $channel = TerminalChannel::create([
