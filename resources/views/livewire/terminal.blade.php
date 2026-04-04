@@ -3,53 +3,23 @@
   x-init="init()"
   x-on:toggle-terminal.window="toggle()"
   class="w-full flex-shrink-0"
+  x-show="open"
+  x-transition:enter="transition ease-out duration-200"
+  x-transition:enter-start="opacity-0 translate-y-4"
+  x-transition:enter-end="opacity-100 translate-y-0"
+  x-transition:leave="transition ease-in duration-150"
+  x-transition:leave-start="opacity-100 translate-y-0"
+  x-transition:leave-end="opacity-0 translate-y-4"
   wire:key="terminal-root"
 >
-  <!-- Always-visible strip (50px) — click to toggle -->
-  <div
-    class="h-[50px] w-full bg-[var(--ui-surface)]/95 backdrop-blur border-t border-[var(--ui-border)]/60 flex items-center px-3 cursor-pointer select-none hover:bg-[var(--ui-surface)]"
-    @click="toggle()"
-    wire:key="terminal-strip"
-  >
-    <div class="flex items-center gap-5 text-[11px] font-mono text-[var(--ui-muted)] truncate w-full">
-      @php $ch = $this->channels; @endphp
-      @foreach(collect($ch['dms'])->merge($ch['channels'])->sortByDesc('unread')->take(3) as $preview)
-        <span class="flex items-center gap-1.5">
-          @if($preview['unread'] > 0)
-            <span class="w-2 h-2 rounded-full bg-[var(--ui-primary)] inline-block"></span>
-          @else
-            <span class="w-2 h-2 rounded-full bg-[var(--ui-muted)]/30 inline-block"></span>
-          @endif
-          {{ $preview['name'] }}
-          @if($preview['last_message'])
-            — {{ $preview['last_message'] }}
-          @endif
-          @if($preview['last_at'])
-            <span class="opacity-60">{{ $preview['last_at'] }}</span>
-          @endif
-        </span>
-      @endforeach
-      @if(collect($ch['dms'])->merge($ch['channels'])->isEmpty())
-        <span class="opacity-60">Keine Unterhaltungen</span>
-      @endif
-    </div>
-    <div class="ml-auto flex-shrink-0 text-[var(--ui-muted)]">
-      <svg class="w-3 h-3 transition-transform duration-200" :class="open ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-        <path fill-rule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clip-rule="evenodd" />
-      </svg>
-    </div>
-  </div>
-
   <!-- Slide container -->
   <div
-    class="w-full border-t border-[var(--ui-border)]/60 bg-[var(--ui-surface)]/95 backdrop-blur overflow-hidden transition-[height] duration-300 ease-out flex flex-col"
-    x-bind:style="open ? 'height: 20rem; max-height: 50vh' : 'height: 0px'"
-    style="height: 0px;"
+    class="w-full border-t border-[var(--ui-border)]/60 bg-[var(--ui-surface)]/95 backdrop-blur overflow-hidden flex flex-col"
+    style="height: 20rem; max-height: 50vh;"
     wire:key="terminal-slide"
   >
     <!-- Panel Content: Sidebar + Main -->
-    <div class="flex-1 min-h-0 flex opacity-100 transition-opacity duration-200"
-         :class="open ? 'opacity-100' : 'opacity-0'"
+    <div class="flex-1 min-h-0 flex"
          wire:key="terminal-content">
 
       <!-- Sidebar (240px) -->
