@@ -58,11 +58,11 @@
         <!-- New Chat / Channel buttons -->
         <div class="px-2 mb-2 flex gap-1">
           <button
-            x-data x-on:click="$dispatch('terminal-show-new-dm')"
+            @click.stop="$dispatch('terminal-show-new-dm')"
             class="flex-1 text-[10px] px-2 py-1 rounded border border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:border-[var(--ui-border)] transition"
           >+ Chat</button>
           <button
-            x-data x-on:click="$dispatch('terminal-show-new-channel')"
+            @click.stop="$dispatch('terminal-show-new-channel')"
             class="flex-1 text-[10px] px-2 py-1 rounded border border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:border-[var(--ui-border)] transition"
           >+ Channel</button>
         </div>
@@ -133,23 +133,30 @@
 
         @if($this->activeChannel)
           <!-- Chat Header -->
-          <div class="h-10 px-3 flex items-center gap-2 text-xs border-b border-[var(--ui-border)]/60 flex-shrink-0">
+          <div class="h-11 px-4 flex items-center gap-2.5 text-xs border-b border-[var(--ui-border)]/60 flex-shrink-0">
             @if($this->activeChannel['type'] === 'dm')
-              <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden">
+              <div class="w-6 h-6 rounded-lg bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[10px] font-semibold flex-shrink-0 overflow-hidden">
                 @if(! empty($this->activeChannel['avatar']))
                   <img src="{{ $this->activeChannel['avatar'] }}" alt="" class="w-full h-full object-cover">
                 @else
                   {{ $this->activeChannel['initials'] ?? '?' }}
                 @endif
               </div>
-              <span class="font-medium text-[var(--ui-body-color)]">{{ $this->activeChannel['name'] }}</span>
+              <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $this->activeChannel['name'] }}</span>
             @else
-              <span class="text-[var(--ui-muted)] font-medium">{{ $this->activeChannel['icon'] ?? '#' }}</span>
-              <span class="font-medium text-[var(--ui-body-color)]">{{ $this->activeChannel['name'] ?? 'Kontext' }}</span>
+              <span class="text-[var(--ui-muted)] font-bold text-[14px]">{{ $this->activeChannel['icon'] ?? '#' }}</span>
+              <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $this->activeChannel['name'] ?? 'Kontext' }}</span>
             @endif
             @if($this->activeChannel['member_count'] > 0)
               <span class="text-[var(--ui-muted)]">&middot;</span>
-              <span class="text-[10px] text-[var(--ui-muted)]">{{ $this->activeChannel['member_count'] }} {{ $this->activeChannel['member_count'] === 1 ? 'Mitglied' : 'Mitglieder' }}</span>
+              @if(in_array($this->activeChannel['type'], ['channel', 'context']))
+                <button
+                  @click.stop="$dispatch('terminal-show-members')"
+                  class="text-[10px] text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition cursor-pointer"
+                >{{ $this->activeChannel['member_count'] }} {{ $this->activeChannel['member_count'] === 1 ? 'Mitglied' : 'Mitglieder' }}</button>
+              @else
+                <span class="text-[10px] text-[var(--ui-muted)]">{{ $this->activeChannel['member_count'] }} {{ $this->activeChannel['member_count'] === 1 ? 'Mitglied' : 'Mitglieder' }}</span>
+              @endif
             @endif
 
             {{-- Channel actions (delete / leave) --}}
@@ -188,62 +195,115 @@
           </div>
 
           <!-- Messages -->
-          <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-3 text-xs" x-ref="body" wire:key="terminal-messages-{{ $channelId }}">
-            <div class="space-y-3">
-              @php $lastDate = null; @endphp
+          <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain text-[13px]" x-ref="body" wire:key="terminal-messages-{{ $channelId }}"
+               x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)">
+            <div class="px-4 py-2">
+              @php $lastDate = null; $lastUserId = null; $lastTime = null; @endphp
               @forelse($this->messages as $msg)
+                @php
+                  $isNewGroup = $msg['user_id'] !== $lastUserId || $msg['date'] !== $lastDate || $msg['time'] !== $lastTime;
+                  $isNewDate = $msg['date'] !== $lastDate;
+                @endphp
+
                 {{-- Date separator --}}
-                @if($msg['date'] !== $lastDate)
+                @if($isNewDate)
                   @php $lastDate = $msg['date']; @endphp
-                  <div class="flex items-center gap-2 py-1">
-                    <div class="flex-1 h-px bg-[var(--ui-border)]/40"></div>
-                    <span class="text-[9px] text-[var(--ui-muted)] font-medium">{{ $msg['date'] }}</span>
-                    <div class="flex-1 h-px bg-[var(--ui-border)]/40"></div>
+                  <div class="flex items-center gap-3 my-3 first:mt-0">
+                    <div class="flex-1 h-px bg-[var(--ui-border)]/50"></div>
+                    <span class="text-[11px] text-[var(--ui-muted)] font-medium px-2 select-none">{{ $msg['date'] }}</span>
+                    <div class="flex-1 h-px bg-[var(--ui-border)]/50"></div>
                   </div>
                 @endif
 
-                <div class="group flex gap-2 hover:bg-[var(--ui-surface-hover)]/50 -mx-1.5 px-1.5 py-0.5 rounded" wire:key="msg-{{ $msg['id'] }}">
-                  <div class="w-6 h-6 rounded-full {{ $msg['is_mine'] ? 'bg-gray-100 text-gray-600' : 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]' }} flex items-center justify-center text-[10px] font-semibold flex-shrink-0 overflow-hidden">
-                    @if(! empty($msg['user_avatar']))
-                      <img src="{{ $msg['user_avatar'] }}" alt="" class="w-full h-full object-cover">
-                    @else
-                      {{ $msg['user_initials'] }}
-                    @endif
+                @php $lastUserId = $msg['user_id']; $lastTime = $msg['time']; @endphp
+
+                {{-- Message row --}}
+                <div class="group relative {{ $isNewGroup ? 'mt-3 first:mt-0' : 'mt-px' }} -mx-4 px-4 py-0.5 hover:bg-[var(--ui-surface-hover)]/40 transition-colors" wire:key="msg-{{ $msg['id'] }}">
+
+                  {{-- Hover action bar --}}
+                  <div class="absolute -top-3 right-5 hidden group-hover:flex items-center gap-px bg-[var(--ui-surface)] border border-[var(--ui-border)]/60 rounded-md shadow-sm z-10">
+                    <button
+                      wire:click="toggleReaction({{ $msg['id'] }}, '👍')"
+                      class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] rounded-l-md transition text-xs"
+                      title="Reagieren"
+                    >👍</button>
+                    <button
+                      wire:click="toggleReaction({{ $msg['id'] }}, '😂')"
+                      class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition text-xs"
+                    >😂</button>
+                    <button
+                      wire:click="toggleReaction({{ $msg['id'] }}, '❤️')"
+                      class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition text-xs"
+                    >❤️</button>
+                    <button
+                      wire:click="toggleReaction({{ $msg['id'] }}, '✅')"
+                      class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] rounded-r-md transition text-xs"
+                    >✅</button>
                   </div>
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-baseline gap-2">
-                      <span class="font-medium text-[var(--ui-body-color)]">{{ $msg['is_mine'] ? 'Du' : $msg['user_name'] }}</span>
-                      <span class="text-[10px] text-[var(--ui-muted)]">{{ $msg['time'] }}</span>
-                    </div>
-                    <div class="mt-0.5 text-[var(--ui-secondary)] prose-terminal">{!! $msg['body_html'] !!}</div>
 
-                    {{-- Reactions --}}
-                    @if(! empty($msg['reactions']))
-                      <div class="flex flex-wrap gap-1 mt-1">
-                        @foreach($msg['reactions'] as $reaction)
-                          <button
-                            wire:click="toggleReaction({{ $msg['id'] }}, '{{ $reaction['emoji'] }}')"
-                            class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] border transition
-                              {{ $reaction['reacted'] ? 'border-[var(--ui-primary)]/30 bg-[var(--ui-primary-5)] text-[var(--ui-primary)]' : 'border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:border-[var(--ui-border)]' }}"
-                          >
-                            <span>{{ $reaction['emoji'] }}</span>
-                            <span>{{ $reaction['count'] }}</span>
-                          </button>
-                        @endforeach
+                  @if($isNewGroup)
+                    {{-- Full message with avatar + name --}}
+                    <div class="flex gap-2.5">
+                      <div class="w-8 h-8 rounded-lg {{ $msg['is_mine'] ? 'bg-gray-100 text-gray-500' : 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]' }} flex items-center justify-center text-[11px] font-semibold flex-shrink-0 overflow-hidden mt-0.5">
+                        @if(! empty($msg['user_avatar']))
+                          <img src="{{ $msg['user_avatar'] }}" alt="" class="w-full h-full object-cover">
+                        @else
+                          {{ $msg['user_initials'] }}
+                        @endif
                       </div>
-                    @endif
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-baseline gap-2">
+                          <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $msg['is_mine'] ? 'Du' : $msg['user_name'] }}</span>
+                          <span class="text-[11px] text-[var(--ui-muted)] font-normal">{{ $msg['time'] }}</span>
+                        </div>
+                        <div class="text-[var(--ui-body-color)] leading-relaxed prose-terminal">{!! $msg['body_html'] !!}</div>
+                      </div>
+                    </div>
+                  @else
+                    {{-- Continuation — no avatar, time on hover --}}
+                    <div class="flex gap-2.5">
+                      <div class="w-8 flex-shrink-0 flex items-center justify-center">
+                        <span class="text-[10px] text-[var(--ui-muted)] opacity-0 group-hover:opacity-100 transition-opacity select-none">{{ $msg['time'] }}</span>
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <div class="text-[var(--ui-body-color)] leading-relaxed prose-terminal">{!! $msg['body_html'] !!}</div>
+                      </div>
+                    </div>
+                  @endif
 
-                    {{-- Thread indicator --}}
-                    @if($msg['reply_count'] > 0)
-                      <button class="mt-1 text-[10px] text-[var(--ui-primary)] hover:underline">
+                  {{-- Reactions --}}
+                  @if(! empty($msg['reactions']))
+                    <div class="flex flex-wrap gap-1 mt-1 ml-[42px]">
+                      @foreach($msg['reactions'] as $reaction)
+                        <button
+                          wire:click="toggleReaction({{ $msg['id'] }}, '{{ $reaction['emoji'] }}')"
+                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border transition
+                            {{ $reaction['reacted'] ? 'border-[var(--ui-primary)]/30 bg-[var(--ui-primary-5)] text-[var(--ui-primary)]' : 'border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:border-[var(--ui-border)] hover:bg-[var(--ui-surface-hover)]' }}"
+                        >
+                          <span>{{ $reaction['emoji'] }}</span>
+                          <span class="font-medium">{{ $reaction['count'] }}</span>
+                        </button>
+                      @endforeach
+                    </div>
+                  @endif
+
+                  {{-- Thread indicator --}}
+                  @if($msg['reply_count'] > 0)
+                    <div class="ml-[42px] mt-1">
+                      <button class="inline-flex items-center gap-1.5 text-[12px] text-[var(--ui-primary)] hover:underline font-medium">
+                        <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5zm11 4V5a4 4 0 00-4-4H7a4 4 0 014 4h2a2 2 0 012 2v4a2 2 0 01-2 2h-1l-2 2h3l3 3v-3a2 2 0 002-2V9z" clip-rule="evenodd"/></svg>
                         {{ $msg['reply_count'] }} {{ $msg['reply_count'] === 1 ? 'Antwort' : 'Antworten' }}
                       </button>
-                    @endif
-                  </div>
+                    </div>
+                  @endif
                 </div>
               @empty
-                <div class="flex items-center justify-center h-full text-[var(--ui-muted)] text-xs">
-                  Noch keine Nachrichten. Schreib die erste!
+                <div class="flex items-center justify-center h-full text-[var(--ui-muted)] text-sm">
+                  <div class="text-center py-8">
+                    <div class="text-3xl mb-3 opacity-20">💬</div>
+                    <p>Noch keine Nachrichten.</p>
+                    <p class="text-[var(--ui-muted)]/60 text-xs mt-1">Schreib die erste!</p>
+                  </div>
                 </div>
               @endforelse
             </div>
@@ -252,9 +312,16 @@
           <!-- Input (Tiptap Editor) — wire:ignore prevents morph from destroying ProseMirror DOM -->
           <div wire:key="terminal-editor-{{ $channelId }}"
                wire:ignore
-               class="px-3 py-2 border-t border-[var(--ui-border)]/60 flex-shrink-0"
+               class="px-4 py-2.5 border-t border-[var(--ui-border)]/60 flex-shrink-0"
                x-data="tiptapEditor({
-                 placeholder: '{{ $this->activeChannel['type'] === 'dm' ? 'Nachricht an ' . e($this->activeChannel['name']) . ' …' : 'Nachricht schreiben …' }}',
+                 placeholder: '{{ $this->activeChannel['type'] === 'dm' ? 'Nachricht an ' . e($this->activeChannel['name']) . ' …' : 'Nachricht in #' . e($this->activeChannel['name'] ?? 'Kontext') . ' schreiben …' }}',
+                 fetchUsers: async (query) => {
+                   const members = await $wire.getTeamMembers();
+                   const q = (query || '').toLowerCase();
+                   return members
+                     .filter(m => m.name.toLowerCase().includes(q))
+                     .map(m => ({ id: m.id, label: m.name, initials: m.initials, avatar: m.avatar || null }));
+                 },
                  onSubmit: (html, text, json) => {
                    const mentions = [];
                    try {
@@ -272,7 +339,7 @@
                  },
                })">
             <div class="flex items-end gap-2">
-              <div class="flex-1 min-w-0 rounded-md border border-[var(--ui-border)]/60 focus-within:border-[var(--ui-primary)]/40 transition-[border-color]">
+              <div class="flex-1 min-w-0 rounded-lg border border-[var(--ui-border)]/80 focus-within:border-[var(--ui-primary)]/50 focus-within:shadow-[0_0_0_1px_var(--ui-primary-10)] transition-all">
                 <div x-ref="editorEl"></div>
               </div>
               <div x-ref="emojiSlot" class="flex-shrink-0"></div>
@@ -280,19 +347,20 @@
                 type="button"
                 @click="submit()"
                 :disabled="isEmpty"
-                :class="!isEmpty ? 'bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary-hover)] cursor-pointer' : 'border border-[var(--ui-border)]/60 text-[var(--ui-muted)] opacity-60 cursor-not-allowed'"
-                class="inline-flex items-center justify-center h-[34px] px-3 rounded-md text-xs transition flex-shrink-0"
+                :class="!isEmpty ? 'bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary-hover)] cursor-pointer shadow-sm' : 'border border-[var(--ui-border)]/60 text-[var(--ui-muted)] opacity-40 cursor-not-allowed'"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs transition flex-shrink-0"
               >
-                Senden
+                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"/></svg>
               </button>
             </div>
           </div>
         @else
           <!-- No channel selected -->
-          <div class="flex-1 flex items-center justify-center text-[var(--ui-muted)] text-xs">
+          <div class="flex-1 flex items-center justify-center text-[var(--ui-muted)] text-sm">
             <div class="text-center">
-              <div class="text-2xl mb-2 opacity-30">💬</div>
-              <p>Starte einen Chat oder tritt einem Channel bei.</p>
+              <div class="text-3xl mb-3 opacity-20">💬</div>
+              <p class="font-medium">Willkommen im Terminal</p>
+              <p class="text-xs text-[var(--ui-muted)]/60 mt-1">Starte einen Chat oder tritt einem Channel bei.</p>
             </div>
           </div>
         @endif
@@ -340,8 +408,8 @@
 
   <!-- New Channel Modal -->
   <div
-    x-data="{ showNewChannel: false, channelName: '', channelDesc: '' }"
-    x-on:terminal-show-new-channel.window="showNewChannel = true; channelName = ''; channelDesc = ''"
+    x-data="{ showNewChannel: false, channelName: '', channelDesc: '', members: [], selectedIds: [] }"
+    x-on:terminal-show-new-channel.window="showNewChannel = true; channelName = ''; channelDesc = ''; selectedIds = []; $wire.getTeamMembers().then(r => members = r)"
     x-show="showNewChannel"
     x-cloak
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
@@ -355,21 +423,150 @@
       <div class="px-4 py-3 space-y-3">
         <div>
           <label class="block text-[10px] font-medium text-[var(--ui-muted)] uppercase tracking-wider mb-1">Name</label>
-          <input x-model="channelName" type="text" placeholder="z.B. general" class="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--ui-border)]/60 bg-transparent text-[var(--ui-body-color)] placeholder:text-[var(--ui-muted)]/50 focus:border-[var(--ui-primary)]/40 outline-none transition" @keydown.enter="if(channelName.trim()) { $wire.createChannel(channelName.trim(), channelDesc.trim() || null); showNewChannel = false; }">
+          <input x-model="channelName" type="text" placeholder="z.B. general" class="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--ui-border)]/60 bg-transparent text-[var(--ui-body-color)] placeholder:text-[var(--ui-muted)]/50 focus:border-[var(--ui-primary)]/40 outline-none transition" @keydown.enter="if(channelName.trim()) { $wire.createChannel(channelName.trim(), channelDesc.trim() || null, null, selectedIds); showNewChannel = false; }">
         </div>
         <div>
           <label class="block text-[10px] font-medium text-[var(--ui-muted)] uppercase tracking-wider mb-1">Beschreibung (optional)</label>
           <input x-model="channelDesc" type="text" placeholder="Worum geht es?" class="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--ui-border)]/60 bg-transparent text-[var(--ui-body-color)] placeholder:text-[var(--ui-muted)]/50 focus:border-[var(--ui-primary)]/40 outline-none transition">
         </div>
+        <div x-show="members.length > 0">
+          <label class="block text-[10px] font-medium text-[var(--ui-muted)] uppercase tracking-wider mb-1">Mitglieder einladen</label>
+          <div class="max-h-36 overflow-y-auto rounded border border-[var(--ui-border)]/60">
+            <template x-for="member in members" :key="member.id">
+              <label class="flex items-center gap-2.5 px-2.5 py-1.5 text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition cursor-pointer">
+                <input type="checkbox" :value="member.id" x-model.number="selectedIds" class="rounded border-[var(--ui-border)] text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]/30 w-3.5 h-3.5">
+                <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden">
+                  <template x-if="member.avatar">
+                    <img :src="member.avatar" alt="" class="w-full h-full object-cover">
+                  </template>
+                  <template x-if="!member.avatar">
+                    <span x-text="member.initials"></span>
+                  </template>
+                </div>
+                <span x-text="member.name" class="text-xs"></span>
+              </label>
+            </template>
+          </div>
+          <div class="text-[10px] text-[var(--ui-muted)] mt-1" x-show="selectedIds.length > 0" x-text="selectedIds.length + ' ausgewählt'"></div>
+        </div>
       </div>
       <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 flex justify-end gap-2">
         <button @click="showNewChannel = false" class="text-xs px-3 py-1.5 rounded text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">Abbrechen</button>
         <button
-          @click="if(channelName.trim()) { $wire.createChannel(channelName.trim(), channelDesc.trim() || null); showNewChannel = false; }"
+          @click="if(channelName.trim()) { $wire.createChannel(channelName.trim(), channelDesc.trim() || null, null, selectedIds); showNewChannel = false; }"
           :disabled="!channelName.trim()"
           :class="channelName.trim() ? 'bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary-hover)]' : 'bg-[var(--ui-muted)]/20 text-[var(--ui-muted)] cursor-not-allowed'"
           class="text-xs px-3 py-1.5 rounded transition"
         >Erstellen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Channel Members Modal -->
+  <div
+    x-data="{
+      showMembers: false,
+      members: [],
+      available: [],
+      loading: false,
+      async load() {
+        this.loading = true;
+        const [m, t] = await Promise.all([
+          this.$wire.getChannelMembers(),
+          this.$wire.getTeamMembers()
+        ]);
+        this.members = m;
+        const memberIds = m.map(x => x.id);
+        this.available = t.filter(x => !memberIds.includes(x.id));
+        this.loading = false;
+      },
+      async add(userId) {
+        await this.$wire.addMember(userId);
+        this.load();
+      },
+      async remove(userId) {
+        await this.$wire.removeMember(userId);
+        this.load();
+      }
+    }"
+    x-on:terminal-show-members.window="showMembers = true; load()"
+    x-show="showMembers"
+    x-cloak
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+    @click.self="showMembers = false"
+    @keydown.escape.window="showMembers = false"
+  >
+    <div class="bg-[var(--ui-surface)] rounded-lg shadow-xl border border-[var(--ui-border)]/60 w-80 max-h-[28rem] overflow-hidden flex flex-col" @click.stop>
+      <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex-shrink-0">
+        <h3 class="text-sm font-medium text-[var(--ui-body-color)]">Mitglieder</h3>
+      </div>
+
+      <div class="flex-1 min-h-0 overflow-y-auto">
+        {{-- Current members --}}
+        <div class="px-2 py-2">
+          <template x-if="loading">
+            <div class="px-2 py-4 text-center text-xs text-[var(--ui-muted)]">Laden…</div>
+          </template>
+          <template x-if="!loading">
+            <div class="space-y-px">
+              <template x-for="member in members" :key="member.id">
+                <div class="flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition">
+                  <div class="w-6 h-6 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden">
+                    <template x-if="member.avatar">
+                      <img :src="member.avatar" alt="" class="w-full h-full object-cover">
+                    </template>
+                    <template x-if="!member.avatar">
+                      <span x-text="member.initials"></span>
+                    </template>
+                  </div>
+                  <span x-text="member.name" class="flex-1 text-xs truncate"></span>
+                  <template x-if="member.role === 'owner'">
+                    <span class="text-[9px] font-medium uppercase tracking-wider text-[var(--ui-muted)] px-1.5 py-0.5 rounded bg-[var(--ui-muted)]/10">Owner</span>
+                  </template>
+                  <template x-if="member.role !== 'owner'">
+                    <button
+                      @click="remove(member.id)"
+                      class="text-[var(--ui-muted)] hover:text-red-500 transition p-0.5 rounded hover:bg-red-50"
+                      title="Entfernen"
+                    >
+                      <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+                    </button>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+
+        {{-- Add members --}}
+        <template x-if="!loading && available.length > 0">
+          <div class="px-2 pb-2">
+            <div class="px-2 py-1.5 text-[10px] font-medium text-[var(--ui-muted)] uppercase tracking-wider">Hinzufügen</div>
+            <div class="space-y-px">
+              <template x-for="user in available" :key="user.id">
+                <button
+                  @click="add(user.id)"
+                  class="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition"
+                >
+                  <div class="w-6 h-6 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden">
+                    <template x-if="user.avatar">
+                      <img :src="user.avatar" alt="" class="w-full h-full object-cover">
+                    </template>
+                    <template x-if="!user.avatar">
+                      <span x-text="user.initials"></span>
+                    </template>
+                  </div>
+                  <span x-text="user.name" class="flex-1 text-xs truncate text-left"></span>
+                  <svg class="w-3.5 h-3.5 text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
+                </button>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <div class="px-4 py-2.5 border-t border-[var(--ui-border)]/60 flex justify-end flex-shrink-0">
+        <button @click="showMembers = false" class="text-xs px-3 py-1.5 rounded text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">Schließen</button>
       </div>
     </div>
   </div>
@@ -380,18 +577,17 @@
         get open(){ return Alpine?.store('page')?.terminalOpen ?? false; },
         toggle(){ if(Alpine?.store('page')) Alpine.store('page').terminalOpen = !Alpine.store('page').terminalOpen; },
         init(){
-          this.$nextTick(() => {
-            const c = this.$refs.body;
-            if (c && this.open) c.scrollTop = c.scrollHeight;
-          });
-          // Auto-scroll on new messages
+          const scrollBottom = () => {
+            this.$nextTick(() => {
+              const c = this.$refs.body;
+              if (c) c.scrollTop = c.scrollHeight;
+            });
+          };
+          // Scroll on new messages / channel switch
           Livewire.hook('morph.updated', ({el}) => {
-            if (el === this.$refs.body || el.closest('[x-ref="body"]')) {
-              this.$nextTick(() => {
-                const c = this.$refs.body;
-                if (c) c.scrollTop = c.scrollHeight;
-              });
-            }
+            const c = this.$refs.body;
+            if (!c) return;
+            if (el === c || c.contains(el)) scrollBottom();
           });
         },
       };

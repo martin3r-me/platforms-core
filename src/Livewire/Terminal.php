@@ -133,7 +133,7 @@ class Terminal extends Component
 
     // ── Group Channel ──────────────────────────────────────────
 
-    public function createChannel(string $name, ?string $description = null, ?string $icon = null): void
+    public function createChannel(string $name, ?string $description = null, ?string $icon = null, array $memberIds = []): void
     {
         $teamId = $this->teamId();
         if (! $teamId || empty(trim($name))) {
@@ -155,6 +155,17 @@ class Terminal extends Component
             'role' => 'owner',
         ]);
 
+        // Add selected members
+        foreach ($memberIds as $userId) {
+            if ((int) $userId === auth()->id()) {
+                continue;
+            }
+            TerminalChannelMember::firstOrCreate(
+                ['channel_id' => $channel->id, 'user_id' => (int) $userId],
+                ['role' => 'member']
+            );
+        }
+
         $this->channelId = $channel->id;
     }
 
@@ -173,6 +184,58 @@ class Terminal extends Component
                 'last_read_message_id' => $channel->last_message_id,
             ]
         );
+    }
+
+    public function getChannelMembers(): array
+    {
+        if (! $this->channelId) {
+            return [];
+        }
+
+        $channel = TerminalChannel::find($this->channelId);
+        if (! $channel || $channel->isDm()) {
+            return [];
+        }
+
+        return TerminalChannelMember::where('channel_id', $channel->id)
+            ->with('user:id,name,avatar')
+            ->get()
+            ->map(fn ($m) => [
+                'id' => $m->user_id,
+                'name' => $m->user?->name ?? 'Unbekannt',
+                'avatar' => $m->user?->avatar,
+                'initials' => $this->initials($m->user?->name ?? '?'),
+                'role' => $m->role,
+            ])
+            ->toArray();
+    }
+
+    public function removeMember(int $userId): void
+    {
+        if (! $this->channelId) {
+            return;
+        }
+
+        $channel = TerminalChannel::findOrFail($this->channelId);
+
+        // Only owners can remove members
+        $isOwner = TerminalChannelMember::where('channel_id', $channel->id)
+            ->where('user_id', auth()->id())
+            ->where('role', 'owner')
+            ->exists();
+
+        if (! $isOwner) {
+            return;
+        }
+
+        // Cannot remove yourself
+        if ($userId === auth()->id()) {
+            return;
+        }
+
+        TerminalChannelMember::where('channel_id', $channel->id)
+            ->where('user_id', $userId)
+            ->delete();
     }
 
     // ── Delete / Leave Channel ─────────────────────────────────

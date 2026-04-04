@@ -72,6 +72,17 @@ class GetModulesTool implements ToolContract
                     ],
                 ], $modules);
             }
+
+            // Terminal: Internes Messaging-System (Channels, DMs, Gruppenchats).
+            if (!isset($modules['terminal'])) {
+                $modules = array_merge([
+                    'terminal' => [
+                        'key' => 'terminal',
+                        'title' => 'Terminal',
+                        'description' => 'Internes Messaging: Channels, DMs, Gruppenchats mit Mitgliederverwaltung. Tools: terminal.channels.GET/POST, terminal.messages.GET/POST, terminal.members.POST.',
+                    ],
+                ], $modules);
+            }
             
             $result = [
                 'modules' => [],

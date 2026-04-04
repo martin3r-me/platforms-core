@@ -1,13 +1,6 @@
 import tippy from 'tippy.js';
 
-// Default dummy users for testing
-const DUMMY_USERS = [
-  { id: 1, label: 'Anna M.', initials: 'AM', color: 'emerald' },
-  { id: 2, label: 'Tom K.', initials: 'TK', color: 'blue' },
-  { id: 3, label: 'Lisa R.', initials: 'LR', color: 'amber' },
-  { id: 4, label: 'Max H.', initials: 'MH', color: 'violet' },
-  { id: 5, label: 'Sarah B.', initials: 'SB', color: 'rose' },
-];
+const COLORS = ['emerald', 'blue', 'amber', 'violet', 'rose'];
 
 const COLOR_MAP = {
   emerald: { bg: '#d1fae5', text: '#059669' },
@@ -23,9 +16,12 @@ function renderDropdown(items, selectedIndex) {
     return '<div class="mention-dropdown-empty">Keine Ergebnisse</div>';
   }
   return items.map((item, i) => {
-    const colors = COLOR_MAP[item.color] || COLOR_MAP.gray;
+    const colors = COLOR_MAP[item.color] || COLOR_MAP[COLORS[item.id % COLORS.length]] || COLOR_MAP.gray;
+    const avatarInner = item.avatar
+      ? `<img src="${item.avatar}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`
+      : (item.initials || item.label.charAt(0));
     return `<div class="mention-dropdown-item ${i === selectedIndex ? 'is-selected' : ''}" data-index="${i}">
-      <div class="mention-dropdown-avatar" style="background:${colors.bg};color:${colors.text}">${item.initials || item.label.charAt(0)}</div>
+      <div class="mention-dropdown-avatar" style="background:${item.avatar ? 'transparent' : colors.bg};color:${colors.text}">${avatarInner}</div>
       <span>${item.label}</span>
     </div>`;
   }).join('');
@@ -37,13 +33,12 @@ export function createMentionSuggestion(fetchUsers) {
       if (typeof fetchUsers === 'function') {
         try {
           const results = await fetchUsers(query);
-          if (Array.isArray(results) && results.length) return results;
+          if (Array.isArray(results)) return results.slice(0, 8);
         } catch (e) {
-          console.warn('fetchUsers failed, using defaults:', e);
+          console.warn('fetchUsers failed:', e);
         }
       }
-      const q = query.toLowerCase();
-      return DUMMY_USERS.filter(u => u.label.toLowerCase().includes(q)).slice(0, 5);
+      return [];
     },
 
     render: () => {
