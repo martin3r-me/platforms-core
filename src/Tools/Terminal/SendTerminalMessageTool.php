@@ -6,6 +6,7 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Events\TerminalMessageSent;
+use Platform\Core\Models\ContextFile;
 use Platform\Core\Models\TerminalChannel;
 use Platform\Core\Models\TerminalChannelMember;
 use Platform\Core\Models\TerminalMention;
@@ -48,6 +49,11 @@ class SendTerminalMessageTool implements ToolContract
                     'items' => ['type' => 'integer'],
                     'description' => 'Optional: Array von User-IDs, die in der Nachricht erwähnt werden.',
                 ],
+                'attachment_file_ids' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'integer'],
+                    'description' => 'Optional: Array von ContextFile-IDs, die als Attachments an die Nachricht angehängt werden.',
+                ],
             ],
             'required' => ['channel_id', 'message'],
         ];
@@ -85,6 +91,7 @@ class SendTerminalMessageTool implements ToolContract
 
         $parentId = $arguments['parent_id'] ?? null;
         $mentionUserIds = $arguments['mention_user_ids'] ?? [];
+        $attachmentFileIds = $arguments['attachment_file_ids'] ?? [];
 
         // Wrap plain text in paragraph tags for HTML
         $bodyHtml = '<p>' . e(trim($messageText)) . '</p>';
@@ -96,8 +103,19 @@ class SendTerminalMessageTool implements ToolContract
             'parent_id' => $parentId,
             'body_html' => $bodyHtml,
             'body_plain' => $bodyPlain,
+            'has_attachments' => ! empty($attachmentFileIds),
             'has_mentions' => ! empty($mentionUserIds),
         ]);
+
+        // Link attachments to the message
+        if (! empty($attachmentFileIds)) {
+            ContextFile::whereIn('id', $attachmentFileIds)
+                ->where('team_id', $team->id)
+                ->update([
+                    'context_type' => TerminalMessage::class,
+                    'context_id' => $message->id,
+                ]);
+        }
 
         // Update channel counters
         $channel->increment('message_count');
@@ -112,12 +130,13 @@ class SendTerminalMessageTool implements ToolContract
             }
         }
 
-        // Store mentions
+        // Store mentions (validate user IDs to avoid FK constraint violations)
         if (! empty($mentionUserIds)) {
-            foreach (array_unique($mentionUserIds) as $uid) {
+            $validUserIds = \Platform\Core\Models\User::whereIn('id', array_unique($mentionUserIds))->pluck('id');
+            foreach ($validUserIds as $uid) {
                 TerminalMention::create([
                     'message_id' => $message->id,
-                    'user_id' => (int) $uid,
+                    'user_id' => $uid,
                     'channel_id' => $channel->id,
                 ]);
             }

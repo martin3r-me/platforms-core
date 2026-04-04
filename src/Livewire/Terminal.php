@@ -5,6 +5,8 @@ namespace Platform\Core\Livewire;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Livewire\WithFileUploads;
+use Platform\Core\Models\ContextFile;
 use Platform\Core\Models\TerminalChannel;
 use Platform\Core\Models\TerminalChannelMember;
 use Platform\Core\Models\TerminalMention;
@@ -13,15 +15,19 @@ use Platform\Core\Models\TerminalReaction;
 use Platform\Core\Models\User;
 use Platform\Core\Events\TerminalMessageSent;
 use Platform\Core\Events\TerminalReactionToggled;
+use Platform\Core\Services\ContextFileService;
 
 /**
  * Terminal UI shell with messaging, DMs, group channels, and context awareness.
  */
 class Terminal extends Component
 {
+    use WithFileUploads;
+
     public ?string $contextType = null;
     public ?int $contextId = null;
     public ?int $channelId = null;
+    public $pendingFiles = [];
 
     // ── Lifecycle ──────────────────────────────────────────────
 
@@ -286,11 +292,47 @@ class Terminal extends Component
         $this->channelId = null;
     }
 
+    // ── File Attachments ──────────────────────────────────────
+
+    public function uploadAttachments(): array
+    {
+        if (empty($this->pendingFiles)) {
+            return [];
+        }
+
+        $service = app(ContextFileService::class);
+        $results = [];
+
+        foreach ($this->pendingFiles as $file) {
+            $result = $service->uploadForContext(
+                $file,
+                TerminalMessage::class,
+                0, // will be updated after message create
+            );
+
+            $results[] = [
+                'id' => $result['id'],
+                'token' => $result['token'],
+                'url' => $result['url'],
+                'mime_type' => $result['mime_type'],
+                'original_name' => $result['original_name'],
+                'file_size' => $result['file_size'],
+                'is_image' => str_starts_with($result['mime_type'], 'image/'),
+            ];
+        }
+
+        $this->pendingFiles = [];
+
+        return $results;
+    }
+
     // ── Send Message ───────────────────────────────────────────
 
-    public function sendMessage(string $bodyHtml, ?string $bodyPlain = null, ?int $parentId = null, array $mentionUserIds = []): void
+    public function sendMessage(string $bodyHtml, ?string $bodyPlain = null, ?int $parentId = null, array $mentionUserIds = [], array $attachmentIds = []): void
     {
-        if (! $this->channelId || empty(trim(strip_tags($bodyHtml)))) {
+        $hasAttachments = ! empty($attachmentIds);
+
+        if (! $this->channelId || (empty(trim(strip_tags($bodyHtml))) && ! $hasAttachments)) {
             return;
         }
 
@@ -303,8 +345,18 @@ class Terminal extends Component
             'parent_id' => $parentId,
             'body_html' => $bodyHtml,
             'body_plain' => $bodyPlain ?? strip_tags($bodyHtml),
+            'has_attachments' => $hasAttachments,
             'has_mentions' => ! empty($mentionUserIds),
         ]);
+
+        // Link attachments to the message
+        if ($hasAttachments) {
+            ContextFile::whereIn('id', $attachmentIds)
+                ->where('context_type', TerminalMessage::class)
+                ->where('context_id', 0)
+                ->where('user_id', auth()->id())
+                ->update(['context_id' => $message->id]);
+        }
 
         // Update channel counters
         $channel->increment('message_count');
@@ -319,15 +371,17 @@ class Terminal extends Component
             }
         }
 
-        // Store mentions
+        // Store mentions (validate user IDs exist to avoid FK constraint violations)
         if (! empty($mentionUserIds)) {
-            foreach (array_unique($mentionUserIds) as $uid) {
+            $validUserIds = User::whereIn('id', array_unique($mentionUserIds))->pluck('id');
+            foreach ($validUserIds as $uid) {
                 TerminalMention::create([
                     'message_id' => $message->id,
                     'user_id' => $uid,
                     'channel_id' => $channel->id,
                 ]);
             }
+            $mentionUserIds = $validUserIds->toArray();
         }
 
         // Mark as read for sender
@@ -599,6 +653,7 @@ class Terminal extends Component
                 'user:id,name,avatar',
                 'reactions' => fn ($q) => $q->select('id', 'message_id', 'user_id', 'emoji'),
                 'replies' => fn ($q) => $q->with('user:id,name,avatar')->latest()->limit(3),
+                'attachments',
             ])
             ->orderBy('id')
             ->limit(100)
@@ -614,6 +669,16 @@ class Terminal extends Component
                 'type' => $m->type,
                 'reply_count' => $m->reply_count,
                 'has_mentions' => $m->has_mentions,
+                'has_attachments' => $m->has_attachments,
+                'attachments' => $m->has_attachments ? $m->attachments->map(fn (ContextFile $f) => [
+                    'id' => $f->id,
+                    'url' => $f->url,
+                    'download_url' => $f->download_url,
+                    'original_name' => $f->original_name,
+                    'mime_type' => $f->mime_type,
+                    'file_size' => $f->file_size,
+                    'is_image' => $f->isImage(),
+                ])->toArray() : [],
                 'reactions' => $m->reactions->groupBy('emoji')->map(fn ($group) => [
                     'emoji' => $group->first()->emoji,
                     'count' => $group->count(),
@@ -672,28 +737,32 @@ class Terminal extends Component
     {
         $listeners = [];
 
-        $teamId = $this->teamId();
-        if ($teamId) {
-            $channelIds = TerminalChannelMember::where('user_id', auth()->id())
-                ->whereHas('channel', fn ($q) => $q->where('team_id', $teamId))
-                ->pluck('channel_id');
+        try {
+            $teamId = $this->teamId();
+            if ($teamId && auth()->check()) {
+                $channelIds = TerminalChannelMember::where('user_id', auth()->id())
+                    ->whereHas('channel', fn ($q) => $q->where('team_id', $teamId))
+                    ->pluck('channel_id');
 
-            foreach ($channelIds as $id) {
-                $listeners["echo-private:terminal.channel.{$id},.message.sent"] = 'onMessageReceived';
-                $listeners["echo-private:terminal.channel.{$id},.reaction.toggled"] = 'onReactionToggled';
+                foreach ($channelIds as $id) {
+                    $listeners["echo-private:terminal.channel.{$id},.message.sent"] = 'onMessageReceived';
+                    $listeners["echo-private:terminal.channel.{$id},.reaction.toggled"] = 'onReactionToggled';
+                }
             }
+        } catch (\Throwable $e) {
+            // Fail silently — listeners will be re-registered on next render
         }
 
         return $listeners;
     }
 
-    public function onMessageReceived(array $payload = []): void
+    public function onMessageReceived($payload = null): void
     {
         unset($this->messages);
         unset($this->channels);
     }
 
-    public function onReactionToggled(array $payload = []): void
+    public function onReactionToggled($payload = null): void
     {
         unset($this->messages);
     }

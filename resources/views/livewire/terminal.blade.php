@@ -3,17 +3,80 @@
   x-init="init()"
   x-on:toggle-terminal.window="toggle()"
   class="w-full flex-shrink-0"
-  x-show="open"
-  x-transition:enter="transition ease-out duration-200"
-  x-transition:enter-start="opacity-0 translate-y-4"
-  x-transition:enter-end="opacity-100 translate-y-0"
-  x-transition:leave="transition ease-in duration-150"
-  x-transition:leave-start="opacity-100 translate-y-0"
-  x-transition:leave-end="opacity-0 translate-y-4"
   wire:key="terminal-root"
 >
-  <!-- Slide container -->
+  <!-- Status bar — always visible when terminal is closed -->
+  @php
+    $allChannels = collect($this->channels['dms'])->map(fn($c) => array_merge($c, ['_type' => 'dm']))
+      ->merge(collect($this->channels['channels'])->map(fn($c) => array_merge($c, ['_type' => 'channel'])))
+      ->sortByDesc('unread');
+    $totalUnread = $allChannels->sum('unread');
+  @endphp
   <div
+    x-show="!open"
+    x-transition:enter="transition ease-out duration-150"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    class="w-full border-t border-[var(--ui-border)]/60 bg-[var(--ui-surface)]/95 backdrop-blur cursor-pointer select-none group/bar"
+    @click="toggle()"
+    wire:key="terminal-statusbar"
+  >
+    <div class="h-9 px-3 flex items-center gap-1 overflow-x-auto scrollbar-none">
+      {{-- Terminal icon + unread badge --}}
+      <div class="flex items-center gap-1.5 mr-2 flex-shrink-0">
+        <svg class="w-3.5 h-3.5 text-[var(--ui-muted)] group-hover/bar:text-[var(--ui-primary)] transition" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 014.25 2h11.5A2.25 2.25 0 0118 4.25v8.5A2.25 2.25 0 0115.75 15h-3.105a3.501 3.501 0 001.1 1.677A.75.75 0 0113.26 18H6.74a.75.75 0 01-.484-1.323A3.501 3.501 0 007.355 15H4.25A2.25 2.25 0 012 12.75v-8.5zm1.5 0a.75.75 0 01.75-.75h11.5a.75.75 0 01.75.75v7.5a.75.75 0 01-.75.75H4.25a.75.75 0 01-.75-.75v-7.5z" clip-rule="evenodd"/></svg>
+        @if($totalUnread > 0)
+          <span class="min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--ui-primary)] text-white text-[10px] font-bold flex items-center justify-center">{{ $totalUnread > 99 ? '99+' : $totalUnread }}</span>
+        @endif
+      </div>
+
+      {{-- Channel pills --}}
+      @forelse($allChannels as $preview)
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] flex-shrink-0 transition
+          {{ $preview['unread'] > 0
+            ? 'bg-[var(--ui-primary-5)] text-[var(--ui-primary)] font-semibold'
+            : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)]' }}">
+          @if($preview['_type'] === 'dm')
+            <div class="w-4 h-4 rounded-full {{ $preview['unread'] > 0 ? 'bg-[var(--ui-primary-10)]' : 'bg-[var(--ui-muted)]/15' }} flex items-center justify-center text-[8px] font-bold flex-shrink-0 overflow-hidden">
+              @if(! empty($preview['avatar']))
+                <img src="{{ $preview['avatar'] }}" alt="" class="w-full h-full object-cover">
+              @else
+                {{ $preview['initials'] ?? '?' }}
+              @endif
+            </div>
+          @else
+            <span class="text-[10px]">{{ $preview['icon'] ?? '#' }}</span>
+          @endif
+          <span class="truncate max-w-[80px]">{{ $preview['name'] }}</span>
+          @if($preview['unread'] > 0)
+            <span class="min-w-[14px] h-[14px] px-0.5 rounded-full bg-[var(--ui-primary)] text-white text-[9px] font-bold flex items-center justify-center">{{ $preview['unread'] > 9 ? '9+' : $preview['unread'] }}</span>
+          @endif
+          @if($preview['last_message'] && $preview['unread'] > 0)
+            <span class="text-[10px] opacity-70 truncate max-w-[120px] hidden sm:inline">{{ $preview['last_message'] }}</span>
+          @endif
+        </div>
+      @empty
+        <span class="text-[11px] text-[var(--ui-muted)]/60">Keine Unterhaltungen</span>
+      @endforelse
+
+      {{-- Chevron --}}
+      <div class="ml-auto flex-shrink-0 text-[var(--ui-muted)] group-hover/bar:text-[var(--ui-body-color)] transition">
+        <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clip-rule="evenodd" />
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide container (terminal panel) -->
+  <div
+    x-show="open"
+    x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0 translate-y-4"
+    x-transition:enter-end="opacity-100 translate-y-0"
+    x-transition:leave="transition ease-in duration-150"
+    x-transition:leave-start="opacity-100 translate-y-0"
+    x-transition:leave-end="opacity-0 translate-y-4"
     class="w-full border-t border-[var(--ui-border)]/60 bg-[var(--ui-surface)]/95 backdrop-blur overflow-hidden flex flex-col"
     style="height: 20rem; max-height: 50vh;"
     wire:key="terminal-slide"
@@ -227,6 +290,9 @@
                           <span class="text-[11px] text-[var(--ui-muted)] font-normal">{{ $msg['time'] }}</span>
                         </div>
                         <div class="text-[var(--ui-body-color)] leading-relaxed prose-terminal">{!! $msg['body_html'] !!}</div>
+                        @if(! empty($msg['attachments']))
+                          @include('platform::livewire.terminal-attachments', ['attachments' => $msg['attachments']])
+                        @endif
                       </div>
                     </div>
                   @else
@@ -237,6 +303,9 @@
                       </div>
                       <div class="flex-1 min-w-0">
                         <div class="text-[var(--ui-body-color)] leading-relaxed prose-terminal">{!! $msg['body_html'] !!}</div>
+                        @if(! empty($msg['attachments']))
+                          @include('platform::livewire.terminal-attachments', ['attachments' => $msg['attachments']])
+                        @endif
                       </div>
                     </div>
                   @endif
@@ -282,46 +351,122 @@
           <!-- Input (Tiptap Editor) — wire:ignore prevents morph from destroying ProseMirror DOM -->
           <div wire:key="terminal-editor-{{ $channelId }}"
                wire:ignore
-               class="px-4 py-2.5 border-t border-[var(--ui-border)]/60 flex-shrink-0"
-               x-data="tiptapEditor({
-                 placeholder: '{{ $this->activeChannel['type'] === 'dm' ? 'Nachricht an ' . e($this->activeChannel['name']) . ' …' : 'Nachricht in #' . e($this->activeChannel['name'] ?? 'Kontext') . ' schreiben …' }}',
-                 fetchUsers: async (query) => {
-                   const members = await $wire.getTeamMembers();
-                   const q = (query || '').toLowerCase();
-                   return members
-                     .filter(m => m.name.toLowerCase().includes(q))
-                     .map(m => ({ id: m.id, label: m.name, initials: m.initials, avatar: m.avatar || null }));
+               class="border-t border-[var(--ui-border)]/60 flex-shrink-0"
+               x-data="{
+                 ...tiptapEditor({
+                   placeholder: '{{ $this->activeChannel['type'] === 'dm' ? 'Nachricht an ' . e($this->activeChannel['name']) . ' …' : 'Nachricht in #' . e($this->activeChannel['name'] ?? 'Kontext') . ' schreiben …' }}',
+                   fetchUsers: async (query) => {
+                     const members = await $wire.getTeamMembers();
+                     const q = (query || '').toLowerCase();
+                     return members
+                       .filter(m => m.name.toLowerCase().includes(q))
+                       .map(m => ({ id: m.id, label: m.name, initials: m.initials, avatar: m.avatar || null }));
+                   },
+                   onSubmit: (html, text, json) => {
+                     const mentions = [];
+                     try {
+                       if (json && json.content) {
+                         const walk = (nodes) => {
+                           for (const n of nodes) {
+                             if (n.type === 'mention' && n.attrs && n.attrs.id) mentions.push(parseInt(n.attrs.id));
+                             if (n.content) walk(n.content);
+                           }
+                         };
+                         walk(json.content);
+                       }
+                     } catch(e) {}
+                     const ids = $data.uploadedFiles.map(f => f.id);
+                     $wire.sendMessage(html, text, null, mentions, ids);
+                     $data.uploadedFiles = [];
+                   },
+                 }),
+                 uploadedFiles: [],
+                 uploading: false,
+                 dragOver: false,
+                 get canSend() {
+                   return !this.isEmpty || this.uploadedFiles.length > 0;
                  },
-                 onSubmit: (html, text, json) => {
-                   const mentions = [];
-                   try {
-                     if (json && json.content) {
-                       const walk = (nodes) => {
-                         for (const n of nodes) {
-                           if (n.type === 'mention' && n.attrs && n.attrs.id) mentions.push(parseInt(n.attrs.id));
-                           if (n.content) walk(n.content);
-                         }
-                       };
-                       walk(json.content);
-                     }
-                   } catch(e) {}
-                   $wire.sendMessage(html, text, null, mentions);
+                 handleFiles(files) {
+                   if (!files || !files.length) return;
+                   this.uploading = true;
+                   $wire.uploadMultiple('pendingFiles', Array.from(files), () => {
+                     $wire.uploadAttachments().then(results => {
+                       this.uploadedFiles = [...this.uploadedFiles, ...results];
+                       this.uploading = false;
+                     });
+                   }, () => { this.uploading = false; });
                  },
-               })">
-            <div class="flex items-end gap-2">
-              <div class="flex-1 min-w-0 rounded-lg border border-[var(--ui-border)]/80 focus-within:border-[var(--ui-primary)]/50 focus-within:shadow-[0_0_0_1px_var(--ui-primary-10)] transition-all">
-                <div x-ref="editorEl"></div>
+                 removeFile(index) {
+                   this.uploadedFiles.splice(index, 1);
+                 },
+                 formatSize(bytes) {
+                   if (bytes < 1024) return bytes + ' B';
+                   if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+                   return (bytes / 1048576).toFixed(1) + ' MB';
+                 },
+               }"
+               x-on:dragover.prevent="dragOver = true"
+               x-on:dragleave.prevent="dragOver = false"
+               x-on:drop.prevent="dragOver = false; handleFiles($event.dataTransfer.files)"
+          >
+            {{-- Upload preview bar --}}
+            <div x-show="uploadedFiles.length > 0 || uploading" x-cloak class="px-4 pt-2 pb-1">
+              <div class="flex flex-wrap gap-2">
+                <template x-for="(file, index) in uploadedFiles" :key="file.id">
+                  <div class="relative group/file">
+                    <template x-if="file.is_image">
+                      <div class="w-12 h-12 rounded-md overflow-hidden border border-[var(--ui-border)]/60 bg-[var(--ui-surface-hover)]">
+                        <img :src="file.url" alt="" class="w-full h-full object-cover">
+                      </div>
+                    </template>
+                    <template x-if="!file.is_image">
+                      <div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-surface-hover)] text-[11px] text-[var(--ui-secondary)] max-w-[140px]">
+                        <svg class="w-3.5 h-3.5 flex-shrink-0 text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3.5A1.5 1.5 0 014.5 2h6.879a1.5 1.5 0 011.06.44l4.122 4.12A1.5 1.5 0 0117 7.622V16.5a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 013 16.5v-13z"/></svg>
+                        <span class="truncate" x-text="file.original_name"></span>
+                      </div>
+                    </template>
+                    <button
+                      @click="removeFile(index)"
+                      class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] opacity-0 group-hover/file:opacity-100 transition"
+                    >&times;</button>
+                  </div>
+                </template>
+                <template x-if="uploading">
+                  <div class="w-12 h-12 rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-surface-hover)] flex items-center justify-center">
+                    <svg class="w-4 h-4 animate-spin text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                  </div>
+                </template>
               </div>
-              <div x-ref="emojiSlot" class="flex-shrink-0"></div>
-              <button
-                type="button"
-                @click="submit()"
-                :disabled="isEmpty"
-                :class="!isEmpty ? 'bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary-hover)] cursor-pointer shadow-sm' : 'border border-[var(--ui-border)]/60 text-[var(--ui-muted)] opacity-40 cursor-not-allowed'"
-                class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs transition flex-shrink-0"
-              >
-                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"/></svg>
-              </button>
+            </div>
+
+            <div class="px-4 py-2.5">
+              <div class="flex items-end gap-2">
+                {{-- Paperclip upload button --}}
+                <button
+                  type="button"
+                  @click="$refs.fileInput.click()"
+                  class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition flex-shrink-0"
+                  title="Datei anhängen"
+                >
+                  <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.52 9.52l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.242z" clip-rule="evenodd"/></svg>
+                </button>
+                <input x-ref="fileInput" type="file" multiple class="hidden" @change="handleFiles($event.target.files); $event.target.value = ''">
+
+                <div class="flex-1 min-w-0 rounded-lg border transition-all"
+                     :class="dragOver ? 'border-[var(--ui-primary)] shadow-[0_0_0_1px_var(--ui-primary-10)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/80 focus-within:border-[var(--ui-primary)]/50 focus-within:shadow-[0_0_0_1px_var(--ui-primary-10)]'">
+                  <div x-ref="editorEl"></div>
+                </div>
+                <div x-ref="emojiSlot" class="flex-shrink-0"></div>
+                <button
+                  type="button"
+                  @click="submit()"
+                  :disabled="!canSend"
+                  :class="canSend ? 'bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary-hover)] cursor-pointer shadow-sm' : 'border border-[var(--ui-border)]/60 text-[var(--ui-muted)] opacity-40 cursor-not-allowed'"
+                  class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs transition flex-shrink-0"
+                >
+                  <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"/></svg>
+                </button>
+              </div>
             </div>
           </div>
         @else

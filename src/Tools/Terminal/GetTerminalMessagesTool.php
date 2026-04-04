@@ -5,6 +5,7 @@ namespace Platform\Core\Tools\Terminal;
 use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
+use Platform\Core\Models\ContextFile;
 use Platform\Core\Models\TerminalChannel;
 use Platform\Core\Models\TerminalChannelMember;
 use Platform\Core\Models\TerminalMessage;
@@ -88,6 +89,7 @@ class GetTerminalMessagesTool implements ToolContract
             ->with([
                 'user:id,name',
                 'reactions' => fn ($q) => $q->select('id', 'message_id', 'user_id', 'emoji'),
+                'attachments',
             ]);
 
         if (! empty($arguments['before_id'])) {
@@ -108,6 +110,15 @@ class GetTerminalMessagesTool implements ToolContract
                 'user_name' => $m->user?->name ?? 'Unbekannt',
                 'body_plain' => $m->body_plain ?? strip_tags($m->body_html),
                 'reply_count' => $m->reply_count,
+                'has_attachments' => $m->has_attachments,
+                'attachments' => $m->has_attachments ? $m->attachments->map(fn (ContextFile $f) => [
+                    'id' => $f->id,
+                    'url' => $f->url,
+                    'original_name' => $f->original_name,
+                    'mime_type' => $f->mime_type,
+                    'file_size' => $f->file_size,
+                    'is_image' => $f->isImage(),
+                ])->toArray() : [],
                 'reactions' => $m->reactions->groupBy('emoji')->map(fn ($group) => [
                     'emoji' => $group->first()->emoji,
                     'count' => $group->count(),
