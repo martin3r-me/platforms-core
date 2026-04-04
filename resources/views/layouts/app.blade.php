@@ -25,7 +25,11 @@
   @livewireStyles
 
   <script src="https://unpkg.com/@wotz/livewire-sortablejs@1.0.0/dist/livewire-sortable.js"></script>
-  <script src="/_platform/assets/platform-tiptap.iife.js" defer></script>
+  @php
+    $tiptapManifest = json_decode(file_get_contents(base_path('vendor/platform/core/resources/dist/manifest.json')), true) ?? [];
+    $tiptapHash = $tiptapManifest['platform-tiptap.iife.js'] ?? '0';
+  @endphp
+  <script src="/_platform/assets/platform-tiptap.iife.js?v={{ $tiptapHash }}" defer></script>
 </head>
 
 <body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)] overflow-hidden">

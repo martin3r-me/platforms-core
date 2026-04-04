@@ -1,5 +1,6 @@
 import { build } from 'esbuild';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
+import { createHash } from 'crypto';
 
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const version = pkg.version || '0.0.0';
@@ -22,4 +23,12 @@ await build({
   },
 });
 
-console.log('Built: resources/dist/platform-tiptap.iife.js');
+// Generate content hash for cache busting
+const bundle = readFileSync('resources/dist/platform-tiptap.iife.js');
+const hash = createHash('md5').update(bundle).digest('hex').slice(0, 8);
+
+writeFileSync('resources/dist/manifest.json', JSON.stringify({
+  'platform-tiptap.iife.js': hash,
+}, null, 2) + '\n');
+
+console.log(`Built: resources/dist/platform-tiptap.iife.js (hash: ${hash})`);
