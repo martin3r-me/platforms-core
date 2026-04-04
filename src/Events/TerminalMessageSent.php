@@ -9,7 +9,7 @@ use Illuminate\Foundation\Events\Dispatchable;
 
 class TerminalMessageSent implements ShouldBroadcastNow
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
+    use Dispatchable, InteractsWithSockets;
 
     public function __construct(
         public int $channelId,
