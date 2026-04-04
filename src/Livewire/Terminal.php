@@ -620,9 +620,16 @@ class Terminal extends Component
     {
         $listeners = [];
 
-        if ($this->channelId) {
-            $listeners["echo-private:terminal.channel.{$this->channelId},.message.sent"] = 'onMessageReceived';
-            $listeners["echo-private:terminal.channel.{$this->channelId},.reaction.toggled"] = 'onReactionToggled';
+        $teamId = $this->teamId();
+        if ($teamId) {
+            $channelIds = TerminalChannelMember::where('user_id', auth()->id())
+                ->whereHas('channel', fn ($q) => $q->where('team_id', $teamId))
+                ->pluck('channel_id');
+
+            foreach ($channelIds as $id) {
+                $listeners["echo-private:terminal.channel.{$id},.message.sent"] = 'onMessageReceived';
+                $listeners["echo-private:terminal.channel.{$id},.reaction.toggled"] = 'onReactionToggled';
+            }
         }
 
         return $listeners;
