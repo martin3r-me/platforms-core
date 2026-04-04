@@ -37,9 +37,9 @@
 
   <!-- Slide container -->
   <div
-    class="w-full border-t border-[var(--ui-border)]/60 bg-[var(--ui-surface)]/95 backdrop-blur overflow-hidden transition-[max-height] duration-300 ease-out flex flex-col"
-    x-bind:style="open ? 'max-height: 42rem' : 'max-height: 0px'"
-    style="max-height: 0px;"
+    class="w-full border-t border-[var(--ui-border)]/60 bg-[var(--ui-surface)]/95 backdrop-blur overflow-hidden transition-[height] duration-300 ease-out flex flex-col"
+    x-bind:style="open ? 'height: 42rem' : 'height: 0px'"
+    style="height: 0px;"
     wire:key="terminal-slide"
   >
     <!-- Panel Content: Sidebar + Main -->
