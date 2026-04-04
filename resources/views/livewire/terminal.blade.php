@@ -9,6 +9,7 @@
   @php
     $allChannels = collect($this->channels['dms'])->map(fn($c) => array_merge($c, ['_type' => 'dm']))
       ->merge(collect($this->channels['channels'])->map(fn($c) => array_merge($c, ['_type' => 'channel'])))
+      ->filter(fn($c) => $c['unread'] > 0)
       ->sortByDesc('unread');
     $totalUnread = $allChannels->sum('unread');
   @endphp
