@@ -124,8 +124,8 @@
         </div>
       </div>
 
-      <!-- Main Chat Area -->
-      <div class="flex-1 min-w-0 flex flex-col" wire:key="terminal-main">
+      <!-- Main Chat Area — keyed per channel so editor + messages fully rebuild -->
+      <div class="flex-1 min-w-0 flex flex-col" wire:key="terminal-main-{{ $channelId }}">
 
         @if($this->activeChannel)
           <!-- Chat Header -->
@@ -203,8 +203,9 @@
             </div>
           </div>
 
-          <!-- Input (Tiptap Editor) -->
-          <div class="px-3 py-2 border-t border-[var(--ui-border)]/60 flex-shrink-0"
+          <!-- Input (Tiptap Editor) — wire:key forces full re-init on channel switch -->
+          <div wire:key="terminal-editor-{{ $channelId }}"
+               class="px-3 py-2 border-t border-[var(--ui-border)]/60 flex-shrink-0"
                x-data="tiptapEditor({
                  placeholder: '{{ $this->activeChannel['type'] === 'dm' ? 'Nachricht an ' . e($this->activeChannel['name']) . ' …' : 'Nachricht schreiben …' }}',
                  onSubmit: (html, text, json) => {
