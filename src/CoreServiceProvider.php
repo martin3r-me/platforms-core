@@ -116,6 +116,7 @@ class CoreServiceProvider extends ServiceProvider
 
         // Broadcast Channel Authorization (Terminal WebSocket)
         if (class_exists(\Illuminate\Support\Facades\Broadcast::class)) {
+            \Illuminate\Support\Facades\Broadcast::routes(['middleware' => ['web', 'auth']]);
             $this->loadRoutesFrom(__DIR__.'/../routes/channels.php');
         }
 
