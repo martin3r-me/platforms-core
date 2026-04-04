@@ -1,4 +1,5 @@
 import { Editor } from '@tiptap/core';
+import { EditorState } from '@tiptap/pm/state';
 import StarterKit from '@tiptap/starter-kit';
 import Mention from '@tiptap/extension-mention';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -125,25 +126,23 @@ export function tiptapEditor({
       const text = this.editor.getText();
       const json = this.editor.getJSON();
 
+      // Reset editor by replacing state directly — bypasses ProseMirror's
+      // transaction system entirely, avoiding "mismatched transaction" errors
+      // that occur when Livewire morph cycles interfere with editor state.
+      const { schema, plugins } = this.editor.view.state;
+      const newState = EditorState.create({
+        doc: schema.node('doc', null, [schema.node('paragraph')]),
+        plugins,
+      });
+      this.editor.view.updateState(newState);
+      this.isEmpty = true;
+
       if (typeof onSubmit === 'function') {
         onSubmit(html, text, json);
       } else {
         console.log('tiptapEditor.submit:', { html, text });
       }
 
-      // Clear after dispatching — use setContent to avoid mismatched transaction
-      // that clearContent(true) can cause during Livewire morph cycles
-      try {
-        this.editor.commands.setContent('', false);
-      } catch (e) {
-        // Last resort: destroy and recreate the editor state
-        const el = this.$refs.editorEl;
-        if (el) {
-          const pm = el.querySelector('.ProseMirror');
-          if (pm) pm.innerHTML = '<p><br></p>';
-        }
-      }
-      this.isEmpty = true;
       this.editor.commands.focus();
       this.$nextTick(() => this._autoResize());
     },
