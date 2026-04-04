@@ -124,15 +124,15 @@ export function tiptapEditor({
       const text = this.editor.getText();
       const json = this.editor.getJSON();
 
-      // Defer clear to next microtask — avoids "mismatched transaction" when
-      // called from handleKeyDown (Enter key), because ProseMirror is still
-      // processing the keystroke transaction at this point.
-      queueMicrotask(() => {
+      // Defer clear to next event-loop tick — avoids "mismatched transaction"
+      // when called from handleKeyDown (Enter key), because ProseMirror needs
+      // the full dispatch cycle to finish before we can apply a new transaction.
+      setTimeout(() => {
         this.editor.commands.clearContent(true);
         this.isEmpty = true;
         this.editor.commands.focus();
         this.$nextTick(() => this._autoResize());
-      });
+      }, 0);
 
       if (typeof onSubmit === 'function') {
         onSubmit(html, text, json);
