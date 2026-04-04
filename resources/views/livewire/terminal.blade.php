@@ -171,20 +171,32 @@
         </div>
 
         <!-- Input -->
-        <div class="h-10 px-3 flex items-center gap-2 border-t border-[var(--ui-border)]/60 flex-shrink-0">
-          <input
-            type="text"
-            class="flex-1 bg-transparent outline-none text-sm text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] rounded-md px-2 py-1 border border-[var(--ui-border)]/60 focus:border-[var(--ui-primary)]/40"
-            placeholder="Nachricht an Anna M. …"
-            disabled
-          />
-          <button
-            type="button"
-            class="inline-flex items-center justify-center h-7 px-3 rounded-md border border-[var(--ui-border)]/60 text-[var(--ui-muted)] opacity-60 cursor-not-allowed text-xs"
-            disabled
-          >
-            Senden
-          </button>
+        <div class="px-3 py-2 border-t border-[var(--ui-border)]/60 flex-shrink-0" x-data="messageInput()">
+          <div class="flex items-end gap-2">
+            <div class="flex-1 min-w-0 relative">
+              <textarea
+                x-ref="textarea"
+                x-model="message"
+                @input="resize()"
+                @keydown.enter.exact.prevent="send()"
+                @keydown.shift.enter="$nextTick(() => resize())"
+                @paste="$nextTick(() => resize())"
+                rows="1"
+                class="w-full bg-transparent outline-none text-sm text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] rounded-md px-2.5 py-1.5 border border-[var(--ui-border)]/60 focus:border-[var(--ui-primary)]/40 resize-none overflow-hidden leading-5 transition-[border-color]"
+                style="min-height: 34px; max-height: 120px;"
+                placeholder="Nachricht an Anna M. …"
+              ></textarea>
+            </div>
+            <button
+              type="button"
+              @click="send()"
+              :disabled="!message.trim()"
+              :class="message.trim() ? 'bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary-hover)] cursor-pointer' : 'border border-[var(--ui-border)]/60 text-[var(--ui-muted)] opacity-60 cursor-not-allowed'"
+              class="inline-flex items-center justify-center h-[34px] px-3 rounded-md text-xs transition flex-shrink-0"
+            >
+              Senden
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -200,6 +212,26 @@
             const c = this.$refs.body;
             if (c && this.open) c.scrollTop = c.scrollHeight;
           });
+        },
+      };
+    }
+
+    function messageInput(){
+      return {
+        message: '',
+        resize(){
+          const el = this.$refs.textarea;
+          if(!el) return;
+          el.style.height = 'auto';
+          el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+          el.style.overflow = el.scrollHeight > 120 ? 'auto' : 'hidden';
+        },
+        send(){
+          if(!this.message.trim()) return;
+          // TODO: actual send logic
+          console.log('send:', this.message);
+          this.message = '';
+          this.$nextTick(() => this.resize());
         },
       };
     }
