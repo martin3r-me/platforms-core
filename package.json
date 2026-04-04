@@ -1,0 +1,18 @@
+{
+  "name": "platform-core",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@tiptap/core": "^2.12",
+    "@tiptap/starter-kit": "^2.12",
+    "@tiptap/extension-mention": "^2.12",
+    "@tiptap/extension-placeholder": "^2.12",
+    "@tiptap/suggestion": "^2.12",
+    "tippy.js": "^6.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25"
+  }
+}

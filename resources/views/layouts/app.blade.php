@@ -25,6 +25,7 @@
   @livewireStyles
 
   <script src="https://unpkg.com/@wotz/livewire-sortablejs@1.0.0/dist/livewire-sortable.js"></script>
+  <script src="/_platform/assets/platform-tiptap.iife.js" defer></script>
 </head>
 
 <body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)] overflow-hidden">

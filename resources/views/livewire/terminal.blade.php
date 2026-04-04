@@ -170,28 +170,23 @@
           </div>
         </div>
 
-        <!-- Input -->
-        <div class="px-3 py-2 border-t border-[var(--ui-border)]/60 flex-shrink-0" x-data="messageInput()">
+        <!-- Input (Tiptap Editor) -->
+        <div class="px-3 py-2 border-t border-[var(--ui-border)]/60 flex-shrink-0"
+             x-data="tiptapEditor({
+               placeholder: 'Nachricht an Anna M. \u2026',
+               onSubmit: (html, text, json) => {
+                 console.log('send:', { html, text });
+               },
+             })">
           <div class="flex items-end gap-2">
-            <div class="flex-1 min-w-0 relative">
-              <textarea
-                x-ref="textarea"
-                x-model="message"
-                @input="resize()"
-                @keydown.enter.exact.prevent="send()"
-                @keydown.shift.enter="$nextTick(() => resize())"
-                @paste="$nextTick(() => resize())"
-                rows="1"
-                class="w-full bg-transparent outline-none text-sm text-[var(--ui-secondary)] placeholder-[var(--ui-muted)] rounded-md px-2.5 py-1.5 border border-[var(--ui-border)]/60 focus:border-[var(--ui-primary)]/40 resize-none overflow-hidden leading-5 transition-[border-color]"
-                style="min-height: 34px; max-height: 120px;"
-                placeholder="Nachricht an Anna M. …"
-              ></textarea>
+            <div class="flex-1 min-w-0 rounded-md border border-[var(--ui-border)]/60 focus-within:border-[var(--ui-primary)]/40 transition-[border-color]">
+              <div x-ref="editorEl"></div>
             </div>
             <button
               type="button"
-              @click="send()"
-              :disabled="!message.trim()"
-              :class="message.trim() ? 'bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary-hover)] cursor-pointer' : 'border border-[var(--ui-border)]/60 text-[var(--ui-muted)] opacity-60 cursor-not-allowed'"
+              @click="submit()"
+              :disabled="isEmpty"
+              :class="!isEmpty ? 'bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary-hover)] cursor-pointer' : 'border border-[var(--ui-border)]/60 text-[var(--ui-muted)] opacity-60 cursor-not-allowed'"
               class="inline-flex items-center justify-center h-[34px] px-3 rounded-md text-xs transition flex-shrink-0"
             >
               Senden
@@ -216,24 +211,6 @@
       };
     }
 
-    function messageInput(){
-      return {
-        message: '',
-        resize(){
-          const el = this.$refs.textarea;
-          if(!el) return;
-          el.style.height = 'auto';
-          el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-          el.style.overflow = el.scrollHeight > 120 ? 'auto' : 'hidden';
-        },
-        send(){
-          if(!this.message.trim()) return;
-          // TODO: actual send logic
-          console.log('send:', this.message);
-          this.message = '';
-          this.$nextTick(() => this.resize());
-        },
-      };
-    }
+    // messageInput() replaced by tiptapEditor Alpine component (PlatformTiptap bundle)
   </script>
 </div>
