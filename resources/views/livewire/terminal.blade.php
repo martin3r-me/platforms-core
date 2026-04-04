@@ -82,8 +82,12 @@
                 class="w-full flex items-center gap-2 px-1.5 py-1.5 rounded-md text-xs transition
                   {{ $channelId === $dm['id'] ? 'bg-[var(--ui-primary-5)] text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)]' }}"
               >
-                <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0">
-                  {{ $dm['initials'] ?? '?' }}
+                <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden">
+                  @if(! empty($dm['avatar']))
+                    <img src="{{ $dm['avatar'] }}" alt="" class="w-full h-full object-cover">
+                  @else
+                    {{ $dm['initials'] ?? '?' }}
+                  @endif
                 </div>
                 <span class="truncate flex-1 text-left">{{ $dm['name'] }}</span>
                 @if($dm['unread'] > 0)
@@ -131,8 +135,12 @@
           <!-- Chat Header -->
           <div class="h-10 px-3 flex items-center gap-2 text-xs border-b border-[var(--ui-border)]/60 flex-shrink-0">
             @if($this->activeChannel['type'] === 'dm')
-              <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0">
-                {{ $this->activeChannel['initials'] ?? '?' }}
+              <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden">
+                @if(! empty($this->activeChannel['avatar']))
+                  <img src="{{ $this->activeChannel['avatar'] }}" alt="" class="w-full h-full object-cover">
+                @else
+                  {{ $this->activeChannel['initials'] ?? '?' }}
+                @endif
               </div>
               <span class="font-medium text-[var(--ui-body-color)]">{{ $this->activeChannel['name'] }}</span>
             @else
@@ -143,6 +151,40 @@
               <span class="text-[var(--ui-muted)]">&middot;</span>
               <span class="text-[10px] text-[var(--ui-muted)]">{{ $this->activeChannel['member_count'] }} {{ $this->activeChannel['member_count'] === 1 ? 'Mitglied' : 'Mitglieder' }}</span>
             @endif
+
+            {{-- Channel actions (delete / leave) --}}
+            <div class="ml-auto flex items-center gap-1">
+              @if($this->activeChannel['type'] === 'channel')
+                @if(! empty($this->activeChannel['can_delete']))
+                  <button
+                    wire:click="deleteChannel"
+                    wire:confirm="Channel und alle Nachrichten unwiderruflich loschen?"
+                    class="text-[10px] text-[var(--ui-muted)] hover:text-red-500 transition px-1.5 py-0.5 rounded hover:bg-red-50"
+                    title="Channel loschen"
+                  >
+                    <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.519.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
+                  </button>
+                @else
+                  <button
+                    wire:click="leaveChannel"
+                    wire:confirm="Channel verlassen?"
+                    class="text-[10px] text-[var(--ui-muted)] hover:text-amber-600 transition px-1.5 py-0.5 rounded hover:bg-amber-50"
+                    title="Channel verlassen"
+                  >
+                    <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2a.75.75 0 01-1.5 0v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2a.75.75 0 011.5 0v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M19 10a.75.75 0 00-.75-.75H8.704l1.048-.943a.75.75 0 10-1.004-1.114l-2.5 2.25a.75.75 0 000 1.114l2.5 2.25a.75.75 0 101.004-1.114l-1.048-.943h9.546A.75.75 0 0019 10z" clip-rule="evenodd"/></svg>
+                  </button>
+                @endif
+              @elseif($this->activeChannel['type'] === 'dm')
+                <button
+                  wire:click="deleteChannel"
+                  wire:confirm="Chat ausblenden? Die Nachrichten bleiben fur den anderen Teilnehmer erhalten."
+                  class="text-[10px] text-[var(--ui-muted)] hover:text-red-500 transition px-1.5 py-0.5 rounded hover:bg-red-50"
+                  title="Chat ausblenden"
+                >
+                  <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+                </button>
+              @endif
+            </div>
           </div>
 
           <!-- Messages -->
@@ -161,8 +203,12 @@
                 @endif
 
                 <div class="group flex gap-2 hover:bg-[var(--ui-surface-hover)]/50 -mx-1.5 px-1.5 py-0.5 rounded" wire:key="msg-{{ $msg['id'] }}">
-                  <div class="w-6 h-6 rounded-full {{ $msg['is_mine'] ? 'bg-gray-100 text-gray-600' : 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]' }} flex items-center justify-center text-[10px] font-semibold flex-shrink-0">
-                    {{ $msg['user_initials'] }}
+                  <div class="w-6 h-6 rounded-full {{ $msg['is_mine'] ? 'bg-gray-100 text-gray-600' : 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]' }} flex items-center justify-center text-[10px] font-semibold flex-shrink-0 overflow-hidden">
+                    @if(! empty($msg['user_avatar']))
+                      <img src="{{ $msg['user_avatar'] }}" alt="" class="w-full h-full object-cover">
+                    @else
+                      {{ $msg['user_initials'] }}
+                    @endif
                   </div>
                   <div class="flex-1 min-w-0">
                     <div class="flex items-baseline gap-2">
@@ -271,7 +317,14 @@
             @click="$wire.openDm(member.id); showNewDm = false"
             class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition"
           >
-            <div class="w-7 h-7 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[10px] font-semibold flex-shrink-0" x-text="member.initials"></div>
+            <div class="w-7 h-7 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[10px] font-semibold flex-shrink-0 overflow-hidden">
+              <template x-if="member.avatar">
+                <img :src="member.avatar" alt="" class="w-full h-full object-cover">
+              </template>
+              <template x-if="!member.avatar">
+                <span x-text="member.initials"></span>
+              </template>
+            </div>
             <span x-text="member.name"></span>
           </button>
         </template>

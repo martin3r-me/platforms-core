@@ -173,6 +173,54 @@ class Terminal extends Component
         );
     }
 
+    // ── Delete / Leave Channel ─────────────────────────────────
+
+    public function deleteChannel(): void
+    {
+        if (! $this->channelId) {
+            return;
+        }
+
+        $channel = TerminalChannel::findOrFail($this->channelId);
+
+        // Only owners can delete group channels
+        if ($channel->type === 'channel') {
+            $isOwner = TerminalChannelMember::where('channel_id', $channel->id)
+                ->where('user_id', auth()->id())
+                ->where('role', 'owner')
+                ->exists();
+
+            if (! $isOwner) {
+                return;
+            }
+        }
+
+        // DMs: just remove membership (don't delete the channel for the other user)
+        if ($channel->isDm()) {
+            TerminalChannelMember::where('channel_id', $channel->id)
+                ->where('user_id', auth()->id())
+                ->delete();
+        } else {
+            // Channel/Context: cascade delete (FK handles messages, members, etc.)
+            $channel->delete();
+        }
+
+        $this->channelId = null;
+    }
+
+    public function leaveChannel(): void
+    {
+        if (! $this->channelId) {
+            return;
+        }
+
+        TerminalChannelMember::where('channel_id', $this->channelId)
+            ->where('user_id', auth()->id())
+            ->delete();
+
+        $this->channelId = null;
+    }
+
     // ── Send Message ───────────────────────────────────────────
 
     public function sendMessage(string $bodyHtml, ?string $bodyPlain = null, ?int $parentId = null, array $mentionUserIds = []): void
@@ -364,6 +412,7 @@ class Terminal extends Component
             ->map(fn ($u) => [
                 'id' => $u->id,
                 'name' => $u->name,
+                'avatar' => $u->avatar,
                 'initials' => $this->initials($u->name),
             ])
             ->toArray();
@@ -418,13 +467,14 @@ class Terminal extends Component
                 'last_at' => $ch->lastMessage?->created_at?->diffForHumans(short: true),
             ];
 
-            // For DMs, resolve the other participant's name
+            // For DMs, resolve the other participant's name + avatar
             if ($ch->type === 'dm') {
                 $other = TerminalChannelMember::where('channel_id', $ch->id)
                     ->where('user_id', '!=', $userId)
-                    ->with('user:id,name')
+                    ->with('user:id,name,avatar')
                     ->first();
                 $item['name'] = $other?->user?->name ?? 'Unbekannt';
+                $item['avatar'] = $other?->user?->avatar;
                 $item['initials'] = $this->initials($item['name']);
                 $dms[] = $item;
             } elseif ($ch->type === 'channel') {
@@ -463,6 +513,7 @@ class Terminal extends Component
                 'id' => $m->id,
                 'user_id' => $m->user_id,
                 'user_name' => $m->user?->name ?? 'Unbekannt',
+                'user_avatar' => $m->user?->avatar,
                 'user_initials' => $this->initials($m->user?->name ?? '?'),
                 'body_html' => $m->body_html,
                 'body_plain' => $m->body_plain,
@@ -505,11 +556,18 @@ class Terminal extends Component
         if ($channel->isDm()) {
             $other = TerminalChannelMember::where('channel_id', $channel->id)
                 ->where('user_id', '!=', auth()->id())
-                ->with('user:id,name')
+                ->with('user:id,name,avatar')
                 ->first();
             $data['name'] = $other?->user?->name ?? 'Unbekannt';
+            $data['avatar'] = $other?->user?->avatar;
             $data['initials'] = $this->initials($data['name']);
         }
+
+        // Check if current user can delete this channel
+        $data['can_delete'] = $channel->type === 'channel' && TerminalChannelMember::where('channel_id', $channel->id)
+            ->where('user_id', auth()->id())
+            ->where('role', 'owner')
+            ->exists();
 
         return $data;
     }
