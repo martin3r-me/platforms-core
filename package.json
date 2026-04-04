@@ -10,7 +10,9 @@
     "@tiptap/extension-mention": "^2.12",
     "@tiptap/extension-placeholder": "^2.12",
     "@tiptap/suggestion": "^2.12",
-    "tippy.js": "^6.3"
+    "tippy.js": "^6.3",
+    "laravel-echo": "^2.1",
+    "pusher-js": "^8.4"
   },
   "devDependencies": {
     "esbuild": "^0.25"

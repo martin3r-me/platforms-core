@@ -68,6 +68,7 @@ class CoreServiceProvider extends ServiceProvider
         if (file_exists($manifestPath)) {
             $manifest = json_decode(file_get_contents($manifestPath), true) ?? [];
             config(['platform.tiptap_hash' => $manifest['platform-tiptap.iife.js'] ?? '0']);
+            config(['platform.echo_hash' => $manifest['platform-echo.iife.js'] ?? '0']);
         }
 
         // Blade Components
@@ -112,6 +113,11 @@ class CoreServiceProvider extends ServiceProvider
             \Platform\Core\Models\ObsidianVault::class,
             \Platform\Core\Policies\ObsidianVaultPolicy::class
         );
+
+        // Broadcast Channel Authorization (Terminal WebSocket)
+        if (class_exists(\Illuminate\Support\Facades\Broadcast::class)) {
+            $this->loadRoutesFrom(__DIR__.'/../routes/channels.php');
+        }
 
         // Terminal Notification Types registrieren
         $this->registerTerminalNotificationTypes();

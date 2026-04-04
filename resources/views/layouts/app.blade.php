@@ -5,6 +5,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
+  @if(config('broadcasting.default') === 'reverb')
+  <meta name="reverb-key" content="{{ config('broadcasting.connections.reverb.key') }}">
+  <meta name="reverb-host" content="{{ parse_url(config('app.url'), PHP_URL_HOST) }}">
+  <meta name="reverb-port" content="443">
+  @endif
 
   <title>{{ config('app.name', 'Platform') }}</title>
 
@@ -26,6 +31,9 @@
 
   <script src="https://unpkg.com/@wotz/livewire-sortablejs@1.0.0/dist/livewire-sortable.js"></script>
   <script src="/_platform/assets/platform-tiptap.iife.js?v={{ config('platform.tiptap_hash', '0') }}" defer></script>
+  @if(config('broadcasting.default') === 'reverb')
+  <script src="/_platform/assets/platform-echo.iife.js?v={{ config('platform.echo_hash', '0') }}" defer></script>
+  @endif
 </head>
 
 <body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)] overflow-hidden">

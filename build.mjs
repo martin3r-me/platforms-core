@@ -5,30 +5,50 @@ import { createHash } from 'crypto';
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const version = pkg.version || '0.0.0';
 
-await build({
-  entryPoints: ['resources/js/tiptap/index.js'],
-  bundle: true,
-  format: 'iife',
-  globalName: 'PlatformTiptap',
-  outfile: 'resources/dist/platform-tiptap.iife.js',
-  minify: true,
-  sourcemap: false,
-  target: ['es2020'],
-  loader: { '.css': 'text' },
-  define: {
-    'process.env.NODE_ENV': '"production"',
+const bundles = [
+  {
+    entryPoints: ['resources/js/tiptap/index.js'],
+    globalName: 'PlatformTiptap',
+    outfile: 'resources/dist/platform-tiptap.iife.js',
+    banner: `/* platform-tiptap v${version} | MIT */`,
+    loader: { '.css': 'text' },
   },
-  banner: {
-    js: `/* platform-tiptap v${version} | MIT */`,
+  {
+    entryPoints: ['resources/js/echo/index.js'],
+    globalName: 'PlatformEcho',
+    outfile: 'resources/dist/platform-echo.iife.js',
+    banner: `/* platform-echo v${version} | MIT */`,
   },
-});
+];
 
-// Generate content hash for cache busting
-const bundle = readFileSync('resources/dist/platform-tiptap.iife.js');
-const hash = createHash('md5').update(bundle).digest('hex').slice(0, 8);
+const manifest = {};
 
-writeFileSync('resources/dist/manifest.json', JSON.stringify({
-  'platform-tiptap.iife.js': hash,
-}, null, 2) + '\n');
+for (const cfg of bundles) {
+  await build({
+    entryPoints: cfg.entryPoints,
+    bundle: true,
+    format: 'iife',
+    globalName: cfg.globalName,
+    outfile: cfg.outfile,
+    minify: true,
+    sourcemap: false,
+    target: ['es2020'],
+    loader: cfg.loader || {},
+    define: {
+      'process.env.NODE_ENV': '"production"',
+    },
+    banner: {
+      js: cfg.banner,
+    },
+  });
 
-console.log(`Built: resources/dist/platform-tiptap.iife.js (hash: ${hash})`);
+  const bundle = readFileSync(cfg.outfile);
+  const hash = createHash('md5').update(bundle).digest('hex').slice(0, 8);
+  const filename = cfg.outfile.split('/').pop();
+  manifest[filename] = hash;
+
+  console.log(`Built: ${cfg.outfile} (hash: ${hash})`);
+}
+
+writeFileSync('resources/dist/manifest.json', JSON.stringify(manifest, null, 2) + '\n');
+console.log('Manifest updated.');

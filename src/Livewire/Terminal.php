@@ -11,6 +11,8 @@ use Platform\Core\Models\TerminalMention;
 use Platform\Core\Models\TerminalMessage;
 use Platform\Core\Models\TerminalReaction;
 use Platform\Core\Models\User;
+use Platform\Core\Events\TerminalMessageSent;
+use Platform\Core\Events\TerminalReactionToggled;
 
 /**
  * Terminal UI shell with messaging, DMs, group channels, and context awareness.
@@ -270,6 +272,24 @@ class Terminal extends Component
 
         // Dispatch notifications
         $this->dispatchNotifications($channel, $message, $mentionUserIds);
+
+        // Broadcast via WebSocket (for real-time updates to other users)
+        TerminalMessageSent::dispatch($channel->id, [
+            'id' => $message->id,
+            'user_id' => $message->user_id,
+            'user_name' => auth()->user()->name ?? 'Unbekannt',
+            'user_avatar' => auth()->user()->avatar,
+            'user_initials' => $this->initials(auth()->user()->name ?? '?'),
+            'body_html' => $message->body_html,
+            'body_plain' => $message->body_plain,
+            'type' => $message->type,
+            'reply_count' => 0,
+            'has_mentions' => $message->has_mentions,
+            'reactions' => [],
+            'time' => $message->created_at->format('H:i'),
+            'date' => $message->created_at->translatedFormat('d. M Y'),
+            'is_mine' => false, // Always false for broadcast recipients
+        ], auth()->id());
     }
 
     protected function dispatchNotifications(TerminalChannel $channel, TerminalMessage $message, array $mentionUserIds = []): void
@@ -369,12 +389,26 @@ class Terminal extends Component
 
         if ($existing) {
             $existing->delete();
+            $added = false;
         } else {
             TerminalReaction::create([
                 'message_id' => $messageId,
                 'user_id' => auth()->id(),
                 'emoji' => $emoji,
             ]);
+            $added = true;
+        }
+
+        // Broadcast reaction toggle to channel members
+        $message = TerminalMessage::find($messageId);
+        if ($message) {
+            TerminalReactionToggled::dispatch(
+                $message->channel_id,
+                $messageId,
+                $emoji,
+                auth()->id(),
+                $added,
+            );
         }
     }
 
@@ -570,6 +604,22 @@ class Terminal extends Component
             ->exists();
 
         return $data;
+    }
+
+    // ── Echo Listeners (WebSocket real-time updates) ───────────
+
+    #[On('echo-private:terminal.channel.{channelId},message.sent')]
+    public function onMessageReceived(array $payload = []): void
+    {
+        // Invalidate computed properties so Livewire re-renders with fresh data
+        unset($this->messages);
+        unset($this->channels);
+    }
+
+    #[On('echo-private:terminal.channel.{channelId},reaction.toggled')]
+    public function onReactionToggled(array $payload = []): void
+    {
+        unset($this->messages);
     }
 
     // ── Render ─────────────────────────────────────────────────
