@@ -125,15 +125,25 @@ export function tiptapEditor({
       const text = this.editor.getText();
       const json = this.editor.getJSON();
 
-      this.editor.commands.clearContent(true);
-      this.isEmpty = true;
-
       if (typeof onSubmit === 'function') {
         onSubmit(html, text, json);
       } else {
         console.log('tiptapEditor.submit:', { html, text });
       }
 
+      // Clear after dispatching — use setContent to avoid mismatched transaction
+      // that clearContent(true) can cause during Livewire morph cycles
+      try {
+        this.editor.commands.setContent('', false);
+      } catch (e) {
+        // Last resort: destroy and recreate the editor state
+        const el = this.$refs.editorEl;
+        if (el) {
+          const pm = el.querySelector('.ProseMirror');
+          if (pm) pm.innerHTML = '<p><br></p>';
+        }
+      }
+      this.isEmpty = true;
       this.editor.commands.focus();
       this.$nextTick(() => this._autoResize());
     },
