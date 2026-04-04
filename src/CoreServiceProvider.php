@@ -63,6 +63,13 @@ class CoreServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'platform');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
+        // Tiptap bundle cache-busting hash
+        $manifestPath = __DIR__ . '/../resources/dist/manifest.json';
+        if (file_exists($manifestPath)) {
+            $manifest = json_decode(file_get_contents($manifestPath), true) ?? [];
+            config(['platform.tiptap_hash' => $manifest['platform-tiptap.iife.js'] ?? '0']);
+        }
+
         // Blade Components
         Blade::component('platform::components.extra-fields-form', 'core-extra-fields-form');
         Blade::component('platform::components.extra-fields-section', 'core-extra-fields-section');
