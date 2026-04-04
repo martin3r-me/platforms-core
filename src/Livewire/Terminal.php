@@ -2,7 +2,6 @@
 
 namespace Platform\Core\Livewire;
 
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -194,17 +193,16 @@ class Terminal extends Component
         ]);
 
         // Update channel counters
-        $channel->update([
-            'last_message_id' => $message->id,
-            'message_count' => DB::raw('message_count + 1'),
-        ]);
+        $channel->increment('message_count');
+        $channel->update(['last_message_id' => $message->id]);
 
         // Update parent reply count if this is a thread reply
         if ($parentId) {
-            TerminalMessage::where('id', $parentId)->update([
-                'reply_count' => DB::raw('reply_count + 1'),
-                'last_reply_at' => now(),
-            ]);
+            $parent = TerminalMessage::find($parentId);
+            if ($parent) {
+                $parent->increment('reply_count');
+                $parent->update(['last_reply_at' => now()]);
+            }
         }
 
         // Store mentions
