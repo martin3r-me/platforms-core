@@ -147,6 +147,8 @@ img.ProseMirror-separator {
 }
 
 /* Mention dropdown */
+.tippy-box { z-index: 9999 !important; }
+
 .mention-dropdown {
   background: var(--ui-bg, #fff);
   border: 1px solid var(--ui-border, #e5e7eb);
@@ -194,17 +196,21 @@ img.ProseMirror-separator {
   text-align: center;
 }
 
-/* Inline formatting */
-.tiptap-editor strong { font-weight: 600; }
-.tiptap-editor em { font-style: italic; }
-.tiptap-editor s { text-decoration: line-through; }
+/* Inline formatting \u2014 !important to override Tailwind preflight reset */
+.tiptap-editor strong,
+.tiptap-editor b { font-weight: 700 !important; }
+.tiptap-editor em,
+.tiptap-editor i { font-style: italic !important; }
+.tiptap-editor s,
+.tiptap-editor del { text-decoration: line-through !important; }
 .tiptap-editor code {
-  background: var(--ui-muted-5, rgba(107,114,128,0.05));
-  border: 1px solid var(--ui-border, #e5e7eb);
-  border-radius: 3px;
-  padding: 0 3px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.9em;
+  background: var(--ui-muted-5, rgba(107,114,128,0.05)) !important;
+  border: 1px solid var(--ui-border, #e5e7eb) !important;
+  border-radius: 3px !important;
+  padding: 0 3px !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-size: 0.9em !important;
+  color: var(--ui-danger, #dc2626) !important;
 }
 
 /* Floating toolbar */
