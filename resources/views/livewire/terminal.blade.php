@@ -257,15 +257,17 @@
                  placeholder: '{{ $this->activeChannel['type'] === 'dm' ? 'Nachricht an ' . e($this->activeChannel['name']) . ' …' : 'Nachricht schreiben …' }}',
                  onSubmit: (html, text, json) => {
                    const mentions = [];
-                   if (json && json.content) {
-                     const walk = (nodes) => {
-                       for (const n of nodes) {
-                         if (n.type === 'mention' && n.attrs && n.attrs.id) mentions.push(parseInt(n.attrs.id));
-                         if (n.content) walk(n.content);
-                       }
-                     };
-                     walk(json.content);
-                   }
+                   try {
+                     if (json && json.content) {
+                       const walk = (nodes) => {
+                         for (const n of nodes) {
+                           if (n.type === 'mention' && n.attrs && n.attrs.id) mentions.push(parseInt(n.attrs.id));
+                           if (n.content) walk(n.content);
+                         }
+                       };
+                       walk(json.content);
+                     }
+                   } catch(e) {}
                    $wire.sendMessage(html, text, null, mentions);
                  },
                })">
