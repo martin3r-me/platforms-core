@@ -621,8 +621,8 @@ class Terminal extends Component
         $listeners = [];
 
         if ($this->channelId) {
-            $listeners["echo-private:terminal.channel.{$this->channelId},message.sent"] = 'onMessageReceived';
-            $listeners["echo-private:terminal.channel.{$this->channelId},reaction.toggled"] = 'onReactionToggled';
+            $listeners["echo-private:terminal.channel.{$this->channelId},.message.sent"] = 'onMessageReceived';
+            $listeners["echo-private:terminal.channel.{$this->channelId},.reaction.toggled"] = 'onReactionToggled';
         }
 
         return $listeners;
