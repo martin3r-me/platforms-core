@@ -249,8 +249,9 @@
             </div>
           </div>
 
-          <!-- Input (Tiptap Editor) — wire:key forces full re-init on channel switch -->
+          <!-- Input (Tiptap Editor) — wire:ignore prevents morph from destroying ProseMirror DOM -->
           <div wire:key="terminal-editor-{{ $channelId }}"
+               wire:ignore
                class="px-3 py-2 border-t border-[var(--ui-border)]/60 flex-shrink-0"
                x-data="tiptapEditor({
                  placeholder: '{{ $this->activeChannel['type'] === 'dm' ? 'Nachricht an ' . e($this->activeChannel['name']) . ' …' : 'Nachricht schreiben …' }}',
