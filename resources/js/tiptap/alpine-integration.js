@@ -124,21 +124,21 @@ export function tiptapEditor({
       const text = this.editor.getText();
       const json = this.editor.getJSON();
 
-      // Clear editor BEFORE triggering any async operations (e.g. Livewire calls)
-      // to ensure the DOM is clean before a potential morph cycle
-      this.editor.commands.clearContent(true);
-      this.isEmpty = true;
+      // Defer clear to next microtask — avoids "mismatched transaction" when
+      // called from handleKeyDown (Enter key), because ProseMirror is still
+      // processing the keystroke transaction at this point.
+      queueMicrotask(() => {
+        this.editor.commands.clearContent(true);
+        this.isEmpty = true;
+        this.editor.commands.focus();
+        this.$nextTick(() => this._autoResize());
+      });
 
       if (typeof onSubmit === 'function') {
         onSubmit(html, text, json);
       } else {
         console.log('tiptapEditor.submit:', { html, text });
       }
-
-      this.editor.commands.focus();
-
-      // Reset terminal height after clearing
-      this.$nextTick(() => this._autoResize());
     },
 
     destroy() {
