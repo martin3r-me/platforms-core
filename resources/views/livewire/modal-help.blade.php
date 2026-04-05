@@ -7,7 +7,7 @@
                 <h2 class="text-xl font-semibold text-[var(--ui-secondary)] m-0 truncate">Hilfe</h2>
             </div>
             @if(!empty($breadcrumb))
-                <div class="hidden sm:flex items-center gap-1 text-sm text-[var(--ui-muted)]">
+                <div class="hidden sm:flex items-center gap-1 text-sm text-[var(--ui-muted)] ml-6">
                     @foreach($breadcrumb as $crumb)
                         @if(!$loop->first)
                             @svg('heroicon-o-chevron-right', 'w-3 h-3')
