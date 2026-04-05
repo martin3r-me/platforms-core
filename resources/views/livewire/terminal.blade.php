@@ -3,7 +3,7 @@
   x-init="init()"
   x-on:toggle-terminal.window="toggle()"
   x-on:toggle-terminal-open.window="if(!open) toggle()"
-  class="w-full flex-shrink-0 relative z-30"
+  class="w-full flex-shrink-0 relative"
   wire:key="terminal-root"
 >
   @php
@@ -22,6 +22,7 @@
     class="w-full border-t-2 border-[var(--ui-border)] bg-[var(--ui-surface)]/95 backdrop-blur overflow-hidden flex flex-col"
     :class="resizing ? '' : 'transition-[height] duration-200 ease-out'"
     x-bind:style="open ? 'height: ' + panelHeight + 'px' : 'height: 38px'"
+    wire:ignore.self
     wire:key="terminal-slide"
   >
     <!-- Resize handle — only visible when open -->
