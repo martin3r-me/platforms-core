@@ -5,6 +5,7 @@ namespace Platform\Core\Services;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Platform\Core\Registry\ModuleRegistry;
 use Symfony\Component\Yaml\Yaml;
 
 class HelpDiscovery
@@ -93,19 +94,8 @@ class HelpDiscovery
     {
         Cache::forget('help:tree');
 
-        // Clear all page caches by scanning existing docs
-        $modulesPath = base_path('modules');
-        if (!File::isDirectory($modulesPath)) {
-            return;
-        }
-
-        foreach (File::directories($modulesPath) as $moduleDir) {
-            $docsDir = $moduleDir . '/docs';
-            if (!File::isDirectory($docsDir)) {
-                continue;
-            }
-
-            $moduleKey = basename($moduleDir);
+        // Clear page caches for all registered modules
+        foreach (static::getDocsDirectories() as $moduleKey => $docsDir) {
             foreach (static::findMarkdownFiles($docsDir) as $file) {
                 $relativePath = static::getRelativePath($docsDir, $file);
                 $hash = md5("{$moduleKey}:{$relativePath}");
@@ -115,31 +105,77 @@ class HelpDiscovery
     }
 
     /**
-     * Build the complete navigation tree from docs directories.
+     * Resolve docs directories for all registered modules.
+     * Uses the ServiceProvider class location to find sibling docs/ folders.
+     *
+     * @return array<string, string> moduleKey => docsDir path
      */
-    protected static function buildTree(): array
+    protected static function getDocsDirectories(): array
     {
-        $modulesPath = base_path('modules');
-        if (!File::isDirectory($modulesPath)) {
-            return [];
-        }
+        $dirs = [];
 
-        $tree = [];
-
-        foreach (File::directories($modulesPath) as $moduleDir) {
-            $docsDir = $moduleDir . '/docs';
-            if (!File::isDirectory($docsDir)) {
+        foreach (ModuleRegistry::all() as $key => $config) {
+            // Strategy 1: Explicit docs_path in module config
+            if (!empty($config['docs_path']) && File::isDirectory($config['docs_path'])) {
+                $dirs[$key] = $config['docs_path'];
                 continue;
             }
 
-            $moduleKey = basename($moduleDir);
+            // Strategy 2: Resolve via ServiceProvider class location
+            $providerClass = $config['provider'] ?? null;
+            if (!$providerClass) {
+                // Guess the provider class name from the module key
+                $studlyKey = Str::studly($key);
+                $providerClass = "Platform\\{$studlyKey}\\{$studlyKey}ServiceProvider";
+            }
+
+            if (class_exists($providerClass)) {
+                try {
+                    $reflection = new \ReflectionClass($providerClass);
+                    $providerDir = dirname($reflection->getFileName());
+                    // ServiceProvider sits in src/, docs/ is a sibling
+                    $docsDir = dirname($providerDir) . '/docs';
+                    if (File::isDirectory($docsDir)) {
+                        $dirs[$key] = $docsDir;
+                    }
+                } catch (\Throwable) {
+                    // Skip if reflection fails
+                }
+            }
+        }
+
+        return $dirs;
+    }
+
+    /**
+     * Resolve the docs directory for a single module.
+     */
+    protected static function getDocsDir(string $moduleKey): ?string
+    {
+        $dirs = static::getDocsDirectories();
+        return $dirs[$moduleKey] ?? null;
+    }
+
+    /**
+     * Build the complete navigation tree from registered modules.
+     */
+    protected static function buildTree(): array
+    {
+        $tree = [];
+
+        foreach (static::getDocsDirectories() as $moduleKey => $docsDir) {
             $moduleMeta = static::readMeta($docsDir);
+
+            // Fall back to registered module title/icon
+            $registeredModule = ModuleRegistry::get($moduleKey);
+            $fallbackTitle = $registeredModule['title'] ?? Str::title(str_replace('-', ' ', $moduleKey));
+            $fallbackIcon = $registeredModule['navigation']['icon'] ?? null;
 
             $moduleNode = [
                 'key' => $moduleKey,
-                'title' => $moduleMeta['title'] ?? Str::title(str_replace('-', ' ', $moduleKey)),
-                'icon' => $moduleMeta['icon'] ?? null,
-                'order' => $moduleMeta['order'] ?? 99,
+                'title' => $moduleMeta['title'] ?? $fallbackTitle,
+                'icon' => $moduleMeta['icon'] ?? $fallbackIcon,
+                'order' => $moduleMeta['order'] ?? ($registeredModule['navigation']['order'] ?? 99),
                 'sections' => static::buildSections($docsDir, $moduleKey),
                 'has_index' => File::exists($docsDir . '/index.md'),
             ];
@@ -147,7 +183,6 @@ class HelpDiscovery
             $tree[] = $moduleNode;
         }
 
-        // Sort by order, then title
         usort($tree, function ($a, $b) {
             if ($a['order'] !== $b['order']) {
                 return $a['order'] <=> $b['order'];
@@ -227,7 +262,15 @@ class HelpDiscovery
      */
     protected static function renderPage(string $module, string $path): array
     {
-        $docsDir = base_path("modules/{$module}/docs");
+        $docsDir = static::getDocsDir($module);
+
+        if (!$docsDir) {
+            return [
+                'html' => '<p class="text-[var(--ui-muted)]">Diese Seite wurde nicht gefunden.</p>',
+                'title' => 'Nicht gefunden',
+                'breadcrumb' => [['label' => $module, 'path' => null]],
+            ];
+        }
 
         // Resolve file path
         $filePath = $docsDir . '/' . $path;
@@ -282,13 +325,11 @@ class HelpDiscovery
      */
     protected static function rewriteLinks(string $content, string $module): string
     {
-        // Match [text](relative-path.md) but not external URLs
         return preg_replace_callback(
             '/\[([^\]]+)\]\((?!https?:\/\/)([^)]+?)(?:\.md)?\)/',
             function ($matches) use ($module) {
                 $text = $matches[1];
                 $path = $matches[2];
-                // Remove leading ./ if present
                 $path = ltrim($path, './');
                 return "<a href=\"#\" onclick=\"\$dispatch('open-help-page', { module: '{$module}', path: '{$path}' }); return false;\" class=\"help-internal-link\">{$text}</a>";
             },
@@ -356,9 +397,16 @@ class HelpDiscovery
      */
     protected static function getModuleTitle(string $moduleKey): string
     {
-        $docsDir = base_path("modules/{$moduleKey}/docs");
-        $meta = static::readMeta($docsDir);
-        return $meta['title'] ?? Str::title(str_replace('-', ' ', $moduleKey));
+        $docsDir = static::getDocsDir($moduleKey);
+        if ($docsDir) {
+            $meta = static::readMeta($docsDir);
+            if (!empty($meta['title'])) {
+                return $meta['title'];
+            }
+        }
+
+        $registered = ModuleRegistry::get($moduleKey);
+        return $registered['title'] ?? Str::title(str_replace('-', ' ', $moduleKey));
     }
 
     /**
