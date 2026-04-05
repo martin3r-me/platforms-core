@@ -3,7 +3,7 @@
   x-init="init()"
   x-on:toggle-terminal.window="toggle()"
   x-on:toggle-terminal-open.window="if(!open) toggle()"
-  class="w-full flex-shrink-0"
+  class="w-full flex-shrink-0 relative z-30"
   wire:key="terminal-root"
 >
   @php
