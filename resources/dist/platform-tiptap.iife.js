@@ -110,9 +110,10 @@ img.ProseMirror-separator {
   line-height: 1.4;
   color: var(--ui-secondary);
   min-height: 34px;
+  max-height: 120px;
   padding: 6px 10px;
   word-break: break-word;
-  overflow-y: hidden;
+  overflow-y: auto;
 }
 
 .tiptap-editor p,

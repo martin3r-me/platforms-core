@@ -75,7 +75,7 @@
 
     <!-- Main Content -->
     <main class="flex-1 min-w-0 h-screen bg-white flex flex-col overflow-hidden">
-      <div class="flex-1 min-h-0 overflow-y-auto relative z-40">
+      <div class="flex-1 min-h-0 overflow-y-auto">
         {{ $slot }}
       </div>
       @livewire('core.terminal')
