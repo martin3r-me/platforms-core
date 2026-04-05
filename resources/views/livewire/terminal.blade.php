@@ -240,7 +240,11 @@
             @elseif($this->activeChannel['type'] === 'context' && ! empty($this->activeChannel['context']))
               <span class="text-[14px]">{{ $this->activeChannel['context']['icon'] }}</span>
               <div class="flex flex-col leading-tight">
-                <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $this->activeChannel['context']['title'] }}</span>
+                @if(! empty($this->activeChannel['context_url']))
+                  <a href="{{ $this->activeChannel['context_url'] }}" class="font-bold text-[13px] text-[var(--ui-body-color)] hover:text-[var(--ui-primary)] transition" title="Zum Kontext springen">{{ $this->activeChannel['context']['title'] }}</a>
+                @else
+                  <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $this->activeChannel['context']['title'] }}</span>
+                @endif
                 <span class="text-[10px] text-[var(--ui-muted)]">Kontext-Diskussion</span>
               </div>
             @else

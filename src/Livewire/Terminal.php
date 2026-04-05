@@ -28,6 +28,7 @@ class Terminal extends Component
     public ?int $contextId = null;
     public ?string $contextSubject = null;
     public ?string $contextSource = null;
+    public ?string $contextUrl = null;
     public array $contextMeta = [];
     public ?int $channelId = null;
     public $pendingFiles = [];
@@ -79,16 +80,35 @@ class Terminal extends Component
         $this->contextId = (int) $modelId;
         $this->contextSubject = $payload['subject'] ?? null;
         $this->contextSource = $payload['source'] ?? null;
+        $this->contextUrl = $payload['url'] ?? null;
         $this->contextMeta = $payload['meta'] ?? [];
 
-        // Persist subject on existing context channel so sidebar always shows the real name
-        if ($this->contextSubject) {
-            $teamId = $this->teamId();
-            if ($teamId) {
+        // Persist subject + URL on existing context channel
+        $teamId = $this->teamId();
+        if ($teamId && ($this->contextSubject || ! empty($payload['url']))) {
+            $updates = [];
+            if ($this->contextSubject) {
+                $updates['name'] = $this->contextSubject;
+            }
+            if (! empty($payload['url'])) {
+                $channel = TerminalChannel::forTeam($teamId)
+                    ->forContext($this->contextType, $this->contextId)
+                    ->first();
+                if ($channel) {
+                    $meta = $channel->meta ?? [];
+                    if (($meta['url'] ?? null) !== $payload['url']) {
+                        $meta['url'] = $payload['url'];
+                        $updates['meta'] = $meta;
+                    }
+                    if (! empty($updates)) {
+                        $channel->update($updates);
+                    }
+                }
+            } elseif ($this->contextSubject) {
                 TerminalChannel::forTeam($teamId)
                     ->forContext($this->contextType, $this->contextId)
                     ->where(fn ($q) => $q->whereNull('name')->orWhere('name', '!=', $this->contextSubject))
-                    ->update(['name' => $this->contextSubject]);
+                    ->update($updates);
             }
         }
     }
@@ -143,6 +163,7 @@ class Terminal extends Component
                 'context_type' => $this->contextType,
                 'context_id' => $this->contextId,
                 'name' => $this->contextSubject,
+                'meta' => $this->contextUrl ? ['url' => $this->contextUrl] : null,
             ]);
         } elseif ($this->contextSubject && $channel->name !== $this->contextSubject) {
             $channel->update(['name' => $this->contextSubject]);
@@ -964,6 +985,7 @@ class Terminal extends Component
                 $channel->context_type,
                 $channel->context_id,
             );
+            $data['context_url'] = $channel->meta['url'] ?? null;
         }
 
         return $data;
