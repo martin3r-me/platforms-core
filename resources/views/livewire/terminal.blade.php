@@ -251,16 +251,38 @@
               <span class="text-[var(--ui-muted)] font-bold text-[14px]">{{ $this->activeChannel['icon'] ?? '#' }}</span>
               <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $this->activeChannel['name'] ?? 'Kontext' }}</span>
             @endif
-            @if($this->activeChannel['member_count'] > 0)
+            @if(! empty($this->activeChannel['members']))
               <span class="text-[var(--ui-muted)]">&middot;</span>
-              @if(in_array($this->activeChannel['type'], ['channel', 'context']))
-                <button
-                  @click.stop="$dispatch('terminal-show-members')"
-                  class="text-[10px] text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition cursor-pointer"
-                >{{ $this->activeChannel['member_count'] }} {{ $this->activeChannel['member_count'] === 1 ? 'Mitglied' : 'Mitglieder' }}</button>
-              @else
-                <span class="text-[10px] text-[var(--ui-muted)]">{{ $this->activeChannel['member_count'] }} {{ $this->activeChannel['member_count'] === 1 ? 'Mitglied' : 'Mitglieder' }}</span>
-              @endif
+              @php $isManageable = in_array($this->activeChannel['type'], ['channel', 'context']); @endphp
+              <{{ $isManageable ? 'button' : 'div' }}
+                @if($isManageable) @click.stop="$dispatch('terminal-show-members')" @endif
+                class="flex items-center gap-1.5 {{ $isManageable ? 'cursor-pointer hover:opacity-80' : '' }} transition"
+                @if($isManageable) title="Mitglieder verwalten" @endif
+              >
+                {{-- Avatar stack --}}
+                <div class="flex -space-x-1.5">
+                  @foreach(array_slice($this->activeChannel['members'], 0, 5) as $member)
+                    <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[8px] font-semibold flex-shrink-0 overflow-hidden ring-1 ring-[var(--ui-surface)]" title="{{ $member['name'] }}">
+                      @if(! empty($member['avatar']))
+                        <img src="{{ $member['avatar'] }}" alt="" class="w-full h-full object-cover">
+                      @else
+                        {{ $member['initials'] }}
+                      @endif
+                    </div>
+                  @endforeach
+                  @if($this->activeChannel['member_count'] > 5)
+                    <div class="w-5 h-5 rounded-full bg-[var(--ui-muted)]/10 text-[var(--ui-muted)] flex items-center justify-center text-[8px] font-semibold flex-shrink-0 ring-1 ring-[var(--ui-surface)]">+{{ $this->activeChannel['member_count'] - 5 }}</div>
+                  @endif
+                </div>
+                {{-- Names --}}
+                <span class="text-[10px] text-[var(--ui-muted)] truncate max-w-[200px]">
+                  @if($this->activeChannel['member_count'] <= 3)
+                    {{ implode(', ', array_map(fn($m) => $m['name'], $this->activeChannel['members'])) }}
+                  @else
+                    {{ implode(', ', array_map(fn($m) => $m['name'], array_slice($this->activeChannel['members'], 0, 2))) }} +{{ $this->activeChannel['member_count'] - 2 }}
+                  @endif
+                </span>
+              </{{ $isManageable ? 'button' : 'div' }}>
             @endif
 
             {{-- Channel actions (delete / leave / context actions) --}}

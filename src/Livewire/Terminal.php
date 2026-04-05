@@ -953,13 +953,25 @@ class Terminal extends Component
             return null;
         }
 
+        $memberRows = TerminalChannelMember::where('channel_id', $channel->id)
+            ->with('user:id,name,avatar')
+            ->get();
+
+        $members = $memberRows->map(fn ($m) => [
+            'id' => $m->user_id,
+            'name' => $m->user?->name ?? 'Unbekannt',
+            'avatar' => $m->user?->avatar,
+            'initials' => $this->initials($m->user?->name ?? '?'),
+        ])->toArray();
+
         $data = [
             'id' => $channel->id,
             'type' => $channel->type,
             'name' => $channel->name,
             'icon' => $channel->icon,
             'description' => $channel->description,
-            'member_count' => $channel->members()->count(),
+            'member_count' => count($members),
+            'members' => $members,
         ];
 
         if ($channel->isDm()) {
