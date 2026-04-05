@@ -3,7 +3,10 @@
   x-init="init()"
   x-on:toggle-terminal.window="toggle()"
   x-on:toggle-terminal-open.window="if(!open) toggle()"
-  class="w-full flex-shrink-0 relative"
+  class="w-full flex-none relative"
+  :class="resizing ? '' : 'transition-[height] duration-200 ease-out'"
+  x-bind:style="open ? 'height:' + panelHeight + 'px;min-height:' + panelHeight + 'px;max-height:' + panelHeight + 'px' : 'height:38px;min-height:38px;max-height:38px'"
+  wire:ignore.self
   wire:key="terminal-root"
 >
   @php
@@ -19,10 +22,7 @@
 
   <!-- Single terminal container — status bar always peeks out -->
   <div
-    class="w-full border-t-2 border-[var(--ui-border)] bg-[var(--ui-surface)] overflow-hidden flex flex-col"
-    :class="resizing ? '' : 'transition-[height] duration-200 ease-out'"
-    x-bind:style="open ? 'height: ' + panelHeight + 'px' : 'height: 38px'"
-    wire:ignore.self
+    class="w-full h-full border-t-2 border-[var(--ui-border)] bg-[var(--ui-surface)] overflow-hidden flex flex-col"
     wire:key="terminal-slide"
   >
     <!-- Resize handle — only visible when open -->

@@ -1,9 +1,8 @@
-<div x-data="{ teamFlyoutOpen: false }" 
+<div x-data="{ teamFlyoutOpen: false }"
      @open-team-flyout.window="teamFlyoutOpen = true"
-     @click.away="teamFlyoutOpen = false"
      class="relative hidden sm:block">
-    
-    <button @click="teamFlyoutOpen = !teamFlyoutOpen" 
+
+    <button x-ref="trigger" @click="teamFlyoutOpen = !teamFlyoutOpen"
         class="inline-flex items-center gap-1 px-2 py-1 h-7 rounded-md border transition text-xs
         {{ $isParentModule ? 'text-[var(--ui-on-warning)] bg-[var(--ui-warning)] border-[var(--ui-warning)]/60' : 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)] border-[var(--ui-primary)]/60' }}"
         title="Team wechseln">
@@ -29,84 +28,88 @@
             <path d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" fill-rule="evenodd" />
         </svg>
     </button>
-    
-    <div x-show="teamFlyoutOpen" x-cloak x-transition
-        class="absolute top-full right-0 mt-2 w-80 bg-[var(--ui-surface)] rounded-lg border border-[var(--ui-border)]/60 shadow-lg z-50 max-h-[80vh] overflow-y-auto">
-        <div class="p-2">
-            <h3 class="text-[0.625rem] font-semibold text-[var(--ui-muted)] mb-2 px-2">SPACES</h3>
-            <div class="space-y-1">
-                @foreach($groupedTeams as $group)
-                    @php 
-                        $parentTeam = $group['parent'];
-                        $childTeams = $group['children'];
-                        $isActiveParentTeam = $baseTeam?->id === $parentTeam->id;
-                    @endphp
-                    
-                    {{-- Parent-Team --}}
-                    <button type="button" wire:click="switchTeam({{ $parentTeam->id }})"
-                        class="w-full group flex items-center gap-2 px-2 py-1.5 rounded-md transition text-xs
-                        {{ $isActiveParentTeam ? 'bg-[var(--ui-primary-5)] border border-[var(--ui-primary)]/60' : 'hover:bg-[var(--ui-muted-5)]' }}">
-                        <div class="flex-shrink-0">
-                            @svg('heroicon-o-user-group', 'w-4 h-4 text-[var(--ui-primary)]')
-                        </div>
-                        <div class="min-w-0 flex-1 text-left">
-                            <div class="font-medium text-[var(--ui-secondary)] truncate text-xs">{{ $parentTeam->name }}</div>
-                        </div>
-                        @if($isActiveParentTeam)
+
+    <template x-teleport="body">
+        <div x-show="teamFlyoutOpen" x-cloak x-transition
+            @click.outside="teamFlyoutOpen = false"
+            x-effect="if(teamFlyoutOpen) { $nextTick(() => { const r = $refs.trigger.getBoundingClientRect(); $el.style.top = (r.bottom + 8) + 'px'; $el.style.right = (window.innerWidth - r.right) + 'px'; }) }"
+            class="fixed z-[99] w-80 bg-[var(--ui-surface)] rounded-lg border border-[var(--ui-border)]/60 shadow-lg max-h-[80vh] overflow-y-auto">
+            <div class="p-2">
+                <h3 class="text-[0.625rem] font-semibold text-[var(--ui-muted)] mb-2 px-2">SPACES</h3>
+                <div class="space-y-1">
+                    @foreach($groupedTeams as $group)
+                        @php
+                            $parentTeam = $group['parent'];
+                            $childTeams = $group['children'];
+                            $isActiveParentTeam = $baseTeam?->id === $parentTeam->id;
+                        @endphp
+
+                        {{-- Parent-Team --}}
+                        <button type="button" @click="$wire.switchTeam({{ $parentTeam->id }})"
+                            class="w-full group flex items-center gap-2 px-2 py-1.5 rounded-md transition text-xs
+                            {{ $isActiveParentTeam ? 'bg-[var(--ui-primary-5)] border border-[var(--ui-primary)]/60' : 'hover:bg-[var(--ui-muted-5)]' }}">
                             <div class="flex-shrink-0">
-                                @svg('heroicon-o-check', 'w-3.5 h-3.5 text-[var(--ui-primary)]')
-                            </div>
-                        @endif
-                    </button>
-                    
-                    {{-- Kind-Teams (eingerückt) --}}
-                    @foreach($childTeams as $childTeam)
-                        @php $isActiveChildTeam = $baseTeam?->id === $childTeam->id; @endphp
-                        <button type="button" wire:click="switchTeam({{ $childTeam->id }})"
-                            class="w-full group flex items-center gap-2 pl-6 pr-2 py-1.5 rounded-md transition text-xs
-                            {{ $isActiveChildTeam ? 'bg-[var(--ui-primary-5)] border border-[var(--ui-primary)]/60' : 'hover:bg-[var(--ui-muted-5)]' }}">
-                            <div class="flex-shrink-0">
-                                @svg('heroicon-o-user-group', 'w-3.5 h-3.5 text-[var(--ui-primary)] opacity-75')
+                                @svg('heroicon-o-user-group', 'w-4 h-4 text-[var(--ui-primary)]')
                             </div>
                             <div class="min-w-0 flex-1 text-left">
-                                <div class="font-medium text-[var(--ui-secondary)] truncate text-xs">{{ $childTeam->name }}</div>
+                                <div class="font-medium text-[var(--ui-secondary)] truncate text-xs">{{ $parentTeam->name }}</div>
                             </div>
-                            @if($isActiveChildTeam)
+                            @if($isActiveParentTeam)
                                 <div class="flex-shrink-0">
                                     @svg('heroicon-o-check', 'w-3.5 h-3.5 text-[var(--ui-primary)]')
                                 </div>
                             @endif
                         </button>
-                    @endforeach
-                @endforeach
-            </div>
-            
-            {{-- Persönliche Teams am Ende --}}
-            @if(count($personalTeams) > 0)
-                <div class="mt-4 pt-4 border-t border-[var(--ui-border)]/60">
-                    <h3 class="text-[0.625rem] font-semibold text-[var(--ui-muted)] mb-2 px-2">Persönlich</h3>
-                    <div class="space-y-1">
-                        @foreach($personalTeams as $personalTeam)
-                            @php $isActivePersonalTeam = $baseTeam?->id === $personalTeam->id; @endphp
-                            <button type="button" wire:click="switchTeam({{ $personalTeam->id }})"
-                                class="w-full group flex items-center gap-2 px-2 py-1.5 rounded-md transition text-xs
-                                {{ $isActivePersonalTeam ? 'bg-[var(--ui-primary-5)] border border-[var(--ui-primary)]/60' : 'hover:bg-[var(--ui-muted-5)]' }}">
+
+                        {{-- Kind-Teams (eingerückt) --}}
+                        @foreach($childTeams as $childTeam)
+                            @php $isActiveChildTeam = $baseTeam?->id === $childTeam->id; @endphp
+                            <button type="button" @click="$wire.switchTeam({{ $childTeam->id }})"
+                                class="w-full group flex items-center gap-2 pl-6 pr-2 py-1.5 rounded-md transition text-xs
+                                {{ $isActiveChildTeam ? 'bg-[var(--ui-primary-5)] border border-[var(--ui-primary)]/60' : 'hover:bg-[var(--ui-muted-5)]' }}">
                                 <div class="flex-shrink-0">
-                                    @svg('heroicon-o-user', 'w-4 h-4 text-[var(--ui-primary)]')
+                                    @svg('heroicon-o-user-group', 'w-3.5 h-3.5 text-[var(--ui-primary)] opacity-75')
                                 </div>
                                 <div class="min-w-0 flex-1 text-left">
-                                    <div class="font-medium text-[var(--ui-secondary)] truncate text-xs">{{ $personalTeam->name }}</div>
+                                    <div class="font-medium text-[var(--ui-secondary)] truncate text-xs">{{ $childTeam->name }}</div>
                                 </div>
-                                @if($isActivePersonalTeam)
+                                @if($isActiveChildTeam)
                                     <div class="flex-shrink-0">
                                         @svg('heroicon-o-check', 'w-3.5 h-3.5 text-[var(--ui-primary)]')
                                     </div>
                                 @endif
                             </button>
                         @endforeach
-                    </div>
+                    @endforeach
                 </div>
-            @endif
+
+                {{-- Persönliche Teams am Ende --}}
+                @if(count($personalTeams) > 0)
+                    <div class="mt-4 pt-4 border-t border-[var(--ui-border)]/60">
+                        <h3 class="text-[0.625rem] font-semibold text-[var(--ui-muted)] mb-2 px-2">Persönlich</h3>
+                        <div class="space-y-1">
+                            @foreach($personalTeams as $personalTeam)
+                                @php $isActivePersonalTeam = $baseTeam?->id === $personalTeam->id; @endphp
+                                <button type="button" @click="$wire.switchTeam({{ $personalTeam->id }})"
+                                    class="w-full group flex items-center gap-2 px-2 py-1.5 rounded-md transition text-xs
+                                    {{ $isActivePersonalTeam ? 'bg-[var(--ui-primary-5)] border border-[var(--ui-primary)]/60' : 'hover:bg-[var(--ui-muted-5)]' }}">
+                                    <div class="flex-shrink-0">
+                                        @svg('heroicon-o-user', 'w-4 h-4 text-[var(--ui-primary)]')
+                                    </div>
+                                    <div class="min-w-0 flex-1 text-left">
+                                        <div class="font-medium text-[var(--ui-secondary)] truncate text-xs">{{ $personalTeam->name }}</div>
+                                    </div>
+                                    @if($isActivePersonalTeam)
+                                        <div class="flex-shrink-0">
+                                            @svg('heroicon-o-check', 'w-3.5 h-3.5 text-[var(--ui-primary)]')
+                                        </div>
+                                    @endif
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+            </div>
         </div>
-    </div>
+    </template>
 </div>
