@@ -239,18 +239,13 @@
               <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $this->activeChannel['name'] }}</span>
             @elseif($this->activeChannel['type'] === 'context' && ! empty($this->activeChannel['context']))
               <span class="text-[14px]">{{ $this->activeChannel['context']['icon'] }}</span>
-              <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $this->activeChannel['context']['label'] }}</span>
+              <div class="flex flex-col leading-tight">
+                <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $this->activeChannel['context']['title'] }}</span>
+                <span class="text-[10px] text-[var(--ui-muted)]">Kontext-Diskussion</span>
+              </div>
             @else
               <span class="text-[var(--ui-muted)] font-bold text-[14px]">{{ $this->activeChannel['icon'] ?? '#' }}</span>
               <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $this->activeChannel['name'] ?? 'Kontext' }}</span>
-            @endif
-            @if(! empty($this->activeChannel['context']))
-              <span class="text-[var(--ui-muted)]">&middot;</span>
-              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--ui-primary-5)] text-[10px] text-[var(--ui-primary)] font-medium">
-                <span>{{ $this->activeChannel['context']['icon'] }}</span>
-                <span>{{ $this->activeChannel['context']['label'] }}:</span>
-                <span class="font-semibold">{{ $this->activeChannel['context']['title'] }}</span>
-              </span>
             @endif
             @if($this->activeChannel['member_count'] > 0)
               <span class="text-[var(--ui-muted)]">&middot;</span>
