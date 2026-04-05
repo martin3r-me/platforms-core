@@ -200,6 +200,9 @@ class Terminal extends Component
             'Invoice' => '🧾',
             'PatientsPatient' => '🏥',
             'PcCanvas' => '🎨',
+            'Cycle' => '🔄',
+            'Okr' => '🎯',
+            'Objective' => '🎯',
         ];
 
         $icon = $iconMap[$shortName] ?? '📎';
@@ -215,7 +218,7 @@ class Terminal extends Component
                 if (class_exists($contextType)) {
                     $model = $contextType::find($contextId);
                     if ($model) {
-                        $title = $model->display_name ?? $model->name ?? $model->title ?? $model->subject ?? null;
+                        $title = $model->display_name ?? $model->name ?? $model->title ?? $model->label ?? $model->subject ?? null;
                         if (isset($model->number)) {
                             $title = "#{$model->number} " . ($title ?? '');
                         }
@@ -785,6 +788,9 @@ class Terminal extends Component
             'NotesFolder' => 'Ordner',
             'Invoice' => 'Rechnungen',
             'PcCanvas' => 'Canvas',
+            'Cycle' => 'OKR Cycles',
+            'Okr' => 'OKRs',
+            'Objective' => 'Objectives',
         ];
 
         // Icon map (reuse from getContextBreadcrumb)
@@ -801,6 +807,9 @@ class Terminal extends Component
             'PcCanvas' => '🎨',
             'NotesNote' => '📝',
             'NotesFolder' => '📁',
+            'Cycle' => '🔄',
+            'Okr' => '🎯',
+            'Objective' => '🎯',
         ];
 
         foreach ($memberships as $membership) {
