@@ -61,7 +61,6 @@ export function tiptapEditor({
         },
         onUpdate: ({ editor }) => {
           this.isEmpty = editor.isEmpty;
-          this._autoResize();
         },
       });
 
@@ -76,47 +75,6 @@ export function tiptapEditor({
         this.$refs.emojiSlot.appendChild(picker.element);
         this._destroyEmoji = picker.destroy;
       }
-    },
-
-    _autoResize() {
-      // Let the ProseMirror content determine height, then adjust terminal
-      const proseMirror = this.$refs.editorEl?.querySelector('.ProseMirror');
-      if (!proseMirror) return;
-
-      // Reset to auto to measure real scroll height
-      proseMirror.style.height = 'auto';
-      const scrollH = proseMirror.scrollHeight;
-      const maxH = 200; // max editor height in px
-
-      if (scrollH > maxH) {
-        proseMirror.style.height = maxH + 'px';
-        proseMirror.style.overflowY = 'auto';
-      } else {
-        proseMirror.style.height = scrollH + 'px';
-        proseMirror.style.overflowY = 'hidden';
-      }
-
-      // Grow terminal panel if needed
-      this._adjustTerminalHeight();
-    },
-
-    _adjustTerminalHeight() {
-      // Find the slide container (parent with transition-[height])
-      const slideEl = this.$el.closest('[wire\\:key="terminal-slide"]')
-        || this.$el.closest('.w-full.border-t');
-      if (!slideEl) return;
-
-      const minH = 320; // 20rem = 320px
-      const maxH = Math.floor(window.innerHeight * 0.5); // max 50vh
-
-      // Measure natural content height
-      const contentEl = slideEl.querySelector('[wire\\:key="terminal-content"]');
-      if (!contentEl) return;
-
-      const naturalH = contentEl.scrollHeight;
-      const targetH = Math.max(minH, Math.min(naturalH, maxH));
-
-      slideEl.style.height = targetH + 'px';
     },
 
     submit() {
@@ -144,7 +102,6 @@ export function tiptapEditor({
       }
 
       this.editor.commands.focus();
-      this.$nextTick(() => this._autoResize());
     },
 
     destroy() {
