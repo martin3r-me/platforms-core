@@ -20,7 +20,7 @@
   <div
     class="w-full border-t-2 border-[var(--ui-border)] bg-[var(--ui-surface)]/95 backdrop-blur overflow-hidden flex flex-col"
     :class="resizing ? '' : 'transition-all duration-200 ease-out'"
-    x-bind:style="open ? 'height: ' + panelHeight + 'px' : 'height: 36px'"
+    x-bind:style="open ? 'height: ' + panelHeight + 'px' : 'height: 38px'"
     wire:key="terminal-slide"
   >
     <!-- Resize handle — only visible when open -->
@@ -36,12 +36,13 @@
     <!-- Status bar — always visible (36px) -->
     <div
       @click="toggle()"
-      class="h-9 flex-shrink-0 px-3 flex items-center gap-1.5 overflow-x-auto scrollbar-none select-none group/bar border-b border-[var(--ui-border)]/40 cursor-pointer"
+      class="h-9 flex-shrink-0 px-4 flex items-center gap-1.5 overflow-x-auto scrollbar-none select-none group/bar cursor-pointer"
       wire:key="terminal-statusbar"
     >
-      {{-- Terminal icon + unread badge — click toggles open/close --}}
-      <div class="flex items-center gap-1.5 mr-1 flex-shrink-0 cursor-pointer" @click.stop="toggle()">
-        <svg class="w-3.5 h-3.5 text-[var(--ui-muted)] group-hover/bar:text-[var(--ui-primary)] transition" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 014.25 2h11.5A2.25 2.25 0 0118 4.25v8.5A2.25 2.25 0 0115.75 15h-3.105a3.501 3.501 0 001.1 1.677A.75.75 0 0113.26 18H6.74a.75.75 0 01-.484-1.323A3.501 3.501 0 007.355 15H4.25A2.25 2.25 0 012 12.75v-8.5zm1.5 0a.75.75 0 01.75-.75h11.5a.75.75 0 01.75.75v7.5a.75.75 0 01-.75.75H4.25a.75.75 0 01-.75-.75v-7.5z" clip-rule="evenodd"/></svg>
+      {{-- Terminal icon + label + unread badge — click toggles open/close --}}
+      <div class="flex items-center gap-3 mr-1 flex-shrink-0 cursor-pointer text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition-colors" @click.stop="toggle()">
+        @svg('heroicon-o-command-line', 'w-5 h-5')
+        <span class="text-sm font-medium">Terminal</span>
         @if($totalUnread > 0)
           <span class="min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">{{ $totalUnread > 99 ? '99+' : $totalUnread }}</span>
         @endif
