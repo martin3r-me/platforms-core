@@ -2,15 +2,18 @@
   x-data="terminalShell()"
   x-init="init()"
   x-on:toggle-terminal.window="toggle()"
+  x-on:toggle-terminal-open.window="if(!open) toggle()"
   class="w-full flex-shrink-0"
   wire:key="terminal-root"
 >
   @php
     $allChannels = collect($this->channels['dms'])->map(fn($c) => array_merge($c, ['_type' => 'dm']))
       ->merge(collect($this->channels['channels'])->map(fn($c) => array_merge($c, ['_type' => 'channel'])))
+      ->merge(collect($this->channels['context'])->map(fn($c) => array_merge($c, ['_type' => 'context'])))
       ->filter(fn($c) => $c['unread'] > 0)
       ->sortByDesc('unread');
     $totalUnread = $allChannels->sum('unread');
+    $pageContext = ($contextType && $contextId) ? $this->getContextBreadcrumb() : null;
   @endphp
 
   <!-- Single terminal container — status bar always peeks out -->
@@ -51,6 +54,8 @@
                 {{ $preview['initials'] ?? '?' }}
               @endif
             </div>
+          @elseif($preview['_type'] === 'context')
+            <span class="text-[10px]">{{ $preview['context_icon'] ?? '📎' }}</span>
           @else
             <span class="text-[10px] text-amber-500">{{ $preview['icon'] ?? '#' }}</span>
           @endif
@@ -61,6 +66,20 @@
           @endif
         </button>
       @endforeach
+
+      {{-- Page context indicator — shows current page entity, click opens context channel --}}
+      @if($pageContext)
+        <div class="w-px h-4 bg-[var(--ui-border)]/40 flex-shrink-0"></div>
+        <button
+          wire:click="openTerminal"
+          @click="if(!open) toggle()"
+          class="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] flex-shrink-0 border border-[var(--ui-border)]/40 text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:border-[var(--ui-primary)]/30 hover:bg-[var(--ui-primary-5)] transition cursor-pointer"
+          title="Diskussion zu {{ $pageContext['label'] }}: {{ $pageContext['title'] }}"
+        >
+          <span class="text-[10px]">{{ $pageContext['icon'] }}</span>
+          <span class="truncate max-w-[120px]">{{ $pageContext['title'] }}</span>
+        </button>
+      @endif
 
       {{-- Chevron — click toggles open/close --}}
       <button @click="toggle()" class="ml-auto flex-shrink-0 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition cursor-pointer p-1 -mr-1 rounded hover:bg-[var(--ui-surface-hover)]">
@@ -122,6 +141,33 @@
           </div>
         </div>
 
+        <!-- Context Channels Section -->
+        @if(! empty($this->channels['context']))
+        <div class="px-2 mb-3" x-data="{ contextOpen: true }">
+          <button @click="contextOpen = !contextOpen" class="w-full flex items-center justify-between px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">
+            <span>Kontexte</span>
+            <svg class="w-3 h-3 transition-transform duration-150" :class="contextOpen ? '' : '-rotate-90'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+            </svg>
+          </button>
+          <div x-show="contextOpen" x-collapse class="mt-0.5 space-y-px">
+            @foreach($this->channels['context'] as $ctx)
+              <button
+                wire:click="openChannel({{ $ctx['id'] }})"
+                class="w-full flex items-center gap-2 px-1.5 py-1.5 rounded-md text-xs transition
+                  {{ $channelId === $ctx['id'] ? 'bg-[var(--ui-primary-5)] text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)]' }}"
+              >
+                <span class="text-[11px] flex-shrink-0">{{ $ctx['context_icon'] ?? '📎' }}</span>
+                <span class="truncate flex-1 text-left">{{ $ctx['name'] }}</span>
+                @if($ctx['unread'] > 0)
+                  <span class="w-4 h-4 rounded-full bg-[var(--ui-primary)] text-white text-[9px] flex items-center justify-center flex-shrink-0">{{ $ctx['unread'] > 9 ? '9+' : $ctx['unread'] }}</span>
+                @endif
+              </button>
+            @endforeach
+          </div>
+        </div>
+        @endif
+
         <!-- Channels Section -->
         <div class="px-2" x-data="{ channelsOpen: true }">
           <button @click="channelsOpen = !channelsOpen" class="w-full flex items-center justify-between px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">
@@ -165,9 +211,20 @@
                 @endif
               </div>
               <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $this->activeChannel['name'] }}</span>
+            @elseif($this->activeChannel['type'] === 'context' && ! empty($this->activeChannel['context']))
+              <span class="text-[14px]">{{ $this->activeChannel['context']['icon'] }}</span>
+              <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $this->activeChannel['context']['label'] }}</span>
             @else
               <span class="text-[var(--ui-muted)] font-bold text-[14px]">{{ $this->activeChannel['icon'] ?? '#' }}</span>
               <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $this->activeChannel['name'] ?? 'Kontext' }}</span>
+            @endif
+            @if(! empty($this->activeChannel['context']))
+              <span class="text-[var(--ui-muted)]">&middot;</span>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--ui-primary-5)] text-[10px] text-[var(--ui-primary)] font-medium">
+                <span>{{ $this->activeChannel['context']['icon'] }}</span>
+                <span>{{ $this->activeChannel['context']['label'] }}:</span>
+                <span class="font-semibold">{{ $this->activeChannel['context']['title'] }}</span>
+              </span>
             @endif
             @if($this->activeChannel['member_count'] > 0)
               <span class="text-[var(--ui-muted)]">&middot;</span>
@@ -181,8 +238,26 @@
               @endif
             @endif
 
-            {{-- Channel actions (delete / leave) --}}
+            {{-- Channel actions (delete / leave / context actions) --}}
             <div class="ml-auto flex items-center gap-1">
+              {{-- Context channel: files + tagging buttons --}}
+              @if(! empty($this->activeChannel['context']))
+                <button
+                  wire:click="dispatchFilesContext"
+                  class="text-[10px] text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition px-1.5 py-0.5 rounded hover:bg-[var(--ui-primary-5)]"
+                  title="Dateien"
+                >
+                  <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.52 9.52l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.242z" clip-rule="evenodd"/></svg>
+                </button>
+                <button
+                  wire:click="dispatchTaggingContext"
+                  class="text-[10px] text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition px-1.5 py-0.5 rounded hover:bg-[var(--ui-primary-5)]"
+                  title="Tags & Farben"
+                >
+                  <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.5 3A2.5 2.5 0 003 5.5v2.879a2.5 2.5 0 00.732 1.767l6.5 6.5a2.5 2.5 0 003.536 0l2.878-2.878a2.5 2.5 0 000-3.536l-6.5-6.5A2.5 2.5 0 008.38 3H5.5zM6 7a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
+                </button>
+                <div class="w-px h-4 bg-[var(--ui-border)]/40"></div>
+              @endif
               @if($this->activeChannel['type'] === 'channel')
                 @if(! empty($this->activeChannel['can_delete']))
                   <button

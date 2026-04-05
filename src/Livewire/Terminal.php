@@ -26,6 +26,9 @@ class Terminal extends Component
 
     public ?string $contextType = null;
     public ?int $contextId = null;
+    public ?string $contextSubject = null;
+    public ?string $contextSource = null;
+    public array $contextMeta = [];
     public ?int $channelId = null;
     public $pendingFiles = [];
 
@@ -51,15 +54,64 @@ class Terminal extends Component
 
     // ── Context Channel ────────────────────────────────────────
 
+    /**
+     * Receive context from modules via dispatch('comms', {...}).
+     * Every module dispatches this in rendered() — this is the platform-standard way
+     * to share page context with global components (formerly ModalComms, now Terminal).
+     *
+     * Payload: model, modelId, subject, description, url, source, recipients, capabilities, meta
+     */
+    #[On('comms')]
+    public function setCommsContext(array $payload = []): void
+    {
+        $model = $payload['model'] ?? null;
+        $modelId = $payload['modelId'] ?? null;
+
+        // Only set context when we have a concrete entity (not dashboards/index pages)
+        if (! $model || ! $modelId) {
+            $this->contextType = null;
+            $this->contextId = null;
+
+            return;
+        }
+
+        $this->contextType = $model;
+        $this->contextId = (int) $modelId;
+        $this->contextSubject = $payload['subject'] ?? null;
+        $this->contextSource = $payload['source'] ?? null;
+        $this->contextMeta = $payload['meta'] ?? [];
+    }
+
+    /**
+     * Direct context set (for explicit terminal targeting from other components).
+     */
     #[On('terminal:set-context')]
     public function setContext(array $payload = []): void
     {
         $this->contextType = $payload['context_type'] ?? null;
         $this->contextId = isset($payload['context_id']) ? (int) $payload['context_id'] : null;
+        $this->contextSubject = $payload['subject'] ?? null;
+        $this->contextSource = $payload['source'] ?? null;
+    }
 
+    /**
+     * Open the terminal panel and switch to the current context channel.
+     * Usage: $dispatch('terminal:open') — opens terminal with current page context.
+     */
+    #[On('terminal:open')]
+    public function openTerminal(array $payload = []): void
+    {
+        // Optionally set context if provided
+        if (! empty($payload['context_type']) && ! empty($payload['context_id'])) {
+            $this->setContext($payload);
+        }
+
+        // Resolve context channel if we have a context
         if ($this->contextType && $this->contextId) {
             $this->resolveContextChannel();
         }
+
+        $this->dispatch('toggle-terminal-open');
     }
 
     protected function resolveContextChannel(): void
@@ -84,6 +136,99 @@ class Terminal extends Component
 
         $this->channelId = $channel->id;
         $this->ensureMembership($channel);
+    }
+
+    /**
+     * Resolve a human-readable breadcrumb for a context channel.
+     * Uses contextSubject from comms event when available, falls back to model lookup.
+     */
+    public function getContextBreadcrumb(?string $contextType = null, ?int $contextId = null, ?string $subject = null): ?array
+    {
+        $contextType = $contextType ?? $this->contextType;
+        $contextId = $contextId ?? $this->contextId;
+
+        if (! $contextType || ! $contextId) {
+            return null;
+        }
+
+        $shortName = class_basename($contextType);
+
+        // Icon map for known model types
+        $iconMap = [
+            'Ticket' => '🎫', 'HelpdeskTicket' => '🎫',
+            'Contact' => '👤', 'CrmContact' => '👤',
+            'Company' => '🏢', 'CrmCompany' => '🏢',
+            'Project' => '📋', 'PlannerProject' => '📋',
+            'Applicant' => '📄', 'RecruitingApplicant' => '📄',
+            'Deal' => '💰',
+            'PlannerTask' => '✅', 'Task' => '✅',
+            'Invoice' => '🧾',
+            'PatientsPatient' => '🏥',
+            'PcCanvas' => '🎨',
+        ];
+
+        $icon = $iconMap[$shortName] ?? '📎';
+
+        // Use provided subject or contextSubject, else try model lookup
+        $title = $subject ?? $this->contextSubject;
+
+        if (! $title) {
+            try {
+                if (class_exists($contextType)) {
+                    $model = $contextType::find($contextId);
+                    if ($model) {
+                        $title = $model->name ?? $model->title ?? $model->subject ?? null;
+                        if (isset($model->number)) {
+                            $title = "#{$model->number} " . ($title ?? '');
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        $title = $title ?: "#{$contextId}";
+
+        return [
+            'label' => $shortName,
+            'title' => \Illuminate\Support\Str::limit($title, 50),
+            'icon' => $icon,
+            'context_type' => $contextType,
+            'context_id' => $contextId,
+        ];
+    }
+
+    /**
+     * Dispatch context to ModalFiles — open file manager for current context.
+     */
+    public function dispatchFilesContext(): void
+    {
+        $channel = $this->channelId ? TerminalChannel::find($this->channelId) : null;
+        if (! $channel || ! $channel->context_type || ! $channel->context_id) {
+            return;
+        }
+
+        $this->dispatch('files', [
+            'context_type' => $channel->context_type,
+            'context_id' => $channel->context_id,
+        ]);
+        $this->dispatch('files:open');
+    }
+
+    /**
+     * Dispatch context to ModalTagging — open tagging for current context.
+     */
+    public function dispatchTaggingContext(): void
+    {
+        $channel = $this->channelId ? TerminalChannel::find($this->channelId) : null;
+        if (! $channel || ! $channel->context_type || ! $channel->context_id) {
+            return;
+        }
+
+        $this->dispatch('tagging', [
+            'context_type' => $channel->context_type,
+            'context_id' => $channel->context_id,
+        ]);
+        $this->dispatch('tagging:open');
     }
 
     // ── Open / Switch Channel ──────────────────────────────────
@@ -628,6 +773,11 @@ class Terminal extends Component
             } elseif ($ch->type === 'channel') {
                 $channels[] = $item;
             } else {
+                // Context channels — resolve breadcrumb from model
+                $breadcrumb = $this->getContextBreadcrumb($ch->context_type, $ch->context_id);
+                $item['name'] = $item['name'] ?: ($breadcrumb ? "{$breadcrumb['label']}: {$breadcrumb['title']}" : 'Kontext');
+                $item['context_label'] = $breadcrumb['label'] ?? 'Kontext';
+                $item['context_icon'] = $breadcrumb['icon'] ?? '📎';
                 $context[] = $item;
             }
         }
@@ -727,6 +877,15 @@ class Terminal extends Component
             ->where('user_id', auth()->id())
             ->where('role', 'owner')
             ->exists();
+
+        // Context breadcrumb for context channels
+        $data['context'] = null;
+        if ($channel->isContext()) {
+            $data['context'] = $this->getContextBreadcrumb(
+                $channel->context_type,
+                $channel->context_id,
+            );
+        }
 
         return $data;
     }
