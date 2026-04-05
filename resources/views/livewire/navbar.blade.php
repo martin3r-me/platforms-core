@@ -16,6 +16,13 @@
                         <span class="text-xs text-gray-500 dark:text-gray-500 truncate max-w-[8rem]">{{ $teamName }}</span>
                     @endif
                 </button>
+
+                <button type="button"
+                    class="border-0 bg-transparent cursor-pointer flex items-center p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    @click="$dispatch('open-help', { module: '{{ $currentModuleKey }}' })"
+                    title="Hilfe">
+                    @svg('heroicon-o-question-mark-circle', 'w-5 h-5 text-gray-500 dark:text-gray-400')
+                </button>
             @endauth
 
             @guest

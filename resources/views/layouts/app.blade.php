@@ -46,6 +46,7 @@
     @livewire('core.modal-counters')
     @livewire('core.modal-pricing')
     @livewire('core.modal-modules')
+    @livewire('core.modal-help')
     @if(class_exists(\Platform\Crm\Livewire\ModalComms::class))
       @livewire('crm.modal-comms')
     @endif
