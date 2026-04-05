@@ -175,6 +175,7 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Console\Commands\MakeToolCommand::class,
                 \Platform\Core\Console\Commands\AutoFillExtraFieldsCommand::class,
                 \Platform\Core\Console\Commands\CreateMcpClientCommand::class,
+                \Platform\Core\Console\Commands\CleanupTerminalChannelsCommand::class,
             ]);
         }
 
