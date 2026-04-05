@@ -31,7 +31,7 @@
         </div>
     </x-slot>
 
-    <div class="flex gap-0 -mx-6 -my-4 min-h-[60vh]">
+    <div class="flex gap-0 -mx-6 -my-4 h-[65vh]">
         {{-- Sidebar --}}
         <div class="w-56 flex-shrink-0 border-r border-[var(--ui-border)]/60 overflow-y-auto bg-[var(--ui-muted-5)]/30 py-4 px-3 hidden sm:block">
             @forelse($tree as $module)
