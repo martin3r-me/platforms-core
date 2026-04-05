@@ -18,7 +18,7 @@
 
   <!-- Single terminal container — status bar always peeks out -->
   <div
-    class="w-full border-t border-[var(--ui-border)] bg-[var(--ui-surface)]/95 backdrop-blur overflow-hidden flex flex-col"
+    class="w-full border-t-2 border-[var(--ui-border)] bg-[var(--ui-surface)]/95 backdrop-blur overflow-hidden flex flex-col"
     :class="resizing ? '' : 'transition-all duration-200 ease-out'"
     x-bind:style="open ? 'height: ' + panelHeight + 'px' : 'height: 36px'"
     wire:key="terminal-slide"
@@ -801,6 +801,10 @@
             localStorage.setItem(STORAGE_KEY, this.panelHeight);
             document.removeEventListener('mousemove', onMove);
             document.removeEventListener('mouseup', onUp);
+            this.$nextTick(() => {
+              const c = this.$refs.body;
+              if (c) c.scrollTop = c.scrollHeight;
+            });
           };
 
           document.addEventListener('mousemove', onMove);
