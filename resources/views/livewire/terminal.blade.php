@@ -7,9 +7,10 @@
   wire:key="terminal-root"
 >
   @php
+    $contextItems = collect($this->channels['context_groups'])->flatMap(fn($g) => $g['items']);
     $allChannels = collect($this->channels['dms'])->map(fn($c) => array_merge($c, ['_type' => 'dm']))
       ->merge(collect($this->channels['channels'])->map(fn($c) => array_merge($c, ['_type' => 'channel'])))
-      ->merge(collect($this->channels['context'])->map(fn($c) => array_merge($c, ['_type' => 'context'])))
+      ->merge($contextItems->map(fn($c) => array_merge($c, ['_type' => 'context'])))
       ->filter(fn($c) => $c['unread'] > 0)
       ->sortByDesc('unread');
     $totalUnread = $allChannels->sum('unread');
@@ -153,23 +154,25 @@
           </div>
         </div>
 
-        <!-- Context Channels Section -->
-        @if(! empty($this->channels['context']))
-        <div class="px-2 mb-3" x-data="{ contextOpen: true }">
-          <button @click="contextOpen = !contextOpen" class="w-full flex items-center justify-between px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">
-            <span>Kontexte</span>
-            <svg class="w-3 h-3 transition-transform duration-150" :class="contextOpen ? '' : '-rotate-90'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+        <!-- Context Channels — grouped by type -->
+        @foreach($this->channels['context_groups'] as $groupKey => $group)
+        <div class="px-2 mb-3" x-data="{ open: true }">
+          <button @click="open = !open" class="w-full flex items-center justify-between px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">
+            <span class="flex items-center gap-1">
+              <span class="text-[10px]">{{ $group['icon'] }}</span>
+              {{ $group['label'] }}
+            </span>
+            <svg class="w-3 h-3 transition-transform duration-150" :class="open ? '' : '-rotate-90'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
             </svg>
           </button>
-          <div x-show="contextOpen" x-collapse class="mt-0.5 space-y-px">
-            @foreach($this->channels['context'] as $ctx)
+          <div x-show="open" x-collapse class="mt-0.5 space-y-px">
+            @foreach($group['items'] as $ctx)
               <button
                 wire:click="openChannel({{ $ctx['id'] }})"
                 class="w-full flex items-center gap-2 px-1.5 py-1.5 rounded-md text-xs transition
                   {{ $channelId === $ctx['id'] ? 'bg-[var(--ui-primary-5)] text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)]' }}"
               >
-                <span class="text-[11px] flex-shrink-0">{{ $ctx['context_icon'] ?? '📎' }}</span>
                 <span class="truncate flex-1 text-left">{{ $ctx['name'] }}</span>
                 @if($ctx['unread'] > 0)
                   <span class="w-4 h-4 rounded-full bg-[var(--ui-primary)] text-white text-[9px] flex items-center justify-center flex-shrink-0">{{ $ctx['unread'] > 9 ? '9+' : $ctx['unread'] }}</span>
@@ -178,7 +181,7 @@
             @endforeach
           </div>
         </div>
-        @endif
+        @endforeach
 
         <!-- Channels Section -->
         <div class="px-2" x-data="{ channelsOpen: true }">

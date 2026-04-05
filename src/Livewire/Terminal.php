@@ -722,7 +722,7 @@ class Terminal extends Component
     {
         $teamId = $this->teamId();
         if (! $teamId) {
-            return ['dms' => [], 'channels' => [], 'context' => []];
+            return ['dms' => [], 'channels' => [], 'context_groups' => []];
         }
 
         $userId = auth()->id();
@@ -734,7 +734,39 @@ class Terminal extends Component
 
         $dms = [];
         $channels = [];
-        $context = [];
+        $contextGroups = [];
+
+        // Label map for context type group names
+        $groupLabelMap = [
+            'PlannerTask' => 'Tasks', 'Task' => 'Tasks',
+            'PlannerProject' => 'Projekte', 'Project' => 'Projekte',
+            'HelpdeskTicket' => 'Tickets', 'Ticket' => 'Tickets',
+            'CrmContact' => 'Kontakte', 'Contact' => 'Kontakte',
+            'CrmCompany' => 'Unternehmen', 'Company' => 'Unternehmen',
+            'Deal' => 'Deals',
+            'RecruitingApplicant' => 'Bewerber', 'Applicant' => 'Bewerber',
+            'PatientsPatient' => 'Patienten',
+            'NotesNote' => 'Notizen',
+            'NotesFolder' => 'Ordner',
+            'Invoice' => 'Rechnungen',
+            'PcCanvas' => 'Canvas',
+        ];
+
+        // Icon map (reuse from getContextBreadcrumb)
+        $iconMap = [
+            'Ticket' => '🎫', 'HelpdeskTicket' => '🎫',
+            'Contact' => '👤', 'CrmContact' => '👤',
+            'Company' => '🏢', 'CrmCompany' => '🏢',
+            'Project' => '📋', 'PlannerProject' => '📋',
+            'Applicant' => '📄', 'RecruitingApplicant' => '📄',
+            'Deal' => '💰',
+            'PlannerTask' => '✅', 'Task' => '✅',
+            'Invoice' => '🧾',
+            'PatientsPatient' => '🏥',
+            'PcCanvas' => '🎨',
+            'NotesNote' => '📝',
+            'NotesFolder' => '📁',
+        ];
 
         foreach ($memberships as $membership) {
             $ch = $membership->channel;
@@ -752,6 +784,8 @@ class Terminal extends Component
                 $unread = $ch->message_count;
             }
 
+            $lastTimestamp = $ch->lastMessage?->created_at?->timestamp ?? 0;
+
             $item = [
                 'id' => $ch->id,
                 'name' => $ch->name,
@@ -762,6 +796,7 @@ class Terminal extends Component
                     ? \Illuminate\Support\Str::limit($ch->lastMessage->body_plain, 40)
                     : null,
                 'last_at' => $ch->lastMessage?->created_at?->diffForHumans(short: true),
+                'last_timestamp' => $lastTimestamp,
             ];
 
             // For DMs, resolve the other participant's name + avatar
@@ -777,21 +812,46 @@ class Terminal extends Component
             } elseif ($ch->type === 'channel') {
                 $channels[] = $item;
             } else {
-                // Context channels — resolve breadcrumb from model
+                // Context channels — resolve breadcrumb and group by type
                 $breadcrumb = $this->getContextBreadcrumb($ch->context_type, $ch->context_id);
                 $item['name'] = $item['name'] ?: ($breadcrumb ? "{$breadcrumb['label']}: {$breadcrumb['title']}" : 'Kontext');
                 $item['context_label'] = $breadcrumb['label'] ?? 'Kontext';
                 $item['context_icon'] = $breadcrumb['icon'] ?? '📎';
-                $context[] = $item;
+
+                $shortName = class_basename($ch->context_type ?? '');
+                $groupKey = \Illuminate\Support\Str::snake($shortName);
+
+                if (! isset($contextGroups[$groupKey])) {
+                    $contextGroups[$groupKey] = [
+                        'label' => $groupLabelMap[$shortName] ?? $shortName,
+                        'icon' => $iconMap[$shortName] ?? '📎',
+                        'items' => [],
+                        'newest_timestamp' => 0,
+                    ];
+                }
+
+                $contextGroups[$groupKey]['items'][] = $item;
+                if ($lastTimestamp > $contextGroups[$groupKey]['newest_timestamp']) {
+                    $contextGroups[$groupKey]['newest_timestamp'] = $lastTimestamp;
+                }
             }
         }
 
-        // Sort by last activity (unreads first, then recency)
-        $sort = fn ($a, $b) => $b['unread'] <=> $a['unread'] ?: ($b['last_at'] ?? '') <=> ($a['last_at'] ?? '');
+        // Sort DMs and channels: unreads first, then by last_timestamp DESC
+        $sort = fn ($a, $b) => $b['unread'] <=> $a['unread'] ?: $b['last_timestamp'] <=> $a['last_timestamp'];
         usort($dms, $sort);
         usort($channels, $sort);
 
-        return compact('dms', 'channels', 'context');
+        // Sort items within each context group by last_timestamp DESC
+        foreach ($contextGroups as &$group) {
+            usort($group['items'], fn ($a, $b) => $b['last_timestamp'] <=> $a['last_timestamp']);
+        }
+        unset($group);
+
+        // Sort context groups by newest_timestamp DESC
+        uasort($contextGroups, fn ($a, $b) => $b['newest_timestamp'] <=> $a['newest_timestamp']);
+
+        return ['dms' => $dms, 'channels' => $channels, 'context_groups' => $contextGroups];
     }
 
     #[Computed]
