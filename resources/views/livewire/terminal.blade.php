@@ -40,9 +40,8 @@
       wire:key="terminal-statusbar"
     >
       {{-- Terminal icon + label + unread badge — click toggles open/close --}}
-      <div class="flex items-center gap-3 mr-1 flex-shrink-0 cursor-pointer text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition-colors" @click.stop="toggle()">
+      <div class="flex items-center gap-1.5 mr-1 flex-shrink-0 cursor-pointer text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition-colors" @click.stop="toggle()">
         @svg('heroicon-o-command-line', 'w-5 h-5')
-        <span class="text-sm font-medium">Terminal</span>
         @if($totalUnread > 0)
           <span class="min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">{{ $totalUnread > 99 ? '99+' : $totalUnread }}</span>
         @endif
