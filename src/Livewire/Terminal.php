@@ -169,8 +169,11 @@ class Terminal extends Component
 
         $icon = $iconMap[$shortName] ?? '📎';
 
-        // Use provided subject or contextSubject, else try model lookup
-        $title = $subject ?? $this->contextSubject;
+        // Use provided subject, or contextSubject only if this IS the current page context
+        $title = $subject;
+        if (! $title && $contextType === $this->contextType && $contextId === $this->contextId) {
+            $title = $this->contextSubject;
+        }
 
         if (! $title) {
             try {
