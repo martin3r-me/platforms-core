@@ -80,6 +80,17 @@ class Terminal extends Component
         $this->contextSubject = $payload['subject'] ?? null;
         $this->contextSource = $payload['source'] ?? null;
         $this->contextMeta = $payload['meta'] ?? [];
+
+        // Persist subject on existing context channel so sidebar always shows the real name
+        if ($this->contextSubject) {
+            $teamId = $this->teamId();
+            if ($teamId) {
+                TerminalChannel::forTeam($teamId)
+                    ->forContext($this->contextType, $this->contextId)
+                    ->where(fn ($q) => $q->whereNull('name')->orWhere('name', '!=', $this->contextSubject))
+                    ->update(['name' => $this->contextSubject]);
+            }
+        }
     }
 
     /**
@@ -131,7 +142,10 @@ class Terminal extends Component
                 'type' => 'context',
                 'context_type' => $this->contextType,
                 'context_id' => $this->contextId,
+                'name' => $this->contextSubject,
             ]);
+        } elseif ($this->contextSubject && $channel->name !== $this->contextSubject) {
+            $channel->update(['name' => $this->contextSubject]);
         }
 
         $this->channelId = $channel->id;
@@ -814,7 +828,8 @@ class Terminal extends Component
             } else {
                 // Context channels — resolve breadcrumb and group by type
                 $breadcrumb = $this->getContextBreadcrumb($ch->context_type, $ch->context_id);
-                $item['name'] = $item['name'] ?: ($breadcrumb ? "{$breadcrumb['label']}: {$breadcrumb['title']}" : 'Kontext');
+                // Prefer persisted name, fall back to breadcrumb title (no type prefix — group header shows type)
+                $item['name'] = $item['name'] ?: ($breadcrumb['title'] ?? 'Kontext');
                 $item['context_label'] = $breadcrumb['label'] ?? 'Kontext';
                 $item['context_icon'] = $breadcrumb['icon'] ?? '📎';
 
