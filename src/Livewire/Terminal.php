@@ -194,7 +194,7 @@ class Terminal extends Component
                 if (class_exists($contextType)) {
                     $model = $contextType::find($contextId);
                     if ($model) {
-                        $title = $model->name ?? $model->title ?? $model->subject ?? null;
+                        $title = $model->display_name ?? $model->name ?? $model->title ?? $model->subject ?? null;
                         if (isset($model->number)) {
                             $title = "#{$model->number} " . ($title ?? '');
                         }
