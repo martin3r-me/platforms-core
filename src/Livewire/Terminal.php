@@ -414,6 +414,7 @@ class Terminal extends Component
             }
         }
 
+        // Context channels: any member can delete (will be recreated on demand)
         // DMs: just remove membership (don't delete the channel for the other user)
         if ($channel->isDm()) {
             TerminalChannelMember::where('channel_id', $channel->id)
