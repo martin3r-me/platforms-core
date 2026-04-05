@@ -18,7 +18,7 @@
 
   <!-- Single terminal container — status bar always peeks out -->
   <div
-    class="w-full border-t border-[var(--ui-border)]/60 bg-[var(--ui-surface)]/95 backdrop-blur overflow-hidden flex flex-col"
+    class="w-full border-t border-[var(--ui-border)] bg-[var(--ui-surface)]/95 backdrop-blur overflow-hidden flex flex-col"
     :class="resizing ? '' : 'transition-all duration-200 ease-out'"
     x-bind:style="open ? 'height: ' + panelHeight + 'px' : 'height: 36px'"
     wire:key="terminal-slide"
