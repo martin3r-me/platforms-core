@@ -18,10 +18,21 @@
 
   <!-- Single terminal container — status bar always peeks out -->
   <div
-    class="w-full border-t border-[var(--ui-border)]/60 bg-[var(--ui-surface)]/95 backdrop-blur overflow-hidden flex flex-col transition-all duration-200 ease-out"
-    x-bind:style="open ? 'height: 20rem; max-height: 50vh' : 'height: 36px'"
+    class="w-full border-t border-[var(--ui-border)]/60 bg-[var(--ui-surface)]/95 backdrop-blur overflow-hidden flex flex-col"
+    :class="resizing ? '' : 'transition-all duration-200 ease-out'"
+    x-bind:style="open ? 'height: ' + panelHeight + 'px' : 'height: 36px'"
     wire:key="terminal-slide"
   >
+    <!-- Resize handle — only visible when open -->
+    <div
+      x-show="open"
+      @mousedown.prevent="startResize($event)"
+      class="h-1 flex-shrink-0 cursor-ns-resize group/resize relative -mb-1 z-10"
+    >
+      <div class="absolute inset-x-0 top-0 h-px bg-transparent group-hover/resize:bg-[var(--ui-primary)]/40 transition"></div>
+      <div class="absolute left-1/2 -translate-x-1/2 top-0 w-8 h-1 rounded-full bg-transparent group-hover/resize:bg-[var(--ui-primary)]/30 transition"></div>
+    </div>
+
     <!-- Status bar — always visible (36px) -->
     <div
       class="h-9 flex-shrink-0 px-3 flex items-center gap-1.5 overflow-x-auto scrollbar-none select-none group/bar border-b border-[var(--ui-border)]/40"
@@ -760,10 +771,48 @@
 
   <script>
     function terminalShell(){
+      const STORAGE_KEY = 'terminal_panel_height';
+      const MIN_HEIGHT = 200;
+      const MAX_RATIO = 0.7; // max 70% of viewport
+      const DEFAULT_HEIGHT = 320;
+
       return {
+        panelHeight: parseInt(localStorage.getItem(STORAGE_KEY)) || DEFAULT_HEIGHT,
+        resizing: false,
+        _startY: 0,
+        _startH: 0,
+
         get open(){ return Alpine?.store('page')?.terminalOpen ?? false; },
         toggle(){ if(Alpine?.store('page')) Alpine.store('page').terminalOpen = !Alpine.store('page').terminalOpen; },
+
+        startResize(e) {
+          this.resizing = true;
+          this._startY = e.clientY;
+          this._startH = this.panelHeight;
+
+          const onMove = (ev) => {
+            const delta = this._startY - ev.clientY; // dragging up = bigger
+            const maxH = Math.floor(window.innerHeight * MAX_RATIO);
+            this.panelHeight = Math.max(MIN_HEIGHT, Math.min(maxH, this._startH + delta));
+          };
+
+          const onUp = () => {
+            this.resizing = false;
+            localStorage.setItem(STORAGE_KEY, this.panelHeight);
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+          };
+
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        },
+
         init(){
+          // Clamp stored height to current viewport
+          const maxH = Math.floor(window.innerHeight * MAX_RATIO);
+          if (this.panelHeight > maxH) this.panelHeight = maxH;
+          if (this.panelHeight < MIN_HEIGHT) this.panelHeight = DEFAULT_HEIGHT;
+
           const scrollBottom = () => {
             this.$nextTick(() => {
               const c = this.$refs.body;
