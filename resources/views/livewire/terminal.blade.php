@@ -106,8 +106,18 @@
     <div class="flex-1 min-h-0 flex"
          wire:key="terminal-content">
 
-      <!-- Sidebar (240px) -->
-      <div class="w-[240px] flex-shrink-0 border-r border-[var(--ui-border)]/60 overflow-y-auto overscroll-contain py-2 flex flex-col" wire:key="terminal-sidebar">
+      <!-- Sidebar (resizable) -->
+      <div class="flex-shrink-0 border-r border-[var(--ui-border)]/60 overflow-y-auto overscroll-contain py-2 flex flex-col relative"
+           :style="'width: ' + sidebarWidth + 'px'"
+           :class="resizingSidebar ? '' : 'transition-[width] duration-0'"
+           wire:key="terminal-sidebar">
+        <!-- Sidebar resize handle -->
+        <div
+          @mousedown.prevent="startSidebarResize($event)"
+          class="absolute top-0 right-0 w-1 h-full cursor-ew-resize group/sresize z-10"
+        >
+          <div class="absolute inset-y-0 right-0 w-px bg-transparent group-hover/sresize:bg-[var(--ui-primary)]/40 transition"></div>
+        </div>
 
         <!-- New Chat / Channel buttons -->
         <div class="px-2 mb-2 flex gap-1">
@@ -776,13 +786,19 @@
   <script>
     function terminalShell(){
       const STORAGE_KEY = 'terminal_panel_height';
+      const SIDEBAR_STORAGE_KEY = 'terminal_sidebar_width';
       const MIN_HEIGHT = 200;
       const MAX_RATIO = 0.7; // max 70% of viewport
       const DEFAULT_HEIGHT = 320;
+      const MIN_SIDEBAR = 180;
+      const MAX_SIDEBAR = 400;
+      const DEFAULT_SIDEBAR = 240;
 
       return {
         panelHeight: parseInt(localStorage.getItem(STORAGE_KEY)) || DEFAULT_HEIGHT,
+        sidebarWidth: parseInt(localStorage.getItem(SIDEBAR_STORAGE_KEY)) || DEFAULT_SIDEBAR,
         resizing: false,
+        resizingSidebar: false,
         _startY: 0,
         _startH: 0,
 
@@ -815,11 +831,36 @@
           document.addEventListener('mouseup', onUp);
         },
 
+        startSidebarResize(e) {
+          this.resizingSidebar = true;
+          const startX = e.clientX;
+          const startW = this.sidebarWidth;
+
+          const onMove = (ev) => {
+            const delta = ev.clientX - startX;
+            this.sidebarWidth = Math.max(MIN_SIDEBAR, Math.min(MAX_SIDEBAR, startW + delta));
+          };
+
+          const onUp = () => {
+            this.resizingSidebar = false;
+            localStorage.setItem(SIDEBAR_STORAGE_KEY, this.sidebarWidth);
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+          };
+
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        },
+
         init(){
           // Clamp stored height to current viewport
           const maxH = Math.floor(window.innerHeight * MAX_RATIO);
           if (this.panelHeight > maxH) this.panelHeight = maxH;
           if (this.panelHeight < MIN_HEIGHT) this.panelHeight = DEFAULT_HEIGHT;
+
+          // Clamp stored sidebar width
+          if (this.sidebarWidth > MAX_SIDEBAR) this.sidebarWidth = MAX_SIDEBAR;
+          if (this.sidebarWidth < MIN_SIDEBAR) this.sidebarWidth = DEFAULT_SIDEBAR;
 
           const scrollBottom = () => {
             this.$nextTick(() => {
