@@ -117,6 +117,7 @@
           class="absolute top-0 right-0 w-1 h-full cursor-ew-resize group/sresize z-10"
         >
           <div class="absolute inset-y-0 right-0 w-px bg-transparent group-hover/sresize:bg-[var(--ui-primary)]/40 transition"></div>
+          <div class="absolute top-1/2 -translate-y-1/2 right-0 h-8 w-1 rounded-full bg-transparent group-hover/sresize:bg-[var(--ui-primary)]/30 transition"></div>
         </div>
 
         <!-- New Chat / Channel buttons -->
