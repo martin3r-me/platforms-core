@@ -71,18 +71,20 @@
                                         {{ $section['title'] }}
                                     </button>
                                 @elseif($section['type'] === 'group')
-                                    <div class="mt-1">
+                                    <div class="mt-1.5">
                                         <div class="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)]">
                                             {{ $section['title'] }}
                                         </div>
-                                        @foreach($section['pages'] as $page)
-                                            <button type="button"
-                                                wire:click="loadPage('{{ $module['key'] }}', '{{ $page['path'] }}')"
-                                                class="w-full text-left px-2 py-1 rounded text-xs transition-colors bg-transparent border-0 cursor-pointer truncate
-                                                    {{ $currentModule === $module['key'] && $currentPage === $page['path'] ? 'bg-[var(--ui-primary-5)] text-[var(--ui-primary)] font-medium' : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]' }}">
-                                                {{ $page['title'] }}
-                                            </button>
-                                        @endforeach
+                                        <div class="ml-3 space-y-0.5">
+                                            @foreach($section['pages'] as $page)
+                                                <button type="button"
+                                                    wire:click="loadPage('{{ $module['key'] }}', '{{ $page['path'] }}')"
+                                                    class="w-full text-left px-2 py-1 rounded text-xs transition-colors bg-transparent border-0 cursor-pointer truncate
+                                                        {{ $currentModule === $module['key'] && $currentPage === $page['path'] ? 'bg-[var(--ui-primary-5)] text-[var(--ui-primary)] font-medium' : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]' }}">
+                                                    {{ $page['title'] }}
+                                                </button>
+                                            @endforeach
+                                        </div>
                                     </div>
                                 @endif
                             @endforeach
