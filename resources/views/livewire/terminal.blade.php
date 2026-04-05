@@ -19,14 +19,13 @@
     x-bind:style="open ? 'height: 20rem; max-height: 50vh' : 'height: 36px'"
     wire:key="terminal-slide"
   >
-    <!-- Status bar — always visible (36px), clickable to toggle -->
+    <!-- Status bar — always visible (36px) -->
     <div
-      class="h-9 flex-shrink-0 px-3 flex items-center gap-1.5 overflow-x-auto scrollbar-none cursor-pointer select-none group/bar border-b border-[var(--ui-border)]/40"
-      @click="toggle()"
+      class="h-9 flex-shrink-0 px-3 flex items-center gap-1.5 overflow-x-auto scrollbar-none select-none group/bar border-b border-[var(--ui-border)]/40"
       wire:key="terminal-statusbar"
     >
-      {{-- Terminal icon + unread badge --}}
-      <div class="flex items-center gap-1.5 mr-1 flex-shrink-0">
+      {{-- Terminal icon + unread badge — click toggles open/close --}}
+      <div class="flex items-center gap-1.5 mr-1 flex-shrink-0 cursor-pointer" @click="toggle()">
         <svg class="w-3.5 h-3.5 text-[var(--ui-muted)] group-hover/bar:text-[var(--ui-primary)] transition" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 014.25 2h11.5A2.25 2.25 0 0118 4.25v8.5A2.25 2.25 0 0115.75 15h-3.105a3.501 3.501 0 001.1 1.677A.75.75 0 0113.26 18H6.74a.75.75 0 01-.484-1.323A3.501 3.501 0 007.355 15H4.25A2.25 2.25 0 012 12.75v-8.5zm1.5 0a.75.75 0 01.75-.75h11.5a.75.75 0 01.75.75v7.5a.75.75 0 01-.75.75H4.25a.75.75 0 01-.75-.75v-7.5z" clip-rule="evenodd"/></svg>
         @if($totalUnread > 0)
           <span class="min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">{{ $totalUnread > 99 ? '99+' : $totalUnread }}</span>
@@ -37,9 +36,13 @@
         <div class="w-px h-4 bg-[var(--ui-border)]/40 flex-shrink-0"></div>
       @endif
 
-      {{-- Unread channel pills --}}
+      {{-- Unread channel pills — click opens that channel + terminal --}}
       @foreach($allChannels as $preview)
-        <div class="flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] flex-shrink-0 bg-[var(--ui-primary-5)] text-[var(--ui-primary)] font-semibold">
+        <button
+          wire:click="openChannel({{ $preview['id'] }})"
+          @click="if(!open) toggle()"
+          class="flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] flex-shrink-0 bg-[var(--ui-primary-5)] text-[var(--ui-primary)] font-semibold hover:bg-[var(--ui-primary-10)] transition cursor-pointer"
+        >
           @if($preview['_type'] === 'dm')
             <div class="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center text-[8px] font-bold flex-shrink-0 overflow-hidden text-emerald-600">
               @if(! empty($preview['avatar']))
@@ -56,15 +59,15 @@
           @if($preview['last_message'])
             <span class="text-[10px] text-[var(--ui-muted)] truncate max-w-[120px] hidden sm:inline font-normal">{{ $preview['last_message'] }}</span>
           @endif
-        </div>
+        </button>
       @endforeach
 
-      {{-- Chevron --}}
-      <div class="ml-auto flex-shrink-0 text-[var(--ui-muted)] group-hover/bar:text-[var(--ui-body-color)] transition">
+      {{-- Chevron — click toggles open/close --}}
+      <button @click="toggle()" class="ml-auto flex-shrink-0 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition cursor-pointer p-1 -mr-1 rounded hover:bg-[var(--ui-surface-hover)]">
         <svg class="w-3 h-3 transition-transform duration-200" :class="open ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clip-rule="evenodd" />
         </svg>
-      </div>
+      </button>
     </div>
 
     <!-- Panel Content: Sidebar + Main -->
