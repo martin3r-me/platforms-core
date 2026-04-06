@@ -1028,6 +1028,7 @@
         resizing: false,
         resizingSidebar: false,
         typingUsers: {},
+        onlineUserIds: $wire.entangle('onlineUserIds'),
         _startY: 0,
         _startH: 0,
 
@@ -1040,7 +1041,7 @@
         },
 
         isOnline(userId) {
-          return ($wire.onlineUserIds || []).includes(Number(userId));
+          return (this.onlineUserIds || []).includes(Number(userId));
         },
 
         get open(){ return Alpine?.store('page')?.terminalOpen ?? false; },
