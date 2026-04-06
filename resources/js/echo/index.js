@@ -27,6 +27,12 @@ function init() {
         wssPort: port || 443,
         forceTLS: true,
         enabledTransports: ['ws', 'wss'],
+        authEndpoint: '/broadcasting/auth',
+        auth: {
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+            },
+        },
     });
 
     // Presence channel for online status
