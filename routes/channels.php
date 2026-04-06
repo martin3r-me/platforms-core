@@ -9,6 +9,10 @@ Broadcast::channel('terminal.channel.{channelId}', function ($user, $channelId) 
         ->exists();
 });
 
+Broadcast::channel('terminal.user.{userId}', function ($user, $userId) {
+    return (int) $user->id === (int) $userId;
+});
+
 Broadcast::channel('terminal.team.{teamId}', function ($user, $teamId) {
     if ($user->currentTeam?->id !== (int) $teamId) {
         return false;
