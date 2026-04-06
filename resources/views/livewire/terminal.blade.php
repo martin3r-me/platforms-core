@@ -176,7 +176,20 @@
               <div class="space-y-px">
                 <template x-for="result in searchResults" :key="result.id">
                   <button
-                    @click="$wire.openChannel(result.channel_id); clearSearch(); $nextTick(() => { const el = document.getElementById('msg-' + result.id); if(el) { el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('!bg-amber-100/30'); setTimeout(() => el.classList.remove('!bg-amber-100/30'), 2000); } })"
+                    @click="
+                      const msgId = result.id;
+                      clearSearch();
+                      $wire.openChannel(result.channel_id).then(() => {
+                        setTimeout(() => {
+                          const el = document.getElementById('msg-' + msgId);
+                          if(el) {
+                            el.scrollIntoView({behavior:'smooth',block:'center'});
+                            el.classList.add('!bg-amber-100/30');
+                            setTimeout(() => el.classList.remove('!bg-amber-100/30'), 2000);
+                          }
+                        }, 150);
+                      });
+                    "
                     class="w-full text-left px-1.5 py-2 rounded-md hover:bg-[var(--ui-surface-hover)] transition"
                   >
                     <div class="flex items-center gap-1.5 text-[10px] text-[var(--ui-muted)]">
