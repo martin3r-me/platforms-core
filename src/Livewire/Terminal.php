@@ -16,7 +16,6 @@ use Platform\Core\Models\User;
 use Platform\Core\Events\TerminalMessageSent;
 use Platform\Core\Events\TerminalReactionToggled;
 use Platform\Core\Services\ContextFileService;
-use Illuminate\Support\Facades\Cache;
 
 /**
  * Terminal UI shell with messaging, DMs, group channels, and context awareness.
@@ -34,6 +33,7 @@ class Terminal extends Component
     public ?int $channelId = null;
     public $pendingFiles = [];
     public ?int $editingMessageId = null;
+    public array $onlineUserIds = [];
 
     // ── Lifecycle ──────────────────────────────────────────────
 
@@ -1197,30 +1197,6 @@ class Terminal extends Component
         return $data;
     }
 
-    // ── Online Presence (cache-based) ───────────────────────────
-
-    public function heartbeat(): array
-    {
-        $teamId = $this->teamId();
-        if (! $teamId) {
-            return [];
-        }
-
-        $key = "terminal.presence.{$teamId}";
-        $presence = Cache::get($key, []);
-
-        // Register current user
-        $presence[auth()->id()] = now()->timestamp;
-
-        // Purge stale entries (>60s)
-        $cutoff = now()->timestamp - 60;
-        $presence = array_filter($presence, fn ($ts) => $ts > $cutoff);
-
-        Cache::put($key, $presence, 120);
-
-        return array_map('intval', array_keys($presence));
-    }
-
     // ── Echo Listeners (WebSocket real-time updates) ───────────
 
     public function getListeners(): array
@@ -1238,6 +1214,11 @@ class Terminal extends Component
                     $listeners["echo-private:terminal.channel.{$id},.message.sent"] = 'onMessageReceived';
                     $listeners["echo-private:terminal.channel.{$id},.reaction.toggled"] = 'onReactionToggled';
                 }
+
+                // Presence channel for online status
+                $listeners["echo-presence:terminal.team.{$teamId},here"] = 'onPresenceHere';
+                $listeners["echo-presence:terminal.team.{$teamId},joining"] = 'onPresenceJoining';
+                $listeners["echo-presence:terminal.team.{$teamId},leaving"] = 'onPresenceLeaving';
             }
         } catch (\Throwable $e) {
             // Fail silently — listeners will be re-registered on next render
@@ -1255,6 +1236,25 @@ class Terminal extends Component
     public function onReactionToggled($payload = null): void
     {
         unset($this->messages);
+    }
+
+    public function onPresenceHere($users): void
+    {
+        $this->onlineUserIds = collect($users)->pluck('id')->map(fn ($id) => (int) $id)->toArray();
+    }
+
+    public function onPresenceJoining($user): void
+    {
+        $id = (int) ($user['id'] ?? $user);
+        if (! in_array($id, $this->onlineUserIds)) {
+            $this->onlineUserIds[] = $id;
+        }
+    }
+
+    public function onPresenceLeaving($user): void
+    {
+        $id = (int) ($user['id'] ?? $user);
+        $this->onlineUserIds = array_values(array_filter($this->onlineUserIds, fn ($uid) => $uid !== $id));
     }
 
     // ── Render ─────────────────────────────────────────────────

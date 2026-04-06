@@ -1027,7 +1027,6 @@
         sidebarWidth: parseInt(localStorage.getItem(SIDEBAR_STORAGE_KEY)) || DEFAULT_SIDEBAR,
         resizing: false,
         resizingSidebar: false,
-        onlineUsers: [],
         typingUsers: {},
         _startY: 0,
         _startH: 0,
@@ -1041,7 +1040,7 @@
         },
 
         isOnline(userId) {
-          return this.onlineUsers.includes(Number(userId));
+          return ($wire.onlineUserIds || []).includes(Number(userId));
         },
 
         get open(){ return Alpine?.store('page')?.terminalOpen ?? false; },
@@ -1167,12 +1166,6 @@
             this.setupTypingListener({{ $channelId }});
           @endif
 
-          // Presence heartbeat: initial + every 30s
-          const refreshPresence = () => {
-            $wire.heartbeat().then(ids => { this.onlineUsers = ids; });
-          };
-          refreshPresence();
-          setInterval(refreshPresence, 30000);
         },
       };
     }
