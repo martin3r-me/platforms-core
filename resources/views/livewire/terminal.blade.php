@@ -211,6 +211,63 @@
         <!-- Channel lists (hidden during search) -->
         <div x-show="searchQuery.trim().length < 2" class="flex-1 min-h-0 overflow-y-auto">
 
+        <!-- Bookmarks toggle -->
+        <div class="px-2 mb-2" x-data="{ showBookmarks: false, bookmarks: [], loadingBookmarks: false }">
+          <button
+            @click="
+              showBookmarks = !showBookmarks;
+              if (showBookmarks && bookmarks.length === 0) {
+                loadingBookmarks = true;
+                $wire.getBookmarks().then(r => { bookmarks = r; loadingBookmarks = false; });
+              }
+            "
+            class="w-full flex items-center gap-1.5 px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition"
+          >
+            <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2c-.22 0-.44.03-.65.09L5.47 3.6a2.5 2.5 0 00-1.8 2.4v9.5a2 2 0 003.32 1.5L10 14.5l3.01 2.5A2 2 0 0016.33 15.5V6a2.5 2.5 0 00-1.8-2.4l-3.88-1.51A1.75 1.75 0 0010 2z"/></svg>
+            <span>Lesezeichen</span>
+            <svg class="w-3 h-3 ml-auto transition-transform duration-150" :class="showBookmarks ? '' : '-rotate-90'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+            </svg>
+          </button>
+          <div x-show="showBookmarks" x-collapse class="mt-0.5 space-y-px">
+            <template x-if="loadingBookmarks">
+              <div class="px-1.5 py-2 text-[10px] text-[var(--ui-muted)] text-center">Laden…</div>
+            </template>
+            <template x-if="!loadingBookmarks && bookmarks.length === 0">
+              <div class="px-1.5 py-2 text-[10px] text-[var(--ui-muted)]">Keine Lesezeichen</div>
+            </template>
+            <template x-if="!loadingBookmarks && bookmarks.length > 0">
+              <div class="space-y-px">
+                <template x-for="bm in bookmarks" :key="bm.id">
+                  <button
+                    @click="
+                      const msgId = bm.message_id;
+                      $wire.openChannel(bm.channel_id).then(() => {
+                        setTimeout(() => {
+                          const el = document.getElementById('msg-' + msgId);
+                          if(el) {
+                            el.scrollIntoView({behavior:'smooth',block:'center'});
+                            el.classList.add('!bg-amber-100/30');
+                            setTimeout(() => el.classList.remove('!bg-amber-100/30'), 2000);
+                          }
+                        }, 150);
+                      });
+                    "
+                    class="w-full text-left px-1.5 py-1.5 rounded-md hover:bg-[var(--ui-surface-hover)] transition"
+                  >
+                    <div class="flex items-center gap-1 text-[10px] text-[var(--ui-muted)]">
+                      <span x-text="bm.channel_name" class="font-medium truncate"></span>
+                      <span>&middot;</span>
+                      <span x-text="bm.date"></span>
+                    </div>
+                    <div class="text-[11px] text-[var(--ui-secondary)] truncate mt-0.5" x-text="bm.body_snippet"></div>
+                  </button>
+                </template>
+              </div>
+            </template>
+          </div>
+        </div>
+
         <!-- New Chat / Channel buttons -->
         <div class="px-2 mb-2 flex gap-1">
           <button
@@ -398,8 +455,20 @@
               </{{ $isManageable ? 'button' : 'div' }}>
             @endif
 
-            {{-- Channel actions (delete / leave / context actions) --}}
+            {{-- Channel actions (pins / delete / leave / context actions) --}}
             <div class="ml-auto flex items-center gap-1">
+              {{-- Pins button --}}
+              @if(($this->activeChannel['pin_count'] ?? 0) > 0)
+                <button
+                  @click.stop="$dispatch('terminal-show-pins')"
+                  class="flex items-center gap-1 text-[10px] text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition px-1.5 py-0.5 rounded hover:bg-[var(--ui-primary-5)]"
+                  title="Gepinnte Nachrichten"
+                >
+                  <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
+                  <span class="min-w-[14px] h-[14px] px-0.5 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] text-[9px] font-bold flex items-center justify-center">{{ $this->activeChannel['pin_count'] }}</span>
+                </button>
+                <div class="w-px h-4 bg-[var(--ui-border)]/40"></div>
+              @endif
               {{-- Context channel: files + tagging buttons --}}
               @if(! empty($this->activeChannel['context']))
                 <button
@@ -487,24 +556,82 @@
 
                   {{-- Hover action bar --}}
                   <div class="absolute -top-3 right-5 hidden group-hover:flex items-center gap-px bg-[var(--ui-surface)] border border-[var(--ui-border)]/60 rounded-md shadow-sm z-10">
-                    <button
-                      wire:click="toggleReaction({{ $msg['id'] }}, '👍')"
-                      class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] rounded-l-md transition text-xs"
-                      title="Reagieren"
-                    >👍</button>
-                    <button
-                      wire:click="toggleReaction({{ $msg['id'] }}, '😂')"
-                      class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition text-xs"
-                    >😂</button>
-                    <button
-                      wire:click="toggleReaction({{ $msg['id'] }}, '❤️')"
-                      class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition text-xs"
-                    >❤️</button>
-                    <button
-                      wire:click="toggleReaction({{ $msg['id'] }}, '✅')"
-                      class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition text-xs"
-                    >✅</button>
+                    {{-- Quick reactions --}}
+                    <button wire:click="toggleReaction({{ $msg['id'] }}, '👍')" class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] rounded-l-md transition text-xs" title="Reagieren">👍</button>
+                    <button wire:click="toggleReaction({{ $msg['id'] }}, '😂')" class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition text-xs">😂</button>
+                    <button wire:click="toggleReaction({{ $msg['id'] }}, '❤️')" class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition text-xs">❤️</button>
+                    <button wire:click="toggleReaction({{ $msg['id'] }}, '✅')" class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition text-xs">✅</button>
+                    {{-- Emoji picker (+) --}}
+                    <div x-data="{ showPicker: false, activeTab: 0 }" class="relative">
+                      <button @click.stop="showPicker = !showPicker" class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition text-xs" title="Mehr Emojis">+</button>
+                      <div x-show="showPicker" x-cloak @click.outside="showPicker = false" class="absolute bottom-full right-0 mb-1 bg-[var(--ui-surface)] border border-[var(--ui-border)]/60 rounded-lg shadow-xl z-50 w-[260px]">
+                        @php
+                          $emojiCategories = [
+                            ['name' => 'Häufig', 'icon' => '👍', 'emojis' => ['👍','❤️','😊','😂','🎉','🔥','✅','👀','🙏','💪','😍','🤔','👏','💯','🚀']],
+                            ['name' => 'Smileys', 'icon' => '😀', 'emojis' => ['😀','😃','😄','😁','😅','🤣','😇','🙂','😉','😌','😋','😎','🤩','🥳','😏']],
+                            ['name' => 'Gesten', 'icon' => '👋', 'emojis' => ['👋','🤝','✌️','🤞','👌','🤙','👆','👇','👈','👉','☝️','✋','🤚','🖐️','🫡']],
+                            ['name' => 'Objekte', 'icon' => '💡', 'emojis' => ['💡','📌','📎','✏️','📝','📅','📊','📈','💻','📱','⏰','🔔','📧','🗂️','🏷️']],
+                            ['name' => 'Symbole', 'icon' => '✅', 'emojis' => ['✅','❌','⚠️','❓','❗','💬','🔗','⭐','🏆','🎯','🔒','🔑','♻️','➡️','⬅️']],
+                          ];
+                        @endphp
+                        <div class="flex gap-0.5 px-1 pt-1 border-b border-[var(--ui-border)]/40">
+                          @foreach($emojiCategories as $ci => $cat)
+                            <button @click.stop="activeTab = {{ $ci }}" :class="activeTab === {{ $ci }} ? 'opacity-100 border-b-2 border-[var(--ui-primary)]' : 'opacity-50'" class="p-1.5 text-sm rounded-t transition">{{ $cat['icon'] }}</button>
+                          @endforeach
+                        </div>
+                        @foreach($emojiCategories as $ci => $cat)
+                          <div x-show="activeTab === {{ $ci }}" class="grid grid-cols-5 gap-0.5 p-1.5">
+                            @foreach($cat['emojis'] as $emoji)
+                              <button wire:click="toggleReaction({{ $msg['id'] }}, '{{ $emoji }}')" @click.stop="showPicker = false" class="p-1.5 text-lg rounded hover:bg-[var(--ui-surface-hover)] transition text-center leading-none">{{ $emoji }}</button>
+                            @endforeach
+                          </div>
+                        @endforeach
+                      </div>
+                    </div>
                     <div class="w-px h-4 bg-[var(--ui-border)]/40 self-center"></div>
+                    {{-- Bookmark --}}
+                    <button
+                      wire:click="toggleBookmark({{ $msg['id'] }})"
+                      class="p-1 transition text-xs {{ $msg['is_bookmarked'] ? 'text-amber-500' : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)]' }} hover:bg-[var(--ui-surface-hover)]"
+                      title="{{ $msg['is_bookmarked'] ? 'Lesezeichen entfernen' : 'Lesezeichen setzen' }}"
+                    >
+                      <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2c-.22 0-.44.03-.65.09L5.47 3.6a2.5 2.5 0 00-1.8 2.4v9.5a2 2 0 003.32 1.5L10 14.5l3.01 2.5A2 2 0 0016.33 15.5V6a2.5 2.5 0 00-1.8-2.4l-3.88-1.51A1.75 1.75 0 0010 2z"/></svg>
+                    </button>
+                    {{-- Pin --}}
+                    <button
+                      wire:click="{{ $msg['is_pinned'] ? 'unpinMessage' : 'pinMessage' }}({{ $msg['id'] }})"
+                      class="p-1 transition text-xs {{ $msg['is_pinned'] ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)]' }} hover:bg-[var(--ui-surface-hover)]"
+                      title="{{ $msg['is_pinned'] ? 'Pin entfernen' : 'Nachricht anpinnen' }}"
+                    >
+                      <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
+                    </button>
+                    {{-- Forward --}}
+                    <button
+                      @click.stop="$dispatch('terminal-show-forward', { messageId: {{ $msg['id'] }} })"
+                      class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition text-xs"
+                      title="Weiterleiten"
+                    >
+                      <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.21 2.22a.75.75 0 011.06-.02l7.5 7.25a.75.75 0 010 1.08l-7.5 7.25a.75.75 0 11-1.04-1.08l6.1-5.9H3.75a.75.75 0 010-1.5h13.08l-6.1-5.9a.75.75 0 01-.02-1.06z" clip-rule="evenodd"/></svg>
+                    </button>
+                    {{-- Reminder --}}
+                    <div x-data="{ showReminder: false }" class="relative">
+                      <button @click.stop="showReminder = !showReminder" class="p-1 transition text-xs {{ $msg['has_reminder'] ? 'text-amber-500' : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)]' }} hover:bg-[var(--ui-surface-hover)]" title="Erinnerung">
+                        <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a6 6 0 00-6 6c0 1.887-.454 3.665-1.257 5.234a.75.75 0 00.515 1.076 32.91 32.91 0 003.256.508 3.5 3.5 0 006.972 0 32.903 32.903 0 003.256-.508.75.75 0 00.515-1.076A11.448 11.448 0 0116 8a6 6 0 00-6-6zm0 14.5a2 2 0 01-1.95-1.557 33.146 33.146 0 003.9 0A2 2 0 0110 16.5z" clip-rule="evenodd"/></svg>
+                      </button>
+                      <div x-show="showReminder" x-cloak @click.outside="showReminder = false" class="absolute bottom-full right-0 mb-1 bg-[var(--ui-surface)] border border-[var(--ui-border)]/60 rounded-lg shadow-xl z-50 w-48 py-1">
+                        <button wire:click="setReminder({{ $msg['id'] }}, '30min')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition">In 30 Minuten</button>
+                        <button wire:click="setReminder({{ $msg['id'] }}, '1h')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition">In 1 Stunde</button>
+                        <button wire:click="setReminder({{ $msg['id'] }}, '3h')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition">In 3 Stunden</button>
+                        <button wire:click="setReminder({{ $msg['id'] }}, 'tomorrow_9')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition">Morgen 09:00</button>
+                        <button wire:click="setReminder({{ $msg['id'] }}, 'next_monday_9')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition">Nächsten Montag 09:00</button>
+                        @if($msg['has_reminder'])
+                          <div class="border-t border-[var(--ui-border)]/40 my-1"></div>
+                          <button wire:click="cancelReminder({{ $msg['id'] }})" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 transition">Erinnerung entfernen</button>
+                        @endif
+                      </div>
+                    </div>
+                    <div class="w-px h-4 bg-[var(--ui-border)]/40 self-center"></div>
+                    {{-- Copy link --}}
                     <button
                       x-data="{ copied: false }"
                       @click.stop="
@@ -562,6 +689,12 @@
                             <span class="text-[10px] text-[var(--ui-muted)] font-normal" title="Bearbeitet am {{ $msg['edited_at'] }}">(bearbeitet)</span>
                           @endif
                         </div>
+                        @if($msg['type'] === 'forwarded' && ! empty($msg['meta']['forwarded_from']))
+                          <div class="text-[10px] text-[var(--ui-muted)] italic mb-0.5 flex items-center gap-1">
+                            <svg class="w-3 h-3 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.21 2.22a.75.75 0 011.06-.02l7.5 7.25a.75.75 0 010 1.08l-7.5 7.25a.75.75 0 11-1.04-1.08l6.1-5.9H3.75a.75.75 0 010-1.5h13.08l-6.1-5.9a.75.75 0 01-.02-1.06z" clip-rule="evenodd"/></svg>
+                            Weitergeleitet von {{ $msg['meta']['forwarded_from']['user_name'] ?? 'Unbekannt' }}
+                          </div>
+                        @endif
                         @if($editingMessageId === $msg['id'])
                           <div x-data="{ editText: @js($msg['body_plain']) }" class="mt-1">
                             <textarea
@@ -594,6 +727,12 @@
                         <span class="text-[10px] text-[var(--ui-muted)] opacity-0 group-hover:opacity-100 transition-opacity select-none">{{ $msg['time'] }}</span>
                       </div>
                       <div class="flex-1 min-w-0">
+                        @if($msg['type'] === 'forwarded' && ! empty($msg['meta']['forwarded_from']))
+                          <div class="text-[10px] text-[var(--ui-muted)] italic mb-0.5 flex items-center gap-1">
+                            <svg class="w-3 h-3 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.21 2.22a.75.75 0 011.06-.02l7.5 7.25a.75.75 0 010 1.08l-7.5 7.25a.75.75 0 11-1.04-1.08l6.1-5.9H3.75a.75.75 0 010-1.5h13.08l-6.1-5.9a.75.75 0 01-.02-1.06z" clip-rule="evenodd"/></svg>
+                            Weitergeleitet von {{ $msg['meta']['forwarded_from']['user_name'] ?? 'Unbekannt' }}
+                          </div>
+                        @endif
                         @if($editingMessageId === $msg['id'])
                           <div x-data="{ editText: @js($msg['body_plain']) }">
                             <textarea
@@ -762,6 +901,19 @@
                   </div>
                 </template>
               </div>
+            </div>
+
+            {{-- Formatting toolbar --}}
+            <div class="px-4 pt-1.5 pb-0 flex items-center gap-0.5">
+              <button type="button" @click="editor?.chain().focus().toggleBulletList().run()" :class="editor?.isActive('bulletList') ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)]'" class="p-1 rounded transition" title="Aufzählung">
+                <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 4.75A.75.75 0 016.75 4h10.5a.75.75 0 010 1.5H6.75A.75.75 0 016 4.75zM6 10a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H6.75A.75.75 0 016 10zm0 5.25a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H6.75a.75.75 0 01-.75-.75zM1.99 4.75a1 1 0 011-1h.01a1 1 0 010 2h-.01a1 1 0 01-1-1zm0 5.25a1 1 0 011-1h.01a1 1 0 010 2h-.01a1 1 0 01-1-1zm1 4.25a1 1 0 100 2h.01a1 1 0 100-2h-.01z" clip-rule="evenodd"/></svg>
+              </button>
+              <button type="button" @click="editor?.chain().focus().toggleOrderedList().run()" :class="editor?.isActive('orderedList') ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)]'" class="p-1 rounded transition" title="Nummerierung">
+                <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 4.75A.75.75 0 016.75 4h10.5a.75.75 0 010 1.5H6.75A.75.75 0 016 4.75zM6 10a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H6.75A.75.75 0 016 10zm0 5.25a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H6.75a.75.75 0 01-.75-.75zM2 4a.75.75 0 01.75-.75h.5a.75.75 0 01.75.75v2.25h.25a.5.5 0 010 1H2a.5.5 0 010-1h.25V4.75H2A.75.75 0 012 4zm0 5.75a.5.5 0 01.5-.5h1a.75.75 0 01.53 1.28L2.56 12H3.5a.5.5 0 010 1h-1a.75.75 0 01-.53-1.28L3.44 10.25H2.5a.5.5 0 01-.5-.5z" clip-rule="evenodd"/></svg>
+              </button>
+              <button type="button" @click="editor?.chain().focus().toggleCodeBlock().run()" :class="editor?.isActive('codeBlock') ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)]'" class="p-1 rounded transition" title="Code-Block">
+                <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 010 1.06L2.56 10l3.72 3.72a.75.75 0 01-1.06 1.06L.97 10.53a.75.75 0 010-1.06l4.25-4.25a.75.75 0 011.06 0zm7.44 0a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 010-1.06zM11.377 2.011a.75.75 0 01.612.867l-2.5 14.5a.75.75 0 01-1.478-.255l2.5-14.5a.75.75 0 01.866-.612z" clip-rule="evenodd"/></svg>
+              </button>
             </div>
 
             <div class="px-4 py-2.5">
@@ -1007,6 +1159,136 @@
 
       <div class="px-4 py-2.5 border-t border-[var(--ui-border)]/60 flex justify-end flex-shrink-0">
         <button @click="showMembers = false" class="text-xs px-3 py-1.5 rounded text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pins Panel Modal -->
+  <div
+    x-data="{ showPins: false, pins: [], loading: false }"
+    x-on:terminal-show-pins.window="showPins = true; loading = true; $wire.getPinnedMessages().then(r => { pins = r; loading = false; })"
+    x-show="showPins"
+    x-cloak
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+    @click.self="showPins = false"
+    @keydown.escape.window="showPins = false"
+  >
+    <div class="bg-[var(--ui-surface)] rounded-lg shadow-xl border border-[var(--ui-border)]/60 w-96 max-h-[28rem] overflow-hidden flex flex-col" @click.stop>
+      <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex-shrink-0 flex items-center justify-between">
+        <h3 class="text-sm font-medium text-[var(--ui-body-color)]">Gepinnte Nachrichten</h3>
+        <button @click="showPins = false" class="text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">
+          <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+        </button>
+      </div>
+      <div class="flex-1 min-h-0 overflow-y-auto">
+        <template x-if="loading">
+          <div class="px-4 py-6 text-center text-xs text-[var(--ui-muted)]">Laden…</div>
+        </template>
+        <template x-if="!loading && pins.length === 0">
+          <div class="px-4 py-6 text-center text-xs text-[var(--ui-muted)]">Keine gepinnten Nachrichten</div>
+        </template>
+        <template x-if="!loading && pins.length > 0">
+          <div class="py-1">
+            <template x-for="pin in pins" :key="pin.id">
+              <div class="px-4 py-2.5 hover:bg-[var(--ui-surface-hover)] transition group/pin">
+                <div class="flex items-start gap-2.5">
+                  <div class="w-6 h-6 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden mt-0.5">
+                    <template x-if="pin.user_avatar">
+                      <img :src="pin.user_avatar" alt="" class="w-full h-full object-cover">
+                    </template>
+                    <template x-if="!pin.user_avatar">
+                      <span x-text="pin.user_initials"></span>
+                    </template>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-baseline gap-2">
+                      <span class="font-medium text-xs text-[var(--ui-body-color)]" x-text="pin.user_name"></span>
+                      <span class="text-[10px] text-[var(--ui-muted)]" x-text="pin.date + ' ' + pin.time"></span>
+                    </div>
+                    <button
+                      @click="
+                        showPins = false;
+                        const msgId = pin.message_id;
+                        setTimeout(() => {
+                          const el = document.getElementById('msg-' + msgId);
+                          if(el) {
+                            el.scrollIntoView({behavior:'smooth',block:'center'});
+                            el.classList.add('!bg-amber-100/30');
+                            setTimeout(() => el.classList.remove('!bg-amber-100/30'), 2000);
+                          }
+                        }, 100);
+                      "
+                      class="text-xs text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] mt-0.5 text-left transition cursor-pointer"
+                      x-text="pin.body_snippet"
+                    ></button>
+                    <div class="flex items-center gap-2 mt-1">
+                      <span class="text-[9px] text-[var(--ui-muted)]">Gepinnt von <span x-text="pin.pinned_by"></span> <span x-text="pin.pinned_at"></span></span>
+                      <button
+                        @click="$wire.unpinMessage(pin.message_id).then(() => { pins = pins.filter(p => p.id !== pin.id); })"
+                        class="text-[9px] text-[var(--ui-muted)] hover:text-red-500 transition opacity-0 group-hover/pin:opacity-100"
+                      >Entfernen</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- Forward Message Modal -->
+  <div
+    x-data="{ showForward: false, forwardMessageId: null, targets: [], loading: false }"
+    x-on:terminal-show-forward.window="showForward = true; forwardMessageId = $event.detail.messageId; loading = true; $wire.getForwardTargets().then(r => { targets = r; loading = false; })"
+    x-show="showForward"
+    x-cloak
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+    @click.self="showForward = false"
+    @keydown.escape.window="showForward = false"
+  >
+    <div class="bg-[var(--ui-surface)] rounded-lg shadow-xl border border-[var(--ui-border)]/60 w-80 max-h-96 overflow-hidden flex flex-col" @click.stop>
+      <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex-shrink-0">
+        <h3 class="text-sm font-medium text-[var(--ui-body-color)]">Nachricht weiterleiten</h3>
+        <p class="text-[10px] text-[var(--ui-muted)] mt-0.5">Wähle einen Channel oder Chat</p>
+      </div>
+      <div class="flex-1 min-h-0 overflow-y-auto">
+        <template x-if="loading">
+          <div class="px-4 py-6 text-center text-xs text-[var(--ui-muted)]">Laden…</div>
+        </template>
+        <template x-if="!loading && targets.length === 0">
+          <div class="px-4 py-6 text-center text-xs text-[var(--ui-muted)]">Keine Ziele verfügbar</div>
+        </template>
+        <template x-if="!loading && targets.length > 0">
+          <div>
+            <template x-for="target in targets" :key="target.id">
+              <button
+                @click="$wire.forwardMessage(forwardMessageId, target.id); showForward = false"
+                class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition"
+              >
+                <template x-if="target.type === 'dm'">
+                  <div class="w-6 h-6 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden">
+                    <template x-if="target.avatar">
+                      <img :src="target.avatar" alt="" class="w-full h-full object-cover">
+                    </template>
+                    <template x-if="!target.avatar">
+                      <span x-text="target.initials || '?'"></span>
+                    </template>
+                  </div>
+                </template>
+                <template x-if="target.type !== 'dm'">
+                  <span class="text-[var(--ui-muted)] text-sm" x-text="target.icon || '#'"></span>
+                </template>
+                <span x-text="target.name" class="flex-1 text-xs truncate text-left"></span>
+                <span class="text-[9px] text-[var(--ui-muted)] uppercase" x-text="target.type === 'dm' ? 'Chat' : target.type === 'channel' ? 'Channel' : 'Kontext'"></span>
+              </button>
+            </template>
+          </div>
+        </template>
+      </div>
+      <div class="px-4 py-2.5 border-t border-[var(--ui-border)]/60 flex justify-end flex-shrink-0">
+        <button @click="showForward = false" class="text-xs px-3 py-1.5 rounded text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">Abbrechen</button>
       </div>
     </div>
   </div>

@@ -180,6 +180,11 @@ class CoreServiceProvider extends ServiceProvider
             ]);
         }
 
+        // Terminal reminder scheduler
+        $this->callAfterResolving(\Illuminate\Console\Scheduling\Schedule::class, function (\Illuminate\Console\Scheduling\Schedule $schedule) {
+            $schedule->job(new \Platform\Core\Jobs\ProcessTerminalRemindersJob)->everyMinute();
+        });
+
         // Automatische Modell-Registrierung entfernt
     }
 

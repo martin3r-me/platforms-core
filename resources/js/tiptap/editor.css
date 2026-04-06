@@ -257,3 +257,49 @@
   background: var(--ui-muted-5, rgba(107,114,128,0.08));
   transform: scale(1.15);
 }
+
+/* === Lists (editor + rendered messages) === */
+.tiptap-editor ul,
+.ProseMirror ul,
+.prose-terminal ul {
+  list-style: disc !important;
+  padding-left: 1.5em !important;
+  margin: 0.25em 0 !important;
+}
+
+.tiptap-editor ol,
+.ProseMirror ol,
+.prose-terminal ol {
+  list-style: decimal !important;
+  padding-left: 1.5em !important;
+  margin: 0.25em 0 !important;
+}
+
+.tiptap-editor li,
+.ProseMirror li,
+.prose-terminal li {
+  margin: 0 !important;
+}
+
+/* === Code blocks (editor + rendered messages) === */
+.tiptap-editor pre,
+.ProseMirror pre,
+.prose-terminal pre {
+  background: var(--ui-muted-5, rgba(107,114,128,0.08)) !important;
+  border-radius: 6px !important;
+  padding: 8px 12px !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-size: 0.85em !important;
+  overflow-x: auto !important;
+  margin: 0.25em 0 !important;
+}
+
+.tiptap-editor pre code,
+.ProseMirror pre code,
+.prose-terminal pre code {
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  color: inherit !important;
+  font-size: inherit !important;
+}

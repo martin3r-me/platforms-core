@@ -12,6 +12,9 @@ use Platform\Core\Models\TerminalChannelMember;
 use Platform\Core\Models\TerminalMention;
 use Platform\Core\Models\TerminalMessage;
 use Platform\Core\Models\TerminalReaction;
+use Platform\Core\Models\TerminalBookmark;
+use Platform\Core\Models\TerminalPin;
+use Platform\Core\Models\TerminalReminder;
 use Platform\Core\Models\User;
 use Platform\Core\Events\TerminalMessageSent;
 use Platform\Core\Events\TerminalReactionToggled;
@@ -742,6 +745,285 @@ class Terminal extends Component
         }
     }
 
+    // ── Pins ──────────────────────────────────────────────────
+
+    public function pinMessage(int $messageId): void
+    {
+        if (! $this->channelId) {
+            return;
+        }
+
+        $msg = TerminalMessage::find($messageId);
+        if (! $msg || $msg->channel_id !== $this->channelId) {
+            return;
+        }
+
+        // Max 50 pins per channel
+        if (TerminalPin::where('channel_id', $this->channelId)->count() >= 50) {
+            return;
+        }
+
+        TerminalPin::firstOrCreate(
+            ['channel_id' => $this->channelId, 'message_id' => $messageId],
+            ['pinned_by_user_id' => auth()->id()]
+        );
+
+        unset($this->messages);
+    }
+
+    public function unpinMessage(int $messageId): void
+    {
+        if (! $this->channelId) {
+            return;
+        }
+
+        TerminalPin::where('channel_id', $this->channelId)
+            ->where('message_id', $messageId)
+            ->delete();
+
+        unset($this->messages);
+    }
+
+    public function getPinnedMessages(): array
+    {
+        if (! $this->channelId) {
+            return [];
+        }
+
+        return TerminalPin::where('channel_id', $this->channelId)
+            ->with(['message.user:id,name,avatar', 'pinnedBy:id,name'])
+            ->latest()
+            ->limit(50)
+            ->get()
+            ->filter(fn ($pin) => $pin->message !== null)
+            ->map(fn ($pin) => [
+                'id' => $pin->id,
+                'message_id' => $pin->message_id,
+                'body_snippet' => \Illuminate\Support\Str::limit($pin->message->body_plain ?? strip_tags($pin->message->body_html), 100),
+                'user_name' => $pin->message->user?->name ?? 'Unbekannt',
+                'user_avatar' => $pin->message->user?->avatar,
+                'user_initials' => $this->initials($pin->message->user?->name ?? '?'),
+                'pinned_by' => $pin->pinnedBy?->name ?? 'Unbekannt',
+                'pinned_at' => $pin->created_at->diffForHumans(short: true),
+                'time' => $pin->message->created_at->format('H:i'),
+                'date' => $pin->message->created_at->translatedFormat('d. M'),
+            ])
+            ->values()
+            ->toArray();
+    }
+
+    // ── Bookmarks ─────────────────────────────────────────────
+
+    public function toggleBookmark(int $messageId): void
+    {
+        $msg = TerminalMessage::find($messageId);
+        if (! $msg) {
+            return;
+        }
+
+        $existing = TerminalBookmark::where('user_id', auth()->id())
+            ->where('message_id', $messageId)
+            ->first();
+
+        if ($existing) {
+            $existing->delete();
+        } else {
+            TerminalBookmark::create([
+                'user_id' => auth()->id(),
+                'message_id' => $messageId,
+            ]);
+        }
+
+        unset($this->messages);
+    }
+
+    public function getBookmarks(): array
+    {
+        $teamId = $this->teamId();
+        if (! $teamId) {
+            return [];
+        }
+
+        $channelIds = TerminalChannelMember::where('user_id', auth()->id())
+            ->whereHas('channel', fn ($q) => $q->where('team_id', $teamId))
+            ->pluck('channel_id');
+
+        return TerminalBookmark::where('user_id', auth()->id())
+            ->whereHas('message', fn ($q) => $q->whereIn('channel_id', $channelIds))
+            ->with(['message.user:id,name,avatar', 'message.channel:id,name,type,context_type,context_id'])
+            ->latest()
+            ->limit(50)
+            ->get()
+            ->filter(fn ($bm) => $bm->message !== null)
+            ->map(function ($bm) {
+                $channelName = $bm->message->channel?->name;
+                if (! $channelName && $bm->message->channel?->type === 'dm') {
+                    $other = TerminalChannelMember::where('channel_id', $bm->message->channel_id)
+                        ->where('user_id', '!=', auth()->id())
+                        ->with('user:id,name')
+                        ->first();
+                    $channelName = $other?->user?->name ?? 'Chat';
+                }
+
+                return [
+                    'id' => $bm->id,
+                    'message_id' => $bm->message_id,
+                    'channel_id' => $bm->message->channel_id,
+                    'channel_name' => $channelName ?? 'Kontext',
+                    'body_snippet' => \Illuminate\Support\Str::limit($bm->message->body_plain ?? strip_tags($bm->message->body_html), 80),
+                    'user_name' => $bm->message->user?->name ?? 'Unbekannt',
+                    'user_avatar' => $bm->message->user?->avatar,
+                    'user_initials' => $this->initials($bm->message->user?->name ?? '?'),
+                    'time' => $bm->message->created_at->format('H:i'),
+                    'date' => $bm->message->created_at->translatedFormat('d. M'),
+                ];
+            })
+            ->values()
+            ->toArray();
+    }
+
+    // ── Forward ───────────────────────────────────────────────
+
+    public function forwardMessage(int $messageId, int $targetChannelId): void
+    {
+        $teamId = $this->teamId();
+        if (! $teamId) {
+            return;
+        }
+
+        // Verify access to source message
+        $msg = TerminalMessage::find($messageId);
+        if (! $msg) {
+            return;
+        }
+
+        $isMemberSource = TerminalChannelMember::where('channel_id', $msg->channel_id)
+            ->where('user_id', auth()->id())
+            ->exists();
+        if (! $isMemberSource) {
+            return;
+        }
+
+        // Verify access to target channel
+        $targetChannel = TerminalChannel::where('id', $targetChannelId)
+            ->where('team_id', $teamId)
+            ->first();
+        if (! $targetChannel) {
+            return;
+        }
+
+        $this->ensureMembership($targetChannel);
+
+        $originalUser = $msg->user;
+
+        $forwarded = TerminalMessage::create([
+            'channel_id' => $targetChannel->id,
+            'user_id' => auth()->id(),
+            'body_html' => $msg->body_html,
+            'body_plain' => $msg->body_plain,
+            'type' => 'forwarded',
+            'meta' => [
+                'forwarded_from' => [
+                    'message_id' => $msg->id,
+                    'user_id' => $msg->user_id,
+                    'user_name' => $originalUser?->name ?? 'Unbekannt',
+                    'channel_id' => $msg->channel_id,
+                ],
+            ],
+        ]);
+
+        $targetChannel->increment('message_count');
+        $targetChannel->update(['last_message_id' => $forwarded->id]);
+
+        try {
+            TerminalMessageSent::dispatch(
+                $targetChannel->id,
+                $forwarded->id,
+                auth()->id(),
+            );
+        } catch (\Throwable $e) {
+            \Log::warning('Terminal forward broadcast failed: ' . $e->getMessage());
+        }
+    }
+
+    public function getForwardTargets(): array
+    {
+        $teamId = $this->teamId();
+        if (! $teamId) {
+            return [];
+        }
+
+        $memberships = TerminalChannelMember::where('user_id', auth()->id())
+            ->whereHas('channel', fn ($q) => $q->where('team_id', $teamId))
+            ->with(['channel'])
+            ->get();
+
+        return $memberships
+            ->filter(fn ($m) => $m->channel && $m->channel_id !== $this->channelId)
+            ->map(function ($m) {
+                $ch = $m->channel;
+                $item = [
+                    'id' => $ch->id,
+                    'name' => $ch->name,
+                    'type' => $ch->type,
+                    'icon' => $ch->icon,
+                ];
+
+                if ($ch->isDm()) {
+                    $other = TerminalChannelMember::where('channel_id', $ch->id)
+                        ->where('user_id', '!=', auth()->id())
+                        ->with('user:id,name,avatar')
+                        ->first();
+                    $item['name'] = $other?->user?->name ?? 'Unbekannt';
+                    $item['avatar'] = $other?->user?->avatar;
+                    $item['initials'] = $this->initials($item['name']);
+                }
+
+                return $item;
+            })
+            ->values()
+            ->toArray();
+    }
+
+    // ── Reminders ─────────────────────────────────────────────
+
+    public function setReminder(int $messageId, string $preset): void
+    {
+        $msg = TerminalMessage::find($messageId);
+        if (! $msg) {
+            return;
+        }
+
+        $remindAt = match ($preset) {
+            '30min' => now()->addMinutes(30),
+            '1h' => now()->addHour(),
+            '3h' => now()->addHours(3),
+            'tomorrow_9' => now()->addDay()->setTime(9, 0),
+            'next_monday_9' => now()->next('Monday')->setTime(9, 0),
+            default => null,
+        };
+
+        if (! $remindAt) {
+            return;
+        }
+
+        TerminalReminder::updateOrCreate(
+            ['user_id' => auth()->id(), 'message_id' => $messageId],
+            ['remind_at' => $remindAt, 'reminded' => false]
+        );
+
+        unset($this->messages);
+    }
+
+    public function cancelReminder(int $messageId): void
+    {
+        TerminalReminder::where('user_id', auth()->id())
+            ->where('message_id', $messageId)
+            ->delete();
+
+        unset($this->messages);
+    }
+
     // ── Edit / Delete Message ─────────────────────────────────
 
     public function deleteMessage(int $messageId): void
@@ -757,11 +1039,17 @@ class Terminal extends Component
         // Cascade delete related records
         $msg->reactions()->delete();
         $msg->mentions()->delete();
+        TerminalPin::where('message_id', $messageId)->delete();
+        TerminalBookmark::where('message_id', $messageId)->delete();
+        TerminalReminder::where('message_id', $messageId)->delete();
 
         // Delete child replies (and their reactions/mentions)
         foreach ($msg->replies as $reply) {
             $reply->reactions()->delete();
             $reply->mentions()->delete();
+            TerminalPin::where('message_id', $reply->id)->delete();
+            TerminalBookmark::where('message_id', $reply->id)->delete();
+            TerminalReminder::where('message_id', $reply->id)->delete();
             $reply->delete();
         }
 
@@ -1090,7 +1378,7 @@ class Terminal extends Component
             return [];
         }
 
-        return TerminalMessage::where('channel_id', $this->channelId)
+        $messages = TerminalMessage::where('channel_id', $this->channelId)
             ->whereNull('parent_id')
             ->with([
                 'user:id,name,avatar',
@@ -1100,8 +1388,25 @@ class Terminal extends Component
             ])
             ->orderBy('id')
             ->limit(100)
-            ->get()
-            ->map(fn (TerminalMessage $m) => [
+            ->get();
+
+        // Batch-load pins, bookmarks, reminders for this channel
+        $messageIds = $messages->pluck('id')->toArray();
+        $pinnedIds = TerminalPin::where('channel_id', $this->channelId)
+            ->whereIn('message_id', $messageIds)
+            ->pluck('message_id')
+            ->flip();
+        $bookmarkedIds = TerminalBookmark::where('user_id', auth()->id())
+            ->whereIn('message_id', $messageIds)
+            ->pluck('message_id')
+            ->flip();
+        $reminderIds = TerminalReminder::where('user_id', auth()->id())
+            ->where('reminded', false)
+            ->whereIn('message_id', $messageIds)
+            ->pluck('message_id')
+            ->flip();
+
+        return $messages->map(fn (TerminalMessage $m) => [
                 'id' => $m->id,
                 'user_id' => $m->user_id,
                 'user_name' => $m->user?->name ?? 'Unbekannt',
@@ -1110,6 +1415,7 @@ class Terminal extends Component
                 'body_html' => $m->body_html,
                 'body_plain' => $m->body_plain,
                 'type' => $m->type,
+                'meta' => $m->meta,
                 'reply_count' => $m->reply_count,
                 'has_mentions' => $m->has_mentions,
                 'has_attachments' => $m->has_attachments,
@@ -1131,6 +1437,9 @@ class Terminal extends Component
                 'date' => $m->created_at->translatedFormat('d. M Y'),
                 'is_mine' => $m->user_id === auth()->id(),
                 'edited_at' => $m->edited_at?->format('d.m.Y H:i'),
+                'is_pinned' => $pinnedIds->has($m->id),
+                'is_bookmarked' => $bookmarkedIds->has($m->id),
+                'has_reminder' => $reminderIds->has($m->id),
             ])
             ->toArray();
     }
@@ -1178,6 +1487,9 @@ class Terminal extends Component
             $data['initials'] = $this->initials($data['name']);
         }
 
+        // Pin count for header badge
+        $data['pin_count'] = TerminalPin::where('channel_id', $channel->id)->count();
+
         // Check if current user can delete this channel
         $data['can_delete'] = $channel->type === 'channel' && TerminalChannelMember::where('channel_id', $channel->id)
             ->where('user_id', auth()->id())
@@ -1215,6 +1527,10 @@ class Terminal extends Component
                     $listeners["echo-private:terminal.channel.{$id},.reaction.toggled"] = 'onReactionToggled';
                 }
 
+                // Private user channel for reminders
+                $userId = auth()->id();
+                $listeners["echo-private:terminal.user.{$userId},.reminder.due"] = 'onReminderDue';
+
                 // Presence channel for online status
                 $listeners["echo-presence:terminal.team.{$teamId},here"] = 'onPresenceHere';
                 $listeners["echo-presence:terminal.team.{$teamId},joining"] = 'onPresenceJoining';
@@ -1236,6 +1552,18 @@ class Terminal extends Component
     public function onReactionToggled($payload = null): void
     {
         unset($this->messages);
+    }
+
+    public function onReminderDue($payload = null): void
+    {
+        $snippet = $payload['snippet'] ?? 'Nachricht';
+        $channelId = $payload['channelId'] ?? null;
+        $messageId = $payload['messageId'] ?? null;
+
+        $this->dispatch('notice', type: 'info', title: 'Erinnerung', message: $snippet, metadata: [
+            'channel_id' => $channelId,
+            'message_id' => $messageId,
+        ]);
     }
 
     public function onPresenceHere($users): void

@@ -25,12 +25,8 @@ export function tiptapEditor({
       const extensions = [
         StarterKit.configure({
           heading: false,
-          codeBlock: false,
           blockquote: false,
           horizontalRule: false,
-          bulletList: false,
-          orderedList: false,
-          listItem: false,
         }),
         Placeholder.configure({ placeholder }),
         Mention.configure({
@@ -50,6 +46,12 @@ export function tiptapEditor({
             if (event.key === 'Enter' && !event.shiftKey) {
               const mentionActive = document.querySelector('.tippy-box .mention-dropdown');
               if (mentionActive) return false;
+
+              // Let Enter pass through inside lists and code blocks
+              const editor = this.editor;
+              if (editor && (editor.isActive('bulletList') || editor.isActive('orderedList') || editor.isActive('codeBlock'))) {
+                return false;
+              }
 
               event.preventDefault();
               // Defer submit entirely out of ProseMirror's dispatch cycle
