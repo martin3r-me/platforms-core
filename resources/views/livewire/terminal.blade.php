@@ -509,13 +509,11 @@
                     <button
                       x-data="{ copied: false }"
                       @click.stop="
-                        $wire.getMessagePermalink({{ $msg['id'] }}).then(url => {
-                          if(url) {
-                            navigator.clipboard.writeText(url);
-                            copied = true;
-                            setTimeout(() => copied = false, 1500);
-                          }
-                        })
+                        const url = location.origin + '/terminal?channel={{ $channelId }}&message={{ $msg['id'] }}';
+                        navigator.clipboard.writeText(url).then(() => {
+                          copied = true;
+                          setTimeout(() => copied = false, 1500);
+                        });
                       "
                       class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition {{ $msg['is_mine'] ? '' : 'rounded-r-md' }}"
                       :title="copied ? 'Kopiert!' : 'Link kopieren'"
