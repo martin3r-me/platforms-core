@@ -30,39 +30,6 @@ function init() {
         wssPort: port || 443,
         forceTLS: true,
         enabledTransports: ['ws', 'wss'],
-        authEndpoint: '/broadcasting/auth',
-        auth: {
-            headers: {
-                'X-CSRF-TOKEN': csrfToken,
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-        },
-        authorizer: (channel) => {
-            return {
-                authorize: (socketId, callback) => {
-                    fetch('/broadcasting/auth', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken,
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                        credentials: 'same-origin',
-                        body: JSON.stringify({
-                            socket_id: socketId,
-                            channel_name: channel.name,
-                        }),
-                    })
-                    .then(response => {
-                        if (!response.ok) throw new Error('Auth failed: ' + response.status);
-                        return response.json();
-                    })
-                    .then(data => callback(null, data))
-                    .catch(error => callback(error));
-                },
-            };
-        },
     });
 
     // Presence channel for online status
@@ -74,22 +41,58 @@ function init() {
             window.dispatchEvent(new CustomEvent('presence-updated', { detail: [...window._onlineUsers] }));
         }
 
-        window.Echo.join(`terminal.team.${teamId}`)
-            .here(users => {
-                window._onlineUsers = new Set(users.map(u => Number(u.id)));
-                dispatchPresence();
+        // Auth presence channel manually via fetch, then subscribe via Pusher
+        function authAndJoinPresence(socketId) {
+            const params = new URLSearchParams();
+            params.append('socket_id', socketId);
+            params.append('channel_name', `presence-terminal.team.${teamId}`);
+
+            fetch('/broadcasting/auth', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: params.toString(),
             })
-            .joining(user => {
-                window._onlineUsers.add(Number(user.id));
-                dispatchPresence();
+            .then(r => {
+                if (!r.ok) throw new Error('Auth ' + r.status);
+                return r.json();
             })
-            .leaving(user => {
-                window._onlineUsers.delete(Number(user.id));
-                dispatchPresence();
+            .then(data => {
+                const pusher = window.Echo.connector.pusher;
+                const channel = pusher.subscribe(`presence-terminal.team.${teamId}`);
+
+                channel.bind('pusher:subscription_succeeded', (members) => {
+                    window._onlineUsers = new Set();
+                    members.each(m => window._onlineUsers.add(Number(m.id)));
+                    dispatchPresence();
+                });
+                channel.bind('pusher:member_added', (member) => {
+                    window._onlineUsers.add(Number(member.id));
+                    dispatchPresence();
+                });
+                channel.bind('pusher:member_removed', (member) => {
+                    window._onlineUsers.delete(Number(member.id));
+                    dispatchPresence();
+                });
             })
-            .error(error => {
-                console.warn('[Terminal] Presence channel error:', error);
+            .catch(err => {
+                console.warn('[Terminal] Presence auth failed:', err);
             });
+        }
+
+        // Wait for WebSocket connection to get socket ID
+        const pusher = window.Echo.connector.pusher;
+        if (pusher.connection.socket_id) {
+            authAndJoinPresence(pusher.connection.socket_id);
+        } else {
+            pusher.connection.bind('connected', () => {
+                authAndJoinPresence(pusher.connection.socket_id);
+            });
+        }
     }
 }
 
