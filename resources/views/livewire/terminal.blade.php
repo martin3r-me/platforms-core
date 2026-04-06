@@ -246,8 +246,8 @@
                       {{ $dm['initials'] ?? '?' }}
                     @endif
                   </div>
-                  @if(! empty($dm['other_user_id']))
-                    <div x-show="isOnline({{ $dm['other_user_id'] }})" x-cloak class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-[var(--ui-surface)]"></div>
+                  @if(! empty($dm['other_user_id']) && in_array($dm['other_user_id'], $this->onlineUserIds))
+                    <div class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-[var(--ui-surface)]"></div>
                   @endif
                 </div>
                 <span class="truncate flex-1 text-left">{{ $dm['name'] }}</span>
@@ -338,13 +338,13 @@
                     {{ $this->activeChannel['initials'] ?? '?' }}
                   @endif
                 </div>
-                @if($dmOther)
-                  <div x-show="isOnline({{ $dmOther['id'] }})" x-cloak class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-[var(--ui-surface)]"></div>
+                @if($dmOther && in_array($dmOther['id'], $this->onlineUserIds))
+                  <div class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-[var(--ui-surface)]"></div>
                 @endif
               </div>
               <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $this->activeChannel['name'] }}</span>
-              @if($dmOther)
-                <span x-show="isOnline({{ $dmOther['id'] }})" x-cloak class="text-[10px] text-emerald-500 font-medium">online</span>
+              @if($dmOther && in_array($dmOther['id'], $this->onlineUserIds))
+                <span class="text-[10px] text-emerald-500 font-medium">online</span>
               @endif
             @elseif($this->activeChannel['type'] === 'context' && ! empty($this->activeChannel['context']))
               <span class="text-[14px]">{{ $this->activeChannel['context']['icon'] }}</span>
@@ -1028,7 +1028,6 @@
         resizing: false,
         resizingSidebar: false,
         typingUsers: {},
-        onlineUserIds: $wire.entangle('onlineUserIds'),
         _startY: 0,
         _startH: 0,
 
@@ -1038,10 +1037,6 @@
           if (names.length === 1) return names[0] + ' tippt…';
           if (names.length === 2) return names[0] + ' und ' + names[1] + ' tippen…';
           return names[0] + ', ' + names[1] + ' und andere tippen…';
-        },
-
-        isOnline(userId) {
-          return (this.onlineUserIds || []).includes(Number(userId));
         },
 
         get open(){ return Alpine?.store('page')?.terminalOpen ?? false; },
