@@ -10,9 +10,6 @@
   <meta name="reverb-host" content="{{ parse_url(config('app.url'), PHP_URL_HOST) }}">
   <meta name="reverb-port" content="443">
   @endif
-  @auth
-  <meta name="team-id" content="{{ auth()->user()->currentTeam?->id }}">
-  @endauth
 
   <title>{{ config('app.name', 'Platform') }}</title>
 

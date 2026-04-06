@@ -3,7 +3,6 @@
   x-init="init()"
   x-on:toggle-terminal.window="toggle()"
   x-on:toggle-terminal-open.window="if(!open) toggle()"
-  x-on:presence-updated.window="onlineUsers = $event.detail"
   x-on:scroll-to-message.window="$nextTick(() => { const el = document.getElementById('msg-' + $event.detail.messageId); if(el) { el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('!bg-amber-100/30'); setTimeout(() => el.classList.remove('!bg-amber-100/30'), 2000); } })"
   x-on:terminal-typing="sendTypingWhisper($wire.channelId)"
   class="w-full flex-none relative"
@@ -1167,6 +1166,13 @@
           @if($channelId)
             this.setupTypingListener({{ $channelId }});
           @endif
+
+          // Presence heartbeat: initial + every 30s
+          const refreshPresence = () => {
+            $wire.heartbeat().then(ids => { this.onlineUsers = ids; });
+          };
+          refreshPresence();
+          setInterval(refreshPresence, 30000);
         },
       };
     }

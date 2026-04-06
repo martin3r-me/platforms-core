@@ -16,6 +16,7 @@ use Platform\Core\Models\User;
 use Platform\Core\Events\TerminalMessageSent;
 use Platform\Core\Events\TerminalReactionToggled;
 use Platform\Core\Services\ContextFileService;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Terminal UI shell with messaging, DMs, group channels, and context awareness.
@@ -1194,6 +1195,30 @@ class Terminal extends Component
         }
 
         return $data;
+    }
+
+    // ── Online Presence (cache-based) ───────────────────────────
+
+    public function heartbeat(): array
+    {
+        $teamId = $this->teamId();
+        if (! $teamId) {
+            return [];
+        }
+
+        $key = "terminal.presence.{$teamId}";
+        $presence = Cache::get($key, []);
+
+        // Register current user
+        $presence[auth()->id()] = now()->timestamp;
+
+        // Purge stale entries (>60s)
+        $cutoff = now()->timestamp - 60;
+        $presence = array_filter($presence, fn ($ts) => $ts > $cutoff);
+
+        Cache::put($key, $presence, 120);
+
+        return array_map('intval', array_keys($presence));
     }
 
     // ── Echo Listeners (WebSocket real-time updates) ───────────

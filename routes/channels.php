@@ -8,15 +8,3 @@ Broadcast::channel('terminal.channel.{channelId}', function ($user, $channelId) 
         ->where('user_id', $user->id)
         ->exists();
 });
-
-Broadcast::channel('terminal.team.{teamId}', function ($user, $teamId) {
-    if ($user->currentTeam?->id !== (int) $teamId) {
-        return false;
-    }
-
-    return [
-        'id' => $user->id,
-        'name' => $user->name,
-        'avatar' => $user->avatar,
-    ];
-});
