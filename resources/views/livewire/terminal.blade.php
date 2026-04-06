@@ -1044,7 +1044,7 @@
         },
 
         isOnline(userId) {
-          return this.onlineUsers.includes(userId);
+          return this.onlineUsers.includes(Number(userId));
         },
 
         get open(){ return Alpine?.store('page')?.terminalOpen ?? false; },

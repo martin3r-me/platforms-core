@@ -40,16 +40,19 @@ function init() {
 
         window.Echo.join(`terminal.team.${teamId}`)
             .here(users => {
-                window._onlineUsers = new Set(users.map(u => u.id));
+                window._onlineUsers = new Set(users.map(u => Number(u.id)));
                 dispatchPresence();
             })
             .joining(user => {
-                window._onlineUsers.add(user.id);
+                window._onlineUsers.add(Number(user.id));
                 dispatchPresence();
             })
             .leaving(user => {
-                window._onlineUsers.delete(user.id);
+                window._onlineUsers.delete(Number(user.id));
                 dispatchPresence();
+            })
+            .error(error => {
+                console.warn('[Terminal] Presence channel error:', error);
             });
     }
 }
