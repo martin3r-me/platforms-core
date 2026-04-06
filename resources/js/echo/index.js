@@ -28,6 +28,30 @@ function init() {
         forceTLS: true,
         enabledTransports: ['ws', 'wss'],
     });
+
+    // Presence channel for online status
+    const teamId = document.querySelector('meta[name="team-id"]')?.content;
+    if (teamId) {
+        window._onlineUsers = new Set();
+
+        function dispatchPresence() {
+            window.dispatchEvent(new CustomEvent('presence-updated', { detail: [...window._onlineUsers] }));
+        }
+
+        window.Echo.join(`terminal.team.${teamId}`)
+            .here(users => {
+                window._onlineUsers = new Set(users.map(u => u.id));
+                dispatchPresence();
+            })
+            .joining(user => {
+                window._onlineUsers.add(user.id);
+                dispatchPresence();
+            })
+            .leaving(user => {
+                window._onlineUsers.delete(user.id);
+                dispatchPresence();
+            });
+    }
 }
 
 // Init when DOM is ready

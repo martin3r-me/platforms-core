@@ -3,6 +3,9 @@
   x-init="init()"
   x-on:toggle-terminal.window="toggle()"
   x-on:toggle-terminal-open.window="if(!open) toggle()"
+  x-on:presence-updated.window="onlineUsers = $event.detail"
+  x-on:scroll-to-message.window="$nextTick(() => { const el = document.getElementById('msg-' + $event.detail.messageId); if(el) { el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('!bg-amber-100/30'); setTimeout(() => el.classList.remove('!bg-amber-100/30'), 2000); } })"
+  x-on:terminal-typing="sendTypingWhisper($wire.channelId)"
   class="w-full flex-none relative"
   :class="resizing ? '' : 'transition-[height] duration-200 ease-out'"
   x-bind:style="open ? 'height:' + panelHeight + 'px;min-height:' + panelHeight + 'px;max-height:' + panelHeight + 'px' : 'height:38px;min-height:38px;max-height:38px'"
@@ -111,7 +114,28 @@
       <div class="flex-shrink-0 border-r border-[var(--ui-border)]/60 overflow-y-auto overscroll-contain py-2 flex flex-col relative"
            :style="'width: ' + sidebarWidth + 'px'"
            :class="resizingSidebar ? '' : 'transition-[width] duration-0'"
-           wire:key="terminal-sidebar">
+           wire:key="terminal-sidebar"
+           x-data="{
+             searchQuery: '',
+             searchResults: [],
+             searching: false,
+             _searchTimeout: null,
+             doSearch() {
+               clearTimeout(this._searchTimeout);
+               const q = this.searchQuery.trim();
+               if (q.length < 2) { this.searchResults = []; this.searching = false; return; }
+               this.searching = true;
+               this._searchTimeout = setTimeout(() => {
+                 $wire.searchMessages(q).then(r => { this.searchResults = r; this.searching = false; });
+               }, 300);
+             },
+             clearSearch() {
+               this.searchQuery = '';
+               this.searchResults = [];
+               this.searching = false;
+             },
+           }"
+      >
         <!-- Sidebar resize handle -->
         <div
           @mousedown.prevent="startSidebarResize($event)"
@@ -120,6 +144,60 @@
           <div class="absolute inset-y-0 right-0 w-px bg-transparent group-hover/sresize:bg-[var(--ui-primary)]/40 transition"></div>
           <div class="absolute top-1/2 -translate-y-1/2 right-0 h-8 w-1 rounded-full bg-transparent group-hover/sresize:bg-[var(--ui-primary)]/30 transition"></div>
         </div>
+
+        <!-- Search field -->
+        <div class="px-2 mb-2">
+          <div class="relative">
+            <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/></svg>
+            <input
+              type="text"
+              x-model="searchQuery"
+              @input="doSearch()"
+              @keydown.escape="clearSearch()"
+              placeholder="Suchen…"
+              class="w-full text-[11px] pl-7 pr-6 py-1.5 rounded border border-[var(--ui-border)]/60 bg-transparent text-[var(--ui-body-color)] placeholder:text-[var(--ui-muted)]/50 focus:border-[var(--ui-primary)]/40 outline-none transition"
+            >
+            <button x-show="searchQuery.length > 0" x-cloak @click="clearSearch()" class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">
+              <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Search results overlay -->
+        <template x-if="searchQuery.trim().length >= 2">
+          <div class="flex-1 min-h-0 overflow-y-auto px-2">
+            <template x-if="searching">
+              <div class="px-1.5 py-4 text-center text-[10px] text-[var(--ui-muted)]">Suche…</div>
+            </template>
+            <template x-if="!searching && searchResults.length === 0">
+              <div class="px-1.5 py-4 text-center text-[10px] text-[var(--ui-muted)]">Keine Ergebnisse</div>
+            </template>
+            <template x-if="!searching && searchResults.length > 0">
+              <div class="space-y-px">
+                <template x-for="result in searchResults" :key="result.id">
+                  <button
+                    @click="$wire.openChannel(result.channel_id); clearSearch(); $nextTick(() => { const el = document.getElementById('msg-' + result.id); if(el) { el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('!bg-amber-100/30'); setTimeout(() => el.classList.remove('!bg-amber-100/30'), 2000); } })"
+                    class="w-full text-left px-1.5 py-2 rounded-md hover:bg-[var(--ui-surface-hover)] transition"
+                  >
+                    <div class="flex items-center gap-1.5 text-[10px] text-[var(--ui-muted)]">
+                      <span x-text="result.channel_name" class="font-medium truncate"></span>
+                      <span>&middot;</span>
+                      <span x-text="result.date"></span>
+                      <span x-text="result.time"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 mt-0.5">
+                      <span class="text-[11px] font-medium text-[var(--ui-secondary)]" x-text="result.user_name"></span>
+                    </div>
+                    <div class="text-[11px] text-[var(--ui-muted)] truncate mt-0.5" x-text="result.snippet"></div>
+                  </button>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- Channel lists (hidden during search) -->
+        <div x-show="searchQuery.trim().length < 2" class="flex-1 min-h-0 overflow-y-auto">
 
         <!-- New Chat / Channel buttons -->
         <div class="px-2 mb-2 flex gap-1">
@@ -148,11 +226,16 @@
                 class="w-full flex items-center gap-2 px-1.5 py-1.5 rounded-md text-xs transition
                   {{ $channelId === $dm['id'] ? 'bg-[var(--ui-primary-5)] text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)]' }}"
               >
-                <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden">
-                  @if(! empty($dm['avatar']))
-                    <img src="{{ $dm['avatar'] }}" alt="" class="w-full h-full object-cover">
-                  @else
-                    {{ $dm['initials'] ?? '?' }}
+                <div class="relative flex-shrink-0">
+                  <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold overflow-hidden">
+                    @if(! empty($dm['avatar']))
+                      <img src="{{ $dm['avatar'] }}" alt="" class="w-full h-full object-cover">
+                    @else
+                      {{ $dm['initials'] ?? '?' }}
+                    @endif
+                  </div>
+                  @if(! empty($dm['other_user_id']))
+                    <div x-show="isOnline({{ $dm['other_user_id'] }})" x-cloak class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-[var(--ui-surface)]"></div>
                   @endif
                 </div>
                 <span class="truncate flex-1 text-left">{{ $dm['name'] }}</span>
@@ -221,6 +304,8 @@
             @endforelse
           </div>
         </div>
+
+        </div>{{-- end channel lists wrapper --}}
       </div>
 
       <!-- Main Chat Area — keyed per channel so editor + messages fully rebuild -->
@@ -230,14 +315,25 @@
           <!-- Chat Header -->
           <div class="h-11 px-4 flex items-center gap-2.5 text-xs border-b border-[var(--ui-border)]/60 flex-shrink-0">
             @if($this->activeChannel['type'] === 'dm')
-              <div class="w-6 h-6 rounded-lg bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[10px] font-semibold flex-shrink-0 overflow-hidden">
-                @if(! empty($this->activeChannel['avatar']))
-                  <img src="{{ $this->activeChannel['avatar'] }}" alt="" class="w-full h-full object-cover">
-                @else
-                  {{ $this->activeChannel['initials'] ?? '?' }}
+              @php
+                $dmOther = collect($this->activeChannel['members'])->first(fn($m) => $m['id'] !== auth()->id());
+              @endphp
+              <div class="relative flex-shrink-0">
+                <div class="w-6 h-6 rounded-lg bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[10px] font-semibold overflow-hidden">
+                  @if(! empty($this->activeChannel['avatar']))
+                    <img src="{{ $this->activeChannel['avatar'] }}" alt="" class="w-full h-full object-cover">
+                  @else
+                    {{ $this->activeChannel['initials'] ?? '?' }}
+                  @endif
+                </div>
+                @if($dmOther)
+                  <div x-show="isOnline({{ $dmOther['id'] }})" x-cloak class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-[var(--ui-surface)]"></div>
                 @endif
               </div>
               <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $this->activeChannel['name'] }}</span>
+              @if($dmOther)
+                <span x-show="isOnline({{ $dmOther['id'] }})" x-cloak class="text-[10px] text-emerald-500 font-medium">online</span>
+              @endif
             @elseif($this->activeChannel['type'] === 'context' && ! empty($this->activeChannel['context']))
               <span class="text-[14px]">{{ $this->activeChannel['context']['icon'] }}</span>
               <div class="flex flex-col leading-tight">
@@ -375,7 +471,7 @@
                 @php $lastUserId = $msg['user_id']; $lastTime = $msg['time']; @endphp
 
                 {{-- Message row --}}
-                <div class="group relative {{ $isNewGroup ? 'mt-3 first:mt-0' : 'mt-px' }} -mx-4 px-4 py-0.5 hover:bg-[var(--ui-surface-hover)]/40 transition-colors" wire:key="msg-{{ $msg['id'] }}">
+                <div id="msg-{{ $msg['id'] }}" class="group relative {{ $isNewGroup ? 'mt-3 first:mt-0' : 'mt-px' }} -mx-4 px-4 py-0.5 hover:bg-[var(--ui-surface-hover)]/40 transition-colors" wire:key="msg-{{ $msg['id'] }}">
 
                   {{-- Hover action bar --}}
                   <div class="absolute -top-3 right-5 hidden group-hover:flex items-center gap-px bg-[var(--ui-surface)] border border-[var(--ui-border)]/60 rounded-md shadow-sm z-10">
@@ -394,8 +490,48 @@
                     >❤️</button>
                     <button
                       wire:click="toggleReaction({{ $msg['id'] }}, '✅')"
-                      class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] rounded-r-md transition text-xs"
+                      class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition text-xs"
                     >✅</button>
+                    <div class="w-px h-4 bg-[var(--ui-border)]/40 self-center"></div>
+                    <button
+                      x-data="{ copied: false }"
+                      @click.stop="
+                        $wire.getMessagePermalink({{ $msg['id'] }}).then(url => {
+                          if(url) {
+                            navigator.clipboard.writeText(url);
+                            copied = true;
+                            setTimeout(() => copied = false, 1500);
+                          }
+                        })
+                      "
+                      class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition {{ $msg['is_mine'] ? '' : 'rounded-r-md' }}"
+                      :title="copied ? 'Kopiert!' : 'Link kopieren'"
+                    >
+                      <template x-if="!copied">
+                        <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M12.232 4.232a2.5 2.5 0 013.536 3.536l-1.225 1.224a.75.75 0 001.061 1.06l1.224-1.224a4 4 0 00-5.656-5.656l-3 3a4 4 0 00.225 5.865.75.75 0 00.977-1.138 2.5 2.5 0 01-.142-3.667l3-3z"/><path d="M11.603 7.963a.75.75 0 00-.977 1.138 2.5 2.5 0 01.142 3.667l-3 3a2.5 2.5 0 01-3.536-3.536l1.225-1.224a.75.75 0 00-1.061-1.06l-1.224 1.224a4 4 0 005.656 5.656l3-3a4 4 0 00-.225-5.865z"/></svg>
+                      </template>
+                      <template x-if="copied">
+                        <svg class="w-3.5 h-3.5 text-emerald-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
+                      </template>
+                    </button>
+                    @if($msg['is_mine'])
+                      <div class="w-px h-4 bg-[var(--ui-border)]/40 self-center"></div>
+                      <button
+                        wire:click="startEditMessage({{ $msg['id'] }})"
+                        class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition"
+                        title="Bearbeiten"
+                      >
+                        <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z"/></svg>
+                      </button>
+                      <button
+                        wire:click="deleteMessage({{ $msg['id'] }})"
+                        wire:confirm="Nachricht unwiderruflich loschen?"
+                        class="p-1 text-[var(--ui-muted)] hover:text-red-500 hover:bg-red-50 rounded-r-md transition"
+                        title="Loschen"
+                      >
+                        <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.519.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
+                      </button>
+                    @endif
                   </div>
 
                   @if($isNewGroup)
@@ -412,8 +548,30 @@
                         <div class="flex items-baseline gap-2">
                           <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $msg['is_mine'] ? 'Du' : $msg['user_name'] }}</span>
                           <span class="text-[11px] text-[var(--ui-muted)] font-normal">{{ $msg['time'] }}</span>
+                          @if(! empty($msg['edited_at']))
+                            <span class="text-[10px] text-[var(--ui-muted)] font-normal" title="Bearbeitet am {{ $msg['edited_at'] }}">(bearbeitet)</span>
+                          @endif
                         </div>
-                        <div class="text-[var(--ui-body-color)] leading-relaxed prose-terminal">{!! $msg['body_html'] !!}</div>
+                        @if($editingMessageId === $msg['id'])
+                          <div x-data="{ editText: @js($msg['body_plain']) }" class="mt-1">
+                            <textarea
+                              x-ref="editInput"
+                              x-model="editText"
+                              x-init="$nextTick(() => { $refs.editInput.focus(); $refs.editInput.selectionStart = $refs.editInput.value.length; })"
+                              @keydown.enter.prevent="if(editText.trim()) $wire.editMessage({{ $msg['id'] }}, '<p>' + editText.replace(/\n/g, '</p><p>') + '</p>', editText)"
+                              @keydown.escape="$wire.cancelEdit()"
+                              class="w-full text-[13px] px-2.5 py-1.5 rounded border border-[var(--ui-primary)]/40 bg-transparent text-[var(--ui-body-color)] focus:border-[var(--ui-primary)] outline-none transition resize-none leading-relaxed"
+                              rows="2"
+                            ></textarea>
+                            <div class="flex items-center gap-2 mt-1 text-[10px] text-[var(--ui-muted)]">
+                              <span>Enter = Speichern</span>
+                              <span>&middot;</span>
+                              <span>Escape = Abbrechen</span>
+                            </div>
+                          </div>
+                        @else
+                          <div class="text-[var(--ui-body-color)] leading-relaxed prose-terminal">{!! $msg['body_html'] !!}</div>
+                        @endif
                         @if(! empty($msg['attachments']))
                           @include('platform::livewire.terminal-attachments', ['attachments' => $msg['attachments']])
                         @endif
@@ -426,7 +584,29 @@
                         <span class="text-[10px] text-[var(--ui-muted)] opacity-0 group-hover:opacity-100 transition-opacity select-none">{{ $msg['time'] }}</span>
                       </div>
                       <div class="flex-1 min-w-0">
-                        <div class="text-[var(--ui-body-color)] leading-relaxed prose-terminal">{!! $msg['body_html'] !!}</div>
+                        @if($editingMessageId === $msg['id'])
+                          <div x-data="{ editText: @js($msg['body_plain']) }">
+                            <textarea
+                              x-ref="editInput"
+                              x-model="editText"
+                              x-init="$nextTick(() => { $refs.editInput.focus(); $refs.editInput.selectionStart = $refs.editInput.value.length; })"
+                              @keydown.enter.prevent="if(editText.trim()) $wire.editMessage({{ $msg['id'] }}, '<p>' + editText.replace(/\n/g, '</p><p>') + '</p>', editText)"
+                              @keydown.escape="$wire.cancelEdit()"
+                              class="w-full text-[13px] px-2.5 py-1.5 rounded border border-[var(--ui-primary)]/40 bg-transparent text-[var(--ui-body-color)] focus:border-[var(--ui-primary)] outline-none transition resize-none leading-relaxed"
+                              rows="2"
+                            ></textarea>
+                            <div class="flex items-center gap-2 mt-1 text-[10px] text-[var(--ui-muted)]">
+                              <span>Enter = Speichern</span>
+                              <span>&middot;</span>
+                              <span>Escape = Abbrechen</span>
+                            </div>
+                          </div>
+                        @else
+                          <div class="text-[var(--ui-body-color)] leading-relaxed prose-terminal">{!! $msg['body_html'] !!}</div>
+                          @if(! empty($msg['edited_at']))
+                            <span class="text-[10px] text-[var(--ui-muted)]" title="Bearbeitet am {{ $msg['edited_at'] }}">(bearbeitet)</span>
+                          @endif
+                        @endif
                         @if(! empty($msg['attachments']))
                           @include('platform::livewire.terminal-attachments', ['attachments' => $msg['attachments']])
                         @endif
@@ -470,6 +650,16 @@
                 </div>
               @endforelse
             </div>
+          </div>
+
+          <!-- Typing indicator -->
+          <div x-show="typingDisplay" x-cloak class="px-4 py-1 text-[11px] text-[var(--ui-muted)] italic flex items-center gap-1.5 border-t border-transparent">
+            <span class="flex gap-0.5">
+              <span class="w-1 h-1 rounded-full bg-[var(--ui-muted)] animate-bounce" style="animation-delay:0ms"></span>
+              <span class="w-1 h-1 rounded-full bg-[var(--ui-muted)] animate-bounce" style="animation-delay:150ms"></span>
+              <span class="w-1 h-1 rounded-full bg-[var(--ui-muted)] animate-bounce" style="animation-delay:300ms"></span>
+            </span>
+            <span x-text="typingDisplay"></span>
           </div>
 
           <!-- Input (Tiptap Editor) — wire:ignore prevents morph from destroying ProseMirror DOM -->
@@ -532,6 +722,7 @@
                x-on:dragover.prevent="dragOver = true"
                x-on:dragleave.prevent="dragOver = false"
                x-on:drop.prevent="dragOver = false; handleFiles($event.dataTransfer.files)"
+               x-on:keydown="$dispatch('terminal-typing')"
           >
             {{-- Upload preview bar --}}
             <div x-show="uploadedFiles.length > 0 || uploading" x-cloak class="px-4 pt-2 pb-1">
@@ -826,8 +1017,22 @@
         sidebarWidth: parseInt(localStorage.getItem(SIDEBAR_STORAGE_KEY)) || DEFAULT_SIDEBAR,
         resizing: false,
         resizingSidebar: false,
+        onlineUsers: [],
+        typingUsers: {},
         _startY: 0,
         _startH: 0,
+
+        get typingDisplay() {
+          const names = Object.values(this.typingUsers).map(u => u.name);
+          if (names.length === 0) return '';
+          if (names.length === 1) return names[0] + ' tippt…';
+          if (names.length === 2) return names[0] + ' und ' + names[1] + ' tippen…';
+          return names[0] + ', ' + names[1] + ' und andere tippen…';
+        },
+
+        isOnline(userId) {
+          return this.onlineUsers.includes(userId);
+        },
 
         get open(){ return Alpine?.store('page')?.terminalOpen ?? false; },
         toggle(){ if(Alpine?.store('page')) Alpine.store('page').terminalOpen = !Alpine.store('page').terminalOpen; },
@@ -879,6 +1084,47 @@
           document.addEventListener('mouseup', onUp);
         },
 
+        _typingChannel: null,
+        _lastTypingSent: 0,
+
+        setupTypingListener(channelId) {
+          // Clean up previous listener
+          if (this._typingChannel) {
+            try { window.Echo?.private(this._typingChannel)?.stopListeningForWhisper('typing'); } catch(e) {}
+          }
+          if (!channelId || !window.Echo) return;
+
+          this._typingChannel = `terminal.channel.${channelId}`;
+          const userId = {{ auth()->id() }};
+
+          window.Echo.private(this._typingChannel)
+            .listenForWhisper('typing', (e) => {
+              if (e.userId === userId) return;
+              const key = e.userId;
+              if (this.typingUsers[key]?._timeout) clearTimeout(this.typingUsers[key]._timeout);
+              const timeout = setTimeout(() => {
+                delete this.typingUsers[key];
+                this.typingUsers = { ...this.typingUsers };
+              }, 4000);
+              this.typingUsers[key] = { name: e.userName, _timeout: timeout };
+              this.typingUsers = { ...this.typingUsers };
+            });
+        },
+
+        sendTypingWhisper(channelId) {
+          if (!channelId || !window.Echo) return;
+          const now = Date.now();
+          if (now - this._lastTypingSent < 3000) return;
+          this._lastTypingSent = now;
+          try {
+            window.Echo.private(`terminal.channel.${channelId}`)
+              .whisper('typing', {
+                userId: {{ auth()->id() }},
+                userName: @js(auth()->user()->name),
+              });
+          } catch(e) {}
+        },
+
         init(){
           // Clamp stored height to current viewport
           const maxH = Math.floor(window.innerHeight * MAX_RATIO);
@@ -901,6 +1147,15 @@
             if (!c) return;
             if (el === c || c.contains(el)) scrollBottom();
           });
+
+          // Setup typing listener for initial channel
+          this.$watch('$wire.channelId', (id) => {
+            this.typingUsers = {};
+            this.setupTypingListener(id);
+          });
+          @if($channelId)
+            this.setupTypingListener({{ $channelId }});
+          @endif
         },
       };
     }

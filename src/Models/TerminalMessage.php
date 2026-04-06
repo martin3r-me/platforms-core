@@ -25,6 +25,7 @@ class TerminalMessage extends Model
         'has_attachments',
         'has_mentions',
         'meta',
+        'edited_at',
     ];
 
     protected $casts = [
@@ -33,6 +34,7 @@ class TerminalMessage extends Model
         'has_mentions' => 'boolean',
         'reply_count' => 'integer',
         'last_reply_at' => 'datetime',
+        'edited_at' => 'datetime',
     ];
 
     protected static function booted(): void

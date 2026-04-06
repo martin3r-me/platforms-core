@@ -32,6 +32,7 @@ class Terminal extends Component
     public array $contextMeta = [];
     public ?int $channelId = null;
     public $pendingFiles = [];
+    public ?int $editingMessageId = null;
 
     // ── Lifecycle ──────────────────────────────────────────────
 
@@ -41,6 +42,33 @@ class Terminal extends Component
         $teamId = $this->teamId();
         if (! $teamId) {
             return;
+        }
+
+        // Deep-link: ?channel={id}&message={id}
+        $deepChannel = request()->query('channel');
+        $deepMessage = request()->query('message');
+
+        if ($deepChannel) {
+            $channel = TerminalChannel::where('id', (int) $deepChannel)
+                ->where('team_id', $teamId)
+                ->first();
+
+            if ($channel) {
+                // Verify membership
+                $isMember = TerminalChannelMember::where('channel_id', $channel->id)
+                    ->where('user_id', auth()->id())
+                    ->exists();
+
+                if ($isMember) {
+                    $this->channelId = $channel->id;
+
+                    if ($deepMessage) {
+                        $this->dispatch('scroll-to-message', messageId: (int) $deepMessage);
+                    }
+
+                    return;
+                }
+            }
         }
 
         $lastMembership = TerminalChannelMember::where('user_id', auth()->id())
@@ -713,6 +741,85 @@ class Terminal extends Component
         }
     }
 
+    // ── Edit / Delete Message ─────────────────────────────────
+
+    public function deleteMessage(int $messageId): void
+    {
+        $msg = TerminalMessage::find($messageId);
+        if (! $msg || $msg->user_id !== auth()->id()) {
+            return;
+        }
+
+        $channel = $msg->channel;
+        $parentId = $msg->parent_id;
+
+        // Cascade delete related records
+        $msg->reactions()->delete();
+        $msg->mentions()->delete();
+
+        // Delete child replies (and their reactions/mentions)
+        foreach ($msg->replies as $reply) {
+            $reply->reactions()->delete();
+            $reply->mentions()->delete();
+            $reply->delete();
+        }
+
+        $msg->delete();
+
+        // Update parent reply_count if this was a reply
+        if ($parentId) {
+            $parent = TerminalMessage::find($parentId);
+            if ($parent) {
+                $parent->update(['reply_count' => $parent->replies()->count()]);
+            }
+        }
+
+        // Update channel message_count
+        if ($channel) {
+            $channel->update(['message_count' => $channel->messages()->count()]);
+        }
+
+        // Invalidate messages cache
+        unset($this->messages);
+        unset($this->channels);
+    }
+
+    public function startEditMessage(int $messageId): void
+    {
+        $msg = TerminalMessage::find($messageId);
+        if (! $msg || $msg->user_id !== auth()->id()) {
+            return;
+        }
+
+        $this->editingMessageId = $messageId;
+    }
+
+    public function cancelEdit(): void
+    {
+        $this->editingMessageId = null;
+    }
+
+    public function editMessage(int $messageId, string $bodyHtml, string $bodyPlain): void
+    {
+        $msg = TerminalMessage::find($messageId);
+        if (! $msg || $msg->user_id !== auth()->id()) {
+            return;
+        }
+
+        if (empty(trim(strip_tags($bodyHtml)))) {
+            return;
+        }
+
+        $msg->update([
+            'body_html' => $bodyHtml,
+            'body_plain' => $bodyPlain,
+            'edited_at' => now(),
+        ]);
+
+        $this->editingMessageId = null;
+        unset($this->messages);
+    }
+
     // ── Read Tracking ──────────────────────────────────────────
 
     public function markAsRead(?int $messageId = null): void
@@ -751,6 +858,81 @@ class Terminal extends Component
                 'initials' => $this->initials($u->name),
             ])
             ->toArray();
+    }
+
+    // ── Search ─────────────────────────────────────────────────
+
+    public function searchMessages(string $query): array
+    {
+        $query = trim($query);
+        if (strlen($query) < 2) {
+            return [];
+        }
+
+        $teamId = $this->teamId();
+        if (! $teamId) {
+            return [];
+        }
+
+        $channelIds = TerminalChannelMember::where('user_id', auth()->id())
+            ->whereHas('channel', fn ($q) => $q->where('team_id', $teamId))
+            ->pluck('channel_id');
+
+        return TerminalMessage::whereIn('channel_id', $channelIds)
+            ->where('body_plain', 'LIKE', "%{$query}%")
+            ->with(['user:id,name,avatar', 'channel:id,name,type,context_type,context_id'])
+            ->latest()
+            ->limit(30)
+            ->get()
+            ->map(function (TerminalMessage $m) use ($query) {
+                $plain = $m->body_plain ?? '';
+                $pos = mb_stripos($plain, $query);
+                $start = max(0, $pos - 30);
+                $snippet = ($start > 0 ? '…' : '') . mb_substr($plain, $start, 80) . (mb_strlen($plain) > $start + 80 ? '…' : '');
+
+                $channelName = $m->channel?->name;
+                if (! $channelName && $m->channel?->type === 'dm') {
+                    $other = TerminalChannelMember::where('channel_id', $m->channel_id)
+                        ->where('user_id', '!=', auth()->id())
+                        ->with('user:id,name')
+                        ->first();
+                    $channelName = $other?->user?->name ?? 'Chat';
+                }
+
+                return [
+                    'id' => $m->id,
+                    'channel_id' => $m->channel_id,
+                    'channel_name' => $channelName ?? 'Kontext',
+                    'channel_type' => $m->channel?->type,
+                    'user_name' => $m->user?->name ?? 'Unbekannt',
+                    'user_avatar' => $m->user?->avatar,
+                    'user_initials' => $this->initials($m->user?->name ?? '?'),
+                    'snippet' => $snippet,
+                    'time' => $m->created_at->format('H:i'),
+                    'date' => $m->created_at->translatedFormat('d. M'),
+                ];
+            })
+            ->toArray();
+    }
+
+    // ── Permalink ──────────────────────────────────────────────
+
+    public function getMessagePermalink(int $messageId): ?string
+    {
+        $message = TerminalMessage::find($messageId);
+        if (! $message) {
+            return null;
+        }
+
+        $isMember = TerminalChannelMember::where('channel_id', $message->channel_id)
+            ->where('user_id', auth()->id())
+            ->exists();
+
+        if (! $isMember) {
+            return null;
+        }
+
+        return config('app.url') . '/terminal?channel=' . $message->channel_id . '&message=' . $message->id;
     }
 
     // ── Computed Properties ────────────────────────────────────
@@ -852,6 +1034,7 @@ class Terminal extends Component
                 $item['name'] = $other?->user?->name ?? 'Unbekannt';
                 $item['avatar'] = $other?->user?->avatar;
                 $item['initials'] = $this->initials($item['name']);
+                $item['other_user_id'] = $other?->user_id;
                 $dms[] = $item;
             } elseif ($ch->type === 'channel') {
                 $channels[] = $item;
@@ -946,6 +1129,7 @@ class Terminal extends Component
                 'time' => $m->created_at->format('H:i'),
                 'date' => $m->created_at->translatedFormat('d. M Y'),
                 'is_mine' => $m->user_id === auth()->id(),
+                'edited_at' => $m->edited_at?->format('d.m.Y H:i'),
             ])
             ->toArray();
     }
