@@ -19,6 +19,9 @@ function init() {
     }
 
     window.Pusher = Pusher;
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
     window.Echo = new Echo({
         broadcaster: 'reverb',
         key: key,
@@ -30,8 +33,35 @@ function init() {
         authEndpoint: '/broadcasting/auth',
         auth: {
             headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
             },
+        },
+        authorizer: (channel) => {
+            return {
+                authorize: (socketId, callback) => {
+                    fetch('/broadcasting/auth', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({
+                            socket_id: socketId,
+                            channel_name: channel.name,
+                        }),
+                    })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Auth failed: ' + response.status);
+                        return response.json();
+                    })
+                    .then(data => callback(null, data))
+                    .catch(error => callback(error));
+                },
+            };
         },
     });
 
