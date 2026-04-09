@@ -271,6 +271,72 @@ class Terminal extends Component
     }
 
     /**
+     * Load activities for the context entity of the active channel.
+     */
+    public function getContextActivities(): array
+    {
+        $channel = $this->channelId ? TerminalChannel::find($this->channelId) : null;
+        if (! $channel || ! $channel->context_type || ! $channel->context_id) {
+            return [];
+        }
+
+        if (! class_exists($channel->context_type)) {
+            return [];
+        }
+
+        $model = $channel->context_type::find($channel->context_id);
+        if (! $model || ! method_exists($model, 'activities')) {
+            return [];
+        }
+
+        return $model->activities()
+            ->with('user')
+            ->limit(30)
+            ->get()
+            ->map(function ($activity) {
+                $userName = $activity->user?->name ?? 'System';
+                $event = $activity->name;
+
+                // Build readable title
+                if ($activity->message) {
+                    $title = "{$userName}: {$activity->message}";
+                } else {
+                    $translations = [
+                        'created' => 'erstellt',
+                        'updated' => 'aktualisiert',
+                        'deleted' => 'gelöscht',
+                    ];
+                    $translated = $translations[$event] ?? $event;
+
+                    $changedFields = [];
+                    $props = $activity->properties ?? [];
+                    if (! empty($props)) {
+                        $fieldKeys = isset($props['new']) ? array_keys($props['new']) : (isset($props['old']) ? [] : array_keys($props));
+                        $fieldTranslations = [
+                            'title' => 'Titel', 'description' => 'Beschreibung', 'due_date' => 'Fälligkeitsdatum',
+                            'is_done' => 'Status', 'status' => 'Status', 'priority' => 'Priorität',
+                            'name' => 'Name', 'user_in_charge_id' => 'Verantwortlicher',
+                        ];
+                        $changedFields = array_map(fn ($f) => $fieldTranslations[$f] ?? $f, $fieldKeys);
+                    }
+
+                    $title = $changedFields
+                        ? "{$userName} hat " . implode(', ', array_slice($changedFields, 0, 3)) . " {$translated}"
+                        : "{$userName} hat {$translated}";
+                }
+
+                return [
+                    'id' => $activity->id,
+                    'title' => $title,
+                    'user' => $userName,
+                    'type' => $activity->activity_type,
+                    'time' => $activity->created_at->diffForHumans(),
+                ];
+            })
+            ->toArray();
+    }
+
+    /**
      * Dispatch context to ModalFiles — open file manager for current context.
      */
     public function dispatchFilesContext(): void
