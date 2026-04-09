@@ -29,9 +29,10 @@
       --t-accent: var(--ui-primary);
       --t-glow: rgba(var(--ui-primary-rgb), 0.15);
       --t-unread-glow: rgba(244,63,94,0.3);
-      /* Slack aubergine sidebar */
-      --t-sidebar: #3F0E40;
-      --t-sidebar-hover: #350D36;
+      /* Aubergine-pink sidebar gradient */
+      --t-sidebar-from: #3F0E40;
+      --t-sidebar-to: #541638;
+      --t-sidebar-hover: #4a1545;
       --t-sidebar-active: #1164A3;
     }
     /* Light scope — remaps terminal vars to platform light theme for content area + modals */
@@ -80,7 +81,8 @@
   <!-- Single terminal container — status bar always peeks out -->
   <div
     class="w-full h-full overflow-hidden flex flex-col relative z-[1]"
-    :class="fullscreen ? 'bg-[var(--t-sidebar)] shadow-2xl' : 'border-t border-[var(--t-border-bright)] shadow-[0_-4px_30px_rgba(0,0,0,0.15)] bg-[var(--t-sidebar)]'"
+    :class="fullscreen ? 'shadow-2xl' : 'border-t border-[var(--t-border-bright)] shadow-[0_-4px_30px_rgba(0,0,0,0.15)]'"
+    style="background: linear-gradient(165deg, var(--t-sidebar-from) 0%, var(--t-sidebar-to) 100%)"
     wire:key="terminal-slide"
   >
     <!-- Resize handle — only visible when open, hidden in fullscreen -->
@@ -94,7 +96,7 @@
     </div>
 
     <!-- Status bar — always visible (42px), top bar in fullscreen -->
-    <div class="relative flex-shrink-0 bg-[var(--t-sidebar)] border-b border-white/[0.08]" wire:key="terminal-statusbar"
+    <div class="relative flex-shrink-0 border-b border-white/[0.08]" wire:key="terminal-statusbar"
     >
     <div
       @click.self="if(!fullscreen) toggle()"
@@ -256,7 +258,7 @@
          wire:key="terminal-content">
 
       <!-- Sidebar (resizable) -->
-      <div class="flex-shrink-0 overflow-y-auto overscroll-contain py-2 flex flex-col relative border-r border-white/[0.06] bg-[var(--t-sidebar)]"
+      <div class="flex-shrink-0 overflow-y-auto overscroll-contain py-2 flex flex-col relative border-r border-white/[0.06]"
            :class="resizingSidebar ? '' : 'transition-[width] duration-0'"
            :style="'width:' + sidebarWidth + 'px'"
            wire:key="terminal-sidebar"
