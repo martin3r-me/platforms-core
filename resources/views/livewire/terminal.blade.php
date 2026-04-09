@@ -1373,16 +1373,27 @@
                 <div id="msg-{{ $msg['id'] }}" class="group relative {{ $isNewGroup ? 'mt-3 first:mt-0' : 'mt-px' }} -mx-4 px-4 py-0.5 hover:bg-white/[0.04] transition-colors" wire:key="msg-{{ $msg['id'] }}">
 
                   {{-- Hover action bar --}}
-                  <div class="absolute -top-3 right-5 hidden group-hover:flex items-center gap-px bg-[var(--t-glass-surface)] border border-[var(--t-border)]/60 rounded-md shadow-sm z-10">
-                    {{-- Quick reactions --}}
-                    <button wire:click="toggleReaction({{ $msg['id'] }}, '👍')" class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 rounded-l-md transition text-xs" title="Reagieren">👍</button>
-                    <button wire:click="toggleReaction({{ $msg['id'] }}, '😂')" class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition text-xs">😂</button>
-                    <button wire:click="toggleReaction({{ $msg['id'] }}, '❤️')" class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition text-xs">❤️</button>
-                    <button wire:click="toggleReaction({{ $msg['id'] }}, '✅')" class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition text-xs">✅</button>
-                    {{-- Emoji picker (+) --}}
-                    <div x-data="{ showPicker: false, activeTab: 0 }" class="relative">
-                      <button @click.stop="showPicker = !showPicker" class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition text-xs" title="Mehr Emojis">+</button>
-                      <div x-show="showPicker" x-cloak @click.outside="showPicker = false" class="absolute bottom-full right-0 mb-1 bg-[var(--t-glass-surface)] border border-[var(--t-border)]/60 rounded-lg shadow-xl z-50 w-[260px]">
+                  <div class="absolute -top-3 right-5 hidden group-hover:flex items-center gap-px bg-[var(--t-glass-surface)] border border-[var(--t-border)]/60 rounded-md shadow-sm z-10"
+                       x-data="{ showMore: false, showEmoji: false, showReminder: false, copied: false }">
+
+                    {{-- Emoji Picker Button --}}
+                    <div class="relative">
+                      <button @click.stop="showEmoji = !showEmoji; showMore = false"
+                              class="p-1 rounded-l-md text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition"
+                              title="Reagieren">
+                        <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.536-4.464a.75.75 0 10-1.072-1.05A3.49 3.49 0 0110 13.5a3.49 3.49 0 01-2.464-1.014.75.75 0 00-1.072 1.05A4.99 4.99 0 0010 15a4.99 4.99 0 003.536-1.464zM9 8.5a1 1 0 11-2 0 1 1 0 012 0zm4 0a1 1 0 11-2 0 1 1 0 012 0z" clip-rule="evenodd"/></svg>
+                      </button>
+                      {{-- Emoji Picker Dropdown --}}
+                      <div x-show="showEmoji" x-cloak @click.outside="showEmoji = false"
+                           class="absolute bottom-full right-0 mb-1 bg-[var(--t-glass-surface)] border border-[var(--t-border)]/60 rounded-lg shadow-xl z-50 w-[260px]"
+                           x-data="{ activeTab: 0 }">
+                        {{-- Quick reactions row --}}
+                        <div class="flex gap-0.5 p-1.5 border-b border-[var(--t-border)]/40">
+                          @foreach(['👍','❤️','😂','🎉','✅','👀','🔥'] as $emoji)
+                            <button wire:click="toggleReaction({{ $msg['id'] }}, '{{ $emoji }}')" @click.stop="showEmoji = false"
+                                    class="p-1.5 text-lg rounded hover:bg-white/5 transition text-center leading-none">{{ $emoji }}</button>
+                          @endforeach
+                        </div>
                         @php
                           $emojiCategories = [
                             ['name' => 'Häufig', 'icon' => '👍', 'emojis' => ['👍','❤️','😊','😂','🎉','🔥','✅','👀','🙏','💪','😍','🤔','👏','💯','🚀']],
@@ -1400,93 +1411,109 @@
                         @foreach($emojiCategories as $ci => $cat)
                           <div x-show="activeTab === {{ $ci }}" class="grid grid-cols-5 gap-0.5 p-1.5">
                             @foreach($cat['emojis'] as $emoji)
-                              <button wire:click="toggleReaction({{ $msg['id'] }}, '{{ $emoji }}')" @click.stop="showPicker = false" class="p-1.5 text-lg rounded hover:bg-white/5 transition text-center leading-none">{{ $emoji }}</button>
+                              <button wire:click="toggleReaction({{ $msg['id'] }}, '{{ $emoji }}')" @click.stop="showEmoji = false" class="p-1.5 text-lg rounded hover:bg-white/5 transition text-center leading-none">{{ $emoji }}</button>
                             @endforeach
                           </div>
                         @endforeach
                       </div>
                     </div>
-                    <div class="w-px h-4 bg-[var(--t-border)]/40 self-center"></div>
+
+                    {{-- Thread / Reply --}}
+                    <button @click.stop="$dispatch('terminal-open-thread', { messageId: {{ $msg['id'] }} })"
+                            class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition"
+                            title="Antworten">
+                      <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5zm11 4V5a4 4 0 00-4-4H7a4 4 0 014 4h2a2 2 0 012 2v4a2 2 0 01-2 2h-1l-2 2h3l3 3v-3a2 2 0 002-2V9z" clip-rule="evenodd"/></svg>
+                    </button>
+
                     {{-- Bookmark --}}
-                    <button
-                      wire:click="toggleBookmark({{ $msg['id'] }})"
-                      class="p-1 transition text-xs {{ $msg['is_bookmarked'] ? 'text-amber-500' : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)]' }} hover:bg-white/5"
-                      title="{{ $msg['is_bookmarked'] ? 'Lesezeichen entfernen' : 'Lesezeichen setzen' }}"
-                    >
+                    <button wire:click="toggleBookmark({{ $msg['id'] }})"
+                            class="p-1 transition {{ $msg['is_bookmarked'] ? 'text-amber-500' : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)]' }} hover:bg-white/5"
+                            title="{{ $msg['is_bookmarked'] ? 'Lesezeichen entfernen' : 'Lesezeichen setzen' }}">
                       <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2c-.22 0-.44.03-.65.09L5.47 3.6a2.5 2.5 0 00-1.8 2.4v9.5a2 2 0 003.32 1.5L10 14.5l3.01 2.5A2 2 0 0016.33 15.5V6a2.5 2.5 0 00-1.8-2.4l-3.88-1.51A1.75 1.75 0 0010 2z"/></svg>
                     </button>
-                    {{-- Pin --}}
-                    <button
-                      wire:click="{{ $msg['is_pinned'] ? 'unpinMessage' : 'pinMessage' }}({{ $msg['id'] }})"
-                      class="p-1 transition text-xs {{ $msg['is_pinned'] ? 'text-[var(--t-accent)]' : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)]' }} hover:bg-white/5"
-                      title="{{ $msg['is_pinned'] ? 'Pin entfernen' : 'Nachricht anpinnen' }}"
-                    >
-                      <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
-                    </button>
-                    {{-- Forward --}}
-                    <button
-                      @click.stop="$dispatch('terminal-show-forward', { messageId: {{ $msg['id'] }} })"
-                      class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition text-xs"
-                      title="Weiterleiten"
-                    >
-                      <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.21 2.22a.75.75 0 011.06-.02l7.5 7.25a.75.75 0 010 1.08l-7.5 7.25a.75.75 0 11-1.04-1.08l6.1-5.9H3.75a.75.75 0 010-1.5h13.08l-6.1-5.9a.75.75 0 01-.02-1.06z" clip-rule="evenodd"/></svg>
-                    </button>
-                    {{-- Reminder --}}
-                    <div x-data="{ showReminder: false }" class="relative">
-                      <button @click.stop="showReminder = !showReminder" class="p-1 transition text-xs {{ $msg['has_reminder'] ? 'text-amber-500' : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)]' }} hover:bg-white/5" title="Erinnerung">
-                        <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a6 6 0 00-6 6c0 1.887-.454 3.665-1.257 5.234a.75.75 0 00.515 1.076 32.91 32.91 0 003.256.508 3.5 3.5 0 006.972 0 32.903 32.903 0 003.256-.508.75.75 0 00.515-1.076A11.448 11.448 0 0116 8a6 6 0 00-6-6zm0 14.5a2 2 0 01-1.95-1.557 33.146 33.146 0 003.9 0A2 2 0 0110 16.5z" clip-rule="evenodd"/></svg>
+
+                    {{-- More menu --}}
+                    <div class="relative">
+                      <button @click.stop="showMore = !showMore; showEmoji = false"
+                              class="p-1 rounded-r-md text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition"
+                              title="Mehr">
+                        <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 10a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zm5.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zm7-1.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z"/></svg>
                       </button>
-                      <div x-show="showReminder" x-cloak @click.outside="showReminder = false" class="absolute bottom-full right-0 mb-1 bg-[var(--t-glass-surface)] border border-[var(--t-border)]/60 rounded-lg shadow-xl z-50 w-48 py-1">
-                        <button wire:click="setReminder({{ $msg['id'] }}, '30min')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--t-text)] hover:bg-white/5 transition">In 30 Minuten</button>
-                        <button wire:click="setReminder({{ $msg['id'] }}, '1h')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--t-text)] hover:bg-white/5 transition">In 1 Stunde</button>
-                        <button wire:click="setReminder({{ $msg['id'] }}, '3h')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--t-text)] hover:bg-white/5 transition">In 3 Stunden</button>
-                        <button wire:click="setReminder({{ $msg['id'] }}, 'tomorrow_9')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--t-text)] hover:bg-white/5 transition">Morgen 09:00</button>
-                        <button wire:click="setReminder({{ $msg['id'] }}, 'next_monday_9')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--t-text)] hover:bg-white/5 transition">Nächsten Montag 09:00</button>
-                        @if($msg['has_reminder'])
+                      {{-- More dropdown --}}
+                      <div x-show="showMore" x-cloak @click.outside="showMore = false"
+                           x-transition:enter="transition ease-out duration-100"
+                           x-transition:enter-start="opacity-0 scale-95"
+                           x-transition:enter-end="opacity-100 scale-100"
+                           x-transition:leave="transition ease-in duration-75"
+                           x-transition:leave-start="opacity-100 scale-100"
+                           x-transition:leave-end="opacity-0 scale-95"
+                           class="absolute bottom-full right-0 mb-1 bg-[var(--t-glass-surface)] border border-[var(--t-border)]/60 rounded-lg shadow-xl z-50 w-52 py-1">
+                        {{-- Pin --}}
+                        <button wire:click="{{ $msg['is_pinned'] ? 'unpinMessage' : 'pinMessage' }}({{ $msg['id'] }})" @click.stop="showMore = false"
+                                class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--t-text)] hover:bg-white/5 transition {{ $msg['is_pinned'] ? 'text-[var(--t-accent)]' : '' }}">
+                          <svg class="w-3.5 h-3.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
+                          <span>{{ $msg['is_pinned'] ? 'Pin entfernen' : 'Anpinnen' }}</span>
+                        </button>
+                        {{-- Forward --}}
+                        <button @click.stop="$dispatch('terminal-show-forward', { messageId: {{ $msg['id'] }} }); showMore = false"
+                                class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--t-text)] hover:bg-white/5 transition">
+                          <svg class="w-3.5 h-3.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.21 2.22a.75.75 0 011.06-.02l7.5 7.25a.75.75 0 010 1.08l-7.5 7.25a.75.75 0 11-1.04-1.08l6.1-5.9H3.75a.75.75 0 010-1.5h13.08l-6.1-5.9a.75.75 0 01-.02-1.06z" clip-rule="evenodd"/></svg>
+                          <span>Weiterleiten</span>
+                        </button>
+                        {{-- Reminder --}}
+                        <button @click.stop="showReminder = !showReminder"
+                                class="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-white/5 transition {{ $msg['has_reminder'] ? 'text-amber-500' : 'text-[var(--t-text)]' }}">
+                          <svg class="w-3.5 h-3.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a6 6 0 00-6 6c0 1.887-.454 3.665-1.257 5.234a.75.75 0 00.515 1.076 32.91 32.91 0 003.256.508 3.5 3.5 0 006.972 0 32.903 32.903 0 003.256-.508.75.75 0 00.515-1.076A11.448 11.448 0 0116 8a6 6 0 00-6-6zm0 14.5a2 2 0 01-1.95-1.557 33.146 33.146 0 003.9 0A2 2 0 0110 16.5z" clip-rule="evenodd"/></svg>
+                          <span>Erinnern</span>
+                          <svg class="w-3 h-3 ml-auto flex-shrink-0 transition-transform" :class="showReminder && 'rotate-180'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+                        </button>
+                        {{-- Reminder sub-options (inline) --}}
+                        <div x-show="showReminder" x-cloak class="bg-white/[0.02]">
+                          <button wire:click="setReminder({{ $msg['id'] }}, '30min')" @click.stop="showMore = false; showReminder = false" class="w-full text-left px-3 py-1.5 pl-9 text-xs text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition">In 30 Minuten</button>
+                          <button wire:click="setReminder({{ $msg['id'] }}, '1h')" @click.stop="showMore = false; showReminder = false" class="w-full text-left px-3 py-1.5 pl-9 text-xs text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition">In 1 Stunde</button>
+                          <button wire:click="setReminder({{ $msg['id'] }}, '3h')" @click.stop="showMore = false; showReminder = false" class="w-full text-left px-3 py-1.5 pl-9 text-xs text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition">In 3 Stunden</button>
+                          <button wire:click="setReminder({{ $msg['id'] }}, 'tomorrow_9')" @click.stop="showMore = false; showReminder = false" class="w-full text-left px-3 py-1.5 pl-9 text-xs text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition">Morgen 09:00</button>
+                          <button wire:click="setReminder({{ $msg['id'] }}, 'next_monday_9')" @click.stop="showMore = false; showReminder = false" class="w-full text-left px-3 py-1.5 pl-9 text-xs text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition">Nächsten Montag 09:00</button>
+                          @if($msg['has_reminder'])
+                            <div class="border-t border-[var(--t-border)]/40 my-0.5 mx-3"></div>
+                            <button wire:click="cancelReminder({{ $msg['id'] }})" @click.stop="showMore = false; showReminder = false" class="w-full text-left px-3 py-1.5 pl-9 text-xs text-red-500 hover:bg-red-500/10 transition">Erinnerung entfernen</button>
+                          @endif
+                        </div>
+                        {{-- Copy link --}}
+                        <button @click.stop="
+                                  const url = location.origin + '/terminal?channel={{ $channelId }}&message={{ $msg['id'] }}';
+                                  navigator.clipboard.writeText(url).then(() => {
+                                    copied = true;
+                                    setTimeout(() => { copied = false }, 1500);
+                                  });
+                                  showMore = false;
+                                "
+                                class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--t-text)] hover:bg-white/5 transition">
+                          <template x-if="!copied">
+                            <svg class="w-3.5 h-3.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M12.232 4.232a2.5 2.5 0 013.536 3.536l-1.225 1.224a.75.75 0 001.061 1.06l1.224-1.224a4 4 0 00-5.656-5.656l-3 3a4 4 0 00.225 5.865.75.75 0 00.977-1.138 2.5 2.5 0 01-.142-3.667l3-3z"/><path d="M11.603 7.963a.75.75 0 00-.977 1.138 2.5 2.5 0 01.142 3.667l-3 3a2.5 2.5 0 01-3.536-3.536l1.225-1.224a.75.75 0 00-1.061-1.06l-1.224 1.224a4 4 0 005.656 5.656l3-3a4 4 0 00-.225-5.865z"/></svg>
+                          </template>
+                          <template x-if="copied">
+                            <svg class="w-3.5 h-3.5 flex-shrink-0 text-emerald-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
+                          </template>
+                          <span x-text="copied ? 'Kopiert!' : 'Link kopieren'"></span>
+                        </button>
+                        @if($msg['is_mine'])
                           <div class="border-t border-[var(--t-border)]/40 my-1"></div>
-                          <button wire:click="cancelReminder({{ $msg['id'] }})" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-red-500/10 transition">Erinnerung entfernen</button>
+                          {{-- Edit --}}
+                          <button wire:click="startEditMessage({{ $msg['id'] }})" @click.stop="showMore = false"
+                                  class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--t-text)] hover:bg-white/5 transition">
+                            <svg class="w-3.5 h-3.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z"/></svg>
+                            <span>Bearbeiten</span>
+                          </button>
+                          {{-- Delete --}}
+                          <button wire:click="deleteMessage({{ $msg['id'] }})" wire:confirm="Nachricht unwiderruflich löschen?" @click.stop="showMore = false"
+                                  class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-500 hover:bg-red-500/10 transition">
+                            <svg class="w-3.5 h-3.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.519.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
+                            <span>Löschen</span>
+                          </button>
                         @endif
                       </div>
                     </div>
-                    <div class="w-px h-4 bg-[var(--t-border)]/40 self-center"></div>
-                    {{-- Copy link --}}
-                    <button
-                      x-data="{ copied: false }"
-                      @click.stop="
-                        const url = location.origin + '/terminal?channel={{ $channelId }}&message={{ $msg['id'] }}';
-                        navigator.clipboard.writeText(url).then(() => {
-                          copied = true;
-                          setTimeout(() => copied = false, 1500);
-                        });
-                      "
-                      class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition {{ $msg['is_mine'] ? '' : 'rounded-r-md' }}"
-                      :title="copied ? 'Kopiert!' : 'Link kopieren'"
-                    >
-                      <template x-if="!copied">
-                        <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M12.232 4.232a2.5 2.5 0 013.536 3.536l-1.225 1.224a.75.75 0 001.061 1.06l1.224-1.224a4 4 0 00-5.656-5.656l-3 3a4 4 0 00.225 5.865.75.75 0 00.977-1.138 2.5 2.5 0 01-.142-3.667l3-3z"/><path d="M11.603 7.963a.75.75 0 00-.977 1.138 2.5 2.5 0 01.142 3.667l-3 3a2.5 2.5 0 01-3.536-3.536l1.225-1.224a.75.75 0 00-1.061-1.06l-1.224 1.224a4 4 0 005.656 5.656l3-3a4 4 0 00-.225-5.865z"/></svg>
-                      </template>
-                      <template x-if="copied">
-                        <svg class="w-3.5 h-3.5 text-emerald-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
-                      </template>
-                    </button>
-                    @if($msg['is_mine'])
-                      <div class="w-px h-4 bg-[var(--t-border)]/40 self-center"></div>
-                      <button
-                        wire:click="startEditMessage({{ $msg['id'] }})"
-                        class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition"
-                        title="Bearbeiten"
-                      >
-                        <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z"/></svg>
-                      </button>
-                      <button
-                        wire:click="deleteMessage({{ $msg['id'] }})"
-                        wire:confirm="Nachricht unwiderruflich loschen?"
-                        class="p-1 text-[var(--t-text-muted)] hover:text-red-500 hover:bg-red-500/10 rounded-r-md transition"
-                        title="Loschen"
-                      >
-                        <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.519.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
-                      </button>
-                    @endif
                   </div>
 
                   @if($isNewGroup)
