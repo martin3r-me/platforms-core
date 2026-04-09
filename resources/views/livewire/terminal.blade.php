@@ -1289,7 +1289,7 @@
 
                   <textarea
                     x-model="noteText"
-                    @keydown.enter.exact.prevent="submitNote()"
+                    @keydown.enter="if(!$event.shiftKey) { $event.preventDefault(); submitNote(); }"
                     placeholder="Notiz hinzufügen…"
                     rows="1"
                     class="flex-1 min-h-[36px] max-h-24 resize-none rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] px-3 py-2 text-sm text-[var(--ui-body-color)] placeholder:text-[var(--ui-muted)]/50 focus:outline-none focus:border-[var(--ui-primary)]/50 focus:ring-1 focus:ring-[var(--ui-primary)]/20 transition"

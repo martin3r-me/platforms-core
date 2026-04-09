@@ -297,16 +297,16 @@ class Terminal extends Component
             return;
         }
 
-        $channel = $this->channelId ? TerminalChannel::find($this->channelId) : null;
-        if (! $channel || ! $channel->context_type || ! $channel->context_id) {
+        // Use contextType/contextId directly (set by comms dispatch), not channelId
+        if (! $this->contextType || ! $this->contextId) {
             return;
         }
 
-        if (! class_exists($channel->context_type)) {
+        if (! class_exists($this->contextType)) {
             return;
         }
 
-        $model = $channel->context_type::find($channel->context_id);
+        $model = $this->contextType::find($this->contextId);
         if (! $model || ! method_exists($model, 'logActivity')) {
             return;
         }
@@ -341,16 +341,15 @@ class Terminal extends Component
      */
     public function deleteActivityNote(int $activityId): void
     {
-        $channel = $this->channelId ? TerminalChannel::find($this->channelId) : null;
-        if (! $channel || ! $channel->context_type || ! $channel->context_id) {
+        if (! $this->contextType || ! $this->contextId) {
             return;
         }
 
-        if (! class_exists($channel->context_type)) {
+        if (! class_exists($this->contextType)) {
             return;
         }
 
-        $model = $channel->context_type::find($channel->context_id);
+        $model = $this->contextType::find($this->contextId);
         if (! $model || ! method_exists($model, 'activities')) {
             return;
         }
@@ -370,16 +369,15 @@ class Terminal extends Component
     #[Computed]
     public function contextActivities(): array
     {
-        $channel = $this->channelId ? TerminalChannel::find($this->channelId) : null;
-        if (! $channel || ! $channel->context_type || ! $channel->context_id) {
+        if (! $this->contextType || ! $this->contextId) {
             return [];
         }
 
-        if (! class_exists($channel->context_type)) {
+        if (! class_exists($this->contextType)) {
             return [];
         }
 
-        $model = $channel->context_type::find($channel->context_id);
+        $model = $this->contextType::find($this->contextId);
         if (! $model || ! method_exists($model, 'activities')) {
             return [];
         }
