@@ -38,6 +38,7 @@ class Terminal extends Component
     public ?int $editingMessageId = null;
     public array $onlineUserIds = [];
     public string $activeApp = 'chat';
+    public array $availableApps = ['chat' => true, 'activity' => false, 'files' => false];
 
     // ── Lifecycle ──────────────────────────────────────────────
 
@@ -109,6 +110,11 @@ class Terminal extends Component
             return;
         }
 
+        // Reset available apps when context changes
+        if ($model !== $this->contextType || (int) $modelId !== $this->contextId) {
+            $this->availableApps = ['chat' => true, 'activity' => false, 'files' => false];
+        }
+
         $this->contextType = $model;
         $this->contextId = (int) $modelId;
         $this->contextSubject = $payload['subject'] ?? null;
@@ -144,6 +150,16 @@ class Terminal extends Component
                     ->update($updates);
             }
         }
+    }
+
+    /**
+     * Enable a specific Terminal app tab via dispatch.
+     * Modules fire e.g. dispatch('terminal:app:activity') to unlock the Activity tab.
+     */
+    #[On('terminal:app:activity')]
+    public function setAppActivity(): void
+    {
+        $this->availableApps['activity'] = true;
     }
 
     /**
