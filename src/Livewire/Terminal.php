@@ -678,30 +678,26 @@ class Terminal extends Component
      */
     public function deleteContextFile(int $fileId): void
     {
-        $user = auth()->user();
-        $team = $user?->currentTeamRelation;
-        if (! $team) {
-            return;
-        }
-
         $file = ContextFile::find($fileId);
         if (! $file) {
             unset($this->contextFiles);
             return;
         }
 
-        // Allow delete if file belongs to the user's team OR if team_id is null
-        if ($file->team_id !== null && $file->team_id !== $team->id) {
-            return;
+        // Verify the file belongs to the current context (prevent deleting arbitrary files)
+        if ($this->contextType && $this->contextId) {
+            if ($file->context_type !== $this->contextType || $file->context_id !== $this->contextId) {
+                return;
+            }
         }
 
         try {
             $service = app(ContextFileService::class);
-            $service->delete($fileId, $file->team_id ? $team->id : null);
+            $service->delete($fileId);
 
             $this->dispatch('notify', ['type' => 'success', 'message' => 'Datei gelöscht.']);
         } catch (\Exception $e) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'Fehler beim Löschen der Datei.']);
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Fehler beim Löschen: ' . $e->getMessage()]);
         }
 
         unset($this->contextFiles);
