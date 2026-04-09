@@ -1375,7 +1375,7 @@
                   {{-- Hover action bar --}}
                   <div class="absolute -top-3 right-5 items-center gap-px bg-[var(--t-glass-surface)] border border-[var(--t-border)]/60 rounded-md shadow-sm z-10"
                        x-data="{ showMore: false, showEmoji: false, showReminder: false, copied: false }"
-                       :class="(showMore || showEmoji) ? 'flex' : 'hidden group-hover:flex'"
+                       :class="(showMore || showEmoji) ? 'flex' : 'hidden group-hover:flex'">
 
                     {{-- Emoji Picker Button --}}
                     <div class="relative">
