@@ -43,7 +43,6 @@
     @livewire('core.modal-team')
     @livewire('core.modal-user')
     @livewire('core.modal-checkin')
-    @livewire('core.modal-counters')
     @livewire('core.modal-pricing')
     @livewire('core.modal-modules')
     @livewire('core.modal-help')
