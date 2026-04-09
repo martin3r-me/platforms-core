@@ -290,9 +290,9 @@ class Terminal extends Component
     /**
      * Add a manual note to the context entity's activity log.
      */
-    public function addActivityNote(string $bodyHtml, ?string $bodyPlain = null, array $attachmentIds = []): void
+    public function addActivityNote(string $text, ?string $_unused = null, array $attachmentIds = []): void
     {
-        $plain = trim($bodyPlain ?? strip_tags($bodyHtml));
+        $plain = trim($text);
         if (empty($plain) && empty($attachmentIds)) {
             return;
         }

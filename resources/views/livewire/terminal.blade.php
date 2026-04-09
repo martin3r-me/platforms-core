@@ -495,8 +495,9 @@
       <div class="flex-1 min-w-0 flex flex-col" wire:key="terminal-main-{{ $channelId }}">
 
         @if($this->activeChannel)
-          <!-- Chat Header -->
-          <div class="px-4 flex items-center gap-2.5 border-b border-[var(--ui-border)]/60 flex-shrink-0"
+          <!-- Chat Header (only visible in chat app) -->
+          <div x-show="$wire.activeApp === 'chat'"
+               class="px-4 flex items-center gap-2.5 border-b border-[var(--ui-border)]/60 flex-shrink-0"
                :class="fullscreen ? 'h-14 text-sm' : 'h-11 text-xs'">
             @if($this->activeChannel['type'] === 'dm')
               @php
@@ -641,6 +642,30 @@
                 </button>
               @endif
             </div>
+          </div>
+
+          <!-- Activity Header (only visible in activity app) -->
+          <div x-show="$wire.activeApp === 'activity'"
+               class="px-4 flex items-center gap-2.5 border-b border-[var(--ui-border)]/60 flex-shrink-0"
+               :class="fullscreen ? 'h-14 text-sm' : 'h-11 text-xs'">
+            @if($this->activeChannel['type'] === 'context' && ! empty($this->activeChannel['context']))
+              <span class="text-[14px]">{{ $this->activeChannel['context']['icon'] ?? '' }}</span>
+              <div class="flex flex-col leading-tight">
+                @php $actContextTitle = $this->activeChannel['name'] ?: ($this->activeChannel['context']['title'] ?? 'Kontext'); @endphp
+                @if(! empty($this->activeChannel['context_url']))
+                  <a href="{{ $this->activeChannel['context_url'] }}" class="inline-flex items-center gap-1 font-bold text-[13px] text-[var(--ui-primary)] hover:underline transition" title="Zum Kontext springen">
+                    {{ $actContextTitle }}
+                    <svg class="w-3 h-3 flex-shrink-0 opacity-60" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5zm7.25-.75a.75.75 0 01.75-.75h3.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0V6.31l-5.47 5.47a.75.75 0 11-1.06-1.06l5.47-5.47H12.25a.75.75 0 01-.75-.75z" clip-rule="evenodd"/></svg>
+                  </a>
+                @else
+                  <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $actContextTitle }}</span>
+                @endif
+                <span class="text-[10px] text-[var(--ui-muted)]">Aktivitäten</span>
+              </div>
+            @else
+              @svg('heroicon-o-clock', 'w-4 h-4 text-[var(--ui-muted)]')
+              <span class="font-bold text-[13px] text-[var(--ui-body-color)]">Aktivitäten</span>
+            @endif
           </div>
 
           <!-- ═══ App: Chat ═══ -->
@@ -1144,34 +1169,23 @@
               </div>
             </div>
 
-            {{-- Note input (Tiptap Editor — same as chat) --}}
-            <div wire:key="terminal-note-editor-{{ $channelId }}"
-                 wire:ignore
-                 class="border-t border-[var(--ui-border)]/60 flex-shrink-0"
+            {{-- Note input --}}
+            <div class="border-t border-[var(--ui-border)]/60 flex-shrink-0"
                  :class="fullscreen ? 'px-2' : ''"
                  x-data="{
-                   ...tiptapEditor({
-                     placeholder: 'Notiz hinzufügen…',
-                     fetchUsers: async (query) => {
-                       const members = await $wire.getTeamMembers();
-                       const q = (query || '').toLowerCase();
-                       return members
-                         .filter(m => m.name.toLowerCase().includes(q))
-                         .map(m => ({ id: m.id, label: m.name, initials: m.initials, avatar: m.avatar || null }));
-                     },
-                     onSubmit: (html, text, json) => {
-                       const ids = $data.uploadedFiles.map(f => f.id);
-                       $wire.addActivityNote(html, text, ids);
-                       $data.uploadedFiles = [];
-                     },
-                     toolbar: false,
-                     emojis: false,
-                   }),
+                   noteText: '',
                    uploadedFiles: [],
                    uploading: false,
                    dragOver: false,
                    get canSend() {
-                     return !this.isEmpty || this.uploadedFiles.length > 0;
+                     return this.noteText.trim().length > 0 || this.uploadedFiles.length > 0;
+                   },
+                   submitNote() {
+                     if (!this.canSend) return;
+                     const ids = this.uploadedFiles.map(f => f.id);
+                     $wire.addActivityNote(this.noteText.trim(), null, ids);
+                     this.noteText = '';
+                     this.uploadedFiles = [];
                    },
                    handleFiles(files) {
                      if (!files || !files.length) return;
@@ -1234,13 +1248,16 @@
                   </button>
                   <input x-ref="noteFileInput" type="file" multiple class="hidden" @change="handleFiles($event.target.files); $event.target.value = ''">
 
-                  <div class="flex-1 min-w-0 rounded-lg border transition-all"
-                       :class="dragOver ? 'border-[var(--ui-primary)] shadow-[0_0_0_1px_var(--ui-primary-10)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/80 focus-within:border-[var(--ui-primary)]/50 focus-within:shadow-[0_0_0_1px_var(--ui-primary-10)]'">
-                    <div x-ref="editorEl"></div>
-                  </div>
+                  <textarea
+                    x-model="noteText"
+                    @keydown.enter.exact.prevent="submitNote()"
+                    placeholder="Notiz hinzufügen…"
+                    rows="1"
+                    class="flex-1 min-h-[36px] max-h-24 resize-none rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] px-3 py-2 text-sm text-[var(--ui-body-color)] placeholder:text-[var(--ui-muted)]/50 focus:outline-none focus:border-[var(--ui-primary)]/50 focus:ring-1 focus:ring-[var(--ui-primary)]/20 transition"
+                  ></textarea>
                   <button
                     type="button"
-                    @click="submit()"
+                    @click="submitNote()"
                     :disabled="!canSend"
                     :class="canSend ? 'bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary-hover)] cursor-pointer shadow-sm' : 'border border-[var(--ui-border)]/60 text-[var(--ui-muted)] opacity-40 cursor-not-allowed'"
                     class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs transition flex-shrink-0"
