@@ -288,6 +288,62 @@ class Terminal extends Component
     }
 
     /**
+     * Add a manual note to the context entity's activity log.
+     */
+    public function addActivityNote(string $text): void
+    {
+        $text = trim($text);
+        if (empty($text)) {
+            return;
+        }
+
+        $channel = $this->channelId ? TerminalChannel::find($this->channelId) : null;
+        if (! $channel || ! $channel->context_type || ! $channel->context_id) {
+            return;
+        }
+
+        if (! class_exists($channel->context_type)) {
+            return;
+        }
+
+        $model = $channel->context_type::find($channel->context_id);
+        if (! $model || ! method_exists($model, 'logActivity')) {
+            return;
+        }
+
+        $model->logActivity($text);
+        unset($this->contextActivities);
+    }
+
+    /**
+     * Delete a manual activity note (only own notes).
+     */
+    public function deleteActivityNote(int $activityId): void
+    {
+        $channel = $this->channelId ? TerminalChannel::find($this->channelId) : null;
+        if (! $channel || ! $channel->context_type || ! $channel->context_id) {
+            return;
+        }
+
+        if (! class_exists($channel->context_type)) {
+            return;
+        }
+
+        $model = $channel->context_type::find($channel->context_id);
+        if (! $model || ! method_exists($model, 'activities')) {
+            return;
+        }
+
+        $model->activities()
+            ->where('id', $activityId)
+            ->where('activity_type', 'manual')
+            ->where('user_id', auth()->id())
+            ->delete();
+
+        unset($this->contextActivities);
+    }
+
+    /**
      * Load activities for the context entity of the active channel.
      */
     #[Computed]
@@ -311,16 +367,21 @@ class Terminal extends Component
             return [];
         }
 
+        $currentUserId = auth()->id();
+
         return $model->activities()
             ->with('user')
             ->limit(30)
             ->get()
-            ->map(function ($activity) {
+            ->map(function ($activity) use ($currentUserId) {
                 $userName = $activity->user?->name ?? 'System';
                 $event = $activity->name;
+                $isManual = $activity->activity_type === 'manual';
 
                 // Build readable title
-                if ($activity->message) {
+                if ($isManual && $activity->message) {
+                    $title = $activity->message;
+                } elseif ($activity->message) {
                     $title = "{$userName}: {$activity->message}";
                 } else {
                     $translations = [
@@ -350,8 +411,10 @@ class Terminal extends Component
                 return [
                     'id' => $activity->id,
                     'title' => $title,
+                    'message' => $activity->message,
                     'user' => $userName,
-                    'type' => $activity->activity_type,
+                    'activity_type' => $activity->activity_type ?? 'system',
+                    'is_mine' => $activity->user_id === $currentUserId,
                     'time' => $activity->created_at->diffForHumans(),
                 ];
             })

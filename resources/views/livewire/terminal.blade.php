@@ -1069,26 +1069,47 @@
           </div>
 
           <!-- ═══ App: Aktivitäten ═══ -->
-          <div x-show="$wire.activeApp === 'activity'" class="flex-1 min-h-0 overflow-y-auto overscroll-contain" wire:key="terminal-activities-{{ $channelId }}">
-            <div class="py-4" :class="fullscreen ? 'px-6' : 'px-4'">
-              <h3 class="text-xs font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-4">Letzte Aktivitäten</h3>
-              <div class="space-y-2">
+          <div x-show="$wire.activeApp === 'activity'" class="flex-1 min-h-0 flex flex-col" wire:key="terminal-activities-{{ $channelId }}">
+            {{-- Scrollable activity list --}}
+            <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+              <div class="py-4 space-y-1.5" :class="fullscreen ? 'px-6' : 'px-4'">
                 @forelse($this->contextActivities as $act)
-                  <div class="p-3 rounded-lg border border-[var(--ui-border)]/40 bg-[var(--ui-surface-hover)]/30 hover:bg-[var(--ui-surface-hover)]/60 transition-colors" wire:key="act-{{ $act['id'] }}">
-                    <div class="flex items-start justify-between gap-2 mb-1">
-                      <div class="flex-1 min-w-0 text-sm text-[var(--ui-body-color)] leading-snug">{{ $act['title'] }}</div>
-                      @if(($act['type'] ?? null) === 'system')
-                        <span class="flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[var(--ui-muted)]/5 border border-[var(--ui-border)]/40 text-[10px] text-[var(--ui-muted)]">
-                          @svg('heroicon-o-cog-6-tooth', 'w-3 h-3')
-                          System
-                        </span>
+                  @if(($act['activity_type'] ?? 'system') === 'manual')
+                    {{-- Manual note --}}
+                    <div class="group flex items-start gap-2.5 py-2 px-3 rounded-lg hover:bg-[var(--ui-surface-hover)]/60 transition-colors" wire:key="act-{{ $act['id'] }}">
+                      <div class="flex-shrink-0 w-6 h-6 rounded-full bg-[var(--ui-primary-10)] flex items-center justify-center mt-0.5">
+                        @svg('heroicon-o-pencil-square', 'w-3.5 h-3.5 text-[var(--ui-primary)]')
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5 mb-0.5">
+                          <span class="text-xs font-semibold text-[var(--ui-body-color)]">{{ $act['user'] }}</span>
+                          <span class="text-[10px] text-[var(--ui-muted)]">{{ $act['time'] }}</span>
+                        </div>
+                        <p class="text-sm text-[var(--ui-body-color)] leading-snug whitespace-pre-line">{{ $act['title'] }}</p>
+                      </div>
+                      @if($act['is_mine'] && ($act['activity_type'] ?? 'system') === 'manual')
+                        <button
+                          wire:click="deleteActivityNote({{ $act['id'] }})"
+                          wire:confirm="Notiz wirklich löschen?"
+                          class="flex-shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--ui-muted)] hover:text-red-500 hover:bg-red-500/10 transition"
+                          title="Notiz löschen"
+                        >
+                          @svg('heroicon-o-trash', 'w-3.5 h-3.5')
+                        </button>
                       @endif
                     </div>
-                    <div class="flex items-center gap-2 text-xs text-[var(--ui-muted)]">
-                      @svg('heroicon-o-clock', 'w-3 h-3')
-                      <span>{{ $act['time'] }}</span>
+                  @else
+                    {{-- System activity --}}
+                    <div class="flex items-start gap-2.5 py-1.5 px-3" wire:key="act-{{ $act['id'] }}">
+                      <div class="flex-shrink-0 w-6 h-6 rounded-full bg-[var(--ui-muted)]/5 flex items-center justify-center mt-0.5">
+                        @svg('heroicon-o-cog-6-tooth', 'w-3.5 h-3.5 text-[var(--ui-muted)]/60')
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-xs text-[var(--ui-muted)] leading-snug">{{ $act['title'] }}</p>
+                        <span class="text-[10px] text-[var(--ui-muted)]/50">{{ $act['time'] }}</span>
+                      </div>
                     </div>
-                  </div>
+                  @endif
                 @empty
                   <div class="py-8 text-center">
                     <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--ui-muted)]/5 mb-3">
@@ -1098,6 +1119,28 @@
                     <p class="text-xs text-[var(--ui-muted)]/60 mt-1">Änderungen werden hier angezeigt</p>
                   </div>
                 @endforelse
+              </div>
+            </div>
+
+            {{-- Note input at bottom --}}
+            <div class="flex-shrink-0 border-t border-[var(--ui-border)]/60" :class="fullscreen ? 'px-6 py-3' : 'px-4 py-2.5'"
+              x-data="{ noteText: '' }"
+            >
+              <div class="flex items-end gap-2">
+                <textarea
+                  x-model="noteText"
+                  @keydown.enter.prevent="if (noteText.trim()) { $wire.addActivityNote(noteText.trim()); noteText = ''; }"
+                  placeholder="Notiz hinzufügen…"
+                  rows="1"
+                  class="flex-1 min-h-[36px] max-h-24 resize-none rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] px-3 py-2 text-sm text-[var(--ui-body-color)] placeholder:text-[var(--ui-muted)]/50 focus:outline-none focus:border-[var(--ui-primary)]/50 focus:ring-1 focus:ring-[var(--ui-primary)]/20 transition"
+                ></textarea>
+                <button
+                  @click="if (noteText.trim()) { $wire.addActivityNote(noteText.trim()); noteText = ''; }"
+                  :class="noteText.trim() ? 'bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary-hover)] cursor-pointer shadow-sm' : 'border border-[var(--ui-border)]/60 text-[var(--ui-muted)] opacity-40 cursor-not-allowed'"
+                  class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs transition flex-shrink-0"
+                >
+                  <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"/></svg>
+                </button>
               </div>
             </div>
           </div>
