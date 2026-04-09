@@ -105,9 +105,9 @@
     >
       {{-- macOS traffic lights --}}
       <div class="flex items-center gap-1.5 mr-1 flex-shrink-0 group/dots" @click.stop>
-        <button @click="toggle()" class="w-3 h-3 rounded-full bg-[#FF5F57] hover:brightness-110 transition cursor-pointer" title="Schließen"></button>
-        <button @click="toggle()" class="w-3 h-3 rounded-full bg-[#FEBC2E] hover:brightness-110 transition cursor-pointer" title="Minimieren"></button>
-        <button @click="toggleFullscreen()" class="w-3 h-3 rounded-full bg-[#28C840] hover:brightness-110 transition cursor-pointer" :title="fullscreen ? 'Vollbild verlassen (Esc)' : 'Vollbild'"></button>
+        <button @click="if(fullscreen) toggleFullscreen(); if(open) toggle()" class="w-3 h-3 rounded-full bg-[#FF5F57] hover:brightness-110 transition cursor-pointer" title="Einfahren"></button>
+        <button @click="if(fullscreen) toggleFullscreen(); if(!open) toggle()" class="w-3 h-3 rounded-full bg-[#FEBC2E] hover:brightness-110 transition cursor-pointer" title="Normal"></button>
+        <button @click="if(!open) toggle(); if(!fullscreen) toggleFullscreen()" class="w-3 h-3 rounded-full bg-[#28C840] hover:brightness-110 transition cursor-pointer" title="Vollbild"></button>
       </div>
 
       {{-- Unread badge --}}
