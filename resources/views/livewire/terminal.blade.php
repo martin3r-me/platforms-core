@@ -6,6 +6,7 @@
   x-on:scroll-to-message.window="$nextTick(() => { const el = document.getElementById('msg-' + $event.detail.messageId); if(el) { el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('!bg-amber-500/15'); setTimeout(() => el.classList.remove('!bg-amber-500/15'), 2000); } })"
   x-on:terminal-typing="sendTypingWhisper($wire.channelId)"
   x-on:keydown.escape.window="if(fullscreen) toggleFullscreen()"
+  style="height:36px;min-height:36px;max-height:36px"
   :class="[
     fullscreen ? 'fixed inset-0 z-[60]' : 'w-full flex-none relative',
     resizing ? '' : 'transition-[height,min-height,max-height] duration-300 ease-[cubic-bezier(0.33,1,0.68,1)]'
@@ -341,23 +342,29 @@
           <div class="absolute top-1/2 -translate-y-1/2 right-0 h-8 w-1 rounded-full bg-transparent group-hover/sresize:bg-[var(--t-accent)]/30 transition"></div>
         </div>
 
-        <!-- ═══ Sidebar: Chat (Channels) ═══ -->
-        <div x-show="$wire.activeApp === 'chat'" class="flex-1 min-h-0 flex flex-col">
-
-        {{-- Page context — open discussion for current page entity --}}
+        {{-- ═══ Shared Context Block (alle Apps) ═══ --}}
         @if($pageContext)
-          <div class="px-2 mb-2">
-            <button
-              wire:click="openTerminal"
-              class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-[var(--t-text)] hover:bg-white/5 transition border border-[var(--t-border)]/60"
-              title="Diskussion zu {{ $pageContext['label'] }}: {{ $pageContext['title'] }}"
-            >
-              <span class="text-sm flex-shrink-0">{{ $pageContext['icon'] }}</span>
-              <span class="truncate flex-1 text-left">{{ $pageContext['title'] }}</span>
-              <svg class="w-3.5 h-3.5 flex-shrink-0 text-[var(--t-text-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"/></svg>
-            </button>
+          <div class="px-2 mb-2 flex-shrink-0">
+            <div class="p-2 rounded-lg border border-[var(--t-border)]/40 bg-white/[0.03]">
+              <div class="flex items-center gap-2">
+                <span class="text-sm flex-shrink-0">{{ $pageContext['icon'] }}</span>
+                <div class="min-w-0 flex-1">
+                  <span class="text-[11px] font-medium text-[var(--t-text)] truncate block">{{ $pageContext['title'] }}</span>
+                  <span class="text-[9px] text-[var(--t-text-muted)]">{{ $pageContext['label'] }}</span>
+                </div>
+                {{-- Quick-action: Diskussion öffnen --}}
+                <button wire:click="openTerminal"
+                        class="p-1 rounded hover:bg-white/10 text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition flex-shrink-0"
+                        title="Diskussion öffnen">
+                  <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"/></svg>
+                </button>
+              </div>
+            </div>
           </div>
         @endif
+
+        <!-- ═══ Sidebar: Chat (Channels) ═══ -->
+        <div x-show="$wire.activeApp === 'chat'" class="flex-1 min-h-0 flex flex-col">
 
         <!-- Search field -->
         <div class="px-2 mb-2">
@@ -596,17 +603,7 @@
         <!-- ═══ Sidebar: Aktivitäten ═══ -->
         <div x-show="$wire.activeApp === 'activity'" class="flex-1 min-h-0 flex flex-col overflow-y-auto">
           <div class="px-3 py-3">
-            <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] mb-3">Kontext</h3>
             @if($this->contextType && $this->contextId)
-              @php $ctxBreadcrumb = $this->getContextBreadcrumb(); @endphp
-              <div class="p-2.5 rounded-lg border border-[var(--t-border)]/40 bg-white/[0.03] mb-4">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="text-sm">{{ $ctxBreadcrumb['icon'] ?? '' }}</span>
-                  <span class="text-xs font-medium text-[var(--t-text)] truncate">{{ $ctxBreadcrumb['title'] ?? $this->contextSubject ?? class_basename($this->contextType) }}</span>
-                </div>
-                <span class="text-[10px] text-[var(--t-text-muted)]">{{ $ctxBreadcrumb['label'] ?? class_basename($this->contextType) }}</span>
-              </div>
-
               {{-- Activity filter --}}
               @php
                 $activities = $this->contextActivities;
@@ -646,10 +643,6 @@
                   <span class="text-[10px] text-[var(--t-text-muted)] tabular-nums">{{ $systemCount }}</span>
                 </button>
               </div>
-            @else
-              <div class="p-2.5 rounded-lg border border-dashed border-[var(--t-border)]/40 mb-4">
-                <p class="text-[10px] text-[var(--t-text-muted)] text-center">Kein Kontext verfügbar</p>
-              </div>
             @endif
           </div>
         </div>
@@ -657,22 +650,6 @@
         <!-- ═══ Sidebar: Tags ═══ -->
         <div x-show="$wire.activeApp === 'tags'" class="flex-1 min-h-0 flex flex-col overflow-y-auto">
           <div class="px-3 py-3">
-            <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] mb-3">Kontext</h3>
-            @if($this->contextType && $this->contextId)
-              @php $tagsCtxBreadcrumb = $this->getContextBreadcrumb(); @endphp
-              <div class="p-2.5 rounded-lg border border-[var(--t-border)]/40 bg-white/[0.03] mb-4">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="text-sm">{{ $tagsCtxBreadcrumb['icon'] ?? '' }}</span>
-                  <span class="text-xs font-medium text-[var(--t-text)] truncate">{{ $tagsCtxBreadcrumb['title'] ?? $this->contextSubject ?? class_basename($this->contextType) }}</span>
-                </div>
-                <span class="text-[10px] text-[var(--t-text-muted)]">{{ $tagsCtxBreadcrumb['label'] ?? class_basename($this->contextType) }}</span>
-              </div>
-            @else
-              <div class="p-2.5 rounded-lg border border-dashed border-[var(--t-border)]/40 mb-4">
-                <p class="text-[10px] text-[var(--t-text-muted)] text-center">Kein Kontext verfügbar</p>
-              </div>
-            @endif
-
             {{-- Compact all-tags overview --}}
             <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] mb-2">Alle Tags</h3>
             <div class="space-y-0.5">
@@ -693,25 +670,6 @@
         <div x-show="$wire.activeApp === 'time'" class="flex-1 min-h-0 flex flex-col overflow-y-auto"
              x-data="{ showBudget: false }">
           <div class="px-3 py-3 space-y-3">
-            {{-- Context info --}}
-            <div>
-              <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] mb-2">Kontext</h3>
-              @if($this->contextType && $this->contextId)
-                @php $timeCtxBreadcrumb = $this->getContextBreadcrumb(); @endphp
-                <div class="p-2.5 rounded-lg border border-[var(--t-border)]/40 bg-white/[0.03]">
-                  <div class="flex items-center gap-2 mb-0.5">
-                    <span class="text-sm">{{ $timeCtxBreadcrumb['icon'] ?? '' }}</span>
-                    <span class="text-xs font-medium text-[var(--t-text)] truncate">{{ $timeCtxBreadcrumb['title'] ?? $this->contextSubject ?? class_basename($this->contextType) }}</span>
-                  </div>
-                  <span class="text-[10px] text-[var(--t-text-muted)]">{{ $timeCtxBreadcrumb['label'] ?? class_basename($this->contextType) }}</span>
-                </div>
-              @else
-                <div class="p-2.5 rounded-lg border border-dashed border-[var(--t-border)]/40">
-                  <p class="text-[10px] text-[var(--t-text-muted)] text-center">Kein Kontext verfügbar</p>
-                </div>
-              @endif
-            </div>
-
             {{-- Time entry form --}}
             <div>
               <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] mb-2">Zeit erfassen</h3>
@@ -845,17 +803,7 @@
         <!-- ═══ Sidebar: Dateien ═══ -->
         <div x-show="$wire.activeApp === 'files'" class="flex-1 min-h-0 flex flex-col overflow-y-auto">
           <div class="px-3 py-3">
-            <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] mb-3">Kontext</h3>
             @if($this->contextType && $this->contextId)
-              @php $filesCtxBreadcrumb = $this->getContextBreadcrumb(); @endphp
-              <div class="p-2.5 rounded-lg border border-[var(--t-border)]/40 bg-white/[0.03] mb-4">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="text-sm">{{ $filesCtxBreadcrumb['icon'] ?? '' }}</span>
-                  <span class="text-xs font-medium text-[var(--t-text)] truncate">{{ $filesCtxBreadcrumb['title'] ?? $this->contextSubject ?? class_basename($this->contextType) }}</span>
-                </div>
-                <span class="text-[10px] text-[var(--t-text-muted)]">{{ $filesCtxBreadcrumb['label'] ?? class_basename($this->contextType) }}</span>
-              </div>
-
               @php
                 $allFiles = $this->contextFiles;
                 $imageCount = count(array_filter($allFiles, fn($f) => $f['is_image']));
@@ -913,10 +861,6 @@
                   <span class="text-[10px] text-[var(--t-text-muted)] tabular-nums">{{ $docCount }}</span>
                 </button>
               </div>
-            @else
-              <div class="p-2.5 rounded-lg border border-dashed border-[var(--t-border)]/40 mb-4">
-                <p class="text-[10px] text-[var(--t-text-muted)] text-center">Kein Kontext verfügbar</p>
-              </div>
             @endif
           </div>
         </div>
@@ -940,19 +884,6 @@
 
             {{-- === Fields Tab === --}}
             @if($this->efTab === 'fields')
-              {{-- Context info --}}
-              @if($this->efContextType && $this->efContextId)
-                <div class="p-2 rounded-lg border border-[var(--t-border)]/40 bg-white/[0.03]">
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm">{{ $this->getContextBreadcrumb($this->efContextType, $this->efContextId)['icon'] ?? '📎' }}</span>
-                    <div class="min-w-0 flex-1">
-                      <span class="text-[11px] font-medium text-[var(--t-text)] truncate block">{{ $this->efContextLabel() ?? class_basename($this->efContextType) }}</span>
-                      <span class="text-[9px] text-[var(--t-text-muted)]">{{ class_basename($this->efContextType) }}</span>
-                    </div>
-                  </div>
-                </div>
-              @endif
-
               {{-- Field list --}}
               <div>
                 <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] mb-2">Felder ({{ count($this->efDefinitions) }})</h3>
