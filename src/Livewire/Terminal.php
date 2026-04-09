@@ -684,19 +684,25 @@ class Terminal extends Component
             return;
         }
 
-        $file = \Platform\Core\Models\ContextFile::find($fileId);
+        $file = ContextFile::find($fileId);
         if (! $file) {
             unset($this->contextFiles);
-
             return;
         }
 
-        if ($file->team_id !== $team->id) {
+        // Allow delete if file belongs to the user's team OR if team_id is null
+        if ($file->team_id !== null && $file->team_id !== $team->id) {
             return;
         }
 
-        $service = app(ContextFileService::class);
-        $service->delete($fileId, $team->id);
+        try {
+            $service = app(ContextFileService::class);
+            $service->delete($fileId, $file->team_id ? $team->id : null);
+
+            $this->dispatch('notify', ['type' => 'success', 'message' => 'Datei gelöscht.']);
+        } catch (\Exception $e) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Fehler beim Löschen der Datei.']);
+        }
 
         unset($this->contextFiles);
     }

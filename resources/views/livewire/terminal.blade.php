@@ -2079,8 +2079,7 @@
                           @svg('heroicon-o-arrow-down-tray', 'w-3.5 h-3.5')
                         </a>
                         <button
-                          wire:click="deleteContextFile({{ $file['id'] }})"
-                          wire:confirm="Datei wirklich löschen?"
+                          @click.stop="if(confirm('Datei wirklich löschen?')) $wire.deleteContextFile({{ $file['id'] }})"
                           class="p-1.5 rounded text-[var(--t-text-muted)] hover:text-red-500 hover:bg-red-500/10 transition"
                           title="Löschen"
                         >
