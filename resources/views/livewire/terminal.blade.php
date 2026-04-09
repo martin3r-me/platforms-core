@@ -71,17 +71,28 @@
           <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"/></svg>
           <span class="hidden sm:inline">Chat</span>
         </button>
-        @if(! empty($this->activeChannel['context']))
-          <button
-            @click.stop="$wire.set('activeApp', 'activity')"
-            class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
-            :class="$wire.activeApp === 'activity'
-              ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]'
-              : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)]'"
-          >
-            <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-            <span class="hidden sm:inline">Aktivitäten</span>
-          </button>
+        @php $hasContext = ! empty($this->activeChannel['context']); @endphp
+          @if($hasContext)
+            <button
+              @click.stop="$wire.set('activeApp', 'activity')"
+              class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
+              :class="$wire.activeApp === 'activity'
+                ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]'
+                : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)]'"
+            >
+              <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+              <span class="hidden sm:inline">Aktivitäten</span>
+            </button>
+          @else
+            <button
+              @click.stop
+              class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--ui-muted)]/40 cursor-not-allowed"
+              title="Aktivitäten — nur bei Kontext-Channels verfügbar"
+            >
+              <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+              <span class="hidden sm:inline">Aktivitäten</span>
+            </button>
+          @endif
           <button
             @click.stop
             class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--ui-muted)]/40 cursor-not-allowed"
@@ -90,7 +101,6 @@
             <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13"/></svg>
             <span class="hidden sm:inline">Dateien</span>
           </button>
-        @endif
         <div class="w-px h-4 bg-[var(--ui-border)]/40 ml-0.5"></div>
       </div>
 
