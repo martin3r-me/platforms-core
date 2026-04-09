@@ -216,6 +216,9 @@
           <div class="absolute top-1/2 -translate-y-1/2 right-0 h-8 w-1 rounded-full bg-transparent group-hover/sresize:bg-[var(--ui-primary)]/30 transition"></div>
         </div>
 
+        <!-- ═══ Sidebar: Chat (Channels) ═══ -->
+        <div x-show="$wire.activeApp === 'chat'" class="flex-1 min-h-0 flex flex-col">
+
         <!-- Search field -->
         <div class="px-2 mb-2">
           <div class="relative">
@@ -447,6 +450,46 @@
         </div>
 
         </div>{{-- end channel lists wrapper --}}
+
+        </div>{{-- end sidebar: chat --}}
+
+        <!-- ═══ Sidebar: Aktivitäten ═══ -->
+        <div x-show="$wire.activeApp === 'activity'" class="flex-1 min-h-0 flex flex-col overflow-y-auto">
+          <div class="px-3 py-3">
+            <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-3">Kontext</h3>
+            @if(! empty($this->activeChannel['context']))
+              <div class="p-2.5 rounded-lg border border-[var(--ui-border)]/40 bg-[var(--ui-surface-hover)]/20 mb-4">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-sm">{{ $this->activeChannel['context']['icon'] ?? '' }}</span>
+                  <span class="text-xs font-medium text-[var(--ui-body-color)] truncate">{{ $this->activeChannel['context']['title'] ?? $this->activeChannel['name'] }}</span>
+                </div>
+                <span class="text-[10px] text-[var(--ui-muted)]">{{ $this->activeChannel['context']['label'] ?? 'Entity' }}</span>
+              </div>
+            @else
+              <div class="p-2.5 rounded-lg border border-dashed border-[var(--ui-border)]/40 mb-4">
+                <p class="text-[10px] text-[var(--ui-muted)] text-center">Kein Kontext — wähle einen Kontext-Channel</p>
+              </div>
+            @endif
+
+            <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-2">Filter</h3>
+            <div class="space-y-0.5">
+              <div class="px-2 py-1.5 rounded text-xs text-[var(--ui-primary)] bg-[var(--ui-primary-5)] font-medium">Alle Aktivitäten</div>
+              <div class="px-2 py-1.5 rounded text-xs text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition cursor-not-allowed opacity-50" title="Kommt bald">Nur Änderungen</div>
+              <div class="px-2 py-1.5 rounded text-xs text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition cursor-not-allowed opacity-50" title="Kommt bald">Nur Notizen</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ Sidebar: Dateien ═══ -->
+        <div x-show="$wire.activeApp === 'files'" class="flex-1 min-h-0 flex flex-col overflow-y-auto">
+          <div class="px-3 py-3">
+            <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-3">Dateien</h3>
+            <div class="py-6 text-center">
+              <p class="text-[10px] text-[var(--ui-muted)]">Kommt bald</p>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <!-- Main Chat Area — keyed per channel so editor + messages fully rebuild -->
