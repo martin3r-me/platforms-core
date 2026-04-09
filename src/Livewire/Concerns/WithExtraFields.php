@@ -699,12 +699,7 @@ trait WithExtraFields
         $fieldTitle = collect($this->extraFieldDefinitions)
             ->firstWhere('id', $fieldId)['label'] ?? null;
 
-        $this->dispatch('files', [
-            'context_type' => $contextType,
-            'context_id' => $contextId,
-        ]);
-
-        $this->dispatch('files:picker', [
+        $this->dispatch('terminal:files:pick', [
             'multiple' => $multiple,
             'callback' => 'extrafield',
             'title' => $fieldTitle,
@@ -730,7 +725,7 @@ trait WithExtraFields
     /**
      * Listener für File-Picker Callback (Modal-basierter Upload)
      */
-    #[On('files:selected')]
+    #[On('terminal:files:picked')]
     public function handleExtraFieldFileSelected(array $payload): void
     {
         if (($payload['callback'] ?? null) !== 'extrafield') {

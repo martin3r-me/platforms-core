@@ -7,6 +7,7 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Platform\Core\Models\ContextFile;
+use Platform\Core\Models\ContextFileReference;
 use Platform\Core\Models\TerminalChannel;
 use Platform\Core\Models\TerminalChannelMember;
 use Platform\Core\Models\TerminalMention;
@@ -41,6 +42,15 @@ class Terminal extends Component
     public array $availableApps = ['chat' => true, 'activity' => false, 'files' => false];
     public string $activityFilter = 'all'; // all | manual | system
     public string $filesFilter = 'all'; // all | images | documents
+
+    // ── File Picker/Assign ───────────────────────────────────
+    public bool $filePickerActive = false;
+    public bool $filePickerMultiple = true;
+    public ?string $filePickerCallback = null;
+    public array $filePickerSelected = [];
+    public ?string $filePickerReferenceType = null;
+    public ?int $filePickerReferenceId = null;
+    public ?int $filePickerAssignReferenceId = null;
 
     // ── Lifecycle ──────────────────────────────────────────────
 
@@ -569,20 +579,157 @@ class Terminal extends Component
     }
 
     /**
-     * Dispatch context to ModalFiles — open file manager for current context.
+     * Open terminal in file-picker mode (select files → return IDs).
+     * Modules fire dispatch('terminal:files:pick', [...]) to trigger this.
      */
-    public function dispatchFilesContext(): void
+    #[On('terminal:files:pick')]
+    public function openFilePicker(array $payload = []): void
     {
-        $channel = $this->channelId ? TerminalChannel::find($this->channelId) : null;
-        if (! $channel || ! $channel->context_type || ! $channel->context_id) {
+        $this->filePickerActive = true;
+        $this->filePickerMultiple = $payload['multiple'] ?? true;
+        $this->filePickerCallback = $payload['callback'] ?? null;
+        $this->filePickerReferenceType = $payload['reference_type'] ?? null;
+        $this->filePickerReferenceId = isset($payload['reference_id']) ? (int) $payload['reference_id'] : null;
+        $this->filePickerAssignReferenceId = null;
+        $this->filePickerSelected = [];
+        $this->activeApp = 'files';
+        $this->dispatch('toggle-terminal-open');
+    }
+
+    /**
+     * Open terminal in file-assign mode (select file → update existing reference).
+     */
+    #[On('terminal:files:assign')]
+    public function openFileAssign(array $payload = []): void
+    {
+        $this->filePickerActive = true;
+        $this->filePickerMultiple = false;
+        $this->filePickerAssignReferenceId = isset($payload['reference_id']) ? (int) $payload['reference_id'] : null;
+        $this->filePickerReferenceType = null;
+        $this->filePickerReferenceId = null;
+        $this->filePickerCallback = null;
+        $this->filePickerSelected = [];
+        $this->activeApp = 'files';
+        $this->dispatch('toggle-terminal-open');
+    }
+
+    /**
+     * Toggle a file's selection in picker mode.
+     */
+    public function toggleFilePickerSelection(int $fileId): void
+    {
+        if (in_array($fileId, $this->filePickerSelected)) {
+            $this->filePickerSelected = array_values(array_diff($this->filePickerSelected, [$fileId]));
+        } else {
+            if ($this->filePickerMultiple) {
+                $this->filePickerSelected[] = $fileId;
+            } else {
+                $this->filePickerSelected = [$fileId];
+            }
+        }
+    }
+
+    /**
+     * Confirm file picker selection.
+     */
+    public function confirmFilePicker(): void
+    {
+        if (empty($this->filePickerSelected)) {
             return;
         }
 
-        $this->dispatch('files', [
-            'context_type' => $channel->context_type,
-            'context_id' => $channel->context_id,
+        // Assign mode: update existing reference
+        if ($this->filePickerAssignReferenceId) {
+            $reference = ContextFileReference::find($this->filePickerAssignReferenceId);
+            if ($reference) {
+                $file = ContextFile::find($this->filePickerSelected[0]);
+                if ($file) {
+                    $reference->update([
+                        'context_file_id' => $file->id,
+                        'context_file_variant_id' => null,
+                        'meta' => array_merge($reference->meta ?? [], ['title' => $file->original_name]),
+                    ]);
+                    $this->dispatch('terminal:files:reference-updated', [
+                        'reference_id' => $this->filePickerAssignReferenceId,
+                    ]);
+                }
+            }
+            $this->resetFilePicker();
+
+            return;
+        }
+
+        // Picker mode with reference_type: create ContextFileReference(s)
+        if ($this->filePickerReferenceType && $this->filePickerReferenceId) {
+            foreach ($this->filePickerSelected as $fileId) {
+                $file = ContextFile::find($fileId);
+                if (! $file) {
+                    continue;
+                }
+
+                $exists = ContextFileReference::where('context_file_id', $file->id)
+                    ->where('context_file_variant_id', null)
+                    ->where('reference_type', $this->filePickerReferenceType)
+                    ->where('reference_id', $this->filePickerReferenceId)
+                    ->exists();
+
+                if (! $exists) {
+                    ContextFileReference::create([
+                        'context_file_id' => $file->id,
+                        'context_file_variant_id' => null,
+                        'reference_type' => $this->filePickerReferenceType,
+                        'reference_id' => $this->filePickerReferenceId,
+                        'meta' => ['title' => $file->original_name],
+                    ]);
+                }
+            }
+
+            $this->dispatch('terminal:files:reference-created', [
+                'reference_type' => $this->filePickerReferenceType,
+                'reference_id' => $this->filePickerReferenceId,
+            ]);
+            $this->resetFilePicker();
+
+            return;
+        }
+
+        // Simple picker mode: return selected file data
+        $files = ContextFile::whereIn('id', $this->filePickerSelected)
+            ->with('variants')
+            ->get();
+
+        $this->dispatch('terminal:files:picked', [
+            'files' => $files->map(fn ($f) => [
+                'id' => $f->id,
+                'token' => $f->token,
+                'original_name' => $f->original_name,
+                'url' => $f->url,
+                'thumbnail' => $f->variants()->where('variant_type', 'thumbnail_4_3')->first()?->url
+                    ?? $f->variants()->where('variant_type', 'like', 'thumbnail_%')->first()?->url
+                    ?? $f->url,
+            ])->toArray(),
+            'callback' => $this->filePickerCallback,
         ]);
-        $this->dispatch('files:open');
+        $this->resetFilePicker();
+    }
+
+    /**
+     * Cancel file picker and reset state.
+     */
+    public function cancelFilePicker(): void
+    {
+        $this->resetFilePicker();
+    }
+
+    protected function resetFilePicker(): void
+    {
+        $this->filePickerActive = false;
+        $this->filePickerMultiple = true;
+        $this->filePickerCallback = null;
+        $this->filePickerSelected = [];
+        $this->filePickerReferenceType = null;
+        $this->filePickerReferenceId = null;
+        $this->filePickerAssignReferenceId = null;
     }
 
     /**
