@@ -587,13 +587,19 @@ class Terminal extends Component
             return;
         }
 
-        $service = app(ContextFileService::class);
+        $file = \Platform\Core\Models\ContextFile::find($fileId);
+        if (! $file) {
+            unset($this->contextFiles);
 
-        try {
-            $service->delete($fileId, $teamId);
-        } catch (\Exception $e) {
-            // Silently fail
+            return;
         }
+
+        if ($file->team_id !== $teamId) {
+            return;
+        }
+
+        $service = app(ContextFileService::class);
+        $service->delete($fileId, $teamId);
 
         unset($this->contextFiles);
     }
