@@ -39,6 +39,7 @@ class Terminal extends Component
     public array $onlineUserIds = [];
     public string $activeApp = 'chat';
     public array $availableApps = ['chat' => true, 'activity' => false, 'files' => false];
+    public string $activityFilter = 'all'; // all | manual | system
 
     // ── Lifecycle ──────────────────────────────────────────────
 

@@ -469,50 +469,48 @@
                 <span class="text-[10px] text-[var(--ui-muted)]">{{ $this->activeChannel['context']['label'] ?? 'Entity' }}</span>
               </div>
 
-              {{-- Activity summary --}}
+              {{-- Activity filter --}}
               @php
                 $activities = $this->contextActivities;
                 $manualCount = count(array_filter($activities, fn($a) => ($a['activity_type'] ?? 'system') === 'manual'));
                 $systemCount = count($activities) - $manualCount;
               @endphp
-              <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-2">Übersicht</h3>
-              <div class="space-y-1.5 mb-4">
-                <div class="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[var(--ui-surface-hover)]/30">
+              <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-2">Filter</h3>
+              <div class="space-y-1 mb-4">
+                <button
+                  wire:click="$set('activityFilter', 'all')"
+                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->activityFilter === 'all' ? 'bg-[var(--ui-primary-10)] ring-1 ring-[var(--ui-primary)]/30' : 'bg-[var(--ui-surface-hover)]/30 hover:bg-[var(--ui-surface-hover)]/60' }}"
+                >
+                  <div class="w-5 h-5 rounded-full bg-[var(--ui-muted)]/10 flex items-center justify-center">
+                    @svg('heroicon-o-queue-list', 'w-3 h-3 text-[var(--ui-muted)]')
+                  </div>
+                  <span class="text-xs text-[var(--ui-body-color)] flex-1">Alle</span>
+                  <span class="text-[10px] text-[var(--ui-muted)] tabular-nums">{{ count($activities) }}</span>
+                </button>
+                <button
+                  wire:click="$set('activityFilter', 'manual')"
+                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->activityFilter === 'manual' ? 'bg-[var(--ui-primary-10)] ring-1 ring-[var(--ui-primary)]/30' : 'bg-[var(--ui-surface-hover)]/30 hover:bg-[var(--ui-surface-hover)]/60' }}"
+                >
                   <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] flex items-center justify-center">
                     @svg('heroicon-o-pencil-square', 'w-3 h-3 text-[var(--ui-primary)]')
                   </div>
-                  <span class="text-xs text-[var(--ui-body-color)]">{{ $manualCount }} {{ $manualCount === 1 ? 'Notiz' : 'Notizen' }}</span>
-                </div>
-                <div class="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[var(--ui-surface-hover)]/30">
+                  <span class="text-xs text-[var(--ui-body-color)] flex-1">Notizen</span>
+                  <span class="text-[10px] text-[var(--ui-muted)] tabular-nums">{{ $manualCount }}</span>
+                </button>
+                <button
+                  wire:click="$set('activityFilter', 'system')"
+                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->activityFilter === 'system' ? 'bg-[var(--ui-primary-10)] ring-1 ring-[var(--ui-primary)]/30' : 'bg-[var(--ui-surface-hover)]/30 hover:bg-[var(--ui-surface-hover)]/60' }}"
+                >
                   <div class="w-5 h-5 rounded-full bg-[var(--ui-muted)]/5 flex items-center justify-center">
                     @svg('heroicon-o-cog-6-tooth', 'w-3 h-3 text-[var(--ui-muted)]')
                   </div>
-                  <span class="text-xs text-[var(--ui-body-color)]">{{ $systemCount }} {{ $systemCount === 1 ? 'System-Event' : 'System-Events' }}</span>
-                </div>
-              </div>
-
-              {{-- Debug info --}}
-              <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-2">Debug</h3>
-              <div class="space-y-1 text-[10px] text-[var(--ui-muted)] font-mono bg-[var(--ui-surface-hover)]/20 rounded-md p-2">
-                <div>channel: {{ $this->channelId }}</div>
-                <div>type: {{ $this->activeChannel['type'] ?? '–' }}</div>
-                <div>context: {{ class_basename($this->activeChannel['context']['context_type'] ?? '–') }}</div>
-                <div>id: {{ $this->activeChannel['context']['context_id'] ?? '–' }}</div>
-                <div>activities: {{ count($activities) }}</div>
-                <div>activeApp: {{ $this->activeApp }}</div>
+                  <span class="text-xs text-[var(--ui-body-color)] flex-1">System</span>
+                  <span class="text-[10px] text-[var(--ui-muted)] tabular-nums">{{ $systemCount }}</span>
+                </button>
               </div>
             @else
               <div class="p-2.5 rounded-lg border border-dashed border-[var(--ui-border)]/40 mb-4">
-                <p class="text-[10px] text-[var(--ui-muted)] text-center">Kein Kontext — wähle einen Kontext-Channel</p>
-              </div>
-
-              {{-- Debug info for non-context --}}
-              <div class="space-y-1 text-[10px] text-[var(--ui-muted)] font-mono bg-[var(--ui-surface-hover)]/20 rounded-md p-2 mt-2">
-                <div>channel: {{ $this->channelId ?? 'none' }}</div>
-                <div>type: {{ $this->activeChannel['type'] ?? '–' }}</div>
-                <div>activeApp: {{ $this->activeApp }}</div>
-                <div>context_type: {{ $this->contextType ?? 'null' }}</div>
-                <div>context_id: {{ $this->contextId ?? 'null' }}</div>
+                <p class="text-[10px] text-[var(--ui-muted)] text-center">Kein Kontext verfügbar</p>
               </div>
             @endif
           </div>
@@ -1137,7 +1135,12 @@
             {{-- Scrollable activity list --}}
             <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
               <div class="py-4 space-y-1.5" :class="fullscreen ? 'px-6' : 'px-4'">
-                @forelse($this->contextActivities as $act)
+                @php
+                  $filteredActivities = $this->activityFilter === 'all'
+                    ? $this->contextActivities
+                    : array_filter($this->contextActivities, fn($a) => ($a['activity_type'] ?? 'system') === $this->activityFilter);
+                @endphp
+                @forelse($filteredActivities as $act)
                   @if(($act['activity_type'] ?? 'system') === 'manual')
                     {{-- Manual note --}}
                     <div class="group flex items-start gap-2.5 py-2 px-3 rounded-lg hover:bg-[var(--ui-surface-hover)]/60 transition-colors" wire:key="act-{{ $act['id'] }}">
