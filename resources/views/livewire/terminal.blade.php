@@ -220,6 +220,27 @@
               <span class="hidden sm:inline">Zeit</span>
             </button>
           @endif
+          @if($this->availableApps['okr'])
+            <button
+              @click.stop="$wire.set('activeApp', 'okr'); if(!open) toggle()"
+              class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
+              :class="$wire.activeApp === 'okr'
+                ? 'bg-white/15 text-white'
+                : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5'"
+            >
+              <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z"/></svg>
+              <span class="hidden sm:inline">OKR</span>
+            </button>
+          @else
+            <button
+              @click.stop
+              class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--t-text-muted)]/30 cursor-not-allowed"
+              title="OKR — nur bei Kontext verfügbar"
+            >
+              <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z"/></svg>
+              <span class="hidden sm:inline">OKR</span>
+            </button>
+          @endif
         <div class="w-px h-4 bg-[var(--t-border)] ml-0.5"></div>
       </div>
 
@@ -1098,6 +1119,31 @@
             @else
               <svg class="w-4 h-4 text-[var(--t-text-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
               <span class="font-bold text-[13px] text-[var(--t-text)]">Zeiterfassung</span>
+            @endif
+          </div>
+
+          <!-- OKR Header (only visible in okr app) -->
+          <div x-show="$wire.activeApp === 'okr'"
+               class="px-4 flex items-center gap-2.5 border-b border-[var(--t-border)]/60 flex-shrink-0"
+               :class="fullscreen ? 'h-14 text-sm' : 'h-11 text-xs'">
+            @if($this->contextType && $this->contextId)
+              @php $okrHeaderBreadcrumb = $this->getContextBreadcrumb(); @endphp
+              <span class="text-[14px]">{{ $okrHeaderBreadcrumb['icon'] ?? '' }}</span>
+              <div class="flex flex-col leading-tight">
+                @php $okrContextTitle = $okrHeaderBreadcrumb['title'] ?? $this->contextSubject ?? 'Kontext'; @endphp
+                @if($this->contextUrl)
+                  <a href="{{ $this->contextUrl }}" class="inline-flex items-center gap-1 font-bold text-[13px] text-[var(--t-accent)] hover:underline transition" title="Zum Kontext springen">
+                    {{ $okrContextTitle }}
+                    <svg class="w-3 h-3 flex-shrink-0 opacity-60" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5zm7.25-.75a.75.75 0 01.75-.75h3.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0V6.31l-5.47 5.47a.75.75 0 11-1.06-1.06l5.47-5.47H12.25a.75.75 0 01-.75-.75z" clip-rule="evenodd"/></svg>
+                  </a>
+                @else
+                  <span class="font-bold text-[13px] text-[var(--t-text)]">{{ $okrContextTitle }}</span>
+                @endif
+                <span class="text-[10px] text-[var(--t-text-muted)]">OKR KeyResults</span>
+              </div>
+            @else
+              <svg class="w-4 h-4 text-[var(--t-text-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z"/></svg>
+              <span class="font-bold text-[13px] text-[var(--t-text)]">OKR KeyResults</span>
             @endif
           </div>
 
@@ -2268,6 +2314,17 @@
                   </div>
                 @endif
 
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══ App: OKR (Platzhalter) ═══ -->
+          <div x-show="$wire.activeApp === 'okr'" class="flex-1 min-h-0 flex flex-col">
+            <div class="flex-1 flex items-center justify-center">
+              <div class="text-center py-12">
+                <div class="text-3xl opacity-20 mb-3">🎯</div>
+                <p class="text-sm font-medium text-[var(--t-text)]">OKR KeyResults</p>
+                <p class="text-xs text-[var(--t-text-muted)] mt-1 max-w-[200px] mx-auto">Wird überarbeitet — KeyResult-Verknüpfungen werden hier integriert.</p>
               </div>
             </div>
           </div>

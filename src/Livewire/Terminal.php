@@ -50,7 +50,7 @@ class Terminal extends Component
     public ?int $editingMessageId = null;
     public array $onlineUserIds = [];
     public string $activeApp = 'chat';
-    public array $availableApps = ['chat' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false];
+    public array $availableApps = ['chat' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false];
     public string $activityFilter = 'all'; // all | manual | system
     public string $filesFilter = 'all'; // all | images | documents
 
@@ -161,7 +161,7 @@ class Terminal extends Component
 
         // Reset available apps when context changes
         if ($model !== $this->contextType || (int) $modelId !== $this->contextId) {
-            $this->availableApps = ['chat' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false];
+            $this->availableApps = ['chat' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false];
         }
 
         $this->contextType = $model;
@@ -805,6 +805,18 @@ class Terminal extends Component
     {
         if (! empty($payload['allow_time_entry'])) {
             $this->availableApps['time'] = true;
+        }
+    }
+
+    /**
+     * Listen to the keyresult dispatch from modules.
+     * Enable the OKR tab when a module sets KeyResult context.
+     */
+    #[On('keyresult')]
+    public function setKeyResultContext(array $payload = []): void
+    {
+        if (! empty($payload['context_type']) && ! empty($payload['context_id'])) {
+            $this->availableApps['okr'] = true;
         }
     }
 
