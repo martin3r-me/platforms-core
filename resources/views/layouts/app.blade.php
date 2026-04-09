@@ -51,7 +51,6 @@
     @endif
     @livewire('core.modal-simple-tool-playground')
     @livewire('organization.modal-organization')
-    @livewire('core.modal-extra-fields')
   @endauth
 
   @php
