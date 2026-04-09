@@ -599,8 +599,9 @@ class Terminal extends Component
      */
     public function deleteContextFile(int $fileId): void
     {
-        $teamId = $this->teamId();
-        if (! $teamId) {
+        $user = auth()->user();
+        $team = $user?->currentTeamRelation;
+        if (! $team) {
             return;
         }
 
@@ -611,12 +612,12 @@ class Terminal extends Component
             return;
         }
 
-        if ($file->team_id !== $teamId) {
+        if ($file->team_id !== $team->id) {
             return;
         }
 
         $service = app(ContextFileService::class);
-        $service->delete($fileId, $teamId);
+        $service->delete($fileId, $team->id);
 
         unset($this->contextFiles);
     }
