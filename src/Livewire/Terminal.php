@@ -796,6 +796,18 @@ class Terminal extends Component
     }
 
     /**
+     * Listen to the organization dispatch from modules.
+     * When allow_time_entry is true, enable the Time tab automatically.
+     */
+    #[On('organization')]
+    public function setOrganizationContext(array $payload = []): void
+    {
+        if (! empty($payload['allow_time_entry'])) {
+            $this->availableApps['time'] = true;
+        }
+    }
+
+    /**
      * Open tags app from sidebar button (uses context from active channel).
      */
     public function openTagsApp(): void
