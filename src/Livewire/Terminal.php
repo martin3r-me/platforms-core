@@ -273,7 +273,8 @@ class Terminal extends Component
     /**
      * Load activities for the context entity of the active channel.
      */
-    public function getContextActivities(): array
+    #[Computed]
+    public function contextActivities(): array
     {
         $channel = $this->channelId ? TerminalChannel::find($this->channelId) : null;
         if (! $channel || ! $channel->context_type || ! $channel->context_id) {
