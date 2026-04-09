@@ -37,6 +37,7 @@ class Terminal extends Component
     public $pendingFiles = [];
     public ?int $editingMessageId = null;
     public array $onlineUserIds = [];
+    public string $activeApp = 'chat';
 
     // ── Lifecycle ──────────────────────────────────────────────
 
@@ -276,6 +277,10 @@ class Terminal extends Component
     #[Computed]
     public function contextActivities(): array
     {
+        if ($this->activeApp !== 'activity') {
+            return [];
+        }
+
         $channel = $this->channelId ? TerminalChannel::find($this->channelId) : null;
         if (! $channel || ! $channel->context_type || ! $channel->context_id) {
             return [];
@@ -381,6 +386,7 @@ class Terminal extends Component
             ->firstOrFail();
 
         $this->channelId = $channel->id;
+        $this->activeApp = 'chat';
         $this->ensureMembership($channel);
         $this->markAsRead();
     }

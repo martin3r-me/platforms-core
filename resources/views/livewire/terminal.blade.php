@@ -62,9 +62,9 @@
       <div x-show="open" x-cloak class="flex items-center gap-0.5 flex-shrink-0">
         <div class="w-px h-4 bg-[var(--ui-border)]/40 mr-0.5"></div>
         <button
-          @click.stop="switchApp('chat')"
+          @click.stop="$wire.set('activeApp', 'chat')"
           class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
-          :class="activeApp === 'chat'
+          :class="$wire.activeApp === 'chat'
             ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]'
             : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)]'"
         >
@@ -73,9 +73,9 @@
         </button>
         @if(! empty($this->activeChannel['context']))
           <button
-            @click.stop="switchApp('activity')"
+            @click.stop="$wire.set('activeApp', 'activity')"
             class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
-            :class="activeApp === 'activity'
+            :class="$wire.activeApp === 'activity'
               ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]'
               : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)]'"
           >
@@ -592,7 +592,7 @@
           </div>
 
           <!-- ═══ App: Chat ═══ -->
-          <div x-show="activeApp === 'chat'" class="flex-1 min-h-0 flex flex-col">
+          <div x-show="$wire.activeApp === 'chat'" class="flex-1 min-h-0 flex flex-col">
 
           <!-- Messages -->
           <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain" :class="fullscreen ? 'text-[14px]' : 'text-[13px]'" x-ref="body" wire:key="terminal-messages-{{ $channelId }}"
@@ -1017,7 +1017,7 @@
           </div>
 
           <!-- ═══ App: Aktivitäten ═══ -->
-          <div x-show="activeApp === 'activity'" class="flex-1 min-h-0 overflow-y-auto overscroll-contain" wire:key="terminal-activities-{{ $channelId }}">
+          <div x-show="$wire.activeApp === 'activity'" class="flex-1 min-h-0 overflow-y-auto overscroll-contain" wire:key="terminal-activities-{{ $channelId }}">
             <div class="py-4" :class="fullscreen ? 'px-6' : 'px-4'">
               <h3 class="text-xs font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-4">Letzte Aktivitäten</h3>
               <div class="space-y-2">
@@ -1051,7 +1051,7 @@
           </div>
 
           <!-- ═══ App: Dateien (Placeholder) ═══ -->
-          <div x-show="activeApp === 'files'" class="flex-1 min-h-0 flex items-center justify-center text-[var(--ui-muted)] text-sm">
+          <div x-show="$wire.activeApp === 'files'" class="flex-1 min-h-0 flex items-center justify-center text-[var(--ui-muted)] text-sm">
             <div class="text-center">
               <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--ui-muted)]/5 mb-3">
                 @svg('heroicon-o-paper-clip', 'w-6 h-6')
@@ -1423,22 +1423,11 @@
         panelHeight: parseInt(localStorage.getItem(STORAGE_KEY)) || DEFAULT_HEIGHT,
         sidebarWidth: parseInt(localStorage.getItem(SIDEBAR_STORAGE_KEY)) || DEFAULT_SIDEBAR,
         fullscreen: localStorage.getItem('terminal_fullscreen') === '1',
-        activeApp: 'chat',
         resizing: false,
         resizingSidebar: false,
         typingUsers: {},
         _startY: 0,
         _startH: 0,
-
-        switchApp(app) {
-          this.activeApp = app;
-          if (app === 'chat') {
-            this.$nextTick(() => {
-              const c = this.$refs.body;
-              if (c) c.scrollTop = c.scrollHeight;
-            });
-          }
-        },
 
         toggleFullscreen() {
           this.fullscreen = !this.fullscreen;
@@ -1587,10 +1576,9 @@
             if (el === c || c.contains(el)) scrollBottom();
           });
 
-          // Setup typing listener for initial channel + reset app on channel switch
+          // Setup typing listener for initial channel
           this.$watch('$wire.channelId', (id) => {
             this.typingUsers = {};
-            this.activeApp = 'chat';
             this.setupTypingListener(id);
           });
           @if($channelId)
