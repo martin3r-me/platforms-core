@@ -29,10 +29,10 @@
       --t-accent: var(--ui-primary);
       --t-glow: rgba(var(--ui-primary-rgb), 0.15);
       --t-unread-glow: rgba(244,63,94,0.3);
-      /* Slack-style solid sidebar */
-      --t-sidebar: #1a1d21;
-      --t-sidebar-hover: #26292d;
-      --t-sidebar-active: #1164a3;
+      /* Slack aubergine sidebar */
+      --t-sidebar: #3F0E40;
+      --t-sidebar-hover: #350D36;
+      --t-sidebar-active: #1164A3;
     }
     /* Light scope — remaps terminal vars to platform light theme for content area + modals */
     .terminal-light {
