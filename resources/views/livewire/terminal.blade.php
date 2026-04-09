@@ -72,6 +72,7 @@
           <span class="hidden sm:inline">Chat</span>
         </button>
           @if($this->availableApps['activity'])
+            @php $activityCount = count($this->contextActivities); @endphp
             <button
               @click.stop="$wire.set('activeApp', 'activity')"
               class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
@@ -81,6 +82,9 @@
             >
               <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
               <span class="hidden sm:inline">Aktivitäten</span>
+              @if($activityCount > 0)
+                <span class="min-w-[14px] h-[14px] px-0.5 rounded-full bg-[var(--ui-muted)]/15 text-[9px] font-bold flex items-center justify-center">{{ $activityCount }}</span>
+              @endif
             </button>
           @else
             <button
@@ -464,18 +468,53 @@
                 </div>
                 <span class="text-[10px] text-[var(--ui-muted)]">{{ $this->activeChannel['context']['label'] ?? 'Entity' }}</span>
               </div>
+
+              {{-- Activity summary --}}
+              @php
+                $activities = $this->contextActivities;
+                $manualCount = count(array_filter($activities, fn($a) => ($a['activity_type'] ?? 'system') === 'manual'));
+                $systemCount = count($activities) - $manualCount;
+              @endphp
+              <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-2">Übersicht</h3>
+              <div class="space-y-1.5 mb-4">
+                <div class="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[var(--ui-surface-hover)]/30">
+                  <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] flex items-center justify-center">
+                    @svg('heroicon-o-pencil-square', 'w-3 h-3 text-[var(--ui-primary)]')
+                  </div>
+                  <span class="text-xs text-[var(--ui-body-color)]">{{ $manualCount }} {{ $manualCount === 1 ? 'Notiz' : 'Notizen' }}</span>
+                </div>
+                <div class="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[var(--ui-surface-hover)]/30">
+                  <div class="w-5 h-5 rounded-full bg-[var(--ui-muted)]/5 flex items-center justify-center">
+                    @svg('heroicon-o-cog-6-tooth', 'w-3 h-3 text-[var(--ui-muted)]')
+                  </div>
+                  <span class="text-xs text-[var(--ui-body-color)]">{{ $systemCount }} {{ $systemCount === 1 ? 'System-Event' : 'System-Events' }}</span>
+                </div>
+              </div>
+
+              {{-- Debug info --}}
+              <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-2">Debug</h3>
+              <div class="space-y-1 text-[10px] text-[var(--ui-muted)] font-mono bg-[var(--ui-surface-hover)]/20 rounded-md p-2">
+                <div>channel: {{ $this->channelId }}</div>
+                <div>type: {{ $this->activeChannel['type'] ?? '–' }}</div>
+                <div>context: {{ class_basename($this->activeChannel['context']['context_type'] ?? '–') }}</div>
+                <div>id: {{ $this->activeChannel['context']['context_id'] ?? '–' }}</div>
+                <div>activities: {{ count($activities) }}</div>
+                <div>activeApp: {{ $this->activeApp }}</div>
+              </div>
             @else
               <div class="p-2.5 rounded-lg border border-dashed border-[var(--ui-border)]/40 mb-4">
                 <p class="text-[10px] text-[var(--ui-muted)] text-center">Kein Kontext — wähle einen Kontext-Channel</p>
               </div>
-            @endif
 
-            <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-2">Filter</h3>
-            <div class="space-y-0.5">
-              <div class="px-2 py-1.5 rounded text-xs text-[var(--ui-primary)] bg-[var(--ui-primary-5)] font-medium">Alle Aktivitäten</div>
-              <div class="px-2 py-1.5 rounded text-xs text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition cursor-not-allowed opacity-50" title="Kommt bald">Nur Änderungen</div>
-              <div class="px-2 py-1.5 rounded text-xs text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition cursor-not-allowed opacity-50" title="Kommt bald">Nur Notizen</div>
-            </div>
+              {{-- Debug info for non-context --}}
+              <div class="space-y-1 text-[10px] text-[var(--ui-muted)] font-mono bg-[var(--ui-surface-hover)]/20 rounded-md p-2 mt-2">
+                <div>channel: {{ $this->channelId ?? 'none' }}</div>
+                <div>type: {{ $this->activeChannel['type'] ?? '–' }}</div>
+                <div>activeApp: {{ $this->activeApp }}</div>
+                <div>context_type: {{ $this->contextType ?? 'null' }}</div>
+                <div>context_id: {{ $this->contextId ?? 'null' }}</div>
+              </div>
+            @endif
           </div>
         </div>
 

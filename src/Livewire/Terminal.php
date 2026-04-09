@@ -370,10 +370,6 @@ class Terminal extends Component
     #[Computed]
     public function contextActivities(): array
     {
-        if ($this->activeApp !== 'activity') {
-            return [];
-        }
-
         $channel = $this->channelId ? TerminalChannel::find($this->channelId) : null;
         if (! $channel || ! $channel->context_type || ! $channel->context_id) {
             return [];
