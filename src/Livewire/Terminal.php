@@ -960,6 +960,42 @@ class Terminal extends Component
         }
     }
 
+    public function setColorPreset(string $color): void
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            return;
+        }
+
+        if (! class_exists($this->contextType)) {
+            return;
+        }
+
+        if (! preg_match('/^#[0-9A-Fa-f]{6}$/', $color)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Ungültige Farbangabe.']);
+            return;
+        }
+
+        try {
+            $context = $this->contextType::find($this->contextId);
+            if (! $context) {
+                return;
+            }
+
+            if (! in_array(\Platform\Core\Traits\HasColors::class, class_uses_recursive($context))) {
+                $this->dispatch('notify', ['type' => 'error', 'message' => 'Dieses Model unterstützt keine Farben.']);
+                return;
+            }
+
+            $context->setColor($color, false);
+            $this->contextColor = $color;
+            $this->newContextColor = null;
+
+            $this->dispatch('notify', ['type' => 'success', 'message' => 'Farbe gesetzt.']);
+        } catch (\Exception $e) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Fehler beim Setzen der Farbe.']);
+        }
+    }
+
     public function removeColor(): void
     {
         if (! $this->contextType || ! $this->contextId || ! class_exists($this->contextType)) {
