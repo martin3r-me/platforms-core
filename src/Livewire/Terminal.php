@@ -290,10 +290,10 @@ class Terminal extends Component
     /**
      * Add a manual note to the context entity's activity log.
      */
-    public function addActivityNote(string $text): void
+    public function addActivityNote(string $bodyHtml, ?string $bodyPlain = null, array $attachmentIds = []): void
     {
-        $text = trim($text);
-        if (empty($text)) {
+        $plain = trim($bodyPlain ?? strip_tags($bodyHtml));
+        if (empty($plain) && empty($attachmentIds)) {
             return;
         }
 
@@ -311,7 +311,28 @@ class Terminal extends Component
             return;
         }
 
-        $model->logActivity($text);
+        $metadata = [];
+        if (! empty($attachmentIds)) {
+            $metadata['attachment_ids'] = $attachmentIds;
+        }
+
+        $model->logActivity($plain, $metadata);
+
+        // Link attachments to the activity model
+        if (! empty($attachmentIds)) {
+            $activity = $model->activities()->latest()->first();
+            if ($activity) {
+                ContextFile::whereIn('id', $attachmentIds)
+                    ->where('context_type', TerminalMessage::class)
+                    ->where('context_id', 0)
+                    ->where('user_id', auth()->id())
+                    ->update([
+                        'context_type' => get_class($activity),
+                        'context_id' => $activity->id,
+                    ]);
+            }
+        }
+
         unset($this->contextActivities);
     }
 
@@ -369,11 +390,24 @@ class Terminal extends Component
 
         $currentUserId = auth()->id();
 
-        return $model->activities()
+        $activities = $model->activities()
             ->with('user')
             ->limit(30)
-            ->get()
-            ->map(function ($activity) use ($currentUserId) {
+            ->get();
+
+        // Batch-load attachments for manual activities that have them
+        $activityClass = get_class($activities->first() ?? new \stdClass());
+        $activityIds = $activities->pluck('id')->toArray();
+        $attachmentsByActivity = [];
+        if (! empty($activityIds) && class_exists($activityClass)) {
+            $attachmentsByActivity = ContextFile::where('context_type', $activityClass)
+                ->whereIn('context_id', $activityIds)
+                ->get()
+                ->groupBy('context_id');
+        }
+
+        return $activities
+            ->map(function ($activity) use ($currentUserId, $attachmentsByActivity) {
                 $userName = $activity->user?->name ?? 'System';
                 $event = $activity->name;
                 $isManual = $activity->activity_type === 'manual';
@@ -408,13 +442,29 @@ class Terminal extends Component
                         : "{$userName} hat {$translated}";
                 }
 
+                // Resolve attachments
+                $files = $attachmentsByActivity[$activity->id] ?? collect();
+                $attachments = $files->map(fn (ContextFile $f) => [
+                    'id' => $f->id,
+                    'url' => $f->url,
+                    'download_url' => $f->download_url,
+                    'original_name' => $f->original_name,
+                    'mime_type' => $f->mime_type,
+                    'file_size' => $f->file_size,
+                    'is_image' => $f->isImage(),
+                ])->values()->toArray();
+
                 return [
                     'id' => $activity->id,
                     'title' => $title,
                     'message' => $activity->message,
                     'user' => $userName,
+                    'user_avatar' => $activity->user?->avatar,
+                    'user_initials' => $this->initials($activity->user?->name ?? '?'),
                     'activity_type' => $activity->activity_type ?? 'system',
                     'is_mine' => $activity->user_id === $currentUserId,
+                    'has_attachments' => ! empty($attachments),
+                    'attachments' => $attachments,
                     'time' => $activity->created_at->diffForHumans(),
                 ];
             })
