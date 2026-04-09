@@ -103,13 +103,17 @@
       class="relative flex-shrink-0 px-4 flex items-center gap-1.5 overflow-x-auto scrollbar-none select-none group/bar"
       :class="fullscreen ? 'h-12 border-b border-[var(--t-border)]' : 'h-9 cursor-pointer'"
     >
-      {{-- Terminal icon + label + unread badge — click toggles open/close --}}
-      <div class="flex items-center gap-1.5 mr-1 flex-shrink-0 cursor-pointer text-[var(--t-text-muted)] hover:text-[var(--t-accent)] transition-colors" @click.stop="toggle()">
-        @svg('heroicon-o-command-line', 'w-5 h-5')
-        @if($totalUnread > 0)
-          <span class="min-w-[18px] h-[18px] px-1 rounded-full bg-gradient-to-r from-rose-500 to-pink-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg shadow-rose-500/30 animate-[t-badge-pop_2s_ease-in-out_infinite]">{{ $totalUnread > 99 ? '99+' : $totalUnread }}</span>
-        @endif
+      {{-- macOS traffic lights --}}
+      <div class="flex items-center gap-1.5 mr-1 flex-shrink-0 group/dots" @click.stop>
+        <button @click="toggle()" class="w-3 h-3 rounded-full bg-[#FF5F57] hover:brightness-110 transition cursor-pointer" title="Schließen"></button>
+        <button @click="toggle()" class="w-3 h-3 rounded-full bg-[#FEBC2E] hover:brightness-110 transition cursor-pointer" title="Minimieren"></button>
+        <button @click="toggleFullscreen()" class="w-3 h-3 rounded-full bg-[#28C840] hover:brightness-110 transition cursor-pointer" :title="fullscreen ? 'Vollbild verlassen (Esc)' : 'Vollbild'"></button>
       </div>
+
+      {{-- Unread badge --}}
+      @if($totalUnread > 0)
+        <span class="min-w-[18px] h-[18px] px-1 rounded-full bg-gradient-to-r from-rose-500 to-pink-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg shadow-rose-500/30 animate-[t-badge-pop_2s_ease-in-out_infinite]">{{ $totalUnread > 99 ? '99+' : $totalUnread }}</span>
+      @endif
 
       {{-- App switcher tabs — always visible, click opens terminal + switches app --}}
       <div class="flex items-center gap-0.5 flex-shrink-0">
@@ -230,26 +234,8 @@
         </button>
       @endforeach
 
-      {{-- Fullscreen toggle --}}
-      <button
-        @click.stop="toggleFullscreen()"
-        class="ml-auto flex-shrink-0 text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition cursor-pointer p-1 rounded hover:bg-white/10"
-        :title="fullscreen ? 'Vollbild verlassen (Esc)' : 'Vollbild'"
-      >
-        <svg x-show="!fullscreen" x-cloak class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"/>
-        </svg>
-        <svg x-show="fullscreen" x-cloak class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9 3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5 5.25 5.25"/>
-        </svg>
-      </button>
-
-      {{-- Chevron — collapse/expand (hidden in fullscreen) --}}
-      <button x-show="!fullscreen" @click.stop="toggle()" class="flex-shrink-0 text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition cursor-pointer p-1 -mr-1 rounded hover:bg-white/10">
-        <svg class="w-3 h-3 transition-transform duration-200" :class="open ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clip-rule="evenodd" />
-        </svg>
-      </button>
+      {{-- Spacer to push unread pills left --}}
+      <div class="ml-auto"></div>
     </div>
     </div>{{-- /status bar wrapper --}}
 
