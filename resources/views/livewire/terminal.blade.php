@@ -30,6 +30,29 @@
       --t-glow: rgba(var(--ui-primary-rgb), 0.15);
       --t-unread-glow: rgba(244,63,94,0.3);
     }
+    /* Light scope — remaps terminal vars to platform light theme for content area + modals */
+    .terminal-light {
+      --t-text: var(--ui-body-color);
+      --t-text-muted: var(--ui-muted);
+      --t-border: var(--ui-border);
+      --t-accent: var(--ui-primary);
+      --t-glass-surface: var(--ui-surface);
+      --t-glass: var(--ui-surface);
+      --t-glass-hover: var(--ui-surface-hover);
+      --t-border-bright: var(--ui-border);
+    }
+    /* Override white-overlay utilities inside light scope (white-on-white → dark-on-white) */
+    .terminal-light .bg-white\/5,
+    .terminal-light .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,0.03) !important; }
+    .terminal-light .bg-white\/\[0\.06\] { background-color: rgba(0,0,0,0.05) !important; }
+    .terminal-light .bg-white\/10 { background-color: rgba(0,0,0,0.06) !important; }
+    .terminal-light .hover\:bg-white\/5:hover,
+    .terminal-light .hover\:bg-white\/\[0\.04\]:hover,
+    .terminal-light .hover\:bg-white\/\[0\.06\]:hover { background-color: rgba(0,0,0,0.04) !important; }
+    .terminal-light .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.06) !important; }
+    .terminal-light .border-white\/5,
+    .terminal-light .border-white\/10 { border-color: rgba(0,0,0,0.06) !important; }
+    .terminal-light .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(0,0,0,0.06) !important; }
     @keyframes t-spring-in { 0% { transform: translateY(16px); opacity: 0.5; } 60% { transform: translateY(-4px); opacity: 1; } 100% { transform: translateY(0); } }
     @keyframes t-glow-pulse { 0%,100% { box-shadow: 0 -2px 20px var(--t-unread-glow); } 50% { box-shadow: 0 -4px 35px var(--t-unread-glow); } }
     @keyframes t-badge-pop { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
@@ -49,7 +72,7 @@
 
   <!-- Fullscreen backdrop -->
   <div x-show="fullscreen" x-cloak x-transition:enter="transition-opacity duration-300" x-transition:leave="transition-opacity duration-200"
-    class="fixed inset-0 bg-black/30 backdrop-blur-sm z-[59]" @click="toggleFullscreen()"></div>
+    class="fixed inset-0 bg-black/10 z-[59]" @click="toggleFullscreen()"></div>
 
   <!-- Single terminal container — status bar always peeks out -->
   <div
@@ -707,7 +730,7 @@
       </div>
 
       <!-- Main Chat Area — keyed per channel so editor + messages fully rebuild -->
-      <div class="flex-1 min-w-0 flex flex-col" wire:key="terminal-main-{{ $channelId }}">
+      <div class="terminal-light flex-1 min-w-0 flex flex-col bg-[var(--ui-surface)]" wire:key="terminal-main-{{ $channelId }}">
 
         @if($this->activeChannel)
           <!-- Chat Header (only visible in chat app) -->
@@ -1921,11 +1944,11 @@
     x-on:terminal-show-new-dm.window="showNewDm = true; $wire.getTeamMembers().then(r => members = r)"
     x-show="showNewDm"
     x-cloak
-    class="fixed inset-0 z-[70] flex items-center justify-center bg-black/30"
+    class="terminal-light fixed inset-0 z-[70] flex items-center justify-center bg-black/30"
     @click.self="showNewDm = false"
     @keydown.escape.window="showNewDm = false"
   >
-    <div class="bg-[var(--t-glass-surface)] rounded-lg shadow-xl border border-[var(--t-border)]/60 w-80 max-h-96 overflow-hidden" @click.stop>
+    <div class="bg-[var(--ui-surface)] rounded-lg shadow-xl border border-[var(--t-border)] w-80 max-h-96 overflow-hidden" @click.stop>
       <div class="px-4 py-3 border-b border-[var(--t-border)]/60">
         <h3 class="text-sm font-medium text-[var(--t-text)]">Neuer Chat</h3>
       </div>
@@ -1959,11 +1982,11 @@
     x-on:terminal-show-new-channel.window="showNewChannel = true; channelName = ''; channelDesc = ''; selectedIds = []; $wire.getTeamMembers().then(r => members = r)"
     x-show="showNewChannel"
     x-cloak
-    class="fixed inset-0 z-[70] flex items-center justify-center bg-black/30"
+    class="terminal-light fixed inset-0 z-[70] flex items-center justify-center bg-black/30"
     @click.self="showNewChannel = false"
     @keydown.escape.window="showNewChannel = false"
   >
-    <div class="bg-[var(--t-glass-surface)] rounded-lg shadow-xl border border-[var(--t-border)]/60 w-80 overflow-hidden" @click.stop>
+    <div class="bg-[var(--ui-surface)] rounded-lg shadow-xl border border-[var(--t-border)] w-80 overflow-hidden" @click.stop>
       <div class="px-4 py-3 border-b border-[var(--t-border)]/60">
         <h3 class="text-sm font-medium text-[var(--t-text)]">Neuer Channel</h3>
       </div>
@@ -2039,11 +2062,11 @@
     x-on:terminal-show-members.window="showMembers = true; load()"
     x-show="showMembers"
     x-cloak
-    class="fixed inset-0 z-[70] flex items-center justify-center bg-black/30"
+    class="terminal-light fixed inset-0 z-[70] flex items-center justify-center bg-black/30"
     @click.self="showMembers = false"
     @keydown.escape.window="showMembers = false"
   >
-    <div class="bg-[var(--t-glass-surface)] rounded-lg shadow-xl border border-[var(--t-border)]/60 w-80 max-h-[28rem] overflow-hidden flex flex-col" @click.stop>
+    <div class="bg-[var(--ui-surface)] rounded-lg shadow-xl border border-[var(--t-border)] w-80 max-h-[28rem] overflow-hidden flex flex-col" @click.stop>
       <div class="px-4 py-3 border-b border-[var(--t-border)]/60 flex-shrink-0">
         <h3 class="text-sm font-medium text-[var(--t-text)]">Mitglieder</h3>
       </div>
@@ -2124,11 +2147,11 @@
     x-on:terminal-show-pins.window="showPins = true; loading = true; $wire.getPinnedMessages().then(r => { pins = r; loading = false; })"
     x-show="showPins"
     x-cloak
-    class="fixed inset-0 z-[70] flex items-center justify-center bg-black/30"
+    class="terminal-light fixed inset-0 z-[70] flex items-center justify-center bg-black/30"
     @click.self="showPins = false"
     @keydown.escape.window="showPins = false"
   >
-    <div class="bg-[var(--t-glass-surface)] rounded-lg shadow-xl border border-[var(--t-border)]/60 w-96 max-h-[28rem] overflow-hidden flex flex-col" @click.stop>
+    <div class="bg-[var(--ui-surface)] rounded-lg shadow-xl border border-[var(--t-border)] w-96 max-h-[28rem] overflow-hidden flex flex-col" @click.stop>
       <div class="px-4 py-3 border-b border-[var(--t-border)]/60 flex-shrink-0 flex items-center justify-between">
         <h3 class="text-sm font-medium text-[var(--t-text)]">Gepinnte Nachrichten</h3>
         <button @click="showPins = false" class="text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition">
@@ -2199,11 +2222,11 @@
     x-on:terminal-show-forward.window="showForward = true; forwardMessageId = $event.detail.messageId; loading = true; $wire.getForwardTargets().then(r => { targets = r; loading = false; })"
     x-show="showForward"
     x-cloak
-    class="fixed inset-0 z-[70] flex items-center justify-center bg-black/30"
+    class="terminal-light fixed inset-0 z-[70] flex items-center justify-center bg-black/30"
     @click.self="showForward = false"
     @keydown.escape.window="showForward = false"
   >
-    <div class="bg-[var(--t-glass-surface)] rounded-lg shadow-xl border border-[var(--t-border)]/60 w-80 max-h-96 overflow-hidden flex flex-col" @click.stop>
+    <div class="bg-[var(--ui-surface)] rounded-lg shadow-xl border border-[var(--t-border)] w-80 max-h-96 overflow-hidden flex flex-col" @click.stop>
       <div class="px-4 py-3 border-b border-[var(--t-border)]/60 flex-shrink-0">
         <h3 class="text-sm font-medium text-[var(--t-text)]">Nachricht weiterleiten</h3>
         <p class="text-[10px] text-[var(--t-text-muted)] mt-0.5">Wähle einen Channel oder Chat</p>
