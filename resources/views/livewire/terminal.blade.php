@@ -3,19 +3,39 @@
   x-init="init()"
   x-on:toggle-terminal.window="toggle()"
   x-on:toggle-terminal-open.window="if(!open) toggle()"
-  x-on:scroll-to-message.window="$nextTick(() => { const el = document.getElementById('msg-' + $event.detail.messageId); if(el) { el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('!bg-amber-100/30'); setTimeout(() => el.classList.remove('!bg-amber-100/30'), 2000); } })"
+  x-on:scroll-to-message.window="$nextTick(() => { const el = document.getElementById('msg-' + $event.detail.messageId); if(el) { el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('!bg-amber-500/15'); setTimeout(() => el.classList.remove('!bg-amber-500/15'), 2000); } })"
   x-on:terminal-typing="sendTypingWhisper($wire.channelId)"
   x-on:keydown.escape.window="if(fullscreen) toggleFullscreen()"
   :class="[
     fullscreen ? 'fixed inset-0 z-[60]' : 'w-full flex-none relative',
-    resizing ? '' : 'transition-[height] duration-200 ease-out'
+    resizing ? '' : 'transition-[height] duration-350 ease-[cubic-bezier(0.34,1.56,0.64,1)]'
   ]"
   x-bind:style="fullscreen
     ? 'height:100vh;min-height:100vh;max-height:100vh'
-    : (open ? 'height:' + panelHeight + 'px;min-height:' + panelHeight + 'px;max-height:' + panelHeight + 'px' : 'height:38px;min-height:38px;max-height:38px')"
+    : (open ? 'height:' + panelHeight + 'px;min-height:' + panelHeight + 'px;max-height:' + panelHeight + 'px' : 'height:42px;min-height:42px;max-height:42px')"
   wire:ignore.self
   wire:key="terminal-root"
 >
+  <style>
+    :root {
+      --t-glass: rgba(15, 15, 20, 0.72);
+      --t-glass-surface: rgba(25, 25, 35, 0.65);
+      --t-glass-hover: rgba(35, 35, 50, 0.55);
+      --t-blur: 24px;
+      --t-border: rgba(255,255,255,0.08);
+      --t-border-bright: rgba(255,255,255,0.14);
+      --t-text: #e4e4e7;
+      --t-text-muted: #a1a1aa;
+      --t-accent: var(--ui-primary);
+      --t-glow: rgba(var(--ui-primary-rgb), 0.15);
+      --t-unread-glow: rgba(244,63,94,0.3);
+    }
+    @keyframes t-spring-in { 0% { transform: translateY(16px); opacity: 0.5; } 60% { transform: translateY(-4px); opacity: 1; } 100% { transform: translateY(0); } }
+    @keyframes t-glow-pulse { 0%,100% { box-shadow: 0 -2px 20px var(--t-unread-glow); } 50% { box-shadow: 0 -4px 35px var(--t-unread-glow); } }
+    @keyframes t-badge-pop { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.05ms !important; } }
+  </style>
+
   @php
     $contextItems = collect($this->channels['context_groups'])->flatMap(fn($g) => $g['items']);
     $allChannels = collect($this->channels['dms'])->map(fn($c) => array_merge($c, ['_type' => 'dm']))
@@ -27,10 +47,14 @@
     $pageContext = ($contextType && $contextId) ? $this->getContextBreadcrumb() : null;
   @endphp
 
+  <!-- Fullscreen backdrop -->
+  <div x-show="fullscreen" x-cloak x-transition:enter="transition-opacity duration-300" x-transition:leave="transition-opacity duration-200"
+    class="fixed inset-0 bg-black/30 backdrop-blur-sm z-[59]" @click="toggleFullscreen()"></div>
+
   <!-- Single terminal container — status bar always peeks out -->
   <div
     class="w-full h-full overflow-hidden flex flex-col"
-    :class="fullscreen ? 'bg-[var(--ui-surface)]' : 'border-t-2 border-[var(--ui-border)] bg-[var(--ui-surface)]'"
+    :class="fullscreen ? 'bg-[var(--t-glass)] backdrop-blur-2xl shadow-2xl' : 'border-t border-[var(--t-border-bright)] shadow-[0_-4px_30px_rgba(0,0,0,0.15)] bg-[var(--t-glass)] backdrop-blur-2xl'"
     wire:key="terminal-slide"
   >
     <!-- Resize handle — only visible when open, hidden in fullscreen -->
@@ -39,34 +63,40 @@
       @mousedown.prevent="startResize($event)"
       class="h-1 flex-shrink-0 cursor-ns-resize group/resize relative -mb-1 z-10"
     >
-      <div class="absolute inset-x-0 top-0 h-px bg-transparent group-hover/resize:bg-[var(--ui-primary)]/40 transition"></div>
-      <div class="absolute left-1/2 -translate-x-1/2 top-0 w-8 h-1 rounded-full bg-transparent group-hover/resize:bg-[var(--ui-primary)]/30 transition"></div>
+      <div class="absolute inset-x-0 top-0 h-px bg-white/5 group-hover/resize:bg-[var(--t-accent)]/50 transition"></div>
+      <div class="absolute left-1/2 -translate-x-1/2 top-0 w-10 h-0.5 rounded-full bg-white/10 group-hover/resize:bg-[var(--t-accent)]/50 transition"></div>
     </div>
 
-    <!-- Status bar — always visible (36px), top bar in fullscreen -->
+    <!-- Status bar — always visible (42px), top bar in fullscreen -->
+    <div class="relative flex-shrink-0" wire:key="terminal-statusbar">
+      {{-- Accent gradient line --}}
+      <div class="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--t-accent)]/40 to-transparent"></div>
+      {{-- Unread glow --}}
+      @if($totalUnread > 0)
+        <div class="absolute inset-0 animate-[t-glow-pulse_3s_ease-in-out_infinite] pointer-events-none rounded-t"></div>
+      @endif
     <div
       @click="if(!fullscreen) toggle()"
-      class="flex-shrink-0 px-4 flex items-center gap-1.5 overflow-x-auto scrollbar-none select-none group/bar"
-      :class="fullscreen ? 'h-12 border-b border-[var(--ui-border)]/40' : 'h-9 cursor-pointer'"
-      wire:key="terminal-statusbar"
+      class="relative flex-shrink-0 px-4 flex items-center gap-1.5 overflow-x-auto scrollbar-none select-none group/bar"
+      :class="fullscreen ? 'h-12 border-b border-[var(--t-border)]' : 'h-[42px] cursor-pointer'"
     >
       {{-- Terminal icon + label + unread badge — click toggles open/close --}}
-      <div class="flex items-center gap-1.5 mr-1 flex-shrink-0 cursor-pointer text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition-colors" @click.stop="toggle()">
+      <div class="flex items-center gap-1.5 mr-1 flex-shrink-0 cursor-pointer text-[var(--t-text-muted)] hover:text-[var(--t-accent)] transition-colors" @click.stop="toggle()">
         @svg('heroicon-o-command-line', 'w-5 h-5')
         @if($totalUnread > 0)
-          <span class="min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">{{ $totalUnread > 99 ? '99+' : $totalUnread }}</span>
+          <span class="min-w-[18px] h-[18px] px-1 rounded-full bg-gradient-to-r from-rose-500 to-pink-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg shadow-rose-500/30 animate-[t-badge-pop_2s_ease-in-out_infinite]">{{ $totalUnread > 99 ? '99+' : $totalUnread }}</span>
         @endif
       </div>
 
       {{-- App switcher tabs — visible when terminal is open --}}
       <div x-show="open" x-cloak class="flex items-center gap-0.5 flex-shrink-0">
-        <div class="w-px h-4 bg-[var(--ui-border)]/40 mr-0.5"></div>
+        <div class="w-px h-4 bg-[var(--t-border)] mr-0.5"></div>
         <button
           @click.stop="$wire.set('activeApp', 'chat')"
           class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
           :class="$wire.activeApp === 'chat'
-            ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]'
-            : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)]'"
+            ? 'bg-[var(--t-accent)]/20 text-[var(--t-accent)]'
+            : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5'"
         >
           <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"/></svg>
           <span class="hidden sm:inline">Chat</span>
@@ -77,19 +107,19 @@
               @click.stop="$wire.set('activeApp', 'activity')"
               class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
               :class="$wire.activeApp === 'activity'
-                ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]'
-                : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)]'"
+                ? 'bg-[var(--t-accent)]/20 text-[var(--t-accent)]'
+                : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5'"
             >
               <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
               <span class="hidden sm:inline">Aktivitäten</span>
               @if($activityCount > 0)
-                <span class="min-w-[14px] h-[14px] px-0.5 rounded-full bg-[var(--ui-muted)]/15 text-[9px] font-bold flex items-center justify-center">{{ $activityCount }}</span>
+                <span class="min-w-[14px] h-[14px] px-0.5 rounded-full bg-white/5 border border-[var(--t-border)] text-[var(--t-text)] text-[9px] font-bold flex items-center justify-center">{{ $activityCount }}</span>
               @endif
             </button>
           @else
             <button
               @click.stop
-              class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--ui-muted)]/40 cursor-not-allowed"
+              class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--t-text-muted)]/30 cursor-not-allowed"
               title="Aktivitäten — nur bei Kontext-Channels verfügbar"
             >
               <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
@@ -102,19 +132,19 @@
               @click.stop="$wire.set('activeApp', 'files')"
               class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
               :class="$wire.activeApp === 'files'
-                ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]'
-                : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)]'"
+                ? 'bg-[var(--t-accent)]/20 text-[var(--t-accent)]'
+                : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5'"
             >
               <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13"/></svg>
               <span class="hidden sm:inline">Dateien</span>
               @if($filesCount > 0)
-                <span class="min-w-[14px] h-[14px] px-0.5 rounded-full bg-[var(--ui-muted)]/15 text-[9px] font-bold flex items-center justify-center">{{ $filesCount }}</span>
+                <span class="min-w-[14px] h-[14px] px-0.5 rounded-full bg-white/5 border border-[var(--t-border)] text-[var(--t-text)] text-[9px] font-bold flex items-center justify-center">{{ $filesCount }}</span>
               @endif
             </button>
           @else
             <button
               @click.stop
-              class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--ui-muted)]/40 cursor-not-allowed"
+              class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--t-text-muted)]/30 cursor-not-allowed"
               title="Dateien — nur bei Kontext verfügbar"
             >
               <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13"/></svg>
@@ -126,8 +156,8 @@
               @click.stop="$wire.set('activeApp', 'tags')"
               class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
               :class="$wire.activeApp === 'tags'
-                ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]'
-                : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)]'"
+                ? 'bg-[var(--t-accent)]/20 text-[var(--t-accent)]'
+                : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5'"
             >
               <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"/></svg>
               <span class="hidden sm:inline">Tags</span>
@@ -135,18 +165,18 @@
           @else
             <button
               @click.stop
-              class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--ui-muted)]/40 cursor-not-allowed"
+              class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--t-text-muted)]/30 cursor-not-allowed"
               title="Tags — nur bei Kontext verfügbar"
             >
               <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"/></svg>
               <span class="hidden sm:inline">Tags</span>
             </button>
           @endif
-        <div class="w-px h-4 bg-[var(--ui-border)]/40 ml-0.5"></div>
+        <div class="w-px h-4 bg-[var(--t-border)] ml-0.5"></div>
       </div>
 
       @if($allChannels->isNotEmpty())
-        <div class="w-px h-4 bg-[var(--ui-border)]/40 flex-shrink-0"></div>
+        <div class="w-px h-4 bg-[var(--t-border)] flex-shrink-0"></div>
       @endif
 
       {{-- Unread channel pills — click opens that channel + terminal --}}
@@ -154,7 +184,7 @@
         <button
           wire:click="openChannel({{ $preview['id'] }})"
           @click.stop="if(!open) toggle()"
-          class="flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] flex-shrink-0 bg-[var(--ui-primary-5)] text-[var(--ui-primary)] font-semibold hover:bg-[var(--ui-primary-10)] transition cursor-pointer"
+          class="flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] flex-shrink-0 bg-white/5 border border-[var(--t-border)] text-[var(--t-text)] font-semibold hover:bg-white/10 transition cursor-pointer"
         >
           @if($preview['_type'] === 'dm')
             <div class="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center text-[8px] font-bold flex-shrink-0 overflow-hidden text-emerald-600">
@@ -172,18 +202,18 @@
           <span class="truncate max-w-[80px]">{{ $preview['name'] }}</span>
           <span class="min-w-[14px] h-[14px] px-0.5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">{{ $preview['unread'] > 9 ? '9+' : $preview['unread'] }}</span>
           @if($preview['last_message'])
-            <span class="text-[10px] text-[var(--ui-muted)] truncate max-w-[120px] hidden sm:inline font-normal">{{ $preview['last_message'] }}</span>
+            <span class="text-[10px] text-[var(--t-text-muted)] truncate max-w-[120px] hidden sm:inline font-normal">{{ $preview['last_message'] }}</span>
           @endif
         </button>
       @endforeach
 
       {{-- Page context indicator — shows current page entity, click opens context channel --}}
       @if($pageContext)
-        <div class="w-px h-4 bg-[var(--ui-border)]/40 flex-shrink-0"></div>
+        <div class="w-px h-4 bg-[var(--t-border)] flex-shrink-0"></div>
         <button
           wire:click="openTerminal"
           @click.stop="if(!open) toggle()"
-          class="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] flex-shrink-0 border border-[var(--ui-border)]/40 text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:border-[var(--ui-primary)]/30 hover:bg-[var(--ui-primary-5)] transition cursor-pointer"
+          class="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] flex-shrink-0 border border-[var(--t-border)] text-[var(--t-text-muted)] hover:text-[var(--t-accent)] hover:border-[var(--t-accent)]/30 hover:bg-white/5 transition cursor-pointer"
           title="Diskussion zu {{ $pageContext['label'] }}: {{ $pageContext['title'] }}"
         >
           <span class="text-[10px]">{{ $pageContext['icon'] }}</span>
@@ -194,7 +224,7 @@
       {{-- Fullscreen toggle --}}
       <button
         @click.stop="toggleFullscreen()"
-        class="ml-auto flex-shrink-0 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition cursor-pointer p-1 rounded hover:bg-[var(--ui-surface-hover)]"
+        class="ml-auto flex-shrink-0 text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition cursor-pointer p-1 rounded hover:bg-white/10"
         :title="fullscreen ? 'Vollbild verlassen (Esc)' : 'Vollbild'"
       >
         <svg x-show="!fullscreen" x-cloak class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -206,19 +236,20 @@
       </button>
 
       {{-- Chevron — collapse/expand (hidden in fullscreen) --}}
-      <button x-show="!fullscreen" @click.stop="toggle()" class="flex-shrink-0 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition cursor-pointer p-1 -mr-1 rounded hover:bg-[var(--ui-surface-hover)]">
+      <button x-show="!fullscreen" @click.stop="toggle()" class="flex-shrink-0 text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition cursor-pointer p-1 -mr-1 rounded hover:bg-white/10">
         <svg class="w-3 h-3 transition-transform duration-200" :class="open ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clip-rule="evenodd" />
         </svg>
       </button>
     </div>
+    </div>{{-- /status bar wrapper --}}
 
     <!-- Panel Content: Sidebar + Main -->
     <div class="flex-1 min-h-0 flex"
          wire:key="terminal-content">
 
       <!-- Sidebar (resizable) -->
-      <div class="flex-shrink-0 overflow-y-auto overscroll-contain py-2 flex flex-col relative border-r border-[var(--ui-border)]/60"
+      <div class="flex-shrink-0 overflow-y-auto overscroll-contain py-2 flex flex-col relative border-r border-[var(--t-border)]"
            :class="resizingSidebar ? '' : 'transition-[width] duration-0'"
            :style="'width:' + sidebarWidth + 'px'"
            wire:key="terminal-sidebar"
@@ -248,8 +279,8 @@
           @mousedown.prevent="startSidebarResize($event)"
           class="absolute top-0 right-0 w-1 h-full cursor-ew-resize group/sresize z-10"
         >
-          <div class="absolute inset-y-0 right-0 w-px bg-transparent group-hover/sresize:bg-[var(--ui-primary)]/40 transition"></div>
-          <div class="absolute top-1/2 -translate-y-1/2 right-0 h-8 w-1 rounded-full bg-transparent group-hover/sresize:bg-[var(--ui-primary)]/30 transition"></div>
+          <div class="absolute inset-y-0 right-0 w-px bg-transparent group-hover/sresize:bg-[var(--t-accent)]/40 transition"></div>
+          <div class="absolute top-1/2 -translate-y-1/2 right-0 h-8 w-1 rounded-full bg-transparent group-hover/sresize:bg-[var(--t-accent)]/30 transition"></div>
         </div>
 
         <!-- ═══ Sidebar: Chat (Channels) ═══ -->
@@ -258,16 +289,16 @@
         <!-- Search field -->
         <div class="px-2 mb-2">
           <div class="relative">
-            <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/></svg>
+            <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[var(--t-text-muted)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/></svg>
             <input
               type="text"
               x-model="searchQuery"
               @input="doSearch()"
               @keydown.escape="clearSearch()"
               placeholder="Suchen…"
-              class="w-full text-[11px] pl-7 pr-6 py-1.5 rounded border border-[var(--ui-border)]/60 bg-transparent text-[var(--ui-body-color)] placeholder:text-[var(--ui-muted)]/50 focus:border-[var(--ui-primary)]/40 outline-none transition"
+              class="w-full text-[11px] pl-7 pr-6 py-1.5 rounded border border-[var(--t-border)]/60 bg-transparent text-[var(--t-text)] placeholder:text-[var(--t-text-muted)]/50 focus:border-[var(--t-accent)]/40 outline-none transition"
             >
-            <button x-show="searchQuery.length > 0" x-cloak @click="clearSearch()" class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">
+            <button x-show="searchQuery.length > 0" x-cloak @click="clearSearch()" class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition">
               <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
             </button>
           </div>
@@ -277,10 +308,10 @@
         <template x-if="searchQuery.trim().length >= 2">
           <div class="flex-1 min-h-0 overflow-y-auto px-2">
             <template x-if="searching">
-              <div class="px-1.5 py-4 text-center text-[10px] text-[var(--ui-muted)]">Suche…</div>
+              <div class="px-1.5 py-4 text-center text-[10px] text-[var(--t-text-muted)]">Suche…</div>
             </template>
             <template x-if="!searching && searchResults.length === 0">
-              <div class="px-1.5 py-4 text-center text-[10px] text-[var(--ui-muted)]">Keine Ergebnisse</div>
+              <div class="px-1.5 py-4 text-center text-[10px] text-[var(--t-text-muted)]">Keine Ergebnisse</div>
             </template>
             <template x-if="!searching && searchResults.length > 0">
               <div class="space-y-px">
@@ -294,24 +325,24 @@
                           const el = document.getElementById('msg-' + msgId);
                           if(el) {
                             el.scrollIntoView({behavior:'smooth',block:'center'});
-                            el.classList.add('!bg-amber-100/30');
-                            setTimeout(() => el.classList.remove('!bg-amber-100/30'), 2000);
+                            el.classList.add('!bg-amber-500/15');
+                            setTimeout(() => el.classList.remove('!bg-amber-500/15'), 2000);
                           }
                         }, 150);
                       });
                     "
-                    class="w-full text-left px-1.5 py-2 rounded-md hover:bg-[var(--ui-surface-hover)] transition"
+                    class="w-full text-left px-1.5 py-2 rounded-md hover:bg-white/5 transition"
                   >
-                    <div class="flex items-center gap-1.5 text-[10px] text-[var(--ui-muted)]">
+                    <div class="flex items-center gap-1.5 text-[10px] text-[var(--t-text-muted)]">
                       <span x-text="result.channel_name" class="font-medium truncate"></span>
                       <span>&middot;</span>
                       <span x-text="result.date"></span>
                       <span x-text="result.time"></span>
                     </div>
                     <div class="flex items-center gap-1.5 mt-0.5">
-                      <span class="text-[11px] font-medium text-[var(--ui-secondary)]" x-text="result.user_name"></span>
+                      <span class="text-[11px] font-medium text-[var(--t-text)]" x-text="result.user_name"></span>
                     </div>
-                    <div class="text-[11px] text-[var(--ui-muted)] truncate mt-0.5" x-text="result.snippet"></div>
+                    <div class="text-[11px] text-[var(--t-text-muted)] truncate mt-0.5" x-text="result.snippet"></div>
                   </button>
                 </template>
               </div>
@@ -332,7 +363,7 @@
                 $wire.getBookmarks().then(r => { bookmarks = r; loadingBookmarks = false; });
               }
             "
-            class="w-full flex items-center gap-1.5 px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition"
+            class="w-full flex items-center gap-1.5 px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition"
           >
             <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2c-.22 0-.44.03-.65.09L5.47 3.6a2.5 2.5 0 00-1.8 2.4v9.5a2 2 0 003.32 1.5L10 14.5l3.01 2.5A2 2 0 0016.33 15.5V6a2.5 2.5 0 00-1.8-2.4l-3.88-1.51A1.75 1.75 0 0010 2z"/></svg>
             <span>Lesezeichen</span>
@@ -342,10 +373,10 @@
           </button>
           <div x-show="showBookmarks" x-collapse class="mt-0.5 space-y-px">
             <template x-if="loadingBookmarks">
-              <div class="px-1.5 py-2 text-[10px] text-[var(--ui-muted)] text-center">Laden…</div>
+              <div class="px-1.5 py-2 text-[10px] text-[var(--t-text-muted)] text-center">Laden…</div>
             </template>
             <template x-if="!loadingBookmarks && bookmarks.length === 0">
-              <div class="px-1.5 py-2 text-[10px] text-[var(--ui-muted)]">Keine Lesezeichen</div>
+              <div class="px-1.5 py-2 text-[10px] text-[var(--t-text-muted)]">Keine Lesezeichen</div>
             </template>
             <template x-if="!loadingBookmarks && bookmarks.length > 0">
               <div class="space-y-px">
@@ -358,20 +389,20 @@
                           const el = document.getElementById('msg-' + msgId);
                           if(el) {
                             el.scrollIntoView({behavior:'smooth',block:'center'});
-                            el.classList.add('!bg-amber-100/30');
-                            setTimeout(() => el.classList.remove('!bg-amber-100/30'), 2000);
+                            el.classList.add('!bg-amber-500/15');
+                            setTimeout(() => el.classList.remove('!bg-amber-500/15'), 2000);
                           }
                         }, 150);
                       });
                     "
-                    class="w-full text-left px-1.5 py-1.5 rounded-md hover:bg-[var(--ui-surface-hover)] transition"
+                    class="w-full text-left px-1.5 py-1.5 rounded-md hover:bg-white/5 transition"
                   >
-                    <div class="flex items-center gap-1 text-[10px] text-[var(--ui-muted)]">
+                    <div class="flex items-center gap-1 text-[10px] text-[var(--t-text-muted)]">
                       <span x-text="bm.channel_name" class="font-medium truncate"></span>
                       <span>&middot;</span>
                       <span x-text="bm.date"></span>
                     </div>
-                    <div class="text-[11px] text-[var(--ui-secondary)] truncate mt-0.5" x-text="bm.body_snippet"></div>
+                    <div class="text-[11px] text-[var(--t-text)] truncate mt-0.5" x-text="bm.body_snippet"></div>
                   </button>
                 </template>
               </div>
@@ -383,17 +414,17 @@
         <div class="px-2 mb-2 flex gap-1">
           <button
             @click.stop="$dispatch('terminal-show-new-dm')"
-            class="flex-1 text-[10px] px-2 py-1 rounded border border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:border-[var(--ui-border)] transition"
+            class="flex-1 text-[10px] px-2 py-1 rounded border border-[var(--t-border)]/60 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:border-[var(--t-border)] transition"
           >+ Chat</button>
           <button
             @click.stop="$dispatch('terminal-show-new-channel')"
-            class="flex-1 text-[10px] px-2 py-1 rounded border border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:border-[var(--ui-border)] transition"
+            class="flex-1 text-[10px] px-2 py-1 rounded border border-[var(--t-border)]/60 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:border-[var(--t-border)] transition"
           >+ Channel</button>
         </div>
 
         <!-- Chats (DMs) Section -->
         <div class="px-2 mb-3" x-data="{ chatsOpen: true }">
-          <button @click="chatsOpen = !chatsOpen" class="w-full flex items-center justify-between px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">
+          <button @click="chatsOpen = !chatsOpen" class="w-full flex items-center justify-between px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition">
             <span>Chats</span>
             <svg class="w-3 h-3 transition-transform duration-150" :class="chatsOpen ? '' : '-rotate-90'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
@@ -404,10 +435,10 @@
               <button
                 wire:click="openChannel({{ $dm['id'] }})"
                 class="w-full flex items-center gap-2 px-1.5 py-1.5 rounded-md text-xs transition
-                  {{ $channelId === $dm['id'] ? 'bg-[var(--ui-primary-5)] text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)]' }}"
+                  {{ $channelId === $dm['id'] ? 'bg-[var(--t-accent)]/10 text-[var(--t-accent)]' : 'text-[var(--t-text)] hover:bg-white/5' }}"
               >
                 <div class="relative flex-shrink-0">
-                  <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold overflow-hidden">
+                  <div class="w-5 h-5 rounded-full bg-[var(--t-accent)]/15 text-[var(--t-accent)] flex items-center justify-center text-[9px] font-semibold overflow-hidden">
                     @if(! empty($dm['avatar']))
                       <img src="{{ $dm['avatar'] }}" alt="" class="w-full h-full object-cover">
                     @else
@@ -415,16 +446,16 @@
                     @endif
                   </div>
                   @if(! empty($dm['other_user_id']) && in_array($dm['other_user_id'], $this->onlineUserIds))
-                    <div class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-[var(--ui-surface)]"></div>
+                    <div class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-[var(--t-glass)]"></div>
                   @endif
                 </div>
                 <span class="truncate flex-1 text-left">{{ $dm['name'] }}</span>
                 @if($dm['unread'] > 0)
-                  <span class="w-4 h-4 rounded-full bg-[var(--ui-primary)] text-white text-[9px] flex items-center justify-center flex-shrink-0">{{ $dm['unread'] > 9 ? '9+' : $dm['unread'] }}</span>
+                  <span class="w-4 h-4 rounded-full bg-[var(--t-accent)] text-white text-[9px] flex items-center justify-center flex-shrink-0">{{ $dm['unread'] > 9 ? '9+' : $dm['unread'] }}</span>
                 @endif
               </button>
             @empty
-              <div class="px-1.5 py-2 text-[10px] text-[var(--ui-muted)]">Noch keine Chats</div>
+              <div class="px-1.5 py-2 text-[10px] text-[var(--t-text-muted)]">Noch keine Chats</div>
             @endforelse
           </div>
         </div>
@@ -432,7 +463,7 @@
         <!-- Context Channels — grouped by type -->
         @foreach($this->channels['context_groups'] as $groupKey => $group)
         <div class="px-2 mb-3" x-data="{ open: true }">
-          <button @click="open = !open" class="w-full flex items-center justify-between px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">
+          <button @click="open = !open" class="w-full flex items-center justify-between px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition">
             <span class="flex items-center gap-1">
               <span class="text-[10px]">{{ $group['icon'] }}</span>
               {{ $group['label'] }}
@@ -446,11 +477,11 @@
               <button
                 wire:click="openChannel({{ $ctx['id'] }})"
                 class="w-full flex items-center gap-2 px-1.5 py-1.5 rounded-md text-xs transition
-                  {{ $channelId === $ctx['id'] ? 'bg-[var(--ui-primary-5)] text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)]' }}"
+                  {{ $channelId === $ctx['id'] ? 'bg-[var(--t-accent)]/10 text-[var(--t-accent)]' : 'text-[var(--t-text)] hover:bg-white/5' }}"
               >
                 <span class="truncate flex-1 text-left">{{ $ctx['name'] }}</span>
                 @if($ctx['unread'] > 0)
-                  <span class="w-4 h-4 rounded-full bg-[var(--ui-primary)] text-white text-[9px] flex items-center justify-center flex-shrink-0">{{ $ctx['unread'] > 9 ? '9+' : $ctx['unread'] }}</span>
+                  <span class="w-4 h-4 rounded-full bg-[var(--t-accent)] text-white text-[9px] flex items-center justify-center flex-shrink-0">{{ $ctx['unread'] > 9 ? '9+' : $ctx['unread'] }}</span>
                 @endif
               </button>
             @endforeach
@@ -460,7 +491,7 @@
 
         <!-- Channels Section -->
         <div class="px-2" x-data="{ channelsOpen: true }">
-          <button @click="channelsOpen = !channelsOpen" class="w-full flex items-center justify-between px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">
+          <button @click="channelsOpen = !channelsOpen" class="w-full flex items-center justify-between px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition">
             <span>Channels</span>
             <svg class="w-3 h-3 transition-transform duration-150" :class="channelsOpen ? '' : '-rotate-90'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
@@ -471,16 +502,16 @@
               <button
                 wire:click="openChannel({{ $ch['id'] }})"
                 class="w-full flex items-center gap-2 px-1.5 py-1.5 rounded-md text-xs transition
-                  {{ $channelId === $ch['id'] ? 'bg-[var(--ui-primary-5)] text-[var(--ui-primary)]' : 'text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)]' }}"
+                  {{ $channelId === $ch['id'] ? 'bg-[var(--t-accent)]/10 text-[var(--t-accent)]' : 'text-[var(--t-text)] hover:bg-white/5' }}"
               >
-                <span class="text-[var(--ui-muted)]">{{ $ch['icon'] ?? '#' }}</span>
+                <span class="text-[var(--t-text-muted)]">{{ $ch['icon'] ?? '#' }}</span>
                 <span class="truncate flex-1 text-left">{{ $ch['name'] }}</span>
                 @if($ch['unread'] > 0)
-                  <span class="w-4 h-4 rounded-full bg-[var(--ui-primary)] text-white text-[9px] flex items-center justify-center flex-shrink-0">{{ $ch['unread'] > 9 ? '9+' : $ch['unread'] }}</span>
+                  <span class="w-4 h-4 rounded-full bg-[var(--t-accent)] text-white text-[9px] flex items-center justify-center flex-shrink-0">{{ $ch['unread'] > 9 ? '9+' : $ch['unread'] }}</span>
                 @endif
               </button>
             @empty
-              <div class="px-1.5 py-2 text-[10px] text-[var(--ui-muted)]">Noch keine Channels</div>
+              <div class="px-1.5 py-2 text-[10px] text-[var(--t-text-muted)]">Noch keine Channels</div>
             @endforelse
           </div>
         </div>
@@ -492,15 +523,15 @@
         <!-- ═══ Sidebar: Aktivitäten ═══ -->
         <div x-show="$wire.activeApp === 'activity'" class="flex-1 min-h-0 flex flex-col overflow-y-auto">
           <div class="px-3 py-3">
-            <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-3">Kontext</h3>
+            <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] mb-3">Kontext</h3>
             @if($this->contextType && $this->contextId)
               @php $ctxBreadcrumb = $this->getContextBreadcrumb(); @endphp
-              <div class="p-2.5 rounded-lg border border-[var(--ui-border)]/40 bg-[var(--ui-surface-hover)]/20 mb-4">
+              <div class="p-2.5 rounded-lg border border-[var(--t-border)]/40 bg-white/[0.03] mb-4">
                 <div class="flex items-center gap-2 mb-1">
                   <span class="text-sm">{{ $ctxBreadcrumb['icon'] ?? '' }}</span>
-                  <span class="text-xs font-medium text-[var(--ui-body-color)] truncate">{{ $ctxBreadcrumb['title'] ?? $this->contextSubject ?? class_basename($this->contextType) }}</span>
+                  <span class="text-xs font-medium text-[var(--t-text)] truncate">{{ $ctxBreadcrumb['title'] ?? $this->contextSubject ?? class_basename($this->contextType) }}</span>
                 </div>
-                <span class="text-[10px] text-[var(--ui-muted)]">{{ $ctxBreadcrumb['label'] ?? class_basename($this->contextType) }}</span>
+                <span class="text-[10px] text-[var(--t-text-muted)]">{{ $ctxBreadcrumb['label'] ?? class_basename($this->contextType) }}</span>
               </div>
 
               {{-- Activity filter --}}
@@ -509,42 +540,42 @@
                 $manualCount = count(array_filter($activities, fn($a) => ($a['activity_type'] ?? 'system') === 'manual'));
                 $systemCount = count($activities) - $manualCount;
               @endphp
-              <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-2">Filter</h3>
+              <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] mb-2">Filter</h3>
               <div class="space-y-1 mb-4">
                 <button
                   wire:click="$set('activityFilter', 'all')"
-                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->activityFilter === 'all' ? 'bg-[var(--ui-primary-10)] ring-1 ring-[var(--ui-primary)]/30' : 'bg-[var(--ui-surface-hover)]/30 hover:bg-[var(--ui-surface-hover)]/60' }}"
+                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->activityFilter === 'all' ? 'bg-[var(--t-accent)]/15 ring-1 ring-[var(--t-accent)]/30' : 'bg-white/[0.03] hover:bg-white/[0.06]' }}"
                 >
-                  <div class="w-5 h-5 rounded-full bg-[var(--ui-muted)]/10 flex items-center justify-center">
-                    @svg('heroicon-o-queue-list', 'w-3 h-3 text-[var(--ui-muted)]')
+                  <div class="w-5 h-5 rounded-full bg-[var(--t-text-muted)]/10 flex items-center justify-center">
+                    @svg('heroicon-o-queue-list', 'w-3 h-3 text-[var(--t-text-muted)]')
                   </div>
-                  <span class="text-xs text-[var(--ui-body-color)] flex-1">Alle</span>
-                  <span class="text-[10px] text-[var(--ui-muted)] tabular-nums">{{ count($activities) }}</span>
+                  <span class="text-xs text-[var(--t-text)] flex-1">Alle</span>
+                  <span class="text-[10px] text-[var(--t-text-muted)] tabular-nums">{{ count($activities) }}</span>
                 </button>
                 <button
                   wire:click="$set('activityFilter', 'manual')"
-                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->activityFilter === 'manual' ? 'bg-[var(--ui-primary-10)] ring-1 ring-[var(--ui-primary)]/30' : 'bg-[var(--ui-surface-hover)]/30 hover:bg-[var(--ui-surface-hover)]/60' }}"
+                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->activityFilter === 'manual' ? 'bg-[var(--t-accent)]/15 ring-1 ring-[var(--t-accent)]/30' : 'bg-white/[0.03] hover:bg-white/[0.06]' }}"
                 >
-                  <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] flex items-center justify-center">
-                    @svg('heroicon-o-pencil-square', 'w-3 h-3 text-[var(--ui-primary)]')
+                  <div class="w-5 h-5 rounded-full bg-[var(--t-accent)]/15 flex items-center justify-center">
+                    @svg('heroicon-o-pencil-square', 'w-3 h-3 text-[var(--t-accent)]')
                   </div>
-                  <span class="text-xs text-[var(--ui-body-color)] flex-1">Notizen</span>
-                  <span class="text-[10px] text-[var(--ui-muted)] tabular-nums">{{ $manualCount }}</span>
+                  <span class="text-xs text-[var(--t-text)] flex-1">Notizen</span>
+                  <span class="text-[10px] text-[var(--t-text-muted)] tabular-nums">{{ $manualCount }}</span>
                 </button>
                 <button
                   wire:click="$set('activityFilter', 'system')"
-                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->activityFilter === 'system' ? 'bg-[var(--ui-primary-10)] ring-1 ring-[var(--ui-primary)]/30' : 'bg-[var(--ui-surface-hover)]/30 hover:bg-[var(--ui-surface-hover)]/60' }}"
+                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->activityFilter === 'system' ? 'bg-[var(--t-accent)]/15 ring-1 ring-[var(--t-accent)]/30' : 'bg-white/[0.03] hover:bg-white/[0.06]' }}"
                 >
-                  <div class="w-5 h-5 rounded-full bg-[var(--ui-muted)]/5 flex items-center justify-center">
-                    @svg('heroicon-o-cog-6-tooth', 'w-3 h-3 text-[var(--ui-muted)]')
+                  <div class="w-5 h-5 rounded-full bg-[var(--t-text-muted)]/5 flex items-center justify-center">
+                    @svg('heroicon-o-cog-6-tooth', 'w-3 h-3 text-[var(--t-text-muted)]')
                   </div>
-                  <span class="text-xs text-[var(--ui-body-color)] flex-1">System</span>
-                  <span class="text-[10px] text-[var(--ui-muted)] tabular-nums">{{ $systemCount }}</span>
+                  <span class="text-xs text-[var(--t-text)] flex-1">System</span>
+                  <span class="text-[10px] text-[var(--t-text-muted)] tabular-nums">{{ $systemCount }}</span>
                 </button>
               </div>
             @else
-              <div class="p-2.5 rounded-lg border border-dashed border-[var(--ui-border)]/40 mb-4">
-                <p class="text-[10px] text-[var(--ui-muted)] text-center">Kein Kontext verfügbar</p>
+              <div class="p-2.5 rounded-lg border border-dashed border-[var(--t-border)]/40 mb-4">
+                <p class="text-[10px] text-[var(--t-text-muted)] text-center">Kein Kontext verfügbar</p>
               </div>
             @endif
           </div>
@@ -553,41 +584,41 @@
         <!-- ═══ Sidebar: Tags ═══ -->
         <div x-show="$wire.activeApp === 'tags'" class="flex-1 min-h-0 flex flex-col overflow-y-auto">
           <div class="px-3 py-3">
-            <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-3">Kontext</h3>
+            <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] mb-3">Kontext</h3>
             @if($this->contextType && $this->contextId)
               @php $tagsCtxBreadcrumb = $this->getContextBreadcrumb(); @endphp
-              <div class="p-2.5 rounded-lg border border-[var(--ui-border)]/40 bg-[var(--ui-surface-hover)]/20 mb-4">
+              <div class="p-2.5 rounded-lg border border-[var(--t-border)]/40 bg-white/[0.03] mb-4">
                 <div class="flex items-center gap-2 mb-1">
                   <span class="text-sm">{{ $tagsCtxBreadcrumb['icon'] ?? '' }}</span>
-                  <span class="text-xs font-medium text-[var(--ui-body-color)] truncate">{{ $tagsCtxBreadcrumb['title'] ?? $this->contextSubject ?? class_basename($this->contextType) }}</span>
+                  <span class="text-xs font-medium text-[var(--t-text)] truncate">{{ $tagsCtxBreadcrumb['title'] ?? $this->contextSubject ?? class_basename($this->contextType) }}</span>
                 </div>
-                <span class="text-[10px] text-[var(--ui-muted)]">{{ $tagsCtxBreadcrumb['label'] ?? class_basename($this->contextType) }}</span>
+                <span class="text-[10px] text-[var(--t-text-muted)]">{{ $tagsCtxBreadcrumb['label'] ?? class_basename($this->contextType) }}</span>
               </div>
 
               {{-- Sub-tab switcher --}}
               <div class="flex gap-1 mb-3">
                 <button
                   wire:click="$set('taggingTab', 'tags')"
-                  class="flex-1 text-[10px] font-medium py-1.5 rounded transition {{ $this->taggingTab === 'tags' ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:bg-[var(--ui-surface-hover)]' }}"
+                  class="flex-1 text-[10px] font-medium py-1.5 rounded transition {{ $this->taggingTab === 'tags' ? 'bg-[var(--t-accent)]/15 text-[var(--t-accent)]' : 'text-[var(--t-text-muted)] hover:bg-white/5' }}"
                 >Tags</button>
                 <button
                   wire:click="$set('taggingTab', 'color')"
-                  class="flex-1 text-[10px] font-medium py-1.5 rounded transition {{ $this->taggingTab === 'color' ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:bg-[var(--ui-surface-hover)]' }}"
+                  class="flex-1 text-[10px] font-medium py-1.5 rounded transition {{ $this->taggingTab === 'color' ? 'bg-[var(--t-accent)]/15 text-[var(--t-accent)]' : 'text-[var(--t-text-muted)] hover:bg-white/5' }}"
                 >Farbe</button>
                 <button
                   wire:click="$set('taggingTab', 'overview')"
-                  class="flex-1 text-[10px] font-medium py-1.5 rounded transition {{ $this->taggingTab === 'overview' ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:bg-[var(--ui-surface-hover)]' }}"
+                  class="flex-1 text-[10px] font-medium py-1.5 rounded transition {{ $this->taggingTab === 'overview' ? 'bg-[var(--t-accent)]/15 text-[var(--t-accent)]' : 'text-[var(--t-text-muted)] hover:bg-white/5' }}"
                 >Übersicht</button>
               </div>
             @else
-              <div class="p-2.5 rounded-lg border border-dashed border-[var(--ui-border)]/40 mb-4">
-                <p class="text-[10px] text-[var(--ui-muted)] text-center">Kein Kontext verfügbar</p>
+              <div class="p-2.5 rounded-lg border border-dashed border-[var(--t-border)]/40 mb-4">
+                <p class="text-[10px] text-[var(--t-text-muted)] text-center">Kein Kontext verfügbar</p>
               </div>
               {{-- Only overview available without context --}}
               <div class="flex gap-1 mb-3">
                 <button
                   wire:click="$set('taggingTab', 'overview')"
-                  class="flex-1 text-[10px] font-medium py-1.5 rounded transition bg-[var(--ui-primary-10)] text-[var(--ui-primary)]"
+                  class="flex-1 text-[10px] font-medium py-1.5 rounded transition bg-[var(--t-accent)]/15 text-[var(--t-accent)]"
                 >Übersicht</button>
               </div>
             @endif
@@ -597,15 +628,15 @@
         <!-- ═══ Sidebar: Dateien ═══ -->
         <div x-show="$wire.activeApp === 'files'" class="flex-1 min-h-0 flex flex-col overflow-y-auto">
           <div class="px-3 py-3">
-            <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-3">Kontext</h3>
+            <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] mb-3">Kontext</h3>
             @if($this->contextType && $this->contextId)
               @php $filesCtxBreadcrumb = $this->getContextBreadcrumb(); @endphp
-              <div class="p-2.5 rounded-lg border border-[var(--ui-border)]/40 bg-[var(--ui-surface-hover)]/20 mb-4">
+              <div class="p-2.5 rounded-lg border border-[var(--t-border)]/40 bg-white/[0.03] mb-4">
                 <div class="flex items-center gap-2 mb-1">
                   <span class="text-sm">{{ $filesCtxBreadcrumb['icon'] ?? '' }}</span>
-                  <span class="text-xs font-medium text-[var(--ui-body-color)] truncate">{{ $filesCtxBreadcrumb['title'] ?? $this->contextSubject ?? class_basename($this->contextType) }}</span>
+                  <span class="text-xs font-medium text-[var(--t-text)] truncate">{{ $filesCtxBreadcrumb['title'] ?? $this->contextSubject ?? class_basename($this->contextType) }}</span>
                 </div>
-                <span class="text-[10px] text-[var(--ui-muted)]">{{ $filesCtxBreadcrumb['label'] ?? class_basename($this->contextType) }}</span>
+                <span class="text-[10px] text-[var(--t-text-muted)]">{{ $filesCtxBreadcrumb['label'] ?? class_basename($this->contextType) }}</span>
               </div>
 
               @php
@@ -615,59 +646,59 @@
               @endphp
 
               {{-- Stats --}}
-              <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-2">Übersicht</h3>
+              <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] mb-2">Übersicht</h3>
               <div class="grid grid-cols-3 gap-1.5 mb-4">
-                <div class="p-2 rounded-lg bg-[var(--ui-surface-hover)]/30 text-center">
-                  <div class="text-sm font-bold text-[var(--ui-body-color)]">{{ count($allFiles) }}</div>
-                  <div class="text-[9px] text-[var(--ui-muted)]">Gesamt</div>
+                <div class="p-2 rounded-lg bg-white/[0.03] text-center">
+                  <div class="text-sm font-bold text-[var(--t-text)]">{{ count($allFiles) }}</div>
+                  <div class="text-[9px] text-[var(--t-text-muted)]">Gesamt</div>
                 </div>
-                <div class="p-2 rounded-lg bg-[var(--ui-surface-hover)]/30 text-center">
-                  <div class="text-sm font-bold text-[var(--ui-body-color)]">{{ $imageCount }}</div>
-                  <div class="text-[9px] text-[var(--ui-muted)]">Bilder</div>
+                <div class="p-2 rounded-lg bg-white/[0.03] text-center">
+                  <div class="text-sm font-bold text-[var(--t-text)]">{{ $imageCount }}</div>
+                  <div class="text-[9px] text-[var(--t-text-muted)]">Bilder</div>
                 </div>
-                <div class="p-2 rounded-lg bg-[var(--ui-surface-hover)]/30 text-center">
-                  <div class="text-sm font-bold text-[var(--ui-body-color)]">{{ $docCount }}</div>
-                  <div class="text-[9px] text-[var(--ui-muted)]">Dokumente</div>
+                <div class="p-2 rounded-lg bg-white/[0.03] text-center">
+                  <div class="text-sm font-bold text-[var(--t-text)]">{{ $docCount }}</div>
+                  <div class="text-[9px] text-[var(--t-text-muted)]">Dokumente</div>
                 </div>
               </div>
 
               {{-- Filter --}}
-              <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-2">Filter</h3>
+              <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)] mb-2">Filter</h3>
               <div class="space-y-1 mb-4">
                 <button
                   wire:click="$set('filesFilter', 'all')"
-                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->filesFilter === 'all' ? 'bg-[var(--ui-primary-10)] ring-1 ring-[var(--ui-primary)]/30' : 'bg-[var(--ui-surface-hover)]/30 hover:bg-[var(--ui-surface-hover)]/60' }}"
+                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->filesFilter === 'all' ? 'bg-[var(--t-accent)]/15 ring-1 ring-[var(--t-accent)]/30' : 'bg-white/[0.03] hover:bg-white/[0.06]' }}"
                 >
-                  <div class="w-5 h-5 rounded-full bg-[var(--ui-muted)]/10 flex items-center justify-center">
-                    @svg('heroicon-o-queue-list', 'w-3 h-3 text-[var(--ui-muted)]')
+                  <div class="w-5 h-5 rounded-full bg-[var(--t-text-muted)]/10 flex items-center justify-center">
+                    @svg('heroicon-o-queue-list', 'w-3 h-3 text-[var(--t-text-muted)]')
                   </div>
-                  <span class="text-xs text-[var(--ui-body-color)] flex-1">Alle</span>
-                  <span class="text-[10px] text-[var(--ui-muted)] tabular-nums">{{ count($allFiles) }}</span>
+                  <span class="text-xs text-[var(--t-text)] flex-1">Alle</span>
+                  <span class="text-[10px] text-[var(--t-text-muted)] tabular-nums">{{ count($allFiles) }}</span>
                 </button>
                 <button
                   wire:click="$set('filesFilter', 'images')"
-                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->filesFilter === 'images' ? 'bg-[var(--ui-primary-10)] ring-1 ring-[var(--ui-primary)]/30' : 'bg-[var(--ui-surface-hover)]/30 hover:bg-[var(--ui-surface-hover)]/60' }}"
+                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->filesFilter === 'images' ? 'bg-[var(--t-accent)]/15 ring-1 ring-[var(--t-accent)]/30' : 'bg-white/[0.03] hover:bg-white/[0.06]' }}"
                 >
-                  <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] flex items-center justify-center">
-                    @svg('heroicon-o-photo', 'w-3 h-3 text-[var(--ui-primary)]')
+                  <div class="w-5 h-5 rounded-full bg-[var(--t-accent)]/15 flex items-center justify-center">
+                    @svg('heroicon-o-photo', 'w-3 h-3 text-[var(--t-accent)]')
                   </div>
-                  <span class="text-xs text-[var(--ui-body-color)] flex-1">Bilder</span>
-                  <span class="text-[10px] text-[var(--ui-muted)] tabular-nums">{{ $imageCount }}</span>
+                  <span class="text-xs text-[var(--t-text)] flex-1">Bilder</span>
+                  <span class="text-[10px] text-[var(--t-text-muted)] tabular-nums">{{ $imageCount }}</span>
                 </button>
                 <button
                   wire:click="$set('filesFilter', 'documents')"
-                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->filesFilter === 'documents' ? 'bg-[var(--ui-primary-10)] ring-1 ring-[var(--ui-primary)]/30' : 'bg-[var(--ui-surface-hover)]/30 hover:bg-[var(--ui-surface-hover)]/60' }}"
+                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->filesFilter === 'documents' ? 'bg-[var(--t-accent)]/15 ring-1 ring-[var(--t-accent)]/30' : 'bg-white/[0.03] hover:bg-white/[0.06]' }}"
                 >
-                  <div class="w-5 h-5 rounded-full bg-[var(--ui-muted)]/5 flex items-center justify-center">
-                    @svg('heroicon-o-document', 'w-3 h-3 text-[var(--ui-muted)]')
+                  <div class="w-5 h-5 rounded-full bg-[var(--t-text-muted)]/5 flex items-center justify-center">
+                    @svg('heroicon-o-document', 'w-3 h-3 text-[var(--t-text-muted)]')
                   </div>
-                  <span class="text-xs text-[var(--ui-body-color)] flex-1">Dokumente</span>
-                  <span class="text-[10px] text-[var(--ui-muted)] tabular-nums">{{ $docCount }}</span>
+                  <span class="text-xs text-[var(--t-text)] flex-1">Dokumente</span>
+                  <span class="text-[10px] text-[var(--t-text-muted)] tabular-nums">{{ $docCount }}</span>
                 </button>
               </div>
             @else
-              <div class="p-2.5 rounded-lg border border-dashed border-[var(--ui-border)]/40 mb-4">
-                <p class="text-[10px] text-[var(--ui-muted)] text-center">Kein Kontext verfügbar</p>
+              <div class="p-2.5 rounded-lg border border-dashed border-[var(--t-border)]/40 mb-4">
+                <p class="text-[10px] text-[var(--t-text-muted)] text-center">Kein Kontext verfügbar</p>
               </div>
             @endif
           </div>
@@ -681,14 +712,14 @@
         @if($this->activeChannel)
           <!-- Chat Header (only visible in chat app) -->
           <div x-show="$wire.activeApp === 'chat'"
-               class="px-4 flex items-center gap-2.5 border-b border-[var(--ui-border)]/60 flex-shrink-0"
+               class="px-4 flex items-center gap-2.5 border-b border-[var(--t-border)]/60 flex-shrink-0"
                :class="fullscreen ? 'h-14 text-sm' : 'h-11 text-xs'">
             @if($this->activeChannel['type'] === 'dm')
               @php
                 $dmOther = collect($this->activeChannel['members'])->first(fn($m) => $m['id'] !== auth()->id());
               @endphp
               <div class="relative flex-shrink-0">
-                <div class="w-6 h-6 rounded-lg bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[10px] font-semibold overflow-hidden">
+                <div class="w-6 h-6 rounded-lg bg-[var(--t-accent)]/15 text-[var(--t-accent)] flex items-center justify-center text-[10px] font-semibold overflow-hidden">
                   @if(! empty($this->activeChannel['avatar']))
                     <img src="{{ $this->activeChannel['avatar'] }}" alt="" class="w-full h-full object-cover">
                   @else
@@ -696,10 +727,10 @@
                   @endif
                 </div>
                 @if($dmOther && in_array($dmOther['id'], $this->onlineUserIds))
-                  <div class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-[var(--ui-surface)]"></div>
+                  <div class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-[var(--t-glass)]"></div>
                 @endif
               </div>
-              <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $this->activeChannel['name'] }}</span>
+              <span class="font-bold text-[13px] text-[var(--t-text)]">{{ $this->activeChannel['name'] }}</span>
               @if($dmOther && in_array($dmOther['id'], $this->onlineUserIds))
                 <span class="text-[10px] text-emerald-500 font-medium">online</span>
               @endif
@@ -708,21 +739,21 @@
               <div class="flex flex-col leading-tight">
                 @php $contextTitle = $this->activeChannel['name'] ?: $this->activeChannel['context']['title']; @endphp
                 @if(! empty($this->activeChannel['context_url']))
-                  <a href="{{ $this->activeChannel['context_url'] }}" class="inline-flex items-center gap-1 font-bold text-[13px] text-[var(--ui-primary)] hover:underline transition" title="Zum Kontext springen">
+                  <a href="{{ $this->activeChannel['context_url'] }}" class="inline-flex items-center gap-1 font-bold text-[13px] text-[var(--t-accent)] hover:underline transition" title="Zum Kontext springen">
                     {{ $contextTitle }}
                     <svg class="w-3 h-3 flex-shrink-0 opacity-60" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5zm7.25-.75a.75.75 0 01.75-.75h3.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0V6.31l-5.47 5.47a.75.75 0 11-1.06-1.06l5.47-5.47H12.25a.75.75 0 01-.75-.75z" clip-rule="evenodd"/></svg>
                   </a>
                 @else
-                  <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $contextTitle }}</span>
+                  <span class="font-bold text-[13px] text-[var(--t-text)]">{{ $contextTitle }}</span>
                 @endif
-                <span class="text-[10px] text-[var(--ui-muted)]">Kontext-Diskussion</span>
+                <span class="text-[10px] text-[var(--t-text-muted)]">Kontext-Diskussion</span>
               </div>
             @else
-              <span class="text-[var(--ui-muted)] font-bold text-[14px]">{{ $this->activeChannel['icon'] ?? '#' }}</span>
-              <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $this->activeChannel['name'] ?? 'Kontext' }}</span>
+              <span class="text-[var(--t-text-muted)] font-bold text-[14px]">{{ $this->activeChannel['icon'] ?? '#' }}</span>
+              <span class="font-bold text-[13px] text-[var(--t-text)]">{{ $this->activeChannel['name'] ?? 'Kontext' }}</span>
             @endif
             @if(! empty($this->activeChannel['members']))
-              <span class="text-[var(--ui-muted)]">&middot;</span>
+              <span class="text-[var(--t-text-muted)]">&middot;</span>
               @php $isManageable = in_array($this->activeChannel['type'], ['channel', 'context']); @endphp
               <{{ $isManageable ? 'button' : 'div' }}
                 @if($isManageable) @click.stop="$dispatch('terminal-show-members')" @endif
@@ -732,7 +763,7 @@
                 {{-- Avatar stack --}}
                 <div class="flex -space-x-1.5">
                   @foreach(array_slice($this->activeChannel['members'], 0, 5) as $member)
-                    <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[8px] font-semibold flex-shrink-0 overflow-hidden ring-1 ring-[var(--ui-surface)]" title="{{ $member['name'] }}">
+                    <div class="w-5 h-5 rounded-full bg-[var(--t-accent)]/15 text-[var(--t-accent)] flex items-center justify-center text-[8px] font-semibold flex-shrink-0 overflow-hidden ring-1 ring-[var(--t-glass)]" title="{{ $member['name'] }}">
                       @if(! empty($member['avatar']))
                         <img src="{{ $member['avatar'] }}" alt="" class="w-full h-full object-cover">
                       @else
@@ -741,11 +772,11 @@
                     </div>
                   @endforeach
                   @if($this->activeChannel['member_count'] > 5)
-                    <div class="w-5 h-5 rounded-full bg-[var(--ui-muted)]/10 text-[var(--ui-muted)] flex items-center justify-center text-[8px] font-semibold flex-shrink-0 ring-1 ring-[var(--ui-surface)]">+{{ $this->activeChannel['member_count'] - 5 }}</div>
+                    <div class="w-5 h-5 rounded-full bg-[var(--t-text-muted)]/10 text-[var(--t-text-muted)] flex items-center justify-center text-[8px] font-semibold flex-shrink-0 ring-1 ring-[var(--t-glass)]">+{{ $this->activeChannel['member_count'] - 5 }}</div>
                   @endif
                 </div>
                 {{-- Names --}}
-                <span class="text-[10px] text-[var(--ui-muted)] truncate max-w-[200px]">
+                <span class="text-[10px] text-[var(--t-text-muted)] truncate max-w-[200px]">
                   @if($this->activeChannel['member_count'] <= 3)
                     {{ implode(', ', array_map(fn($m) => $m['name'], $this->activeChannel['members'])) }}
                   @else
@@ -761,28 +792,28 @@
               @if(($this->activeChannel['pin_count'] ?? 0) > 0)
                 <button
                   @click.stop="$dispatch('terminal-show-pins')"
-                  class="flex items-center gap-1 text-[10px] text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition px-1.5 py-0.5 rounded hover:bg-[var(--ui-primary-5)]"
+                  class="flex items-center gap-1 text-[10px] text-[var(--t-text-muted)] hover:text-[var(--t-accent)] transition px-1.5 py-0.5 rounded hover:bg-[var(--t-accent)]/10"
                   title="Gepinnte Nachrichten"
                 >
                   <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
-                  <span class="min-w-[14px] h-[14px] px-0.5 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] text-[9px] font-bold flex items-center justify-center">{{ $this->activeChannel['pin_count'] }}</span>
+                  <span class="min-w-[14px] h-[14px] px-0.5 rounded-full bg-[var(--t-accent)]/15 text-[var(--t-accent)] text-[9px] font-bold flex items-center justify-center">{{ $this->activeChannel['pin_count'] }}</span>
                 </button>
-                <div class="w-px h-4 bg-[var(--ui-border)]/40"></div>
+                <div class="w-px h-4 bg-[var(--t-border)]/40"></div>
               @endif
               {{-- Context channel: tagging button --}}
               @if(! empty($this->activeChannel['context']))
                 <button
                   wire:click="openTagsApp"
-                  class="text-[10px] text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition px-1.5 py-0.5 rounded hover:bg-[var(--ui-primary-5)]"
+                  class="text-[10px] text-[var(--t-text-muted)] hover:text-[var(--t-accent)] transition px-1.5 py-0.5 rounded hover:bg-[var(--t-accent)]/10"
                   title="Tags & Farben"
                 >
                   <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.5 3A2.5 2.5 0 003 5.5v2.879a2.5 2.5 0 00.732 1.767l6.5 6.5a2.5 2.5 0 003.536 0l2.878-2.878a2.5 2.5 0 000-3.536l-6.5-6.5A2.5 2.5 0 008.38 3H5.5zM6 7a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
                 </button>
-                <div class="w-px h-4 bg-[var(--ui-border)]/40"></div>
+                <div class="w-px h-4 bg-[var(--t-border)]/40"></div>
                 <button
                   wire:click="deleteChannel"
                   wire:confirm="Kontext-Diskussion löschen? Kann jederzeit neu erstellt werden."
-                  class="text-[10px] text-[var(--ui-muted)] hover:text-red-500 transition px-1.5 py-0.5 rounded hover:bg-red-50"
+                  class="text-[10px] text-[var(--t-text-muted)] hover:text-red-500 transition px-1.5 py-0.5 rounded hover:bg-red-500/10"
                   title="Diskussion löschen"
                 >
                   <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.519.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
@@ -793,7 +824,7 @@
                   <button
                     wire:click="deleteChannel"
                     wire:confirm="Channel und alle Nachrichten unwiderruflich loschen?"
-                    class="text-[10px] text-[var(--ui-muted)] hover:text-red-500 transition px-1.5 py-0.5 rounded hover:bg-red-50"
+                    class="text-[10px] text-[var(--t-text-muted)] hover:text-red-500 transition px-1.5 py-0.5 rounded hover:bg-red-500/10"
                     title="Channel loschen"
                   >
                     <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.519.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
@@ -802,7 +833,7 @@
                   <button
                     wire:click="leaveChannel"
                     wire:confirm="Channel verlassen?"
-                    class="text-[10px] text-[var(--ui-muted)] hover:text-amber-600 transition px-1.5 py-0.5 rounded hover:bg-amber-50"
+                    class="text-[10px] text-[var(--t-text-muted)] hover:text-amber-600 transition px-1.5 py-0.5 rounded hover:bg-amber-500/10"
                     title="Channel verlassen"
                   >
                     <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2a.75.75 0 01-1.5 0v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2a.75.75 0 011.5 0v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M19 10a.75.75 0 00-.75-.75H8.704l1.048-.943a.75.75 0 10-1.004-1.114l-2.5 2.25a.75.75 0 000 1.114l2.5 2.25a.75.75 0 101.004-1.114l-1.048-.943h9.546A.75.75 0 0019 10z" clip-rule="evenodd"/></svg>
@@ -812,7 +843,7 @@
                 <button
                   wire:click="deleteChannel"
                   wire:confirm="Chat ausblenden? Die Nachrichten bleiben fur den anderen Teilnehmer erhalten."
-                  class="text-[10px] text-[var(--ui-muted)] hover:text-red-500 transition px-1.5 py-0.5 rounded hover:bg-red-50"
+                  class="text-[10px] text-[var(--t-text-muted)] hover:text-red-500 transition px-1.5 py-0.5 rounded hover:bg-red-500/10"
                   title="Chat ausblenden"
                 >
                   <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
@@ -823,31 +854,31 @@
 
           <!-- Activity Header (only visible in activity app) -->
           <div x-show="$wire.activeApp === 'activity'"
-               class="px-4 flex items-center gap-2.5 border-b border-[var(--ui-border)]/60 flex-shrink-0"
+               class="px-4 flex items-center gap-2.5 border-b border-[var(--t-border)]/60 flex-shrink-0"
                :class="fullscreen ? 'h-14 text-sm' : 'h-11 text-xs'">
             @if($this->activeChannel['type'] === 'context' && ! empty($this->activeChannel['context']))
               <span class="text-[14px]">{{ $this->activeChannel['context']['icon'] ?? '' }}</span>
               <div class="flex flex-col leading-tight">
                 @php $actContextTitle = $this->activeChannel['name'] ?: ($this->activeChannel['context']['title'] ?? 'Kontext'); @endphp
                 @if(! empty($this->activeChannel['context_url']))
-                  <a href="{{ $this->activeChannel['context_url'] }}" class="inline-flex items-center gap-1 font-bold text-[13px] text-[var(--ui-primary)] hover:underline transition" title="Zum Kontext springen">
+                  <a href="{{ $this->activeChannel['context_url'] }}" class="inline-flex items-center gap-1 font-bold text-[13px] text-[var(--t-accent)] hover:underline transition" title="Zum Kontext springen">
                     {{ $actContextTitle }}
                     <svg class="w-3 h-3 flex-shrink-0 opacity-60" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5zm7.25-.75a.75.75 0 01.75-.75h3.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0V6.31l-5.47 5.47a.75.75 0 11-1.06-1.06l5.47-5.47H12.25a.75.75 0 01-.75-.75z" clip-rule="evenodd"/></svg>
                   </a>
                 @else
-                  <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $actContextTitle }}</span>
+                  <span class="font-bold text-[13px] text-[var(--t-text)]">{{ $actContextTitle }}</span>
                 @endif
-                <span class="text-[10px] text-[var(--ui-muted)]">Aktivitäten</span>
+                <span class="text-[10px] text-[var(--t-text-muted)]">Aktivitäten</span>
               </div>
             @else
-              @svg('heroicon-o-clock', 'w-4 h-4 text-[var(--ui-muted)]')
-              <span class="font-bold text-[13px] text-[var(--ui-body-color)]">Aktivitäten</span>
+              @svg('heroicon-o-clock', 'w-4 h-4 text-[var(--t-text-muted)]')
+              <span class="font-bold text-[13px] text-[var(--t-text)]">Aktivitäten</span>
             @endif
           </div>
 
           <!-- Tags Header (only visible in tags app) -->
           <div x-show="$wire.activeApp === 'tags'"
-               class="px-4 flex items-center gap-2.5 border-b border-[var(--ui-border)]/60 flex-shrink-0"
+               class="px-4 flex items-center gap-2.5 border-b border-[var(--t-border)]/60 flex-shrink-0"
                :class="fullscreen ? 'h-14 text-sm' : 'h-11 text-xs'">
             @if($this->contextType && $this->contextId)
               @php $tagsHeaderBreadcrumb = $this->getContextBreadcrumb(); @endphp
@@ -855,18 +886,18 @@
               <div class="flex flex-col leading-tight">
                 @php $tagsContextTitle = $tagsHeaderBreadcrumb['title'] ?? $this->contextSubject ?? 'Kontext'; @endphp
                 @if($this->contextUrl)
-                  <a href="{{ $this->contextUrl }}" class="inline-flex items-center gap-1 font-bold text-[13px] text-[var(--ui-primary)] hover:underline transition" title="Zum Kontext springen">
+                  <a href="{{ $this->contextUrl }}" class="inline-flex items-center gap-1 font-bold text-[13px] text-[var(--t-accent)] hover:underline transition" title="Zum Kontext springen">
                     {{ $tagsContextTitle }}
                     <svg class="w-3 h-3 flex-shrink-0 opacity-60" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5zm7.25-.75a.75.75 0 01.75-.75h3.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0V6.31l-5.47 5.47a.75.75 0 11-1.06-1.06l5.47-5.47H12.25a.75.75 0 01-.75-.75z" clip-rule="evenodd"/></svg>
                   </a>
                 @else
-                  <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $tagsContextTitle }}</span>
+                  <span class="font-bold text-[13px] text-[var(--t-text)]">{{ $tagsContextTitle }}</span>
                 @endif
-                <span class="text-[10px] text-[var(--ui-muted)]">Tags & Farben</span>
+                <span class="text-[10px] text-[var(--t-text-muted)]">Tags & Farben</span>
               </div>
             @else
-              <svg class="w-4 h-4 text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"/></svg>
-              <span class="font-bold text-[13px] text-[var(--ui-body-color)]">Tags & Farben</span>
+              <svg class="w-4 h-4 text-[var(--t-text-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"/></svg>
+              <span class="font-bold text-[13px] text-[var(--t-text)]">Tags & Farben</span>
             @endif
           </div>
 
@@ -888,28 +919,28 @@
                 @if($isNewDate)
                   @php $lastDate = $msg['date']; @endphp
                   <div class="flex items-center gap-3 my-3 first:mt-0">
-                    <div class="flex-1 h-px bg-[var(--ui-border)]/50"></div>
-                    <span class="text-[11px] text-[var(--ui-muted)] font-medium px-2 select-none">{{ $msg['date'] }}</span>
-                    <div class="flex-1 h-px bg-[var(--ui-border)]/50"></div>
+                    <div class="flex-1 h-px bg-[var(--t-border)]/50"></div>
+                    <span class="text-[11px] text-[var(--t-text-muted)] font-medium px-2 select-none">{{ $msg['date'] }}</span>
+                    <div class="flex-1 h-px bg-[var(--t-border)]/50"></div>
                   </div>
                 @endif
 
                 @php $lastUserId = $msg['user_id']; $lastTime = $msg['time']; @endphp
 
                 {{-- Message row --}}
-                <div id="msg-{{ $msg['id'] }}" class="group relative {{ $isNewGroup ? 'mt-3 first:mt-0' : 'mt-px' }} -mx-4 px-4 py-0.5 hover:bg-[var(--ui-surface-hover)]/40 transition-colors" wire:key="msg-{{ $msg['id'] }}">
+                <div id="msg-{{ $msg['id'] }}" class="group relative {{ $isNewGroup ? 'mt-3 first:mt-0' : 'mt-px' }} -mx-4 px-4 py-0.5 hover:bg-white/[0.04] transition-colors" wire:key="msg-{{ $msg['id'] }}">
 
                   {{-- Hover action bar --}}
-                  <div class="absolute -top-3 right-5 hidden group-hover:flex items-center gap-px bg-[var(--ui-surface)] border border-[var(--ui-border)]/60 rounded-md shadow-sm z-10">
+                  <div class="absolute -top-3 right-5 hidden group-hover:flex items-center gap-px bg-[var(--t-glass-surface)] border border-[var(--t-border)]/60 rounded-md shadow-sm z-10">
                     {{-- Quick reactions --}}
-                    <button wire:click="toggleReaction({{ $msg['id'] }}, '👍')" class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] rounded-l-md transition text-xs" title="Reagieren">👍</button>
-                    <button wire:click="toggleReaction({{ $msg['id'] }}, '😂')" class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition text-xs">😂</button>
-                    <button wire:click="toggleReaction({{ $msg['id'] }}, '❤️')" class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition text-xs">❤️</button>
-                    <button wire:click="toggleReaction({{ $msg['id'] }}, '✅')" class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition text-xs">✅</button>
+                    <button wire:click="toggleReaction({{ $msg['id'] }}, '👍')" class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 rounded-l-md transition text-xs" title="Reagieren">👍</button>
+                    <button wire:click="toggleReaction({{ $msg['id'] }}, '😂')" class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition text-xs">😂</button>
+                    <button wire:click="toggleReaction({{ $msg['id'] }}, '❤️')" class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition text-xs">❤️</button>
+                    <button wire:click="toggleReaction({{ $msg['id'] }}, '✅')" class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition text-xs">✅</button>
                     {{-- Emoji picker (+) --}}
                     <div x-data="{ showPicker: false, activeTab: 0 }" class="relative">
-                      <button @click.stop="showPicker = !showPicker" class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition text-xs" title="Mehr Emojis">+</button>
-                      <div x-show="showPicker" x-cloak @click.outside="showPicker = false" class="absolute bottom-full right-0 mb-1 bg-[var(--ui-surface)] border border-[var(--ui-border)]/60 rounded-lg shadow-xl z-50 w-[260px]">
+                      <button @click.stop="showPicker = !showPicker" class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition text-xs" title="Mehr Emojis">+</button>
+                      <div x-show="showPicker" x-cloak @click.outside="showPicker = false" class="absolute bottom-full right-0 mb-1 bg-[var(--t-glass-surface)] border border-[var(--t-border)]/60 rounded-lg shadow-xl z-50 w-[260px]">
                         @php
                           $emojiCategories = [
                             ['name' => 'Häufig', 'icon' => '👍', 'emojis' => ['👍','❤️','😊','😂','🎉','🔥','✅','👀','🙏','💪','😍','🤔','👏','💯','🚀']],
@@ -919,25 +950,25 @@
                             ['name' => 'Symbole', 'icon' => '✅', 'emojis' => ['✅','❌','⚠️','❓','❗','💬','🔗','⭐','🏆','🎯','🔒','🔑','♻️','➡️','⬅️']],
                           ];
                         @endphp
-                        <div class="flex gap-0.5 px-1 pt-1 border-b border-[var(--ui-border)]/40">
+                        <div class="flex gap-0.5 px-1 pt-1 border-b border-[var(--t-border)]/40">
                           @foreach($emojiCategories as $ci => $cat)
-                            <button @click.stop="activeTab = {{ $ci }}" :class="activeTab === {{ $ci }} ? 'opacity-100 border-b-2 border-[var(--ui-primary)]' : 'opacity-50'" class="p-1.5 text-sm rounded-t transition">{{ $cat['icon'] }}</button>
+                            <button @click.stop="activeTab = {{ $ci }}" :class="activeTab === {{ $ci }} ? 'opacity-100 border-b-2 border-[var(--t-accent)]' : 'opacity-50'" class="p-1.5 text-sm rounded-t transition">{{ $cat['icon'] }}</button>
                           @endforeach
                         </div>
                         @foreach($emojiCategories as $ci => $cat)
                           <div x-show="activeTab === {{ $ci }}" class="grid grid-cols-5 gap-0.5 p-1.5">
                             @foreach($cat['emojis'] as $emoji)
-                              <button wire:click="toggleReaction({{ $msg['id'] }}, '{{ $emoji }}')" @click.stop="showPicker = false" class="p-1.5 text-lg rounded hover:bg-[var(--ui-surface-hover)] transition text-center leading-none">{{ $emoji }}</button>
+                              <button wire:click="toggleReaction({{ $msg['id'] }}, '{{ $emoji }}')" @click.stop="showPicker = false" class="p-1.5 text-lg rounded hover:bg-white/5 transition text-center leading-none">{{ $emoji }}</button>
                             @endforeach
                           </div>
                         @endforeach
                       </div>
                     </div>
-                    <div class="w-px h-4 bg-[var(--ui-border)]/40 self-center"></div>
+                    <div class="w-px h-4 bg-[var(--t-border)]/40 self-center"></div>
                     {{-- Bookmark --}}
                     <button
                       wire:click="toggleBookmark({{ $msg['id'] }})"
-                      class="p-1 transition text-xs {{ $msg['is_bookmarked'] ? 'text-amber-500' : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)]' }} hover:bg-[var(--ui-surface-hover)]"
+                      class="p-1 transition text-xs {{ $msg['is_bookmarked'] ? 'text-amber-500' : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)]' }} hover:bg-white/5"
                       title="{{ $msg['is_bookmarked'] ? 'Lesezeichen entfernen' : 'Lesezeichen setzen' }}"
                     >
                       <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2c-.22 0-.44.03-.65.09L5.47 3.6a2.5 2.5 0 00-1.8 2.4v9.5a2 2 0 003.32 1.5L10 14.5l3.01 2.5A2 2 0 0016.33 15.5V6a2.5 2.5 0 00-1.8-2.4l-3.88-1.51A1.75 1.75 0 0010 2z"/></svg>
@@ -945,7 +976,7 @@
                     {{-- Pin --}}
                     <button
                       wire:click="{{ $msg['is_pinned'] ? 'unpinMessage' : 'pinMessage' }}({{ $msg['id'] }})"
-                      class="p-1 transition text-xs {{ $msg['is_pinned'] ? 'text-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)]' }} hover:bg-[var(--ui-surface-hover)]"
+                      class="p-1 transition text-xs {{ $msg['is_pinned'] ? 'text-[var(--t-accent)]' : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)]' }} hover:bg-white/5"
                       title="{{ $msg['is_pinned'] ? 'Pin entfernen' : 'Nachricht anpinnen' }}"
                     >
                       <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
@@ -953,29 +984,29 @@
                     {{-- Forward --}}
                     <button
                       @click.stop="$dispatch('terminal-show-forward', { messageId: {{ $msg['id'] }} })"
-                      class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition text-xs"
+                      class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition text-xs"
                       title="Weiterleiten"
                     >
                       <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.21 2.22a.75.75 0 011.06-.02l7.5 7.25a.75.75 0 010 1.08l-7.5 7.25a.75.75 0 11-1.04-1.08l6.1-5.9H3.75a.75.75 0 010-1.5h13.08l-6.1-5.9a.75.75 0 01-.02-1.06z" clip-rule="evenodd"/></svg>
                     </button>
                     {{-- Reminder --}}
                     <div x-data="{ showReminder: false }" class="relative">
-                      <button @click.stop="showReminder = !showReminder" class="p-1 transition text-xs {{ $msg['has_reminder'] ? 'text-amber-500' : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)]' }} hover:bg-[var(--ui-surface-hover)]" title="Erinnerung">
+                      <button @click.stop="showReminder = !showReminder" class="p-1 transition text-xs {{ $msg['has_reminder'] ? 'text-amber-500' : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)]' }} hover:bg-white/5" title="Erinnerung">
                         <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a6 6 0 00-6 6c0 1.887-.454 3.665-1.257 5.234a.75.75 0 00.515 1.076 32.91 32.91 0 003.256.508 3.5 3.5 0 006.972 0 32.903 32.903 0 003.256-.508.75.75 0 00.515-1.076A11.448 11.448 0 0116 8a6 6 0 00-6-6zm0 14.5a2 2 0 01-1.95-1.557 33.146 33.146 0 003.9 0A2 2 0 0110 16.5z" clip-rule="evenodd"/></svg>
                       </button>
-                      <div x-show="showReminder" x-cloak @click.outside="showReminder = false" class="absolute bottom-full right-0 mb-1 bg-[var(--ui-surface)] border border-[var(--ui-border)]/60 rounded-lg shadow-xl z-50 w-48 py-1">
-                        <button wire:click="setReminder({{ $msg['id'] }}, '30min')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition">In 30 Minuten</button>
-                        <button wire:click="setReminder({{ $msg['id'] }}, '1h')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition">In 1 Stunde</button>
-                        <button wire:click="setReminder({{ $msg['id'] }}, '3h')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition">In 3 Stunden</button>
-                        <button wire:click="setReminder({{ $msg['id'] }}, 'tomorrow_9')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition">Morgen 09:00</button>
-                        <button wire:click="setReminder({{ $msg['id'] }}, 'next_monday_9')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition">Nächsten Montag 09:00</button>
+                      <div x-show="showReminder" x-cloak @click.outside="showReminder = false" class="absolute bottom-full right-0 mb-1 bg-[var(--t-glass-surface)] border border-[var(--t-border)]/60 rounded-lg shadow-xl z-50 w-48 py-1">
+                        <button wire:click="setReminder({{ $msg['id'] }}, '30min')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--t-text)] hover:bg-white/5 transition">In 30 Minuten</button>
+                        <button wire:click="setReminder({{ $msg['id'] }}, '1h')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--t-text)] hover:bg-white/5 transition">In 1 Stunde</button>
+                        <button wire:click="setReminder({{ $msg['id'] }}, '3h')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--t-text)] hover:bg-white/5 transition">In 3 Stunden</button>
+                        <button wire:click="setReminder({{ $msg['id'] }}, 'tomorrow_9')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--t-text)] hover:bg-white/5 transition">Morgen 09:00</button>
+                        <button wire:click="setReminder({{ $msg['id'] }}, 'next_monday_9')" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-[var(--t-text)] hover:bg-white/5 transition">Nächsten Montag 09:00</button>
                         @if($msg['has_reminder'])
-                          <div class="border-t border-[var(--ui-border)]/40 my-1"></div>
-                          <button wire:click="cancelReminder({{ $msg['id'] }})" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 transition">Erinnerung entfernen</button>
+                          <div class="border-t border-[var(--t-border)]/40 my-1"></div>
+                          <button wire:click="cancelReminder({{ $msg['id'] }})" @click.stop="showReminder = false" class="w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-red-500/10 transition">Erinnerung entfernen</button>
                         @endif
                       </div>
                     </div>
-                    <div class="w-px h-4 bg-[var(--ui-border)]/40 self-center"></div>
+                    <div class="w-px h-4 bg-[var(--t-border)]/40 self-center"></div>
                     {{-- Copy link --}}
                     <button
                       x-data="{ copied: false }"
@@ -986,7 +1017,7 @@
                           setTimeout(() => copied = false, 1500);
                         });
                       "
-                      class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition {{ $msg['is_mine'] ? '' : 'rounded-r-md' }}"
+                      class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition {{ $msg['is_mine'] ? '' : 'rounded-r-md' }}"
                       :title="copied ? 'Kopiert!' : 'Link kopieren'"
                     >
                       <template x-if="!copied">
@@ -997,10 +1028,10 @@
                       </template>
                     </button>
                     @if($msg['is_mine'])
-                      <div class="w-px h-4 bg-[var(--ui-border)]/40 self-center"></div>
+                      <div class="w-px h-4 bg-[var(--t-border)]/40 self-center"></div>
                       <button
                         wire:click="startEditMessage({{ $msg['id'] }})"
-                        class="p-1 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition"
+                        class="p-1 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition"
                         title="Bearbeiten"
                       >
                         <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z"/></svg>
@@ -1008,7 +1039,7 @@
                       <button
                         wire:click="deleteMessage({{ $msg['id'] }})"
                         wire:confirm="Nachricht unwiderruflich loschen?"
-                        class="p-1 text-[var(--ui-muted)] hover:text-red-500 hover:bg-red-50 rounded-r-md transition"
+                        class="p-1 text-[var(--t-text-muted)] hover:text-red-500 hover:bg-red-500/10 rounded-r-md transition"
                         title="Loschen"
                       >
                         <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.519.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
@@ -1019,7 +1050,7 @@
                   @if($isNewGroup)
                     {{-- Full message with avatar + name --}}
                     <div class="flex gap-2.5">
-                      <div class="w-8 h-8 rounded-lg {{ $msg['is_mine'] ? 'bg-gray-100 text-gray-500' : 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]' }} flex items-center justify-center text-[11px] font-semibold flex-shrink-0 overflow-hidden mt-0.5">
+                      <div class="w-8 h-8 rounded-lg {{ $msg['is_mine'] ? 'bg-white/10 text-[var(--t-text-muted)]' : 'bg-[var(--t-accent)]/15 text-[var(--t-accent)]' }} flex items-center justify-center text-[11px] font-semibold flex-shrink-0 overflow-hidden mt-0.5">
                         @if(! empty($msg['user_avatar']))
                           <img src="{{ $msg['user_avatar'] }}" alt="" class="w-full h-full object-cover">
                         @else
@@ -1028,14 +1059,14 @@
                       </div>
                       <div class="flex-1 min-w-0">
                         <div class="flex items-baseline gap-2">
-                          <span class="font-bold text-[13px] text-[var(--ui-body-color)]">{{ $msg['is_mine'] ? 'Du' : $msg['user_name'] }}</span>
-                          <span class="text-[11px] text-[var(--ui-muted)] font-normal">{{ $msg['time'] }}</span>
+                          <span class="font-bold text-[13px] text-[var(--t-text)]">{{ $msg['is_mine'] ? 'Du' : $msg['user_name'] }}</span>
+                          <span class="text-[11px] text-[var(--t-text-muted)] font-normal">{{ $msg['time'] }}</span>
                           @if(! empty($msg['edited_at']))
-                            <span class="text-[10px] text-[var(--ui-muted)] font-normal" title="Bearbeitet am {{ $msg['edited_at'] }}">(bearbeitet)</span>
+                            <span class="text-[10px] text-[var(--t-text-muted)] font-normal" title="Bearbeitet am {{ $msg['edited_at'] }}">(bearbeitet)</span>
                           @endif
                         </div>
                         @if($msg['type'] === 'forwarded' && ! empty($msg['meta']['forwarded_from']))
-                          <div class="text-[10px] text-[var(--ui-muted)] italic mb-0.5 flex items-center gap-1">
+                          <div class="text-[10px] text-[var(--t-text-muted)] italic mb-0.5 flex items-center gap-1">
                             <svg class="w-3 h-3 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.21 2.22a.75.75 0 011.06-.02l7.5 7.25a.75.75 0 010 1.08l-7.5 7.25a.75.75 0 11-1.04-1.08l6.1-5.9H3.75a.75.75 0 010-1.5h13.08l-6.1-5.9a.75.75 0 01-.02-1.06z" clip-rule="evenodd"/></svg>
                             Weitergeleitet von {{ $msg['meta']['forwarded_from']['user_name'] ?? 'Unbekannt' }}
                           </div>
@@ -1048,17 +1079,17 @@
                               x-init="$nextTick(() => { $refs.editInput.focus(); $refs.editInput.selectionStart = $refs.editInput.value.length; })"
                               @keydown.enter.prevent="if(editText.trim()) $wire.editMessage({{ $msg['id'] }}, '<p>' + editText.replace(/\n/g, '</p><p>') + '</p>', editText)"
                               @keydown.escape="$wire.cancelEdit()"
-                              class="w-full text-[13px] px-2.5 py-1.5 rounded border border-[var(--ui-primary)]/40 bg-transparent text-[var(--ui-body-color)] focus:border-[var(--ui-primary)] outline-none transition resize-none leading-relaxed"
+                              class="w-full text-[13px] px-2.5 py-1.5 rounded border border-[var(--t-accent)]/40 bg-transparent text-[var(--t-text)] focus:border-[var(--t-accent)] outline-none transition resize-none leading-relaxed"
                               rows="2"
                             ></textarea>
-                            <div class="flex items-center gap-2 mt-1 text-[10px] text-[var(--ui-muted)]">
+                            <div class="flex items-center gap-2 mt-1 text-[10px] text-[var(--t-text-muted)]">
                               <span>Enter = Speichern</span>
                               <span>&middot;</span>
                               <span>Escape = Abbrechen</span>
                             </div>
                           </div>
                         @else
-                          <div class="text-[var(--ui-body-color)] leading-relaxed prose-terminal">{!! $msg['body_html'] !!}</div>
+                          <div class="text-[var(--t-text)] leading-relaxed prose-terminal">{!! $msg['body_html'] !!}</div>
                         @endif
                         @if(! empty($msg['attachments']))
                           @include('platform::livewire.terminal-attachments', ['attachments' => $msg['attachments']])
@@ -1069,11 +1100,11 @@
                     {{-- Continuation — no avatar, time on hover --}}
                     <div class="flex gap-2.5">
                       <div class="w-8 flex-shrink-0 flex items-center justify-center">
-                        <span class="text-[10px] text-[var(--ui-muted)] opacity-0 group-hover:opacity-100 transition-opacity select-none">{{ $msg['time'] }}</span>
+                        <span class="text-[10px] text-[var(--t-text-muted)] opacity-0 group-hover:opacity-100 transition-opacity select-none">{{ $msg['time'] }}</span>
                       </div>
                       <div class="flex-1 min-w-0">
                         @if($msg['type'] === 'forwarded' && ! empty($msg['meta']['forwarded_from']))
-                          <div class="text-[10px] text-[var(--ui-muted)] italic mb-0.5 flex items-center gap-1">
+                          <div class="text-[10px] text-[var(--t-text-muted)] italic mb-0.5 flex items-center gap-1">
                             <svg class="w-3 h-3 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.21 2.22a.75.75 0 011.06-.02l7.5 7.25a.75.75 0 010 1.08l-7.5 7.25a.75.75 0 11-1.04-1.08l6.1-5.9H3.75a.75.75 0 010-1.5h13.08l-6.1-5.9a.75.75 0 01-.02-1.06z" clip-rule="evenodd"/></svg>
                             Weitergeleitet von {{ $msg['meta']['forwarded_from']['user_name'] ?? 'Unbekannt' }}
                           </div>
@@ -1086,19 +1117,19 @@
                               x-init="$nextTick(() => { $refs.editInput.focus(); $refs.editInput.selectionStart = $refs.editInput.value.length; })"
                               @keydown.enter.prevent="if(editText.trim()) $wire.editMessage({{ $msg['id'] }}, '<p>' + editText.replace(/\n/g, '</p><p>') + '</p>', editText)"
                               @keydown.escape="$wire.cancelEdit()"
-                              class="w-full text-[13px] px-2.5 py-1.5 rounded border border-[var(--ui-primary)]/40 bg-transparent text-[var(--ui-body-color)] focus:border-[var(--ui-primary)] outline-none transition resize-none leading-relaxed"
+                              class="w-full text-[13px] px-2.5 py-1.5 rounded border border-[var(--t-accent)]/40 bg-transparent text-[var(--t-text)] focus:border-[var(--t-accent)] outline-none transition resize-none leading-relaxed"
                               rows="2"
                             ></textarea>
-                            <div class="flex items-center gap-2 mt-1 text-[10px] text-[var(--ui-muted)]">
+                            <div class="flex items-center gap-2 mt-1 text-[10px] text-[var(--t-text-muted)]">
                               <span>Enter = Speichern</span>
                               <span>&middot;</span>
                               <span>Escape = Abbrechen</span>
                             </div>
                           </div>
                         @else
-                          <div class="text-[var(--ui-body-color)] leading-relaxed prose-terminal">{!! $msg['body_html'] !!}</div>
+                          <div class="text-[var(--t-text)] leading-relaxed prose-terminal">{!! $msg['body_html'] !!}</div>
                           @if(! empty($msg['edited_at']))
-                            <span class="text-[10px] text-[var(--ui-muted)]" title="Bearbeitet am {{ $msg['edited_at'] }}">(bearbeitet)</span>
+                            <span class="text-[10px] text-[var(--t-text-muted)]" title="Bearbeitet am {{ $msg['edited_at'] }}">(bearbeitet)</span>
                           @endif
                         @endif
                         @if(! empty($msg['attachments']))
@@ -1115,7 +1146,7 @@
                         <button
                           wire:click="toggleReaction({{ $msg['id'] }}, '{{ $reaction['emoji'] }}')"
                           class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border transition
-                            {{ $reaction['reacted'] ? 'border-[var(--ui-primary)]/30 bg-[var(--ui-primary-5)] text-[var(--ui-primary)]' : 'border-[var(--ui-border)]/60 text-[var(--ui-muted)] hover:border-[var(--ui-border)] hover:bg-[var(--ui-surface-hover)]' }}"
+                            {{ $reaction['reacted'] ? 'border-[var(--t-accent)]/30 bg-[var(--t-accent)]/10 text-[var(--t-accent)]' : 'border-[var(--t-border)]/60 text-[var(--t-text-muted)] hover:border-[var(--t-border)] hover:bg-white/5' }}"
                         >
                           <span>{{ $reaction['emoji'] }}</span>
                           <span class="font-medium">{{ $reaction['count'] }}</span>
@@ -1127,7 +1158,7 @@
                   {{-- Thread indicator --}}
                   @if($msg['reply_count'] > 0)
                     <div class="ml-[42px] mt-1">
-                      <button class="inline-flex items-center gap-1.5 text-[12px] text-[var(--ui-primary)] hover:underline font-medium">
+                      <button class="inline-flex items-center gap-1.5 text-[12px] text-[var(--t-accent)] hover:underline font-medium">
                         <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5zm11 4V5a4 4 0 00-4-4H7a4 4 0 014 4h2a2 2 0 012 2v4a2 2 0 01-2 2h-1l-2 2h3l3 3v-3a2 2 0 002-2V9z" clip-rule="evenodd"/></svg>
                         {{ $msg['reply_count'] }} {{ $msg['reply_count'] === 1 ? 'Antwort' : 'Antworten' }}
                       </button>
@@ -1135,11 +1166,11 @@
                   @endif
                 </div>
               @empty
-                <div class="flex items-center justify-center h-full text-[var(--ui-muted)] text-sm">
+                <div class="flex items-center justify-center h-full text-[var(--t-text-muted)] text-sm">
                   <div class="text-center py-8">
                     <div class="text-3xl mb-3 opacity-20">💬</div>
                     <p>Noch keine Nachrichten.</p>
-                    <p class="text-[var(--ui-muted)]/60 text-xs mt-1">Schreib die erste!</p>
+                    <p class="text-[var(--t-text-muted)]/60 text-xs mt-1">Schreib die erste!</p>
                   </div>
                 </div>
               @endforelse
@@ -1147,11 +1178,11 @@
           </div>
 
           <!-- Typing indicator -->
-          <div x-show="typingDisplay" x-cloak class="px-4 py-1 text-[11px] text-[var(--ui-muted)] italic flex items-center gap-1.5 border-t border-transparent">
+          <div x-show="typingDisplay" x-cloak class="px-4 py-1 text-[11px] text-[var(--t-text-muted)] italic flex items-center gap-1.5 border-t border-transparent">
             <span class="flex gap-0.5">
-              <span class="w-1 h-1 rounded-full bg-[var(--ui-muted)] animate-bounce" style="animation-delay:0ms"></span>
-              <span class="w-1 h-1 rounded-full bg-[var(--ui-muted)] animate-bounce" style="animation-delay:150ms"></span>
-              <span class="w-1 h-1 rounded-full bg-[var(--ui-muted)] animate-bounce" style="animation-delay:300ms"></span>
+              <span class="w-1 h-1 rounded-full bg-[var(--t-text-muted)] animate-bounce" style="animation-delay:0ms"></span>
+              <span class="w-1 h-1 rounded-full bg-[var(--t-text-muted)] animate-bounce" style="animation-delay:150ms"></span>
+              <span class="w-1 h-1 rounded-full bg-[var(--t-text-muted)] animate-bounce" style="animation-delay:300ms"></span>
             </span>
             <span x-text="typingDisplay"></span>
           </div>
@@ -1159,7 +1190,7 @@
           <!-- Input (Tiptap Editor) — wire:ignore prevents morph from destroying ProseMirror DOM -->
           <div wire:key="terminal-editor-{{ $channelId }}"
                wire:ignore
-               class="border-t border-[var(--ui-border)]/60 flex-shrink-0"
+               class="border-t border-[var(--t-border)]/60 flex-shrink-0"
                :class="fullscreen ? 'px-2' : ''"
                x-data="{
                  ...tiptapEditor({
@@ -1225,13 +1256,13 @@
                 <template x-for="(file, index) in uploadedFiles" :key="file.id">
                   <div class="relative group/file">
                     <template x-if="file.is_image">
-                      <div class="w-12 h-12 rounded-md overflow-hidden border border-[var(--ui-border)]/60 bg-[var(--ui-surface-hover)]">
+                      <div class="w-12 h-12 rounded-md overflow-hidden border border-[var(--t-border)]/60 bg-white/5">
                         <img :src="file.url" alt="" class="w-full h-full object-cover">
                       </div>
                     </template>
                     <template x-if="!file.is_image">
-                      <div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-surface-hover)] text-[11px] text-[var(--ui-secondary)] max-w-[140px]">
-                        <svg class="w-3.5 h-3.5 flex-shrink-0 text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3.5A1.5 1.5 0 014.5 2h6.879a1.5 1.5 0 011.06.44l4.122 4.12A1.5 1.5 0 0117 7.622V16.5a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 013 16.5v-13z"/></svg>
+                      <div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-[var(--t-border)]/60 bg-white/5 text-[11px] text-[var(--t-text)] max-w-[140px]">
+                        <svg class="w-3.5 h-3.5 flex-shrink-0 text-[var(--t-text-muted)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3.5A1.5 1.5 0 014.5 2h6.879a1.5 1.5 0 011.06.44l4.122 4.12A1.5 1.5 0 0117 7.622V16.5a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 013 16.5v-13z"/></svg>
                         <span class="truncate" x-text="file.original_name"></span>
                       </div>
                     </template>
@@ -1242,8 +1273,8 @@
                   </div>
                 </template>
                 <template x-if="uploading">
-                  <div class="w-12 h-12 rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-surface-hover)] flex items-center justify-center">
-                    <svg class="w-4 h-4 animate-spin text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                  <div class="w-12 h-12 rounded-md border border-[var(--t-border)]/60 bg-white/5 flex items-center justify-center">
+                    <svg class="w-4 h-4 animate-spin text-[var(--t-text-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                   </div>
                 </template>
               </div>
@@ -1251,13 +1282,13 @@
 
             {{-- Formatting toolbar --}}
             <div class="px-4 pt-1.5 pb-0 flex items-center gap-0.5">
-              <button type="button" @click="editor?.chain().focus().toggleBulletList().run()" :class="editor?.isActive('bulletList') ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)]'" class="p-1 rounded transition" title="Aufzählung">
+              <button type="button" @click="editor?.chain().focus().toggleBulletList().run()" :class="editor?.isActive('bulletList') ? 'text-[var(--t-accent)] bg-[var(--t-accent)]/10' : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)]'" class="p-1 rounded transition" title="Aufzählung">
                 <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 4.75A.75.75 0 016.75 4h10.5a.75.75 0 010 1.5H6.75A.75.75 0 016 4.75zM6 10a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H6.75A.75.75 0 016 10zm0 5.25a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H6.75a.75.75 0 01-.75-.75zM1.99 4.75a1 1 0 011-1h.01a1 1 0 010 2h-.01a1 1 0 01-1-1zm0 5.25a1 1 0 011-1h.01a1 1 0 010 2h-.01a1 1 0 01-1-1zm1 4.25a1 1 0 100 2h.01a1 1 0 100-2h-.01z" clip-rule="evenodd"/></svg>
               </button>
-              <button type="button" @click="editor?.chain().focus().toggleOrderedList().run()" :class="editor?.isActive('orderedList') ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)]'" class="p-1 rounded transition" title="Nummerierung">
+              <button type="button" @click="editor?.chain().focus().toggleOrderedList().run()" :class="editor?.isActive('orderedList') ? 'text-[var(--t-accent)] bg-[var(--t-accent)]/10' : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)]'" class="p-1 rounded transition" title="Nummerierung">
                 <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 4.75A.75.75 0 016.75 4h10.5a.75.75 0 010 1.5H6.75A.75.75 0 016 4.75zM6 10a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H6.75A.75.75 0 016 10zm0 5.25a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H6.75a.75.75 0 01-.75-.75zM2 4a.75.75 0 01.75-.75h.5a.75.75 0 01.75.75v2.25h.25a.5.5 0 010 1H2a.5.5 0 010-1h.25V4.75H2A.75.75 0 012 4zm0 5.75a.5.5 0 01.5-.5h1a.75.75 0 01.53 1.28L2.56 12H3.5a.5.5 0 010 1h-1a.75.75 0 01-.53-1.28L3.44 10.25H2.5a.5.5 0 01-.5-.5z" clip-rule="evenodd"/></svg>
               </button>
-              <button type="button" @click="editor?.chain().focus().toggleCodeBlock().run()" :class="editor?.isActive('codeBlock') ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)]'" class="p-1 rounded transition" title="Code-Block">
+              <button type="button" @click="editor?.chain().focus().toggleCodeBlock().run()" :class="editor?.isActive('codeBlock') ? 'text-[var(--t-accent)] bg-[var(--t-accent)]/10' : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)]'" class="p-1 rounded transition" title="Code-Block">
                 <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 010 1.06L2.56 10l3.72 3.72a.75.75 0 01-1.06 1.06L.97 10.53a.75.75 0 010-1.06l4.25-4.25a.75.75 0 011.06 0zm7.44 0a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 010-1.06zM11.377 2.011a.75.75 0 01.612.867l-2.5 14.5a.75.75 0 01-1.478-.255l2.5-14.5a.75.75 0 01.866-.612z" clip-rule="evenodd"/></svg>
               </button>
             </div>
@@ -1268,7 +1299,7 @@
                 <button
                   type="button"
                   @click="$refs.fileInput.click()"
-                  class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition flex-shrink-0"
+                  class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition flex-shrink-0"
                   title="Datei anhängen"
                 >
                   <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.52 9.52l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.242z" clip-rule="evenodd"/></svg>
@@ -1276,7 +1307,7 @@
                 <input x-ref="fileInput" type="file" multiple class="hidden" @change="handleFiles($event.target.files); $event.target.value = ''">
 
                 <div class="flex-1 min-w-0 rounded-lg border transition-all"
-                     :class="dragOver ? 'border-[var(--ui-primary)] shadow-[0_0_0_1px_var(--ui-primary-10)] bg-[var(--ui-primary-5)]' : 'border-[var(--ui-border)]/80 focus-within:border-[var(--ui-primary)]/50 focus-within:shadow-[0_0_0_1px_var(--ui-primary-10)]'">
+                     :class="dragOver ? 'border-[var(--t-accent)] shadow-[0_0_0_1px_var(--t-accent)] bg-[var(--t-accent)]/10' : 'border-[var(--t-border)]/80 focus-within:border-[var(--t-accent)]/50 focus-within:shadow-[0_0_0_1px_var(--t-accent)]'">
                   <div x-ref="editorEl"></div>
                 </div>
                 <div x-ref="emojiSlot" class="flex-shrink-0"></div>
@@ -1284,7 +1315,7 @@
                   type="button"
                   @click="submit()"
                   :disabled="!canSend"
-                  :class="canSend ? 'bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary-hover)] cursor-pointer shadow-sm' : 'border border-[var(--ui-border)]/60 text-[var(--ui-muted)] opacity-40 cursor-not-allowed'"
+                  :class="canSend ? 'bg-[var(--t-accent)] text-white hover:bg-[var(--t-accent)]/80 cursor-pointer shadow-sm' : 'border border-[var(--t-border)]/60 text-[var(--t-text-muted)] opacity-40 cursor-not-allowed'"
                   class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs transition flex-shrink-0"
                 >
                   <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"/></svg>
@@ -1308,9 +1339,9 @@
                 @forelse($filteredActivities as $act)
                   @if(($act['activity_type'] ?? 'system') === 'manual')
                     {{-- Manual note --}}
-                    <div class="group flex items-start gap-2.5 py-2 px-3 rounded-lg hover:bg-[var(--ui-surface-hover)]/60 transition-colors" wire:key="act-{{ $act['id'] }}">
+                    <div class="group flex items-start gap-2.5 py-2 px-3 rounded-lg hover:bg-white/[0.06] transition-colors" wire:key="act-{{ $act['id'] }}">
                       <div class="flex-shrink-0 mt-0.5">
-                        <div class="w-7 h-7 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[10px] font-semibold overflow-hidden">
+                        <div class="w-7 h-7 rounded-full bg-[var(--t-accent)]/15 text-[var(--t-accent)] flex items-center justify-center text-[10px] font-semibold overflow-hidden">
                           @if(! empty($act['user_avatar']))
                             <img src="{{ $act['user_avatar'] }}" alt="" class="w-full h-full object-cover">
                           @else
@@ -1320,20 +1351,20 @@
                       </div>
                       <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-1.5 mb-0.5">
-                          <span class="text-xs font-semibold text-[var(--ui-body-color)]">{{ $act['user'] }}</span>
-                          <span class="text-[10px] text-[var(--ui-muted)]">{{ $act['time'] }}</span>
+                          <span class="text-xs font-semibold text-[var(--t-text)]">{{ $act['user'] }}</span>
+                          <span class="text-[10px] text-[var(--t-text-muted)]">{{ $act['time'] }}</span>
                         </div>
-                        <p class="text-sm text-[var(--ui-body-color)] leading-snug whitespace-pre-line">{{ $act['title'] }}</p>
+                        <p class="text-sm text-[var(--t-text)] leading-snug whitespace-pre-line">{{ $act['title'] }}</p>
                         @if(! empty($act['attachments']))
                           <div class="flex flex-wrap gap-1.5 mt-1.5">
                             @foreach($act['attachments'] as $att)
                               @if($att['is_image'])
-                                <a href="{{ $att['url'] }}" target="_blank" class="block w-20 h-20 rounded-md overflow-hidden border border-[var(--ui-border)]/60 bg-[var(--ui-surface-hover)] hover:opacity-80 transition">
+                                <a href="{{ $att['url'] }}" target="_blank" class="block w-20 h-20 rounded-md overflow-hidden border border-[var(--t-border)]/60 bg-white/5 hover:opacity-80 transition">
                                   <img src="{{ $att['url'] }}" alt="{{ $att['original_name'] }}" class="w-full h-full object-cover">
                                 </a>
                               @else
-                                <a href="{{ $att['download_url'] }}" target="_blank" class="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-surface-hover)] text-[11px] text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)]/80 transition max-w-[180px]">
-                                  <svg class="w-3.5 h-3.5 flex-shrink-0 text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3.5A1.5 1.5 0 014.5 2h6.879a1.5 1.5 0 011.06.44l4.122 4.12A1.5 1.5 0 0117 7.622V16.5a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 013 16.5v-13z"/></svg>
+                                <a href="{{ $att['download_url'] }}" target="_blank" class="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-[var(--t-border)]/60 bg-white/5 text-[11px] text-[var(--t-text)] hover:bg-white/[0.06] transition max-w-[180px]">
+                                  <svg class="w-3.5 h-3.5 flex-shrink-0 text-[var(--t-text-muted)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3.5A1.5 1.5 0 014.5 2h6.879a1.5 1.5 0 011.06.44l4.122 4.12A1.5 1.5 0 0117 7.622V16.5a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 013 16.5v-13z"/></svg>
                                   <span class="truncate">{{ $att['original_name'] }}</span>
                                 </a>
                               @endif
@@ -1345,7 +1376,7 @@
                         <button
                           wire:click="deleteActivityNote({{ $act['id'] }})"
                           wire:confirm="Notiz wirklich löschen?"
-                          class="flex-shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--ui-muted)] hover:text-red-500 hover:bg-red-500/10 transition"
+                          class="flex-shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--t-text-muted)] hover:text-red-500 hover:bg-red-500/10 transition"
                           title="Notiz löschen"
                         >
                           @svg('heroicon-o-trash', 'w-3.5 h-3.5')
@@ -1355,29 +1386,29 @@
                   @else
                     {{-- System activity --}}
                     <div class="flex items-start gap-2.5 py-1.5 px-3" wire:key="act-{{ $act['id'] }}">
-                      <div class="flex-shrink-0 w-7 h-7 rounded-full bg-[var(--ui-muted)]/5 flex items-center justify-center mt-0.5">
-                        @svg('heroicon-o-cog-6-tooth', 'w-3.5 h-3.5 text-[var(--ui-muted)]/60')
+                      <div class="flex-shrink-0 w-7 h-7 rounded-full bg-[var(--t-text-muted)]/5 flex items-center justify-center mt-0.5">
+                        @svg('heroicon-o-cog-6-tooth', 'w-3.5 h-3.5 text-[var(--t-text-muted)]/60')
                       </div>
                       <div class="flex-1 min-w-0">
-                        <p class="text-xs text-[var(--ui-muted)] leading-snug">{{ $act['title'] }}</p>
-                        <span class="text-[10px] text-[var(--ui-muted)]/50">{{ $act['time'] }}</span>
+                        <p class="text-xs text-[var(--t-text-muted)] leading-snug">{{ $act['title'] }}</p>
+                        <span class="text-[10px] text-[var(--t-text-muted)]/50">{{ $act['time'] }}</span>
                       </div>
                     </div>
                   @endif
                 @empty
                   <div class="py-8 text-center">
-                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--ui-muted)]/5 mb-3">
-                      @svg('heroicon-o-clock', 'w-6 h-6 text-[var(--ui-muted)]')
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--t-text-muted)]/5 mb-3">
+                      @svg('heroicon-o-clock', 'w-6 h-6 text-[var(--t-text-muted)]')
                     </div>
-                    <p class="text-sm text-[var(--ui-muted)]">Noch keine Aktivitäten</p>
-                    <p class="text-xs text-[var(--ui-muted)]/60 mt-1">Änderungen werden hier angezeigt</p>
+                    <p class="text-sm text-[var(--t-text-muted)]">Noch keine Aktivitäten</p>
+                    <p class="text-xs text-[var(--t-text-muted)]/60 mt-1">Änderungen werden hier angezeigt</p>
                   </div>
                 @endforelse
               </div>
             </div>
 
             {{-- Note input --}}
-            <div class="border-t border-[var(--ui-border)]/60 flex-shrink-0"
+            <div class="border-t border-[var(--t-border)]/60 flex-shrink-0"
                  :class="fullscreen ? 'px-2' : ''"
                  x-data="{
                    noteText: '',
@@ -1418,13 +1449,13 @@
                   <template x-for="(file, index) in uploadedFiles" :key="file.id">
                     <div class="relative group/file">
                       <template x-if="file.is_image">
-                        <div class="w-12 h-12 rounded-md overflow-hidden border border-[var(--ui-border)]/60 bg-[var(--ui-surface-hover)]">
+                        <div class="w-12 h-12 rounded-md overflow-hidden border border-[var(--t-border)]/60 bg-white/5">
                           <img :src="file.url" alt="" class="w-full h-full object-cover">
                         </div>
                       </template>
                       <template x-if="!file.is_image">
-                        <div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-surface-hover)] text-[11px] text-[var(--ui-secondary)] max-w-[140px]">
-                          <svg class="w-3.5 h-3.5 flex-shrink-0 text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3.5A1.5 1.5 0 014.5 2h6.879a1.5 1.5 0 011.06.44l4.122 4.12A1.5 1.5 0 0117 7.622V16.5a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 013 16.5v-13z"/></svg>
+                        <div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-[var(--t-border)]/60 bg-white/5 text-[11px] text-[var(--t-text)] max-w-[140px]">
+                          <svg class="w-3.5 h-3.5 flex-shrink-0 text-[var(--t-text-muted)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3.5A1.5 1.5 0 014.5 2h6.879a1.5 1.5 0 011.06.44l4.122 4.12A1.5 1.5 0 0117 7.622V16.5a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 013 16.5v-13z"/></svg>
                           <span class="truncate" x-text="file.original_name"></span>
                         </div>
                       </template>
@@ -1435,8 +1466,8 @@
                     </div>
                   </template>
                   <template x-if="uploading">
-                    <div class="w-12 h-12 rounded-md border border-[var(--ui-border)]/60 bg-[var(--ui-surface-hover)] flex items-center justify-center">
-                      <svg class="w-4 h-4 animate-spin text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <div class="w-12 h-12 rounded-md border border-[var(--t-border)]/60 bg-white/5 flex items-center justify-center">
+                      <svg class="w-4 h-4 animate-spin text-[var(--t-text-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     </div>
                   </template>
                 </div>
@@ -1448,7 +1479,7 @@
                   <button
                     type="button"
                     @click="$refs.noteFileInput.click()"
-                    class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition flex-shrink-0"
+                    class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition flex-shrink-0"
                     title="Datei anhängen"
                   >
                     <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.52 9.52l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.242z" clip-rule="evenodd"/></svg>
@@ -1460,13 +1491,13 @@
                     @keydown.enter="if(!$event.shiftKey) { $event.preventDefault(); submitNote(); }"
                     placeholder="Notiz hinzufügen…"
                     rows="1"
-                    class="flex-1 min-h-[36px] max-h-24 resize-none rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] px-3 py-2 text-sm text-[var(--ui-body-color)] placeholder:text-[var(--ui-muted)]/50 focus:outline-none focus:border-[var(--ui-primary)]/50 focus:ring-1 focus:ring-[var(--ui-primary)]/20 transition"
+                    class="flex-1 min-h-[36px] max-h-24 resize-none rounded-lg border border-[var(--t-border)]/60 bg-[var(--t-glass-surface)] px-3 py-2 text-sm text-[var(--t-text)] placeholder:text-[var(--t-text-muted)]/50 focus:outline-none focus:border-[var(--t-accent)]/50 focus:ring-1 focus:ring-[var(--t-accent)]/20 transition"
                   ></textarea>
                   <button
                     type="button"
                     @click="submitNote()"
                     :disabled="!canSend"
-                    :class="canSend ? 'bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary-hover)] cursor-pointer shadow-sm' : 'border border-[var(--ui-border)]/60 text-[var(--ui-muted)] opacity-40 cursor-not-allowed'"
+                    :class="canSend ? 'bg-[var(--t-accent)] text-white hover:bg-[var(--t-accent)]/80 cursor-pointer shadow-sm' : 'border border-[var(--t-border)]/60 text-[var(--t-text-muted)] opacity-40 cursor-not-allowed'"
                     class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs transition flex-shrink-0"
                   >
                     <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"/></svg>
@@ -1493,53 +1524,53 @@
                   <div
                     class="group flex items-center gap-3 py-2 px-3 rounded-lg transition-colors
                       {{ $this->filePickerActive ? 'cursor-pointer' : '' }}
-                      {{ $isSelected ? 'bg-[var(--ui-primary-5)] ring-2 ring-[var(--ui-primary)]/40' : 'hover:bg-[var(--ui-surface-hover)]/60' }}"
+                      {{ $isSelected ? 'bg-[var(--t-accent)]/10 ring-2 ring-[var(--t-accent)]/40' : 'hover:bg-white/[0.06]' }}"
                     wire:key="ctxfile-{{ $file['id'] }}"
                     @if($this->filePickerActive) wire:click="toggleFilePickerSelection({{ $file['id'] }})" @endif
                   >
                     {{-- Selection indicator (picker mode) --}}
                     @if($this->filePickerActive)
                       <div class="flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition
-                        {{ $isSelected ? 'border-[var(--ui-primary)] bg-[var(--ui-primary)] text-white' : 'border-[var(--ui-border)]' }}">
+                        {{ $isSelected ? 'border-[var(--t-accent)] bg-[var(--t-accent)] text-white' : 'border-[var(--t-border)]' }}">
                         @if($isSelected)
                           <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
                         @endif
                       </div>
                     @endif
                     {{-- Thumbnail / Icon --}}
-                    <div class="flex-shrink-0 w-10 h-10 rounded-md overflow-hidden border border-[var(--ui-border)]/60 bg-[var(--ui-surface-hover)] flex items-center justify-center">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-md overflow-hidden border border-[var(--t-border)]/60 bg-white/5 flex items-center justify-center">
                       @if($file['is_image'] && ($file['thumbnail'] ?? $file['url']))
                         <img src="{{ $file['thumbnail'] ?? $file['url'] }}" alt="" class="w-full h-full object-cover">
                       @else
-                        <svg class="w-5 h-5 text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3.5A1.5 1.5 0 014.5 2h6.879a1.5 1.5 0 011.06.44l4.122 4.12A1.5 1.5 0 0117 7.622V16.5a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 013 16.5v-13z"/></svg>
+                        <svg class="w-5 h-5 text-[var(--t-text-muted)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3.5A1.5 1.5 0 014.5 2h6.879a1.5 1.5 0 011.06.44l4.122 4.12A1.5 1.5 0 0117 7.622V16.5a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 013 16.5v-13z"/></svg>
                       @endif
                     </div>
                     {{-- File info --}}
                     <div class="flex-1 min-w-0">
-                      <p class="text-xs font-medium text-[var(--ui-body-color)] truncate" title="{{ $file['original_name'] }}">{{ $file['original_name'] }}</p>
+                      <p class="text-xs font-medium text-[var(--t-text)] truncate" title="{{ $file['original_name'] }}">{{ $file['original_name'] }}</p>
                       <div class="flex items-center gap-2 mt-0.5">
-                        <span class="text-[10px] text-[var(--ui-muted)]">{{ \Illuminate\Support\Number::fileSize($file['file_size']) }}</span>
-                        <span class="text-[10px] text-[var(--ui-muted)]">&middot;</span>
-                        <span class="text-[10px] text-[var(--ui-muted)]">{{ $file['uploaded_by'] }}</span>
-                        <span class="text-[10px] text-[var(--ui-muted)]">&middot;</span>
-                        <span class="text-[10px] text-[var(--ui-muted)]">{{ $file['created_at'] }}</span>
+                        <span class="text-[10px] text-[var(--t-text-muted)]">{{ \Illuminate\Support\Number::fileSize($file['file_size']) }}</span>
+                        <span class="text-[10px] text-[var(--t-text-muted)]">&middot;</span>
+                        <span class="text-[10px] text-[var(--t-text-muted)]">{{ $file['uploaded_by'] }}</span>
+                        <span class="text-[10px] text-[var(--t-text-muted)]">&middot;</span>
+                        <span class="text-[10px] text-[var(--t-text-muted)]">{{ $file['created_at'] }}</span>
                       </div>
                     </div>
                     {{-- Actions (hidden in picker mode) --}}
                     @if(! $this->filePickerActive)
                       <div class="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition">
                         @if($file['is_image'] && $file['url'])
-                          <a href="{{ $file['url'] }}" target="_blank" class="p-1.5 rounded text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition" title="Ansehen">
+                          <a href="{{ $file['url'] }}" target="_blank" class="p-1.5 rounded text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition" title="Ansehen">
                             @svg('heroicon-o-eye', 'w-3.5 h-3.5')
                           </a>
                         @endif
-                        <a href="{{ $file['download_url'] }}" target="_blank" class="p-1.5 rounded text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition" title="Download">
+                        <a href="{{ $file['download_url'] }}" target="_blank" class="p-1.5 rounded text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition" title="Download">
                           @svg('heroicon-o-arrow-down-tray', 'w-3.5 h-3.5')
                         </a>
                         <button
                           wire:click="deleteContextFile({{ $file['id'] }})"
                           wire:confirm="Datei wirklich löschen?"
-                          class="p-1.5 rounded text-[var(--ui-muted)] hover:text-red-500 hover:bg-red-500/10 transition"
+                          class="p-1.5 rounded text-[var(--t-text-muted)] hover:text-red-500 hover:bg-red-500/10 transition"
                           title="Löschen"
                         >
                           @svg('heroicon-o-trash', 'w-3.5 h-3.5')
@@ -1549,11 +1580,11 @@
                   </div>
                 @empty
                   <div class="py-8 text-center">
-                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--ui-muted)]/5 mb-3">
-                      @svg('heroicon-o-paper-clip', 'w-6 h-6 text-[var(--ui-muted)]')
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--t-text-muted)]/5 mb-3">
+                      @svg('heroicon-o-paper-clip', 'w-6 h-6 text-[var(--t-text-muted)]')
                     </div>
-                    <p class="text-sm text-[var(--ui-muted)]">Keine Dateien</p>
-                    <p class="text-xs text-[var(--ui-muted)]/60 mt-1">Lade Dateien hoch per Drag & Drop oder Button</p>
+                    <p class="text-sm text-[var(--t-text-muted)]">Keine Dateien</p>
+                    <p class="text-xs text-[var(--t-text-muted)]/60 mt-1">Lade Dateien hoch per Drag & Drop oder Button</p>
                   </div>
                 @endforelse
               </div>
@@ -1562,30 +1593,30 @@
             {{-- Bottom bar: Picker confirmation OR Upload area --}}
             @if($this->filePickerActive)
               {{-- Picker selection bar --}}
-              <div class="border-t border-[var(--ui-border)]/60 flex-shrink-0 px-4 py-2.5">
+              <div class="border-t border-[var(--t-border)]/60 flex-shrink-0 px-4 py-2.5">
                 <div class="flex items-center gap-3">
                   <div class="flex-1 text-xs">
                     @if(count($this->filePickerSelected) > 0)
-                      <span class="font-medium text-[var(--ui-primary)]">{{ count($this->filePickerSelected) }} {{ count($this->filePickerSelected) === 1 ? 'Datei' : 'Dateien' }} ausgewählt</span>
+                      <span class="font-medium text-[var(--t-accent)]">{{ count($this->filePickerSelected) }} {{ count($this->filePickerSelected) === 1 ? 'Datei' : 'Dateien' }} ausgewählt</span>
                     @else
-                      <span class="text-[var(--ui-muted)]">Dateien auswählen…</span>
+                      <span class="text-[var(--t-text-muted)]">Dateien auswählen…</span>
                     @endif
                   </div>
                   <button
                     wire:click="cancelFilePicker"
-                    class="px-3 py-1.5 rounded text-xs text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition"
+                    class="px-3 py-1.5 rounded text-xs text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition"
                   >Abbrechen</button>
                   <button
                     wire:click="confirmFilePicker"
                     @if(empty($this->filePickerSelected)) disabled @endif
                     class="px-3 py-1.5 rounded text-xs font-medium transition
-                      {{ ! empty($this->filePickerSelected) ? 'bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/90' : 'bg-[var(--ui-muted)]/10 text-[var(--ui-muted)] cursor-not-allowed' }}"
+                      {{ ! empty($this->filePickerSelected) ? 'bg-[var(--t-accent)] text-white hover:bg-[var(--t-accent)]/90' : 'bg-[var(--t-text-muted)]/10 text-[var(--t-text-muted)] cursor-not-allowed' }}"
                   >Auswählen</button>
                 </div>
               </div>
             @else
               {{-- Upload area --}}
-              <div class="border-t border-[var(--ui-border)]/60 flex-shrink-0"
+              <div class="border-t border-[var(--t-border)]/60 flex-shrink-0"
                    :class="fullscreen ? 'px-2' : ''"
                    x-data="{
                      selectedFiles: [],
@@ -1608,25 +1639,25 @@
               >
                 <div class="px-4 py-2.5">
                   <div class="flex items-center gap-2"
-                       :class="dragOver ? 'ring-2 ring-[var(--ui-primary)]/40 ring-offset-1 rounded-lg' : ''"
+                       :class="dragOver ? 'ring-2 ring-[var(--t-accent)]/40 ring-offset-1 rounded-lg' : ''"
                   >
                     <button
                       type="button"
                       @click="$refs.contextFileInput.click()"
-                      class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition flex-shrink-0"
+                      class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition flex-shrink-0"
                       title="Dateien auswählen"
                     >
                       <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.52 9.52l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.242z" clip-rule="evenodd"/></svg>
                     </button>
                     <input x-ref="contextFileInput" type="file" multiple class="hidden" @change="handleFiles($event.target.files); $event.target.value = ''">
 
-                    <div class="flex-1 text-xs text-[var(--ui-muted)]" x-show="!uploading">
-                      <span :class="dragOver ? 'text-[var(--ui-primary)] font-medium' : ''">
+                    <div class="flex-1 text-xs text-[var(--t-text-muted)]" x-show="!uploading">
+                      <span :class="dragOver ? 'text-[var(--t-accent)] font-medium' : ''">
                         <span x-show="dragOver">Dateien hier ablegen</span>
                         <span x-show="!dragOver">Dateien hochladen per Drag & Drop oder Klick</span>
                       </span>
                     </div>
-                    <div class="flex-1 flex items-center gap-2 text-xs text-[var(--ui-muted)]" x-show="uploading" x-cloak>
+                    <div class="flex-1 flex items-center gap-2 text-xs text-[var(--t-text-muted)]" x-show="uploading" x-cloak>
                       <svg class="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                       <span>Wird hochgeladen…</span>
                     </div>
@@ -1644,60 +1675,60 @@
                 @if($this->taggingTab === 'tags' && $this->contextType && $this->contextId)
                   {{-- Tag Autocomplete --}}
                   <div x-data="{ showSuggestions: @entangle('showTagSuggestions') }">
-                    <h4 class="text-xs font-semibold text-[var(--ui-body-color)] mb-2">Tag hinzufügen</h4>
+                    <h4 class="text-xs font-semibold text-[var(--t-text)] mb-2">Tag hinzufügen</h4>
                     <div class="relative" x-on:click.away="showSuggestions = false">
                       <input
                         type="text"
                         wire:model.live.debounce.300ms="tagInput"
                         @focus="showSuggestions = $wire.showTagSuggestions"
                         placeholder="Tag suchen oder erstellen…"
-                        class="w-full px-3 py-2 text-xs border border-[var(--ui-border)]/40 bg-[var(--ui-surface)] text-[var(--ui-body-color)] placeholder-[var(--ui-muted)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
+                        class="w-full px-3 py-2 text-xs border border-[var(--t-border)]/40 bg-[var(--t-glass-surface)] text-[var(--t-text)] placeholder-[var(--t-text-muted)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--t-accent)] focus:border-transparent"
                       />
                       {{-- Suggestions dropdown --}}
                       <div
                         x-show="showSuggestions && ($wire.tagSuggestions.length > 0 || $wire.tagInput.length >= 2)"
                         x-transition
-                        class="absolute z-10 w-full mt-1 bg-[var(--ui-surface)] border border-[var(--ui-border)]/40 shadow-lg rounded-md max-h-48 overflow-y-auto"
+                        class="absolute z-10 w-full mt-1 bg-[var(--t-glass-surface)] border border-[var(--t-border)]/40 shadow-lg rounded-md max-h-48 overflow-y-auto"
                       >
                         @foreach($tagSuggestions as $suggestion)
-                          <div class="flex items-center justify-between p-2 hover:bg-[var(--ui-surface-hover)] transition-colors">
+                          <div class="flex items-center justify-between p-2 hover:bg-white/5 transition-colors">
                             <div class="flex items-center gap-1.5">
                               @if($suggestion['color'])
                                 <div class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {{ $suggestion['color'] }}"></div>
                               @endif
-                              <span class="text-xs font-medium text-[var(--ui-body-color)]">{{ $suggestion['label'] }}</span>
-                              <span class="text-[9px] text-[var(--ui-muted)] px-1 py-px bg-[var(--ui-muted)]/5 rounded">{{ $suggestion['is_team_tag'] ? 'Team' : 'Global' }}</span>
+                              <span class="text-xs font-medium text-[var(--t-text)]">{{ $suggestion['label'] }}</span>
+                              <span class="text-[9px] text-[var(--t-text-muted)] px-1 py-px bg-[var(--t-text-muted)]/5 rounded">{{ $suggestion['is_team_tag'] ? 'Team' : 'Global' }}</span>
                             </div>
                             <div class="flex gap-1">
                               <button
                                 wire:click="addTagFromSuggestion({{ $suggestion['id'] }}, false)"
                                 @click="showSuggestions = false"
-                                class="text-[9px] px-1.5 py-0.5 bg-[var(--ui-primary)] text-white rounded hover:bg-[var(--ui-primary)]/90 transition"
+                                class="text-[9px] px-1.5 py-0.5 bg-[var(--t-accent)] text-white rounded hover:bg-[var(--t-accent)]/90 transition"
                               >Team</button>
                               <button
                                 wire:click="addTagFromSuggestion({{ $suggestion['id'] }}, true)"
                                 @click="showSuggestions = false"
-                                class="text-[9px] px-1.5 py-0.5 bg-[var(--ui-muted)]/5 text-[var(--ui-body-color)] rounded border border-[var(--ui-border)]/40 hover:bg-[var(--ui-muted)]/10 transition"
+                                class="text-[9px] px-1.5 py-0.5 bg-[var(--t-text-muted)]/5 text-[var(--t-text)] rounded border border-[var(--t-border)]/40 hover:bg-[var(--t-text-muted)]/10 transition"
                               >Persönlich</button>
                             </div>
                           </div>
                         @endforeach
 
                         @if(strlen($tagInput) >= 2 && count($tagSuggestions) === 0)
-                          <div class="p-2 border-t border-[var(--ui-border)]/40">
+                          <div class="p-2 border-t border-[var(--t-border)]/40">
                             <div class="flex items-center justify-between mb-1.5">
-                              <span class="text-[10px] font-medium text-[var(--ui-body-color)]">Neues Tag:</span>
+                              <span class="text-[10px] font-medium text-[var(--t-text)]">Neues Tag:</span>
                               <label class="flex items-center gap-1">
-                                <input type="checkbox" wire:model="newTagIsPersonal" class="w-3 h-3 text-[var(--ui-primary)] border-[var(--ui-border)] rounded focus:ring-[var(--ui-primary)]" />
-                                <span class="text-[9px] text-[var(--ui-muted)]">Persönlich</span>
+                                <input type="checkbox" wire:model="newTagIsPersonal" class="w-3 h-3 text-[var(--t-accent)] border-[var(--t-border)] rounded focus:ring-[var(--t-accent)]" />
+                                <span class="text-[9px] text-[var(--t-text-muted)]">Persönlich</span>
                               </label>
                             </div>
                             <div class="flex items-center gap-1.5">
-                              <input type="color" wire:model="newTagColor" class="h-7 w-10 border border-[var(--ui-border)]/40 rounded cursor-pointer" />
+                              <input type="color" wire:model="newTagColor" class="h-7 w-10 border border-[var(--t-border)]/40 rounded cursor-pointer" />
                               <button
                                 wire:click="createAndAddTag"
                                 @click="showSuggestions = false"
-                                class="flex-1 px-2 py-1.5 bg-[var(--ui-primary)] text-white rounded text-[10px] font-medium hover:bg-[var(--ui-primary)]/90 transition"
+                                class="flex-1 px-2 py-1.5 bg-[var(--t-accent)] text-white rounded text-[10px] font-medium hover:bg-[var(--t-accent)]/90 transition"
                               >"{{ $tagInput }}" erstellen</button>
                             </div>
                           </div>
@@ -1708,14 +1739,14 @@
 
                   {{-- Assigned Tags --}}
                   <div>
-                    <h4 class="text-xs font-semibold text-[var(--ui-body-color)] mb-2">Zugeordnete Tags</h4>
+                    <h4 class="text-xs font-semibold text-[var(--t-text)] mb-2">Zugeordnete Tags</h4>
 
                     {{-- Filter tabs --}}
                     <div class="flex gap-1 mb-2">
                       @foreach(['all' => 'Alle', 'team' => 'Team', 'personal' => 'Persönlich'] as $fKey => $fLabel)
                         <button
                           wire:click="$set('tagFilter', '{{ $fKey }}')"
-                          class="text-[9px] font-medium px-2 py-1 rounded transition {{ $this->tagFilter === $fKey ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:bg-[var(--ui-surface-hover)]' }}"
+                          class="text-[9px] font-medium px-2 py-1 rounded transition {{ $this->tagFilter === $fKey ? 'bg-[var(--t-accent)]/15 text-[var(--t-accent)]' : 'text-[var(--t-text-muted)] hover:bg-white/5' }}"
                         >{{ $fLabel }}</button>
                       @endforeach
                     </div>
@@ -1723,35 +1754,35 @@
                     <div class="space-y-1">
                       @if($this->tagFilter === 'all' || $this->tagFilter === 'team')
                         @foreach($teamTags as $tag)
-                          <div class="flex items-center justify-between p-2 rounded-md bg-[var(--ui-surface-hover)]/30 border border-[var(--ui-border)]/30">
+                          <div class="flex items-center justify-between p-2 rounded-md bg-white/[0.03] border border-[var(--t-border)]/30">
                             <div class="flex items-center gap-1.5">
                               @if($tag['color'])
                                 <div class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {{ $tag['color'] }}"></div>
                               @endif
-                              <span class="text-xs font-medium text-[var(--ui-body-color)]">{{ $tag['label'] }}</span>
-                              <span class="text-[9px] text-[var(--ui-muted)] px-1 py-px bg-[var(--ui-muted)]/5 rounded">Team</span>
+                              <span class="text-xs font-medium text-[var(--t-text)]">{{ $tag['label'] }}</span>
+                              <span class="text-[9px] text-[var(--t-text-muted)] px-1 py-px bg-[var(--t-text-muted)]/5 rounded">Team</span>
                             </div>
-                            <button wire:click="toggleTag({{ $tag['id'] }}, false)" class="text-[10px] text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 px-1.5 py-0.5 rounded hover:bg-[var(--ui-danger)]/5 transition">Entfernen</button>
+                            <button wire:click="toggleTag({{ $tag['id'] }}, false)" class="text-[10px] text-red-400 hover:text-red-400/80 px-1.5 py-0.5 rounded hover:bg-red-400/5 transition">Entfernen</button>
                           </div>
                         @endforeach
                       @endif
                       @if($this->tagFilter === 'all' || $this->tagFilter === 'personal')
                         @foreach($personalTags as $tag)
-                          <div class="flex items-center justify-between p-2 rounded-md bg-[var(--ui-surface-hover)]/30 border border-[var(--ui-border)]/30">
+                          <div class="flex items-center justify-between p-2 rounded-md bg-white/[0.03] border border-[var(--t-border)]/30">
                             <div class="flex items-center gap-1.5">
                               @if($tag['color'])
                                 <div class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {{ $tag['color'] }}"></div>
                               @endif
-                              <span class="text-xs font-medium text-[var(--ui-body-color)]">{{ $tag['label'] }}</span>
-                              <span class="text-[9px] text-[var(--ui-muted)] px-1 py-px bg-[var(--ui-muted)]/5 rounded">Persönlich</span>
+                              <span class="text-xs font-medium text-[var(--t-text)]">{{ $tag['label'] }}</span>
+                              <span class="text-[9px] text-[var(--t-text-muted)] px-1 py-px bg-[var(--t-text-muted)]/5 rounded">Persönlich</span>
                             </div>
-                            <button wire:click="toggleTag({{ $tag['id'] }}, true)" class="text-[10px] text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 px-1.5 py-0.5 rounded hover:bg-[var(--ui-danger)]/5 transition">Entfernen</button>
+                            <button wire:click="toggleTag({{ $tag['id'] }}, true)" class="text-[10px] text-red-400 hover:text-red-400/80 px-1.5 py-0.5 rounded hover:bg-red-400/5 transition">Entfernen</button>
                           </div>
                         @endforeach
                       @endif
                       @if(empty($teamTags) && empty($personalTags))
                         <div class="py-6 text-center">
-                          <p class="text-xs text-[var(--ui-muted)]">Noch keine Tags zugeordnet.</p>
+                          <p class="text-xs text-[var(--t-text-muted)]">Noch keine Tags zugeordnet.</p>
                         </div>
                       @endif
                     </div>
@@ -1760,18 +1791,18 @@
                 @elseif($this->taggingTab === 'color' && $this->contextType && $this->contextId)
                   {{-- Color tab --}}
                   <div>
-                    <h4 class="text-xs font-semibold text-[var(--ui-body-color)] mb-2">Farbe zuordnen</h4>
+                    <h4 class="text-xs font-semibold text-[var(--t-text)] mb-2">Farbe zuordnen</h4>
                     @if($contextColor)
-                      <div class="p-3 rounded-md bg-[var(--ui-surface-hover)]/30 border border-[var(--ui-border)]/30">
+                      <div class="p-3 rounded-md bg-white/[0.03] border border-[var(--t-border)]/30">
                         <div class="flex items-center justify-between">
                           <div class="flex items-center gap-2.5">
-                            <div class="w-10 h-10 rounded-md border border-[var(--ui-border)]/40" style="background-color: {{ $contextColor }}"></div>
+                            <div class="w-10 h-10 rounded-md border border-[var(--t-border)]/40" style="background-color: {{ $contextColor }}"></div>
                             <div>
-                              <div class="text-xs font-medium text-[var(--ui-body-color)]">Aktuelle Farbe</div>
-                              <div class="text-[10px] text-[var(--ui-muted)] font-mono">{{ $contextColor }}</div>
+                              <div class="text-xs font-medium text-[var(--t-text)]">Aktuelle Farbe</div>
+                              <div class="text-[10px] text-[var(--t-text-muted)] font-mono">{{ $contextColor }}</div>
                             </div>
                           </div>
-                          <button wire:click="removeColor" class="text-[10px] text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 px-2 py-1 rounded hover:bg-[var(--ui-danger)]/5 transition">Entfernen</button>
+                          <button wire:click="removeColor" class="text-[10px] text-red-400 hover:text-red-400/80 px-2 py-1 rounded hover:bg-red-400/5 transition">Entfernen</button>
                         </div>
                       </div>
                     @else
@@ -1779,16 +1810,16 @@
                         <input
                           type="color"
                           wire:model.live="newContextColor"
-                          class="w-full h-12 rounded-md border border-[var(--ui-border)]/40 cursor-pointer"
+                          class="w-full h-12 rounded-md border border-[var(--t-border)]/40 cursor-pointer"
                         />
                         @if($newContextColor)
                           <div class="flex items-center gap-2.5">
-                            <div class="w-10 h-10 rounded-md border border-[var(--ui-border)]/40" style="background-color: {{ $newContextColor }}"></div>
+                            <div class="w-10 h-10 rounded-md border border-[var(--t-border)]/40" style="background-color: {{ $newContextColor }}"></div>
                             <div class="flex-1">
-                              <div class="text-xs font-medium text-[var(--ui-body-color)]">Vorschau</div>
-                              <div class="text-[10px] text-[var(--ui-muted)] font-mono">{{ $newContextColor }}</div>
+                              <div class="text-xs font-medium text-[var(--t-text)]">Vorschau</div>
+                              <div class="text-[10px] text-[var(--t-text-muted)] font-mono">{{ $newContextColor }}</div>
                             </div>
-                            <button wire:click="setColor" class="px-3 py-1.5 bg-[var(--ui-primary)] text-white rounded text-[10px] font-medium hover:bg-[var(--ui-primary)]/90 transition">Setzen</button>
+                            <button wire:click="setColor" class="px-3 py-1.5 bg-[var(--t-accent)] text-white rounded text-[10px] font-medium hover:bg-[var(--t-accent)]/90 transition">Setzen</button>
                           </div>
                         @endif
                       </div>
@@ -1800,31 +1831,31 @@
                   <div class="space-y-6">
                     {{-- All Tags --}}
                     <div>
-                      <h4 class="text-xs font-semibold text-[var(--ui-body-color)] mb-2">Alle Tags</h4>
+                      <h4 class="text-xs font-semibold text-[var(--t-text)] mb-2">Alle Tags</h4>
                       <div class="space-y-1">
                         @forelse($allTags as $tag)
-                          <div class="flex items-center justify-between p-2 rounded-md hover:bg-[var(--ui-surface-hover)]/30 transition">
+                          <div class="flex items-center justify-between p-2 rounded-md hover:bg-white/[0.03] transition">
                             <div class="flex items-center gap-1.5 min-w-0">
                               @if($tag['color'])
                                 <div class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {{ $tag['color'] }}"></div>
                               @endif
-                              <span class="text-xs font-medium text-[var(--ui-body-color)] truncate">{{ $tag['label'] }}</span>
-                              <span class="text-[9px] text-[var(--ui-muted)] px-1 py-px bg-[var(--ui-muted)]/5 rounded flex-shrink-0">{{ $tag['is_team_tag'] ? 'Team' : 'Global' }}</span>
+                              <span class="text-xs font-medium text-[var(--t-text)] truncate">{{ $tag['label'] }}</span>
+                              <span class="text-[9px] text-[var(--t-text-muted)] px-1 py-px bg-[var(--t-text-muted)]/5 rounded flex-shrink-0">{{ $tag['is_team_tag'] ? 'Team' : 'Global' }}</span>
                             </div>
                             <div class="flex items-center gap-2 flex-shrink-0">
-                              <span class="text-[10px] text-[var(--ui-muted)] tabular-nums">{{ $tag['total_count'] }}x</span>
+                              <span class="text-[10px] text-[var(--t-text-muted)] tabular-nums">{{ $tag['total_count'] }}x</span>
                               @if($tag['total_count'] === 0)
                                 <button
                                   wire:click="deleteTag({{ $tag['id'] }})"
                                   wire:confirm="Tag wirklich löschen?"
-                                  class="text-[9px] text-[var(--ui-danger)] hover:text-[var(--ui-danger)]/80 px-1 py-0.5 rounded hover:bg-[var(--ui-danger)]/5 transition"
+                                  class="text-[9px] text-red-400 hover:text-red-400/80 px-1 py-0.5 rounded hover:bg-red-400/5 transition"
                                 >Löschen</button>
                               @endif
                             </div>
                           </div>
                         @empty
                           <div class="py-6 text-center">
-                            <p class="text-xs text-[var(--ui-muted)]">Noch keine Tags vorhanden.</p>
+                            <p class="text-xs text-[var(--t-text-muted)]">Noch keine Tags vorhanden.</p>
                           </div>
                         @endforelse
                       </div>
@@ -1832,15 +1863,15 @@
 
                     {{-- All Colors --}}
                     <div>
-                      <h4 class="text-xs font-semibold text-[var(--ui-body-color)] mb-2">Alle Farben</h4>
+                      <h4 class="text-xs font-semibold text-[var(--t-text)] mb-2">Alle Farben</h4>
                       <div class="space-y-1">
                         @forelse($allColors as $color)
-                          <div class="flex items-center justify-between p-2 rounded-md hover:bg-[var(--ui-surface-hover)]/30 transition">
+                          <div class="flex items-center justify-between p-2 rounded-md hover:bg-white/[0.03] transition">
                             <div class="flex items-center gap-2">
-                              <div class="w-6 h-6 rounded-md border border-[var(--ui-border)]/40" style="background-color: {{ $color['color'] }}"></div>
-                              <span class="text-xs font-medium text-[var(--ui-body-color)] font-mono">{{ $color['color'] }}</span>
+                              <div class="w-6 h-6 rounded-md border border-[var(--t-border)]/40" style="background-color: {{ $color['color'] }}"></div>
+                              <span class="text-xs font-medium text-[var(--t-text)] font-mono">{{ $color['color'] }}</span>
                             </div>
-                            <div class="flex items-center gap-3 text-[10px] text-[var(--ui-muted)] tabular-nums">
+                            <div class="flex items-center gap-3 text-[10px] text-[var(--t-text-muted)] tabular-nums">
                               <span>{{ $color['total_count'] }}x</span>
                               <span>T:{{ $color['team_count'] }}</span>
                               <span>P:{{ $color['personal_count'] }}</span>
@@ -1848,7 +1879,7 @@
                           </div>
                         @empty
                           <div class="py-6 text-center">
-                            <p class="text-xs text-[var(--ui-muted)]">Noch keine Farben verwendet.</p>
+                            <p class="text-xs text-[var(--t-text-muted)]">Noch keine Farben verwendet.</p>
                           </div>
                         @endforelse
                       </div>
@@ -1858,11 +1889,11 @@
                 @else
                   {{-- No context --}}
                   <div class="py-8 text-center">
-                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--ui-muted)]/5 mb-3">
-                      <svg class="w-6 h-6 text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"/></svg>
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--t-text-muted)]/5 mb-3">
+                      <svg class="w-6 h-6 text-[var(--t-text-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"/></svg>
                     </div>
-                    <p class="text-sm text-[var(--ui-muted)]">Kein Kontext</p>
-                    <p class="text-xs text-[var(--ui-muted)]/60 mt-1">Öffne einen Kontext um Tags & Farben zu verwalten.</p>
+                    <p class="text-sm text-[var(--t-text-muted)]">Kein Kontext</p>
+                    <p class="text-xs text-[var(--t-text-muted)]/60 mt-1">Öffne einen Kontext um Tags & Farben zu verwalten.</p>
                   </div>
                 @endif
 
@@ -1872,11 +1903,11 @@
 
         @else
           <!-- No channel selected -->
-          <div class="flex-1 flex items-center justify-center text-[var(--ui-muted)] text-sm">
+          <div class="flex-1 flex items-center justify-center text-[var(--t-text-muted)] text-sm">
             <div class="text-center">
               <div class="text-3xl mb-3 opacity-20">💬</div>
               <p class="font-medium">Willkommen im Terminal</p>
-              <p class="text-xs text-[var(--ui-muted)]/60 mt-1">Starte einen Chat oder tritt einem Channel bei.</p>
+              <p class="text-xs text-[var(--t-text-muted)]/60 mt-1">Starte einen Chat oder tritt einem Channel bei.</p>
             </div>
           </div>
         @endif
@@ -1894,17 +1925,17 @@
     @click.self="showNewDm = false"
     @keydown.escape.window="showNewDm = false"
   >
-    <div class="bg-[var(--ui-surface)] rounded-lg shadow-xl border border-[var(--ui-border)]/60 w-80 max-h-96 overflow-hidden" @click.stop>
-      <div class="px-4 py-3 border-b border-[var(--ui-border)]/60">
-        <h3 class="text-sm font-medium text-[var(--ui-body-color)]">Neuer Chat</h3>
+    <div class="bg-[var(--t-glass-surface)] rounded-lg shadow-xl border border-[var(--t-border)]/60 w-80 max-h-96 overflow-hidden" @click.stop>
+      <div class="px-4 py-3 border-b border-[var(--t-border)]/60">
+        <h3 class="text-sm font-medium text-[var(--t-text)]">Neuer Chat</h3>
       </div>
       <div class="overflow-y-auto max-h-72">
         <template x-for="member in members" :key="member.id">
           <button
             @click="$wire.openDm(member.id); showNewDm = false"
-            class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition"
+            class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--t-text)] hover:bg-white/5 transition"
           >
-            <div class="w-7 h-7 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[10px] font-semibold flex-shrink-0 overflow-hidden">
+            <div class="w-7 h-7 rounded-full bg-[var(--t-accent)]/15 text-[var(--t-accent)] flex items-center justify-center text-[10px] font-semibold flex-shrink-0 overflow-hidden">
               <template x-if="member.avatar">
                 <img :src="member.avatar" alt="" class="w-full h-full object-cover">
               </template>
@@ -1916,7 +1947,7 @@
           </button>
         </template>
         <template x-if="members.length === 0">
-          <div class="px-4 py-6 text-center text-xs text-[var(--ui-muted)]">Keine Team-Mitglieder gefunden</div>
+          <div class="px-4 py-6 text-center text-xs text-[var(--t-text-muted)]">Keine Team-Mitglieder gefunden</div>
         </template>
       </div>
     </div>
@@ -1932,26 +1963,26 @@
     @click.self="showNewChannel = false"
     @keydown.escape.window="showNewChannel = false"
   >
-    <div class="bg-[var(--ui-surface)] rounded-lg shadow-xl border border-[var(--ui-border)]/60 w-80 overflow-hidden" @click.stop>
-      <div class="px-4 py-3 border-b border-[var(--ui-border)]/60">
-        <h3 class="text-sm font-medium text-[var(--ui-body-color)]">Neuer Channel</h3>
+    <div class="bg-[var(--t-glass-surface)] rounded-lg shadow-xl border border-[var(--t-border)]/60 w-80 overflow-hidden" @click.stop>
+      <div class="px-4 py-3 border-b border-[var(--t-border)]/60">
+        <h3 class="text-sm font-medium text-[var(--t-text)]">Neuer Channel</h3>
       </div>
       <div class="px-4 py-3 space-y-3">
         <div>
-          <label class="block text-[10px] font-medium text-[var(--ui-muted)] uppercase tracking-wider mb-1">Name</label>
-          <input x-model="channelName" type="text" placeholder="z.B. general" class="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--ui-border)]/60 bg-transparent text-[var(--ui-body-color)] placeholder:text-[var(--ui-muted)]/50 focus:border-[var(--ui-primary)]/40 outline-none transition" @keydown.enter="if(channelName.trim()) { $wire.createChannel(channelName.trim(), channelDesc.trim() || null, null, selectedIds); showNewChannel = false; }">
+          <label class="block text-[10px] font-medium text-[var(--t-text-muted)] uppercase tracking-wider mb-1">Name</label>
+          <input x-model="channelName" type="text" placeholder="z.B. general" class="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--t-border)]/60 bg-transparent text-[var(--t-text)] placeholder:text-[var(--t-text-muted)]/50 focus:border-[var(--t-accent)]/40 outline-none transition" @keydown.enter="if(channelName.trim()) { $wire.createChannel(channelName.trim(), channelDesc.trim() || null, null, selectedIds); showNewChannel = false; }">
         </div>
         <div>
-          <label class="block text-[10px] font-medium text-[var(--ui-muted)] uppercase tracking-wider mb-1">Beschreibung (optional)</label>
-          <input x-model="channelDesc" type="text" placeholder="Worum geht es?" class="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--ui-border)]/60 bg-transparent text-[var(--ui-body-color)] placeholder:text-[var(--ui-muted)]/50 focus:border-[var(--ui-primary)]/40 outline-none transition">
+          <label class="block text-[10px] font-medium text-[var(--t-text-muted)] uppercase tracking-wider mb-1">Beschreibung (optional)</label>
+          <input x-model="channelDesc" type="text" placeholder="Worum geht es?" class="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--t-border)]/60 bg-transparent text-[var(--t-text)] placeholder:text-[var(--t-text-muted)]/50 focus:border-[var(--t-accent)]/40 outline-none transition">
         </div>
         <div x-show="members.length > 0">
-          <label class="block text-[10px] font-medium text-[var(--ui-muted)] uppercase tracking-wider mb-1">Mitglieder einladen</label>
-          <div class="max-h-36 overflow-y-auto rounded border border-[var(--ui-border)]/60">
+          <label class="block text-[10px] font-medium text-[var(--t-text-muted)] uppercase tracking-wider mb-1">Mitglieder einladen</label>
+          <div class="max-h-36 overflow-y-auto rounded border border-[var(--t-border)]/60">
             <template x-for="member in members" :key="member.id">
-              <label class="flex items-center gap-2.5 px-2.5 py-1.5 text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition cursor-pointer">
-                <input type="checkbox" :value="member.id" x-model.number="selectedIds" class="rounded border-[var(--ui-border)] text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]/30 w-3.5 h-3.5">
-                <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden">
+              <label class="flex items-center gap-2.5 px-2.5 py-1.5 text-sm text-[var(--t-text)] hover:bg-white/5 transition cursor-pointer">
+                <input type="checkbox" :value="member.id" x-model.number="selectedIds" class="rounded border-[var(--t-border)] text-[var(--t-accent)] focus:ring-[var(--t-accent)]/30 w-3.5 h-3.5">
+                <div class="w-5 h-5 rounded-full bg-[var(--t-accent)]/15 text-[var(--t-accent)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden">
                   <template x-if="member.avatar">
                     <img :src="member.avatar" alt="" class="w-full h-full object-cover">
                   </template>
@@ -1963,15 +1994,15 @@
               </label>
             </template>
           </div>
-          <div class="text-[10px] text-[var(--ui-muted)] mt-1" x-show="selectedIds.length > 0" x-text="selectedIds.length + ' ausgewählt'"></div>
+          <div class="text-[10px] text-[var(--t-text-muted)] mt-1" x-show="selectedIds.length > 0" x-text="selectedIds.length + ' ausgewählt'"></div>
         </div>
       </div>
-      <div class="px-4 py-3 border-t border-[var(--ui-border)]/60 flex justify-end gap-2">
-        <button @click="showNewChannel = false" class="text-xs px-3 py-1.5 rounded text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">Abbrechen</button>
+      <div class="px-4 py-3 border-t border-[var(--t-border)]/60 flex justify-end gap-2">
+        <button @click="showNewChannel = false" class="text-xs px-3 py-1.5 rounded text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition">Abbrechen</button>
         <button
           @click="if(channelName.trim()) { $wire.createChannel(channelName.trim(), channelDesc.trim() || null, null, selectedIds); showNewChannel = false; }"
           :disabled="!channelName.trim()"
-          :class="channelName.trim() ? 'bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary-hover)]' : 'bg-[var(--ui-muted)]/20 text-[var(--ui-muted)] cursor-not-allowed'"
+          :class="channelName.trim() ? 'bg-[var(--t-accent)] text-white hover:bg-[var(--t-accent)]/80' : 'bg-[var(--t-text-muted)]/20 text-[var(--t-text-muted)] cursor-not-allowed'"
           class="text-xs px-3 py-1.5 rounded transition"
         >Erstellen</button>
       </div>
@@ -2012,22 +2043,22 @@
     @click.self="showMembers = false"
     @keydown.escape.window="showMembers = false"
   >
-    <div class="bg-[var(--ui-surface)] rounded-lg shadow-xl border border-[var(--ui-border)]/60 w-80 max-h-[28rem] overflow-hidden flex flex-col" @click.stop>
-      <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex-shrink-0">
-        <h3 class="text-sm font-medium text-[var(--ui-body-color)]">Mitglieder</h3>
+    <div class="bg-[var(--t-glass-surface)] rounded-lg shadow-xl border border-[var(--t-border)]/60 w-80 max-h-[28rem] overflow-hidden flex flex-col" @click.stop>
+      <div class="px-4 py-3 border-b border-[var(--t-border)]/60 flex-shrink-0">
+        <h3 class="text-sm font-medium text-[var(--t-text)]">Mitglieder</h3>
       </div>
 
       <div class="flex-1 min-h-0 overflow-y-auto">
         {{-- Current members --}}
         <div class="px-2 py-2">
           <template x-if="loading">
-            <div class="px-2 py-4 text-center text-xs text-[var(--ui-muted)]">Laden…</div>
+            <div class="px-2 py-4 text-center text-xs text-[var(--t-text-muted)]">Laden…</div>
           </template>
           <template x-if="!loading">
             <div class="space-y-px">
               <template x-for="member in members" :key="member.id">
-                <div class="flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition">
-                  <div class="w-6 h-6 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden">
+                <div class="flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm text-[var(--t-text)] hover:bg-white/5 transition">
+                  <div class="w-6 h-6 rounded-full bg-[var(--t-accent)]/15 text-[var(--t-accent)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden">
                     <template x-if="member.avatar">
                       <img :src="member.avatar" alt="" class="w-full h-full object-cover">
                     </template>
@@ -2037,12 +2068,12 @@
                   </div>
                   <span x-text="member.name" class="flex-1 text-xs truncate"></span>
                   <template x-if="member.role === 'owner'">
-                    <span class="text-[9px] font-medium uppercase tracking-wider text-[var(--ui-muted)] px-1.5 py-0.5 rounded bg-[var(--ui-muted)]/10">Owner</span>
+                    <span class="text-[9px] font-medium uppercase tracking-wider text-[var(--t-text-muted)] px-1.5 py-0.5 rounded bg-[var(--t-text-muted)]/10">Owner</span>
                   </template>
                   <template x-if="member.role !== 'owner'">
                     <button
                       @click="remove(member.id)"
-                      class="text-[var(--ui-muted)] hover:text-red-500 transition p-0.5 rounded hover:bg-red-50"
+                      class="text-[var(--t-text-muted)] hover:text-red-500 transition p-0.5 rounded hover:bg-red-500/10"
                       title="Entfernen"
                     >
                       <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
@@ -2057,14 +2088,14 @@
         {{-- Add members --}}
         <template x-if="!loading && available.length > 0">
           <div class="px-2 pb-2">
-            <div class="px-2 py-1.5 text-[10px] font-medium text-[var(--ui-muted)] uppercase tracking-wider">Hinzufügen</div>
+            <div class="px-2 py-1.5 text-[10px] font-medium text-[var(--t-text-muted)] uppercase tracking-wider">Hinzufügen</div>
             <div class="space-y-px">
               <template x-for="user in available" :key="user.id">
                 <button
                   @click="add(user.id)"
-                  class="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition"
+                  class="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm text-[var(--t-text)] hover:bg-white/5 transition"
                 >
-                  <div class="w-6 h-6 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden">
+                  <div class="w-6 h-6 rounded-full bg-[var(--t-accent)]/15 text-[var(--t-accent)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden">
                     <template x-if="user.avatar">
                       <img :src="user.avatar" alt="" class="w-full h-full object-cover">
                     </template>
@@ -2073,7 +2104,7 @@
                     </template>
                   </div>
                   <span x-text="user.name" class="flex-1 text-xs truncate text-left"></span>
-                  <svg class="w-3.5 h-3.5 text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
+                  <svg class="w-3.5 h-3.5 text-[var(--t-text-muted)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
                 </button>
               </template>
             </div>
@@ -2081,8 +2112,8 @@
         </template>
       </div>
 
-      <div class="px-4 py-2.5 border-t border-[var(--ui-border)]/60 flex justify-end flex-shrink-0">
-        <button @click="showMembers = false" class="text-xs px-3 py-1.5 rounded text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">Schließen</button>
+      <div class="px-4 py-2.5 border-t border-[var(--t-border)]/60 flex justify-end flex-shrink-0">
+        <button @click="showMembers = false" class="text-xs px-3 py-1.5 rounded text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition">Schließen</button>
       </div>
     </div>
   </div>
@@ -2097,26 +2128,26 @@
     @click.self="showPins = false"
     @keydown.escape.window="showPins = false"
   >
-    <div class="bg-[var(--ui-surface)] rounded-lg shadow-xl border border-[var(--ui-border)]/60 w-96 max-h-[28rem] overflow-hidden flex flex-col" @click.stop>
-      <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex-shrink-0 flex items-center justify-between">
-        <h3 class="text-sm font-medium text-[var(--ui-body-color)]">Gepinnte Nachrichten</h3>
-        <button @click="showPins = false" class="text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">
+    <div class="bg-[var(--t-glass-surface)] rounded-lg shadow-xl border border-[var(--t-border)]/60 w-96 max-h-[28rem] overflow-hidden flex flex-col" @click.stop>
+      <div class="px-4 py-3 border-b border-[var(--t-border)]/60 flex-shrink-0 flex items-center justify-between">
+        <h3 class="text-sm font-medium text-[var(--t-text)]">Gepinnte Nachrichten</h3>
+        <button @click="showPins = false" class="text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition">
           <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
         </button>
       </div>
       <div class="flex-1 min-h-0 overflow-y-auto">
         <template x-if="loading">
-          <div class="px-4 py-6 text-center text-xs text-[var(--ui-muted)]">Laden…</div>
+          <div class="px-4 py-6 text-center text-xs text-[var(--t-text-muted)]">Laden…</div>
         </template>
         <template x-if="!loading && pins.length === 0">
-          <div class="px-4 py-6 text-center text-xs text-[var(--ui-muted)]">Keine gepinnten Nachrichten</div>
+          <div class="px-4 py-6 text-center text-xs text-[var(--t-text-muted)]">Keine gepinnten Nachrichten</div>
         </template>
         <template x-if="!loading && pins.length > 0">
           <div class="py-1">
             <template x-for="pin in pins" :key="pin.id">
-              <div class="px-4 py-2.5 hover:bg-[var(--ui-surface-hover)] transition group/pin">
+              <div class="px-4 py-2.5 hover:bg-white/5 transition group/pin">
                 <div class="flex items-start gap-2.5">
-                  <div class="w-6 h-6 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden mt-0.5">
+                  <div class="w-6 h-6 rounded-full bg-[var(--t-accent)]/15 text-[var(--t-accent)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden mt-0.5">
                     <template x-if="pin.user_avatar">
                       <img :src="pin.user_avatar" alt="" class="w-full h-full object-cover">
                     </template>
@@ -2126,8 +2157,8 @@
                   </div>
                   <div class="flex-1 min-w-0">
                     <div class="flex items-baseline gap-2">
-                      <span class="font-medium text-xs text-[var(--ui-body-color)]" x-text="pin.user_name"></span>
-                      <span class="text-[10px] text-[var(--ui-muted)]" x-text="pin.date + ' ' + pin.time"></span>
+                      <span class="font-medium text-xs text-[var(--t-text)]" x-text="pin.user_name"></span>
+                      <span class="text-[10px] text-[var(--t-text-muted)]" x-text="pin.date + ' ' + pin.time"></span>
                     </div>
                     <button
                       @click="
@@ -2137,19 +2168,19 @@
                           const el = document.getElementById('msg-' + msgId);
                           if(el) {
                             el.scrollIntoView({behavior:'smooth',block:'center'});
-                            el.classList.add('!bg-amber-100/30');
-                            setTimeout(() => el.classList.remove('!bg-amber-100/30'), 2000);
+                            el.classList.add('!bg-amber-500/15');
+                            setTimeout(() => el.classList.remove('!bg-amber-500/15'), 2000);
                           }
                         }, 100);
                       "
-                      class="text-xs text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] mt-0.5 text-left transition cursor-pointer"
+                      class="text-xs text-[var(--t-text)] hover:text-[var(--t-accent)] mt-0.5 text-left transition cursor-pointer"
                       x-text="pin.body_snippet"
                     ></button>
                     <div class="flex items-center gap-2 mt-1">
-                      <span class="text-[9px] text-[var(--ui-muted)]">Gepinnt von <span x-text="pin.pinned_by"></span> <span x-text="pin.pinned_at"></span></span>
+                      <span class="text-[9px] text-[var(--t-text-muted)]">Gepinnt von <span x-text="pin.pinned_by"></span> <span x-text="pin.pinned_at"></span></span>
                       <button
                         @click="$wire.unpinMessage(pin.message_id).then(() => { pins = pins.filter(p => p.id !== pin.id); })"
-                        class="text-[9px] text-[var(--ui-muted)] hover:text-red-500 transition opacity-0 group-hover/pin:opacity-100"
+                        class="text-[9px] text-[var(--t-text-muted)] hover:text-red-500 transition opacity-0 group-hover/pin:opacity-100"
                       >Entfernen</button>
                     </div>
                   </div>
@@ -2172,27 +2203,27 @@
     @click.self="showForward = false"
     @keydown.escape.window="showForward = false"
   >
-    <div class="bg-[var(--ui-surface)] rounded-lg shadow-xl border border-[var(--ui-border)]/60 w-80 max-h-96 overflow-hidden flex flex-col" @click.stop>
-      <div class="px-4 py-3 border-b border-[var(--ui-border)]/60 flex-shrink-0">
-        <h3 class="text-sm font-medium text-[var(--ui-body-color)]">Nachricht weiterleiten</h3>
-        <p class="text-[10px] text-[var(--ui-muted)] mt-0.5">Wähle einen Channel oder Chat</p>
+    <div class="bg-[var(--t-glass-surface)] rounded-lg shadow-xl border border-[var(--t-border)]/60 w-80 max-h-96 overflow-hidden flex flex-col" @click.stop>
+      <div class="px-4 py-3 border-b border-[var(--t-border)]/60 flex-shrink-0">
+        <h3 class="text-sm font-medium text-[var(--t-text)]">Nachricht weiterleiten</h3>
+        <p class="text-[10px] text-[var(--t-text-muted)] mt-0.5">Wähle einen Channel oder Chat</p>
       </div>
       <div class="flex-1 min-h-0 overflow-y-auto">
         <template x-if="loading">
-          <div class="px-4 py-6 text-center text-xs text-[var(--ui-muted)]">Laden…</div>
+          <div class="px-4 py-6 text-center text-xs text-[var(--t-text-muted)]">Laden…</div>
         </template>
         <template x-if="!loading && targets.length === 0">
-          <div class="px-4 py-6 text-center text-xs text-[var(--ui-muted)]">Keine Ziele verfügbar</div>
+          <div class="px-4 py-6 text-center text-xs text-[var(--t-text-muted)]">Keine Ziele verfügbar</div>
         </template>
         <template x-if="!loading && targets.length > 0">
           <div>
             <template x-for="target in targets" :key="target.id">
               <button
                 @click="$wire.forwardMessage(forwardMessageId, target.id); showForward = false"
-                class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-hover)] transition"
+                class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--t-text)] hover:bg-white/5 transition"
               >
                 <template x-if="target.type === 'dm'">
-                  <div class="w-6 h-6 rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden">
+                  <div class="w-6 h-6 rounded-full bg-[var(--t-accent)]/15 text-[var(--t-accent)] flex items-center justify-center text-[9px] font-semibold flex-shrink-0 overflow-hidden">
                     <template x-if="target.avatar">
                       <img :src="target.avatar" alt="" class="w-full h-full object-cover">
                     </template>
@@ -2202,17 +2233,17 @@
                   </div>
                 </template>
                 <template x-if="target.type !== 'dm'">
-                  <span class="text-[var(--ui-muted)] text-sm" x-text="target.icon || '#'"></span>
+                  <span class="text-[var(--t-text-muted)] text-sm" x-text="target.icon || '#'"></span>
                 </template>
                 <span x-text="target.name" class="flex-1 text-xs truncate text-left"></span>
-                <span class="text-[9px] text-[var(--ui-muted)] uppercase" x-text="target.type === 'dm' ? 'Chat' : target.type === 'channel' ? 'Channel' : 'Kontext'"></span>
+                <span class="text-[9px] text-[var(--t-text-muted)] uppercase" x-text="target.type === 'dm' ? 'Chat' : target.type === 'channel' ? 'Channel' : 'Kontext'"></span>
               </button>
             </template>
           </div>
         </template>
       </div>
-      <div class="px-4 py-2.5 border-t border-[var(--ui-border)]/60 flex justify-end flex-shrink-0">
-        <button @click="showForward = false" class="text-xs px-3 py-1.5 rounded text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition">Abbrechen</button>
+      <div class="px-4 py-2.5 border-t border-[var(--t-border)]/60 flex justify-end flex-shrink-0">
+        <button @click="showForward = false" class="text-xs px-3 py-1.5 rounded text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition">Abbrechen</button>
       </div>
     </div>
   </div>
@@ -2239,15 +2270,51 @@
         _startH: 0,
 
         toggleFullscreen() {
-          this.fullscreen = !this.fullscreen;
-          localStorage.setItem('terminal_fullscreen', this.fullscreen ? '1' : '0');
-          if (this.fullscreen) {
-            if (Alpine?.store('page') && !Alpine.store('page').terminalOpen) {
-              Alpine.store('page').terminalOpen = true;
-            }
-            document.body.style.overflow = 'hidden';
+          const el = this.$el.querySelector('[wire\\:key="terminal-slide"]');
+          if (!this.fullscreen && el) {
+            el.style.transform = 'scale(0.97)';
+            el.style.opacity = '0.8';
+            el.style.transition = 'transform 400ms cubic-bezier(0.34,1.56,0.64,1), opacity 400ms ease-out';
+            requestAnimationFrame(() => {
+              this.fullscreen = true;
+              localStorage.setItem('terminal_fullscreen', '1');
+              if (Alpine?.store('page') && !Alpine.store('page').terminalOpen) {
+                Alpine.store('page').terminalOpen = true;
+              }
+              document.body.style.overflow = 'hidden';
+              requestAnimationFrame(() => {
+                el.style.transform = 'scale(1)';
+                el.style.opacity = '1';
+                setTimeout(() => { el.style.transition = ''; el.style.transform = ''; el.style.opacity = ''; }, 420);
+              });
+            });
+          } else if (el) {
+            el.style.transform = 'scale(1)';
+            el.style.opacity = '1';
+            el.style.transition = 'transform 300ms ease-in, opacity 300ms ease-in';
+            requestAnimationFrame(() => {
+              el.style.transform = 'scale(0.97)';
+              el.style.opacity = '0.8';
+              setTimeout(() => {
+                this.fullscreen = false;
+                localStorage.setItem('terminal_fullscreen', '0');
+                document.body.style.overflow = '';
+                el.style.transition = '';
+                el.style.transform = '';
+                el.style.opacity = '';
+              }, 310);
+            });
           } else {
-            document.body.style.overflow = '';
+            this.fullscreen = !this.fullscreen;
+            localStorage.setItem('terminal_fullscreen', this.fullscreen ? '1' : '0');
+            if (this.fullscreen) {
+              if (Alpine?.store('page') && !Alpine.store('page').terminalOpen) {
+                Alpine.store('page').terminalOpen = true;
+              }
+              document.body.style.overflow = 'hidden';
+            } else {
+              document.body.style.overflow = '';
+            }
           }
           this.$nextTick(() => {
             const c = this.$refs.body;

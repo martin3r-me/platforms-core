@@ -760,22 +760,6 @@ class Terminal extends Component
     public function setAppTags(): void
     {
         $this->availableApps['tags'] = true;
-        $this->activeApp = 'tags';
-        $this->taggingTab = ($this->contextType && $this->contextId) ? 'tags' : 'overview';
-        $this->tagFilter = 'all';
-        $this->tagInput = '';
-        $this->tagSuggestions = [];
-        $this->showTagSuggestions = false;
-        $this->newTagColor = null;
-        $this->newTagIsPersonal = false;
-        $this->newContextColor = null;
-
-        if ($this->contextType && $this->contextId) {
-            $this->loadTags();
-            $this->loadColor();
-        }
-        $this->loadAllTags();
-        $this->loadAllColors();
     }
 
     /**
