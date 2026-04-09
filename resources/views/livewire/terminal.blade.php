@@ -88,11 +88,11 @@
         @endif
       </div>
 
-      {{-- App switcher tabs — visible when terminal is open --}}
-      <div x-show="open" x-cloak class="flex items-center gap-0.5 flex-shrink-0">
+      {{-- App switcher tabs — always visible, click opens terminal + switches app --}}
+      <div class="flex items-center gap-0.5 flex-shrink-0">
         <div class="w-px h-4 bg-[var(--t-border)] mr-0.5"></div>
         <button
-          @click.stop="$wire.set('activeApp', 'chat')"
+          @click.stop="$wire.set('activeApp', 'chat'); if(!open) toggle()"
           class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
           :class="$wire.activeApp === 'chat'
             ? 'bg-[var(--t-accent)]/20 text-[var(--t-accent)]'
@@ -104,7 +104,7 @@
           @if($this->availableApps['activity'])
             @php $activityCount = count($this->contextActivities); @endphp
             <button
-              @click.stop="$wire.set('activeApp', 'activity')"
+              @click.stop="$wire.set('activeApp', 'activity'); if(!open) toggle()"
               class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
               :class="$wire.activeApp === 'activity'
                 ? 'bg-[var(--t-accent)]/20 text-[var(--t-accent)]'
@@ -129,7 +129,7 @@
           @if($this->availableApps['files'])
             @php $filesCount = count($this->contextFiles); @endphp
             <button
-              @click.stop="$wire.set('activeApp', 'files')"
+              @click.stop="$wire.set('activeApp', 'files'); if(!open) toggle()"
               class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
               :class="$wire.activeApp === 'files'
                 ? 'bg-[var(--t-accent)]/20 text-[var(--t-accent)]'
@@ -153,7 +153,7 @@
           @endif
           @if($this->availableApps['tags'])
             <button
-              @click.stop="$wire.set('activeApp', 'tags')"
+              @click.stop="$wire.set('activeApp', 'tags'); if(!open) toggle()"
               class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
               :class="$wire.activeApp === 'tags'
                 ? 'bg-[var(--t-accent)]/20 text-[var(--t-accent)]'
