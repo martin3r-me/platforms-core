@@ -8,7 +8,7 @@
   x-on:keydown.escape.window="if(fullscreen) toggleFullscreen()"
   :class="[
     fullscreen ? 'fixed inset-0 z-[60]' : 'w-full flex-none relative',
-    resizing ? '' : 'transition-[height] duration-350 ease-[cubic-bezier(0.34,1.56,0.64,1)]'
+    resizing ? '' : 'transition-[height,min-height,max-height] duration-300 ease-[cubic-bezier(0.33,1,0.68,1)]'
   ]"
   x-bind:style="fullscreen
     ? 'height:100vh;min-height:100vh;max-height:100vh'
@@ -29,10 +29,10 @@
       --t-accent: var(--ui-primary);
       --t-glow: rgba(var(--ui-primary-rgb), 0.15);
       --t-unread-glow: rgba(244,63,94,0.3);
-      /* Gradient palette for sidebar + status bar */
-      --t-grad-from: #0c1929;
-      --t-grad-via: #1a1836;
-      --t-grad-to: #1f1230;
+      /* Slack-style solid sidebar */
+      --t-sidebar: #1a1d21;
+      --t-sidebar-hover: #26292d;
+      --t-sidebar-active: #1164a3;
     }
     /* Light scope — remaps terminal vars to platform light theme for content area + modals */
     .terminal-light {
@@ -57,19 +57,7 @@
     .terminal-light .border-white\/5,
     .terminal-light .border-white\/10 { border-color: rgba(0,0,0,0.06) !important; }
     .terminal-light .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(0,0,0,0.06) !important; }
-    /* Status bar gradient shimmer */
-    .terminal-statusbar-grad {
-      position: relative;
-    }
-    .terminal-statusbar-grad::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(90deg, rgba(56,189,248,0.04) 0%, rgba(139,92,246,0.05) 40%, rgba(236,72,153,0.04) 100%);
-      pointer-events: none;
-    }
     @keyframes t-spring-in { 0% { transform: translateY(16px); opacity: 0.5; } 60% { transform: translateY(-4px); opacity: 1; } 100% { transform: translateY(0); } }
-    @keyframes t-glow-pulse { 0%,100% { box-shadow: 0 -2px 20px var(--t-unread-glow); } 50% { box-shadow: 0 -4px 35px var(--t-unread-glow); } }
     @keyframes t-badge-pop { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.05ms !important; } }
   </style>
@@ -87,12 +75,12 @@
 
   <!-- Fullscreen backdrop -->
   <div x-show="fullscreen" x-cloak x-transition:enter="transition-opacity duration-300" x-transition:leave="transition-opacity duration-200"
-    class="fixed inset-0 bg-black/10 z-[59]" @click="toggleFullscreen()"></div>
+    class="fixed inset-0 bg-black/40 z-[59]" @click="toggleFullscreen()"></div>
 
   <!-- Single terminal container — status bar always peeks out -->
   <div
     class="w-full h-full overflow-hidden flex flex-col"
-    :class="fullscreen ? 'bg-[var(--t-glass)] backdrop-blur-2xl shadow-2xl' : 'border-t border-[var(--t-border-bright)] shadow-[0_-4px_30px_rgba(0,0,0,0.15)] bg-[var(--t-glass)] backdrop-blur-2xl'"
+    :class="fullscreen ? 'bg-[var(--t-sidebar)] shadow-2xl' : 'border-t border-[var(--t-border-bright)] shadow-[0_-4px_30px_rgba(0,0,0,0.15)] bg-[var(--t-sidebar)]'"
     wire:key="terminal-slide"
   >
     <!-- Resize handle — only visible when open, hidden in fullscreen -->
@@ -106,15 +94,8 @@
     </div>
 
     <!-- Status bar — always visible (42px), top bar in fullscreen -->
-    <div class="terminal-statusbar-grad relative flex-shrink-0" wire:key="terminal-statusbar"
-         style="background: linear-gradient(90deg, var(--t-grad-from) 0%, var(--t-grad-via) 50%, var(--t-grad-to) 100%)"
+    <div class="relative flex-shrink-0 bg-[var(--t-sidebar)] border-b border-white/[0.08]" wire:key="terminal-statusbar"
     >
-      {{-- Accent gradient line --}}
-      <div class="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-cyan-400/30 via-violet-400/30 to-pink-400/30"></div>
-      {{-- Unread glow --}}
-      @if($totalUnread > 0)
-        <div class="absolute inset-0 animate-[t-glow-pulse_3s_ease-in-out_infinite] pointer-events-none rounded-t"></div>
-      @endif
     <div
       @click.self="if(!fullscreen) toggle()"
       class="relative flex-shrink-0 px-4 flex items-center gap-1.5 overflow-x-auto scrollbar-none select-none group/bar"
@@ -132,7 +113,7 @@
       <div class="flex items-center gap-0.5 flex-shrink-0">
         <div class="w-px h-4 bg-[var(--t-border)] mr-0.5"></div>
         <button
-          @click.stop="$wire.set('activeApp', 'chat'); if(!open) toggle()"
+          @click.stop="$wire.activeApp = 'chat'; if(!open) toggle()"
           class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
           :class="$wire.activeApp === 'chat'
             ? 'bg-white/15 text-white'
@@ -144,7 +125,7 @@
           @if($this->availableApps['activity'])
             @php $activityCount = count($this->contextActivities); @endphp
             <button
-              @click.stop="$wire.set('activeApp', 'activity'); if(!open) toggle()"
+              @click.stop="$wire.activeApp = 'activity'; if(!open) toggle()"
               class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
               :class="$wire.activeApp === 'activity'
                 ? 'bg-white/15 text-white'
@@ -169,7 +150,7 @@
           @if($this->availableApps['files'])
             @php $filesCount = count($this->contextFiles); @endphp
             <button
-              @click.stop="$wire.set('activeApp', 'files'); if(!open) toggle()"
+              @click.stop="$wire.activeApp = 'files'; if(!open) toggle()"
               class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
               :class="$wire.activeApp === 'files'
                 ? 'bg-white/15 text-white'
@@ -193,7 +174,7 @@
           @endif
           @if($this->availableApps['tags'])
             <button
-              @click.stop="$wire.set('activeApp', 'tags'); if(!open) toggle()"
+              @click.stop="$wire.activeApp = 'tags'; if(!open) toggle()"
               class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
               :class="$wire.activeApp === 'tags'
                 ? 'bg-white/15 text-white'
@@ -289,8 +270,7 @@
          wire:key="terminal-content">
 
       <!-- Sidebar (resizable) -->
-      <div class="flex-shrink-0 overflow-y-auto overscroll-contain py-2 flex flex-col relative border-r border-white/[0.06]"
-           style="background: linear-gradient(165deg, var(--t-grad-from) 0%, var(--t-grad-via) 55%, var(--t-grad-to) 100%)"
+      <div class="flex-shrink-0 overflow-y-auto overscroll-contain py-2 flex flex-col relative border-r border-white/[0.06] bg-[var(--t-sidebar)]"
            :class="resizingSidebar ? '' : 'transition-[width] duration-0'"
            :style="'width:' + sidebarWidth + 'px'"
            wire:key="terminal-sidebar"
@@ -315,11 +295,6 @@
              },
            }"
       >
-        <!-- Sidebar ambient glow -->
-        <div class="sticky top-0 left-0 w-full h-0 pointer-events-none z-0" aria-hidden="true">
-          <div class="absolute -top-16 -left-8 w-32 h-32 rounded-full opacity-100" style="background: radial-gradient(circle, rgba(56,189,248,0.10) 0%, transparent 70%)"></div>
-          <div class="absolute top-48 -right-6 w-28 h-28 rounded-full opacity-100" style="background: radial-gradient(circle, rgba(236,72,153,0.08) 0%, transparent 70%)"></div>
-        </div>
         <!-- Sidebar resize handle -->
         <div
           @mousedown.prevent="startSidebarResize($event)"
@@ -2308,9 +2283,9 @@
         toggleFullscreen() {
           const el = this.$el.querySelector('[wire\\:key="terminal-slide"]');
           if (!this.fullscreen && el) {
-            el.style.transform = 'scale(0.97)';
-            el.style.opacity = '0.8';
-            el.style.transition = 'transform 400ms cubic-bezier(0.34,1.56,0.64,1), opacity 400ms ease-out';
+            el.style.transform = 'scale(0.98)';
+            el.style.opacity = '0.85';
+            el.style.transition = 'transform 300ms cubic-bezier(0.33,1,0.68,1), opacity 300ms ease-out';
             requestAnimationFrame(() => {
               this.fullscreen = true;
               localStorage.setItem('terminal_fullscreen', '1');
@@ -2321,16 +2296,16 @@
               requestAnimationFrame(() => {
                 el.style.transform = 'scale(1)';
                 el.style.opacity = '1';
-                setTimeout(() => { el.style.transition = ''; el.style.transform = ''; el.style.opacity = ''; }, 420);
+                setTimeout(() => { el.style.transition = ''; el.style.transform = ''; el.style.opacity = ''; }, 320);
               });
             });
           } else if (el) {
             el.style.transform = 'scale(1)';
             el.style.opacity = '1';
-            el.style.transition = 'transform 300ms ease-in, opacity 300ms ease-in';
+            el.style.transition = 'transform 250ms ease-in, opacity 250ms ease-in';
             requestAnimationFrame(() => {
-              el.style.transform = 'scale(0.97)';
-              el.style.opacity = '0.8';
+              el.style.transform = 'scale(0.98) translateY(8px)';
+              el.style.opacity = '0.85';
               setTimeout(() => {
                 this.fullscreen = false;
                 localStorage.setItem('terminal_fullscreen', '0');
@@ -2338,7 +2313,7 @@
                 el.style.transition = '';
                 el.style.transform = '';
                 el.style.opacity = '';
-              }, 310);
+              }, 260);
             });
           } else {
             this.fullscreen = !this.fullscreen;
