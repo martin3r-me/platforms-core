@@ -5,9 +5,14 @@
   x-on:toggle-terminal-open.window="if(!open) toggle()"
   x-on:scroll-to-message.window="$nextTick(() => { const el = document.getElementById('msg-' + $event.detail.messageId); if(el) { el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('!bg-amber-100/30'); setTimeout(() => el.classList.remove('!bg-amber-100/30'), 2000); } })"
   x-on:terminal-typing="sendTypingWhisper($wire.channelId)"
-  class="w-full flex-none relative"
-  :class="resizing ? '' : 'transition-[height] duration-200 ease-out'"
-  x-bind:style="open ? 'height:' + panelHeight + 'px;min-height:' + panelHeight + 'px;max-height:' + panelHeight + 'px' : 'height:38px;min-height:38px;max-height:38px'"
+  x-on:keydown.escape.window="if(fullscreen) toggleFullscreen()"
+  :class="[
+    fullscreen ? 'fixed inset-0 z-[60]' : 'w-full flex-none relative',
+    resizing ? '' : 'transition-[height] duration-200 ease-out'
+  ]"
+  x-bind:style="fullscreen
+    ? 'height:100vh;min-height:100vh;max-height:100vh'
+    : (open ? 'height:' + panelHeight + 'px;min-height:' + panelHeight + 'px;max-height:' + panelHeight + 'px' : 'height:38px;min-height:38px;max-height:38px')"
   wire:ignore.self
   wire:key="terminal-root"
 >
@@ -24,12 +29,13 @@
 
   <!-- Single terminal container — status bar always peeks out -->
   <div
-    class="w-full h-full border-t-2 border-[var(--ui-border)] bg-[var(--ui-surface)] overflow-hidden flex flex-col"
+    class="w-full h-full overflow-hidden flex flex-col"
+    :class="fullscreen ? 'bg-[var(--ui-surface)]' : 'border-t-2 border-[var(--ui-border)] bg-[var(--ui-surface)]'"
     wire:key="terminal-slide"
   >
-    <!-- Resize handle — only visible when open -->
+    <!-- Resize handle — only visible when open, hidden in fullscreen -->
     <div
-      x-show="open"
+      x-show="open && !fullscreen"
       @mousedown.prevent="startResize($event)"
       class="h-1 flex-shrink-0 cursor-ns-resize group/resize relative -mb-1 z-10"
     >
@@ -37,10 +43,11 @@
       <div class="absolute left-1/2 -translate-x-1/2 top-0 w-8 h-1 rounded-full bg-transparent group-hover/resize:bg-[var(--ui-primary)]/30 transition"></div>
     </div>
 
-    <!-- Status bar — always visible (36px) -->
+    <!-- Status bar — always visible (36px), top bar in fullscreen -->
     <div
-      @click="toggle()"
-      class="h-9 flex-shrink-0 px-4 flex items-center gap-1.5 overflow-x-auto scrollbar-none select-none group/bar cursor-pointer"
+      @click="if(!fullscreen) toggle()"
+      class="flex-shrink-0 px-4 flex items-center gap-1.5 overflow-x-auto scrollbar-none select-none group/bar"
+      :class="fullscreen ? 'h-12 border-b border-[var(--ui-border)]/40' : 'h-9 cursor-pointer'"
       wire:key="terminal-statusbar"
     >
       {{-- Terminal icon + label + unread badge — click toggles open/close --}}
@@ -97,8 +104,22 @@
         </button>
       @endif
 
-      {{-- Chevron — click toggles open/close --}}
-      <button @click.stop="toggle()" class="ml-auto flex-shrink-0 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition cursor-pointer p-1 -mr-1 rounded hover:bg-[var(--ui-surface-hover)]">
+      {{-- Fullscreen toggle --}}
+      <button
+        @click.stop="toggleFullscreen()"
+        class="ml-auto flex-shrink-0 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition cursor-pointer p-1 rounded hover:bg-[var(--ui-surface-hover)]"
+        :title="fullscreen ? 'Vollbild verlassen (Esc)' : 'Vollbild'"
+      >
+        <svg x-show="!fullscreen" x-cloak class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"/>
+        </svg>
+        <svg x-show="fullscreen" x-cloak class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9 3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5 5.25 5.25"/>
+        </svg>
+      </button>
+
+      {{-- Chevron — collapse/expand (hidden in fullscreen) --}}
+      <button x-show="!fullscreen" @click.stop="toggle()" class="flex-shrink-0 text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] transition cursor-pointer p-1 -mr-1 rounded hover:bg-[var(--ui-surface-hover)]">
         <svg class="w-3 h-3 transition-transform duration-200" :class="open ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clip-rule="evenodd" />
         </svg>
@@ -109,10 +130,15 @@
     <div class="flex-1 min-h-0 flex"
          wire:key="terminal-content">
 
-      <!-- Sidebar (resizable) -->
-      <div class="flex-shrink-0 border-r border-[var(--ui-border)]/60 overflow-y-auto overscroll-contain py-2 flex flex-col relative"
-           :style="'width: ' + sidebarWidth + 'px'"
-           :class="resizingSidebar ? '' : 'transition-[width] duration-0'"
+      <!-- Sidebar (resizable, dark in fullscreen) -->
+      <div class="flex-shrink-0 overflow-y-auto overscroll-contain py-2 flex flex-col relative"
+           :class="[
+             resizingSidebar ? '' : 'transition-[width] duration-0',
+             fullscreen
+               ? 'border-r border-slate-700/60'
+               : 'border-r border-[var(--ui-border)]/60'
+           ]"
+           :style="'width:' + sidebarWidth + 'px;' + (fullscreen ? '--ui-surface:#0f172a;--ui-body-color:#e2e8f0;--ui-muted:#94a3b8;--ui-border:#334155;--ui-surface-hover:#1e293b;--ui-primary-5:rgba(99,102,241,0.1);--ui-primary-10:rgba(99,102,241,0.15);background-color:#0f172a;color:#e2e8f0;' : '')"
            wire:key="terminal-sidebar"
            x-data="{
              searchQuery: '',
@@ -382,7 +408,8 @@
 
         @if($this->activeChannel)
           <!-- Chat Header -->
-          <div class="h-11 px-4 flex items-center gap-2.5 text-xs border-b border-[var(--ui-border)]/60 flex-shrink-0">
+          <div class="px-4 flex items-center gap-2.5 border-b border-[var(--ui-border)]/60 flex-shrink-0"
+               :class="fullscreen ? 'h-14 text-sm' : 'h-11 text-xs'">
             @if($this->activeChannel['type'] === 'dm')
               @php
                 $dmOther = collect($this->activeChannel['members'])->first(fn($m) => $m['id'] !== auth()->id());
@@ -529,9 +556,9 @@
           </div>
 
           <!-- Messages -->
-          <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain text-[13px]" x-ref="body" wire:key="terminal-messages-{{ $channelId }}"
+          <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain" :class="fullscreen ? 'text-[14px]' : 'text-[13px]'" x-ref="body" wire:key="terminal-messages-{{ $channelId }}"
                x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)">
-            <div class="px-4 py-2">
+            <div class="py-2" :class="fullscreen ? 'px-6' : 'px-4'">
               @php $lastDate = null; $lastUserId = null; $lastTime = null; @endphp
               @forelse($this->messages as $msg)
                 @php
@@ -815,6 +842,7 @@
           <div wire:key="terminal-editor-{{ $channelId }}"
                wire:ignore
                class="border-t border-[var(--ui-border)]/60 flex-shrink-0"
+               :class="fullscreen ? 'px-2' : ''"
                x-data="{
                  ...tiptapEditor({
                    placeholder: '{{ $this->activeChannel['type'] === 'dm' ? 'Nachricht an ' . e($this->activeChannel['name']) . ' …' : 'Nachricht in #' . e($this->activeChannel['name'] ?? 'Kontext') . ' schreiben …' }}',
@@ -966,7 +994,7 @@
     x-on:terminal-show-new-dm.window="showNewDm = true; $wire.getTeamMembers().then(r => members = r)"
     x-show="showNewDm"
     x-cloak
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+    class="fixed inset-0 z-[70] flex items-center justify-center bg-black/30"
     @click.self="showNewDm = false"
     @keydown.escape.window="showNewDm = false"
   >
@@ -1004,7 +1032,7 @@
     x-on:terminal-show-new-channel.window="showNewChannel = true; channelName = ''; channelDesc = ''; selectedIds = []; $wire.getTeamMembers().then(r => members = r)"
     x-show="showNewChannel"
     x-cloak
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+    class="fixed inset-0 z-[70] flex items-center justify-center bg-black/30"
     @click.self="showNewChannel = false"
     @keydown.escape.window="showNewChannel = false"
   >
@@ -1084,7 +1112,7 @@
     x-on:terminal-show-members.window="showMembers = true; load()"
     x-show="showMembers"
     x-cloak
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+    class="fixed inset-0 z-[70] flex items-center justify-center bg-black/30"
     @click.self="showMembers = false"
     @keydown.escape.window="showMembers = false"
   >
@@ -1169,7 +1197,7 @@
     x-on:terminal-show-pins.window="showPins = true; loading = true; $wire.getPinnedMessages().then(r => { pins = r; loading = false; })"
     x-show="showPins"
     x-cloak
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+    class="fixed inset-0 z-[70] flex items-center justify-center bg-black/30"
     @click.self="showPins = false"
     @keydown.escape.window="showPins = false"
   >
@@ -1244,7 +1272,7 @@
     x-on:terminal-show-forward.window="showForward = true; forwardMessageId = $event.detail.messageId; loading = true; $wire.getForwardTargets().then(r => { targets = r; loading = false; })"
     x-show="showForward"
     x-cloak
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+    class="fixed inset-0 z-[70] flex items-center justify-center bg-black/30"
     @click.self="showForward = false"
     @keydown.escape.window="showForward = false"
   >
@@ -1307,11 +1335,29 @@
       return {
         panelHeight: parseInt(localStorage.getItem(STORAGE_KEY)) || DEFAULT_HEIGHT,
         sidebarWidth: parseInt(localStorage.getItem(SIDEBAR_STORAGE_KEY)) || DEFAULT_SIDEBAR,
+        fullscreen: localStorage.getItem('terminal_fullscreen') === '1',
         resizing: false,
         resizingSidebar: false,
         typingUsers: {},
         _startY: 0,
         _startH: 0,
+
+        toggleFullscreen() {
+          this.fullscreen = !this.fullscreen;
+          localStorage.setItem('terminal_fullscreen', this.fullscreen ? '1' : '0');
+          if (this.fullscreen) {
+            if (Alpine?.store('page') && !Alpine.store('page').terminalOpen) {
+              Alpine.store('page').terminalOpen = true;
+            }
+            document.body.style.overflow = 'hidden';
+          } else {
+            document.body.style.overflow = '';
+          }
+          this.$nextTick(() => {
+            const c = this.$refs.body;
+            if (c) c.scrollTop = c.scrollHeight;
+          });
+        },
 
         get typingDisplay() {
           const names = Object.values(this.typingUsers).map(u => u.name);
@@ -1421,6 +1467,14 @@
           // Clamp stored sidebar width
           if (this.sidebarWidth > MAX_SIDEBAR) this.sidebarWidth = MAX_SIDEBAR;
           if (this.sidebarWidth < MIN_SIDEBAR) this.sidebarWidth = DEFAULT_SIDEBAR;
+
+          // Restore fullscreen body lock
+          if (this.fullscreen) {
+            document.body.style.overflow = 'hidden';
+            if (Alpine?.store('page') && !Alpine.store('page').terminalOpen) {
+              Alpine.store('page').terminalOpen = true;
+            }
+          }
 
           const scrollBottom = () => {
             this.$nextTick(() => {
