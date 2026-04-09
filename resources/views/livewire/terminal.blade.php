@@ -75,11 +75,11 @@
 
   <!-- Fullscreen backdrop -->
   <div x-show="fullscreen" x-cloak x-transition:enter="transition-opacity duration-300" x-transition:leave="transition-opacity duration-200"
-    class="fixed inset-0 bg-black/40 z-[59]" @click="toggleFullscreen()"></div>
+    class="fixed inset-0 bg-black/10" @click="toggleFullscreen()"></div>
 
   <!-- Single terminal container — status bar always peeks out -->
   <div
-    class="w-full h-full overflow-hidden flex flex-col"
+    class="w-full h-full overflow-hidden flex flex-col relative z-[1]"
     :class="fullscreen ? 'bg-[var(--t-sidebar)] shadow-2xl' : 'border-t border-[var(--t-border-bright)] shadow-[0_-4px_30px_rgba(0,0,0,0.15)] bg-[var(--t-sidebar)]'"
     wire:key="terminal-slide"
   >
@@ -113,7 +113,7 @@
       <div class="flex items-center gap-0.5 flex-shrink-0">
         <div class="w-px h-4 bg-[var(--t-border)] mr-0.5"></div>
         <button
-          @click.stop="$wire.activeApp = 'chat'; if(!open) toggle()"
+          @click.stop="$wire.set('activeApp', 'chat'); if(!open) toggle()"
           class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
           :class="$wire.activeApp === 'chat'
             ? 'bg-white/15 text-white'
@@ -125,7 +125,7 @@
           @if($this->availableApps['activity'])
             @php $activityCount = count($this->contextActivities); @endphp
             <button
-              @click.stop="$wire.activeApp = 'activity'; if(!open) toggle()"
+              @click.stop="$wire.set('activeApp', 'activity'); if(!open) toggle()"
               class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
               :class="$wire.activeApp === 'activity'
                 ? 'bg-white/15 text-white'
@@ -150,7 +150,7 @@
           @if($this->availableApps['files'])
             @php $filesCount = count($this->contextFiles); @endphp
             <button
-              @click.stop="$wire.activeApp = 'files'; if(!open) toggle()"
+              @click.stop="$wire.set('activeApp', 'files'); if(!open) toggle()"
               class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
               :class="$wire.activeApp === 'files'
                 ? 'bg-white/15 text-white'
@@ -174,7 +174,7 @@
           @endif
           @if($this->availableApps['tags'])
             <button
-              @click.stop="$wire.activeApp = 'tags'; if(!open) toggle()"
+              @click.stop="$wire.set('activeApp', 'tags'); if(!open) toggle()"
               class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
               :class="$wire.activeApp === 'tags'
                 ? 'bg-white/15 text-white'
