@@ -1373,8 +1373,9 @@
                 <div id="msg-{{ $msg['id'] }}" class="group relative {{ $isNewGroup ? 'mt-3 first:mt-0' : 'mt-px' }} -mx-4 px-4 py-0.5 hover:bg-white/[0.04] transition-colors" wire:key="msg-{{ $msg['id'] }}">
 
                   {{-- Hover action bar --}}
-                  <div class="absolute -top-3 right-5 hidden group-hover:flex items-center gap-px bg-[var(--t-glass-surface)] border border-[var(--t-border)]/60 rounded-md shadow-sm z-10"
-                       x-data="{ showMore: false, showEmoji: false, showReminder: false, copied: false }">
+                  <div class="absolute -top-3 right-5 items-center gap-px bg-[var(--t-glass-surface)] border border-[var(--t-border)]/60 rounded-md shadow-sm z-10"
+                       x-data="{ showMore: false, showEmoji: false, showReminder: false, copied: false }"
+                       :class="(showMore || showEmoji) ? 'flex' : 'hidden group-hover:flex'"
 
                     {{-- Emoji Picker Button --}}
                     <div class="relative">
