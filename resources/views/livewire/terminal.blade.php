@@ -29,6 +29,10 @@
       --t-accent: var(--ui-primary);
       --t-glow: rgba(var(--ui-primary-rgb), 0.15);
       --t-unread-glow: rgba(244,63,94,0.3);
+      /* Gradient palette for sidebar + status bar */
+      --t-grad-from: #0c1929;
+      --t-grad-via: #1a1836;
+      --t-grad-to: #1f1230;
     }
     /* Light scope — remaps terminal vars to platform light theme for content area + modals */
     .terminal-light {
@@ -53,6 +57,17 @@
     .terminal-light .border-white\/5,
     .terminal-light .border-white\/10 { border-color: rgba(0,0,0,0.06) !important; }
     .terminal-light .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(0,0,0,0.06) !important; }
+    /* Status bar gradient shimmer */
+    .terminal-statusbar-grad {
+      position: relative;
+    }
+    .terminal-statusbar-grad::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(56,189,248,0.04) 0%, rgba(139,92,246,0.05) 40%, rgba(236,72,153,0.04) 100%);
+      pointer-events: none;
+    }
     @keyframes t-spring-in { 0% { transform: translateY(16px); opacity: 0.5; } 60% { transform: translateY(-4px); opacity: 1; } 100% { transform: translateY(0); } }
     @keyframes t-glow-pulse { 0%,100% { box-shadow: 0 -2px 20px var(--t-unread-glow); } 50% { box-shadow: 0 -4px 35px var(--t-unread-glow); } }
     @keyframes t-badge-pop { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
@@ -91,9 +106,11 @@
     </div>
 
     <!-- Status bar — always visible (42px), top bar in fullscreen -->
-    <div class="relative flex-shrink-0" wire:key="terminal-statusbar">
+    <div class="terminal-statusbar-grad relative flex-shrink-0" wire:key="terminal-statusbar"
+         style="background: linear-gradient(90deg, var(--t-grad-from) 0%, var(--t-grad-via) 50%, var(--t-grad-to) 100%)"
+    >
       {{-- Accent gradient line --}}
-      <div class="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--t-accent)]/40 to-transparent"></div>
+      <div class="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-cyan-400/30 via-violet-400/30 to-pink-400/30"></div>
       {{-- Unread glow --}}
       @if($totalUnread > 0)
         <div class="absolute inset-0 animate-[t-glow-pulse_3s_ease-in-out_infinite] pointer-events-none rounded-t"></div>
@@ -272,7 +289,8 @@
          wire:key="terminal-content">
 
       <!-- Sidebar (resizable) -->
-      <div class="flex-shrink-0 overflow-y-auto overscroll-contain py-2 flex flex-col relative border-r border-[var(--t-border)]"
+      <div class="flex-shrink-0 overflow-y-auto overscroll-contain py-2 flex flex-col relative border-r border-white/[0.06]"
+           style="background: linear-gradient(165deg, var(--t-grad-from) 0%, var(--t-grad-via) 55%, var(--t-grad-to) 100%)"
            :class="resizingSidebar ? '' : 'transition-[width] duration-0'"
            :style="'width:' + sidebarWidth + 'px'"
            wire:key="terminal-sidebar"
@@ -297,6 +315,11 @@
              },
            }"
       >
+        <!-- Sidebar ambient glow -->
+        <div class="sticky top-0 left-0 w-full h-0 pointer-events-none z-0" aria-hidden="true">
+          <div class="absolute -top-16 -left-8 w-32 h-32 rounded-full opacity-100" style="background: radial-gradient(circle, rgba(56,189,248,0.10) 0%, transparent 70%)"></div>
+          <div class="absolute top-48 -right-6 w-28 h-28 rounded-full opacity-100" style="background: radial-gradient(circle, rgba(236,72,153,0.08) 0%, transparent 70%)"></div>
+        </div>
         <!-- Sidebar resize handle -->
         <div
           @mousedown.prevent="startSidebarResize($event)"
