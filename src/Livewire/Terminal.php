@@ -40,6 +40,7 @@ class Terminal extends Component
     public string $activeApp = 'chat';
     public array $availableApps = ['chat' => true, 'activity' => false, 'files' => false];
     public string $activityFilter = 'all'; // all | manual | system
+    public string $filesFilter = 'all'; // all | images | documents
 
     // ── Lifecycle ──────────────────────────────────────────────
 
@@ -161,6 +162,16 @@ class Terminal extends Component
     public function setAppActivity(): void
     {
         $this->availableApps['activity'] = true;
+    }
+
+    /**
+     * Enable the Files app tab via dispatch.
+     * Modules fire dispatch('terminal:app:files') to unlock the Files tab.
+     */
+    #[On('terminal:app:files')]
+    public function setAppFiles(): void
+    {
+        $this->availableApps['files'] = true;
     }
 
     /**
@@ -464,6 +475,97 @@ class Terminal extends Component
                 ];
             })
             ->toArray();
+    }
+
+    /**
+     * Load files for the context entity (Browse in Files app).
+     */
+    #[Computed]
+    public function contextFiles(): array
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            return [];
+        }
+
+        return ContextFile::where('context_type', $this->contextType)
+            ->where('context_id', $this->contextId)
+            ->with(['variants', 'user'])
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($file) {
+                return [
+                    'id' => $file->id,
+                    'token' => $file->token,
+                    'original_name' => $file->original_name,
+                    'mime_type' => $file->mime_type,
+                    'file_size' => $file->file_size,
+                    'url' => $file->url,
+                    'download_url' => $file->download_url,
+                    'is_image' => $file->isImage(),
+                    'thumbnail' => $file->variants()->where('variant_type', 'thumbnail_4_3')->first()?->url
+                        ?? $file->variants()->where('variant_type', 'like', 'thumbnail_%')->first()?->url
+                        ?? null,
+                    'created_at' => $file->created_at->diffForHumans(),
+                    'uploaded_by' => $file->user?->name ?? 'Unbekannt',
+                ];
+            })
+            ->toArray();
+    }
+
+    /**
+     * Upload files to the current context (Files app).
+     */
+    public function uploadContextFiles(): void
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            return;
+        }
+
+        if (empty($this->pendingFiles)) {
+            return;
+        }
+
+        $service = app(ContextFileService::class);
+
+        foreach ($this->pendingFiles as $file) {
+            try {
+                $service->uploadForContext(
+                    $file,
+                    $this->contextType,
+                    $this->contextId,
+                    [
+                        'keep_original' => false,
+                        'generate_variants' => true,
+                    ]
+                );
+            } catch (\Exception $e) {
+                // Continue with remaining files
+            }
+        }
+
+        $this->pendingFiles = [];
+        unset($this->contextFiles);
+    }
+
+    /**
+     * Delete a context file (Files app).
+     */
+    public function deleteContextFile(int $fileId): void
+    {
+        $teamId = $this->teamId();
+        if (! $teamId) {
+            return;
+        }
+
+        $service = app(ContextFileService::class);
+
+        try {
+            $service->delete($fileId, $teamId);
+        } catch (\Exception $e) {
+            // Silently fail
+        }
+
+        unset($this->contextFiles);
     }
 
     /**

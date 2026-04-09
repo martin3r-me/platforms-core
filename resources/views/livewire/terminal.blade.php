@@ -96,14 +96,31 @@
               <span class="hidden sm:inline">Aktivitäten</span>
             </button>
           @endif
-          <button
-            @click.stop
-            class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--ui-muted)]/40 cursor-not-allowed"
-            title="Dateien — kommt bald"
-          >
-            <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13"/></svg>
-            <span class="hidden sm:inline">Dateien</span>
-          </button>
+          @if($this->availableApps['files'])
+            @php $filesCount = count($this->contextFiles); @endphp
+            <button
+              @click.stop="$wire.set('activeApp', 'files')"
+              class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
+              :class="$wire.activeApp === 'files'
+                ? 'bg-[var(--ui-primary-10)] text-[var(--ui-primary)]'
+                : 'text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)]'"
+            >
+              <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13"/></svg>
+              <span class="hidden sm:inline">Dateien</span>
+              @if($filesCount > 0)
+                <span class="min-w-[14px] h-[14px] px-0.5 rounded-full bg-[var(--ui-muted)]/15 text-[9px] font-bold flex items-center justify-center">{{ $filesCount }}</span>
+              @endif
+            </button>
+          @else
+            <button
+              @click.stop
+              class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--ui-muted)]/40 cursor-not-allowed"
+              title="Dateien — nur bei Kontext verfügbar"
+            >
+              <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13"/></svg>
+              <span class="hidden sm:inline">Dateien</span>
+            </button>
+          @endif
         <div class="w-px h-4 bg-[var(--ui-border)]/40 ml-0.5"></div>
       </div>
 
@@ -520,10 +537,79 @@
         <!-- ═══ Sidebar: Dateien ═══ -->
         <div x-show="$wire.activeApp === 'files'" class="flex-1 min-h-0 flex flex-col overflow-y-auto">
           <div class="px-3 py-3">
-            <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-3">Dateien</h3>
-            <div class="py-6 text-center">
-              <p class="text-[10px] text-[var(--ui-muted)]">Kommt bald</p>
-            </div>
+            <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-3">Kontext</h3>
+            @if($this->contextType && $this->contextId)
+              @php $filesCtxBreadcrumb = $this->getContextBreadcrumb(); @endphp
+              <div class="p-2.5 rounded-lg border border-[var(--ui-border)]/40 bg-[var(--ui-surface-hover)]/20 mb-4">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-sm">{{ $filesCtxBreadcrumb['icon'] ?? '' }}</span>
+                  <span class="text-xs font-medium text-[var(--ui-body-color)] truncate">{{ $filesCtxBreadcrumb['title'] ?? $this->contextSubject ?? class_basename($this->contextType) }}</span>
+                </div>
+                <span class="text-[10px] text-[var(--ui-muted)]">{{ $filesCtxBreadcrumb['label'] ?? class_basename($this->contextType) }}</span>
+              </div>
+
+              @php
+                $allFiles = $this->contextFiles;
+                $imageCount = count(array_filter($allFiles, fn($f) => $f['is_image']));
+                $docCount = count($allFiles) - $imageCount;
+              @endphp
+
+              {{-- Stats --}}
+              <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-2">Übersicht</h3>
+              <div class="grid grid-cols-3 gap-1.5 mb-4">
+                <div class="p-2 rounded-lg bg-[var(--ui-surface-hover)]/30 text-center">
+                  <div class="text-sm font-bold text-[var(--ui-body-color)]">{{ count($allFiles) }}</div>
+                  <div class="text-[9px] text-[var(--ui-muted)]">Gesamt</div>
+                </div>
+                <div class="p-2 rounded-lg bg-[var(--ui-surface-hover)]/30 text-center">
+                  <div class="text-sm font-bold text-[var(--ui-body-color)]">{{ $imageCount }}</div>
+                  <div class="text-[9px] text-[var(--ui-muted)]">Bilder</div>
+                </div>
+                <div class="p-2 rounded-lg bg-[var(--ui-surface-hover)]/30 text-center">
+                  <div class="text-sm font-bold text-[var(--ui-body-color)]">{{ $docCount }}</div>
+                  <div class="text-[9px] text-[var(--ui-muted)]">Dokumente</div>
+                </div>
+              </div>
+
+              {{-- Filter --}}
+              <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-2">Filter</h3>
+              <div class="space-y-1 mb-4">
+                <button
+                  wire:click="$set('filesFilter', 'all')"
+                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->filesFilter === 'all' ? 'bg-[var(--ui-primary-10)] ring-1 ring-[var(--ui-primary)]/30' : 'bg-[var(--ui-surface-hover)]/30 hover:bg-[var(--ui-surface-hover)]/60' }}"
+                >
+                  <div class="w-5 h-5 rounded-full bg-[var(--ui-muted)]/10 flex items-center justify-center">
+                    @svg('heroicon-o-queue-list', 'w-3 h-3 text-[var(--ui-muted)]')
+                  </div>
+                  <span class="text-xs text-[var(--ui-body-color)] flex-1">Alle</span>
+                  <span class="text-[10px] text-[var(--ui-muted)] tabular-nums">{{ count($allFiles) }}</span>
+                </button>
+                <button
+                  wire:click="$set('filesFilter', 'images')"
+                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->filesFilter === 'images' ? 'bg-[var(--ui-primary-10)] ring-1 ring-[var(--ui-primary)]/30' : 'bg-[var(--ui-surface-hover)]/30 hover:bg-[var(--ui-surface-hover)]/60' }}"
+                >
+                  <div class="w-5 h-5 rounded-full bg-[var(--ui-primary-10)] flex items-center justify-center">
+                    @svg('heroicon-o-photo', 'w-3 h-3 text-[var(--ui-primary)]')
+                  </div>
+                  <span class="text-xs text-[var(--ui-body-color)] flex-1">Bilder</span>
+                  <span class="text-[10px] text-[var(--ui-muted)] tabular-nums">{{ $imageCount }}</span>
+                </button>
+                <button
+                  wire:click="$set('filesFilter', 'documents')"
+                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left {{ $this->filesFilter === 'documents' ? 'bg-[var(--ui-primary-10)] ring-1 ring-[var(--ui-primary)]/30' : 'bg-[var(--ui-surface-hover)]/30 hover:bg-[var(--ui-surface-hover)]/60' }}"
+                >
+                  <div class="w-5 h-5 rounded-full bg-[var(--ui-muted)]/5 flex items-center justify-center">
+                    @svg('heroicon-o-document', 'w-3 h-3 text-[var(--ui-muted)]')
+                  </div>
+                  <span class="text-xs text-[var(--ui-body-color)] flex-1">Dokumente</span>
+                  <span class="text-[10px] text-[var(--ui-muted)] tabular-nums">{{ $docCount }}</span>
+                </button>
+              </div>
+            @else
+              <div class="p-2.5 rounded-lg border border-dashed border-[var(--ui-border)]/40 mb-4">
+                <p class="text-[10px] text-[var(--ui-muted)] text-center">Kein Kontext verfügbar</p>
+              </div>
+            @endif
           </div>
         </div>
 
@@ -1312,14 +1398,119 @@
             </div>
           </div>
 
-          <!-- ═══ App: Dateien (Placeholder) ═══ -->
-          <div x-show="$wire.activeApp === 'files'" class="flex-1 min-h-0 flex items-center justify-center text-[var(--ui-muted)] text-sm">
-            <div class="text-center">
-              <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--ui-muted)]/5 mb-3">
-                @svg('heroicon-o-paper-clip', 'w-6 h-6')
+          <!-- ═══ App: Dateien ═══ -->
+          <div x-show="$wire.activeApp === 'files'" class="flex-1 min-h-0 flex flex-col">
+            {{-- Scrollable file list --}}
+            <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+              <div class="py-4 space-y-1" :class="fullscreen ? 'px-6' : 'px-4'">
+                @php
+                  $filteredFiles = match($this->filesFilter) {
+                    'images' => array_filter($this->contextFiles, fn($f) => $f['is_image']),
+                    'documents' => array_filter($this->contextFiles, fn($f) => ! $f['is_image']),
+                    default => $this->contextFiles,
+                  };
+                @endphp
+                @forelse($filteredFiles as $file)
+                  <div class="group flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-[var(--ui-surface-hover)]/60 transition-colors" wire:key="ctxfile-{{ $file['id'] }}">
+                    {{-- Thumbnail / Icon --}}
+                    <div class="flex-shrink-0 w-10 h-10 rounded-md overflow-hidden border border-[var(--ui-border)]/60 bg-[var(--ui-surface-hover)] flex items-center justify-center">
+                      @if($file['is_image'] && ($file['thumbnail'] ?? $file['url']))
+                        <img src="{{ $file['thumbnail'] ?? $file['url'] }}" alt="" class="w-full h-full object-cover">
+                      @else
+                        <svg class="w-5 h-5 text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3.5A1.5 1.5 0 014.5 2h6.879a1.5 1.5 0 011.06.44l4.122 4.12A1.5 1.5 0 0117 7.622V16.5a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 013 16.5v-13z"/></svg>
+                      @endif
+                    </div>
+                    {{-- File info --}}
+                    <div class="flex-1 min-w-0">
+                      <p class="text-xs font-medium text-[var(--ui-body-color)] truncate" title="{{ $file['original_name'] }}">{{ $file['original_name'] }}</p>
+                      <div class="flex items-center gap-2 mt-0.5">
+                        <span class="text-[10px] text-[var(--ui-muted)]">{{ \Illuminate\Support\Number::fileSize($file['file_size']) }}</span>
+                        <span class="text-[10px] text-[var(--ui-muted)]">&middot;</span>
+                        <span class="text-[10px] text-[var(--ui-muted)]">{{ $file['uploaded_by'] }}</span>
+                        <span class="text-[10px] text-[var(--ui-muted)]">&middot;</span>
+                        <span class="text-[10px] text-[var(--ui-muted)]">{{ $file['created_at'] }}</span>
+                      </div>
+                    </div>
+                    {{-- Actions --}}
+                    <div class="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition">
+                      @if($file['is_image'] && $file['url'])
+                        <a href="{{ $file['url'] }}" target="_blank" class="p-1.5 rounded text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition" title="Ansehen">
+                          @svg('heroicon-o-eye', 'w-3.5 h-3.5')
+                        </a>
+                      @endif
+                      <a href="{{ $file['download_url'] }}" target="_blank" class="p-1.5 rounded text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition" title="Download">
+                        @svg('heroicon-o-arrow-down-tray', 'w-3.5 h-3.5')
+                      </a>
+                      <button
+                        wire:click="deleteContextFile({{ $file['id'] }})"
+                        wire:confirm="Datei wirklich löschen?"
+                        class="p-1.5 rounded text-[var(--ui-muted)] hover:text-red-500 hover:bg-red-500/10 transition"
+                        title="Löschen"
+                      >
+                        @svg('heroicon-o-trash', 'w-3.5 h-3.5')
+                      </button>
+                    </div>
+                  </div>
+                @empty
+                  <div class="py-8 text-center">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--ui-muted)]/5 mb-3">
+                      @svg('heroicon-o-paper-clip', 'w-6 h-6 text-[var(--ui-muted)]')
+                    </div>
+                    <p class="text-sm text-[var(--ui-muted)]">Keine Dateien</p>
+                    <p class="text-xs text-[var(--ui-muted)]/60 mt-1">Lade Dateien hoch per Drag & Drop oder Button</p>
+                  </div>
+                @endforelse
               </div>
-              <p class="font-medium">Dateien</p>
-              <p class="text-xs text-[var(--ui-muted)]/60 mt-1">Dateien-Verwaltung kommt bald</p>
+            </div>
+
+            {{-- Upload area --}}
+            <div class="border-t border-[var(--ui-border)]/60 flex-shrink-0"
+                 :class="fullscreen ? 'px-2' : ''"
+                 x-data="{
+                   selectedFiles: [],
+                   uploading: false,
+                   dragOver: false,
+                   handleFiles(files) {
+                     if (!files || !files.length) return;
+                     this.uploading = true;
+                     $wire.uploadMultiple('pendingFiles', Array.from(files), () => {
+                       $wire.uploadContextFiles().then(() => {
+                         this.uploading = false;
+                         this.selectedFiles = [];
+                       });
+                     }, () => { this.uploading = false; });
+                   },
+                 }"
+                 x-on:dragover.prevent="dragOver = true"
+                 x-on:dragleave.prevent="dragOver = false"
+                 x-on:drop.prevent="dragOver = false; handleFiles($event.dataTransfer.files)"
+            >
+              <div class="px-4 py-2.5">
+                <div class="flex items-center gap-2"
+                     :class="dragOver ? 'ring-2 ring-[var(--ui-primary)]/40 ring-offset-1 rounded-lg' : ''"
+                >
+                  <button
+                    type="button"
+                    @click="$refs.contextFileInput.click()"
+                    class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-[var(--ui-muted)] hover:text-[var(--ui-body-color)] hover:bg-[var(--ui-surface-hover)] transition flex-shrink-0"
+                    title="Dateien auswählen"
+                  >
+                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.52 9.52l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.242z" clip-rule="evenodd"/></svg>
+                  </button>
+                  <input x-ref="contextFileInput" type="file" multiple class="hidden" @change="handleFiles($event.target.files); $event.target.value = ''">
+
+                  <div class="flex-1 text-xs text-[var(--ui-muted)]" x-show="!uploading">
+                    <span :class="dragOver ? 'text-[var(--ui-primary)] font-medium' : ''">
+                      <span x-show="dragOver">Dateien hier ablegen</span>
+                      <span x-show="!dragOver">Dateien hochladen per Drag & Drop oder Klick</span>
+                    </span>
+                  </div>
+                  <div class="flex-1 flex items-center gap-2 text-xs text-[var(--ui-muted)]" x-show="uploading" x-cloak>
+                    <svg class="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <span>Wird hochgeladen…</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
