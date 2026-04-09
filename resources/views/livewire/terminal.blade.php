@@ -460,13 +460,14 @@
         <div x-show="$wire.activeApp === 'activity'" class="flex-1 min-h-0 flex flex-col overflow-y-auto">
           <div class="px-3 py-3">
             <h3 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-3">Kontext</h3>
-            @if(! empty($this->activeChannel['context']))
+            @if($this->contextType && $this->contextId)
+              @php $ctxBreadcrumb = $this->getContextBreadcrumb(); @endphp
               <div class="p-2.5 rounded-lg border border-[var(--ui-border)]/40 bg-[var(--ui-surface-hover)]/20 mb-4">
                 <div class="flex items-center gap-2 mb-1">
-                  <span class="text-sm">{{ $this->activeChannel['context']['icon'] ?? '' }}</span>
-                  <span class="text-xs font-medium text-[var(--ui-body-color)] truncate">{{ $this->activeChannel['context']['title'] ?? $this->activeChannel['name'] }}</span>
+                  <span class="text-sm">{{ $ctxBreadcrumb['icon'] ?? '' }}</span>
+                  <span class="text-xs font-medium text-[var(--ui-body-color)] truncate">{{ $ctxBreadcrumb['title'] ?? $this->contextSubject ?? class_basename($this->contextType) }}</span>
                 </div>
-                <span class="text-[10px] text-[var(--ui-muted)]">{{ $this->activeChannel['context']['label'] ?? 'Entity' }}</span>
+                <span class="text-[10px] text-[var(--ui-muted)]">{{ $ctxBreadcrumb['label'] ?? class_basename($this->contextType) }}</span>
               </div>
 
               {{-- Activity filter --}}
