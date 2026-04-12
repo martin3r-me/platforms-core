@@ -75,15 +75,6 @@
     $pageContext = ($contextType && $contextId) ? $this->getContextBreadcrumb() : null;
   @endphp
 
-  {{-- DEBUG: Inline Terminal State --}}
-  <div class="fixed top-0 left-0 right-0 z-[9999] bg-red-900/95 text-red-100 text-[10px] font-mono px-3 py-1.5 space-y-0.5 border-b border-red-500/50">
-    <div><strong>contextType:</strong> {{ $contextType ?? 'NULL' }} | <strong>contextId:</strong> {{ $contextId ?? 'NULL' }}</div>
-    <div><strong>contextSubject:</strong> {{ $contextSubject ?? 'NULL' }} | <strong>contextSource:</strong> {{ $contextSource ?? 'NULL' }}</div>
-    <div><strong>availableApps:</strong> {{ json_encode(array_filter($availableApps)) }}</div>
-    <div><strong>commsInit:</strong> {{ $commsInitialized ? 'true' : 'false' }} | <strong>activeApp:</strong> {{ $activeApp }}</div>
-    <div><strong>pageContext:</strong> {{ $pageContext ? json_encode($pageContext) : 'NULL' }}</div>
-  </div>
-
   <!-- Fullscreen backdrop -->
   <div x-show="fullscreen" x-cloak x-transition:enter="transition-opacity duration-300" x-transition:leave="transition-opacity duration-200"
     class="fixed inset-0 bg-black/10" @click="toggleFullscreen()"></div>
