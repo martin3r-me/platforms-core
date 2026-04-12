@@ -256,6 +256,12 @@ class Terminal extends Component
     #[On('comms')]
     public function setCommsContext(array $payload = []): void
     {
+        \Log::debug('[Terminal:setCommsContext] received', [
+            'payload_keys' => array_keys($payload),
+            'model' => $payload['model'] ?? null,
+            'modelId' => $payload['modelId'] ?? null,
+        ]);
+
         $model = $payload['model'] ?? null;
         $modelId = $payload['modelId'] ?? null;
 
