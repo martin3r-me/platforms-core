@@ -1,4 +1,4 @@
-{{-- Context header bar for terminal apps --}}
+{{-- Global context header — always visible at top of main content area --}}
 @if($pageContext)
   <div class="px-4 flex items-center gap-2.5 border-b border-[var(--t-border)]/60 flex-shrink-0"
        :class="fullscreen ? 'h-14 text-sm' : 'h-11 text-xs'">
@@ -12,10 +12,10 @@
       @else
         <span class="font-bold text-[13px] text-[var(--t-text)] truncate">{{ $pageContext['title'] }}</span>
       @endif
-      <span class="text-[10px] text-[var(--t-text-muted)]">{{ $appLabel ?? $pageContext['label'] }}</span>
+      <span class="text-[10px] text-[var(--t-text-muted)]">{{ $pageContext['label'] }}</span>
     </div>
     {{-- App-specific actions --}}
-    @if(($appLabel ?? '') === 'Agenda' && $activeAgendaId && $this->canAttachContextToAgenda())
+    @if($activeApp === 'agenda' && $activeAgendaId && $this->canAttachContextToAgenda())
       @if($this->isContextAttachedToAgenda())
         <span class="p-1 text-[var(--t-accent)] flex-shrink-0" title="Bereits in Agenda">
           <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
@@ -28,7 +28,7 @@
         </button>
       @endif
     @endif
-    @if(($appLabel ?? '') === 'Diskussion')
+    @if($activeApp === 'chat')
       @if(($this->activeChannel['type'] ?? '') === 'context')
         <span class="p-1 text-[var(--t-accent)] flex-shrink-0" title="Kontext-Diskussion aktiv">
           <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>

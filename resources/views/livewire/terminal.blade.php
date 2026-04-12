@@ -1143,8 +1143,11 @@
 
       </div>
 
-      <!-- Main Chat Area — keyed per channel so editor + messages fully rebuild -->
+      <!-- Main Content Area — keyed per channel so editor + messages fully rebuild -->
       <div class="terminal-light flex-1 min-w-0 flex flex-col bg-[var(--ui-surface)]" wire:key="terminal-main-{{ $channelId }}">
+
+        {{-- Global context header — always visible as first element --}}
+        @include('platform::livewire.partials.terminal-context-header')
 
         @if($this->activeChannel)
           <!-- Chat Header (only visible in chat app) -->
@@ -1532,7 +1535,6 @@
 
           <!-- ═══ App: Chat ═══ -->
           <div x-show="$wire.activeApp === 'chat'" class="flex-1 min-h-0 flex flex-col">
-            @include('platform::livewire.partials.terminal-context-header', ['appLabel' => 'Diskussion'])
 
           <!-- Messages -->
           <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain" :class="fullscreen ? 'text-[14px]' : 'text-[13px]'" x-ref="body" wire:key="terminal-messages-{{ $channelId }}"
@@ -1986,7 +1988,6 @@
 
           <!-- ═══ App: Aktivitäten ═══ -->
           <div x-show="$wire.activeApp === 'activity'" class="flex-1 min-h-0 flex flex-col" wire:key="terminal-activities-{{ $channelId }}">
-            @include('platform::livewire.partials.terminal-context-header', ['appLabel' => 'Aktivitäten'])
             {{-- Scrollable activity list --}}
             <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
               <div class="py-4 space-y-1.5" :class="fullscreen ? 'px-6' : 'px-4'">
@@ -2168,7 +2169,6 @@
 
           <!-- ═══ App: Dateien ═══ -->
           <div x-show="$wire.activeApp === 'files'" class="flex-1 min-h-0 flex flex-col">
-            @include('platform::livewire.partials.terminal-context-header', ['appLabel' => 'Dateien'])
             {{-- Scrollable file list --}}
             <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
               <div class="py-4 space-y-1" :class="fullscreen ? 'px-6' : 'px-4'">
@@ -2329,7 +2329,6 @@
           <!-- ═══ App: Tags ═══ -->
           <div x-show="$wire.activeApp === 'tags'" class="flex-1 min-h-0 flex flex-col"
                x-data="{ tagSearch: '', personalMode: false }">
-            @include('platform::livewire.partials.terminal-context-header', ['appLabel' => 'Tags & Farben'])
             <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
               <div class="py-4 space-y-5" :class="fullscreen ? 'px-6' : 'px-4'">
 
@@ -2562,7 +2561,6 @@
 
           <!-- ═══ App: Zeit ═══ -->
           <div x-show="$wire.activeApp === 'time'" class="flex-1 min-h-0 flex flex-col">
-            @include('platform::livewire.partials.terminal-context-header', ['appLabel' => 'Zeiterfassung'])
             <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
               <div class="py-4 space-y-4" :class="fullscreen ? 'px-6' : 'px-4'">
 
@@ -2735,7 +2733,6 @@
 
           <!-- ═══ App: OKR (Platzhalter) ═══ -->
           <div x-show="$wire.activeApp === 'okr'" class="flex-1 min-h-0 flex flex-col">
-            @include('platform::livewire.partials.terminal-context-header', ['appLabel' => 'OKR'])
             <div class="flex-1 flex items-center justify-center">
               <div class="text-center py-12">
                 <div class="text-3xl opacity-20 mb-3">🎯</div>
@@ -2747,7 +2744,6 @@
 
           <!-- ═══ App: ExtraFields ═══ -->
           <div x-show="$wire.activeApp === 'extrafields'" class="flex-1 min-h-0 flex flex-col overflow-y-auto">
-            @include('platform::livewire.partials.terminal-context-header', ['appLabel' => 'Zusatzfelder'])
 
             {{-- Field Editor (5 sub-tabs) --}}
             @if($this->efEditingDefinitionId)
@@ -3142,7 +3138,6 @@
                  newItemColor: '',
                  colors: ['', 'red', 'orange', 'amber', 'green', 'blue', 'purple', 'pink'],
                }">
-            @include('platform::livewire.partials.terminal-context-header', ['appLabel' => 'Agenda'])
 
             {{-- Kanban View — single agenda --}}
             @if($agendaView === 'board' && $activeAgendaId)
