@@ -362,7 +362,7 @@
                   <span class="text-[11px] font-medium text-[var(--t-text)] truncate block">{{ $pageContext['title'] }}</span>
                   <span class="text-[9px] text-[var(--t-text-muted)]">{{ $pageContext['label'] }}</span>
                 </div>
-                {{-- Quick-action: Attach to Agenda (only in agenda app with active agenda) --}}
+                {{-- Quick-action: Agenda attach (only in agenda app) --}}
                 @if($activeApp === 'agenda' && $activeAgendaId && $this->canAttachContextToAgenda())
                   @if($this->isContextAttachedToAgenda())
                     <span class="p-1 text-[var(--t-accent)] flex-shrink-0" title="Bereits in Agenda">
@@ -376,12 +376,6 @@
                     </button>
                   @endif
                 @endif
-                {{-- Quick-action: Chat zum Kontext --}}
-                <button wire:click="$set('activeApp', 'chat')"
-                        class="p-1 rounded hover:bg-white/10 text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition flex-shrink-0"
-                        title="Chat öffnen">
-                  <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"/></svg>
-                </button>
               </div>
             </div>
           </div>
@@ -2020,6 +2014,7 @@
 
           <!-- ═══ App: Aktivitäten ═══ -->
           <div x-show="$wire.activeApp === 'activity'" class="flex-1 min-h-0 flex flex-col" wire:key="terminal-activities-{{ $channelId }}">
+            @include('platform::livewire.partials.terminal-context-header', ['appLabel' => 'Aktivitäten'])
             {{-- Scrollable activity list --}}
             <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
               <div class="py-4 space-y-1.5" :class="fullscreen ? 'px-6' : 'px-4'">
@@ -2201,6 +2196,7 @@
 
           <!-- ═══ App: Dateien ═══ -->
           <div x-show="$wire.activeApp === 'files'" class="flex-1 min-h-0 flex flex-col">
+            @include('platform::livewire.partials.terminal-context-header', ['appLabel' => 'Dateien'])
             {{-- Scrollable file list --}}
             <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
               <div class="py-4 space-y-1" :class="fullscreen ? 'px-6' : 'px-4'">
@@ -2361,6 +2357,7 @@
           <!-- ═══ App: Tags ═══ -->
           <div x-show="$wire.activeApp === 'tags'" class="flex-1 min-h-0 flex flex-col"
                x-data="{ tagSearch: '', personalMode: false }">
+            @include('platform::livewire.partials.terminal-context-header', ['appLabel' => 'Tags & Farben'])
             <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
               <div class="py-4 space-y-5" :class="fullscreen ? 'px-6' : 'px-4'">
 
@@ -2593,6 +2590,7 @@
 
           <!-- ═══ App: Zeit ═══ -->
           <div x-show="$wire.activeApp === 'time'" class="flex-1 min-h-0 flex flex-col">
+            @include('platform::livewire.partials.terminal-context-header', ['appLabel' => 'Zeiterfassung'])
             <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
               <div class="py-4 space-y-4" :class="fullscreen ? 'px-6' : 'px-4'">
 
@@ -2765,6 +2763,7 @@
 
           <!-- ═══ App: OKR (Platzhalter) ═══ -->
           <div x-show="$wire.activeApp === 'okr'" class="flex-1 min-h-0 flex flex-col">
+            @include('platform::livewire.partials.terminal-context-header', ['appLabel' => 'OKR'])
             <div class="flex-1 flex items-center justify-center">
               <div class="text-center py-12">
                 <div class="text-3xl opacity-20 mb-3">🎯</div>
@@ -2776,6 +2775,7 @@
 
           <!-- ═══ App: ExtraFields ═══ -->
           <div x-show="$wire.activeApp === 'extrafields'" class="flex-1 min-h-0 flex flex-col overflow-y-auto">
+            @include('platform::livewire.partials.terminal-context-header', ['appLabel' => 'Zusatzfelder'])
 
             {{-- Field Editor (5 sub-tabs) --}}
             @if($this->efEditingDefinitionId)
@@ -3170,6 +3170,7 @@
                  newItemColor: '',
                  colors: ['', 'red', 'orange', 'amber', 'green', 'blue', 'purple', 'pink'],
                }">
+            @include('platform::livewire.partials.terminal-context-header', ['appLabel' => 'Agenda'])
 
             {{-- Kanban View — single agenda --}}
             @if($agendaView === 'board' && $activeAgendaId)
