@@ -13,15 +13,14 @@ use Platform\Core\Models\TerminalAgendaMember;
 class ManageTerminalAgendaItemsTool implements ToolContract
 {
     private const AGENDABLE_TYPES = [
-        'planner.task' => \Modules\Planner\Models\PlannerTask::class,
-        'planner.project' => \Modules\Planner\Models\PlannerProject::class,
-        'planner.canvas' => \Modules\Planner\Models\PlannerCanvas::class,
-        'canvas' => \Modules\Canvas\Models\Canvas::class,
-        'helpdesk.board' => \Modules\Helpdesk\Models\HelpdeskBoard::class,
-        'helpdesk.ticket' => \Modules\Helpdesk\Models\HelpdeskTicket::class,
-        'okr.objective' => \Modules\Okr\Models\Objective::class,
-        'okr.key_result' => \Modules\Okr\Models\KeyResult::class,
-        'brands.brand' => \Modules\Brands\Models\BrandsBrand::class,
+        'planner.task' => \Platform\Planner\Models\PlannerTask::class,
+        'planner.project' => \Platform\Planner\Models\PlannerProject::class,
+        'canvas' => \Platform\Canvas\Models\Canvas::class,
+        'helpdesk.board' => \Platform\Helpdesk\Models\HelpdeskBoard::class,
+        'helpdesk.ticket' => \Platform\Helpdesk\Models\HelpdeskTicket::class,
+        'okr.objective' => \Platform\Okr\Models\Objective::class,
+        'okr.key_result' => \Platform\Okr\Models\KeyResult::class,
+        'brands.brand' => \Platform\Brands\Models\BrandsBrand::class,
     ];
 
     public function getName(): string
@@ -77,7 +76,7 @@ class ManageTerminalAgendaItemsTool implements ToolContract
                 'agendable_type' => [
                     'type' => 'string',
                     'enum' => array_keys(self::AGENDABLE_TYPES),
-                    'description' => 'Entity-Typ zum Verlinken (erforderlich bei action=attach). Z.B. "planner.task", "planner.canvas".',
+                    'description' => 'Entity-Typ zum Verlinken (erforderlich bei action=attach). Z.B. "planner.task", "canvas", "helpdesk.ticket".',
                 ],
                 'agendable_id' => [
                     'type' => 'integer',

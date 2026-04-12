@@ -174,7 +174,7 @@ class Terminal extends Component
 
     // ── Agenda App ────────────────────────────────────────────
     public ?int $activeAgendaId = null;
-    public string $agendaView = 'board'; // 'board' | 'kanban' | 'day'
+    public string $agendaView = 'board'; // 'board' | 'day'
     public string $agendaDayDate = '';    // Y-m-d for "Mein Tag" navigation
 
     // ── Lifecycle ──────────────────────────────────────────────
@@ -4581,15 +4581,14 @@ class Terminal extends Component
     }
 
     private const AGENDABLE_TYPE_LABELS = [
-        \Modules\Planner\Models\PlannerTask::class => 'Aufgabe',
-        \Modules\Planner\Models\PlannerProject::class => 'Projekt',
-        \Modules\Planner\Models\PlannerCanvas::class => 'Canvas',
-        \Modules\Canvas\Models\Canvas::class => 'Canvas',
-        \Modules\Helpdesk\Models\HelpdeskBoard::class => 'Board',
-        \Modules\Helpdesk\Models\HelpdeskTicket::class => 'Ticket',
-        \Modules\Okr\Models\Objective::class => 'Objective',
-        \Modules\Okr\Models\KeyResult::class => 'Key Result',
-        \Modules\Brands\Models\BrandsBrand::class => 'Marke',
+        \Platform\Planner\Models\PlannerTask::class => 'Aufgabe',
+        \Platform\Planner\Models\PlannerProject::class => 'Projekt',
+        \Platform\Canvas\Models\Canvas::class => 'Canvas',
+        \Platform\Helpdesk\Models\HelpdeskBoard::class => 'Board',
+        \Platform\Helpdesk\Models\HelpdeskTicket::class => 'Ticket',
+        \Platform\Okr\Models\Objective::class => 'Objective',
+        \Platform\Okr\Models\KeyResult::class => 'Key Result',
+        \Platform\Brands\Models\BrandsBrand::class => 'Marke',
     ];
 
     protected function formatAgendaItem(TerminalAgendaItem $item, bool $showAgenda = false): array
@@ -4624,15 +4623,14 @@ class Terminal extends Component
     // ── Agenda Context Attach ──────────────────────────────────
 
     private const CONTEXT_AGENDABLE_TYPES = [
-        \Modules\Planner\Models\PlannerTask::class => true,
-        \Modules\Planner\Models\PlannerProject::class => true,
-        \Modules\Planner\Models\PlannerCanvas::class => true,
-        \Modules\Canvas\Models\Canvas::class => true,
-        \Modules\Helpdesk\Models\HelpdeskBoard::class => true,
-        \Modules\Helpdesk\Models\HelpdeskTicket::class => true,
-        \Modules\Okr\Models\Objective::class => true,
-        \Modules\Okr\Models\KeyResult::class => true,
-        \Modules\Brands\Models\BrandsBrand::class => true,
+        \Platform\Planner\Models\PlannerTask::class => true,
+        \Platform\Planner\Models\PlannerProject::class => true,
+        \Platform\Canvas\Models\Canvas::class => true,
+        \Platform\Helpdesk\Models\HelpdeskBoard::class => true,
+        \Platform\Helpdesk\Models\HelpdeskTicket::class => true,
+        \Platform\Okr\Models\Objective::class => true,
+        \Platform\Okr\Models\KeyResult::class => true,
+        \Platform\Brands\Models\BrandsBrand::class => true,
     ];
 
     public function canAttachContextToAgenda(): bool

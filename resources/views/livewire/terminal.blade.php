@@ -376,10 +376,10 @@
                     </button>
                   @endif
                 @endif
-                {{-- Quick-action: Diskussion öffnen --}}
-                <button wire:click="openTerminal"
+                {{-- Quick-action: Chat zum Kontext --}}
+                <button wire:click="$set('activeApp', 'chat')"
                         class="p-1 rounded hover:bg-white/10 text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition flex-shrink-0"
-                        title="Diskussion öffnen">
+                        title="Chat öffnen">
                   <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"/></svg>
                 </button>
               </div>
@@ -1546,20 +1546,6 @@
                       </div>
                     </div>
                   @endif
-                </div>
-
-                {{-- View toggle: List / Kanban --}}
-                <div class="flex items-center border border-[var(--t-border)]/40 rounded overflow-hidden">
-                  <button wire:click="$set('agendaView', 'board')"
-                          class="p-1 transition {{ $agendaView === 'board' ? 'bg-[var(--t-accent)]/20 text-[var(--t-accent)]' : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)]' }}"
-                          title="Liste">
-                    <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"/></svg>
-                  </button>
-                  <button wire:click="$set('agendaView', 'kanban')"
-                          class="p-1 transition {{ $agendaView === 'kanban' ? 'bg-[var(--t-accent)]/20 text-[var(--t-accent)]' : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)]' }}"
-                          title="Kanban">
-                    <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125Z"/></svg>
-                  </button>
                 </div>
 
                 {{-- Delete agenda button (owner only) --}}
@@ -3182,347 +3168,96 @@
                  newItemTimeStart: '',
                  newItemTimeEnd: '',
                  newItemColor: '',
-                 editingItem: null,
-                 editTitle: '',
-                 editNotes: '',
-                 editDate: '',
-                 editTimeStart: '',
-                 editTimeEnd: '',
-                 editColor: '',
                  colors: ['', 'red', 'orange', 'amber', 'green', 'blue', 'purple', 'pink'],
-                 colorMap: {
-                   red: 'bg-red-500/20 border-red-500/30 text-red-600',
-                   orange: 'bg-orange-500/20 border-orange-500/30 text-orange-600',
-                   amber: 'bg-amber-500/20 border-amber-500/30 text-amber-600',
-                   green: 'bg-green-500/20 border-green-500/30 text-green-600',
-                   blue: 'bg-blue-500/20 border-blue-500/30 text-blue-600',
-                   purple: 'bg-purple-500/20 border-purple-500/30 text-purple-600',
-                   pink: 'bg-pink-500/20 border-pink-500/30 text-pink-600',
-                 },
-                 startEdit(item) {
-                   this.editingItem = item.id;
-                   this.editTitle = item.title;
-                   this.editNotes = item.notes || '';
-                   this.editDate = item.date || '';
-                   this.editTimeStart = item.time_start || '';
-                   this.editTimeEnd = item.time_end || '';
-                   this.editColor = item.color || '';
-                 },
-                 saveEdit() {
-                   if(this.editingItem && this.editTitle.trim()) {
-                     $wire.updateAgendaItem(
-                       this.editingItem,
-                       this.editTitle.trim(),
-                       this.editNotes,
-                       this.editDate,
-                       this.editTimeStart,
-                       this.editTimeEnd,
-                       this.editColor
-                     );
-                   }
-                   this.editingItem = null;
-                 },
-                 cancelEdit() { this.editingItem = null; },
                }">
 
-            {{-- Board View — single agenda --}}
+            {{-- Kanban View — single agenda --}}
             @if($agendaView === 'board' && $activeAgendaId)
-              <div class="flex-1 min-h-0 overflow-y-auto" :class="fullscreen ? 'p-6' : 'p-4'"
-                   wire:sortable="updateAgendaItemOrder">
+              <x-ui-kanban-container sortable="updateAgendaSlotOrder" sortable-group="updateAgendaItemSlotOrder">
 
-                {{-- Items --}}
-                <div class="space-y-1">
-                  @forelse($this->agendaItems as $item)
-                    <div wire:sortable.item="{{ $item['id'] }}" wire:key="agenda-item-{{ $item['id'] }}"
-                         class="group rounded-lg border transition cursor-grab
-                           {{ $item['is_done'] ? 'opacity-50' : '' }}
-                           {{ $item['color'] && isset($item['color']) ? '' : 'bg-[var(--ui-muted-5)] border-[var(--ui-border)]/30 hover:border-[var(--ui-border)]/60' }}"
-                         :class="editingItem === {{ $item['id'] }} ? 'ring-2 ring-[var(--ui-primary)]/30' : ''"
-                         @if($item['color'])
-                           style="background: rgba(var(--color-{{ $item['color'] }}-500), 0.08); border-color: rgba(var(--color-{{ $item['color'] }}-500), 0.2);"
-                         @endif
-                    >
-                      <template x-if="editingItem !== {{ $item['id'] }}">
-                        <div class="px-3 py-2.5 flex items-start gap-2.5" wire:sortable.handle>
-                          {{-- Done checkbox --}}
-                          <button wire:click="toggleAgendaItemDone({{ $item['id'] }})"
-                                  class="mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition
-                                    {{ $item['is_done'] ? 'bg-[var(--ui-primary)] border-[var(--ui-primary)] text-white' : 'border-[var(--ui-border)] hover:border-[var(--ui-primary)]' }}">
-                            @if($item['is_done'])
-                              <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
-                            @endif
-                          </button>
-
-                          {{-- Content --}}
-                          <div class="flex-1 min-w-0" @dblclick="startEdit({{ json_encode($item) }})">
-                            <div class="text-sm font-medium text-[var(--ui-text)] {{ $item['is_done'] ? 'line-through' : '' }}">{{ $item['title'] }}</div>
-                            @if($item['notes'])
-                              <div class="text-xs text-[var(--ui-muted)] mt-0.5 line-clamp-2">{{ $item['notes'] }}</div>
-                            @endif
-                            <div class="flex items-center gap-2 mt-1 flex-wrap">
-                              @if(!empty($item['is_linked']))
-                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] inline-flex items-center gap-0.5">
-                                  <svg class="w-2.5 h-2.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364l1.757 1.757"/></svg>
-                                  {{ $item['agendable_type_label'] }}
-                                </span>
-                              @endif
-                              @if($item['date_label'])
-                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">
-                                  <svg class="w-3 h-3 inline -mt-px" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
-                                  {{ $item['date_label'] }}
-                                </span>
-                              @endif
-                              @if($item['time_start'])
-                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">
-                                  {{ $item['time_start'] }}@if($item['time_end']) – {{ $item['time_end'] }}@endif
-                                </span>
-                              @endif
-                            </div>
-                          </div>
-
-                          {{-- Actions --}}
-                          <div class="flex items-center gap-0.5 {{ !empty($item['is_linked']) ? '' : 'opacity-0 group-hover:opacity-100' }} transition flex-shrink-0">
-                            @if(!empty($item['is_linked']))
-                              <button wire:click="detachAgendaItem({{ $item['id'] }})"
-                                      class="p-1 rounded hover:bg-red-500/10 text-[var(--ui-muted)] hover:text-red-500 transition" title="Aus Agenda entfernen">
-                                <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
-                              </button>
-                            @else
-                              <button @click="startEdit({{ json_encode($item) }})" class="p-1 rounded hover:bg-[var(--ui-muted-5)] text-[var(--ui-muted)] hover:text-[var(--ui-text)] transition" title="Bearbeiten">
-                                <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"/></svg>
-                              </button>
-                              <button wire:click="deleteAgendaItem({{ $item['id'] }})"
-                                      wire:confirm="Item löschen?"
-                                      class="p-1 rounded hover:bg-red-500/10 text-[var(--ui-muted)] hover:text-red-500 transition" title="Löschen">
-                                <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
-                              </button>
-                            @endif
+                {{-- Backlog (nicht sortierbar als Spalte) --}}
+                <x-ui-kanban-column title="Backlog" :sortable-id="null" :scrollable="true" :muted="true">
+                  <x-slot name="headerActions">
+                    <span class="text-xs text-[var(--ui-muted)] font-medium">{{ count($this->agendaBacklogItems) }}</span>
+                  </x-slot>
+                  @foreach($this->agendaBacklogItems as $item)
+                    <x-ui-kanban-card :title="''" :sortable-id="$item['id']">
+                      <div class="flex items-start gap-2">
+                        <button wire:click="toggleAgendaItemDone({{ $item['id'] }})" class="mt-0.5 w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center transition border-[var(--ui-border)] hover:border-[var(--ui-primary)]"></button>
+                        <div class="flex-1 min-w-0">
+                          <div class="text-xs font-medium text-[var(--ui-text)] leading-tight">{{ $item['title'] }}</div>
+                          @if($item['notes'])<div class="text-[10px] text-[var(--ui-muted)] mt-0.5 line-clamp-1">{{ $item['notes'] }}</div>@endif
+                          <div class="flex items-center gap-1 mt-1 flex-wrap">
+                            @if(!empty($item['is_linked']))<span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]">{{ $item['agendable_type_label'] }}</span>@endif
+                            @if($item['date_label'])<span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $item['date_label'] }}</span>@endif
                           </div>
                         </div>
-                      </template>
-
-                      {{-- Inline edit form --}}
-                      <template x-if="editingItem === {{ $item['id'] }}">
-                        <div class="px-3 py-3 space-y-2" @click.outside="saveEdit()" @keydown.escape="cancelEdit()">
-                          <input type="text" x-model="editTitle" @keydown.enter="saveEdit()"
-                                 class="w-full text-sm font-medium px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-surface)] text-[var(--ui-text)] focus:outline-none focus:ring-1 focus:ring-[var(--ui-primary)]">
-                          <textarea x-model="editNotes" rows="2" placeholder="Notizen…"
-                                    class="w-full text-xs px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-surface)] text-[var(--ui-text)] placeholder:text-[var(--ui-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--ui-primary)] resize-none"></textarea>
-                          <div class="flex gap-2 flex-wrap">
-                            <input type="date" x-model="editDate" class="text-[10px] px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-surface)] text-[var(--ui-text)] focus:outline-none">
-                            <input type="time" x-model="editTimeStart" class="text-[10px] px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-surface)] text-[var(--ui-text)] focus:outline-none" placeholder="Von">
-                            <input type="time" x-model="editTimeEnd" class="text-[10px] px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-surface)] text-[var(--ui-text)] focus:outline-none" placeholder="Bis">
-                          </div>
-                          <div class="flex items-center gap-1">
-                            <span class="text-[10px] text-[var(--ui-muted)] mr-1">Farbe:</span>
-                            <template x-for="c in colors" :key="c || 'none'">
-                              <button @click="editColor = c"
-                                      class="w-4 h-4 rounded-full border transition"
-                                      :class="editColor === c ? 'ring-2 ring-[var(--ui-primary)] ring-offset-1' : ''"
-                                      :style="c ? 'background: var(--color-' + c + '-500); border-color: var(--color-' + c + '-500)' : 'background: var(--ui-muted-5); border-color: var(--ui-border)'">
-                              </button>
-                            </template>
-                          </div>
-                          <div class="flex justify-end gap-1 pt-1">
-                            <button @click="cancelEdit()" class="text-[10px] px-2 py-1 rounded text-[var(--ui-muted)] hover:text-[var(--ui-text)] transition">Abbrechen</button>
-                            <button @click="saveEdit()" class="text-[10px] px-2 py-1 rounded bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/80 transition">Speichern</button>
-                          </div>
-                        </div>
-                      </template>
-                    </div>
-                  @empty
-                    <div class="text-center py-8">
-                      <div class="text-3xl opacity-20 mb-3">📋</div>
-                      <p class="text-sm font-medium text-[var(--ui-text)]">Noch keine Items</p>
-                      <p class="text-xs text-[var(--ui-muted)] mt-1">Erstelle dein erstes Agenda-Item</p>
-                    </div>
-                  @endforelse
-                </div>
-
-                {{-- Add new item --}}
-                <div class="mt-3 flex gap-2" x-data="{ showAdd: false }">
-                  <div x-show="!showAdd">
-                    <button @click="showAdd = true" class="flex items-center gap-1.5 text-xs text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition">
-                      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-                      Item hinzufügen
-                    </button>
-                  </div>
-                  <div x-show="showAdd" x-cloak class="w-full space-y-2 p-3 rounded-lg border border-[var(--ui-border)]/40 bg-[var(--ui-muted-5)]">
-                    <input type="text" x-model="newItemTitle" placeholder="Was steht an?"
-                           @keydown.enter="if(newItemTitle.trim()) { $wire.createAgendaItem({{ $activeAgendaId }}, newItemTitle.trim(), null, newItemDate || null, newItemTimeStart || null, newItemTimeEnd || null, newItemColor || null); newItemTitle = ''; newItemDate = ''; newItemTimeStart = ''; newItemTimeEnd = ''; newItemColor = ''; }"
-                           @keydown.escape="showAdd = false; newItemTitle = ''"
-                           class="w-full text-sm px-3 py-2 rounded-md border border-[var(--ui-border)] bg-[var(--ui-surface)] text-[var(--ui-text)] placeholder:text-[var(--ui-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--ui-primary)]">
-                    <div class="flex gap-2 flex-wrap items-center">
-                      <input type="date" x-model="newItemDate" class="text-[10px] px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-surface)] text-[var(--ui-text)] focus:outline-none">
-                      <input type="time" x-model="newItemTimeStart" class="text-[10px] px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-surface)] text-[var(--ui-text)] focus:outline-none" placeholder="Von">
-                      <input type="time" x-model="newItemTimeEnd" class="text-[10px] px-2 py-1 rounded border border-[var(--ui-border)] bg-[var(--ui-surface)] text-[var(--ui-text)] focus:outline-none" placeholder="Bis">
-                      <div class="flex items-center gap-1 ml-auto">
-                        <template x-for="c in colors" :key="c || 'none'">
-                          <button @click="newItemColor = c"
-                                  class="w-3.5 h-3.5 rounded-full border transition"
-                                  :class="newItemColor === c ? 'ring-2 ring-[var(--ui-primary)] ring-offset-1' : ''"
-                                  :style="c ? 'background: var(--color-' + c + '-500); border-color: var(--color-' + c + '-500)' : 'background: var(--ui-muted-5); border-color: var(--ui-border)'">
-                          </button>
-                        </template>
                       </div>
-                    </div>
-                    <div class="flex justify-end gap-1">
-                      <button @click="showAdd = false; newItemTitle = ''" class="text-[10px] px-2 py-1 rounded text-[var(--ui-muted)] hover:text-[var(--ui-text)] transition">Abbrechen</button>
-                      <button @click="if(newItemTitle.trim()) { $wire.createAgendaItem({{ $activeAgendaId }}, newItemTitle.trim(), null, newItemDate || null, newItemTimeStart || null, newItemTimeEnd || null, newItemColor || null); newItemTitle = ''; newItemDate = ''; newItemTimeStart = ''; newItemTimeEnd = ''; newItemColor = ''; showAdd = false; }"
-                              class="text-[10px] px-2 py-1 rounded bg-[var(--ui-primary)] text-white hover:bg-[var(--ui-primary)]/80 transition">Hinzufügen</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                    </x-ui-kanban-card>
+                  @endforeach
+                </x-ui-kanban-column>
 
-            {{-- Kanban View --}}
-            @elseif($agendaView === 'kanban' && $activeAgendaId)
-              <div class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden flex gap-3" :class="fullscreen ? 'p-4' : 'p-3'"
-                   wire:sortable="updateAgendaSlotOrder"
-                   wire:sortable-group="updateAgendaItemSlotOrder"
-                   x-data="{ newSlotName: '' }">
-
-                {{-- Backlog column --}}
-                <div class="flex-shrink-0 w-64 h-full flex flex-col bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/30" wire:key="kanban-col-backlog">
-                  <div class="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] border-b border-[var(--ui-border)]/20 flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"/></svg>
-                    Backlog
-                    @if(count($this->agendaBacklogItems) > 0)
-                      <span class="ml-auto text-[9px] tabular-nums opacity-60">{{ count($this->agendaBacklogItems) }}</span>
-                    @endif
-                  </div>
-                  <div class="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1" wire:sortable-group.item-group="backlog">
-                    @foreach($this->agendaBacklogItems as $item)
-                      <div wire:sortable-group.item="{{ $item['id'] }}" wire:key="kanban-item-{{ $item['id'] }}"
-                           class="group rounded-md border px-2.5 py-2 bg-[var(--ui-surface)] border-[var(--ui-border)]/20 hover:border-[var(--ui-border)]/50 transition cursor-grab"
-                           @if($item['color'])
-                             style="border-left: 3px solid rgba(var(--color-{{ $item['color'] }}-500), 0.6);"
-                           @endif>
+                {{-- Custom Slot Spalten (sortierbar) --}}
+                @foreach($this->agendaSlots as $slot)
+                  <x-ui-kanban-column :title="$slot['name']" :sortable-id="$slot['id']" :scrollable="true">
+                    <x-slot name="headerActions">
+                      @if(count($slot['items']) > 0)
+                        <span class="text-xs text-[var(--ui-muted)] font-medium">{{ count($slot['items']) }}</span>
+                      @endif
+                      <button wire:click="deleteAgendaSlot({{ $slot['id'] }})" wire:confirm="Slot löschen? Items werden in den Backlog verschoben."
+                              class="text-[var(--ui-muted)] hover:text-red-500 transition-colors" title="Slot löschen">
+                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+                      </button>
+                    </x-slot>
+                    @foreach($slot['items'] as $item)
+                      <x-ui-kanban-card :title="''" :sortable-id="$item['id']">
                         <div class="flex items-start gap-2">
-                          <button wire:click="toggleAgendaItemDone({{ $item['id'] }})"
-                                  class="mt-0.5 w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center transition border-[var(--ui-border)] hover:border-[var(--ui-primary)]">
-                          </button>
+                          <button wire:click="toggleAgendaItemDone({{ $item['id'] }})" class="mt-0.5 w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center transition border-[var(--ui-border)] hover:border-[var(--ui-primary)]"></button>
                           <div class="flex-1 min-w-0">
                             <div class="text-xs font-medium text-[var(--ui-text)] leading-tight">{{ $item['title'] }}</div>
-                            @if($item['notes'])
-                              <div class="text-[10px] text-[var(--ui-muted)] mt-0.5 line-clamp-1">{{ $item['notes'] }}</div>
-                            @endif
+                            @if($item['notes'])<div class="text-[10px] text-[var(--ui-muted)] mt-0.5 line-clamp-1">{{ $item['notes'] }}</div>@endif
                             <div class="flex items-center gap-1 mt-1 flex-wrap">
-                              @if(!empty($item['is_linked']))
-                                <span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]">{{ $item['agendable_type_label'] }}</span>
-                              @endif
-                              @if($item['date_label'])
-                                <span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $item['date_label'] }}</span>
-                              @endif
+                              @if(!empty($item['is_linked']))<span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]">{{ $item['agendable_type_label'] }}</span>@endif
+                              @if($item['date_label'])<span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $item['date_label'] }}</span>@endif
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </x-ui-kanban-card>
                     @endforeach
-                  </div>
-                </div>
-
-                {{-- Custom slot columns --}}
-                @foreach($this->agendaSlots as $slot)
-                  <div wire:sortable.item="{{ $slot['id'] }}" wire:key="kanban-col-{{ $slot['id'] }}"
-                       class="flex-shrink-0 w-64 h-full flex flex-col bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/30">
-                    <div class="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-secondary)] border-b border-[var(--ui-border)]/20 flex items-center gap-1.5"
-                         x-data="{ editing: false, slotName: '{{ addslashes($slot['name']) }}' }">
-                      <template x-if="!editing">
-                        <div class="flex items-center gap-1.5 flex-1 min-w-0">
-                          <span class="truncate flex-1" @dblclick="editing = true; $nextTick(() => $refs.slotInput?.focus())">{{ $slot['name'] }}</span>
-                          @if(count($slot['items']) > 0)
-                            <span class="text-[9px] tabular-nums opacity-60">{{ count($slot['items']) }}</span>
-                          @endif
-                          <button wire:sortable.handle class="p-0.5 rounded hover:bg-[var(--ui-muted-5)] text-[var(--ui-muted)] hover:text-[var(--ui-text)] cursor-grab opacity-0 group-hover:opacity-100 transition" title="Spalte verschieben">
-                            <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16"/></svg>
-                          </button>
-                          <button wire:click="deleteAgendaSlot({{ $slot['id'] }})" wire:confirm="Slot löschen? Items werden in den Backlog verschoben."
-                                  class="p-0.5 rounded hover:bg-red-500/10 text-[var(--ui-muted)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition" title="Slot löschen">
-                            <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
-                          </button>
-                        </div>
-                      </template>
-                      <template x-if="editing">
-                        <input x-ref="slotInput" type="text" x-model="slotName"
-                               @keydown.enter="if(slotName.trim()) { $wire.renameAgendaSlot({{ $slot['id'] }}, slotName.trim()); editing = false; }"
-                               @keydown.escape="editing = false; slotName = '{{ addslashes($slot['name']) }}'"
-                               @click.outside="if(slotName.trim()) { $wire.renameAgendaSlot({{ $slot['id'] }}, slotName.trim()); } editing = false;"
-                               class="flex-1 text-[10px] font-semibold uppercase tracking-wider px-1 py-0 border border-[var(--ui-primary)]/40 rounded bg-[var(--ui-surface)] text-[var(--ui-text)] outline-none">
-                      </template>
-                    </div>
-                    <div class="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1" wire:sortable-group.item-group="{{ $slot['id'] }}">
-                      @foreach($slot['items'] as $item)
-                        <div wire:sortable-group.item="{{ $item['id'] }}" wire:key="kanban-item-{{ $item['id'] }}"
-                             class="group rounded-md border px-2.5 py-2 bg-[var(--ui-surface)] border-[var(--ui-border)]/20 hover:border-[var(--ui-border)]/50 transition cursor-grab"
-                             @if($item['color'])
-                               style="border-left: 3px solid rgba(var(--color-{{ $item['color'] }}-500), 0.6);"
-                             @endif>
-                          <div class="flex items-start gap-2">
-                            <button wire:click="toggleAgendaItemDone({{ $item['id'] }})"
-                                    class="mt-0.5 w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center transition border-[var(--ui-border)] hover:border-[var(--ui-primary)]">
-                            </button>
-                            <div class="flex-1 min-w-0">
-                              <div class="text-xs font-medium text-[var(--ui-text)] leading-tight">{{ $item['title'] }}</div>
-                              @if($item['notes'])
-                                <div class="text-[10px] text-[var(--ui-muted)] mt-0.5 line-clamp-1">{{ $item['notes'] }}</div>
-                              @endif
-                              <div class="flex items-center gap-1 mt-1 flex-wrap">
-                                @if(!empty($item['is_linked']))
-                                  <span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]">{{ $item['agendable_type_label'] }}</span>
-                                @endif
-                                @if($item['date_label'])
-                                  <span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $item['date_label'] }}</span>
-                                @endif
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      @endforeach
-                    </div>
-                  </div>
+                  </x-ui-kanban-column>
                 @endforeach
 
-                {{-- Done column --}}
-                <div class="flex-shrink-0 w-64 h-full flex flex-col bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/30 opacity-70" wire:key="kanban-col-done">
-                  <div class="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] border-b border-[var(--ui-border)]/20 flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-                    Erledigt
-                    @if(count($this->agendaDoneItems) > 0)
-                      <span class="ml-auto text-[9px] tabular-nums opacity-60">{{ count($this->agendaDoneItems) }}</span>
-                    @endif
-                  </div>
-                  <div class="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1" wire:sortable-group.item-group="done">
-                    @foreach($this->agendaDoneItems as $item)
-                      <div wire:sortable-group.item="{{ $item['id'] }}" wire:key="kanban-item-{{ $item['id'] }}"
-                           class="rounded-md border px-2.5 py-2 bg-[var(--ui-surface)] border-[var(--ui-border)]/10 transition cursor-grab">
-                        <div class="flex items-start gap-2">
-                          <button wire:click="toggleAgendaItemDone({{ $item['id'] }})"
-                                  class="mt-0.5 w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center bg-[var(--ui-primary)] border-[var(--ui-primary)] text-white">
-                            <svg class="w-2.5 h-2.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
-                          </button>
-                          <div class="flex-1 min-w-0">
-                            <div class="text-xs text-[var(--ui-muted)] line-through leading-tight">{{ $item['title'] }}</div>
-                          </div>
+                {{-- Erledigt (nicht sortierbar als Spalte) --}}
+                <x-ui-kanban-column title="Erledigt" :sortable-id="null" :scrollable="true" :muted="true">
+                  <x-slot name="headerActions">
+                    <span class="text-xs text-[var(--ui-muted)] font-medium">{{ count($this->agendaDoneItems) }}</span>
+                  </x-slot>
+                  @foreach($this->agendaDoneItems as $item)
+                    <x-ui-kanban-card :title="''" :sortable-id="$item['id']">
+                      <div class="flex items-start gap-2">
+                        <button wire:click="toggleAgendaItemDone({{ $item['id'] }})" class="mt-0.5 w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center bg-[var(--ui-primary)] border-[var(--ui-primary)] text-white">
+                          <svg class="w-2.5 h-2.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
+                        </button>
+                        <div class="flex-1 min-w-0">
+                          <div class="text-xs text-[var(--ui-muted)] line-through leading-tight">{{ $item['title'] }}</div>
                         </div>
                       </div>
-                    @endforeach
-                  </div>
-                </div>
+                    </x-ui-kanban-card>
+                  @endforeach
+                </x-ui-kanban-column>
 
-                {{-- Add new slot button --}}
-                <div class="flex-shrink-0 w-64 h-auto" x-data="{ showNewSlot: false }">
+                {{-- Neue Spalte hinzufügen --}}
+                <div class="flex-shrink-0 w-80 pt-2" x-data="{ showNewSlot: false, newSlotName: '' }">
                   <div x-show="!showNewSlot">
-                    <button @click="showNewSlot = true" class="flex items-center gap-1.5 text-xs text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition px-3 py-2">
+                    <button @click="showNewSlot = true; $nextTick(() => $refs.newSlotInput?.focus())" class="flex items-center gap-1.5 text-xs text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition px-3 py-2">
                       <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
                       Spalte hinzufügen
                     </button>
                   </div>
                   <div x-show="showNewSlot" x-cloak class="p-2 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/30 space-y-2">
-                    <input type="text" x-model="newSlotName" placeholder="Spalten-Name…"
+                    <input x-ref="newSlotInput" type="text" x-model="newSlotName" placeholder="Spalten-Name…"
                            @keydown.enter="if(newSlotName.trim()) { $wire.createAgendaSlot({{ $activeAgendaId }}, newSlotName.trim()); newSlotName = ''; showNewSlot = false; }"
                            @keydown.escape="showNewSlot = false; newSlotName = ''"
-                           x-init="showNewSlot && $nextTick(() => $el.focus())"
                            class="w-full text-xs px-2.5 py-1.5 rounded border border-[var(--ui-border)] bg-[var(--ui-surface)] text-[var(--ui-text)] placeholder:text-[var(--ui-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--ui-primary)]">
                     <div class="flex gap-1">
                       <button @click="if(newSlotName.trim()) { $wire.createAgendaSlot({{ $activeAgendaId }}, newSlotName.trim()); newSlotName = ''; showNewSlot = false; }"
@@ -3532,7 +3267,8 @@
                     </div>
                   </div>
                 </div>
-              </div>
+
+              </x-ui-kanban-container>
 
             {{-- "Mein Tag" View --}}
             @elseif($agendaView === 'day')
