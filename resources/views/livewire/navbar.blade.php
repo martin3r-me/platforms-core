@@ -91,21 +91,37 @@
 
             <div class="h-6 w-px bg-[var(--ui-border)]/60 mx-0.5"></div>
 
-            {{-- Layout Toggles: Sidebar, Terminal, Activity — grouped --}}
+            {{-- Layout Toggles: Main Sidebar, Page Sidebar, Terminal, Activity — grouped --}}
             <div class="flex items-center gap-0 rounded-md border border-[var(--ui-border)]/60 p-0.5">
+                {{-- Main Sidebar (Navigation) --}}
+                <button x-data
+                    @click="window.dispatchEvent(new CustomEvent('toggle-main-sidebar'))"
+                    class="inline-flex items-center justify-center w-7 h-7 rounded transition"
+                    :class="Alpine.store('page')?.mainSidebarOpen
+                        ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]'
+                        : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
+                    title="Navigation">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4">
+                        <rect x="3" y="5" width="6" height="14" rx="1.5" fill="currentColor" opacity="0.9" stroke="none" />
+                        <rect x="10.5" y="5" width="10.5" height="14" rx="1.5" />
+                    </svg>
+                </button>
+
+                {{-- Page Sidebar (left) --}}
                 <button x-data
                     @click="Alpine.store('page') && (Alpine.store('page').sidebarOpen = !Alpine.store('page').sidebarOpen)"
                     class="inline-flex items-center justify-center w-7 h-7 rounded transition"
                     :class="Alpine.store('page')?.sidebarOpen
                         ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]'
                         : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
-                    title="Linke Sidebar">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
-                        <rect x="3" y="5" width="8" height="14" rx="2" class="opacity-90" />
-                        <rect x="11" y="5" width="10" height="14" rx="2" class="opacity-40" />
+                    title="Seiten-Sidebar">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4">
+                        <rect x="3" y="5" width="8" height="14" rx="1.5" fill="currentColor" opacity="0.9" stroke="none" />
+                        <rect x="12.5" y="5" width="8.5" height="14" rx="1.5" />
                     </svg>
                 </button>
 
+                {{-- Terminal (bottom) --}}
                 <button x-data
                     @click="window.dispatchEvent(new CustomEvent('toggle-terminal'))"
                     class="inline-flex items-center justify-center w-7 h-7 rounded transition"
@@ -113,12 +129,13 @@
                         ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]'
                         : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
                     title="Terminal">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
-                        <rect x="3" y="5" width="18" height="9" rx="2" class="opacity-40" />
-                        <rect x="3" y="14" width="18" height="5" rx="2" class="opacity-90" />
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4">
+                        <rect x="3" y="5" width="18" height="8.5" rx="1.5" />
+                        <rect x="3" y="15" width="18" height="4" rx="1.5" fill="currentColor" opacity="0.9" stroke="none" />
                     </svg>
                 </button>
 
+                {{-- Activity Sidebar (right) --}}
                 <button x-data
                     @click="Alpine.store('page') && (Alpine.store('page').activityOpen = !Alpine.store('page').activityOpen)"
                     class="inline-flex items-center justify-center w-7 h-7 rounded transition"
@@ -126,9 +143,9 @@
                         ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]'
                         : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
                     title="Aktivitäten">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
-                        <rect x="3" y="5" width="10" height="14" rx="2" class="opacity-40" />
-                        <rect x="13" y="5" width="8" height="14" rx="2" class="opacity-90" />
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4">
+                        <rect x="3" y="5" width="10" height="14" rx="1.5" />
+                        <rect x="14.5" y="5" width="6.5" height="14" rx="1.5" fill="currentColor" opacity="0.9" stroke="none" />
                     </svg>
                 </button>
             </div>
