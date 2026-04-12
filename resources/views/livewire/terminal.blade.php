@@ -352,35 +352,6 @@
           <div class="absolute top-1/2 -translate-y-1/2 right-0 h-8 w-1 rounded-full bg-transparent group-hover/sresize:bg-[var(--t-accent)]/30 transition"></div>
         </div>
 
-        {{-- ═══ Shared Context Block (alle Apps) ═══ --}}
-        @if($pageContext)
-          <div class="px-2 mb-2 flex-shrink-0">
-            <div class="p-2 rounded-lg border border-[var(--t-border)]/40 bg-white/[0.03]">
-              <div class="flex items-center gap-2">
-                <span class="text-sm flex-shrink-0">{{ $pageContext['icon'] }}</span>
-                <div class="min-w-0 flex-1">
-                  <span class="text-[11px] font-medium text-[var(--t-text)] truncate block">{{ $pageContext['title'] }}</span>
-                  <span class="text-[9px] text-[var(--t-text-muted)]">{{ $pageContext['label'] }}</span>
-                </div>
-                {{-- Quick-action: Agenda attach (only in agenda app) --}}
-                @if($activeApp === 'agenda' && $activeAgendaId && $this->canAttachContextToAgenda())
-                  @if($this->isContextAttachedToAgenda())
-                    <span class="p-1 text-[var(--t-accent)] flex-shrink-0" title="Bereits in Agenda">
-                      <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
-                    </span>
-                  @else
-                    <button wire:click="attachContextToAgenda"
-                            class="p-1 rounded hover:bg-[var(--t-accent)]/20 text-[var(--t-text-muted)] hover:text-[var(--t-accent)] transition flex-shrink-0"
-                            title="In Agenda aufnehmen">
-                      <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-                    </button>
-                  @endif
-                @endif
-              </div>
-            </div>
-          </div>
-        @endif
-
         <!-- ═══ Sidebar: Chat (Channels) ═══ -->
         <div x-show="$wire.activeApp === 'chat'" class="flex-1 min-h-0 flex flex-col">
 
