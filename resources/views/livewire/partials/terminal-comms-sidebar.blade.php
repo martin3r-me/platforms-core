@@ -24,10 +24,6 @@
     {{-- ── Context Threads ── --}}
     @if(!empty($allContextThreads))
       <div class="mb-1">
-        <div class="px-2 py-1.5 flex items-center gap-1.5">
-          <span class="text-[9px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)]/50">Kontext</span>
-          <span class="text-[9px] text-[var(--t-text-muted)]/30">{{ count($allContextThreads) }}</span>
-        </div>
         <div class="space-y-0.5">
           @foreach($allContextThreads as $idx => $thread)
             @php
