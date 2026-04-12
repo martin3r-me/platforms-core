@@ -3177,14 +3177,16 @@
         @endif
 
           <!-- ═══ App: Comms ═══ -->
-          <div x-show="$wire.activeApp === 'comms'" class="flex-1 min-h-0 flex flex-col"
+          <div x-show="$wire.activeApp === 'comms'" class="flex-1 min-h-0 flex flex-col relative"
                wire:poll.5s="refreshTimelines">
-            @if($commsView === 'timeline')
-              @include('platform::livewire.partials.terminal-comms-timeline')
-            @elseif($commsView === 'new')
-              @include('platform::livewire.partials.terminal-comms-new')
-            @elseif($commsView === 'settings')
-              @include('platform::livewire.partials.terminal-comms-settings')
+            {{-- Timeline is ALWAYS rendered --}}
+            @include('platform::livewire.partials.terminal-comms-timeline')
+
+            {{-- Settings Overlay (modal over timeline) --}}
+            @if($commsShowSettings)
+              <div class="absolute inset-0 z-30 flex flex-col bg-[var(--t-glass-surface)]/95 backdrop-blur-md">
+                @include('platform::livewire.partials.terminal-comms-settings')
+              </div>
             @endif
           </div>
 

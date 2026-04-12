@@ -53,6 +53,7 @@ class Terminal extends Component
     use WithCommsChat {
         WithCommsChat::setCommsContext as initCommsFromPayload;
         WithCommsChat::buildContextThreadsList as traitBuildContextThreadsList;
+        WithCommsChat::switchToContextThread as traitSwitchToContextThread;
     }
     use WithCommsChannelSettings;
 
@@ -72,10 +73,14 @@ class Terminal extends Component
     public string $filesFilter = 'all'; // all | images | documents
 
     // ── Comms App ────────────────────────────────────────────
-    public string $commsView = 'timeline'; // 'timeline' | 'new' | 'settings'
     public bool $commsInitialized = false;
+    public bool $commsShowNewMessage = false;  // overlay panel above timeline
+    public bool $commsShowSettings = false;    // overlay modal over timeline
+    public string $commsComposeChannel = 'email'; // 'email' | 'whatsapp' — for compose + new message
+    public bool $commsIncludeContext = false;     // toggle: append context block to outbound message
     public array $otherRecentThreads = [];
     public bool $showOtherThreads = false;
+    public ?int $activeOtherThreadIndex = null;
 
     // ── Tagging ──────────────────────────────────────────────
     public string $taggingTab = 'tags'; // 'tags', 'color', 'overview'
@@ -266,6 +271,11 @@ class Terminal extends Component
         if ($model !== $this->contextType || (int) $modelId !== $this->contextId) {
             $this->availableApps = ['chat' => true, 'agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false];
             $this->commsInitialized = false;
+            $this->commsShowNewMessage = false;
+            $this->commsShowSettings = false;
+            $this->commsIncludeContext = false;
+            $this->activeOtherThreadIndex = null;
+            $this->otherRecentThreads = [];
         }
 
         $this->contextType = $model;
@@ -964,43 +974,61 @@ class Terminal extends Component
             if ($this->activeWhatsAppChannelId) {
                 $this->loadWhatsAppTemplates();
             }
+            // Set default compose channel based on available channels
+            if (!empty($this->emailChannels)) {
+                $this->commsComposeChannel = 'email';
+            } elseif (!empty($this->whatsappChannels)) {
+                $this->commsComposeChannel = 'whatsapp';
+            }
             $this->commsInitialized = true;
         }
     }
 
     /**
-     * Open comms settings view (channels + connections management).
+     * Open comms settings as overlay (timeline stays visible underneath).
      */
     public function openCommsSettings(): void
     {
-        $this->commsView = 'settings';
+        $this->commsShowSettings = true;
         $this->loadPostmarkConnection();
         $this->loadCommsSettingsChannels();
         $this->loadAvailableWhatsAppAccounts();
     }
 
     /**
-     * Navigate back to timeline from any sub-view (settings, new).
+     * Close all overlays — back to pure timeline.
      */
     public function commsBackToTimeline(): void
     {
-        $this->commsView = 'timeline';
+        $this->commsShowNewMessage = false;
+        $this->commsShowSettings = false;
     }
 
     /**
-     * Open new message view and pre-load WA templates if available.
+     * Close settings overlay.
+     */
+    public function closeCommsSettings(): void
+    {
+        $this->commsShowSettings = false;
+    }
+
+    /**
+     * Toggle new-message panel (overlay above timeline).
      */
     public function openCommsNewMessage(): void
     {
-        $this->commsView = 'new';
-        // Always (re)load WhatsApp templates for the active channel
-        if ($this->activeWhatsAppChannelId) {
-            $this->loadWhatsAppTemplates();
+        $this->commsShowNewMessage = !$this->commsShowNewMessage;
+        if ($this->commsShowNewMessage) {
+            $this->commsShowSettings = false; // close settings if open
+            // Pre-load WA templates for the active channel
+            if ($this->activeWhatsAppChannelId) {
+                $this->loadWhatsAppTemplates();
+            }
+            // Reset template selection for clean state
+            $this->whatsappSelectedTemplateId = null;
+            $this->whatsappTemplatePreview = [];
+            $this->whatsappTemplateVariables = [];
         }
-        // Reset template selection for clean state
-        $this->whatsappSelectedTemplateId = null;
-        $this->whatsappTemplatePreview = [];
-        $this->whatsappTemplateVariables = [];
     }
 
     /**
@@ -1008,32 +1036,86 @@ class Terminal extends Component
      */
     public function sendNewEmail(): void
     {
+        $this->maybeAppendContextToEmailBody();
         $this->sendEmail();
         if ($this->activeEmailThreadId) {
-            $this->commsView = 'timeline';
+            $this->commsShowNewMessage = false;
         }
     }
 
     /**
-     * Send WhatsApp from "new message" view and switch to the new thread.
+     * Send WhatsApp from "new message" panel and close it.
      */
     public function sendNewWhatsApp(): void
     {
+        $this->maybeAppendContextToWhatsAppBody();
         $this->sendWhatsApp();
         if ($this->activeWhatsAppThreadId) {
-            $this->commsView = 'timeline';
+            $this->commsShowNewMessage = false;
         }
     }
 
     /**
-     * Send WhatsApp template from "new message" view and switch to the new thread.
+     * Send WhatsApp template from "new message" panel and close it.
      */
     public function sendNewWhatsAppTemplate(): void
     {
         $this->sendWhatsAppTemplate();
         if ($this->activeWhatsAppThreadId) {
-            $this->commsView = 'timeline';
+            $this->commsShowNewMessage = false;
         }
+    }
+
+    /**
+     * Build a plain-text context footer block from available context properties.
+     */
+    protected function buildContextFooter(): ?string
+    {
+        if (! $this->commsIncludeContext) {
+            return null;
+        }
+
+        $parts = [];
+        if ($this->contextSubject) {
+            $parts[] = $this->contextSubject;
+        }
+        if ($this->contextDescription) {
+            $parts[] = $this->contextDescription;
+        }
+        foreach ($this->contextMeta as $key => $value) {
+            if (is_string($value) && $value !== '') {
+                $parts[] = ucfirst((string) $key) . ': ' . $value;
+            }
+        }
+        if ($this->contextUrl) {
+            $parts[] = $this->contextUrl;
+        }
+
+        return ! empty($parts) ? "\n\n---\n" . implode("\n", $parts) : null;
+    }
+
+    /**
+     * If context toggle is on for a new email, append context block to body.
+     */
+    protected function maybeAppendContextToEmailBody(): void
+    {
+        $footer = $this->buildContextFooter();
+        if ($footer && ! empty($this->emailCompose['body'])) {
+            $this->emailCompose['body'] .= $footer;
+        }
+        $this->commsIncludeContext = false;
+    }
+
+    /**
+     * If context toggle is on for a new WA message, append context block to body.
+     */
+    protected function maybeAppendContextToWhatsAppBody(): void
+    {
+        $footer = $this->buildContextFooter();
+        if ($footer && ! empty($this->whatsappCompose['body'])) {
+            $this->whatsappCompose['body'] .= $footer;
+        }
+        $this->commsIncludeContext = false;
     }
 
     /**
@@ -1152,6 +1234,22 @@ class Terminal extends Component
     }
 
     /**
+     * Override trait's switchToContextThread to also clear the "other" active index
+     * and set compose channel to match thread type.
+     */
+    public function switchToContextThread(int $index): void
+    {
+        $this->activeOtherThreadIndex = null;
+        $this->commsShowNewMessage = false;
+        $this->traitSwitchToContextThread($index);
+
+        // Set compose channel to match the selected thread type
+        if (isset($this->allContextThreads[$index])) {
+            $this->commsComposeChannel = $this->allContextThreads[$index]['type'] === 'whatsapp' ? 'whatsapp' : 'email';
+        }
+    }
+
+    /**
      * Switch to a thread from the "other recent" list (non-context thread).
      */
     public function switchToOtherThread(int $index): void
@@ -1162,6 +1260,9 @@ class Terminal extends Component
 
         $entry = $this->otherRecentThreads[$index];
         $this->activeContextThreadIndex = null; // Deselect context threads
+        $this->activeOtherThreadIndex = $index;
+        $this->commsShowNewMessage = false;
+        $this->commsComposeChannel = $entry['type'] === 'whatsapp' ? 'whatsapp' : 'email';
 
         if ($entry['type'] === 'email') {
             $this->activeEmailChannelId = (int) $entry['channel_id'];
