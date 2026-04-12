@@ -1036,6 +1036,54 @@ class Terminal extends Component
     }
 
     /**
+     * Override trait's setActiveEmailThread to also fill 'to' from last outbound
+     * when there are no inbound mails (outbound-only thread scenario).
+     */
+    public function setActiveEmailThread(int $threadId): void
+    {
+        // Call parent trait logic via the inherited method chain
+        $this->activeEmailThreadId = $threadId;
+        $this->resetForwardState();
+        $this->loadEmailTimeline();
+
+        $thread = \Platform\Crm\Models\CommsEmailThread::query()->whereKey($threadId)->first();
+
+        // 1. Try inbound address (trait's original logic)
+        if ($thread?->last_inbound_from_address) {
+            $this->emailCompose['to'] = (string) $thread->last_inbound_from_address;
+        } else {
+            $lastInbound = \Platform\Crm\Models\CommsEmailInboundMail::query()
+                ->where('thread_id', $threadId)
+                ->orderByDesc('received_at')
+                ->first();
+            if ($lastInbound?->from) {
+                $this->emailCompose['to'] = $this->extractEmailAddress((string) $lastInbound->from) ?: (string) $lastInbound->from;
+            }
+        }
+
+        // 2. Fallback: last outbound's "to" address (for outbound-only threads)
+        if (empty(trim($this->emailCompose['to'] ?? ''))) {
+            $lastOutbound = \Platform\Crm\Models\CommsEmailOutboundMail::query()
+                ->where('thread_id', $threadId)
+                ->orderByDesc('sent_at')
+                ->first();
+            if ($lastOutbound?->to) {
+                $this->emailCompose['to'] = $this->extractEmailAddress((string) $lastOutbound->to) ?: (string) $lastOutbound->to;
+            }
+        }
+
+        // 3. Final fallback: context recipient
+        if (empty(trim($this->emailCompose['to'] ?? ''))) {
+            $contextEmail = $this->findContextRecipientByType('email');
+            if ($contextEmail) {
+                $this->emailCompose['to'] = $contextEmail;
+            }
+        }
+
+        $this->dispatch('comms:scroll-bottom');
+    }
+
+    /**
      * Open tags app from sidebar button (uses context from active channel).
      */
     public function openTagsApp(): void

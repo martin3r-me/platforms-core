@@ -294,117 +294,134 @@
     @endif
   </div>
 
-  {{-- ════ Compose Area (sticky bottom) ════ --}}
+  {{-- ════ Compose Area (sticky bottom) — matches Chat input style ════ --}}
   @if($activeEmailThreadId || $activeWhatsAppThreadId)
-    <div class="border-t border-[var(--t-border)]/40 px-4 py-2.5 flex-shrink-0 bg-white/[0.02]"
+    <div class="border-t border-[var(--t-border)]/60 flex-shrink-0"
          x-data="{ autoGrow(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; } }">
 
-      {{-- Email Compose --}}
-      @if($activeEmailThreadId)
-        <div class="flex gap-2 items-end">
-          <textarea
-            x-ref="emailBody"
-            x-init="$nextTick(() => autoGrow($refs.emailBody))"
-            @input="autoGrow($event.target)"
-            @keydown.enter="if(!$event.shiftKey){ $event.preventDefault(); $wire.sendEmail(); }"
-            rows="1"
-            wire:model="emailCompose.body"
-            class="flex-1 px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/30 text-[var(--t-text)] placeholder-[var(--t-text-muted)]/50 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/30 resize-none transition"
-            placeholder="Antworten..."
-          ></textarea>
-          <button wire:click="sendEmail" wire:loading.attr="disabled" wire:target="sendEmail"
-                  class="px-3 py-2 rounded-lg text-xs font-semibold bg-blue-500 text-white hover:bg-blue-600 transition disabled:opacity-50 shadow-sm shadow-blue-500/20 flex-shrink-0">
-            <svg class="w-4 h-4" wire:loading.remove wire:target="sendEmail" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/></svg>
-            <svg class="w-4 h-4 animate-pulse" wire:loading wire:target="sendEmail" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-          </button>
+      {{-- Status messages --}}
+      @if($emailMessage || $whatsappMessage)
+        <div class="px-4 pt-2 pb-0">
+          @if($emailMessage)
+            <div class="text-[10px] text-emerald-400">{{ $emailMessage }}</div>
+          @endif
+          @if($whatsappMessage)
+            <div class="text-[10px] text-emerald-400">{{ $whatsappMessage }}</div>
+          @endif
         </div>
-        @error('emailCompose.body')
-          <div class="text-[10px] text-red-400 mt-1">{{ $message }}</div>
-        @enderror
-        @if($emailMessage)
-          <div class="text-[10px] text-emerald-400 mt-1">{{ $emailMessage }}</div>
-        @endif
       @endif
+      @error('emailCompose.body')
+        <div class="px-4 pt-2 pb-0 text-[10px] text-red-400">{{ $message }}</div>
+      @enderror
+      @error('whatsappCompose.body')
+        <div class="px-4 pt-2 pb-0 text-[10px] text-red-400">{{ $message }}</div>
+      @enderror
 
-      {{-- WhatsApp Compose --}}
-      @if($activeWhatsAppThreadId)
-        @if($viewingConversationHistory)
-          <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-[var(--t-border)]/25">
-            <svg class="w-3.5 h-3.5 text-[var(--t-text-muted)] flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>
-            <span class="text-[10px] text-[var(--t-text-muted)]">Archiviert — wechsle zum aktiven Thread zum Antworten.</span>
-          </div>
-        @elseif($whatsappWindowOpen)
-          <div class="flex gap-2 items-end">
-            <textarea
-              x-ref="waBody"
-              x-init="$nextTick(() => autoGrow($refs.waBody))"
-              @input="autoGrow($event.target)"
-              @keydown.enter="if(!$event.shiftKey){ $event.preventDefault(); $wire.sendWhatsApp(); }"
-              rows="1"
-              wire:model="whatsappCompose.body"
-              class="flex-1 px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/30 text-[var(--t-text)] placeholder-[var(--t-text-muted)]/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/30 resize-none transition"
-              placeholder="Nachricht..."
-            ></textarea>
-            <button wire:click="sendWhatsApp" wire:loading.attr="disabled" wire:target="sendWhatsApp"
-                    class="px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition disabled:opacity-50 shadow-sm shadow-emerald-600/20 flex-shrink-0">
-              <svg class="w-4 h-4" wire:loading.remove wire:target="sendWhatsApp" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/></svg>
-              <svg class="w-4 h-4 animate-pulse" wire:loading wire:target="sendWhatsApp" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+      <div class="px-4 py-2.5">
+
+        {{-- Email Compose --}}
+        @if($activeEmailThreadId)
+          <div class="flex items-end gap-2">
+            <div class="flex-1 min-w-0 rounded-lg border transition-all border-[var(--t-border)]/80 focus-within:border-[var(--t-accent)]/50 focus-within:shadow-[0_0_0_1px_var(--t-accent)]">
+              <textarea
+                x-ref="emailBody"
+                x-init="$nextTick(() => autoGrow($refs.emailBody))"
+                @input="autoGrow($event.target)"
+                @keydown.enter="if(!$event.shiftKey){ $event.preventDefault(); $wire.sendEmail(); }"
+                rows="1"
+                wire:model="emailCompose.body"
+                class="w-full px-3 py-2 text-xs bg-transparent text-[var(--t-text)] placeholder-[var(--t-text-muted)]/50 focus:outline-none resize-none"
+                placeholder="Antworten..."
+              ></textarea>
+            </div>
+            <button
+              wire:click="sendEmail" wire:loading.attr="disabled" wire:target="sendEmail"
+              class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs transition flex-shrink-0 bg-[var(--t-accent)] text-white hover:bg-[var(--t-accent)]/80 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <svg class="w-4 h-4" wire:loading.remove wire:target="sendEmail" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"/></svg>
+              <svg class="w-4 h-4 animate-spin" wire:loading wire:target="sendEmail" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
             </button>
           </div>
-        @else
-          {{-- Closed window: Template mode --}}
-          <div class="space-y-2">
-            <div class="rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2 flex items-center gap-2">
-              <svg class="w-3.5 h-3.5 text-amber-400 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-              <span class="text-[10px] text-amber-300 font-medium">24h-Fenster geschlossen — nur Templates möglich.</span>
+        @endif
+
+        {{-- WhatsApp Compose --}}
+        @if($activeWhatsAppThreadId)
+          @if($viewingConversationHistory)
+            <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-[var(--t-border)]/25">
+              <svg class="w-3.5 h-3.5 text-[var(--t-text-muted)] flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>
+              <span class="text-[10px] text-[var(--t-text-muted)]">Archiviert — wechsle zum aktiven Thread zum Antworten.</span>
             </div>
-            @if(!empty($whatsappTemplates))
-              <select wire:model.live="whatsappSelectedTemplateId"
-                      class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] focus:outline-none focus:ring-1 focus:ring-amber-500/50">
-                <option value="">Template wählen...</option>
-                @foreach($whatsappTemplates as $tpl)
-                  <option value="{{ $tpl['id'] }}">{{ $tpl['label'] ?? $tpl['name'] ?? '' }}</option>
-                @endforeach
-              </select>
-              @if(!empty($whatsappTemplatePreview))
-                <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.04] p-3 space-y-2">
-                  <div class="flex items-center justify-between">
-                    <span class="text-[11px] font-semibold text-emerald-400">{{ $whatsappTemplatePreview['name'] ?? '' }}</span>
-                  </div>
-                  <div class="rounded-lg bg-white/[0.04] px-2.5 py-2 text-xs text-[var(--t-text)]/80 whitespace-pre-wrap">{{ $this->getTemplatePreviewText() }}</div>
-                  @if(($whatsappTemplatePreview['variables_count'] ?? 0) > 0)
-                    <div class="space-y-1">
-                      @for($i = 1; $i <= $whatsappTemplatePreview['variables_count']; $i++)
-                        <div class="flex items-center gap-2">
-                          <span class="text-[10px] text-emerald-400/70 font-mono w-6 flex-shrink-0 text-right">&#123;&#123;{{ $i }}&#125;&#125;</span>
-                          <input type="text" wire:model.live="whatsappTemplateVariables.{{ $i }}"
-                                 class="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] focus:outline-none focus:ring-1 focus:ring-emerald-500/50 placeholder-[var(--t-text-muted)]/50"
-                                 placeholder="Wert..." />
-                        </div>
-                      @endfor
+          @elseif($whatsappWindowOpen)
+            <div class="flex items-end gap-2">
+              <div class="flex-1 min-w-0 rounded-lg border transition-all border-[var(--t-border)]/80 focus-within:border-[var(--t-accent)]/50 focus-within:shadow-[0_0_0_1px_var(--t-accent)]">
+                <textarea
+                  x-ref="waBody"
+                  x-init="$nextTick(() => autoGrow($refs.waBody))"
+                  @input="autoGrow($event.target)"
+                  @keydown.enter="if(!$event.shiftKey){ $event.preventDefault(); $wire.sendWhatsApp(); }"
+                  rows="1"
+                  wire:model="whatsappCompose.body"
+                  class="w-full px-3 py-2 text-xs bg-transparent text-[var(--t-text)] placeholder-[var(--t-text-muted)]/50 focus:outline-none resize-none"
+                  placeholder="Nachricht..."
+                ></textarea>
+              </div>
+              <button
+                wire:click="sendWhatsApp" wire:loading.attr="disabled" wire:target="sendWhatsApp"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs transition flex-shrink-0 bg-[var(--t-accent)] text-white hover:bg-[var(--t-accent)]/80 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <svg class="w-4 h-4" wire:loading.remove wire:target="sendWhatsApp" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"/></svg>
+                <svg class="w-4 h-4 animate-spin" wire:loading wire:target="sendWhatsApp" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+              </button>
+            </div>
+          @else
+            {{-- Closed window: Template mode --}}
+            <div class="space-y-2">
+              <div class="rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2 flex items-center gap-2">
+                <svg class="w-3.5 h-3.5 text-amber-400 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+                <span class="text-[10px] text-amber-300 font-medium">24h-Fenster geschlossen — nur Templates möglich.</span>
+              </div>
+              @if(!empty($whatsappTemplates))
+                <select wire:model.live="whatsappSelectedTemplateId"
+                        class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] focus:outline-none focus:ring-1 focus:ring-amber-500/50">
+                  <option value="">Template wählen...</option>
+                  @foreach($whatsappTemplates as $tpl)
+                    <option value="{{ $tpl['id'] }}">{{ $tpl['label'] ?? $tpl['name'] ?? '' }}</option>
+                  @endforeach
+                </select>
+                @if(!empty($whatsappTemplatePreview))
+                  <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.04] p-3 space-y-2">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[11px] font-semibold text-emerald-400">{{ $whatsappTemplatePreview['name'] ?? '' }}</span>
                     </div>
-                  @endif
-                  <div class="flex justify-end">
-                    <button wire:click="sendWhatsAppTemplate" wire:loading.attr="disabled" wire:target="sendWhatsAppTemplate"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition disabled:opacity-50 shadow-sm shadow-emerald-600/20">
-                      <span wire:loading.remove wire:target="sendWhatsAppTemplate">Template senden</span>
-                      <span wire:loading wire:target="sendWhatsAppTemplate">Sende...</span>
-                    </button>
+                    <div class="rounded-lg bg-white/[0.04] px-2.5 py-2 text-xs text-[var(--t-text)]/80 whitespace-pre-wrap">{{ $this->getTemplatePreviewText() }}</div>
+                    @if(($whatsappTemplatePreview['variables_count'] ?? 0) > 0)
+                      <div class="space-y-1">
+                        @for($i = 1; $i <= $whatsappTemplatePreview['variables_count']; $i++)
+                          <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-emerald-400/70 font-mono w-6 flex-shrink-0 text-right">&#123;&#123;{{ $i }}&#125;&#125;</span>
+                            <input type="text" wire:model.live="whatsappTemplateVariables.{{ $i }}"
+                                   class="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] focus:outline-none focus:ring-1 focus:ring-emerald-500/50 placeholder-[var(--t-text-muted)]/50"
+                                   placeholder="Wert..." />
+                          </div>
+                        @endfor
+                      </div>
+                    @endif
+                    <div class="flex justify-end">
+                      <button wire:click="sendWhatsAppTemplate" wire:loading.attr="disabled" wire:target="sendWhatsAppTemplate"
+                              class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs transition flex-shrink-0 bg-[var(--t-accent)] text-white hover:bg-[var(--t-accent)]/80 shadow-sm disabled:opacity-40">
+                        <svg class="w-4 h-4" wire:loading.remove wire:target="sendWhatsAppTemplate" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"/></svg>
+                        <svg class="w-4 h-4 animate-spin" wire:loading wire:target="sendWhatsAppTemplate" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                      </button>
+                    </div>
                   </div>
-                </div>
+                @endif
+              @else
+                <div class="text-[10px] text-[var(--t-text-muted)] text-center py-1">Keine Templates verfügbar.</div>
               @endif
-            @else
-              <div class="text-[10px] text-[var(--t-text-muted)] text-center py-1">Keine Templates verfügbar.</div>
-            @endif
-          </div>
+            </div>
+          @endif
         @endif
-        @error('whatsappCompose.body')
-          <div class="text-[10px] text-red-400 mt-1">{{ $message }}</div>
-        @enderror
-        @if($whatsappMessage)
-          <div class="text-[10px] text-emerald-400 mt-1">{{ $whatsappMessage }}</div>
-        @endif
-      @endif
+      </div>
     </div>
   @endif
 </div>
