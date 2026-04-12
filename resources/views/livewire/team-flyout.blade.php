@@ -1,6 +1,6 @@
 <div x-data="{ teamFlyoutOpen: false }"
      @open-team-flyout.window="teamFlyoutOpen = true"
-     class="relative hidden sm:block">
+     class="relative">
 
     <button x-ref="trigger" @click="teamFlyoutOpen = !teamFlyoutOpen"
         class="inline-flex items-center gap-1 px-2 py-1 h-7 rounded-md border transition text-xs

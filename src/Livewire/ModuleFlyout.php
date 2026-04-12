@@ -91,6 +91,9 @@ class ModuleFlyout extends Component
             $grouped[$groupKey][] = $module;
         }
 
+        // Admin-Module werden im AdminFlyout angezeigt
+        unset($grouped['admin']);
+
         // Nach Gruppen-Order sortieren
         uksort($grouped, function ($a, $b) use ($groups) {
             $orderA = $groups[$a]['order'] ?? 999;

@@ -23,6 +23,7 @@ class User extends Authenticatable
         'type',
         'core_ai_model_id',
         'instruction',
+        'navbar_favorites',
         'team_id',
     ];
 
@@ -36,6 +37,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'navbar_favorites' => 'array',
         ];
     }
 
