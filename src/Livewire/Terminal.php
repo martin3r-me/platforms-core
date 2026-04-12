@@ -199,6 +199,7 @@ class Terminal extends Component
 
     public function mount(): void
     {
+        \Log::debug('[Terminal] mount() called', ['url' => request()->url()]);
         $this->agendaDayDate = now()->toDateString();
 
         // Load last active channel for the user
@@ -340,6 +341,7 @@ class Terminal extends Component
     #[On('terminal:app:activity')]
     public function setAppActivity(): void
     {
+        \Log::debug('[Terminal] setAppActivity received');
         $this->availableApps['activity'] = true;
     }
 
@@ -350,6 +352,7 @@ class Terminal extends Component
     #[On('terminal:app:files')]
     public function setAppFiles(): void
     {
+        \Log::debug('[Terminal] setAppFiles received');
         $this->availableApps['files'] = true;
     }
 
@@ -924,6 +927,7 @@ class Terminal extends Component
     #[On('terminal:app:tags')]
     public function setAppTags(): void
     {
+        \Log::debug('[Terminal] setAppTags received');
         $this->availableApps['tags'] = true;
     }
 
