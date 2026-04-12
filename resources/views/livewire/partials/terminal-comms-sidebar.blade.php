@@ -50,7 +50,12 @@
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between gap-1">
               <span class="text-[11px] font-semibold text-[var(--t-text)] truncate">{{ $thread['label'] }}</span>
-              <span class="text-[9px] text-[var(--t-text-muted)]/50 whitespace-nowrap flex-shrink-0">{{ $thread['last_at'] }}</span>
+              <div class="flex items-center gap-1 flex-shrink-0">
+                @if(!$isEmail && ($thread['window_open'] ?? false))
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" title="24h-Fenster offen"></span>
+                @endif
+                <span class="text-[9px] text-[var(--t-text-muted)]/50 whitespace-nowrap">{{ $thread['last_at'] }}</span>
+              </div>
             </div>
             <div class="text-[10px] text-[var(--t-text-muted)] truncate">{{ $thread['counterpart'] }}</div>
           </div>

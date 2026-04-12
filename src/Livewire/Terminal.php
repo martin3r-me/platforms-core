@@ -50,7 +50,10 @@ use Platform\Crm\Livewire\Concerns\WithCommsChannelSettings;
 class Terminal extends Component
 {
     use WithFileUploads;
-    use WithCommsChat { WithCommsChat::setCommsContext as initCommsFromPayload; }
+    use WithCommsChat {
+        WithCommsChat::setCommsContext as initCommsFromPayload;
+        WithCommsChat::buildContextThreadsList as traitBuildContextThreadsList;
+    }
     use WithCommsChannelSettings;
 
     public ?string $contextType = null;
@@ -1036,6 +1039,25 @@ class Terminal extends Component
      * Parent trait's updatedActiveWhatsAppChannelId handles thread switching;
      * we additionally load templates for the new-message context.
      */
+    /**
+     * Override trait's buildContextThreadsList to enrich WA threads with window_open status.
+     */
+    public function buildContextThreadsList(): void
+    {
+        // Call trait logic (populates $this->allContextThreads)
+        $this->traitBuildContextThreadsList();
+
+        // Enrich WA threads with 24h window info
+        foreach ($this->allContextThreads as &$thread) {
+            if ($thread['type'] === 'whatsapp') {
+                $waThread = \Platform\Crm\Models\CommsWhatsAppThread::query()->whereKey($thread['thread_id'])->first();
+                $thread['window_open'] = $waThread?->isWindowOpen() ?? false;
+                $thread['window_expires_at'] = $waThread?->windowExpiresAt()?->toIso8601String();
+            }
+        }
+        unset($thread);
+    }
+
     public function commsLoadTemplatesForChannel(): void
     {
         if ($this->activeWhatsAppChannelId) {
