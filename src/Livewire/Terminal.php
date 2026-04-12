@@ -971,6 +971,39 @@ class Terminal extends Component
     }
 
     /**
+     * Send email from "new message" view and switch to the new thread.
+     */
+    public function sendNewEmail(): void
+    {
+        $this->sendEmail();
+        if ($this->activeEmailThreadId) {
+            $this->commsView = 'timeline';
+        }
+    }
+
+    /**
+     * Send WhatsApp from "new message" view and switch to the new thread.
+     */
+    public function sendNewWhatsApp(): void
+    {
+        $this->sendWhatsApp();
+        if ($this->activeWhatsAppThreadId) {
+            $this->commsView = 'timeline';
+        }
+    }
+
+    /**
+     * Send WhatsApp template from "new message" view and switch to the new thread.
+     */
+    public function sendNewWhatsAppTemplate(): void
+    {
+        $this->sendWhatsAppTemplate();
+        if ($this->activeWhatsAppThreadId) {
+            $this->commsView = 'timeline';
+        }
+    }
+
+    /**
      * Open tags app from sidebar button (uses context from active channel).
      */
     public function openTagsApp(): void
