@@ -97,7 +97,7 @@ class DetectModuleGuard
 
                 // Track module usage frequency (skip dashboard/core)
                 if (!in_array($moduleKey, ['dashboard', 'core'])) {
-                    ModuleUsageCount::increment($user->id, $user->current_team_id, $moduleKey);
+                    ModuleUsageCount::track($user->id, $user->current_team_id, $moduleKey);
                 }
                 
                 // Session-Flag nach dem ersten Request entfernen

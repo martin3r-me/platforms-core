@@ -21,12 +21,13 @@ class ModuleUsageCount extends Model
         ];
     }
 
-    public static function increment(int $userId, int $teamId, string $moduleKey): void
+    public static function track(int $userId, int $teamId, string $moduleKey): void
     {
-        self::updateOrCreate(
+        $record = self::updateOrCreate(
             ['user_id' => $userId, 'team_id' => $teamId, 'module_key' => $moduleKey],
             ['last_visited_at' => now()]
-        )->increment('visit_count');
+        );
+        $record->increment('visit_count');
     }
 
     public static function topModules(int $userId, int $teamId, int $limit = 5): array
