@@ -21,7 +21,7 @@
     :root {
       --t-glass: rgba(var(--ui-primary-rgb), 0.72);
       --t-glass-surface: rgba(var(--ui-primary-rgb), 0.65);
-      --t-glass-hover: rgba(var(--ui-primary-rgb), 0.45);
+      --t-glass-hover: rgba(var(--ui-primary-rgb), 0.55);
       --t-blur: 24px;
       --t-border: rgba(255,255,255,0.08);
       --t-border-bright: rgba(255,255,255,0.14);
@@ -32,8 +32,8 @@
       --t-unread-glow: rgba(var(--ui-danger-rgb), 0.3);
       /* Sidebar gradient — derived from primary (dark) to secondary (lighter) */
       --t-sidebar-from: rgb(var(--ui-primary-rgb));
-      --t-sidebar-to: rgba(var(--ui-secondary-rgb), 0.25);
-      --t-sidebar-hover: rgba(var(--ui-secondary-rgb), 0.15);
+      --t-sidebar-to: rgba(var(--ui-secondary-rgb), 0.45);
+      --t-sidebar-hover: rgba(var(--ui-secondary-rgb), 0.35);
       --t-sidebar-active: var(--ui-secondary);
     }
     /* Light scope — remaps terminal vars to platform light theme for content area + modals */
