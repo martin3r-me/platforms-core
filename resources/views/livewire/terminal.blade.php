@@ -30,10 +30,10 @@
       --t-accent: var(--ui-secondary);
       --t-glow: rgba(var(--ui-secondary-rgb), 0.15);
       --t-unread-glow: rgba(var(--ui-danger-rgb), 0.3);
-      /* Sidebar gradient — derived from primary (dark) to secondary (lighter) */
+      /* Sidebar — dark primary base with subtle secondary tint */
       --t-sidebar-from: rgb(var(--ui-primary-rgb));
-      --t-sidebar-to: rgba(var(--ui-secondary-rgb), 0.45);
-      --t-sidebar-hover: rgba(var(--ui-secondary-rgb), 0.35);
+      --t-sidebar-to: color-mix(in srgb, rgb(var(--ui-primary-rgb)) 75%, rgb(var(--ui-secondary-rgb)));
+      --t-sidebar-hover: rgba(var(--ui-secondary-rgb), 0.12);
       --t-sidebar-active: var(--ui-secondary);
     }
     /* Light scope — remaps terminal vars to platform light theme for content area + modals */
