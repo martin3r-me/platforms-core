@@ -955,6 +955,10 @@ class Terminal extends Component
             if (!empty($this->allContextThreads) && $this->activeContextThreadIndex === null) {
                 $this->switchToContextThread(0);
             }
+            // Pre-load WA templates so they're immediately available
+            if ($this->activeWhatsAppChannelId) {
+                $this->loadWhatsAppTemplates();
+            }
             $this->commsInitialized = true;
         }
     }
@@ -984,10 +988,14 @@ class Terminal extends Component
     public function openCommsNewMessage(): void
     {
         $this->commsView = 'new';
-        // Pre-load WhatsApp templates so they're available in the new message form
+        // Always (re)load WhatsApp templates for the active channel
         if ($this->activeWhatsAppChannelId) {
             $this->loadWhatsAppTemplates();
         }
+        // Reset template selection for clean state
+        $this->whatsappSelectedTemplateId = null;
+        $this->whatsappTemplatePreview = [];
+        $this->whatsappTemplateVariables = [];
     }
 
     /**
