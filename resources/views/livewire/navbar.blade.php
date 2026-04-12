@@ -55,77 +55,77 @@
     <div class="flex items-center gap-1">
         {{-- Action buttons (desktop/tablet) --}}
         <div class="hidden md:flex items-center gap-1">
-            {{-- Left Sidebar Toggle --}}
-            <button x-data
-                @click="Alpine.store('page') && (Alpine.store('page').sidebarOpen = !Alpine.store('page').sidebarOpen)"
-                class="inline-flex items-center justify-center w-8 h-8 rounded-md transition"
-                :class="Alpine.store('page')?.sidebarOpen
-                    ? 'text-[var(--ui-primary)] bg-[var(--ui-muted-5)]'
-                    : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
-                title="Linke Sidebar umschalten">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
-                    <rect x="3" y="5" width="8" height="14" rx="2" class="opacity-90" />
-                    <rect x="11" y="5" width="10" height="14" rx="2" class="opacity-40" />
-                </svg>
-            </button>
-
-            {{-- Check-in --}}
-            <button x-data
-                @click="$dispatch('open-modal-checkin')"
-                class="inline-flex items-center justify-center w-8 h-8 rounded-md transition text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]"
-                title="Täglicher Check-in">
-                @svg('heroicon-o-sun', 'w-4 h-4')
-            </button>
-
-            {{-- Comms --}}
-            <button x-data
-                @click="$dispatch('open-modal-comms')"
-                class="inline-flex items-center justify-center w-8 h-8 rounded-md transition text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]"
-                title="Kommunikation">
-                @svg('heroicon-o-paper-airplane', 'w-4 h-4')
-            </button>
-
-            {{-- Help --}}
             @php
                 $routeName = request()->route()?->getName();
                 $routeModule = is_string($routeName) && str_contains($routeName, '.') ? strstr($routeName, '.', true) : null;
             @endphp
+
+            {{-- Actions: Check-in, Comms, Help, Playground --}}
+            <button x-data
+                @click="$dispatch('open-modal-checkin')"
+                class="inline-flex items-center justify-center w-7 h-7 rounded-md transition text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]"
+                title="Täglicher Check-in">
+                @svg('heroicon-o-sun', 'w-4 h-4')
+            </button>
+
+            <button x-data
+                @click="$dispatch('open-modal-comms')"
+                class="inline-flex items-center justify-center w-7 h-7 rounded-md transition text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]"
+                title="Kommunikation">
+                @svg('heroicon-o-paper-airplane', 'w-4 h-4')
+            </button>
+
             <button x-data
                 @click="$dispatch('open-help', { module: @js($routeModule) })"
-                class="inline-flex items-center justify-center w-8 h-8 rounded-md transition text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]"
+                class="inline-flex items-center justify-center w-7 h-7 rounded-md transition text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]"
                 title="Hilfe">
                 @svg('heroicon-o-question-mark-circle', 'w-4 h-4')
             </button>
 
-            {{-- Playground --}}
             <button x-data
                 @click="$dispatch('playground:open', { context: { source_route: @js($routeName), source_module: @js($routeModule), source_url: window.location.href } })"
-                class="inline-flex items-center justify-center w-8 h-8 rounded-md transition text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]"
+                class="inline-flex items-center justify-center w-7 h-7 rounded-md transition text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]"
                 title="Playground öffnen">
                 @svg('heroicon-o-sparkles', 'w-4 h-4')
             </button>
 
-            {{-- Terminal Toggle --}}
-            <button x-data
-                @click="window.dispatchEvent(new CustomEvent('toggle-terminal'))"
-                class="inline-flex items-center justify-center w-8 h-8 rounded-md transition"
-                :class="Alpine.store('page')?.terminalOpen
-                    ? 'text-[var(--ui-primary)] bg-[var(--ui-muted-5)]'
-                    : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
-                title="Terminal umschalten">
-                @svg('heroicon-o-command-line', 'w-4 h-4')
-            </button>
+            <div class="h-6 w-px bg-[var(--ui-border)]/60 mx-0.5"></div>
 
-            {{-- Activity Sidebar Toggle --}}
-            <button x-data
-                @click="Alpine.store('page') && (Alpine.store('page').activityOpen = !Alpine.store('page').activityOpen)"
-                class="inline-flex items-center justify-center w-8 h-8 rounded-md transition"
-                :class="Alpine.store('page')?.activityOpen
-                    ? 'text-[var(--ui-primary)] bg-[var(--ui-muted-5)]'
-                    : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
-                title="Aktivitäten-Sidebar umschalten">
-                @svg('heroicon-o-bell-alert', 'w-4 h-4')
-            </button>
+            {{-- Layout Toggles: Sidebar, Terminal, Activity — grouped --}}
+            <div class="flex items-center gap-0 rounded-md border border-[var(--ui-border)]/60 p-0.5">
+                <button x-data
+                    @click="Alpine.store('page') && (Alpine.store('page').sidebarOpen = !Alpine.store('page').sidebarOpen)"
+                    class="inline-flex items-center justify-center w-7 h-7 rounded transition"
+                    :class="Alpine.store('page')?.sidebarOpen
+                        ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]'
+                        : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
+                    title="Linke Sidebar">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                        <rect x="3" y="5" width="8" height="14" rx="2" class="opacity-90" />
+                        <rect x="11" y="5" width="10" height="14" rx="2" class="opacity-40" />
+                    </svg>
+                </button>
+
+                <button x-data
+                    @click="window.dispatchEvent(new CustomEvent('toggle-terminal'))"
+                    class="inline-flex items-center justify-center w-7 h-7 rounded transition"
+                    :class="Alpine.store('page')?.terminalOpen
+                        ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]'
+                        : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
+                    title="Terminal">
+                    @svg('heroicon-o-command-line', 'w-4 h-4')
+                </button>
+
+                <button x-data
+                    @click="Alpine.store('page') && (Alpine.store('page').activityOpen = !Alpine.store('page').activityOpen)"
+                    class="inline-flex items-center justify-center w-7 h-7 rounded transition"
+                    :class="Alpine.store('page')?.activityOpen
+                        ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]'
+                        : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
+                    title="Aktivitäten">
+                    @svg('heroicon-o-bell-alert', 'w-4 h-4')
+                </button>
+            </div>
 
             <div class="h-6 w-px bg-[var(--ui-border)]/60 mx-0.5"></div>
         </div>
