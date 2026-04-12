@@ -1162,8 +1162,6 @@
           </div>
         </div>
 
-        @include('platform::livewire.partials.terminal-comms-sidebar')
-
       </div>
 
       <!-- Main Content Area — keyed per channel so editor + messages fully rebuild -->
@@ -3154,16 +3152,18 @@
           </div>
         @endif
 
-          <!-- ═══ App: Comms ═══ -->
-          <div x-show="$wire.activeApp === 'comms'" class="flex-1 min-h-0 flex flex-col relative"
-               wire:poll.5s="refreshTimelines">
-            {{-- Timeline is ALWAYS rendered --}}
-            @include('platform::livewire.partials.terminal-comms-timeline')
-
-            {{-- Settings Overlay (modal over timeline) --}}
-            @if($commsShowSettings)
-              <div class="absolute inset-0 z-30 flex flex-col bg-[var(--t-glass-surface)]/95 backdrop-blur-md">
-                @include('platform::livewire.partials.terminal-comms-settings')
+          <!-- ═══ App: Comms (InlineComms) ═══ -->
+          <div x-show="$wire.activeApp === 'comms'" class="flex-1 min-h-0 flex flex-col">
+            @if($contextType && $contextId && class_exists(\Platform\Crm\Livewire\InlineComms::class))
+              <livewire:crm.inline-comms
+                :context-type="$contextType"
+                :context-id="$contextId"
+                :subject="$contextSubject ?? ''"
+                :key="'terminal-comms-' . $contextType . '-' . $contextId"
+              />
+            @else
+              <div class="flex-1 flex items-center justify-center text-[var(--t-text-muted)] text-sm">
+                Kein Kontext — öffne eine Detail-Seite, um Comms zu nutzen.
               </div>
             @endif
           </div>

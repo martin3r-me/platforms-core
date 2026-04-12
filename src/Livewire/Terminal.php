@@ -41,8 +41,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Platform\Crm\Livewire\Concerns\WithCommsChat;
-use Platform\Crm\Livewire\Concerns\WithCommsChannelSettings;
 
 /**
  * Terminal UI shell with messaging, DMs, group channels, and context awareness.
@@ -50,12 +48,6 @@ use Platform\Crm\Livewire\Concerns\WithCommsChannelSettings;
 class Terminal extends Component
 {
     use WithFileUploads;
-    use WithCommsChat {
-        WithCommsChat::setCommsContext as initCommsFromPayload;
-        WithCommsChat::buildContextThreadsList as traitBuildContextThreadsList;
-        WithCommsChat::switchToContextThread as traitSwitchToContextThread;
-    }
-    use WithCommsChannelSettings;
 
     public ?string $contextType = null;
     public ?int $contextId = null;
@@ -72,15 +64,6 @@ class Terminal extends Component
     public string $activityFilter = 'all'; // all | manual | system
     public string $filesFilter = 'all'; // all | images | documents
 
-    // ── Comms App ────────────────────────────────────────────
-    public bool $commsInitialized = false;
-    public bool $commsShowNewMessage = false;  // overlay panel above timeline
-    public bool $commsShowSettings = false;    // overlay modal over timeline
-    public string $commsComposeChannel = 'email'; // 'email' | 'whatsapp' — for compose + new message
-    public bool $commsIncludeContext = false;     // toggle: append context block to outbound message
-    public array $otherRecentThreads = [];
-    public bool $showOtherThreads = false;
-    public ?int $activeOtherThreadIndex = null;
 
     // ── Tagging ──────────────────────────────────────────────
     public string $taggingTab = 'tags'; // 'tags', 'color', 'overview'
@@ -256,12 +239,6 @@ class Terminal extends Component
     #[On('comms')]
     public function setCommsContext(array $payload = []): void
     {
-        \Log::debug('[Terminal:setCommsContext] received', [
-            'payload_keys' => array_keys($payload),
-            'model' => $payload['model'] ?? null,
-            'modelId' => $payload['modelId'] ?? null,
-        ]);
-
         $model = $payload['model'] ?? null;
         $modelId = $payload['modelId'] ?? null;
 
@@ -276,12 +253,6 @@ class Terminal extends Component
         // Reset available apps when context changes
         if ($model !== $this->contextType || (int) $modelId !== $this->contextId) {
             $this->availableApps = ['chat' => true, 'agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false];
-            $this->commsInitialized = false;
-            $this->commsShowNewMessage = false;
-            $this->commsShowSettings = false;
-            $this->commsIncludeContext = false;
-            $this->activeOtherThreadIndex = null;
-            $this->otherRecentThreads = [];
         }
 
         $this->contextType = $model;
@@ -320,17 +291,8 @@ class Terminal extends Component
             }
         }
 
-        // Forward context to the Comms chat trait (email + WhatsApp runtime)
-        $this->initCommsFromPayload($payload);
+        // Enable comms tab — InlineComms handles everything internally
         $this->availableApps['comms'] = true;
-
-        // If user is already on the Comms tab, reinitialize immediately
-        // (updatedActiveApp won't fire because activeApp hasn't changed)
-        if ($this->activeApp === 'comms') {
-            $this->initCommsRuntime();
-        } else {
-            $this->commsInitialized = false;
-        }
     }
 
     /**
@@ -961,408 +923,6 @@ class Terminal extends Component
         }
     }
 
-    // ── Comms App ─────────────────────────────────────────────
-
-    /**
-     * WithCommsChat abstract: only poll when comms tab is active.
-     */
-    protected function shouldRefreshTimelines(): bool
-    {
-        return $this->activeApp === 'comms' && $this->commsInitialized;
-    }
-
-    /**
-     * Lazy-init comms runtime when tab is first opened.
-     */
-    public function updatedActiveApp(string $value): void
-    {
-        if ($value === 'comms' && !$this->commsInitialized) {
-            $this->initCommsRuntime();
-        }
-    }
-
-    /**
-     * Initialize (or reinitialize) the Comms runtime for the current context.
-     * Called on first tab switch and on context change while tab is active.
-     */
-    protected function initCommsRuntime(): void
-    {
-        if (!$this->contextModel || !$this->contextModelId) {
-            return;
-        }
-
-        $this->loadEmailRuntime();
-        $this->loadWhatsAppRuntime();
-        $this->buildContextThreadsList();
-
-        if (!empty($this->allContextThreads)) {
-            $this->switchToContextThread(0);
-        } else {
-            $this->activeContextThreadIndex = null;
-        }
-
-        // Pre-load WA templates so they're immediately available
-        if ($this->activeWhatsAppChannelId) {
-            $this->loadWhatsAppTemplates();
-        }
-
-        // Set default compose channel based on available channels
-        if (!empty($this->emailChannels)) {
-            $this->commsComposeChannel = 'email';
-        } elseif (!empty($this->whatsappChannels)) {
-            $this->commsComposeChannel = 'whatsapp';
-        }
-
-        $this->commsInitialized = true;
-    }
-
-    /**
-     * Open comms settings as overlay (timeline stays visible underneath).
-     */
-    public function openCommsSettings(): void
-    {
-        $this->commsShowSettings = true;
-        $this->loadPostmarkConnection();
-        $this->loadCommsSettingsChannels();
-        $this->loadAvailableWhatsAppAccounts();
-    }
-
-    /**
-     * Close all overlays — back to pure timeline.
-     */
-    public function commsBackToTimeline(): void
-    {
-        $this->commsShowNewMessage = false;
-        $this->commsShowSettings = false;
-    }
-
-    /**
-     * Close settings overlay.
-     */
-    public function closeCommsSettings(): void
-    {
-        $this->commsShowSettings = false;
-    }
-
-    /**
-     * Toggle new-message panel (overlay above timeline).
-     */
-    public function openCommsNewMessage(): void
-    {
-        $this->commsShowNewMessage = !$this->commsShowNewMessage;
-        if ($this->commsShowNewMessage) {
-            $this->commsShowSettings = false; // close settings if open
-            // Pre-load WA templates for the active channel
-            if ($this->activeWhatsAppChannelId) {
-                $this->loadWhatsAppTemplates();
-            }
-            // Reset template selection for clean state
-            $this->whatsappSelectedTemplateId = null;
-            $this->whatsappTemplatePreview = [];
-            $this->whatsappTemplateVariables = [];
-        }
-    }
-
-    /**
-     * Send email from "new message" view and switch to the new thread.
-     */
-    public function sendNewEmail(): void
-    {
-        $this->maybeAppendContextToEmailBody();
-        $this->sendEmail();
-        if ($this->activeEmailThreadId) {
-            $this->commsShowNewMessage = false;
-        }
-    }
-
-    /**
-     * Send WhatsApp from "new message" panel and close it.
-     */
-    public function sendNewWhatsApp(): void
-    {
-        $this->maybeAppendContextToWhatsAppBody();
-        $this->sendWhatsApp();
-        if ($this->activeWhatsAppThreadId) {
-            $this->commsShowNewMessage = false;
-        }
-    }
-
-    /**
-     * Send WhatsApp template from "new message" panel and close it.
-     */
-    public function sendNewWhatsAppTemplate(): void
-    {
-        $this->sendWhatsAppTemplate();
-        if ($this->activeWhatsAppThreadId) {
-            $this->commsShowNewMessage = false;
-        }
-    }
-
-    /**
-     * Build a plain-text context footer block from available context properties.
-     */
-    protected function buildContextFooter(): ?string
-    {
-        if (! $this->commsIncludeContext) {
-            return null;
-        }
-
-        $parts = [];
-        if ($this->contextSubject) {
-            $parts[] = $this->contextSubject;
-        }
-        if ($this->contextDescription) {
-            $parts[] = $this->contextDescription;
-        }
-        foreach ($this->contextMeta as $key => $value) {
-            if (is_string($value) && $value !== '') {
-                $parts[] = ucfirst((string) $key) . ': ' . $value;
-            }
-        }
-        if ($this->contextUrl) {
-            $parts[] = $this->contextUrl;
-        }
-
-        return ! empty($parts) ? "\n\n---\n" . implode("\n", $parts) : null;
-    }
-
-    /**
-     * If context toggle is on for a new email, append context block to body.
-     */
-    protected function maybeAppendContextToEmailBody(): void
-    {
-        $footer = $this->buildContextFooter();
-        if ($footer && ! empty($this->emailCompose['body'])) {
-            $this->emailCompose['body'] .= $footer;
-        }
-        $this->commsIncludeContext = false;
-    }
-
-    /**
-     * If context toggle is on for a new WA message, append context block to body.
-     */
-    protected function maybeAppendContextToWhatsAppBody(): void
-    {
-        $footer = $this->buildContextFooter();
-        if ($footer && ! empty($this->whatsappCompose['body'])) {
-            $this->whatsappCompose['body'] .= $footer;
-        }
-        $this->commsIncludeContext = false;
-    }
-
-    /**
-     * When WA channel changes in new-message view, reload templates.
-     * Parent trait's updatedActiveWhatsAppChannelId handles thread switching;
-     * we additionally load templates for the new-message context.
-     */
-    /**
-     * Override trait's buildContextThreadsList to enrich WA threads with window_open status
-     * and load recent non-context threads from the same channels.
-     */
-    public function buildContextThreadsList(): void
-    {
-        // Call trait logic (populates $this->allContextThreads)
-        $this->traitBuildContextThreadsList();
-
-        // Collect context thread IDs to exclude from "other" list
-        $contextEmailIds = [];
-        $contextWaIds = [];
-
-        // Enrich WA threads with 24h window info
-        foreach ($this->allContextThreads as &$thread) {
-            if ($thread['type'] === 'whatsapp') {
-                $contextWaIds[] = $thread['thread_id'];
-                $waThread = \Platform\Crm\Models\CommsWhatsAppThread::query()->whereKey($thread['thread_id'])->first();
-                $thread['window_open'] = $waThread?->isWindowOpen() ?? false;
-                $thread['window_expires_at'] = $waThread?->windowExpiresAt()?->toIso8601String();
-            } else {
-                $contextEmailIds[] = $thread['thread_id'];
-            }
-        }
-        unset($thread);
-
-        // Load recent non-context threads from same channels
-        $this->loadOtherRecentThreads($contextEmailIds, $contextWaIds);
-    }
-
-    /**
-     * Load recent threads from the same channels that are NOT linked to the current context.
-     */
-    protected function loadOtherRecentThreads(array $excludeEmailIds, array $excludeWaIds): void
-    {
-        $this->otherRecentThreads = [];
-
-        $emailChannelIds = collect($this->emailChannels)->pluck('id')->all();
-        $waChannelIds = collect($this->whatsappChannels)->pluck('id')->all();
-
-        if (empty($emailChannelIds) && empty($waChannelIds)) {
-            return;
-        }
-
-        $list = [];
-        $emailChannelLabels = collect($this->emailChannels)->keyBy('id');
-        $waChannelLabels = collect($this->whatsappChannels)->keyBy('id');
-
-        // Recent email threads (not in context)
-        if (!empty($emailChannelIds)) {
-            $emailThreads = \Platform\Crm\Models\CommsEmailThread::query()
-                ->whereIn('comms_channel_id', $emailChannelIds)
-                ->when(!empty($excludeEmailIds), fn ($q) => $q->whereNotIn('id', $excludeEmailIds))
-                ->orderByRaw('GREATEST(COALESCE(last_inbound_at, updated_at), COALESCE(last_outbound_at, updated_at)) DESC')
-                ->limit(10)
-                ->get();
-
-            foreach ($emailThreads as $t) {
-                $lastAt = $t->last_inbound_at && (!$t->last_outbound_at || $t->last_inbound_at->greaterThanOrEqualTo($t->last_outbound_at))
-                    ? $t->last_inbound_at
-                    : ($t->last_outbound_at ?: $t->updated_at);
-
-                $list[] = [
-                    'type' => 'email',
-                    'thread_id' => (int) $t->id,
-                    'channel_id' => (int) $t->comms_channel_id,
-                    'label' => (string) ($t->subject ?: 'Ohne Betreff'),
-                    'counterpart' => (string) ($t->last_inbound_from_address ?: $t->last_outbound_to_address ?: ''),
-                    'last_at' => $lastAt?->format('d.m. H:i') ?? '',
-                    'last_at_sort' => $lastAt?->toDateTimeString() ?? '',
-                    'channel_label' => (string) ($emailChannelLabels[(int) $t->comms_channel_id]['label'] ?? ''),
-                ];
-            }
-        }
-
-        // Recent WA threads (not in context)
-        if (!empty($waChannelIds)) {
-            $waThreads = \Platform\Crm\Models\CommsWhatsAppThread::query()
-                ->whereIn('comms_channel_id', $waChannelIds)
-                ->when(!empty($excludeWaIds), fn ($q) => $q->whereNotIn('id', $excludeWaIds))
-                ->orderByRaw('GREATEST(COALESCE(last_inbound_at, updated_at), COALESCE(last_outbound_at, updated_at)) DESC')
-                ->limit(10)
-                ->get();
-
-            foreach ($waThreads as $t) {
-                $lastAt = $t->last_inbound_at && (!$t->last_outbound_at || $t->last_inbound_at->greaterThanOrEqualTo($t->last_outbound_at))
-                    ? $t->last_inbound_at
-                    : ($t->last_outbound_at ?: $t->updated_at);
-
-                $waChannel = $waChannelLabels[(int) $t->comms_channel_id] ?? [];
-                $channelLabel = ($waChannel['name'] ?? '') ?: ($waChannel['label'] ?? '');
-
-                $list[] = [
-                    'type' => 'whatsapp',
-                    'thread_id' => (int) $t->id,
-                    'channel_id' => (int) $t->comms_channel_id,
-                    'label' => (string) ($t->remote_phone_number ?: '—'),
-                    'counterpart' => (string) ($t->remote_phone_number ?: ''),
-                    'last_at' => $lastAt?->format('d.m. H:i') ?? '',
-                    'last_at_sort' => $lastAt?->toDateTimeString() ?? '',
-                    'channel_label' => (string) $channelLabel,
-                    'window_open' => $t->isWindowOpen(),
-                ];
-            }
-        }
-
-        usort($list, fn ($a, $b) => strcmp((string) $b['last_at_sort'], (string) $a['last_at_sort']));
-        $this->otherRecentThreads = array_values(array_slice($list, 0, 15));
-    }
-
-    /**
-     * Override trait's switchToContextThread to also clear the "other" active index
-     * and set compose channel to match thread type.
-     */
-    public function switchToContextThread(int $index): void
-    {
-        $this->activeOtherThreadIndex = null;
-        $this->commsShowNewMessage = false;
-        $this->traitSwitchToContextThread($index);
-
-        // Set compose channel to match the selected thread type
-        if (isset($this->allContextThreads[$index])) {
-            $this->commsComposeChannel = $this->allContextThreads[$index]['type'] === 'whatsapp' ? 'whatsapp' : 'email';
-        }
-    }
-
-    /**
-     * Switch to a thread from the "other recent" list (non-context thread).
-     */
-    public function switchToOtherThread(int $index): void
-    {
-        if (!isset($this->otherRecentThreads[$index])) {
-            return;
-        }
-
-        $entry = $this->otherRecentThreads[$index];
-        $this->activeContextThreadIndex = null; // Deselect context threads
-        $this->activeOtherThreadIndex = $index;
-        $this->commsShowNewMessage = false;
-        $this->commsComposeChannel = $entry['type'] === 'whatsapp' ? 'whatsapp' : 'email';
-
-        if ($entry['type'] === 'email') {
-            $this->activeEmailChannelId = (int) $entry['channel_id'];
-            $this->refreshActiveEmailChannelLabel();
-            $this->loadEmailThreads();
-            $this->setActiveEmailThread((int) $entry['thread_id']);
-        } elseif ($entry['type'] === 'whatsapp') {
-            $this->activeWhatsAppChannelId = (int) $entry['channel_id'];
-            $this->refreshActiveWhatsAppChannelLabel();
-            $this->loadWhatsAppThreads();
-            $this->setActiveWhatsAppThread((int) $entry['thread_id']);
-        }
-    }
-
-    public function commsLoadTemplatesForChannel(): void
-    {
-        if ($this->activeWhatsAppChannelId) {
-            $this->loadWhatsAppTemplates();
-        }
-    }
-
-    /**
-     * Override trait's setActiveEmailThread to also fill 'to' from last outbound
-     * when there are no inbound mails (outbound-only thread scenario).
-     */
-    public function setActiveEmailThread(int $threadId): void
-    {
-        // Call parent trait logic via the inherited method chain
-        $this->activeEmailThreadId = $threadId;
-        $this->resetForwardState();
-        $this->loadEmailTimeline();
-
-        $thread = \Platform\Crm\Models\CommsEmailThread::query()->whereKey($threadId)->first();
-
-        // 1. Try inbound address (trait's original logic)
-        if ($thread?->last_inbound_from_address) {
-            $this->emailCompose['to'] = (string) $thread->last_inbound_from_address;
-        } else {
-            $lastInbound = \Platform\Crm\Models\CommsEmailInboundMail::query()
-                ->where('thread_id', $threadId)
-                ->orderByDesc('received_at')
-                ->first();
-            if ($lastInbound?->from) {
-                $this->emailCompose['to'] = $this->extractEmailAddress((string) $lastInbound->from) ?: (string) $lastInbound->from;
-            }
-        }
-
-        // 2. Fallback: last outbound's "to" address (for outbound-only threads)
-        if (empty(trim($this->emailCompose['to'] ?? ''))) {
-            $lastOutbound = \Platform\Crm\Models\CommsEmailOutboundMail::query()
-                ->where('thread_id', $threadId)
-                ->orderByDesc('sent_at')
-                ->first();
-            if ($lastOutbound?->to) {
-                $this->emailCompose['to'] = $this->extractEmailAddress((string) $lastOutbound->to) ?: (string) $lastOutbound->to;
-            }
-        }
-
-        // 3. Final fallback: context recipient
-        if (empty(trim($this->emailCompose['to'] ?? ''))) {
-            $contextEmail = $this->findContextRecipientByType('email');
-            if ($contextEmail) {
-                $this->emailCompose['to'] = $contextEmail;
-            }
-        }
-
-        $this->dispatch('comms:scroll-bottom');
-    }
 
     /**
      * Open tags app from sidebar button (uses context from active channel).
