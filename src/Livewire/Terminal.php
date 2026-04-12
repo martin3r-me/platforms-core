@@ -4531,6 +4531,19 @@ class Terminal extends Component
         unset($this->agendaItems, $this->agendas, $this->myDayItems, $this->myDayBacklogItems);
     }
 
+    public function detachAgendaItem(int $itemId): void
+    {
+        $item = TerminalAgendaItem::find($itemId);
+        if (! $item) {
+            return;
+        }
+
+        $agenda = $item->agenda;
+        $item->delete();
+        $agenda?->refreshItemCount();
+        unset($this->agendaItems, $this->agendas, $this->myDayItems, $this->myDayBacklogItems);
+    }
+
     public function toggleAgendaItemDone(int $itemId): void
     {
         $item = TerminalAgendaItem::find($itemId);
@@ -4564,8 +4577,15 @@ class Terminal extends Component
         unset($this->agendaItems, $this->myDayItems, $this->myDayBacklogItems);
     }
 
+    private const AGENDABLE_TYPE_LABELS = [
+        \Modules\Planner\Models\PlannerTask::class => 'Aufgabe',
+        \Modules\Planner\Models\PlannerCanvas::class => 'Canvas',
+    ];
+
     protected function formatAgendaItem(TerminalAgendaItem $item, bool $showAgenda = false): array
     {
+        $isLinked = ! empty($item->agendable_type);
+
         $data = [
             'id' => $item->id,
             'agenda_id' => $item->agenda_id,
@@ -4578,6 +4598,8 @@ class Terminal extends Component
             'is_done' => $item->is_done,
             'sort_order' => $item->sort_order,
             'color' => $item->color,
+            'is_linked' => $isLinked,
+            'agendable_type_label' => $isLinked ? (self::AGENDABLE_TYPE_LABELS[$item->agendable_type] ?? 'Verknüpft') : null,
         ];
 
         if ($showAgenda && $item->relationLoaded('agenda') && $item->agenda) {

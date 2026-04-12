@@ -3232,6 +3232,12 @@
                               <div class="text-xs text-[var(--ui-muted)] mt-0.5 line-clamp-2">{{ $item['notes'] }}</div>
                             @endif
                             <div class="flex items-center gap-2 mt-1 flex-wrap">
+                              @if(!empty($item['is_linked']))
+                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] inline-flex items-center gap-0.5">
+                                  <svg class="w-2.5 h-2.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364l1.757 1.757"/></svg>
+                                  {{ $item['agendable_type_label'] }}
+                                </span>
+                              @endif
                               @if($item['date_label'])
                                 <span class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">
                                   <svg class="w-3 h-3 inline -mt-px" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
@@ -3247,15 +3253,22 @@
                           </div>
 
                           {{-- Actions --}}
-                          <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition flex-shrink-0">
-                            <button @click="startEdit({{ json_encode($item) }})" class="p-1 rounded hover:bg-[var(--ui-muted-5)] text-[var(--ui-muted)] hover:text-[var(--ui-text)] transition" title="Bearbeiten">
-                              <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"/></svg>
-                            </button>
-                            <button wire:click="deleteAgendaItem({{ $item['id'] }})"
-                                    wire:confirm="Item löschen?"
-                                    class="p-1 rounded hover:bg-red-500/10 text-[var(--ui-muted)] hover:text-red-500 transition" title="Löschen">
-                              <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
-                            </button>
+                          <div class="flex items-center gap-0.5 {{ !empty($item['is_linked']) ? '' : 'opacity-0 group-hover:opacity-100' }} transition flex-shrink-0">
+                            @if(!empty($item['is_linked']))
+                              <button wire:click="detachAgendaItem({{ $item['id'] }})"
+                                      class="p-1 rounded hover:bg-red-500/10 text-[var(--ui-muted)] hover:text-red-500 transition" title="Aus Agenda entfernen">
+                                <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+                              </button>
+                            @else
+                              <button @click="startEdit({{ json_encode($item) }})" class="p-1 rounded hover:bg-[var(--ui-muted-5)] text-[var(--ui-muted)] hover:text-[var(--ui-text)] transition" title="Bearbeiten">
+                                <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"/></svg>
+                              </button>
+                              <button wire:click="deleteAgendaItem({{ $item['id'] }})"
+                                      wire:confirm="Item löschen?"
+                                      class="p-1 rounded hover:bg-red-500/10 text-[var(--ui-muted)] hover:text-red-500 transition" title="Löschen">
+                                <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
+                              </button>
+                            @endif
                           </div>
                         </div>
                       </template>
@@ -3369,17 +3382,30 @@
                               @if(!empty($item['agenda_name']))
                                 <span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $item['agenda_icon'] ?? '📋' }} {{ $item['agenda_name'] }}</span>
                               @endif
+                              @if(!empty($item['is_linked']))
+                                <span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] inline-flex items-center gap-0.5">
+                                  <svg class="w-2.5 h-2.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364l1.757 1.757"/></svg>
+                                  {{ $item['agendable_type_label'] }}
+                                </span>
+                              @endif
                             </div>
                             <div class="text-sm font-medium text-[var(--ui-text)] {{ $item['is_done'] ? 'line-through' : '' }}">{{ $item['title'] }}</div>
                             @if($item['notes'])
                               <div class="text-xs text-[var(--ui-muted)] mt-0.5 line-clamp-1">{{ $item['notes'] }}</div>
                             @endif
                           </div>
-                          <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition flex-shrink-0">
-                            <button wire:click="deleteAgendaItem({{ $item['id'] }})" wire:confirm="Item löschen?"
-                                    class="p-1 rounded hover:bg-red-500/10 text-[var(--ui-muted)] hover:text-red-500 transition">
-                              <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
-                            </button>
+                          <div class="flex items-center gap-0.5 {{ !empty($item['is_linked']) ? '' : 'opacity-0 group-hover:opacity-100' }} transition flex-shrink-0">
+                            @if(!empty($item['is_linked']))
+                              <button wire:click="detachAgendaItem({{ $item['id'] }})"
+                                      class="p-1 rounded hover:bg-red-500/10 text-[var(--ui-muted)] hover:text-red-500 transition" title="Aus Agenda entfernen">
+                                <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+                              </button>
+                            @else
+                              <button wire:click="deleteAgendaItem({{ $item['id'] }})" wire:confirm="Item löschen?"
+                                      class="p-1 rounded hover:bg-red-500/10 text-[var(--ui-muted)] hover:text-red-500 transition">
+                                <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
+                              </button>
+                            @endif
                           </div>
                         </div>
                       @endforeach
@@ -3409,15 +3435,30 @@
                             @if($item['notes'])
                               <div class="text-xs text-[var(--ui-muted)] mt-0.5 line-clamp-1">{{ $item['notes'] }}</div>
                             @endif
-                            @if(!empty($item['agenda_name']))
-                              <span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)] mt-1 inline-block">{{ $item['agenda_icon'] ?? '📋' }} {{ $item['agenda_name'] }}</span>
-                            @endif
+                            <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+                              @if(!empty($item['agenda_name']))
+                                <span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)] inline-block">{{ $item['agenda_icon'] ?? '📋' }} {{ $item['agenda_name'] }}</span>
+                              @endif
+                              @if(!empty($item['is_linked']))
+                                <span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] inline-flex items-center gap-0.5">
+                                  <svg class="w-2.5 h-2.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364l1.757 1.757"/></svg>
+                                  {{ $item['agendable_type_label'] }}
+                                </span>
+                              @endif
+                            </div>
                           </div>
-                          <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition flex-shrink-0">
-                            <button wire:click="deleteAgendaItem({{ $item['id'] }})" wire:confirm="Item löschen?"
-                                    class="p-1 rounded hover:bg-red-500/10 text-[var(--ui-muted)] hover:text-red-500 transition">
-                              <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
-                            </button>
+                          <div class="flex items-center gap-0.5 {{ !empty($item['is_linked']) ? '' : 'opacity-0 group-hover:opacity-100' }} transition flex-shrink-0">
+                            @if(!empty($item['is_linked']))
+                              <button wire:click="detachAgendaItem({{ $item['id'] }})"
+                                      class="p-1 rounded hover:bg-red-500/10 text-[var(--ui-muted)] hover:text-red-500 transition" title="Aus Agenda entfernen">
+                                <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+                              </button>
+                            @else
+                              <button wire:click="deleteAgendaItem({{ $item['id'] }})" wire:confirm="Item löschen?"
+                                      class="p-1 rounded hover:bg-red-500/10 text-[var(--ui-muted)] hover:text-red-500 transition">
+                                <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
+                              </button>
+                            @endif
                           </div>
                         </div>
                       @endforeach
@@ -3453,19 +3494,34 @@
                           </button>
                           <div class="flex-1 min-w-0">
                             <div class="text-sm font-medium text-[var(--ui-text)] {{ $item['is_done'] ? 'line-through' : '' }}">{{ $item['title'] }}</div>
-                            @if(!empty($item['agenda_name']))
-                              <span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)] mt-1 inline-block">{{ $item['agenda_icon'] ?? '📋' }} {{ $item['agenda_name'] }}</span>
-                            @endif
+                            <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+                              @if(!empty($item['agenda_name']))
+                                <span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)] inline-block">{{ $item['agenda_icon'] ?? '📋' }} {{ $item['agenda_name'] }}</span>
+                              @endif
+                              @if(!empty($item['is_linked']))
+                                <span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] inline-flex items-center gap-0.5">
+                                  <svg class="w-2.5 h-2.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364l1.757 1.757"/></svg>
+                                  {{ $item['agendable_type_label'] }}
+                                </span>
+                              @endif
+                            </div>
                           </div>
-                          <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition flex-shrink-0">
+                          <div class="flex items-center gap-0.5 {{ !empty($item['is_linked']) ? '' : 'opacity-0 group-hover:opacity-100' }} transition flex-shrink-0">
                             <button wire:click="moveAgendaItemDate({{ $item['id'] }}, '{{ $agendaDayDate ?: now()->toDateString() }}')"
                                     class="p-1 rounded hover:bg-[var(--ui-primary)]/10 text-[var(--ui-muted)] hover:text-[var(--ui-primary)] transition" title="Auf heute setzen">
                               <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
                             </button>
-                            <button wire:click="deleteAgendaItem({{ $item['id'] }})" wire:confirm="Item löschen?"
-                                    class="p-1 rounded hover:bg-red-500/10 text-[var(--ui-muted)] hover:text-red-500 transition">
-                              <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
-                            </button>
+                            @if(!empty($item['is_linked']))
+                              <button wire:click="detachAgendaItem({{ $item['id'] }})"
+                                      class="p-1 rounded hover:bg-red-500/10 text-[var(--ui-muted)] hover:text-red-500 transition" title="Aus Agenda entfernen">
+                                <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+                              </button>
+                            @else
+                              <button wire:click="deleteAgendaItem({{ $item['id'] }})" wire:confirm="Item löschen?"
+                                      class="p-1 rounded hover:bg-red-500/10 text-[var(--ui-muted)] hover:text-red-500 transition">
+                                <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
+                              </button>
+                            @endif
                           </div>
                         </div>
                       @endforeach

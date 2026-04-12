@@ -649,7 +649,7 @@ class CoreServiceProvider extends ServiceProvider
             }
         }
 
-        // Terminal Tools (terminal.channels.*, terminal.messages.*, terminal.members.*)
+        // Terminal Tools (terminal.channels.*, terminal.messages.*, terminal.members.*, terminal.agendas.*, terminal.agenda_items.*)
         $terminalTools = [
             \Platform\Core\Tools\Terminal\ListTerminalChannelsTool::class => 'terminal.channels.GET',
             \Platform\Core\Tools\Terminal\CreateTerminalChannelTool::class => 'terminal.channels.POST',
@@ -659,6 +659,12 @@ class CoreServiceProvider extends ServiceProvider
             \Platform\Core\Tools\Terminal\DeleteTerminalMessageTool::class => 'terminal.messages.DELETE',
             \Platform\Core\Tools\Terminal\UpdateTerminalChannelTool::class => 'terminal.channels.PATCH',
             \Platform\Core\Tools\Terminal\DeleteTerminalChannelTool::class => 'terminal.channels.DELETE',
+            \Platform\Core\Tools\Terminal\ListTerminalAgendasTool::class => 'terminal.agendas.GET',
+            \Platform\Core\Tools\Terminal\CreateTerminalAgendaTool::class => 'terminal.agendas.POST',
+            \Platform\Core\Tools\Terminal\DeleteTerminalAgendaTool::class => 'terminal.agendas.DELETE',
+            \Platform\Core\Tools\Terminal\ListTerminalAgendaItemsTool::class => 'terminal.agenda_items.GET',
+            \Platform\Core\Tools\Terminal\ManageTerminalAgendaItemsTool::class => 'terminal.agenda_items.POST',
+            \Platform\Core\Tools\Terminal\UpdateTerminalAgendaItemTool::class => 'terminal.agenda_items.PATCH',
         ];
         foreach ($terminalTools as $class => $name) {
             if (class_exists($class) && !$registry->has($name)) {
