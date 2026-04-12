@@ -13,6 +13,9 @@ use Platform\Core\Models\TerminalChannelMember;
 use Platform\Core\Models\TerminalMention;
 use Platform\Core\Models\TerminalMessage;
 use Platform\Core\Models\TerminalReaction;
+use Platform\Core\Models\TerminalAgenda;
+use Platform\Core\Models\TerminalAgendaMember;
+use Platform\Core\Models\TerminalAgendaItem;
 use Platform\Core\Models\TerminalBookmark;
 use Platform\Core\Models\TerminalPin;
 use Platform\Core\Models\TerminalReminder;
@@ -56,7 +59,7 @@ class Terminal extends Component
     public ?int $editingMessageId = null;
     public array $onlineUserIds = [];
     public string $activeApp = 'chat';
-    public array $availableApps = ['chat' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false];
+    public array $availableApps = ['chat' => true, 'agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false];
     public string $activityFilter = 'all'; // all | manual | system
     public string $filesFilter = 'all'; // all | images | documents
 
@@ -168,10 +171,17 @@ class Terminal extends Component
     public string $efNewLookupValueText = '';
     public string $efNewLookupValueLabel = '';
 
+    // ── Agenda App ────────────────────────────────────────────
+    public ?int $activeAgendaId = null;
+    public string $agendaView = 'board'; // 'board' | 'day'
+    public string $agendaDayDate = '';    // Y-m-d for "Mein Tag" navigation
+
     // ── Lifecycle ──────────────────────────────────────────────
 
     public function mount(): void
     {
+        $this->agendaDayDate = now()->toDateString();
+
         // Load last active channel for the user
         $teamId = $this->teamId();
         if (! $teamId) {
@@ -240,7 +250,7 @@ class Terminal extends Component
 
         // Reset available apps when context changes
         if ($model !== $this->contextType || (int) $modelId !== $this->contextId) {
-            $this->availableApps = ['chat' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false];
+            $this->availableApps = ['chat' => true, 'agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false];
         }
 
         $this->contextType = $model;
@@ -4207,6 +4217,375 @@ class Terminal extends Component
         } catch (\Exception $e) {
             return null;
         }
+    }
+
+    // ── Agenda App ─────────────────────────────────────────────
+
+    #[Computed]
+    public function agendas(): array
+    {
+        $teamId = $this->teamId();
+        if (! $teamId) {
+            return [];
+        }
+
+        return TerminalAgenda::forTeam($teamId)
+            ->whereHas('members', fn ($q) => $q->where('user_id', auth()->id()))
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($a) => [
+                'id' => $a->id,
+                'name' => $a->name,
+                'description' => $a->description,
+                'icon' => $a->icon ?? '📋',
+                'item_count' => $a->item_count,
+                'role' => $a->members()->where('user_id', auth()->id())->value('role') ?? 'member',
+            ])
+            ->toArray();
+    }
+
+    #[Computed]
+    public function agendaItems(): array
+    {
+        if (! $this->activeAgendaId) {
+            return [];
+        }
+
+        $agenda = TerminalAgenda::find($this->activeAgendaId);
+        if (! $agenda) {
+            return [];
+        }
+
+        return $agenda->items()
+            ->ordered()
+            ->get()
+            ->map(fn ($item) => $this->formatAgendaItem($item))
+            ->toArray();
+    }
+
+    #[Computed]
+    public function myDayItems(): array
+    {
+        $teamId = $this->teamId();
+        if (! $teamId) {
+            return [];
+        }
+
+        $date = $this->agendaDayDate ?: now()->toDateString();
+
+        $agendaIds = TerminalAgendaMember::where('user_id', auth()->id())
+            ->whereHas('agenda', fn ($q) => $q->where('team_id', $teamId))
+            ->pluck('agenda_id');
+
+        if ($agendaIds->isEmpty()) {
+            return [];
+        }
+
+        return TerminalAgendaItem::whereIn('agenda_id', $agendaIds)
+            ->forDate($date)
+            ->ordered()
+            ->with('agenda:id,name,icon')
+            ->get()
+            ->map(fn ($item) => $this->formatAgendaItem($item, true))
+            ->toArray();
+    }
+
+    #[Computed]
+    public function myDayBacklogItems(): array
+    {
+        $teamId = $this->teamId();
+        if (! $teamId) {
+            return [];
+        }
+
+        $agendaIds = TerminalAgendaMember::where('user_id', auth()->id())
+            ->whereHas('agenda', fn ($q) => $q->where('team_id', $teamId))
+            ->pluck('agenda_id');
+
+        if ($agendaIds->isEmpty()) {
+            return [];
+        }
+
+        return TerminalAgendaItem::whereIn('agenda_id', $agendaIds)
+            ->backlog()
+            ->open()
+            ->ordered()
+            ->with('agenda:id,name,icon')
+            ->get()
+            ->map(fn ($item) => $this->formatAgendaItem($item, true))
+            ->toArray();
+    }
+
+    public function selectAgenda(int $agendaId): void
+    {
+        $this->activeAgendaId = $agendaId;
+        $this->agendaView = 'board';
+        unset($this->agendaItems);
+    }
+
+    public function openMyDay(): void
+    {
+        $this->activeAgendaId = null;
+        $this->agendaView = 'day';
+        $this->agendaDayDate = now()->toDateString();
+        unset($this->myDayItems, $this->myDayBacklogItems);
+    }
+
+    public function navigateDay(string $direction): void
+    {
+        $current = $this->agendaDayDate ?: now()->toDateString();
+        $date = \Carbon\Carbon::parse($current);
+
+        $this->agendaDayDate = $direction === 'next'
+            ? $date->addDay()->toDateString()
+            : $date->subDay()->toDateString();
+
+        unset($this->myDayItems);
+    }
+
+    public function createAgenda(string $name, ?string $description = null, ?string $icon = null): void
+    {
+        $teamId = $this->teamId();
+        if (! $teamId || empty(trim($name))) {
+            return;
+        }
+
+        $agenda = TerminalAgenda::create([
+            'team_id' => $teamId,
+            'name' => trim($name),
+            'description' => $description ? trim($description) : null,
+            'icon' => $icon,
+        ]);
+
+        TerminalAgendaMember::create([
+            'agenda_id' => $agenda->id,
+            'user_id' => auth()->id(),
+            'role' => 'owner',
+        ]);
+
+        $this->activeAgendaId = $agenda->id;
+        $this->agendaView = 'board';
+        unset($this->agendas, $this->agendaItems);
+    }
+
+    public function updateAgenda(int $agendaId, string $name, ?string $description = null, ?string $icon = null): void
+    {
+        $agenda = TerminalAgenda::find($agendaId);
+        if (! $agenda || empty(trim($name))) {
+            return;
+        }
+
+        $agenda->update([
+            'name' => trim($name),
+            'description' => $description ? trim($description) : null,
+            'icon' => $icon ?? $agenda->icon,
+        ]);
+
+        unset($this->agendas);
+    }
+
+    public function deleteAgenda(int $agendaId): void
+    {
+        $agenda = TerminalAgenda::find($agendaId);
+        if (! $agenda) {
+            return;
+        }
+
+        $isOwner = TerminalAgendaMember::where('agenda_id', $agenda->id)
+            ->where('user_id', auth()->id())
+            ->where('role', 'owner')
+            ->exists();
+
+        if (! $isOwner) {
+            return;
+        }
+
+        $agenda->delete();
+
+        if ($this->activeAgendaId === $agendaId) {
+            $this->activeAgendaId = null;
+        }
+
+        unset($this->agendas);
+    }
+
+    public function getAgendaMembers(): array
+    {
+        if (! $this->activeAgendaId) {
+            return [];
+        }
+
+        return TerminalAgendaMember::where('agenda_id', $this->activeAgendaId)
+            ->with('user:id,name,avatar')
+            ->get()
+            ->map(fn ($m) => [
+                'id' => $m->user_id,
+                'name' => $m->user?->name ?? 'Unbekannt',
+                'avatar' => $m->user?->avatar,
+                'initials' => $this->initials($m->user?->name ?? '?'),
+                'role' => $m->role,
+            ])
+            ->toArray();
+    }
+
+    public function addAgendaMember(int $userId): void
+    {
+        if (! $this->activeAgendaId) {
+            return;
+        }
+
+        TerminalAgendaMember::firstOrCreate(
+            ['agenda_id' => $this->activeAgendaId, 'user_id' => $userId],
+            ['role' => 'member']
+        );
+    }
+
+    public function removeAgendaMember(int $userId): void
+    {
+        if (! $this->activeAgendaId) {
+            return;
+        }
+
+        $isOwner = TerminalAgendaMember::where('agenda_id', $this->activeAgendaId)
+            ->where('user_id', auth()->id())
+            ->where('role', 'owner')
+            ->exists();
+
+        if (! $isOwner || $userId === auth()->id()) {
+            return;
+        }
+
+        TerminalAgendaMember::where('agenda_id', $this->activeAgendaId)
+            ->where('user_id', $userId)
+            ->delete();
+    }
+
+    public function createAgendaItem(int $agendaId, string $title, ?string $notes = null, ?string $date = null, ?string $timeStart = null, ?string $timeEnd = null, ?string $color = null): void
+    {
+        $agenda = TerminalAgenda::find($agendaId);
+        if (! $agenda || empty(trim($title))) {
+            return;
+        }
+
+        $maxSort = TerminalAgendaItem::where('agenda_id', $agendaId)->max('sort_order') ?? 0;
+
+        TerminalAgendaItem::create([
+            'agenda_id' => $agendaId,
+            'title' => trim($title),
+            'notes' => $notes ? trim($notes) : null,
+            'date' => $date,
+            'time_start' => $timeStart,
+            'time_end' => $timeEnd,
+            'color' => $color,
+            'sort_order' => $maxSort + 1,
+        ]);
+
+        $agenda->refreshItemCount();
+        unset($this->agendaItems, $this->agendas, $this->myDayItems);
+    }
+
+    public function updateAgendaItem(int $itemId, ?string $title = null, ?string $notes = null, ?string $date = null, ?string $timeStart = null, ?string $timeEnd = null, ?string $color = null): void
+    {
+        $item = TerminalAgendaItem::find($itemId);
+        if (! $item) {
+            return;
+        }
+
+        $updates = [];
+        if ($title !== null) {
+            $updates['title'] = trim($title);
+        }
+        if ($notes !== null) {
+            $updates['notes'] = $notes === '' ? null : trim($notes);
+        }
+        if ($date !== null) {
+            $updates['date'] = $date === '' ? null : $date;
+        }
+        if ($timeStart !== null) {
+            $updates['time_start'] = $timeStart === '' ? null : $timeStart;
+        }
+        if ($timeEnd !== null) {
+            $updates['time_end'] = $timeEnd === '' ? null : $timeEnd;
+        }
+        if ($color !== null) {
+            $updates['color'] = $color === '' ? null : $color;
+        }
+
+        if (! empty($updates)) {
+            $item->update($updates);
+        }
+
+        unset($this->agendaItems, $this->myDayItems);
+    }
+
+    public function deleteAgendaItem(int $itemId): void
+    {
+        $item = TerminalAgendaItem::find($itemId);
+        if (! $item) {
+            return;
+        }
+
+        $agenda = $item->agenda;
+        $item->delete();
+        $agenda?->refreshItemCount();
+        unset($this->agendaItems, $this->agendas, $this->myDayItems, $this->myDayBacklogItems);
+    }
+
+    public function toggleAgendaItemDone(int $itemId): void
+    {
+        $item = TerminalAgendaItem::find($itemId);
+        if (! $item) {
+            return;
+        }
+
+        $item->update(['is_done' => ! $item->is_done]);
+        $item->agenda?->refreshItemCount();
+        unset($this->agendaItems, $this->agendas, $this->myDayItems);
+    }
+
+    public function updateAgendaItemOrder(array $items): void
+    {
+        foreach ($items as $entry) {
+            TerminalAgendaItem::where('id', $entry['value'])
+                ->update(['sort_order' => $entry['order']]);
+        }
+
+        unset($this->agendaItems, $this->myDayItems);
+    }
+
+    public function moveAgendaItemDate(int $itemId, ?string $date): void
+    {
+        $item = TerminalAgendaItem::find($itemId);
+        if (! $item) {
+            return;
+        }
+
+        $item->update(['date' => $date ?: null]);
+        unset($this->agendaItems, $this->myDayItems, $this->myDayBacklogItems);
+    }
+
+    protected function formatAgendaItem(TerminalAgendaItem $item, bool $showAgenda = false): array
+    {
+        $data = [
+            'id' => $item->id,
+            'agenda_id' => $item->agenda_id,
+            'title' => $item->title,
+            'notes' => $item->notes,
+            'date' => $item->date?->toDateString(),
+            'date_label' => $item->date?->translatedFormat('D, d. M') ?? null,
+            'time_start' => $item->time_start ? substr($item->time_start, 0, 5) : null,
+            'time_end' => $item->time_end ? substr($item->time_end, 0, 5) : null,
+            'is_done' => $item->is_done,
+            'sort_order' => $item->sort_order,
+            'color' => $item->color,
+        ];
+
+        if ($showAgenda && $item->relationLoaded('agenda') && $item->agenda) {
+            $data['agenda_name'] = $item->agenda->name;
+            $data['agenda_icon'] = $item->agenda->icon ?? '📋';
+        }
+
+        return $data;
     }
 
     // ── Render ─────────────────────────────────────────────────
