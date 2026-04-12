@@ -273,6 +273,27 @@
               <span class="hidden sm:inline">Felder</span>
             </button>
           @endif
+
+          {{-- Comms Tab --}}
+          @if($this->availableApps['comms'])
+            <button
+              wire:click="$set('activeApp', 'comms')"
+              @click.stop="if(!open) toggle()"
+              class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
+              :class="$wire.activeApp === 'comms'
+                ? 'bg-white/15 text-white'
+                : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5'"
+            >
+              <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/></svg>
+              <span class="hidden sm:inline">Comms</span>
+            </button>
+          @else
+            <button @click.stop class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--t-text-muted)]/30 cursor-not-allowed" title="Comms — nur bei Kontext verfügbar">
+              <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/></svg>
+              <span class="hidden sm:inline">Comms</span>
+            </button>
+          @endif
+
         <div class="w-px h-4 bg-[var(--t-border)] ml-0.5"></div>
       </div>
 
@@ -1141,6 +1162,8 @@
           </div>
         </div>
 
+        @include('platform::livewire.partials.terminal-comms-sidebar')
+
       </div>
 
       <!-- Main Content Area — keyed per channel so editor + messages fully rebuild -->
@@ -1406,6 +1429,31 @@
             @else
               <svg class="w-4 h-4 text-[var(--t-text-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 16.875h3.375m0 0h3.375m-3.375 0V13.5m0 3.375v3.375M6 10.5h2.25a2.25 2.25 0 0 0 2.25-2.25V6a2.25 2.25 0 0 0-2.25-2.25H6A2.25 2.25 0 0 0 3.75 6v2.25A2.25 2.25 0 0 0 6 10.5Zm0 9.75h2.25A2.25 2.25 0 0 0 10.5 18v-2.25a2.25 2.25 0 0 0-2.25-2.25H6a2.25 2.25 0 0 0-2.25 2.25V18A2.25 2.25 0 0 0 6 20.25Zm9.75-9.75H18a2.25 2.25 0 0 0 2.25-2.25V6A2.25 2.25 0 0 0 18 3.75h-2.25A2.25 2.25 0 0 0 13.5 6v2.25a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>
               <span class="font-bold text-[13px] text-[var(--t-text)]">Extra-Felder</span>
+            @endif
+          </div>
+
+          <!-- Comms Header (only visible in comms app) -->
+          <div x-show="$wire.activeApp === 'comms'"
+               class="px-4 flex items-center gap-2.5 border-b border-[var(--t-border)]/60 flex-shrink-0"
+               :class="fullscreen ? 'h-14 text-sm' : 'h-11 text-xs'">
+            @if($this->contextType && $this->contextId)
+              @php $commsHeaderBreadcrumb = $this->getContextBreadcrumb(); @endphp
+              <span class="text-[14px]">{{ $commsHeaderBreadcrumb['icon'] ?? '📨' }}</span>
+              <div class="flex flex-col leading-tight">
+                @php $commsContextTitle = $commsHeaderBreadcrumb['title'] ?? $this->contextSubject ?? 'Kontext'; @endphp
+                @if($this->contextUrl)
+                  <a href="{{ $this->contextUrl }}" class="inline-flex items-center gap-1 font-bold text-[13px] text-[var(--t-accent)] hover:underline transition" title="Zum Kontext springen">
+                    {{ $commsContextTitle }}
+                    <svg class="w-3 h-3 flex-shrink-0 opacity-60" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5zm7.25-.75a.75.75 0 01.75-.75h3.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0V6.31l-5.47 5.47a.75.75 0 11-1.06-1.06l5.47-5.47H12.25a.75.75 0 01-.75-.75z" clip-rule="evenodd"/></svg>
+                  </a>
+                @else
+                  <span class="font-bold text-[13px] text-[var(--t-text)]">{{ $commsContextTitle }}</span>
+                @endif
+                <span class="text-[10px] text-[var(--t-text-muted)]">E-Mail &middot; WhatsApp</span>
+              </div>
+            @else
+              <svg class="w-4 h-4 text-[var(--t-text-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/></svg>
+              <span class="font-bold text-[13px] text-[var(--t-text)]">Comms</span>
             @endif
           </div>
 
@@ -3127,6 +3175,18 @@
             </div>
           </div>
         @endif
+
+          <!-- ═══ App: Comms ═══ -->
+          <div x-show="$wire.activeApp === 'comms'" class="flex-1 min-h-0 flex flex-col"
+               wire:poll.5s="refreshTimelines">
+            @if($commsView === 'timeline')
+              @include('platform::livewire.partials.terminal-comms-timeline')
+            @elseif($commsView === 'new')
+              @include('platform::livewire.partials.terminal-comms-new')
+            @elseif($commsView === 'settings')
+              @include('platform::livewire.partials.terminal-comms-settings')
+            @endif
+          </div>
 
           <!-- ═══ App: Agenda ═══ -->
           <div x-show="$wire.activeApp === 'agenda'" class="flex-1 min-h-0 flex flex-col"

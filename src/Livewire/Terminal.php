@@ -41,6 +41,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Platform\Crm\Livewire\Concerns\WithCommsChat;
+use Platform\Crm\Livewire\Concerns\WithCommsChannelSettings;
 
 /**
  * Terminal UI shell with messaging, DMs, group channels, and context awareness.
@@ -48,6 +50,8 @@ use Illuminate\Support\Str;
 class Terminal extends Component
 {
     use WithFileUploads;
+    use WithCommsChat { WithCommsChat::setCommsContext as initCommsFromPayload; }
+    use WithCommsChannelSettings;
 
     public ?string $contextType = null;
     public ?int $contextId = null;
@@ -60,9 +64,13 @@ class Terminal extends Component
     public ?int $editingMessageId = null;
     public array $onlineUserIds = [];
     public string $activeApp = 'chat';
-    public array $availableApps = ['chat' => true, 'agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false];
+    public array $availableApps = ['chat' => true, 'agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false];
     public string $activityFilter = 'all'; // all | manual | system
     public string $filesFilter = 'all'; // all | images | documents
+
+    // ── Comms App ────────────────────────────────────────────
+    public string $commsView = 'timeline'; // 'timeline' | 'new' | 'settings'
+    public bool $commsInitialized = false;
 
     // ── Tagging ──────────────────────────────────────────────
     public string $taggingTab = 'tags'; // 'tags', 'color', 'overview'
@@ -251,7 +259,8 @@ class Terminal extends Component
 
         // Reset available apps when context changes
         if ($model !== $this->contextType || (int) $modelId !== $this->contextId) {
-            $this->availableApps = ['chat' => true, 'agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false];
+            $this->availableApps = ['chat' => true, 'agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false];
+            $this->commsInitialized = false;
         }
 
         $this->contextType = $model;
@@ -289,6 +298,11 @@ class Terminal extends Component
                     ->update($updates);
             }
         }
+
+        // Forward context to the Comms chat trait (email + WhatsApp runtime)
+        $this->initCommsFromPayload($payload);
+        $this->availableApps['comms'] = true;
+        $this->commsInitialized = false;
     }
 
     /**
@@ -917,6 +931,43 @@ class Terminal extends Component
         if (! empty($payload['context_type']) && ! empty($payload['context_id'])) {
             $this->availableApps['okr'] = true;
         }
+    }
+
+    // ── Comms App ─────────────────────────────────────────────
+
+    /**
+     * WithCommsChat abstract: only poll when comms tab is active.
+     */
+    protected function shouldRefreshTimelines(): bool
+    {
+        return $this->activeApp === 'comms' && $this->commsInitialized;
+    }
+
+    /**
+     * Lazy-init comms runtime when tab is first opened.
+     */
+    public function updatedActiveApp(string $value): void
+    {
+        if ($value === 'comms' && !$this->commsInitialized && $this->contextModel && $this->contextModelId) {
+            $this->loadEmailRuntime();
+            $this->loadWhatsAppRuntime();
+            $this->buildContextThreadsList();
+            if (!empty($this->allContextThreads) && $this->activeContextThreadIndex === null) {
+                $this->switchToContextThread(0);
+            }
+            $this->commsInitialized = true;
+        }
+    }
+
+    /**
+     * Open comms settings view (channels + connections management).
+     */
+    public function openCommsSettings(): void
+    {
+        $this->commsView = 'settings';
+        $this->loadPostmarkConnection();
+        $this->loadCommsSettingsChannels();
+        $this->loadAvailableWhatsAppAccounts();
     }
 
     /**
