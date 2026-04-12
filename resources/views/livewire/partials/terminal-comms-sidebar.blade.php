@@ -23,56 +23,114 @@
     </button>
   </div>
 
-  {{-- Thread List --}}
-  <div class="flex-1 min-h-0 overflow-y-auto px-2 pb-2 space-y-0.5">
-    @forelse($allContextThreads as $idx => $thread)
-      @php
-        $isActive = $activeContextThreadIndex === $idx && $commsView === 'timeline';
-        $isEmail = $thread['type'] === 'email';
-      @endphp
-      <button wire:click="switchToContextThread({{ $idx }}); commsBackToTimeline()"
-              class="w-full text-left rounded-lg px-2.5 py-2 transition group
-                {{ $isActive
-                    ? 'bg-white/12 ring-1 ring-[var(--t-accent)]/30'
-                    : 'hover:bg-white/5' }}">
-        <div class="flex items-center gap-2 min-w-0">
-          {{-- Type Icon --}}
-          @if($isEmail)
-            <div class="w-6 h-6 rounded-lg {{ $isActive ? 'bg-blue-500/20' : 'bg-blue-500/10' }} text-blue-400 flex items-center justify-center flex-shrink-0 transition">
-              <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>
-            </div>
-          @else
-            <div class="w-6 h-6 rounded-lg {{ $isActive ? 'bg-emerald-500/20' : 'bg-emerald-500/10' }} text-emerald-400 flex items-center justify-center flex-shrink-0 transition">
-              <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"/></svg>
-            </div>
-          @endif
-          {{-- Thread Info --}}
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center justify-between gap-1">
-              <span class="text-[11px] font-semibold text-[var(--t-text)] truncate">{{ $thread['label'] }}</span>
-              <div class="flex items-center gap-1 flex-shrink-0">
-                @if(!$isEmail && ($thread['window_open'] ?? false))
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" title="24h-Fenster offen"></span>
-                @endif
-                <span class="text-[9px] text-[var(--t-text-muted)]/50 whitespace-nowrap">{{ $thread['last_at'] }}</span>
-              </div>
-            </div>
-            <div class="text-[10px] text-[var(--t-text-muted)] truncate">{{ $thread['counterpart'] }}</div>
-          </div>
+  {{-- Thread Lists --}}
+  <div class="flex-1 min-h-0 overflow-y-auto px-2 pb-2">
+
+    {{-- ── Context Threads ── --}}
+    @if(!empty($allContextThreads))
+      <div class="mb-1">
+        <div class="px-2 py-1.5 flex items-center gap-1.5">
+          <span class="text-[9px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)]/50">Kontext</span>
+          <span class="text-[9px] text-[var(--t-text-muted)]/30">{{ count($allContextThreads) }}</span>
         </div>
-        @if($thread['channel_label'])
-          <div class="mt-0.5 text-[9px] text-[var(--t-text-muted)]/40 truncate pl-8">via {{ $thread['channel_label'] }}</div>
-        @endif
-      </button>
-    @empty
-      <div class="px-3 py-8 text-center">
+        <div class="space-y-0.5">
+          @foreach($allContextThreads as $idx => $thread)
+            @php
+              $isActive = $activeContextThreadIndex === $idx && $commsView === 'timeline';
+              $isEmail = $thread['type'] === 'email';
+            @endphp
+            <button wire:click="switchToContextThread({{ $idx }}); commsBackToTimeline()"
+                    class="w-full text-left rounded-lg px-2.5 py-2 transition group
+                      {{ $isActive
+                          ? 'bg-white/12 ring-1 ring-[var(--t-accent)]/30'
+                          : 'hover:bg-white/5' }}">
+              <div class="flex items-center gap-2 min-w-0">
+                @if($isEmail)
+                  <div class="w-6 h-6 rounded-lg {{ $isActive ? 'bg-blue-500/20' : 'bg-blue-500/10' }} text-blue-400 flex items-center justify-center flex-shrink-0 transition">
+                    <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>
+                  </div>
+                @else
+                  <div class="w-6 h-6 rounded-lg {{ $isActive ? 'bg-emerald-500/20' : 'bg-emerald-500/10' }} text-emerald-400 flex items-center justify-center flex-shrink-0 transition">
+                    <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"/></svg>
+                  </div>
+                @endif
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between gap-1">
+                    <span class="text-[11px] font-semibold text-[var(--t-text)] truncate">{{ $thread['label'] }}</span>
+                    <div class="flex items-center gap-1 flex-shrink-0">
+                      @if(!$isEmail && ($thread['window_open'] ?? false))
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" title="24h-Fenster offen"></span>
+                      @endif
+                      <span class="text-[9px] text-[var(--t-text-muted)]/50 whitespace-nowrap">{{ $thread['last_at'] }}</span>
+                    </div>
+                  </div>
+                  <div class="text-[10px] text-[var(--t-text-muted)] truncate">{{ $thread['counterpart'] }}</div>
+                </div>
+              </div>
+              @if($thread['channel_label'])
+                <div class="mt-0.5 text-[9px] text-[var(--t-text-muted)]/40 truncate pl-8">via {{ $thread['channel_label'] }}</div>
+              @endif
+            </button>
+          @endforeach
+        </div>
+      </div>
+    @else
+      <div class="px-3 py-6 text-center">
         <div class="w-10 h-10 mx-auto mb-2 rounded-xl bg-[var(--t-accent)]/10 flex items-center justify-center">
           <svg class="w-5 h-5 text-[var(--t-accent)]/30" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/></svg>
         </div>
-        <p class="text-[10px] text-[var(--t-text-muted)]">Noch keine Threads</p>
+        <p class="text-[10px] text-[var(--t-text-muted)]">Keine Threads zu diesem Kontext</p>
         <p class="text-[9px] text-[var(--t-text-muted)]/50 mt-0.5">Neue Nachricht verfassen um zu starten.</p>
       </div>
-    @endforelse
+    @endif
+
+    {{-- ── Other Recent Threads (non-context) ── --}}
+    @if(!empty($otherRecentThreads))
+      <div class="mt-1 border-t border-[var(--t-border)]/20 pt-1">
+        <button wire:click="$toggle('showOtherThreads')"
+                class="w-full px-2 py-1.5 flex items-center justify-between group">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[9px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)]/50">Weitere Threads</span>
+            <span class="text-[9px] text-[var(--t-text-muted)]/30">{{ count($otherRecentThreads) }}</span>
+          </div>
+          <svg class="w-3 h-3 text-[var(--t-text-muted)]/40 transition-transform duration-150 {{ $showOtherThreads ? 'rotate-180' : '' }}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+
+        @if($showOtherThreads)
+          <div class="space-y-0.5 mt-0.5">
+            @foreach($otherRecentThreads as $idx => $thread)
+              @php $isEmail = $thread['type'] === 'email'; @endphp
+              <button wire:click="switchToOtherThread({{ $idx }}); commsBackToTimeline()"
+                      class="w-full text-left rounded-lg px-2.5 py-1.5 transition hover:bg-white/5 group">
+                <div class="flex items-center gap-2 min-w-0">
+                  @if($isEmail)
+                    <div class="w-5 h-5 rounded-md bg-blue-500/8 text-blue-400/60 flex items-center justify-center flex-shrink-0">
+                      <svg class="w-2.5 h-2.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>
+                    </div>
+                  @else
+                    <div class="w-5 h-5 rounded-md bg-emerald-500/8 text-emerald-400/60 flex items-center justify-center flex-shrink-0">
+                      <svg class="w-2.5 h-2.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"/></svg>
+                    </div>
+                  @endif
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between gap-1">
+                      <span class="text-[10px] font-medium text-[var(--t-text)]/70 truncate group-hover:text-[var(--t-text)] transition">{{ $thread['label'] }}</span>
+                      <div class="flex items-center gap-1 flex-shrink-0">
+                        @if(!$isEmail && ($thread['window_open'] ?? false))
+                          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        @endif
+                        <span class="text-[8px] text-[var(--t-text-muted)]/40 whitespace-nowrap">{{ $thread['last_at'] }}</span>
+                      </div>
+                    </div>
+                    <div class="text-[9px] text-[var(--t-text-muted)]/60 truncate">{{ $thread['counterpart'] }}</div>
+                  </div>
+                </div>
+              </button>
+            @endforeach
+          </div>
+        @endif
+      </div>
+    @endif
   </div>
 
   {{-- Channel overview + Settings link --}}

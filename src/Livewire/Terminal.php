@@ -74,6 +74,8 @@ class Terminal extends Component
     // ── Comms App ────────────────────────────────────────────
     public string $commsView = 'timeline'; // 'timeline' | 'new' | 'settings'
     public bool $commsInitialized = false;
+    public array $otherRecentThreads = [];
+    public bool $showOtherThreads = false;
 
     // ── Tagging ──────────────────────────────────────────────
     public string $taggingTab = 'tags'; // 'tags', 'color', 'overview'
@@ -1040,22 +1042,138 @@ class Terminal extends Component
      * we additionally load templates for the new-message context.
      */
     /**
-     * Override trait's buildContextThreadsList to enrich WA threads with window_open status.
+     * Override trait's buildContextThreadsList to enrich WA threads with window_open status
+     * and load recent non-context threads from the same channels.
      */
     public function buildContextThreadsList(): void
     {
         // Call trait logic (populates $this->allContextThreads)
         $this->traitBuildContextThreadsList();
 
+        // Collect context thread IDs to exclude from "other" list
+        $contextEmailIds = [];
+        $contextWaIds = [];
+
         // Enrich WA threads with 24h window info
         foreach ($this->allContextThreads as &$thread) {
             if ($thread['type'] === 'whatsapp') {
+                $contextWaIds[] = $thread['thread_id'];
                 $waThread = \Platform\Crm\Models\CommsWhatsAppThread::query()->whereKey($thread['thread_id'])->first();
                 $thread['window_open'] = $waThread?->isWindowOpen() ?? false;
                 $thread['window_expires_at'] = $waThread?->windowExpiresAt()?->toIso8601String();
+            } else {
+                $contextEmailIds[] = $thread['thread_id'];
             }
         }
         unset($thread);
+
+        // Load recent non-context threads from same channels
+        $this->loadOtherRecentThreads($contextEmailIds, $contextWaIds);
+    }
+
+    /**
+     * Load recent threads from the same channels that are NOT linked to the current context.
+     */
+    protected function loadOtherRecentThreads(array $excludeEmailIds, array $excludeWaIds): void
+    {
+        $this->otherRecentThreads = [];
+
+        $emailChannelIds = collect($this->emailChannels)->pluck('id')->all();
+        $waChannelIds = collect($this->whatsappChannels)->pluck('id')->all();
+
+        if (empty($emailChannelIds) && empty($waChannelIds)) {
+            return;
+        }
+
+        $list = [];
+        $emailChannelLabels = collect($this->emailChannels)->keyBy('id');
+        $waChannelLabels = collect($this->whatsappChannels)->keyBy('id');
+
+        // Recent email threads (not in context)
+        if (!empty($emailChannelIds)) {
+            $emailThreads = \Platform\Crm\Models\CommsEmailThread::query()
+                ->whereIn('comms_channel_id', $emailChannelIds)
+                ->when(!empty($excludeEmailIds), fn ($q) => $q->whereNotIn('id', $excludeEmailIds))
+                ->orderByRaw('GREATEST(COALESCE(last_inbound_at, updated_at), COALESCE(last_outbound_at, updated_at)) DESC')
+                ->limit(10)
+                ->get();
+
+            foreach ($emailThreads as $t) {
+                $lastAt = $t->last_inbound_at && (!$t->last_outbound_at || $t->last_inbound_at->greaterThanOrEqualTo($t->last_outbound_at))
+                    ? $t->last_inbound_at
+                    : ($t->last_outbound_at ?: $t->updated_at);
+
+                $list[] = [
+                    'type' => 'email',
+                    'thread_id' => (int) $t->id,
+                    'channel_id' => (int) $t->comms_channel_id,
+                    'label' => (string) ($t->subject ?: 'Ohne Betreff'),
+                    'counterpart' => (string) ($t->last_inbound_from_address ?: $t->last_outbound_to_address ?: ''),
+                    'last_at' => $lastAt?->format('d.m. H:i') ?? '',
+                    'last_at_sort' => $lastAt?->toDateTimeString() ?? '',
+                    'channel_label' => (string) ($emailChannelLabels[(int) $t->comms_channel_id]['label'] ?? ''),
+                ];
+            }
+        }
+
+        // Recent WA threads (not in context)
+        if (!empty($waChannelIds)) {
+            $waThreads = \Platform\Crm\Models\CommsWhatsAppThread::query()
+                ->whereIn('comms_channel_id', $waChannelIds)
+                ->when(!empty($excludeWaIds), fn ($q) => $q->whereNotIn('id', $excludeWaIds))
+                ->orderByRaw('GREATEST(COALESCE(last_inbound_at, updated_at), COALESCE(last_outbound_at, updated_at)) DESC')
+                ->limit(10)
+                ->get();
+
+            foreach ($waThreads as $t) {
+                $lastAt = $t->last_inbound_at && (!$t->last_outbound_at || $t->last_inbound_at->greaterThanOrEqualTo($t->last_outbound_at))
+                    ? $t->last_inbound_at
+                    : ($t->last_outbound_at ?: $t->updated_at);
+
+                $waChannel = $waChannelLabels[(int) $t->comms_channel_id] ?? [];
+                $channelLabel = ($waChannel['name'] ?? '') ?: ($waChannel['label'] ?? '');
+
+                $list[] = [
+                    'type' => 'whatsapp',
+                    'thread_id' => (int) $t->id,
+                    'channel_id' => (int) $t->comms_channel_id,
+                    'label' => (string) ($t->remote_phone_number ?: '—'),
+                    'counterpart' => (string) ($t->remote_phone_number ?: ''),
+                    'last_at' => $lastAt?->format('d.m. H:i') ?? '',
+                    'last_at_sort' => $lastAt?->toDateTimeString() ?? '',
+                    'channel_label' => (string) $channelLabel,
+                    'window_open' => $t->isWindowOpen(),
+                ];
+            }
+        }
+
+        usort($list, fn ($a, $b) => strcmp((string) $b['last_at_sort'], (string) $a['last_at_sort']));
+        $this->otherRecentThreads = array_values(array_slice($list, 0, 15));
+    }
+
+    /**
+     * Switch to a thread from the "other recent" list (non-context thread).
+     */
+    public function switchToOtherThread(int $index): void
+    {
+        if (!isset($this->otherRecentThreads[$index])) {
+            return;
+        }
+
+        $entry = $this->otherRecentThreads[$index];
+        $this->activeContextThreadIndex = null; // Deselect context threads
+
+        if ($entry['type'] === 'email') {
+            $this->activeEmailChannelId = (int) $entry['channel_id'];
+            $this->refreshActiveEmailChannelLabel();
+            $this->loadEmailThreads();
+            $this->setActiveEmailThread((int) $entry['thread_id']);
+        } elseif ($entry['type'] === 'whatsapp') {
+            $this->activeWhatsAppChannelId = (int) $entry['channel_id'];
+            $this->refreshActiveWhatsAppChannelLabel();
+            $this->loadWhatsAppThreads();
+            $this->setActiveWhatsAppThread((int) $entry['thread_id']);
+        }
     }
 
     public function commsLoadTemplatesForChannel(): void
