@@ -113,7 +113,10 @@
                         ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]'
                         : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
                     title="Terminal">
-                    @svg('heroicon-o-command-line', 'w-4 h-4')
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                        <rect x="3" y="5" width="18" height="9" rx="2" class="opacity-40" />
+                        <rect x="3" y="14" width="18" height="5" rx="2" class="opacity-90" />
+                    </svg>
                 </button>
 
                 <button x-data
@@ -123,7 +126,10 @@
                         ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]'
                         : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
                     title="Aktivitäten">
-                    @svg('heroicon-o-bell-alert', 'w-4 h-4')
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                        <rect x="3" y="5" width="10" height="14" rx="2" class="opacity-40" />
+                        <rect x="13" y="5" width="8" height="14" rx="2" class="opacity-90" />
+                    </svg>
                 </button>
             </div>
 
