@@ -362,6 +362,20 @@
                   <span class="text-[11px] font-medium text-[var(--t-text)] truncate block">{{ $pageContext['title'] }}</span>
                   <span class="text-[9px] text-[var(--t-text-muted)]">{{ $pageContext['label'] }}</span>
                 </div>
+                {{-- Quick-action: Attach to Agenda (only in agenda app with active agenda) --}}
+                @if($activeApp === 'agenda' && $activeAgendaId && $this->canAttachContextToAgenda())
+                  @if($this->isContextAttachedToAgenda())
+                    <span class="p-1 text-[var(--t-accent)] flex-shrink-0" title="Bereits in Agenda">
+                      <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
+                    </span>
+                  @else
+                    <button wire:click="attachContextToAgenda"
+                            class="p-1 rounded hover:bg-[var(--t-accent)]/20 text-[var(--t-text-muted)] hover:text-[var(--t-accent)] transition flex-shrink-0"
+                            title="In Agenda aufnehmen">
+                      <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                    </button>
+                  @endif
+                @endif
                 {{-- Quick-action: Diskussion öffnen --}}
                 <button wire:click="openTerminal"
                         class="p-1 rounded hover:bg-white/10 text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition flex-shrink-0"

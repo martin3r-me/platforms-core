@@ -4621,6 +4621,87 @@ class Terminal extends Component
         return $data;
     }
 
+    // ── Agenda Context Attach ──────────────────────────────────
+
+    private const CONTEXT_AGENDABLE_TYPES = [
+        \Modules\Planner\Models\PlannerTask::class => true,
+        \Modules\Planner\Models\PlannerProject::class => true,
+        \Modules\Planner\Models\PlannerCanvas::class => true,
+        \Modules\Canvas\Models\Canvas::class => true,
+        \Modules\Helpdesk\Models\HelpdeskBoard::class => true,
+        \Modules\Helpdesk\Models\HelpdeskTicket::class => true,
+        \Modules\Okr\Models\Objective::class => true,
+        \Modules\Okr\Models\KeyResult::class => true,
+        \Modules\Brands\Models\BrandsBrand::class => true,
+    ];
+
+    public function canAttachContextToAgenda(): bool
+    {
+        return $this->activeAgendaId
+            && $this->contextType
+            && $this->contextId
+            && isset(self::CONTEXT_AGENDABLE_TYPES[$this->contextType]);
+    }
+
+    public function isContextAttachedToAgenda(): bool
+    {
+        if (! $this->activeAgendaId || ! $this->contextType || ! $this->contextId) {
+            return false;
+        }
+
+        return TerminalAgendaItem::where('agenda_id', $this->activeAgendaId)
+            ->where('agendable_type', $this->contextType)
+            ->where('agendable_id', $this->contextId)
+            ->exists();
+    }
+
+    public function attachContextToAgenda(): void
+    {
+        if (! $this->canAttachContextToAgenda()) {
+            return;
+        }
+
+        // Already attached?
+        $existing = TerminalAgendaItem::where('agenda_id', $this->activeAgendaId)
+            ->where('agendable_type', $this->contextType)
+            ->where('agendable_id', $this->contextId)
+            ->first();
+
+        if ($existing) {
+            return;
+        }
+
+        $entity = $this->contextType::find($this->contextId);
+        if (! $entity) {
+            return;
+        }
+
+        $title = null;
+        $color = null;
+
+        if ($entity instanceof \Platform\Core\Contracts\AgendaRenderable) {
+            $rendered = $entity->toAgendaItem();
+            $title = $rendered['title'] ?? null;
+            $color = $rendered['color'] ?? null;
+        }
+
+        if (! $title) {
+            $title = $entity->title ?? $entity->name ?? class_basename($this->contextType) . ' #' . $this->contextId;
+        }
+
+        TerminalAgendaItem::create([
+            'agenda_id' => $this->activeAgendaId,
+            'agendable_type' => $this->contextType,
+            'agendable_id' => $this->contextId,
+            'title' => $title,
+            'color' => $color,
+            'created_by_user_id' => auth()->id(),
+        ]);
+
+        TerminalAgenda::find($this->activeAgendaId)?->refreshItemCount();
+        unset($this->agendaItems, $this->agendas, $this->agendaBacklogItems, $this->agendaSlots);
+    }
+
     // ── Agenda Kanban Slots ────────────────────────────────────
 
     #[Computed]
