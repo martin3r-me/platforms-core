@@ -1,13 +1,14 @@
 <div x-data="{ moduleFlyoutOpen: false, search: '' }"
      @open-module-flyout.window="moduleFlyoutOpen = true; $nextTick(() => { const r = $refs.trigger.getBoundingClientRect(); })"
-     class="relative hidden sm:block">
+     class="relative">
 
     <button x-ref="trigger" @click="moduleFlyoutOpen = !moduleFlyoutOpen"
-        class="inline-flex items-center gap-1 px-2 py-1 h-7 rounded-md border transition text-xs
-        text-[var(--ui-primary)] bg-[var(--ui-primary-5)] border-[var(--ui-primary)]/60"
+        class="inline-flex items-center gap-1.5 px-2 py-1 h-7 rounded-md border transition text-xs
+        text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:bg-[var(--ui-muted-5)]"
         title="Modul wechseln">
-        <span class="truncate max-w-[12rem]">{{ $currentModule }}</span>
-        <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+        @svg('heroicon-o-squares-2x2', 'w-3.5 h-3.5 text-[var(--ui-muted)]')
+        <span class="truncate max-w-[10rem]">{{ $currentModule }}</span>
+        <svg viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 text-[var(--ui-muted)]">
             <path d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" fill-rule="evenodd" />
         </svg>
     </button>

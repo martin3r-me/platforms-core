@@ -6,6 +6,7 @@ use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
 use Platform\Core\PlatformCore;
 use Platform\Core\Models\Module;
+use Platform\Core\Models\ModuleUsageCount;
 
 class Navbar extends Component
 {
@@ -46,15 +47,19 @@ class Navbar extends Component
             return;
         }
 
-        $savedFavorites = $user->navbar_favorites ?? [];
-        $allModules = PlatformCore::getVisibleModules();
+        $team = $user->currentTeam;
+        if (!$team) {
+            return;
+        }
 
-        // Build lookup of allowed non-admin modules
+        $allModules = PlatformCore::getVisibleModules();
         $allowedModules = $this->getAllowedNonAdminModules($user, $allModules);
 
-        if (!empty($savedFavorites)) {
-            // Resolve saved favorites against allowed modules
-            $this->favorites = collect($savedFavorites)
+        // Get top modules by usage for this user+team
+        $topKeys = ModuleUsageCount::topModules($user->id, $team->id, 5);
+
+        if (!empty($topKeys)) {
+            $this->favorites = collect($topKeys)
                 ->filter(fn ($key) => isset($allowedModules[$key]))
                 ->take(5)
                 ->map(fn ($key) => $allowedModules[$key])
@@ -62,7 +67,7 @@ class Navbar extends Component
                 ->toArray();
         }
 
-        // Auto-fill: if empty, take first 3 allowed non-admin modules
+        // Fallback: if no usage data yet, take first 3 allowed modules
         if (empty($this->favorites)) {
             $this->favorites = collect($allowedModules)
                 ->take(3)
@@ -82,7 +87,6 @@ class Navbar extends Component
 
         return collect($allModules)
             ->filter(function ($module) use ($user, $baseTeam, $rootTeam) {
-                // Exclude admin group
                 if (($module['group'] ?? 'other') === 'admin') {
                     return false;
                 }
@@ -93,11 +97,10 @@ class Navbar extends Component
                 }
 
                 $checkTeam = $moduleModel->isRootScoped() ? $rootTeam : $baseTeam;
-                $checkTeamId = $checkTeam->id;
 
                 $userAllowed = $user->modules()
                     ->where('module_id', $moduleModel->id)
-                    ->wherePivot('team_id', $checkTeamId)
+                    ->wherePivot('team_id', $checkTeam->id)
                     ->wherePivot('enabled', true)
                     ->exists();
 
@@ -124,41 +127,6 @@ class Navbar extends Component
                 ]];
             })
             ->toArray();
-    }
-
-    public function removeFavorite(string $key): void
-    {
-        $user = Auth::user();
-        if (!$user) {
-            return;
-        }
-
-        $favorites = $user->navbar_favorites ?? [];
-        $favorites = array_values(array_filter($favorites, fn ($k) => $k !== $key));
-        $user->navbar_favorites = $favorites;
-        $user->save();
-
-        $this->loadFavorites();
-    }
-
-    public function addFavorite(string $key): void
-    {
-        $user = Auth::user();
-        if (!$user) {
-            return;
-        }
-
-        $favorites = $user->navbar_favorites ?? [];
-
-        if (count($favorites) >= 5 || in_array($key, $favorites)) {
-            return;
-        }
-
-        $favorites[] = $key;
-        $user->navbar_favorites = $favorites;
-        $user->save();
-
-        $this->loadFavorites();
     }
 
     public function render()

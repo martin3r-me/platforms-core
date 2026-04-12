@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\PlatformCore;
 use Platform\Core\Models\TeamUserLastModule;
+use Platform\Core\Models\ModuleUsageCount;
 use Platform\Core\Models\Module;
 
 class DetectModuleGuard
@@ -92,6 +93,11 @@ class DetectModuleGuard
                 // Andere Module werden normal gespeichert.
                 if (!$isTeamSwitch || $moduleKey !== 'dashboard') {
                     TeamUserLastModule::updateLastModule($user->id, $user->current_team_id, $moduleKey);
+                }
+
+                // Track module usage frequency (skip dashboard/core)
+                if (!in_array($moduleKey, ['dashboard', 'core'])) {
+                    ModuleUsageCount::increment($user->id, $user->current_team_id, $moduleKey);
                 }
                 
                 // Session-Flag nach dem ersten Request entfernen

@@ -4,11 +4,14 @@
 
     @if($isAdmin)
         <button x-ref="trigger" @click="adminFlyoutOpen = !adminFlyoutOpen"
-            class="inline-flex items-center gap-1 px-2 py-1 h-7 rounded-md border transition text-xs
-            text-[var(--ui-secondary)] bg-transparent border-[var(--ui-border)]/60 hover:bg-[var(--ui-muted-5)]"
+            class="inline-flex items-center gap-1.5 px-2 py-1 h-7 rounded-md border transition text-xs
+            text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:bg-[var(--ui-muted-5)]"
             title="Administration">
-            @svg('heroicon-o-cog-6-tooth', 'w-4 h-4')
+            @svg('heroicon-o-cog-6-tooth', 'w-3.5 h-3.5 text-[var(--ui-muted)]')
             <span class="hidden lg:inline">Admin</span>
+            <svg viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 text-[var(--ui-muted)]">
+                <path d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" fill-rule="evenodd" />
+            </svg>
         </button>
 
         <template x-teleport="body">
