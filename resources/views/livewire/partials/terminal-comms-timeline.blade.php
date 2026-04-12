@@ -381,13 +381,49 @@
                 <span class="text-[10px] text-amber-300 font-medium">24h-Fenster geschlossen — nur Templates möglich.</span>
               </div>
               @if(!empty($whatsappTemplates))
-                <select wire:model.live="whatsappSelectedTemplateId"
-                        class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] focus:outline-none focus:ring-1 focus:ring-amber-500/50">
-                  <option value="">Template wählen...</option>
-                  @foreach($whatsappTemplates as $tpl)
-                    <option value="{{ $tpl['id'] }}">{{ $tpl['label'] ?? $tpl['name'] ?? '' }}</option>
-                  @endforeach
-                </select>
+                {{-- Template Select (Custom Dropdown) --}}
+                <div x-data="{
+                  open: false,
+                  search: '',
+                  options: @js(collect($whatsappTemplates)->map(fn($t) => ['id' => $t['id'], 'label' => $t['label'] ?? $t['name'] ?? ''])->values()->all()),
+                  get selectedLabel() {
+                    const v = String($wire.whatsappSelectedTemplateId || '');
+                    if (!v) return 'Template wählen...';
+                    const opt = this.options.find(o => String(o.id) === v);
+                    return opt ? opt.label : 'Template wählen...';
+                  },
+                  get filtered() {
+                    if (!this.search) return this.options;
+                    const s = this.search.toLowerCase();
+                    return this.options.filter(o => o.label.toLowerCase().includes(s));
+                  },
+                  select(id) { $wire.set('whatsappSelectedTemplateId', id); this.open = false; this.search = ''; }
+                }" @click.outside="open = false; search = ''" @keydown.escape.window="open = false; search = ''" class="relative">
+                  <button @click="open = !open" type="button"
+                          class="w-full flex items-center justify-between px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] hover:bg-white/8 hover:border-[var(--t-border)]/60 focus:outline-none focus:ring-1 focus:ring-amber-500/40 transition cursor-pointer"
+                          :class="$wire.whatsappSelectedTemplateId ? 'border-amber-500/30' : ''">
+                    <span x-text="selectedLabel" class="truncate" :class="!$wire.whatsappSelectedTemplateId && 'text-[var(--t-text-muted)]/60'"></span>
+                    <svg class="w-3.5 h-3.5 text-[var(--t-text-muted)]/60 transition-transform duration-150" :class="open && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                  </button>
+                  <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 -translate-y-1"
+                       class="absolute z-50 mb-1 bottom-full w-full rounded-lg bg-[var(--t-glass-surface)] backdrop-blur-xl border border-[var(--t-border-bright)] shadow-xl shadow-black/30 max-h-56 overflow-hidden" style="display: none;">
+                    <div class="p-1.5 border-b border-[var(--t-border)]/40">
+                      <input type="text" x-model="search" x-ref="tplTimelineSearch" @click.stop placeholder="Suchen..."
+                             x-init="$watch('open', v => { if(v) setTimeout(() => $refs.tplTimelineSearch.focus(), 50) })"
+                             class="w-full px-2.5 py-1.5 text-xs rounded-md bg-white/5 border border-[var(--t-border)]/30 text-[var(--t-text)] placeholder-[var(--t-text-muted)]/40 focus:outline-none focus:ring-1 focus:ring-amber-500/40" />
+                    </div>
+                    <div class="overflow-auto max-h-40 py-1">
+                      <template x-for="opt in filtered" :key="opt.id">
+                        <button @click="select(opt.id)" type="button"
+                                class="w-full text-left px-3 py-1.5 text-xs transition"
+                                :class="String($wire.whatsappSelectedTemplateId) === String(opt.id) ? 'bg-amber-500/15 text-amber-300 font-medium' : 'text-[var(--t-text)] hover:bg-white/8'">
+                          <span x-text="opt.label"></span>
+                        </button>
+                      </template>
+                      <div x-show="filtered.length === 0 && search" class="px-3 py-2 text-[10px] text-[var(--t-text-muted)]/50 italic">Keine Ergebnisse</div>
+                    </div>
+                  </div>
+                </div>
                 @if(!empty($whatsappTemplatePreview))
                   <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.04] p-3 space-y-2">
                     <div class="flex items-center justify-between">

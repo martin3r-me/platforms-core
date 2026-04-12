@@ -164,30 +164,42 @@
         {{-- New Channel Form --}}
         <div class="rounded-lg border border-dashed border-[var(--t-border)]/30 bg-white/[0.01] p-3 space-y-2.5">
           <span class="text-[10px] font-semibold text-[var(--t-text-muted)] uppercase tracking-wider">Neuer Kanal</span>
-          <div class="grid grid-cols-3 gap-2">
+          {{-- Type & Visibility as badge toggles --}}
+          <div class="space-y-2.5">
             <div>
-              <label class="block text-[9px] text-[var(--t-text-muted)]/60 mb-0.5">Typ</label>
-              <select wire:model.live="newChannel.type"
-                      class="w-full px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/30 text-[var(--t-text)] focus:outline-none focus:ring-1 focus:ring-[var(--t-accent)]/50 transition">
-                <option value="email">E-Mail</option>
-                <option value="whatsapp">WhatsApp</option>
-              </select>
+              <label class="block text-[9px] text-[var(--t-text-muted)]/60 mb-1">Typ</label>
+              <div class="flex gap-1.5" x-data="{ type: $wire.entangle('newChannel.type') }">
+                <button @click="type = 'email'" type="button"
+                        class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition border"
+                        :class="type === 'email' ? 'bg-blue-500/15 text-blue-400 border-blue-500/30' : 'bg-white/5 text-[var(--t-text-muted)] border-[var(--t-border)]/30 hover:bg-white/8'">
+                  <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>
+                  E-Mail
+                </button>
+                <button @click="type = 'whatsapp'" type="button"
+                        class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition border"
+                        :class="type === 'whatsapp' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-white/5 text-[var(--t-text-muted)] border-[var(--t-border)]/30 hover:bg-white/8'">
+                  <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"/></svg>
+                  WhatsApp
+                </button>
+                <div class="flex-1 flex items-center justify-center px-2.5 py-1.5 text-[10px] rounded-lg bg-white/5 border border-[var(--t-border)]/30 text-[var(--t-text-muted)]/50" x-text="type === 'email' ? 'Postmark' : 'Meta'"></div>
+              </div>
             </div>
             <div>
-              <label class="block text-[9px] text-[var(--t-text-muted)]/60 mb-0.5">Provider</label>
-              @if($newChannel['type'] === 'email')
-                <div class="w-full px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/30 text-[var(--t-text-muted)]/50">Postmark</div>
-              @else
-                <div class="w-full px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/30 text-[var(--t-text-muted)]/50">Meta</div>
-              @endif
-            </div>
-            <div>
-              <label class="block text-[9px] text-[var(--t-text-muted)]/60 mb-0.5">Sichtbarkeit</label>
-              <select wire:model.defer="newChannel.visibility"
-                      class="w-full px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/30 text-[var(--t-text)] focus:outline-none focus:ring-1 focus:ring-[var(--t-accent)]/50 transition">
-                <option value="private">Privat</option>
-                <option value="team">Teamweit</option>
-              </select>
+              <label class="block text-[9px] text-[var(--t-text-muted)]/60 mb-1">Sichtbarkeit</label>
+              <div class="flex gap-1.5" x-data="{ vis: $wire.entangle('newChannel.visibility') }">
+                <button @click="vis = 'private'" type="button"
+                        class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition border"
+                        :class="vis === 'private' ? 'bg-[var(--t-accent)]/15 text-[var(--t-accent)] border-[var(--t-accent)]/30' : 'bg-white/5 text-[var(--t-text-muted)] border-[var(--t-border)]/30 hover:bg-white/8'">
+                  <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>
+                  Privat
+                </button>
+                <button @click="vis = 'team'" type="button"
+                        class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition border"
+                        :class="vis === 'team' ? 'bg-[var(--t-accent)]/15 text-[var(--t-accent)] border-[var(--t-accent)]/30' : 'bg-white/5 text-[var(--t-text-muted)] border-[var(--t-border)]/30 hover:bg-white/8'">
+                  <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"/></svg>
+                  Teamweit
+                </button>
+              </div>
             </div>
           </div>
 
@@ -200,14 +212,33 @@
               </div>
               <div>
                 <label class="block text-[9px] text-[var(--t-text-muted)]/60 mb-0.5">Domain</label>
-                <select wire:model.defer="newChannel.sender_domain"
-                        @if(empty($postmarkDomains)) disabled @endif
-                        class="w-full px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/30 text-[var(--t-text)] focus:outline-none focus:ring-1 focus:ring-blue-500/50 disabled:opacity-30 transition">
-                  <option value="">(Domain)</option>
-                  @foreach($postmarkDomains as $d)
-                    <option value="{{ $d['domain'] }}">{{ $d['domain'] }}</option>
-                  @endforeach
-                </select>
+                @if(empty($postmarkDomains))
+                  <div class="w-full px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/30 text-[var(--t-text-muted)]/30">(Keine Domains)</div>
+                @else
+                  <div x-data="{
+                    open: false,
+                    options: @js(collect($postmarkDomains)->pluck('domain')->values()->all()),
+                    get selectedLabel() {
+                      return $wire.newChannel?.sender_domain || '(Domain)';
+                    },
+                    select(d) { $wire.set('newChannel.sender_domain', d); this.open = false; }
+                  }" @click.outside="open = false" class="relative">
+                    <button @click="open = !open" type="button"
+                            class="w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/30 text-[var(--t-text)] hover:bg-white/8 hover:border-[var(--t-border)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--t-accent)]/50 transition cursor-pointer">
+                      <span x-text="selectedLabel" class="truncate" :class="!$wire.newChannel?.sender_domain && 'text-[var(--t-text-muted)]/50'"></span>
+                      <svg class="w-3 h-3 text-[var(--t-text-muted)]/50 transition-transform duration-150" :class="open && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open" x-transition class="absolute z-50 mt-1 w-full rounded-lg bg-[var(--t-glass-surface)] backdrop-blur-xl border border-[var(--t-border-bright)] shadow-xl shadow-black/30 max-h-36 overflow-auto py-1" style="display: none;">
+                      <template x-for="d in options" :key="d">
+                        <button @click="select(d)" type="button"
+                                class="w-full text-left px-2.5 py-1.5 text-xs transition"
+                                :class="$wire.newChannel?.sender_domain === d ? 'bg-[var(--t-accent)]/15 text-[var(--t-accent)] font-medium' : 'text-[var(--t-text)] hover:bg-white/8'">
+                          <span x-text="d"></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                @endif
               </div>
               <div>
                 <label class="block text-[9px] text-[var(--t-text-muted)]/60 mb-0.5">Name</label>
@@ -227,14 +258,36 @@
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[9px] text-[var(--t-text-muted)]/60 mb-0.5">WhatsApp Account</label>
-                <select wire:model.defer="newChannel.whatsapp_account_id"
-                        @if(empty($availableWhatsAppAccounts)) disabled @endif
-                        class="w-full px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/30 text-[var(--t-text)] focus:outline-none focus:ring-1 focus:ring-emerald-500/50 disabled:opacity-30 transition">
-                  <option value="">(Account)</option>
-                  @foreach($availableWhatsAppAccounts as $wa)
-                    <option value="{{ $wa['id'] }}">{{ $wa['label'] }}</option>
-                  @endforeach
-                </select>
+                @if(empty($availableWhatsAppAccounts))
+                  <div class="w-full px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/30 text-[var(--t-text-muted)]/30">(Keine Accounts)</div>
+                @else
+                  <div x-data="{
+                    open: false,
+                    options: @js(collect($availableWhatsAppAccounts)->map(fn($a) => ['id' => $a['id'], 'label' => $a['label']])->values()->all()),
+                    get selectedLabel() {
+                      const v = String($wire.newChannel?.whatsapp_account_id || '');
+                      if (!v) return '(Account)';
+                      const opt = this.options.find(o => String(o.id) === v);
+                      return opt ? opt.label : '(Account)';
+                    },
+                    select(id) { $wire.set('newChannel.whatsapp_account_id', id); this.open = false; }
+                  }" @click.outside="open = false" class="relative">
+                    <button @click="open = !open" type="button"
+                            class="w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/30 text-[var(--t-text)] hover:bg-white/8 hover:border-[var(--t-border)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--t-accent)]/50 transition cursor-pointer">
+                      <span x-text="selectedLabel" class="truncate" :class="!$wire.newChannel?.whatsapp_account_id && 'text-[var(--t-text-muted)]/50'"></span>
+                      <svg class="w-3 h-3 text-[var(--t-text-muted)]/50 transition-transform duration-150" :class="open && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open" x-transition class="absolute z-50 mt-1 w-full rounded-lg bg-[var(--t-glass-surface)] backdrop-blur-xl border border-[var(--t-border-bright)] shadow-xl shadow-black/30 max-h-36 overflow-auto py-1" style="display: none;">
+                      <template x-for="opt in options" :key="opt.id">
+                        <button @click="select(opt.id)" type="button"
+                                class="w-full text-left px-2.5 py-1.5 text-xs transition"
+                                :class="String($wire.newChannel?.whatsapp_account_id) === String(opt.id) ? 'bg-[var(--t-accent)]/15 text-[var(--t-accent)] font-medium' : 'text-[var(--t-text)] hover:bg-white/8'">
+                          <span x-text="opt.label"></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                @endif
               </div>
               <div>
                 <label class="block text-[9px] text-[var(--t-text-muted)]/60 mb-0.5">Name</label>

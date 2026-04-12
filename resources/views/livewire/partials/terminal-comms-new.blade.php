@@ -53,15 +53,35 @@
     {{-- ════ Email Form ════ --}}
     <div x-show="channelType === 'email'" x-cloak class="space-y-3">
       @if(!empty($emailChannels))
-        {{-- Channel Select --}}
+        {{-- Channel Select (Custom Dropdown) --}}
         <div>
           <label class="block text-[10px] font-semibold text-[var(--t-text-muted)] uppercase tracking-wider mb-1">Von</label>
-          <select wire:model.live="activeEmailChannelId"
-                  class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/30">
-            @foreach($emailChannels as $ec)
-              <option value="{{ $ec['id'] }}">{{ $ec['label'] ?? $ec['sender_identifier'] ?? '' }}</option>
-            @endforeach
-          </select>
+          <div x-data="{
+            open: false,
+            options: @js(collect($emailChannels)->map(fn($c) => ['id' => $c['id'], 'label' => $c['label'] ?? $c['sender_identifier'] ?? ''])->values()->all()),
+            get selectedLabel() {
+              const v = String($wire.activeEmailChannelId);
+              const opt = this.options.find(o => String(o.id) === v);
+              return opt ? opt.label : 'Kanal wählen...';
+            },
+            select(id) { $wire.set('activeEmailChannelId', id); this.open = false; }
+          }" @click.outside="open = false" @keydown.escape.window="open = false" class="relative">
+            <button @click="open = !open" type="button"
+                    class="w-full flex items-center justify-between px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] hover:bg-white/8 hover:border-[var(--t-border)]/60 focus:outline-none focus:ring-1 focus:ring-[var(--t-accent)]/50 transition cursor-pointer">
+              <span x-text="selectedLabel" class="truncate"></span>
+              <svg class="w-3.5 h-3.5 text-[var(--t-text-muted)]/60 transition-transform duration-150" :class="open && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 -translate-y-1"
+                 class="absolute z-50 mt-1 w-full rounded-lg bg-[var(--t-glass-surface)] backdrop-blur-xl border border-[var(--t-border-bright)] shadow-xl shadow-black/30 max-h-48 overflow-auto py-1" style="display: none;">
+              <template x-for="opt in options" :key="opt.id">
+                <button @click="select(opt.id)" type="button"
+                        class="w-full text-left px-3 py-1.5 text-xs transition"
+                        :class="String($wire.activeEmailChannelId) === String(opt.id) ? 'bg-[var(--t-accent)]/15 text-[var(--t-accent)] font-medium' : 'text-[var(--t-text)] hover:bg-white/8'">
+                  <span x-text="opt.label"></span>
+                </button>
+              </template>
+            </div>
+          </div>
         </div>
 
         {{-- To --}}
@@ -72,7 +92,7 @@
                  @if(empty($emailCompose['to']) && !empty($contextRecipients))
                    x-init="if(!$wire.emailCompose.to) { $wire.set('emailCompose.to', '{{ addslashes($this->findContextRecipientByType('email') ?? '') }}') }"
                  @endif
-                 class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] placeholder-[var(--t-text-muted)]/50 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/30" />
+                 class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] placeholder-[var(--t-text-muted)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--t-accent)]/50 transition" />
         </div>
 
         {{-- Subject --}}
@@ -80,7 +100,7 @@
           <label class="block text-[10px] font-semibold text-[var(--t-text-muted)] uppercase tracking-wider mb-1">Betreff</label>
           <input type="text" wire:model.live="emailCompose.subject"
                  placeholder="Betreff..."
-                 class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] placeholder-[var(--t-text-muted)]/50 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/30" />
+                 class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] placeholder-[var(--t-text-muted)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--t-accent)]/50 transition" />
         </div>
 
         {{-- Body --}}
@@ -91,7 +111,7 @@
                     @input="autoGrow($event.target)"
                     wire:model="emailCompose.body"
                     rows="5"
-                    class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] placeholder-[var(--t-text-muted)]/50 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/30 resize-none"
+                    class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] placeholder-[var(--t-text-muted)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--t-accent)]/50 resize-none transition"
                     placeholder="Nachricht verfassen..."></textarea>
         </div>
 
@@ -107,8 +127,8 @@
         <div class="flex items-center justify-between">
           <span class="text-[10px] text-[var(--t-text-muted)]/50">Enter zum Senden</span>
           <button wire:click="sendNewEmail" wire:loading.attr="disabled" wire:target="sendNewEmail"
-                  class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-blue-500 text-white hover:bg-blue-600 transition disabled:opacity-50 shadow-sm shadow-blue-500/20">
-            <svg class="w-3.5 h-3.5" wire:loading.remove wire:target="sendNewEmail" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/></svg>
+                  class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-[var(--t-accent)] text-white hover:bg-[var(--t-accent)]/80 transition disabled:opacity-50 shadow-sm">
+            <svg class="w-3.5 h-3.5" wire:loading.remove wire:target="sendNewEmail" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"/></svg>
             <span wire:loading.remove wire:target="sendNewEmail">E-Mail senden</span>
             <span wire:loading wire:target="sendNewEmail">Sende...</span>
           </button>
@@ -119,16 +139,35 @@
     {{-- ════ WhatsApp Form ════ --}}
     <div x-show="channelType === 'whatsapp'" x-cloak class="space-y-3">
       @if(!empty($whatsappChannels))
-        {{-- Channel Select --}}
+        {{-- Channel Select (Custom Dropdown) --}}
         <div>
           <label class="block text-[10px] font-semibold text-[var(--t-text-muted)] uppercase tracking-wider mb-1">Von</label>
-          <select wire:model.live="activeWhatsAppChannelId"
-                  x-on:change="$wire.commsLoadTemplatesForChannel()"
-                  class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] focus:outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/30">
-            @foreach($whatsappChannels as $wc)
-              <option value="{{ $wc['id'] }}">{{ $wc['name'] ?? $wc['label'] ?? $wc['sender_identifier'] ?? '' }}</option>
-            @endforeach
-          </select>
+          <div x-data="{
+            open: false,
+            options: @js(collect($whatsappChannels)->map(fn($c) => ['id' => $c['id'], 'label' => $c['name'] ?? $c['label'] ?? $c['sender_identifier'] ?? ''])->values()->all()),
+            get selectedLabel() {
+              const v = String($wire.activeWhatsAppChannelId);
+              const opt = this.options.find(o => String(o.id) === v);
+              return opt ? opt.label : 'Kanal wählen...';
+            },
+            select(id) { $wire.set('activeWhatsAppChannelId', id).then(() => $wire.commsLoadTemplatesForChannel()); this.open = false; }
+          }" @click.outside="open = false" @keydown.escape.window="open = false" class="relative">
+            <button @click="open = !open" type="button"
+                    class="w-full flex items-center justify-between px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] hover:bg-white/8 hover:border-[var(--t-border)]/60 focus:outline-none focus:ring-1 focus:ring-[var(--t-accent)]/50 transition cursor-pointer">
+              <span x-text="selectedLabel" class="truncate"></span>
+              <svg class="w-3.5 h-3.5 text-[var(--t-text-muted)]/60 transition-transform duration-150" :class="open && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 -translate-y-1"
+                 class="absolute z-50 mt-1 w-full rounded-lg bg-[var(--t-glass-surface)] backdrop-blur-xl border border-[var(--t-border-bright)] shadow-xl shadow-black/30 max-h-48 overflow-auto py-1" style="display: none;">
+              <template x-for="opt in options" :key="opt.id">
+                <button @click="select(opt.id)" type="button"
+                        class="w-full text-left px-3 py-1.5 text-xs transition"
+                        :class="String($wire.activeWhatsAppChannelId) === String(opt.id) ? 'bg-[var(--t-accent)]/15 text-[var(--t-accent)] font-medium' : 'text-[var(--t-text)] hover:bg-white/8'">
+                  <span x-text="opt.label"></span>
+                </button>
+              </template>
+            </div>
+          </div>
         </div>
 
         {{-- To (Phone) --}}
@@ -139,7 +178,7 @@
                  @if(empty($whatsappCompose['to']) && !empty($contextRecipients))
                    x-init="if(!$wire.whatsappCompose.to) { $wire.set('whatsappCompose.to', '{{ addslashes($this->findContextRecipientByType('phone') ?? '') }}') }"
                  @endif
-                 class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] placeholder-[var(--t-text-muted)]/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/30" />
+                 class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] placeholder-[var(--t-text-muted)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--t-accent)]/50 transition" />
         </div>
 
         {{-- Freeform Message --}}
@@ -150,7 +189,7 @@
                     @input="autoGrow($event.target)"
                     wire:model="whatsappCompose.body"
                     rows="4"
-                    class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] placeholder-[var(--t-text-muted)]/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/30 resize-none"
+                    class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] placeholder-[var(--t-text-muted)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--t-accent)]/50 resize-none transition"
                     placeholder="Nachricht verfassen..."></textarea>
         </div>
 
@@ -166,8 +205,8 @@
         <div class="flex items-center justify-between">
           <span class="text-[10px] text-[var(--t-text-muted)]/50">Enter zum Senden</span>
           <button wire:click="sendNewWhatsApp" wire:loading.attr="disabled" wire:target="sendNewWhatsApp"
-                  class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition disabled:opacity-50 shadow-sm shadow-emerald-600/20">
-            <svg class="w-3.5 h-3.5" wire:loading.remove wire:target="sendNewWhatsApp" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/></svg>
+                  class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-[var(--t-accent)] text-white hover:bg-[var(--t-accent)]/80 transition disabled:opacity-50 shadow-sm">
+            <svg class="w-3.5 h-3.5" wire:loading.remove wire:target="sendNewWhatsApp" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"/></svg>
             <span wire:loading.remove wire:target="sendNewWhatsApp">WhatsApp senden</span>
             <span wire:loading wire:target="sendNewWhatsApp">Sende...</span>
           </button>
@@ -190,13 +229,53 @@
           </div>
 
           @if(!empty($whatsappTemplates))
-            <select wire:model.live="whatsappSelectedTemplateId"
-                    class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] focus:outline-none focus:ring-1 focus:ring-amber-500/50">
-              <option value="">Template wählen...</option>
-              @foreach($whatsappTemplates as $tpl)
-                <option value="{{ $tpl['id'] }}">{{ $tpl['label'] ?? $tpl['name'] ?? '' }}</option>
-              @endforeach
-            </select>
+            {{-- Template Select (Custom Dropdown with Search) --}}
+            <div x-data="{
+              open: false,
+              search: '',
+              options: @js(collect($whatsappTemplates)->map(fn($t) => ['id' => $t['id'], 'label' => $t['label'] ?? $t['name'] ?? ''])->values()->all()),
+              get selectedLabel() {
+                const v = String($wire.whatsappSelectedTemplateId || '');
+                if (!v) return 'Template wählen...';
+                const opt = this.options.find(o => String(o.id) === v);
+                return opt ? opt.label : 'Template wählen...';
+              },
+              get filtered() {
+                if (!this.search) return this.options;
+                const s = this.search.toLowerCase();
+                return this.options.filter(o => o.label.toLowerCase().includes(s));
+              },
+              select(id) { $wire.set('whatsappSelectedTemplateId', id); this.open = false; this.search = ''; }
+            }" @click.outside="open = false; search = ''" @keydown.escape.window="open = false; search = ''" class="relative">
+              <button @click="open = !open" type="button"
+                      class="w-full flex items-center justify-between px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] hover:bg-white/8 hover:border-[var(--t-border)]/60 focus:outline-none focus:ring-1 focus:ring-amber-500/40 transition cursor-pointer"
+                      :class="$wire.whatsappSelectedTemplateId ? 'border-amber-500/30' : ''">
+                <span x-text="selectedLabel" class="truncate" :class="!$wire.whatsappSelectedTemplateId && 'text-[var(--t-text-muted)]/60'"></span>
+                <svg class="w-3.5 h-3.5 text-[var(--t-text-muted)]/60 transition-transform duration-150" :class="open && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+              </button>
+              <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 -translate-y-1"
+                   class="absolute z-50 mt-1 w-full rounded-lg bg-[var(--t-glass-surface)] backdrop-blur-xl border border-[var(--t-border-bright)] shadow-xl shadow-black/30 max-h-56 overflow-hidden" style="display: none;">
+                <div class="p-1.5 border-b border-[var(--t-border)]/40">
+                  <input type="text" x-model="search" x-ref="tplSearch" @click.stop placeholder="Suchen..."
+                         x-init="$watch('open', v => { if(v) setTimeout(() => $refs.tplSearch.focus(), 50) })"
+                         class="w-full px-2.5 py-1.5 text-xs rounded-md bg-white/5 border border-[var(--t-border)]/30 text-[var(--t-text)] placeholder-[var(--t-text-muted)]/40 focus:outline-none focus:ring-1 focus:ring-amber-500/40" />
+                </div>
+                <div class="overflow-auto max-h-40 py-1">
+                  <button @click="select('')" type="button"
+                          class="w-full text-left px-3 py-1.5 text-xs transition text-[var(--t-text-muted)] hover:bg-white/8">
+                    — Kein Template —
+                  </button>
+                  <template x-for="opt in filtered" :key="opt.id">
+                    <button @click="select(opt.id)" type="button"
+                            class="w-full text-left px-3 py-1.5 text-xs transition"
+                            :class="String($wire.whatsappSelectedTemplateId) === String(opt.id) ? 'bg-amber-500/15 text-amber-300 font-medium' : 'text-[var(--t-text)] hover:bg-white/8'">
+                      <span x-text="opt.label"></span>
+                    </button>
+                  </template>
+                  <div x-show="filtered.length === 0 && search" class="px-3 py-2 text-[10px] text-[var(--t-text-muted)]/50 italic">Keine Ergebnisse</div>
+                </div>
+              </div>
+            </div>
 
             @if(!empty($whatsappTemplatePreview))
               <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.04] p-3 space-y-2">
@@ -214,7 +293,7 @@
                       <div class="flex items-center gap-2">
                         <span class="text-[10px] text-emerald-400/70 font-mono w-8 flex-shrink-0 text-right">&#123;&#123;{{ $i }}&#125;&#125;</span>
                         <input type="text" wire:model.live="whatsappTemplateVariables.{{ $i }}"
-                               class="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] focus:outline-none focus:ring-1 focus:ring-emerald-500/50 placeholder-[var(--t-text-muted)]/50"
+                               class="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] focus:outline-none focus:ring-1 focus:ring-emerald-500/50 placeholder-[var(--t-text-muted)]/50 transition"
                                placeholder="Wert für Variable {{ $i }}..." />
                       </div>
                     @endfor
@@ -222,8 +301,8 @@
                 @endif
                 <div class="flex justify-end pt-1">
                   <button wire:click="sendNewWhatsAppTemplate" wire:loading.attr="disabled" wire:target="sendNewWhatsAppTemplate"
-                          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition disabled:opacity-50 shadow-sm shadow-emerald-600/20">
-                    <svg class="w-3.5 h-3.5" wire:loading.remove wire:target="sendNewWhatsAppTemplate" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/></svg>
+                          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-[var(--t-accent)] text-white hover:bg-[var(--t-accent)]/80 transition disabled:opacity-50 shadow-sm">
+                    <svg class="w-3.5 h-3.5" wire:loading.remove wire:target="sendNewWhatsAppTemplate" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"/></svg>
                     <span wire:loading.remove wire:target="sendNewWhatsAppTemplate">Template senden</span>
                     <span wire:loading wire:target="sendNewWhatsAppTemplate">Sende...</span>
                   </button>
