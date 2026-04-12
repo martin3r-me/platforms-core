@@ -1,9 +1,19 @@
 {{-- ═══ Sidebar: Comms ═══ --}}
 <div x-show="$wire.activeApp === 'comms'" class="flex-1 min-h-0 flex flex-col">
 
-  {{-- New Message Button --}}
-  <div class="px-3 pt-3 pb-2">
-    <button wire:click="$set('commsView', 'new')"
+  {{-- Action Buttons --}}
+  <div class="px-3 pt-3 pb-2 space-y-1">
+    {{-- Back to Timeline (shown when in settings or new) --}}
+    @if($commsView === 'settings' || $commsView === 'new')
+      <button wire:click="commsBackToTimeline"
+              class="w-full flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/8 transition">
+        <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+        Zurück zu Threads
+      </button>
+    @endif
+
+    {{-- New Message Button --}}
+    <button wire:click="openCommsNewMessage"
             class="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-semibold transition
               {{ $commsView === 'new'
                   ? 'bg-[var(--t-accent)] text-white shadow-sm shadow-[var(--t-accent)]/20'
@@ -19,9 +29,8 @@
       @php
         $isActive = $activeContextThreadIndex === $idx && $commsView === 'timeline';
         $isEmail = $thread['type'] === 'email';
-        $messageCount = $thread['messages_count'] ?? null;
       @endphp
-      <button wire:click="switchToContextThread({{ $idx }}); $set('commsView', 'timeline')"
+      <button wire:click="switchToContextThread({{ $idx }}); commsBackToTimeline()"
               class="w-full text-left rounded-lg px-2.5 py-2 transition group
                 {{ $isActive
                     ? 'bg-white/12 ring-1 ring-[var(--t-accent)]/30'
@@ -65,10 +74,14 @@
   <div class="border-t border-[var(--t-border)]/30 px-3 py-2">
     <div class="flex items-center justify-between mb-1">
       <span class="text-[9px] font-semibold uppercase tracking-wider text-[var(--t-text-muted)]/40">Kanäle</span>
-      <button wire:click="openCommsSettings"
-              class="text-[9px] text-[var(--t-accent)] hover:text-[var(--t-accent)]/80 transition font-semibold">
-        Verwalten
-      </button>
+      @if($commsView === 'settings')
+        <span class="text-[9px] text-[var(--t-accent)] font-semibold">Einstellungen aktiv</span>
+      @else
+        <button wire:click="openCommsSettings"
+                class="text-[9px] text-[var(--t-accent)] hover:text-[var(--t-accent)]/80 transition font-semibold">
+          Verwalten
+        </button>
+      @endif
     </div>
     @if(!empty($emailChannels) || !empty($whatsappChannels))
       <div class="space-y-0.5">

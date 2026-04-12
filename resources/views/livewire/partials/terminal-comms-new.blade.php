@@ -8,7 +8,7 @@
   {{-- Header --}}
   <div class="px-4 py-2.5 border-b border-[var(--t-border)]/40 flex-shrink-0 bg-white/[0.02]">
     <div class="flex items-center gap-2">
-      <button wire:click="$set('commsView', 'timeline')" class="w-6 h-6 rounded-md flex items-center justify-center text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/10 transition">
+      <button wire:click="commsBackToTimeline" class="w-6 h-6 rounded-md flex items-center justify-center text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/10 transition">
         <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
       </button>
       <svg class="w-4 h-4 text-[var(--t-accent)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"/></svg>
@@ -123,6 +123,7 @@
         <div>
           <label class="block text-[10px] font-semibold text-[var(--t-text-muted)] uppercase tracking-wider mb-1">Von</label>
           <select wire:model.live="activeWhatsAppChannelId"
+                  x-on:change="$wire.commsLoadTemplatesForChannel()"
                   class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] focus:outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/30">
             @foreach($whatsappChannels as $wc)
               <option value="{{ $wc['id'] }}">{{ $wc['name'] ?? $wc['label'] ?? $wc['sender_identifier'] ?? '' }}</option>
@@ -173,13 +174,22 @@
         </div>
 
         {{-- Templates Section --}}
-        @if(!empty($whatsappTemplates))
-          <div class="border-t border-[var(--t-border)]/30 pt-3 space-y-2">
+        <div class="border-t border-[var(--t-border)]/30 pt-3 space-y-2">
+          <div class="flex items-center justify-between">
             <div class="flex items-center gap-1.5">
               <svg class="w-3.5 h-3.5 text-amber-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>
               <span class="text-[10px] font-semibold text-[var(--t-text)] uppercase tracking-wider">Oder Template verwenden</span>
             </div>
+            @if(empty($whatsappTemplates))
+              <button wire:click="commsLoadTemplatesForChannel" wire:loading.attr="disabled" wire:target="commsLoadTemplatesForChannel"
+                      class="text-[9px] text-[var(--t-accent)] hover:text-[var(--t-accent)]/80 font-semibold transition">
+                <span wire:loading.remove wire:target="commsLoadTemplatesForChannel">Templates laden</span>
+                <span wire:loading wire:target="commsLoadTemplatesForChannel">Lädt...</span>
+              </button>
+            @endif
+          </div>
 
+          @if(!empty($whatsappTemplates))
             <select wire:model.live="whatsappSelectedTemplateId"
                     class="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-[var(--t-border)]/40 text-[var(--t-text)] focus:outline-none focus:ring-1 focus:ring-amber-500/50">
               <option value="">Template wählen...</option>
@@ -220,8 +230,10 @@
                 </div>
               </div>
             @endif
-          </div>
-        @endif
+          @else
+            <div class="text-[10px] text-[var(--t-text-muted)]/50 text-center py-2">Noch keine Templates geladen. Kanal wählen oder oben laden.</div>
+          @endif
+        </div>
       @endif
     </div>
 

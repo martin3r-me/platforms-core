@@ -971,6 +971,26 @@ class Terminal extends Component
     }
 
     /**
+     * Navigate back to timeline from any sub-view (settings, new).
+     */
+    public function commsBackToTimeline(): void
+    {
+        $this->commsView = 'timeline';
+    }
+
+    /**
+     * Open new message view and pre-load WA templates if available.
+     */
+    public function openCommsNewMessage(): void
+    {
+        $this->commsView = 'new';
+        // Pre-load WhatsApp templates so they're available in the new message form
+        if ($this->activeWhatsAppChannelId) {
+            $this->loadWhatsAppTemplates();
+        }
+    }
+
+    /**
      * Send email from "new message" view and switch to the new thread.
      */
     public function sendNewEmail(): void
@@ -1000,6 +1020,18 @@ class Terminal extends Component
         $this->sendWhatsAppTemplate();
         if ($this->activeWhatsAppThreadId) {
             $this->commsView = 'timeline';
+        }
+    }
+
+    /**
+     * When WA channel changes in new-message view, reload templates.
+     * Parent trait's updatedActiveWhatsAppChannelId handles thread switching;
+     * we additionally load templates for the new-message context.
+     */
+    public function commsLoadTemplatesForChannel(): void
+    {
+        if ($this->activeWhatsAppChannelId) {
+            $this->loadWhatsAppTemplates();
         }
     }
 
