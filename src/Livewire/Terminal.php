@@ -317,7 +317,14 @@ class Terminal extends Component
         // Forward context to the Comms chat trait (email + WhatsApp runtime)
         $this->initCommsFromPayload($payload);
         $this->availableApps['comms'] = true;
-        $this->commsInitialized = false;
+
+        // If user is already on the Comms tab, reinitialize immediately
+        // (updatedActiveApp won't fire because activeApp hasn't changed)
+        if ($this->activeApp === 'comms') {
+            $this->initCommsRuntime();
+        } else {
+            $this->commsInitialized = false;
+        }
     }
 
     /**
@@ -963,25 +970,44 @@ class Terminal extends Component
      */
     public function updatedActiveApp(string $value): void
     {
-        if ($value === 'comms' && !$this->commsInitialized && $this->contextModel && $this->contextModelId) {
-            $this->loadEmailRuntime();
-            $this->loadWhatsAppRuntime();
-            $this->buildContextThreadsList();
-            if (!empty($this->allContextThreads) && $this->activeContextThreadIndex === null) {
-                $this->switchToContextThread(0);
-            }
-            // Pre-load WA templates so they're immediately available
-            if ($this->activeWhatsAppChannelId) {
-                $this->loadWhatsAppTemplates();
-            }
-            // Set default compose channel based on available channels
-            if (!empty($this->emailChannels)) {
-                $this->commsComposeChannel = 'email';
-            } elseif (!empty($this->whatsappChannels)) {
-                $this->commsComposeChannel = 'whatsapp';
-            }
-            $this->commsInitialized = true;
+        if ($value === 'comms' && !$this->commsInitialized) {
+            $this->initCommsRuntime();
         }
+    }
+
+    /**
+     * Initialize (or reinitialize) the Comms runtime for the current context.
+     * Called on first tab switch and on context change while tab is active.
+     */
+    protected function initCommsRuntime(): void
+    {
+        if (!$this->contextModel || !$this->contextModelId) {
+            return;
+        }
+
+        $this->loadEmailRuntime();
+        $this->loadWhatsAppRuntime();
+        $this->buildContextThreadsList();
+
+        if (!empty($this->allContextThreads)) {
+            $this->switchToContextThread(0);
+        } else {
+            $this->activeContextThreadIndex = null;
+        }
+
+        // Pre-load WA templates so they're immediately available
+        if ($this->activeWhatsAppChannelId) {
+            $this->loadWhatsAppTemplates();
+        }
+
+        // Set default compose channel based on available channels
+        if (!empty($this->emailChannels)) {
+            $this->commsComposeChannel = 'email';
+        } elseif (!empty($this->whatsappChannels)) {
+            $this->commsComposeChannel = 'whatsapp';
+        }
+
+        $this->commsInitialized = true;
     }
 
     /**
