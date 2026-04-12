@@ -19,22 +19,22 @@
 >
   <style>
     :root {
-      --t-glass: rgba(15, 15, 20, 0.72);
-      --t-glass-surface: rgba(25, 25, 35, 0.65);
-      --t-glass-hover: rgba(35, 35, 50, 0.55);
+      --t-glass: rgba(var(--ui-primary-rgb), 0.72);
+      --t-glass-surface: rgba(var(--ui-primary-rgb), 0.65);
+      --t-glass-hover: rgba(var(--ui-primary-rgb), 0.45);
       --t-blur: 24px;
       --t-border: rgba(255,255,255,0.08);
       --t-border-bright: rgba(255,255,255,0.14);
       --t-text: #e4e4e7;
       --t-text-muted: #a1a1aa;
-      --t-accent: var(--ui-primary);
-      --t-glow: rgba(var(--ui-primary-rgb), 0.15);
-      --t-unread-glow: rgba(244,63,94,0.3);
-      /* Aubergine-pink sidebar gradient */
-      --t-sidebar-from: #3F0E40;
-      --t-sidebar-to: #541638;
-      --t-sidebar-hover: #4a1545;
-      --t-sidebar-active: #1164A3;
+      --t-accent: var(--ui-secondary);
+      --t-glow: rgba(var(--ui-secondary-rgb), 0.15);
+      --t-unread-glow: rgba(var(--ui-danger-rgb), 0.3);
+      /* Sidebar gradient — derived from primary (dark) to secondary (lighter) */
+      --t-sidebar-from: rgb(var(--ui-primary-rgb));
+      --t-sidebar-to: rgba(var(--ui-secondary-rgb), 0.25);
+      --t-sidebar-hover: rgba(var(--ui-secondary-rgb), 0.15);
+      --t-sidebar-active: var(--ui-secondary);
     }
     /* Light scope — remaps terminal vars to platform light theme for content area + modals */
     .terminal-light {
