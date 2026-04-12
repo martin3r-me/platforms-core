@@ -70,9 +70,6 @@
 
     <!-- Main Content -->
     <main class="flex-1 min-w-0 h-screen bg-white flex flex-col overflow-hidden">
-      @auth
-        @livewire('core.navbar')
-      @endauth
       <div class="flex-1 min-h-0 overflow-y-auto">
         {{ $slot }}
       </div>
