@@ -53,7 +53,7 @@ class Navbar extends Component
         }
 
         $allModules = PlatformCore::getVisibleModules();
-        $allowedModules = $this->getAllowedNonAdminModules($user, $allModules);
+        $allowedModules = $this->getAllowedModules($user, $allModules);
 
         // Get top modules by usage for this user+team
         $topKeys = ModuleUsageCount::topModules($user->id, $team->id, 5);
@@ -76,7 +76,7 @@ class Navbar extends Component
         }
     }
 
-    protected function getAllowedNonAdminModules($user, array $allModules): array
+    protected function getAllowedModules($user, array $allModules): array
     {
         $baseTeam = $user->currentTeamRelation;
         if (!$baseTeam) {
@@ -87,10 +87,6 @@ class Navbar extends Component
 
         return collect($allModules)
             ->filter(function ($module) use ($user, $baseTeam, $rootTeam) {
-                if (($module['group'] ?? 'other') === 'admin') {
-                    return false;
-                }
-
                 $moduleModel = Module::where('key', $module['key'])->first();
                 if (!$moduleModel) {
                     return false;
