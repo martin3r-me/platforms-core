@@ -343,6 +343,13 @@ class Terminal extends Component
         $this->dispatch('toggle-terminal-open');
     }
 
+    public function openContextChannel(): void
+    {
+        if ($this->contextType && $this->contextId) {
+            $this->resolveContextChannel();
+        }
+    }
+
     protected function resolveContextChannel(): void
     {
         $teamId = $this->teamId();

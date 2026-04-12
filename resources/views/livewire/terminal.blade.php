@@ -1225,16 +1225,6 @@
 
             {{-- Channel actions (pins / delete / leave / context actions) --}}
             <div class="ml-auto flex items-center gap-1">
-              {{-- Start context discussion (when context exists but active channel is not the context channel) --}}
-              @if($pageContext && ($this->activeChannel['type'] ?? '') !== 'context')
-                <button wire:click="openTerminal"
-                        class="flex items-center gap-1 text-[10px] text-[var(--t-text-muted)] hover:text-[var(--t-accent)] transition px-1.5 py-0.5 rounded hover:bg-[var(--t-accent)]/10"
-                        title="Kontext-Diskussion öffnen">
-                  <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"/></svg>
-                  <span>{{ $pageContext['title'] }}</span>
-                </button>
-                <div class="w-px h-4 bg-[var(--t-border)]/40"></div>
-              @endif
               {{-- Pins button --}}
               @if(($this->activeChannel['pin_count'] ?? 0) > 0)
                 <button
@@ -1542,6 +1532,7 @@
 
           <!-- ═══ App: Chat ═══ -->
           <div x-show="$wire.activeApp === 'chat'" class="flex-1 min-h-0 flex flex-col">
+            @include('platform::livewire.partials.terminal-context-header', ['appLabel' => 'Diskussion'])
 
           <!-- Messages -->
           <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain" :class="fullscreen ? 'text-[14px]' : 'text-[13px]'" x-ref="body" wire:key="terminal-messages-{{ $channelId }}"
