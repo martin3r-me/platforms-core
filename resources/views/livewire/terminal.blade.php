@@ -3175,25 +3175,13 @@
             @if($agendaView === 'board' && $activeAgendaId)
               <x-ui-kanban-container sortable="updateAgendaSlotOrder" sortable-group="updateAgendaItemSlotOrder">
 
-                {{-- Backlog (nicht sortierbar als Spalte) --}}
-                <x-ui-kanban-column title="Backlog" :sortable-id="null" :scrollable="true" :muted="true">
+                {{-- Backlog --}}
+                <x-ui-kanban-column title="Backlog" sortable-id="backlog" :scrollable="true" :muted="true">
                   <x-slot name="headerActions">
                     <span class="text-xs text-[var(--ui-muted)] font-medium">{{ count($this->agendaBacklogItems) }}</span>
                   </x-slot>
                   @foreach($this->agendaBacklogItems as $item)
-                    <x-ui-kanban-card :title="''" :sortable-id="$item['id']">
-                      <div class="flex items-start gap-2">
-                        <button wire:click="toggleAgendaItemDone({{ $item['id'] }})" class="mt-0.5 w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center transition border-[var(--ui-border)] hover:border-[var(--ui-primary)]"></button>
-                        <div class="flex-1 min-w-0">
-                          <div class="text-xs font-medium text-[var(--ui-text)] leading-tight">{{ $item['title'] }}</div>
-                          @if($item['notes'])<div class="text-[10px] text-[var(--ui-muted)] mt-0.5 line-clamp-1">{{ $item['notes'] }}</div>@endif
-                          <div class="flex items-center gap-1 mt-1 flex-wrap">
-                            @if(!empty($item['is_linked']))<span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]">{{ $item['agendable_type_label'] }}</span>@endif
-                            @if($item['date_label'])<span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $item['date_label'] }}</span>@endif
-                          </div>
-                        </div>
-                      </div>
-                    </x-ui-kanban-card>
+                    @include('platform::livewire.partials.agenda-kanban-card', ['item' => $item])
                   @endforeach
                 </x-ui-kanban-column>
 
@@ -3210,25 +3198,13 @@
                       </button>
                     </x-slot>
                     @foreach($slot['items'] as $item)
-                      <x-ui-kanban-card :title="''" :sortable-id="$item['id']">
-                        <div class="flex items-start gap-2">
-                          <button wire:click="toggleAgendaItemDone({{ $item['id'] }})" class="mt-0.5 w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center transition border-[var(--ui-border)] hover:border-[var(--ui-primary)]"></button>
-                          <div class="flex-1 min-w-0">
-                            <div class="text-xs font-medium text-[var(--ui-text)] leading-tight">{{ $item['title'] }}</div>
-                            @if($item['notes'])<div class="text-[10px] text-[var(--ui-muted)] mt-0.5 line-clamp-1">{{ $item['notes'] }}</div>@endif
-                            <div class="flex items-center gap-1 mt-1 flex-wrap">
-                              @if(!empty($item['is_linked']))<span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]">{{ $item['agendable_type_label'] }}</span>@endif
-                              @if($item['date_label'])<span class="text-[9px] px-1 py-0 rounded bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $item['date_label'] }}</span>@endif
-                            </div>
-                          </div>
-                        </div>
-                      </x-ui-kanban-card>
+                      @include('platform::livewire.partials.agenda-kanban-card', ['item' => $item])
                     @endforeach
                   </x-ui-kanban-column>
                 @endforeach
 
-                {{-- Erledigt (nicht sortierbar als Spalte) --}}
-                <x-ui-kanban-column title="Erledigt" :sortable-id="null" :scrollable="true" :muted="true">
+                {{-- Erledigt --}}
+                <x-ui-kanban-column title="Erledigt" sortable-id="done" :scrollable="true" :muted="true">
                   <x-slot name="headerActions">
                     <span class="text-xs text-[var(--ui-muted)] font-medium">{{ count($this->agendaDoneItems) }}</span>
                   </x-slot>

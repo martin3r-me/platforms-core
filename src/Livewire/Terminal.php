@@ -4610,7 +4610,31 @@ class Terminal extends Component
             'color' => $item->color,
             'is_linked' => $isLinked,
             'agendable_type_label' => $isLinked ? (self::AGENDABLE_TYPE_LABELS[$item->agendable_type] ?? 'Verknüpft') : null,
+            'linked_icon' => null,
+            'linked_status' => null,
+            'linked_status_color' => null,
+            'linked_description' => null,
+            'linked_url' => null,
+            'linked_meta' => [],
         ];
+
+        // Enrich with AgendaRenderable data for linked entities
+        if ($isLinked && class_exists($item->agendable_type)) {
+            try {
+                $entity = $item->agendable_type::find($item->agendable_id);
+                if ($entity instanceof \Platform\Core\Contracts\AgendaRenderable) {
+                    $rendered = $entity->toAgendaItem();
+                    $data['linked_icon'] = $rendered['icon'] ?? null;
+                    $data['linked_status'] = $rendered['status'] ?? null;
+                    $data['linked_status_color'] = $rendered['status_color'] ?? null;
+                    $data['linked_description'] = $rendered['description'] ?? null;
+                    $data['linked_url'] = $rendered['url'] ?? null;
+                    $data['linked_meta'] = $rendered['meta'] ?? [];
+                }
+            } catch (\Throwable) {
+                // Entity may have been deleted or module unloaded
+            }
+        }
 
         if ($showAgenda && $item->relationLoaded('agenda') && $item->agenda) {
             $data['agenda_name'] = $item->agenda->name;
@@ -4804,14 +4828,20 @@ class Terminal extends Component
     public function updateAgendaItemSlotOrder(array $groups): void
     {
         foreach ($groups as $group) {
-            $slotId = $group['value'];
+            $rawSlotId = $group['value'];
             $items = $group['items'] ?? [];
+
+            // Livewire Sortable sends 'null' as string when :sortable-id="null"
+            $isDone = $rawSlotId === 'done';
+            $slotId = ($rawSlotId === 'null' || $rawSlotId === null || $rawSlotId === 'backlog' || $rawSlotId === 'done' || (int) $rawSlotId === 0)
+                ? null
+                : (int) $rawSlotId;
 
             foreach ($items as $item) {
                 TerminalAgendaItem::where('id', $item['value'])
                     ->update([
-                        'agenda_slot_id' => $slotId === 'backlog' || $slotId === 'done' ? null : (int) $slotId,
-                        'is_done' => $slotId === 'done',
+                        'agenda_slot_id' => $slotId,
+                        'is_done' => $isDone,
                         'sort_order' => $item['order'],
                     ]);
             }
@@ -4828,6 +4858,10 @@ class Terminal extends Component
     public function updateAgendaSlotOrder(array $slots): void
     {
         foreach ($slots as $entry) {
+            // Skip virtual columns (backlog/done are not real slots)
+            if (in_array($entry['value'], ['backlog', 'done'], true) || ! is_numeric($entry['value'])) {
+                continue;
+            }
             TerminalAgendaSlot::where('id', $entry['value'])
                 ->update(['order' => $entry['order']]);
         }
