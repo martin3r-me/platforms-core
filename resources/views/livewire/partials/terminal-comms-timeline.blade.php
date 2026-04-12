@@ -418,21 +418,6 @@
       @error('emailCompose.body')<div class="px-4 pt-2 pb-0 text-[10px] text-red-400 font-medium">{{ $message }}</div>@enderror
       @error('whatsappCompose.body')<div class="px-4 pt-2 pb-0 text-[10px] text-red-400 font-medium">{{ $message }}</div>@enderror
 
-      {{-- Context indicator (reply) — compact, read-only --}}
-      @if($contextSubject)
-        <div class="px-4 pt-2 pb-0">
-          <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.025] border border-[var(--t-border)]/15">
-            <svg class="w-2.5 h-2.5 text-[var(--t-text-muted)]/40 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"/></svg>
-            <span class="text-[9px] text-[var(--t-text-muted)]/60 truncate">{{ $contextSubject }}</span>
-            @if($contextUrl)
-              <a href="{{ $contextUrl }}" target="_blank" class="ml-auto flex-shrink-0 text-[var(--t-text-muted)]/30 hover:text-[var(--t-accent)] transition">
-                <svg class="w-2.5 h-2.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
-              </a>
-            @endif
-          </div>
-        </div>
-      @endif
-
       <div class="px-4 py-2.5">
         {{-- Email Compose --}}
         @if($activeEmailThreadId)

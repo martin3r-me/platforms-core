@@ -1432,30 +1432,8 @@
             @endif
           </div>
 
-          <!-- Comms Header (only visible in comms app) -->
-          <div x-show="$wire.activeApp === 'comms'"
-               class="px-4 flex items-center gap-2.5 border-b border-[var(--t-border)]/60 flex-shrink-0"
-               :class="fullscreen ? 'h-14 text-sm' : 'h-11 text-xs'">
-            @if($this->contextType && $this->contextId)
-              @php $commsHeaderBreadcrumb = $this->getContextBreadcrumb(); @endphp
-              <span class="text-[14px]">{{ $commsHeaderBreadcrumb['icon'] ?? '📨' }}</span>
-              <div class="flex flex-col leading-tight">
-                @php $commsContextTitle = $commsHeaderBreadcrumb['title'] ?? $this->contextSubject ?? 'Kontext'; @endphp
-                @if($this->contextUrl)
-                  <a href="{{ $this->contextUrl }}" class="inline-flex items-center gap-1 font-bold text-[13px] text-[var(--t-accent)] hover:underline transition" title="Zum Kontext springen">
-                    {{ $commsContextTitle }}
-                    <svg class="w-3 h-3 flex-shrink-0 opacity-60" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5zm7.25-.75a.75.75 0 01.75-.75h3.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0V6.31l-5.47 5.47a.75.75 0 11-1.06-1.06l5.47-5.47H12.25a.75.75 0 01-.75-.75z" clip-rule="evenodd"/></svg>
-                  </a>
-                @else
-                  <span class="font-bold text-[13px] text-[var(--t-text)]">{{ $commsContextTitle }}</span>
-                @endif
-                <span class="text-[10px] text-[var(--t-text-muted)]">E-Mail &middot; WhatsApp</span>
-              </div>
-            @else
-              <svg class="w-4 h-4 text-[var(--t-text-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/></svg>
-              <span class="font-bold text-[13px] text-[var(--t-text)]">Comms</span>
-            @endif
-          </div>
+          {{-- Comms has no separate app header — global context header is sufficient,
+               thread header in timeline shows thread-specific info --}}
 
           <!-- Agenda Header -->
           <div x-show="$wire.activeApp === 'agenda'"
