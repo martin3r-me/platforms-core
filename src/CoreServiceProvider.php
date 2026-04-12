@@ -665,6 +665,7 @@ class CoreServiceProvider extends ServiceProvider
             \Platform\Core\Tools\Terminal\ListTerminalAgendaItemsTool::class => 'terminal.agenda_items.GET',
             \Platform\Core\Tools\Terminal\ManageTerminalAgendaItemsTool::class => 'terminal.agenda_items.POST',
             \Platform\Core\Tools\Terminal\UpdateTerminalAgendaItemTool::class => 'terminal.agenda_items.PATCH',
+            \Platform\Core\Tools\Terminal\ManageTerminalAgendaSlotsTool::class => 'terminal.agenda_slots.POST',
         ];
         foreach ($terminalTools as $class => $name) {
             if (class_exists($class) && !$registry->has($name)) {

@@ -16,6 +16,7 @@ use Platform\Core\Models\TerminalReaction;
 use Platform\Core\Models\TerminalAgenda;
 use Platform\Core\Models\TerminalAgendaMember;
 use Platform\Core\Models\TerminalAgendaItem;
+use Platform\Core\Models\TerminalAgendaSlot;
 use Platform\Core\Models\TerminalBookmark;
 use Platform\Core\Models\TerminalPin;
 use Platform\Core\Models\TerminalReminder;
@@ -173,7 +174,7 @@ class Terminal extends Component
 
     // ── Agenda App ────────────────────────────────────────────
     public ?int $activeAgendaId = null;
-    public string $agendaView = 'board'; // 'board' | 'day'
+    public string $agendaView = 'board'; // 'board' | 'kanban' | 'day'
     public string $agendaDayDate = '';    // Y-m-d for "Mein Tag" navigation
 
     // ── Lifecycle ──────────────────────────────────────────────
@@ -4319,8 +4320,10 @@ class Terminal extends Component
     public function selectAgenda(int $agendaId): void
     {
         $this->activeAgendaId = $agendaId;
-        $this->agendaView = 'board';
-        unset($this->agendaItems);
+        if ($this->agendaView === 'day') {
+            $this->agendaView = 'board';
+        }
+        unset($this->agendaItems, $this->agendaSlots, $this->agendaBacklogItems, $this->agendaDoneItems);
     }
 
     public function openMyDay(): void
@@ -4553,7 +4556,7 @@ class Terminal extends Component
 
         $item->update(['is_done' => ! $item->is_done]);
         $item->agenda?->refreshItemCount();
-        unset($this->agendaItems, $this->agendas, $this->myDayItems);
+        unset($this->agendaItems, $this->agendas, $this->myDayItems, $this->agendaSlots, $this->agendaBacklogItems, $this->agendaDoneItems);
     }
 
     public function updateAgendaItemOrder(array $items): void
@@ -4579,7 +4582,14 @@ class Terminal extends Component
 
     private const AGENDABLE_TYPE_LABELS = [
         \Modules\Planner\Models\PlannerTask::class => 'Aufgabe',
+        \Modules\Planner\Models\PlannerProject::class => 'Projekt',
         \Modules\Planner\Models\PlannerCanvas::class => 'Canvas',
+        \Modules\Canvas\Models\Canvas::class => 'Canvas',
+        \Modules\Helpdesk\Models\HelpdeskBoard::class => 'Board',
+        \Modules\Helpdesk\Models\HelpdeskTicket::class => 'Ticket',
+        \Modules\Okr\Models\Objective::class => 'Objective',
+        \Modules\Okr\Models\KeyResult::class => 'Key Result',
+        \Modules\Brands\Models\BrandsBrand::class => 'Marke',
     ];
 
     protected function formatAgendaItem(TerminalAgendaItem $item, bool $showAgenda = false): array
@@ -4589,6 +4599,7 @@ class Terminal extends Component
         $data = [
             'id' => $item->id,
             'agenda_id' => $item->agenda_id,
+            'agenda_slot_id' => $item->agenda_slot_id,
             'title' => $item->title,
             'notes' => $item->notes,
             'date' => $item->date?->toDateString(),
@@ -4608,6 +4619,141 @@ class Terminal extends Component
         }
 
         return $data;
+    }
+
+    // ── Agenda Kanban Slots ────────────────────────────────────
+
+    #[Computed]
+    public function agendaSlots(): array
+    {
+        if (! $this->activeAgendaId) {
+            return [];
+        }
+
+        return TerminalAgendaSlot::where('agenda_id', $this->activeAgendaId)
+            ->orderBy('order')
+            ->get()
+            ->map(fn ($slot) => [
+                'id' => $slot->id,
+                'name' => $slot->name,
+                'order' => $slot->order,
+                'color' => $slot->color,
+                'items' => $slot->items()
+                    ->where('is_done', false)
+                    ->ordered()
+                    ->get()
+                    ->map(fn ($item) => $this->formatAgendaItem($item))
+                    ->toArray(),
+            ])
+            ->toArray();
+    }
+
+    #[Computed]
+    public function agendaBacklogItems(): array
+    {
+        if (! $this->activeAgendaId) {
+            return [];
+        }
+
+        return TerminalAgendaItem::where('agenda_id', $this->activeAgendaId)
+            ->whereNull('agenda_slot_id')
+            ->where('is_done', false)
+            ->ordered()
+            ->get()
+            ->map(fn ($item) => $this->formatAgendaItem($item))
+            ->toArray();
+    }
+
+    #[Computed]
+    public function agendaDoneItems(): array
+    {
+        if (! $this->activeAgendaId) {
+            return [];
+        }
+
+        return TerminalAgendaItem::where('agenda_id', $this->activeAgendaId)
+            ->where('is_done', true)
+            ->orderByDesc('updated_at')
+            ->limit(20)
+            ->get()
+            ->map(fn ($item) => $this->formatAgendaItem($item))
+            ->toArray();
+    }
+
+    public function createAgendaSlot(int $agendaId, string $name): void
+    {
+        $agenda = TerminalAgenda::find($agendaId);
+        if (! $agenda || empty(trim($name))) {
+            return;
+        }
+
+        $maxOrder = TerminalAgendaSlot::where('agenda_id', $agendaId)->max('order') ?? 0;
+
+        TerminalAgendaSlot::create([
+            'agenda_id' => $agendaId,
+            'name' => trim($name),
+            'order' => $maxOrder + 1,
+        ]);
+
+        unset($this->agendaSlots);
+    }
+
+    public function deleteAgendaSlot(int $slotId): void
+    {
+        $slot = TerminalAgendaSlot::find($slotId);
+        if (! $slot) {
+            return;
+        }
+
+        $slot->items()->update(['agenda_slot_id' => null]);
+        $slot->delete();
+
+        unset($this->agendaSlots, $this->agendaBacklogItems);
+    }
+
+    public function renameAgendaSlot(int $slotId, string $name): void
+    {
+        $slot = TerminalAgendaSlot::find($slotId);
+        if (! $slot || empty(trim($name))) {
+            return;
+        }
+
+        $slot->update(['name' => trim($name)]);
+        unset($this->agendaSlots);
+    }
+
+    public function updateAgendaItemSlotOrder(array $groups): void
+    {
+        foreach ($groups as $group) {
+            $slotId = $group['value'];
+            $items = $group['items'] ?? [];
+
+            foreach ($items as $item) {
+                TerminalAgendaItem::where('id', $item['value'])
+                    ->update([
+                        'agenda_slot_id' => $slotId === 'backlog' || $slotId === 'done' ? null : (int) $slotId,
+                        'is_done' => $slotId === 'done',
+                        'sort_order' => $item['order'],
+                    ]);
+            }
+        }
+
+        // Refresh item count on agenda
+        if ($this->activeAgendaId) {
+            TerminalAgenda::find($this->activeAgendaId)?->refreshItemCount();
+        }
+
+        unset($this->agendaSlots, $this->agendaBacklogItems, $this->agendaDoneItems, $this->agendaItems, $this->agendas);
+    }
+
+    public function updateAgendaSlotOrder(array $slots): void
+    {
+        foreach ($slots as $entry) {
+            TerminalAgendaSlot::where('id', $entry['value'])
+                ->update(['order' => $entry['order']]);
+        }
+
+        unset($this->agendaSlots);
     }
 
     // ── Render ─────────────────────────────────────────────────

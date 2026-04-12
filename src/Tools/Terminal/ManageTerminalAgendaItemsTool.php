@@ -14,7 +14,14 @@ class ManageTerminalAgendaItemsTool implements ToolContract
 {
     private const AGENDABLE_TYPES = [
         'planner.task' => \Modules\Planner\Models\PlannerTask::class,
+        'planner.project' => \Modules\Planner\Models\PlannerProject::class,
         'planner.canvas' => \Modules\Planner\Models\PlannerCanvas::class,
+        'canvas' => \Modules\Canvas\Models\Canvas::class,
+        'helpdesk.board' => \Modules\Helpdesk\Models\HelpdeskBoard::class,
+        'helpdesk.ticket' => \Modules\Helpdesk\Models\HelpdeskTicket::class,
+        'okr.objective' => \Modules\Okr\Models\Objective::class,
+        'okr.key_result' => \Modules\Okr\Models\KeyResult::class,
+        'brands.brand' => \Modules\Brands\Models\BrandsBrand::class,
     ];
 
     public function getName(): string
@@ -76,6 +83,10 @@ class ManageTerminalAgendaItemsTool implements ToolContract
                     'type' => 'integer',
                     'description' => 'ID der Entity zum Verlinken (erforderlich bei action=attach).',
                 ],
+                'slot_id' => [
+                    'type' => 'integer',
+                    'description' => 'Optional: ID eines Agenda-Slots, in den das Item einsortiert wird.',
+                ],
                 'item_id' => [
                     'type' => 'integer',
                     'description' => 'ID des Agenda-Items zum Entfernen (erforderlich bei action=detach).',
@@ -134,6 +145,7 @@ class ManageTerminalAgendaItemsTool implements ToolContract
 
         $item = TerminalAgendaItem::create([
             'agenda_id' => $agenda->id,
+            'agenda_slot_id' => $arguments['slot_id'] ?? null,
             'title' => $title,
             'notes' => ! empty($arguments['notes']) ? trim($arguments['notes']) : null,
             'date' => $arguments['date'] ?? null,
@@ -207,6 +219,7 @@ class ManageTerminalAgendaItemsTool implements ToolContract
 
         $item = TerminalAgendaItem::create([
             'agenda_id' => $agenda->id,
+            'agenda_slot_id' => $arguments['slot_id'] ?? null,
             'agendable_type' => $fqcn,
             'agendable_id' => $entityId,
             'title' => $title,

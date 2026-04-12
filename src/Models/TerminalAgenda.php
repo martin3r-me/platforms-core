@@ -64,6 +64,11 @@ class TerminalAgenda extends Model
         return $this->hasMany(TerminalAgendaItem::class, 'agenda_id');
     }
 
+    public function slots(): HasMany
+    {
+        return $this->hasMany(TerminalAgendaSlot::class, 'agenda_id');
+    }
+
     // ── Scopes ─────────────────────────────────────────────────
 
     public function scopeForTeam(Builder $query, int $teamId): Builder

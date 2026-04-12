@@ -13,6 +13,7 @@ class TerminalAgendaItem extends Model
 
     protected $fillable = [
         'agenda_id',
+        'agenda_slot_id',
         'agendable_type',
         'agendable_id',
         'title',
@@ -51,6 +52,11 @@ class TerminalAgendaItem extends Model
     public function agendable(): MorphTo
     {
         return $this->morphTo('agendable');
+    }
+
+    public function slot(): BelongsTo
+    {
+        return $this->belongsTo(TerminalAgendaSlot::class, 'agenda_slot_id');
     }
 
     public function createdBy(): BelongsTo

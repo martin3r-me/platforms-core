@@ -58,6 +58,10 @@ class UpdateTerminalAgendaItemTool implements ToolContract
                     'type' => 'boolean',
                     'description' => 'Erledigt-Status setzen.',
                 ],
+                'agenda_slot_id' => [
+                    'type' => 'integer',
+                    'description' => 'ID des Agenda-Slots zum Verschieben (null für Backlog).',
+                ],
             ],
             'required' => ['item_id'],
         ];
@@ -93,7 +97,7 @@ class UpdateTerminalAgendaItemTool implements ToolContract
             return ToolResult::error('Du bist kein Mitglied dieser Agenda.', 'FORBIDDEN');
         }
 
-        $updatable = ['title', 'notes', 'date', 'time_start', 'time_end', 'color', 'is_done'];
+        $updatable = ['title', 'notes', 'date', 'time_start', 'time_end', 'color', 'is_done', 'agenda_slot_id'];
         $updates = [];
 
         foreach ($updatable as $field) {
