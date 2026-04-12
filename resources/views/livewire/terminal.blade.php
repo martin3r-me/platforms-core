@@ -3145,7 +3145,7 @@
 
         @else
           <!-- No channel selected (only for non-agenda apps) -->
-          <div x-show="$wire.activeApp !== 'agenda'" class="flex-1 flex items-center justify-center text-[var(--t-text-muted)] text-sm">
+          <div x-show="$wire.activeApp !== 'agenda' && $wire.activeApp !== 'comms'" class="flex-1 flex items-center justify-center text-[var(--t-text-muted)] text-sm">
             <div class="text-center">
               <div class="text-3xl mb-3 opacity-20">💬</div>
               <p class="font-medium">Willkommen im Terminal</p>
