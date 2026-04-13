@@ -29,7 +29,7 @@
                             @foreach($matrixUsers as $matrixUser)
                                 <tr class="group hover:bg-[var(--ui-primary-5)]/40 transition-colors">
                                     {{-- User name: sticky left --}}
-                                    <td class="sticky left-0 z-10 bg-[var(--ui-surface)] group-hover:bg-[var(--ui-primary-5)]/40 border-b border-r border-[var(--ui-border)]/30 px-3 py-1.5 text-xs font-medium text-[var(--ui-secondary)] truncate max-w-[11rem]">
+                                    <td class="sticky left-0 z-20 bg-[var(--ui-surface)] group-hover:bg-[var(--ui-primary-5)]/40 border-b border-r border-[var(--ui-border)]/30 px-3 py-1.5 text-xs font-medium text-[var(--ui-secondary)] truncate max-w-[11rem]">
                                         {{ $matrixUser->name }}
                                     </td>
                                     @foreach($matrixModules as $module)
