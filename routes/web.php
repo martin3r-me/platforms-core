@@ -127,6 +127,11 @@ Route::get('/embedded/config/helpdesk', function () {
 })->name('embedded.config.helpdesk');
 
 // AI SSE Streaming (auth required)
+// Module Matrix (Owner-only, auth in component)
+Route::get('/admin/module-matrix', \Platform\Core\Livewire\ModuleMatrix::class)
+    ->middleware(['web', 'auth'])
+    ->name('platform.admin.module-matrix');
+
 Route::middleware(['web', 'auth'])->group(function () {
     // Minimaler Test-Endpoint direkt im Controller
     Route::get('/core/ai/stream/minimal', function (Request $request) {

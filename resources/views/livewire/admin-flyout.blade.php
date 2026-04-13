@@ -58,8 +58,8 @@
                             </div>
                         </button>
 
-                        <button type="button"
-                            @click="$dispatch('open-modal-modules', { tab: 'matrix' }); adminFlyoutOpen = false"
+                        <a href="{{ route('platform.admin.module-matrix') }}"
+                            @click="adminFlyoutOpen = false"
                             class="w-full group flex items-center gap-2 px-2 py-1.5 rounded-md transition text-xs hover:bg-[var(--ui-muted-5)]">
                             <div class="flex-shrink-0">
                                 @svg('heroicon-o-table-cells', 'w-4 h-4 text-[var(--ui-primary)]')
@@ -67,7 +67,7 @@
                             <div class="min-w-0 flex-1 text-left">
                                 <div class="font-medium text-[var(--ui-secondary)] text-xs">Modul-Matrix</div>
                             </div>
-                        </button>
+                        </a>
                     </div>
                 </div>
             </div>
