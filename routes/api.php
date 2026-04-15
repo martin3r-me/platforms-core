@@ -23,6 +23,25 @@ Route::middleware('api.auth')->get('/user', function (Request $request) {
     ]);
 });
 
+// Test-Endpoint: POST echo + log to file
+Route::post('/test', function (Request $request) {
+    $data = [
+        'timestamp' => now()->toIso8601String(),
+        'method' => $request->method(),
+        'content_type' => $request->header('Content-Type'),
+        'accept' => $request->header('Accept'),
+        'all_headers' => $request->headers->all(),
+        'query' => $request->query(),
+        'payload' => $request->all(),
+        'raw_body' => $request->getContent(),
+    ];
+
+    $logFile = storage_path('logs/test-post.log');
+    file_put_contents($logFile, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n---\n", FILE_APPEND);
+
+    return response()->json(['success' => true, 'logged_to' => $logFile, 'payload' => $request->all()]);
+})->name('core.test.post');
+
 // Health Check (ohne Authentifizierung)
 Route::get('/health', function () {
     return response()->json([
