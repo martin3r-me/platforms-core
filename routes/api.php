@@ -42,6 +42,33 @@ Route::post('/test', function (Request $request) {
     return response()->json(['success' => true, 'logged_to' => $logFile, 'payload' => $request->all()]);
 })->name('core.test.post');
 
+// Test-Log lesen (letzten N Einträge, default 5)
+Route::get('/test/log', function (Request $request) {
+    $logFile = storage_path('logs/test-post.log');
+
+    if (!file_exists($logFile)) {
+        return response()->json(['success' => false, 'error' => 'No log file yet']);
+    }
+
+    $content = file_get_contents($logFile);
+    $entries = array_filter(explode("\n---\n", $content));
+    $limit = (int) $request->query('limit', 5);
+    $entries = array_slice($entries, -$limit);
+
+    $parsed = array_map(fn($e) => json_decode(trim($e), true), $entries);
+
+    return response()->json(['success' => true, 'count' => count($parsed), 'entries' => $parsed]);
+})->name('core.test.log');
+
+// Test-Log löschen
+Route::delete('/test/log', function () {
+    $logFile = storage_path('logs/test-post.log');
+    if (file_exists($logFile)) {
+        unlink($logFile);
+    }
+    return response()->json(['success' => true, 'message' => 'Log cleared']);
+})->name('core.test.log.clear');
+
 // Health Check (ohne Authentifizierung)
 Route::get('/health', function () {
     return response()->json([
