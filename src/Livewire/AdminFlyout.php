@@ -13,6 +13,7 @@ class AdminFlyout extends Component
     public $show = false;
     public array $adminModules = [];
     public bool $isAdmin = false;
+    public bool $isOwner = false;
 
     #[On('open-admin-flyout')]
     public function openFlyout()
@@ -32,6 +33,7 @@ class AdminFlyout extends Component
         if ($team) {
             $pivot = $user->teams()->where('team_id', $team->id)->first()?->pivot;
             $this->isAdmin = $pivot && in_array($pivot->role, ['owner', 'admin']);
+            $this->isOwner = $pivot && $pivot->role === 'owner';
         }
 
         if ($this->isAdmin) {
