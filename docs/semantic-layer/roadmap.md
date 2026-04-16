@@ -5,7 +5,7 @@ order: 6
 
 # Roadmap
 
-V1.0 ist **Infrastruktur**. Der Code läuft, die Injektion wirkt, das Debug-UI steht — aber der eigentliche Wert entsteht erst durch Inhalt und die nachfolgenden Phasen. Dieses Dokument skizziert, was kommt.
+V1.0 ist **Infrastruktur**. Der Code läuft, die Injektion wirkt, das Admin-UI steht — aber der eigentliche Wert entsteht erst durch Inhalt und die nachfolgenden Phasen. Dieses Dokument skizziert, was kommt.
 
 ---
 
@@ -19,7 +19,7 @@ V1.0 ist **Infrastruktur**. Der Code läuft, die Injektion wirkt, das Debug-UI s
 | LLM-Integration (`CoreContextTool` → `OpenAiService`) | ✅ |
 | Cold-Start-Flag `enabled_modules` | ✅ |
 | 5 Console-Commands | ✅ |
-| Debug-UI `/admin/semantic-layer` | ✅ |
+| Admin-UI `/admin/semantic-layer` inkl. Level-A-Editor (Create/Edit, Live-Preview) | ✅ |
 | Unit- & Feature-Tests | ✅ |
 
 **Kein Breaking Change**: Solange keine Layer-Daten in der DB sind, ist das Verhalten identisch zu vorher.
@@ -106,13 +106,19 @@ Der Resolver kann schon heute Extensions — jetzt kommen erste Daten:
 
 ---
 
-## V2.0 — Production-Rollout & Admin-UI (~5–10 Tage)
+## V2.0 — Production-Rollout & Admin-UI Level B/C (~5–10 Tage)
 
-**Admin-UI:**
+V1.0 hat bereits **Level A** (Create/Edit mit Live-Preview) ausgeliefert. Offen bleiben:
 
-- Vollwertiger Editor für Core-Layer (Livewire/Filament, Stil wie Rest der Plattform)
-- Versionshistorie mit Diff-Ansicht
-- Audit-Dashboard mit Filter nach Scope/Aktion/User
+**Admin-UI Level B — Versionshistorie:**
+
+- Zeitstrahl aller Versionen pro Layer
+- Diff-Ansicht zwischen zwei Versionen (`{field, op, from, to}` visualisieren)
+- Rollback per Klick (legt eine neue Version mit dem alten Content an — Versionen bleiben immutable)
+
+**Admin-UI Level C — Audit & Drift:**
+
+- Audit-Dashboard mit Filter nach Scope/Aktion/User (Daten liegen bereits in `semantic_layer_audit`)
 - Drift-Detection-Dashboard (Sample-Outputs zum Reviewen → "Würde ich das unterschreiben?")
 
 **Rollout:**
@@ -130,7 +136,7 @@ Der Resolver kann schon heute Extensions — jetzt kommen erste Daten:
 | ❌ Lint für Modul-Prompts | V1.1 |
 | ❌ Quantitatives Scoring | V1.2 |
 | ❌ Venture-Extensions mit realen Daten | V1.3 (Schema ist da) |
-| ❌ Admin-UI | V2.0 — V1.0 nutzt Console + Debug-Panel |
+| ❌ Versionshistorie / Diff / Audit-Dashboard im UI | V2.0 Level B+C — V1.0 hat Level A (Create/Edit) + Audit in DB |
 | ❌ Plattformweiter Rollout | V2.0 — V1.0 ist Pilot auf OKR + Canvas |
 | ❌ Parallele A/B-Tests | Canvas hat sequenziellen Rollout (Pre → Draft → Pilot → Prod), nicht parallel |
 | ❌ Automatische Modul-Detection für Queue/Console | Aktuell nur Route-Name-Parsing; für Queue-Jobs greift nur `status=production` |
@@ -140,7 +146,7 @@ Der Resolver kann schon heute Extensions — jetzt kommen erste Daten:
 ## Nächster konkreter Schritt
 
 1. **Martin: Layer-Content erarbeiten** (Compression-Arbeit, ~4–8h über 1–2 Wochen)
-2. **Layer laden + pilotieren auf OKR** (Console-Commands)
+2. **Layer laden + pilotieren auf OKR** — entweder direkt im Admin-UI (`/admin/semantic-layer` → `+ Global-Layer anlegen`) oder über `php artisan layer:create --from-file=…` für dateibasiertes Arbeiten
 3. **Qualitativer Blind-Test** via OKR-Frontend: 5 neutrale Prompts ohne Layer archivieren, dann mit Layer wiederholen, Martin bewertet
 4. **Go/No-Go für Canvas als zweites Pilot-Modul**
 5. **V1.1 Lint-Mechanismus planen** — sobald mehr als zwei Module beteiligt sind, wird Konflikt-Prüfung Pflicht

@@ -99,7 +99,7 @@ Jede Änderung erzeugt einen Eintrag in `semantic_layer_audit`:
 | `created` | `layer:create` für komplett neuen Scope |
 | `version_created` | `layer:create` für zusätzliche Version im bestehenden Scope |
 | `activated` | `layer:activate` |
-| `status_changed` | Status-Switch im Debug-UI oder via Command |
+| `status_changed` | Status-Switch im Admin-UI oder via Command |
 | `enabled_module` / `disabled_module` | `layer:enable-module` oder UI-Toggle |
 | `archived` | manueller Status-Wechsel auf `archived` |
 

@@ -3,9 +3,11 @@ title: Bedienung
 order: 4
 ---
 
-# Bedienung — Console & Debug-UI
+# Bedienung — Console & Admin-UI
 
-V1.0 arbeitet bewusst **Console-first**. Der Debug-UI (Livewire-Panel) ist eine read-mostly-Schaltzentrale für Pilot-Betrieb, nicht der Editor. Die eigentliche Compression-Arbeit — Inhalte formulieren, kürzen, Negativ-Raum schärfen — bleibt textbasiert.
+V1.0 bietet **zwei gleichwertige Eingriffspunkte**: die Console-Commands (für CI/Seeder/Skripte und dateibasiertes Arbeiten) und das Livewire-Admin-Panel unter `/admin/semantic-layer` (für schnelle inhaltliche Iteration mit Live-Preview). Beide nutzen denselben Validator, Scaffold und Resolver — es gibt keine UI-Sonderlogik.
+
+Die eigentliche Compression-Arbeit — Inhalte formulieren, kürzen, Negativ-Raum schärfen — bleibt textbasierte Denkarbeit. Die UI macht das Iterieren schneller, ersetzt die Arbeit aber nicht.
 
 ---
 
@@ -110,9 +112,9 @@ php artisan layer:show --resolved --module=okr --json
 
 ---
 
-## Debug-UI — `/admin/semantic-layer`
+## Admin-UI — `/admin/semantic-layer`
 
-Owner-only Livewire-Panel (`<x-ui-page>` Design). Drei Bereiche:
+Owner-only Livewire-Panel (`<x-ui-page>` Design). Vier Bereiche:
 
 ### 1. Modul-Vorschau-Selector
 
@@ -131,35 +133,83 @@ Jede Preview zeigt:
 
 Wenn ein Scope nichts liefert (Layer fehlt, Modul nicht enabled, Status draft): `Kein Layer aktiv für diese Kombination.`
 
-### 3. Layer-Liste mit Status-Switcher + Modul-Toggles
+### 3. Inline-Editor (Level A)
+
+Zwei Einstiegspunkte über der Layer-Liste:
+
+- **`+ Global-Layer anlegen`** — erscheint nur, solange kein globaler Layer existiert. Öffnet ein Formular für die erste Version `v1.0.0`.
+- **`+ Extension für «{Team}»`** — erscheint, wenn das aktuelle Team noch keinen Extension-Layer hat. Legt einen Team-Scope-Layer mit `v0.1.0` an.
+- **`+ Neue Version`** — pro bestehendem Layer; Formular wird mit dem aktuellen Content vorbefüllt, SemVer wird abhängig vom gewählten `version-type` automatisch hochgezählt.
+
+Das Formular enthält:
+
+| Feld | Verhalten |
+|---|---|
+| `SemVer` | Freies Feld, Format `MAJOR.MINOR.PATCH`, Vorschlag nach Version-Type |
+| `Version-Type` | `patch` / `minor` / `major` — steuert den automatischen SemVer-Bump |
+| `Perspektive` | Textarea + Live-Counter `x/500` |
+| `Ton` | Textarea, eine Zeile pro Item, max 12 |
+| `Heuristiken` | Textarea, eine Zeile pro Item, max 12 |
+| `Negativ-Raum` | Textarea, eine Zeile pro Item, max 12 |
+| `Notizen` | Optional — Platz für Negativ-Dokumentation |
+
+Rechts neben dem Formular läuft eine **Live-Preview** des `rendered_block` mit:
+
+- **Live-Token-Count** (debounced 400 ms)
+- **Budget-Ampel:** grün im Soft-Bereich 80–250 (Ziel 150–200), amber außerhalb
+- **Schema-Errors inline** als rote Liste, wenn der Validator fehlschlägt (leeres Array, zu langer String, unerlaubte Felder)
+
+Beim Speichern:
+
+1. Validator läuft (`LayerSchemaValidator`)
+2. Neue Version wird angelegt (alte bleiben immutable in der DB)
+3. Neue Version wird **automatisch als `current_version` aktiviert** — Status des Layers bleibt unverändert
+4. Audit-Eintrag mit strukturiertem Feld-Diff wird geschrieben
+5. Resolver-Cache wird invalidiert → Preview oben aktualisiert sich sofort
+
+### 4. Layer-Liste mit Status-Switcher + Modul-Toggles
 
 Pro Layer:
 
 - Scope-Label, Status-Badge, aktive SemVer, Token-Count, Versionsanzahl, letztes Update
+- **`+ Neue Version`** (siehe Level-A-Editor oben)
 - **Status-Switcher:** `draft · pilot · production · archived` — Klick setzt sofort
 - **Enabled-Modules-Chips:** jeder registrierte Modul-Key wird als klickbarer Chip angezeigt; grün = enabled
 
-Jede Aktion triggert `SemanticLayer::saved` → Cache-Bump → Preview oben aktualisiert sich im selben Request.
+Jede Aktion triggert `SemanticLayer::saved` → Cache-Bump → Preview oben aktualisiert sich im selben Request. Status- und Modul-Änderungen landen im Audit (`status_changed`, `enabled_module`, `disabled_module`).
 
 ### Was die UI bewusst **nicht** kann
 
-- JSON-Inhalt editieren (Perspektive, Ton, Heuristiken, Negativ-Raum) — das ist Compression-Arbeit, gehört in Editor + Review
-- Neue Versionen anlegen — geht nur über `layer:create`
-- Venture-Layer erstellen — ebenso
+- **Bestehende Versionen editieren** — Versionen sind immutable. Jede Änderung ist eine neue Version.
+- **Versionshistorie / Diff-Ansicht** — kommt in Level B (siehe [Roadmap](roadmap))
+- **Audit-Log-UI** — kommt in Level C
+- **Dateibasiertes Arbeiten** — für CI, Seeder und stdin-Pipes bleibt `layer:create --from-file=` / `--from-stdin` der richtige Weg
+- **Production-Sprung mit Validierungsprotokoll** — Status auf `production` setzen ist ein Klick; das qualitative Go/No-Go bleibt menschliche Entscheidung bis V1.2 Scoring steht
 
-Das Prinzip: **Console für Veränderung, UI für Beobachtung und Schalten**.
+Das Prinzip: **UI für schnelle Iteration + Beobachtung, Console für Pipelines**.
 
 ---
 
-## Typischer Pilot-Workflow
+## Typische Workflows
 
-1. **Layer-Content erarbeiten** in Editor / Canvas → JSON-Datei
+### Variante A — UI-first (empfohlen für Iteration)
+
+1. `/admin/semantic-layer` öffnen
+2. **`+ Global-Layer anlegen`** → Formular ausfüllen, Live-Preview beobachten, Token-Budget prüfen → **Speichern**
+3. Im Modul-Vorschau-Selector `okr` wählen → Preview für OKR-Kontext checken
+4. In der Layer-Liste **Enabled Modules** → `okr` togglen (Chip wird grün)
+5. Über OKR-Frontend eine echte Anfrage stellen → Tonalität checken
+6. Nachschärfen: **`+ Neue Version`** am Layer → Form ist vorbefüllt → bearbeiten → **Speichern** (neue Version wird automatisch aktiv)
+
+### Variante B — Console-first (für CI / dateibasiertes Arbeiten)
+
+1. **Layer-Content erarbeiten** in Editor → JSON-Datei
 2. `php artisan layer:create --scope=global --semver=1.0.0 --from-file=…`
 3. `php artisan layer:show --scope=global` → Inhalt verifizieren
 4. `php artisan layer:activate --scope=global --semver=1.0.0` → Version als aktiv markieren
 5. `php artisan layer:enable-module --scope=global --module=okr` → Modul freischalten
-6. `/admin/semantic-layer` öffnen → Preview für `okr` checken
-7. Über OKR-Frontend eine echte Anfrage stellen → Tonalität checken
-8. Wenn okay: `--module=canvas` zusätzlich, sonst Layer via `layer:create` nachschärfen
+6. `/admin/semantic-layer` → Preview + echten Test wie in Variante A
 
-Der Sprung auf `status=production` passiert **erst nach erfolgtem Validierungsprotokoll** — in V1.0 qualitativ, ab V1.2 quantitativ via Scoring.
+### Go/No-Go für Production
+
+Der Sprung auf `status=production` passiert **erst nach erfolgtem Validierungsprotokoll** — in V1.0 qualitativ (Blind-Test, Tonalität-Check), ab V1.2 quantitativ via Scoring. Der Status-Switcher im UI sollte nicht ohne diesen Schritt auf `production` gezogen werden.

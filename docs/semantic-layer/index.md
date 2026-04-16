@@ -60,12 +60,12 @@ Beide Wege rufen denselben `SemanticLayerResolver` auf. Der Layer wird **einmal 
 | LLM-Injektion (`CoreContextTool` → `OpenAiService`) | ✅ aktiv (bei `with_context=true`, Default für Frontend-Chat) |
 | Cold-Start-Flag `enabled_modules` | ✅ funktional |
 | 5 Console-Commands | ✅ verfügbar |
-| Debug-UI `/admin/semantic-layer` | ✅ Owner-only Livewire-Panel |
+| Admin-UI `/admin/semantic-layer` | ✅ Owner-only Livewire-Panel mit Level-A-Editor (Create/Edit, Live-Preview, Token-Budget-Ampel) |
 | **Erste Layer-Inhalte** | ⏳ **offen — parallel zur Compression-Arbeit** |
 | Lint für Modul-Prompts (V1.1) | ⏳ geplant |
 | Scoring-Framework (V1.2) | ⏳ geplant |
 | Venture-Extensions live (V1.3) | ⏳ geplant |
-| Admin-UI (V2.0) | ⏳ geplant |
+| Admin-UI Level B/C (Versionshistorie + Audit-Dashboard) | ⏳ geplant (V2.0) |
 
 Solange keine Layer-Daten in der DB liegen, bleibt das Verhalten der Plattform **identisch zu vorher** — kein Breaking Change.
 
@@ -77,7 +77,7 @@ Solange keine Layer-Daten in der DB liegen, bleibt das Verhalten der Plattform *
 |---|---|
 | [Konzept](konzept) | Warum Semantic Layer wirken — Attention-Mechanismus, Kompression, Interference-Problem |
 | [Architektur](architektur) | DB-Schema, Resolver-Algorithmus, Cache, Eingriffe in den bestehenden Code |
-| [Bedienung](bedienung) | Console-Commands + Debug-UI |
+| [Bedienung](bedienung) | Console-Commands + Admin-UI mit Inline-Editor |
 | [Versionierung](versionierung) | SemVer-Semantik, Governance, Migrations-Protokoll |
 | [Roadmap](roadmap) | V1.1+ — Lint, Scoring, Venture-Extensions, Production-Rollout |
 

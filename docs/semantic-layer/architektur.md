@@ -187,7 +187,7 @@ SemanticLayerVersion::saved(fn() => SemanticLayerResolver::forgetCache());
 SemanticLayerVersion::deleted(fn() => SemanticLayerResolver::forgetCache());
 ```
 
-Praktisch: jede Änderung im Debug-UI (Status ändern, Modul togglen) bumpt den Counter → sofort sichtbar im nächsten Resolve.
+Praktisch: jede Änderung im Admin-UI (Status ändern, Modul togglen, neue Version speichern) bumpt den Counter → sofort sichtbar im nächsten Resolve.
 
 ---
 
