@@ -132,6 +132,11 @@ Route::get('/admin/module-matrix', \Platform\Core\Livewire\ModuleMatrix::class)
     ->middleware(['web', 'auth'])
     ->name('platform.admin.module-matrix');
 
+// Semantic Layer Debug-Panel (Owner-only, auth in component)
+Route::get('/admin/semantic-layer', \Platform\Core\Livewire\SemanticLayerDebug::class)
+    ->middleware(['web', 'auth'])
+    ->name('platform.admin.semantic-layer');
+
 Route::middleware(['web', 'auth'])->group(function () {
     // Minimaler Test-Endpoint direkt im Controller
     Route::get('/core/ai/stream/minimal', function (Request $request) {
