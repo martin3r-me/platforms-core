@@ -3,9 +3,9 @@ title: Bedienung
 order: 4
 ---
 
-# Bedienung — Console & Admin-UI
+# Bedienung — Console, Admin-UI & MCP
 
-V1.0 bietet **zwei gleichwertige Eingriffspunkte**: die Console-Commands (für CI/Seeder/Skripte und dateibasiertes Arbeiten) und das Livewire-Admin-Panel unter `/admin/semantic-layer` (für schnelle inhaltliche Iteration mit Live-Preview). Beide nutzen denselben Validator, Scaffold und Resolver — es gibt keine UI-Sonderlogik.
+V1.0 bietet **drei gleichwertige Eingriffspunkte**: die Console-Commands (für CI/Seeder/Skripte und dateibasiertes Arbeiten), das Livewire-Admin-Panel unter `/admin/semantic-layer` (für schnelle inhaltliche Iteration mit Live-Preview) und die MCP-Tools `core.semantic_layer.*` (damit ein LLM live mit dem Owner Layer-Content iterieren kann — ohne Browser-Wechsel, ohne Console-SSH). Alle drei nutzen denselben Validator, Scaffold und Resolver — es gibt keine UI-Sonderlogik.
 
 Die eigentliche Compression-Arbeit — Inhalte formulieren, kürzen, Negativ-Raum schärfen — bleibt textbasierte Denkarbeit. Die UI macht das Iterieren schneller, ersetzt die Arbeit aber nicht.
 
@@ -213,3 +213,22 @@ Das Prinzip: **UI für schnelle Iteration + Beobachtung, Console für Pipelines*
 ### Go/No-Go für Production
 
 Der Sprung auf `status=production` passiert **erst nach erfolgtem Validierungsprotokoll** — in V1.0 qualitativ (Blind-Test, Tonalität-Check), ab V1.2 quantitativ via Scoring. Der Status-Switcher im UI sollte nicht ohne diesen Schritt auf `production` gezogen werden.
+
+---
+
+## MCP — `core.semantic_layer.*`
+
+Sechs Tools im Namensraum `core.semantic_layer.*` machen alle UI-/Console-Aktionen auch über die MCP-Schnittstelle verfügbar. Anwendungsfall: ein LLM (z.B. Claude über die MCP-Bridge) iteriert live mit dem Team-Owner — Layer anlegen, Preview prüfen, neue Version, Modul-Toggle, Status-Wechsel — alles im selben Chat.
+
+| Tool | Entspricht UI/Console |
+|---|---|
+| `core.semantic_layer.layers.GET` | Layer-Liste / `layer:list` |
+| `core.semantic_layer.layer.GET` | Layer-Detail / `layer:show` |
+| `core.semantic_layer.versions.POST` | „+ Neue Version" / `layer:create` (auto-aktiviert) |
+| `core.semantic_layer.status.PATCH` | Status-Switcher / `layer:activate --status=…` |
+| `core.semantic_layer.module.PATCH` | Modul-Chip / `layer:enable-module` |
+| `core.semantic_layer.resolved.GET` | Resolved-Preview / `layer:show --resolved` |
+
+**Auth:** alle Tools owner-only (identisch zur UI). Ausführung als Non-Owner → `ACCESS_DENIED`.
+
+**Detaillierte Tool-Referenz** mit Parametern, Beispielen, Fehler-Codes: siehe [MCP-Tools](mcp-tools).
