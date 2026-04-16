@@ -218,7 +218,7 @@ Der Sprung auf `status=production` passiert **erst nach erfolgtem Validierungspr
 
 ## MCP — `core.semantic_layer.*`
 
-Sechs Tools im Namensraum `core.semantic_layer.*` machen alle UI-/Console-Aktionen auch über die MCP-Schnittstelle verfügbar. Anwendungsfall: ein LLM (z.B. Claude über die MCP-Bridge) iteriert live mit dem Team-Owner — Layer anlegen, Preview prüfen, neue Version, Modul-Toggle, Status-Wechsel — alles im selben Chat.
+Sieben Tools im Namensraum `core.semantic_layer.*` machen alle UI-/Console-Aktionen auch über die MCP-Schnittstelle verfügbar — plus einen **Dryrun**-Pfad, der serverseitig einen echten LLM-Call mit Layer-Inject triggert und die Antwort 1:1 zurückgibt (A/B-Verifikation). Anwendungsfall: ein LLM (z.B. Claude über die MCP-Bridge) iteriert live mit dem Team-Owner — Layer anlegen, Preview prüfen, neue Version, Modul-Toggle, Status-Wechsel, LLM-Test — alles im selben Chat.
 
 | Tool | Entspricht UI/Console |
 |---|---|
@@ -228,6 +228,7 @@ Sechs Tools im Namensraum `core.semantic_layer.*` machen alle UI-/Console-Aktion
 | `core.semantic_layer.status.PATCH` | Status-Switcher / `layer:activate --status=…` |
 | `core.semantic_layer.module.PATCH` | Modul-Chip / `layer:enable-module` |
 | `core.semantic_layer.resolved.GET` | Resolved-Preview / `layer:show --resolved` |
+| `core.semantic_layer.dryrun.POST` | Serverseitiger LLM-Call mit Layer-Inject (A/B-Test) |
 
 **Auth:** alle Tools owner-only (identisch zur UI). Ausführung als Non-Owner → `ACCESS_DENIED`.
 

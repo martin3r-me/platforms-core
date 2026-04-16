@@ -5,7 +5,7 @@ order: 5
 
 # MCP-Tools — `core.semantic_layer.*`
 
-Sechs Tools im Namensraum `core.semantic_layer.*` machen den Semantic Base Layer auch über die MCP-Schnittstelle editierbar. Damit ist MCP der **dritte gleichwertige Eingriffspunkt** neben den Console-Commands (`layer:*`) und dem Admin-UI (`/admin/semantic-layer`). Alle drei nutzen dieselben Services (`LayerSchemaValidator`, `SemanticLayerScaffold`, `SemanticLayerResolver`) und schreiben dieselben Audit-Einträge.
+Sieben Tools im Namensraum `core.semantic_layer.*` machen den Semantic Base Layer auch über die MCP-Schnittstelle editierbar. Damit ist MCP der **dritte gleichwertige Eingriffspunkt** neben den Console-Commands (`layer:*`) und dem Admin-UI (`/admin/semantic-layer`). Alle drei nutzen dieselben Services (`LayerSchemaValidator`, `SemanticLayerScaffold`, `SemanticLayerResolver`) und schreiben dieselben Audit-Einträge.
 
 Konkretes Ziel: ein LLM (z.B. Claude über die MCP-Bridge) kann live mit dem User Layer-Content iterieren — anlegen, prüfen, neue Version, Modul-Toggle, Status — ohne Browser-Wechsel und ohne Console-SSH.
 
@@ -42,6 +42,7 @@ Falls `scope=team` ohne `team_id` und ohne aktiven Team-Kontext aufgerufen wird,
 | `core.semantic_layer.status.PATCH` | Status setzen (`draft` / `pilot` / `production` / `archived`) | write |
 | `core.semantic_layer.module.PATCH` | Modul-Eintrag in `enabled_modules` togglen | write |
 | `core.semantic_layer.resolved.GET` | Live-Preview: was sieht das LLM für `{team, module}`? | safe |
+| `core.semantic_layer.dryrun.POST` | Echter LLM-Call mit Layer-Inject → Antwort + layer_meta (A/B-Test) | safe |
 
 ---
 
@@ -254,6 +255,88 @@ Mögliche `reason`-Werte:
 - `status_not_active` — Layer ist auf `draft` oder `archived`
 - `module_not_enabled` — Layer aktiv, aber das angefragte Modul ist nicht in `enabled_modules` und der Layer steht nicht auf `production`
 - `unknown` — Fallback (sollte nie vorkommen)
+
+---
+
+## `core.semantic_layer.dryrun.POST`
+
+**Zweck:** echter LLM-Call gegen `OpenAiService::chat()` mit automatischer Layer-Injektion. Damit ist die Wirkung des Layers **serverseitig verifizierbar** — die Antwort ist 1:1 das Modell-Output, nicht vom rufenden Client zusammengestellt.
+
+Nicht für Produktiv-Use gedacht — reines Test-/Iterations-Werkzeug, owner-only. Kein Tool-Loop, kein Streaming, keine Persistenz (kein Audit).
+
+**Params:**
+```json
+{
+  "prompt": "Was sollte ich heute als erstes anpacken?",
+  "module": "planner",
+  "system": null,
+  "max_tokens": 500,
+  "temperature": 0.7,
+  "model": null
+}
+```
+
+- `prompt` — Pflicht, 1..2000 Zeichen.
+- `module` — optional. Wird in `options.source_module` an OpenAiService durchgereicht, damit der Resolver die richtige `{team, module}`-Kombi sieht (statt des aktiven Session-Moduls `mcp`).
+- `system` — optionaler zusätzlicher System-Prompt-Prefix. **Ersetzt** den Layer-System-Prompt nicht — der Layer bleibt injiziert.
+- `max_tokens` — Default 500, Hard-Cap 2000.
+- `temperature` — Default 0.7.
+- `model` — Default: OpenAiService-Default.
+
+**Output bei aktivem Layer:**
+```json
+{
+  "ok": true,
+  "data": {
+    "content": "…die LLM-Antwort…",
+    "model": "gpt-5",
+    "layer_active": true,
+    "layer_meta": {
+      "scope_chain": ["global"],
+      "version_chain": ["1.0.0"],
+      "token_count": 46,
+      "rendered_block": "[SEMANTIC LAYER · v1.0.0]\n…\n[/SEMANTIC LAYER]"
+    },
+    "module": "planner",
+    "team_id": 9,
+    "usage": { "input_tokens": 123, "output_tokens": 87 }
+  }
+}
+```
+
+**Output bei inaktivem Layer:**
+```json
+{
+  "ok": true,
+  "data": {
+    "content": "…neutrale LLM-Antwort…",
+    "model": "gpt-5",
+    "layer_active": false,
+    "layer_meta": null,
+    "reason": "status_not_active",
+    "module": "planner",
+    "team_id": 9,
+    "usage": { ... }
+  }
+}
+```
+
+`reason` spiegelt die gleichen Werte wie `core.semantic_layer.resolved.GET`: `no_layer_in_scope`, `no_active_version`, `status_not_active`, `module_not_enabled`, `unknown`.
+
+**Fehler:**
+
+- `ACCESS_DENIED` — non-Owner.
+- `VALIDATION_ERROR` — `prompt` fehlt/zu lang, `max_tokens`/`temperature` ungültig, `module`/`system`/`model` falscher Typ.
+- `LLM_ERROR` — OpenAI-Call schlägt fehl (enthält die Original-Exception-Message aus `OpenAiService`).
+
+**A/B-Test-Workflow:**
+
+1. Status auf `pilot` setzen (`core.semantic_layer.status.PATCH`), Modul via `core.semantic_layer.module.PATCH` enablen.
+2. Dryrun mit `module`-Param aufrufen → Antwort sollte die Layer-Perspektive/Ton zeigen, `layer_active: true`.
+3. Status auf `draft` zurücksetzen.
+4. Gleichen Dryrun nochmal → Antwort neutral, `layer_active: false`, `reason: status_not_active`.
+
+Der Stil-Unterschied zwischen 2. und 4. ist die serverseitig messbare Layer-Wirkung.
 
 ---
 
