@@ -135,6 +135,18 @@ class GetContextTool implements ToolContract
                 'team' => $teamData,
             ];
 
+            // SemanticLayer — additiv, nur wenn aktiv + Modul freigeschaltet (oder production)
+            try {
+                $resolver = app(\Platform\Core\SemanticLayer\Services\SemanticLayerResolver::class);
+                $moduleForLayer = $context->metadata['module'] ?? null;
+                $resolvedLayer = $resolver->resolveFor($targetTeam, is_string($moduleForLayer) ? $moduleForLayer : null);
+                if (!$resolvedLayer->isEmpty()) {
+                    $result['semantic_layer'] = $resolvedLayer->toArray();
+                }
+            } catch (\Throwable $e) {
+                // Defensive: Layer ist additiv, darf nie brechen
+            }
+
             // best-effort: Team-Scope für hasAccess
             $baseTeam = $targetTeam
                 ?? ($user?->currentTeamRelation ?? null)

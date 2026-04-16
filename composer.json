@@ -22,7 +22,8 @@
     "laravel": {
       "providers": [
         "Platform\\Core\\CoreServiceProvider",
-        "Platform\\Core\\Providers\\AzureSsoServiceProvider"
+        "Platform\\Core\\Providers\\AzureSsoServiceProvider",
+        "Platform\\Core\\SemanticLayer\\SemanticLayerServiceProvider"
       ]
     }
   },
