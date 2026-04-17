@@ -232,4 +232,6 @@ Sieben Tools im Namensraum `core.semantic_layer.*` machen alle UI-/Console-Aktio
 
 **Auth:** alle Tools owner-only (identisch zur UI). Ausführung als Non-Owner → `ACCESS_DENIED`.
 
+**MCP-Instructions-Injection:** Der Semantic Layer wird automatisch in die MCP-Server-Instructions injiziert, wenn das Modul `mcp` im Layer enabled ist (`core.semantic_layer.module.PATCH` → `module="mcp"`, `enabled=true`). Claude.ai und andere MCP-Clients empfangen den Layer dann direkt als Teil der `serverInfo.instructions` — ohne clientseitige Logik.
+
 **Detaillierte Tool-Referenz** mit Parametern, Beispielen, Fehler-Codes: siehe [MCP-Tools](mcp-tools).

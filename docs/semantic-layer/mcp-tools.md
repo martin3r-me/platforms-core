@@ -17,6 +17,8 @@ Konkretes Ziel: ein LLM (z.B. Claude über die MCP-Bridge) kann live mit dem Use
 
 Der Owner-Check + die Auflösung der Scope-Parameter sind im Trait `Platform\Core\Tools\SemanticLayer\AssertsOwnerAccess` gekapselt.
 
+**MCP-Instructions-Injection:** Der Layer wird beim MCP-Boot automatisch in `serverInfo.instructions` injiziert, sofern `mcp` als Modul im Layer enabled ist. Claude.ai empfängt den Layer damit direkt im System-Prompt. Voraussetzung: `core.semantic_layer.module.PATCH` mit `module="mcp"`, `enabled=true` — der Key `mcp` ist als virtuelles Modul in der `ModuleRegistry` registriert.
+
 ---
 
 ## Gemeinsame Scope-Parameter

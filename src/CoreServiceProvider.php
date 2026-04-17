@@ -59,6 +59,14 @@ class CoreServiceProvider extends ServiceProvider
             ]);
         }
 
+        // Virtuelles Modul für Semantic-Layer-Gate (kein Route/View-Modul)
+        ModuleRegistry::register([
+            'key' => 'mcp',
+            'title' => 'MCP',
+            'scope_type' => 'single',
+            'description' => 'Model Context Protocol — externe AI-Clients',
+        ]);
+
         // Views & Migrations
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'platform');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');

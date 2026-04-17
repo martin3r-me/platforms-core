@@ -11,6 +11,7 @@ use Platform\Core\Mcp\Tools\ToolDiscoveryToolContract;
 use Platform\Core\Mcp\Tools\ExecuteToolContract;
 use Platform\Core\Mcp\Adapters\ToolContractAdapter;
 use Platform\Core\Models\McpSession;
+use Platform\Core\SemanticLayer\Services\SemanticLayerResolver;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -238,10 +239,64 @@ MARKDOWN;
                 'total_tools' => count($this->tools),
             ]);
 
+            // Semantic Layer in instructions injizieren (graceful)
+            $this->injectSemanticLayer();
+
         } catch (\Throwable $e) {
             Log::error("[DiscoveryMcpServer] Boot fehlgeschlagen", [
                 'error' => $e->getMessage(),
                 'trace' => substr($e->getTraceAsString(), 0, 500),
+            ]);
+        }
+    }
+
+    /**
+     * Semantic Layer in $this->instructions injizieren.
+     *
+     * Resolves den Layer für das aktuelle Team mit Modul-Gate "mcp"
+     * und hängt den rendered_block an die Server-Instructions an.
+     * Graceful: Fehler führen nie zum Boot-Abbruch.
+     */
+    private function injectSemanticLayer(): void
+    {
+        try {
+            $user = auth()->user();
+            if (!$user) {
+                return;
+            }
+
+            // Team: MCP-Session-Team > User's current UI team
+            $team = null;
+            try {
+                $mcpSession = McpSession::find($this->sessionId);
+                if ($mcpSession?->team_id) {
+                    $team = $mcpSession->team;
+                }
+            } catch (\Throwable $e) {
+                // graceful
+            }
+            if (!$team && method_exists($user, 'currentTeam')) {
+                $team = $user->currentTeam;
+            }
+
+            $resolver = app(SemanticLayerResolver::class);
+            $resolved = $resolver->resolveFor($team, 'mcp');
+
+            if ($resolved->isEmpty()) {
+                return;
+            }
+
+            $this->instructions .= "\n\n" . $resolved->rendered_block;
+
+            Log::info('[MCP SemanticLayer] Layer injected into instructions', [
+                'scope_chain' => $resolved->scope_chain,
+                'version_chain' => $resolved->version_chain,
+                'token_count' => $resolved->token_count,
+                'team_id' => $team?->id,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('[MCP SemanticLayer] Injection failed (graceful skip)', [
+                'error' => $e->getMessage(),
             ]);
         }
     }
