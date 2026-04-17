@@ -19,15 +19,11 @@ use Platform\Core\SemanticLayer\Services\SemanticLayerScaffold;
  * core.semantic_layer.versions.POST
  *
  * Kernoperation des Semantic-Layer-MCP-Toolsets. Legt eine neue Version
- * an. Wenn noch kein Layer im Scope existiert, wird er automatisch
+ * an. Wenn noch kein Layer im Scope+Label existiert, wird er automatisch
  * angelegt (Status: pilot, enabled_modules: []).
  *
- * Validiert via LayerSchemaValidator, rendert via SemanticLayerScaffold,
- * schreibt einen strukturierten Audit-Diff gegen die vorherige
- * current_version und aktiviert die neue Version automatisch als
- * current_version_id (Auto-Activate, abweichend zur Console).
- *
- * SemVer ist ein expliziter Parameter — kein Auto-Bump.
+ * Unterstützt `label` für Multi-Layer: "leitbild" (Default, sort=0) oder
+ * beliebiger anderer Label (sort=10).
  *
  * Owner-only.
  */
@@ -49,10 +45,11 @@ class CreateVersionTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'Legt eine neue Version eines Semantic-Layers an (oder erstellt den Layer, falls noch keiner im Scope existiert). '
+        return 'Legt eine neue Version eines Semantic-Layers an (oder erstellt den Layer, falls noch keiner im Scope+Label existiert). '
             . 'Validiert hart gegen das 4-Kanal-Schema (perspektive, ton, heuristiken, negativ_raum), rendert den Prompt-Block, '
             . 'aktiviert die neue Version automatisch als current_version und schreibt einen Audit-Diff. '
             . 'SemVer muss explizit als MAJOR.MINOR.PATCH-String mitgegeben werden — kein Auto-Bump. '
+            . 'label="leitbild" (Default) für Leitbild-Layer, oder z.B. label="mcp" für Modul-spezifische Layer. '
             . 'Owner-only. '
             . 'Bei Token-Count außerhalb des Soft-Bereichs (80–250) wird ein "budget_warning" im Output gesetzt.';
     }
@@ -71,9 +68,14 @@ class CreateVersionTool implements ToolContract, ToolMetadataContract
                     'type' => ['integer', 'null'],
                     'description' => 'Team-ID — nur bei scope=team relevant. Wenn nicht angegeben, wird der aktive Team-Kontext verwendet.',
                 ],
+                'label' => [
+                    'type' => 'string',
+                    'description' => 'Layer-Label: "leitbild" (Default, ungated, greift überall) oder z.B. "mcp" (Modul-spezifisch, muss gegateted werden). '
+                        . 'Pro scope+label existiert max. ein Layer.',
+                ],
                 'semver' => [
                     'type' => 'string',
-                    'description' => 'SemVer der neuen Version im Format MAJOR.MINOR.PATCH (z.B. "1.0.0"). Muss im Scope eindeutig sein.',
+                    'description' => 'SemVer der neuen Version im Format MAJOR.MINOR.PATCH (z.B. "1.0.0"). Muss im Scope+Label eindeutig sein.',
                 ],
                 'version_type' => [
                     'type' => 'string',
@@ -125,6 +127,13 @@ class CreateVersionTool implements ToolContract, ToolMetadataContract
             }
             [$scope, $teamId] = $scopeResult;
 
+            // Label
+            $label = $arguments['label'] ?? SemanticLayer::LABEL_LEITBILD;
+            if (!is_string($label) || $label === '') {
+                $label = SemanticLayer::LABEL_LEITBILD;
+            }
+            $label = mb_substr(trim($label), 0, 50);
+
             // SemVer
             $semver = $arguments['semver'] ?? null;
             if (!is_string($semver) || $semver === '') {
@@ -174,6 +183,7 @@ class CreateVersionTool implements ToolContract, ToolMetadataContract
                 heuristiken: $payload['heuristiken'],
                 negativRaum: $payload['negativ_raum'],
                 versionChain: [$semver],
+                labelChain: [$label . ':v' . $semver],
             );
             $tokenCount = $this->validator->estimateTokens($rendered);
             $budgetWarning = $this->validator->checkTokenBudget($tokenCount);
@@ -185,10 +195,15 @@ class CreateVersionTool implements ToolContract, ToolMetadataContract
 
             $userId = $context->user->id ?? null;
 
+            // Auto sort_order: 0 für leitbild, 10 für andere
+            $sortOrder = ($label === SemanticLayer::LABEL_LEITBILD) ? 0 : 10;
+
             try {
                 $result = DB::transaction(function () use (
                     $scope,
                     $teamId,
+                    $label,
+                    $sortOrder,
                     $semver,
                     $versionType,
                     $payload,
@@ -197,14 +212,14 @@ class CreateVersionTool implements ToolContract, ToolMetadataContract
                     $userId
                 ) {
                     $layer = SemanticLayer::firstOrCreate(
-                        ['scope_type' => $scope, 'scope_id' => $teamId],
-                        ['status' => SemanticLayer::STATUS_PILOT, 'enabled_modules' => []],
+                        ['scope_type' => $scope, 'scope_id' => $teamId, 'label' => $label],
+                        ['status' => SemanticLayer::STATUS_PILOT, 'enabled_modules' => [], 'sort_order' => $sortOrder],
                     );
                     $layerWasNew = $layer->wasRecentlyCreated;
 
                     if ($layer->versions()->where('semver', $semver)->exists()) {
                         throw new VersionExistsException(
-                            "Version {$semver} existiert bereits für scope={$scope}"
+                            "Version {$semver} existiert bereits für scope={$scope}, label={$label}"
                             . ($scope === SemanticLayer::SCOPE_TEAM ? ", team_id={$teamId}" : '')
                             . '.'
                         );
@@ -243,6 +258,7 @@ class CreateVersionTool implements ToolContract, ToolMetadataContract
                         context: [
                             'semver' => $semver,
                             'scope' => $scope,
+                            'label' => $label,
                             'team_id' => $teamId,
                             'source' => 'mcp',
                         ],
@@ -263,6 +279,8 @@ class CreateVersionTool implements ToolContract, ToolMetadataContract
             $output = [
                 'layer_id' => $result['layer']->id,
                 'layer_was_new' => $result['layer_was_new'],
+                'label' => $result['layer']->label,
+                'sort_order' => $result['layer']->sort_order,
                 'version_id' => $result['version']->id,
                 'semver' => $semver,
                 'version_type' => $versionType,
@@ -282,8 +300,6 @@ class CreateVersionTool implements ToolContract, ToolMetadataContract
     }
 
     /**
-     * Strukturierter Diff für die Audit-Chain. Identisch zur UI-Implementierung.
-     *
      * @param  array<string, mixed> $from
      * @param  array<string, mixed> $to
      * @return array<int, array<string, mixed>>

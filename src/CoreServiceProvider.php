@@ -32,7 +32,6 @@ use Platform\Core\Services\IntelligentAgent;
 use Platform\Core\Services\AgentOrchestrator;
 use Platform\Core\Contracts\CounterKeyResultSyncer;
 use Platform\Core\Services\NullCounterKeyResultSyncer;
-use Platform\Core\Registry\ModuleRegistry;
 use Platform\Core\Contracts\DocumentRendererContract;
 use Platform\Core\Services\Documents\PdfRenderer;
 use Platform\Core\Services\Documents\DocumentTemplateRegistry;
@@ -59,13 +58,22 @@ class CoreServiceProvider extends ServiceProvider
             ]);
         }
 
-        // Virtuelles Modul für Semantic-Layer-Gate (kein Route/View-Modul)
-        ModuleRegistry::register([
-            'key' => 'mcp',
-            'title' => 'MCP',
-            'scope_type' => 'single',
-            'description' => 'Model Context Protocol — externe AI-Clients',
-        ]);
+        // ContextKeyRegistry: Builtin-Keys für Semantic-Layer-Gate
+        // (entkoppelt von ModuleRegistry — keine Phantom-Module nötig)
+        \Platform\Core\SemanticLayer\ContextKeyRegistry::register('mcp', 'Model Context Protocol — externe AI-Clients');
+        \Platform\Core\SemanticLayer\ContextKeyRegistry::register('api', 'REST API Kontext');
+        \Platform\Core\SemanticLayer\ContextKeyRegistry::register('webhook', 'Webhook Kontext');
+
+        // Auto-Import aller DB-Module als Context-Keys
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('modules')) {
+                foreach (\Platform\Core\Models\Module::pluck('title', 'key') as $key => $title) {
+                    \Platform\Core\SemanticLayer\ContextKeyRegistry::register($key, $title ?: $key);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Silent: DB möglicherweise nicht verfügbar (migrate, install)
+        }
 
         // Views & Migrations
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'platform');

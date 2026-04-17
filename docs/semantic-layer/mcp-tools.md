@@ -17,18 +17,24 @@ Konkretes Ziel: ein LLM (z.B. Claude über die MCP-Bridge) kann live mit dem Use
 
 Der Owner-Check + die Auflösung der Scope-Parameter sind im Trait `Platform\Core\Tools\SemanticLayer\AssertsOwnerAccess` gekapselt.
 
-**MCP-Instructions-Injection:** Der Layer wird beim MCP-Boot automatisch in `serverInfo.instructions` injiziert, sofern `mcp` als Modul im Layer enabled ist. Claude.ai empfängt den Layer damit direkt im System-Prompt. Voraussetzung: `core.semantic_layer.module.PATCH` mit `module="mcp"`, `enabled=true` — der Key `mcp` ist als virtuelles Modul in der `ModuleRegistry` registriert.
+**MCP-Instructions-Injection:** Alle Layer, deren `enabled_modules` den Key `mcp` enthält (oder die ungated sind, z.B. Leitbild), werden beim MCP-Boot automatisch in `serverInfo.instructions` injiziert. Claude.ai empfängt den gemergten Layer im System-Prompt. Der Key `mcp` ist in der `ContextKeyRegistry` registriert (nicht mehr `ModuleRegistry`).
 
 ---
 
-## Gemeinsame Scope-Parameter
+## Gemeinsame Parameter
 
-Die meisten Tools akzeptieren zwei gemeinsame Parameter:
+Die meisten Tools akzeptieren diese gemeinsamen Parameter zur Layer-Identifikation:
 
 | Parameter | Typ | Default | Bedeutung |
 |---|---|---|---|
-| `scope` | `"global"` \| `"team"` | `"global"` | Welcher Layer-Scope. |
+| `layer_id` | `int` \| `null` | — | Direkte Layer-ID (hat Vorrang vor scope+label). |
+| `scope` | `"global"` \| `"team"` | `"global"` | Welcher Layer-Scope. Nur relevant ohne `layer_id`. |
 | `team_id` | `int` \| `null` | aktiver Team-Kontext | Nur bei `scope=team`. Wenn `null`, wird der Team-Kontext der MCP-Session verwendet (siehe `core.team.switch`). |
+| `label` | `string` | `"leitbild"` | Layer-Label. Pro `scope+label` existiert max. ein Layer. |
+
+**Multi-Layer:** Pro Scope können mehrere Layer mit unterschiedlichen Labels existieren (z.B. `leitbild` + `mcp`). Die `label`-Semantik:
+- `"leitbild"` — Ungated, greift überall (sort_order=0)
+- beliebig (z.B. `"mcp"`) — Muss über `enabled_modules` gegateted werden (sort_order=10)
 
 Falls `scope=team` ohne `team_id` und ohne aktiven Team-Kontext aufgerufen wird, antwortet das Tool mit `MISSING_TEAM_CONTEXT`.
 
@@ -57,19 +63,35 @@ Falls `scope=team` ohne `team_id` und ohne aktiven Team-Kontext aufgerufen wird,
 {
   "ok": true,
   "data": {
-    "count": 2,
+    "count": 3,
     "layers": [
       {
         "id": 1,
         "scope_type": "global",
         "scope_id": null,
+        "label": "leitbild",
+        "sort_order": 0,
         "status": "pilot",
-        "enabled_modules": ["okr"],
+        "enabled_modules": [],
+        "is_ungated": true,
         "current_version": { "id": 3, "semver": "1.1.0", "token_count": 180 },
         "version_count": 3,
         "updated_at": "2026-04-16T14:22:00+00:00"
       },
-      { "id": 2, "scope_type": "team", "scope_id": 9, ... }
+      {
+        "id": 4,
+        "scope_type": "global",
+        "scope_id": null,
+        "label": "mcp",
+        "sort_order": 10,
+        "status": "pilot",
+        "enabled_modules": ["mcp"],
+        "is_ungated": false,
+        "current_version": { "id": 5, "semver": "0.2.0", "token_count": 46 },
+        "version_count": 2,
+        "updated_at": "2026-04-17T10:00:00+00:00"
+      },
+      { "id": 2, "scope_type": "team", "scope_id": 9, "label": "leitbild", ... }
     ]
   }
 }
@@ -79,23 +101,24 @@ Falls `scope=team` ohne `team_id` und ohne aktiven Team-Kontext aufgerufen wird,
 
 ## `core.semantic_layer.layer.GET`
 
-**Params:** `scope`, `team_id` (optional).
+**Params:** `layer_id` (direkt) ODER `scope`, `team_id`, `label` (optional, Default label: `"leitbild"`).
 
-**Output:** Wie oben, plus vollständiger Content der `current_version` (Perspektive, Ton, Heuristiken, Negativ-Raum, Notes, SemVer, Token-Count, Created-At).
+**Output:** Wie oben, plus vollständiger Content der `current_version` (Perspektive, Ton, Heuristiken, Negativ-Raum, Notes, SemVer, Token-Count, Created-At) sowie `label`, `sort_order`, `is_ungated`.
 
-Fehler `LAYER_NOT_FOUND`, wenn im Scope noch kein Layer existiert — der Aufrufer kann dann mit `versions.POST` einen anlegen.
+Fehler `LAYER_NOT_FOUND`, wenn kein Layer für die Kombination existiert — der Aufrufer kann dann mit `versions.POST` einen anlegen.
 
 ---
 
 ## `core.semantic_layer.versions.POST`
 
-**Kernoperation.** Legt eine neue Version an. Wenn im Scope noch kein Layer existiert, wird er automatisch angelegt (Status: `pilot`, `enabled_modules: []`).
+**Kernoperation.** Legt eine neue Version an. Wenn im Scope+Label noch kein Layer existiert, wird er automatisch angelegt (Status: `pilot`, `enabled_modules: []`).
 
 **Params:**
 ```json
 {
   "scope": "global",
   "team_id": null,
+  "label": "leitbild",
   "semver": "1.0.0",
   "version_type": "minor",
   "perspektive": "Wir sind…",
@@ -108,6 +131,7 @@ Fehler `LAYER_NOT_FOUND`, wenn im Scope noch kein Layer existiert — der Aufruf
 
 **Wichtig:**
 
+- `label` wählt den Layer (Default: `"leitbild"`). Bei `label="leitbild"` wird `sort_order=0` gesetzt, bei anderen Labels `sort_order=10`.
 - `semver` ist **explizit** als `MAJOR.MINOR.PATCH`-String erforderlich — kein Auto-Bump (Aufrufer entscheidet bewusst).
 - Die neue Version wird **automatisch** als `current_version_id` aktiviert (Auto-Activate, abweichend zur Console).
 - Der Status des Layers wird **nicht** verändert — neuer Layer bleibt auf `pilot`, bestehender behält seinen Status.
@@ -142,11 +166,11 @@ Fehler `LAYER_NOT_FOUND`, wenn im Scope noch kein Layer existiert — der Aufruf
 
 ## `core.semantic_layer.status.PATCH`
 
-**Params:**
+**Params:** `layer_id` (direkt) ODER `scope + label`. Plus:
 ```json
 {
   "scope": "global",
-  "team_id": null,
+  "label": "leitbild",
   "status": "production"
 }
 ```
@@ -175,28 +199,29 @@ Erlaubte Werte: `draft`, `pilot`, `production`, `archived`.
 
 ## `core.semantic_layer.module.PATCH`
 
-**Params:**
+**Params:** `layer_id` (direkt) ODER `scope + label`. Plus:
 ```json
 {
   "scope": "global",
-  "team_id": null,
-  "module": "okr",
+  "label": "mcp",
+  "module": "mcp",
   "enabled": true
 }
 ```
 
-Der Modul-Key wird gegen die existierenden Module geprüft (DB + In-Memory-`ModuleRegistry`). Unbekannte Keys → `UNKNOWN_MODULE`.
+Der Kontext-Key wird gegen die `ContextKeyRegistry` geprüft (DB-Module + Builtins wie `mcp`, `api`, `webhook`). Unbekannte Keys → `UNKNOWN_MODULE`.
 
 **Output:**
 ```json
 {
   "ok": true,
   "data": {
-    "layer_id": 1,
-    "module": "okr",
+    "layer_id": 4,
+    "label": "mcp",
+    "module": "mcp",
     "enabled": true,
     "changed": true,
-    "enabled_modules": ["okr", "canvas"]
+    "enabled_modules": ["mcp"]
   }
 }
 ```
@@ -215,9 +240,9 @@ Test-Spiegel zu `core.context.GET`. Zeigt, was das LLM für eine konkrete `{team
 }
 ```
 
-Beide Parameter sind optional. `team_id=null` → nur Global-Layer (entspricht Queue-Job- / API-Kontext). `module=null` → Discovery-Modus (Modul-Gate wird ignoriert).
+Beide Parameter sind optional. `team_id=null` → nur Global-Layer. `module=null` → nur ungated Leitbild-Layer.
 
-**Output bei aktivem Layer:**
+**Output bei aktivem Layer (Multi-Layer Merge):**
 ```json
 {
   "ok": true,
@@ -227,12 +252,12 @@ Beide Parameter sind optional. `team_id=null` → nur Global-Layer (entspricht Q
     "ton": [...],
     "heuristiken": [...],
     "negativ_raum": [...],
-    "scope_chain": ["global"],
-    "version_chain": ["1.0.0"],
-    "token_count": 180,
-    "rendered_block": "[SEMANTIC LAYER · v1.0.0]\n…",
-    "team_id": null,
-    "module": "okr"
+    "scope_chain": ["global:leitbild", "global:mcp", "team:9:leitbild"],
+    "version_chain": ["1.0.0", "0.2.0", "0.1.0"],
+    "token_count": 226,
+    "rendered_block": "[SEMANTIC LAYER · leitbild:v1.0.0 + mcp:v0.2.0 + leitbild:v0.1.0]\n…",
+    "team_id": 9,
+    "module": "mcp"
   }
 }
 ```
@@ -358,7 +383,7 @@ Der Stil-Unterschied zwischen 2. und 4. ist die serverseitig messbare Layer-Wirk
 | LLM erzeugt schlampigen Layer-Content via POST | Owner-Only + Schema-Validator + Budget-Warning + alle Versionen immutable + jederzeit Rollback via neuer Version |
 | User springt versehentlich auf `production` | `warning_production_broadens_scope` im Output (V1.2: Scoring-Gate) |
 | MCP-Discovery zeigt Tools auch non-Owner | Tools bleiben sichtbar, Ausführung schlägt mit `ACCESS_DENIED` fehl |
-| Modul-Key-Typo blockiert nicht den Save | Vorab-Check gegen DB-Module + ModuleRegistry → `UNKNOWN_MODULE` |
+| Kontext-Key-Typo blockiert nicht den Save | Vorab-Check gegen `ContextKeyRegistry` (Module + Builtins) → `UNKNOWN_MODULE` |
 | Team-Scope-Operation ohne Team-Kontext | Klare Fehlermeldung `MISSING_TEAM_CONTEXT` |
 
 ---

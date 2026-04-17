@@ -16,8 +16,7 @@ use Platform\Core\Services\OpenAiService;
  * Dünner Adapter, der serverseitig einen LLM-Call gegen OpenAiService::chat()
  * ausführt. Der Semantic Layer wird dort automatisch via CoreContextTool in den
  * System-Prompt gemischt (`with_context=true`). Das Tool liefert den Modell-
- * Output 1:1 zurück + zusätzlich `layer_active` + `layer_meta`, damit die Wirkung
- * des Layers in der Server-Antwort sichtbar ist (A/B-Test).
+ * Output 1:1 zurück + zusätzlich `layer_active` + `layer_meta`.
  *
  * Bewusst: kein Tool-Loop, keine State-Effekte, keine Persistenz — reines
  * Test-/Iterations-Werkzeug, owner-only.
@@ -59,18 +58,15 @@ class DryrunTool implements ToolContract, ToolMetadataContract
                     'type' => 'string',
                     'minLength' => 1,
                     'maxLength' => self::PROMPT_MAX_LENGTH,
-                    'description' => 'User-Prompt für den LLM-Call. Wird als einzelne user-message an OpenAiService übergeben.',
+                    'description' => 'User-Prompt für den LLM-Call.',
                 ],
                 'module' => [
                     'type' => ['string', 'null'],
-                    'description' => 'Modul-Key, für den der Layer gerendert werden soll (z.B. "planner"). '
-                        . 'Wird in options["source_module"] durchgereicht, damit der Resolver die richtige '
-                        . '{team, module}-Kombi sieht — sonst würde das aktive Session-Modul (mcp) verwendet.',
+                    'description' => 'Kontext-Key, für den der Layer gerendert werden soll (z.B. "planner", "mcp").',
                 ],
                 'system' => [
                     'type' => ['string', 'null'],
-                    'description' => 'Optionaler zusätzlicher System-Prompt-Prefix (zusätzliche system-message VOR dem '
-                        . 'Default-System mit Layer). Ersetzt den Layer-System-Prompt NICHT.',
+                    'description' => 'Optionaler zusätzlicher System-Prompt-Prefix.',
                 ],
                 'max_tokens' => [
                     'type' => ['integer', 'null'],
@@ -82,7 +78,7 @@ class DryrunTool implements ToolContract, ToolMetadataContract
                 ],
                 'model' => [
                     'type' => ['string', 'null'],
-                    'description' => 'Optional: abweichendes Modell. Default: OpenAiService-Default.',
+                    'description' => 'Optional: abweichendes Modell.',
                 ],
             ],
             'required' => ['prompt'],
@@ -175,14 +171,12 @@ class DryrunTool implements ToolContract, ToolMetadataContract
 
         // ---- Options ----
         $options = [
-            'with_context' => true,     // Layer wird automatisch in System-Prompt gemischt
-            'tools' => false,           // Kein Tool-Loop
+            'with_context' => true,
+            'tools' => false,
             'max_tokens' => $maxTokens,
             'temperature' => $temperature,
         ];
         if ($module !== null) {
-            // Damit Resolver die {team, module}-Kombi für unsere Test-Anfrage nutzt —
-            // sonst würde das aktuelle Session-Modul (mcp) verwendet.
             $options['source_module'] = $module;
         }
 
@@ -218,21 +212,21 @@ class DryrunTool implements ToolContract, ToolMetadataContract
 
     /**
      * Best-Effort-Diagnose, warum der Resolver leer geliefert hat.
-     * Spiegelt die Logik aus GetResolvedTool — selbe reason-Werte.
      */
     private function diagnoseEmpty(?int $teamId, ?string $module): string
     {
-        $global = SemanticLayer::global();
-        $teamLayer = $teamId ? SemanticLayer::forTeam($teamId) : null;
+        $globalLayers = SemanticLayer::globalLayers();
+        $teamLayers = $teamId ? SemanticLayer::forTeamLayers($teamId) : collect();
 
-        if (!$global && !$teamLayer) {
+        $candidates = $globalLayers->merge($teamLayers);
+
+        if ($candidates->isEmpty()) {
             return 'no_layer_in_scope';
         }
 
-        $candidates = array_filter([$global, $teamLayer]);
         $hasActiveStatus = false;
         $hasCurrentVersion = false;
-        $moduleEnabledSomewhere = false;
+        $contextApplies = false;
         $productionSomewhere = false;
 
         foreach ($candidates as $layer) {
@@ -245,8 +239,8 @@ class DryrunTool implements ToolContract, ToolMetadataContract
             if ($layer->status === SemanticLayer::STATUS_PRODUCTION) {
                 $productionSomewhere = true;
             }
-            if ($module !== null && $layer->hasModuleEnabled($module)) {
-                $moduleEnabledSomewhere = true;
+            if ($layer->appliesToContext($module)) {
+                $contextApplies = true;
             }
         }
 
@@ -256,7 +250,7 @@ class DryrunTool implements ToolContract, ToolMetadataContract
         if (!$hasActiveStatus) {
             return 'status_not_active';
         }
-        if ($module !== null && !$moduleEnabledSomewhere && !$productionSomewhere) {
+        if (!$contextApplies && !$productionSomewhere) {
             return 'module_not_enabled';
         }
 

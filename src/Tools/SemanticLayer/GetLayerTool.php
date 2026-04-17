@@ -11,9 +11,8 @@ use Platform\Core\SemanticLayer\Models\SemanticLayer;
 /**
  * core.semantic_layer.layer.GET
  *
- * Liefert einen einzelnen Semantic-Layer (global oder team-scoped) mit
- * vollem Content der current_version (Perspektive, Ton, Heuristiken,
- * Negativ-Raum, Notes, Token-Count, SemVer).
+ * Liefert einen einzelnen Semantic-Layer mit vollem Content der
+ * current_version. Akzeptiert `layer_id` (direkt) ODER `scope + label`.
  *
  * Owner-only.
  */
@@ -28,9 +27,10 @@ class GetLayerTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'Liefert einen einzelnen Semantic-Layer (global oder team-scoped) mit vollem Content der aktiven Version. '
+        return 'Liefert einen einzelnen Semantic-Layer mit vollem Content der aktiven Version. '
+            . 'Akzeptiert layer_id (direkt) ODER scope + label (Default label: "leitbild"). '
             . 'Enthält die vier Kanäle (perspektive, ton, heuristiken, negativ_raum), Notes, Token-Count, SemVer und Status. '
-            . 'Read-only, Owner-only. Nutze "core.semantic_layer.layers.GET" um zu sehen, welche Layer existieren.';
+            . 'Read-only, Owner-only.';
     }
 
     public function getSchema(): array
@@ -38,14 +38,22 @@ class GetLayerTool implements ToolContract, ToolMetadataContract
         return [
             'type' => 'object',
             'properties' => [
+                'layer_id' => [
+                    'type' => ['integer', 'null'],
+                    'description' => 'Direkte Layer-ID. Alternativ scope + label verwenden.',
+                ],
                 'scope' => [
                     'type' => 'string',
                     'enum' => [SemanticLayer::SCOPE_GLOBAL, SemanticLayer::SCOPE_TEAM],
-                    'description' => '"global" für den BHG-Core-Layer, "team" für den Venture-Extension-Layer. Default: "global".',
+                    'description' => '"global" oder "team". Default: "global".',
                 ],
                 'team_id' => [
                     'type' => ['integer', 'null'],
-                    'description' => 'Team-ID — nur bei scope=team relevant. Wenn nicht angegeben, wird der aktive Team-Kontext verwendet.',
+                    'description' => 'Team-ID — nur bei scope=team relevant.',
+                ],
+                'label' => [
+                    'type' => 'string',
+                    'description' => 'Layer-Label (z.B. "leitbild", "mcp"). Default: "leitbild".',
                 ],
             ],
         ];
@@ -58,25 +66,12 @@ class GetLayerTool implements ToolContract, ToolMetadataContract
                 return $denied;
             }
 
-            $scopeResult = $this->resolveScope($arguments, $context);
-            if ($scopeResult instanceof ToolResult) {
-                return $scopeResult;
+            $layerResult = $this->resolveLayer($arguments, $context);
+            if ($layerResult instanceof ToolResult) {
+                return $layerResult;
             }
-            [$scope, $teamId] = $scopeResult;
-
-            $layer = SemanticLayer::where('scope_type', $scope)
-                ->where('scope_id', $teamId)
-                ->with('currentVersion')
-                ->first();
-
-            if (!$layer) {
-                return ToolResult::error(
-                    'LAYER_NOT_FOUND',
-                    'Es existiert noch kein Semantic-Layer für scope=' . $scope
-                    . ($scope === SemanticLayer::SCOPE_TEAM ? ', team_id=' . $teamId : '')
-                    . '. Lege einen mit "core.semantic_layer.versions.POST" an.'
-                );
-            }
+            $layer = $layerResult;
+            $layer->load('currentVersion');
 
             $v = $layer->currentVersion;
 
@@ -85,8 +80,11 @@ class GetLayerTool implements ToolContract, ToolMetadataContract
                     'id' => $layer->id,
                     'scope_type' => $layer->scope_type,
                     'scope_id' => $layer->scope_id,
+                    'label' => $layer->label,
+                    'sort_order' => $layer->sort_order,
                     'status' => $layer->status,
                     'enabled_modules' => $layer->enabled_modules ?? [],
+                    'is_ungated' => $layer->isUngated(),
                     'current_version' => $v ? [
                         'id' => $v->id,
                         'semver' => $v->semver,

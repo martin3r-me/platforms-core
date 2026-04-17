@@ -13,12 +13,8 @@ use Platform\Core\SemanticLayer\Services\SemanticLayerResolver;
 /**
  * core.semantic_layer.status.PATCH
  *
- * Setzt den Status eines Semantic-Layers auf draft / pilot / production / archived.
- * Schreibt einen Audit-Eintrag mit `from` und `to`. Invalidiert den Resolver-Cache.
- *
- * Hinweis bei status=production: Der Layer wirkt dann auf ALLEN Modulen,
- * unabhängig von enabled_modules. Wir geben einen `warning_production_broadens_scope`
- * im Output zurück (informativer Hint, kein Block).
+ * Setzt den Status eines Semantic-Layers. Akzeptiert `layer_id` (direkt)
+ * ODER `scope + label`.
  *
  * Owner-only.
  */
@@ -39,10 +35,10 @@ class SetStatusTool implements ToolContract, ToolMetadataContract
     public function getDescription(): string
     {
         return 'Setzt den Status eines Semantic-Layers (draft, pilot, production, archived). '
+            . 'Akzeptiert layer_id (direkt) ODER scope + label. '
             . 'Schreibt einen Audit-Eintrag und invalidiert den Resolver-Cache. '
-            . 'Bei status=production wirkt der Layer auf ALLEN Modulen, unabhängig von enabled_modules — '
-            . 'das Tool liefert dann einen informativen Hint im Output zurück. '
-            . 'Owner-only. Zum Archivieren eines Layers status=archived setzen (es gibt kein Delete-Tool).';
+            . 'Bei status=production wirkt der Layer auf ALLEN Modulen, unabhängig von enabled_modules. '
+            . 'Owner-only.';
     }
 
     public function getSchema(): array
@@ -50,14 +46,22 @@ class SetStatusTool implements ToolContract, ToolMetadataContract
         return [
             'type' => 'object',
             'properties' => [
+                'layer_id' => [
+                    'type' => ['integer', 'null'],
+                    'description' => 'Direkte Layer-ID. Alternativ scope + label verwenden.',
+                ],
                 'scope' => [
                     'type' => 'string',
                     'enum' => [SemanticLayer::SCOPE_GLOBAL, SemanticLayer::SCOPE_TEAM],
-                    'description' => '"global" für den BHG-Core-Layer, "team" für den Venture-Extension-Layer. Default: "global".',
+                    'description' => '"global" oder "team". Default: "global".',
                 ],
                 'team_id' => [
                     'type' => ['integer', 'null'],
-                    'description' => 'Team-ID — nur bei scope=team relevant. Wenn nicht angegeben, wird der aktive Team-Kontext verwendet.',
+                    'description' => 'Team-ID — nur bei scope=team relevant.',
+                ],
+                'label' => [
+                    'type' => 'string',
+                    'description' => 'Layer-Label (z.B. "leitbild", "mcp"). Default: "leitbild".',
                 ],
                 'status' => [
                     'type' => 'string',
@@ -81,12 +85,6 @@ class SetStatusTool implements ToolContract, ToolMetadataContract
                 return $denied;
             }
 
-            $scopeResult = $this->resolveScope($arguments, $context);
-            if ($scopeResult instanceof ToolResult) {
-                return $scopeResult;
-            }
-            [$scope, $teamId] = $scopeResult;
-
             $status = $arguments['status'] ?? null;
             $allowed = [
                 SemanticLayer::STATUS_DRAFT,
@@ -101,23 +99,17 @@ class SetStatusTool implements ToolContract, ToolMetadataContract
                 );
             }
 
-            $layer = SemanticLayer::where('scope_type', $scope)
-                ->where('scope_id', $teamId)
-                ->first();
-
-            if (!$layer) {
-                return ToolResult::error(
-                    'LAYER_NOT_FOUND',
-                    'Es existiert noch kein Semantic-Layer für scope=' . $scope
-                    . ($scope === SemanticLayer::SCOPE_TEAM ? ', team_id=' . $teamId : '')
-                    . '. Lege einen mit "core.semantic_layer.versions.POST" an.'
-                );
+            $layerResult = $this->resolveLayer($arguments, $context);
+            if ($layerResult instanceof ToolResult) {
+                return $layerResult;
             }
+            $layer = $layerResult;
 
             $previous = $layer->status;
             if ($previous === $status) {
                 return ToolResult::success([
                     'layer_id' => $layer->id,
+                    'label' => $layer->label,
                     'status' => $status,
                     'previous_status' => $previous,
                     'changed' => false,
@@ -139,13 +131,14 @@ class SetStatusTool implements ToolContract, ToolMetadataContract
                     'to' => $status,
                 ]],
                 userId: $context->user->id ?? null,
-                context: ['source' => 'mcp'],
+                context: ['label' => $layer->label, 'source' => 'mcp'],
             );
 
             $this->resolver->forgetCache();
 
             $output = [
                 'layer_id' => $layer->id,
+                'label' => $layer->label,
                 'status' => $status,
                 'previous_status' => $previous,
                 'changed' => true,

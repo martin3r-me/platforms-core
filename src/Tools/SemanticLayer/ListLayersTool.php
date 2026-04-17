@@ -12,8 +12,8 @@ use Platform\Core\SemanticLayer\Models\SemanticLayer;
  * core.semantic_layer.layers.GET
  *
  * Listet alle für den aktuellen Team-Owner sichtbaren Semantic-Layer
- * (global + Team-Scope des aktuellen Teams). Enthält Status, aktive
- * SemVer + Token-Count, Modul-Flags und Versionsanzahl pro Layer.
+ * (global + Team-Scope des aktuellen Teams). Unterstützt mehrere
+ * Layer pro Scope (Multi-Layer mit label + sort_order).
  *
  * Owner-only.
  */
@@ -29,9 +29,9 @@ class ListLayersTool implements ToolContract, ToolMetadataContract
     public function getDescription(): string
     {
         return 'Listet alle Semantic-Layer auf, die für den aktuellen Team-Owner sichtbar sind '
-            . '(global + Team-Scope des aktuellen Teams). Enthält Status, aktive SemVer mit Token-Count, '
-            . 'die enabled_modules-Liste und die Anzahl Versionen pro Layer. Read-only, Owner-only. '
-            . 'Verwende anschließend "core.semantic_layer.layer.GET" um den vollen Content der current_version eines Layers zu sehen.';
+            . '(global + Team-Scope des aktuellen Teams). Unterstützt mehrere Layer pro Scope '
+            . '(z.B. Leitbild + MCP-Layer). Enthält label, sort_order, Status, aktive SemVer mit Token-Count, '
+            . 'die enabled_modules-Liste und die Anzahl Versionen pro Layer. Read-only, Owner-only.';
     }
 
     public function getSchema(): array
@@ -65,6 +65,7 @@ class ListLayersTool implements ToolContract, ToolMetadataContract
                 })
                 ->orderBy('scope_type')
                 ->orderBy('scope_id')
+                ->orderBy('sort_order')
                 ->get();
 
             $layers = $rows->map(function (SemanticLayer $layer) {
@@ -73,8 +74,11 @@ class ListLayersTool implements ToolContract, ToolMetadataContract
                     'id' => $layer->id,
                     'scope_type' => $layer->scope_type,
                     'scope_id' => $layer->scope_id,
+                    'label' => $layer->label,
+                    'sort_order' => $layer->sort_order,
                     'status' => $layer->status,
                     'enabled_modules' => $layer->enabled_modules ?? [],
+                    'is_ungated' => $layer->isUngated(),
                     'current_version' => $v ? [
                         'id' => $v->id,
                         'semver' => $v->semver,

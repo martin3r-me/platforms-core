@@ -13,7 +13,7 @@ use Platform\Core\SemanticLayer\Models\SemanticLayer;
  *
  * Alle Semantic-Layer-Tools sind owner-only (konsistent zur Admin-UI).
  * Der Trait kapselt die Owner-Prüfung und die Auflösung der gemeinsamen
- * Scope-Parameter (`scope`, `team_id`).
+ * Scope-Parameter (`scope`, `team_id`, `label`).
  */
 trait AssertsOwnerAccess
 {
@@ -108,5 +108,53 @@ trait AssertsOwnerAccess
         }
 
         return [SemanticLayer::SCOPE_TEAM, $teamId];
+    }
+
+    /**
+     * Löst einen Layer auf via `layer_id` (direkt) ODER `scope + label`.
+     *
+     * @param array<string, mixed> $arguments
+     * @return SemanticLayer|ToolResult
+     */
+    protected function resolveLayer(array $arguments, ToolContext $context): SemanticLayer|ToolResult
+    {
+        // Direkte ID
+        $layerId = $arguments['layer_id'] ?? null;
+        if ($layerId !== null && $layerId !== '' && $layerId !== 0) {
+            $layer = SemanticLayer::find((int) $layerId);
+            if (!$layer) {
+                return ToolResult::error('LAYER_NOT_FOUND', 'Layer mit ID ' . $layerId . ' wurde nicht gefunden.');
+            }
+            return $layer;
+        }
+
+        // Scope + Label
+        $scopeResult = $this->resolveScope($arguments, $context);
+        if ($scopeResult instanceof ToolResult) {
+            return $scopeResult;
+        }
+        [$scope, $teamId] = $scopeResult;
+
+        $label = $arguments['label'] ?? SemanticLayer::LABEL_LEITBILD;
+        if (!is_string($label) || $label === '') {
+            $label = SemanticLayer::LABEL_LEITBILD;
+        }
+
+        $layer = SemanticLayer::where('scope_type', $scope)
+            ->where('scope_id', $teamId)
+            ->where('label', $label)
+            ->first();
+
+        if (!$layer) {
+            return ToolResult::error(
+                'LAYER_NOT_FOUND',
+                'Es existiert noch kein Semantic-Layer für scope=' . $scope
+                . ($scope === SemanticLayer::SCOPE_TEAM ? ', team_id=' . $teamId : '')
+                . ', label="' . $label . '"'
+                . '. Lege einen mit "core.semantic_layer.versions.POST" an.'
+            );
+        }
+
+        return $layer;
     }
 }

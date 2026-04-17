@@ -7,7 +7,7 @@ namespace Platform\Core\SemanticLayer\Services;
  *
  * Erzeugt den Prompt-Block-Text im fixierten Format:
  *
- *   [SEMANTIC LAYER · v{semver_chain}]
+ *   [SEMANTIC LAYER · leitbild:v1.0.0 + mcp:v0.2.0]
  *   Perspektive: {perspektive}
  *
  *   Ton:
@@ -32,6 +32,7 @@ class SemanticLayerScaffold
      * @param array<int, string> $heuristiken
      * @param array<int, string> $negativRaum
      * @param array<int, string> $versionChain  z.B. ['1.0.0'] oder ['1.0.0', '0.2.0']
+     * @param array<int, string> $labelChain    z.B. ['leitbild:v1.0.0', 'mcp:v0.2.0']
      */
     public function render(
         string $perspektive,
@@ -39,10 +40,16 @@ class SemanticLayerScaffold
         array $heuristiken,
         array $negativRaum,
         array $versionChain = [],
+        array $labelChain = [],
     ): string {
-        $versionLabel = empty($versionChain)
-            ? 'v?'
-            : 'v' . implode(' + v', $versionChain);
+        // Label-aware header wenn labelChain vorhanden, sonst Fallback auf versionChain
+        if (!empty($labelChain)) {
+            $versionLabel = implode(' + ', $labelChain);
+        } elseif (!empty($versionChain)) {
+            $versionLabel = 'v' . implode(' + v', $versionChain);
+        } else {
+            $versionLabel = 'v?';
+        }
 
         $lines = [];
         $lines[] = "[SEMANTIC LAYER · {$versionLabel}]";

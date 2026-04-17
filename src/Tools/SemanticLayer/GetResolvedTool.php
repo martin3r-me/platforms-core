@@ -14,10 +14,8 @@ use Platform\Core\SemanticLayer\Services\SemanticLayerResolver;
  * core.semantic_layer.resolved.GET
  *
  * Live-Preview: liefert den vom Resolver für eine konkrete
- * {team, module}-Kombi aufgelösten Layer (gemerged Global + Team-Extension,
- * mit gerendertem Prompt-Block). Dient als Test-Spiegel zu
- * `core.context.GET` — zeigt genau, was das LLM bei diesem Modul-Aufruf
- * tatsächlich sehen würde, ohne einen echten LLM-Call auszulösen.
+ * {team, module}-Kombi aufgelösten Layer (gemerged aus allen
+ * zutreffenden Layern, mit gerendertem Prompt-Block).
  *
  * Read-only, Owner-only.
  */
@@ -38,10 +36,10 @@ class GetResolvedTool implements ToolContract, ToolMetadataContract
     public function getDescription(): string
     {
         return 'Live-Preview des resolvten Semantic-Layers für eine konkrete {team, module}-Kombination. '
-            . 'Zeigt den fertig gemergten Layer (Global + ggf. Team-Extension) inklusive Render-Block, '
-            . 'Scope-Chain, Version-Chain und Token-Count — exakt wie das LLM ihn bei einem Tool-Call '
-            . 'in diesem Modul sehen würde. Read-only, Owner-only. '
-            . 'Nutze "core.modules.GET" um verfügbare Modul-Keys zu sehen.';
+            . 'Zeigt den fertig gemergten Layer (alle zutreffenden Global + Team Layer) inklusive Render-Block, '
+            . 'Scope-Chain, Version-Chain und Token-Count. '
+            . 'Bei module=null werden nur ungated Leitbild-Layer geliefert. '
+            . 'Read-only, Owner-only.';
     }
 
     public function getSchema(): array
@@ -52,12 +50,11 @@ class GetResolvedTool implements ToolContract, ToolMetadataContract
                 'team_id' => [
                     'type' => ['integer', 'null'],
                     'description' => 'Team-ID, dessen Extension-Layer dazugemerged werden soll. '
-                        . 'Wenn null/leer: nur Global-Layer (entspricht Queue-Job- / API-Kontext ohne Team).',
+                        . 'Wenn null/leer: nur Global-Layer.',
                 ],
                 'module' => [
                     'type' => ['string', 'null'],
-                    'description' => 'Modul-Key (z.B. "okr"). Wenn null: Discovery-Modus (Modul-Gate wird ignoriert, '
-                        . 'der Layer wird trotzdem geliefert, falls einer existiert).',
+                    'description' => 'Kontext-Key (z.B. "mcp", "planner"). Wenn null: nur ungated Leitbild-Layer.',
                 ],
             ],
         ];
@@ -118,21 +115,21 @@ class GetResolvedTool implements ToolContract, ToolMetadataContract
 
     /**
      * Best-Effort-Diagnose, warum der Resolver leer geliefert hat.
-     * Hilft dem Aufrufer, das Setup zu debuggen.
      */
     private function diagnoseEmpty(?int $teamId, ?string $module): string
     {
-        $global = SemanticLayer::global();
-        $teamLayer = $teamId ? SemanticLayer::forTeam($teamId) : null;
+        $globalLayers = SemanticLayer::globalLayers();
+        $teamLayers = $teamId ? SemanticLayer::forTeamLayers($teamId) : collect();
 
-        if (!$global && !$teamLayer) {
+        $candidates = $globalLayers->merge($teamLayers);
+
+        if ($candidates->isEmpty()) {
             return 'no_layer_in_scope';
         }
 
-        $candidates = array_filter([$global, $teamLayer]);
         $hasActiveStatus = false;
         $hasCurrentVersion = false;
-        $moduleEnabledSomewhere = false;
+        $contextApplies = false;
         $productionSomewhere = false;
 
         foreach ($candidates as $layer) {
@@ -145,8 +142,8 @@ class GetResolvedTool implements ToolContract, ToolMetadataContract
             if ($layer->status === SemanticLayer::STATUS_PRODUCTION) {
                 $productionSomewhere = true;
             }
-            if ($module !== null && $layer->hasModuleEnabled($module)) {
-                $moduleEnabledSomewhere = true;
+            if ($layer->appliesToContext($module)) {
+                $contextApplies = true;
             }
         }
 
@@ -156,7 +153,7 @@ class GetResolvedTool implements ToolContract, ToolMetadataContract
         if (!$hasActiveStatus) {
             return 'status_not_active';
         }
-        if ($module !== null && !$moduleEnabledSomewhere && !$productionSomewhere) {
+        if (!$contextApplies && !$productionSomewhere) {
             return 'module_not_enabled';
         }
 

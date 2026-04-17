@@ -12,17 +12,18 @@ use Platform\Core\SemanticLayer\Schema\LayerSchemaValidator;
 
 /**
  * Kern des Semantic Base Layers: löst pro Aufruf den effektiven Layer auf,
- * indem Global-Core + optional Team-Extension gemergt werden.
+ * indem alle zutreffenden Layer (Global + Team) in sort_order gemergt werden.
  *
- * Merge-Regeln ("inherit + extend, never override"):
- *   - perspektive: Extension überschreibt Core nur, wenn Extension gesetzt
- *   - ton/heuristiken/negativ_raum: array_merge mit Deduplication
+ * Multi-Layer Merge (N-Layer):
+ *   1. Lade alle aktiven Global-Layer → filter nach appliesToContext($module)
+ *   2. Lade alle aktiven Team-Layer → filter nach appliesToContext($module)
+ *   3. Production-Status überschreibt Gate (wie bisher)
+ *   4. Sort: Global vor Team, dann sort_order
+ *   5. Merge sequentiell (perspektive=letzte nicht-leere, arrays=dedup-merge)
  *
- * Cold-Start: enabled_modules muss das aktuelle Modul enthalten, sonst empty.
- * Wenn $module === null (z.B. MCP-Discovery), wird der Layer trotzdem geliefert,
- * damit Clients ihn sehen können (Discovery-Transparenz).
+ * Bei $module === null → nur ungated Leitbild-Layer.
  *
- * Cache: 1h TTL, Schlüssel enthält Version-IDs → bei Version-Update neuer Key.
+ * Cache: 1h TTL, Schlüssel enthält Hash aller beitragenden Version-IDs.
  */
 class SemanticLayerResolver
 {
@@ -39,52 +40,27 @@ class SemanticLayerResolver
      * Löst den effektiven Layer für Team + Modul-Kontext auf.
      *
      * @param Team|null $team    Team-Scope (null → nur Global)
-     * @param string|null $module  Aktuelles Modul (null → Discovery-Modus, kein Enabled-Gate)
+     * @param string|null $module  Aktuelles Modul/Kontext-Key (null → nur ungated Layer)
      */
     public function resolveFor(?Team $team, ?string $module): ResolvedLayer
     {
         try {
-            $globalLayer = SemanticLayer::global();
-            $globalVersion = $this->loadActiveVersion($globalLayer);
+            $contributing = $this->collectContributingLayers($team, $module);
 
-            $teamLayer = $team ? SemanticLayer::forTeam($team->id) : null;
-            $teamVersion = $this->loadActiveVersion($teamLayer);
-
-            // Nichts da → leer
-            if ($globalVersion === null && $teamVersion === null) {
+            if (empty($contributing)) {
                 return ResolvedLayer::empty();
-            }
-
-            // Cold-Start: Modul-Gate (nur wenn Modul angegeben)
-            if ($module !== null && $module !== '') {
-                $enabledOnGlobal = $globalLayer?->hasModuleEnabled($module) ?? false;
-                $enabledOnTeam = $teamLayer?->hasModuleEnabled($module) ?? false;
-
-                // Production-Status überschreibt Modul-Gate (Layer gilt dann überall)
-                $productionOnGlobal = $globalLayer?->status === SemanticLayer::STATUS_PRODUCTION;
-                $productionOnTeam = $teamLayer?->status === SemanticLayer::STATUS_PRODUCTION;
-
-                $active = $enabledOnGlobal || $enabledOnTeam || $productionOnGlobal || $productionOnTeam;
-                if (!$active) {
-                    return ResolvedLayer::empty();
-                }
             }
 
             $cacheKey = $this->buildCacheKey(
                 teamId: $team?->id,
                 module: $module,
-                globalVersionId: $globalVersion?->id,
-                teamVersionId: $teamVersion?->id,
+                contributing: $contributing,
             );
 
-            return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use (
-                $globalVersion,
-                $teamVersion
-            ) {
-                return $this->buildResolved($globalVersion, $teamVersion);
+            return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($contributing) {
+                return $this->buildResolved($contributing);
             });
         } catch (\Throwable $e) {
-            // Defensive: nie den Haupt-Flow brechen
             Log::warning('[SemanticLayerResolver] resolveFor failed', [
                 'team_id' => $team?->id,
                 'module' => $module,
@@ -99,62 +75,113 @@ class SemanticLayerResolver
      */
     public function forgetCache(): void
     {
-        // Kein Pattern-Delete im Default-Cache. Wir bumpen einen globalen
-        // Version-Counter, dessen Wert in den Key einfließt, und invalidieren
-        // damit effektiv alle bestehenden Einträge.
         Cache::forget(self::CACHE_KEY_PREFIX . ':version_bump');
     }
 
-    private function loadActiveVersion(?SemanticLayer $layer): ?SemanticLayerVersion
+    /**
+     * Sammelt alle Layer+Version-Paare, die zum Kontext beitragen.
+     *
+     * @return array<int, array{layer: SemanticLayer, version: SemanticLayerVersion}>
+     */
+    private function collectContributingLayers(?Team $team, ?string $module): array
     {
-        if ($layer === null) {
-            return null;
+        $contributing = [];
+
+        // Global layers
+        $globalLayers = SemanticLayer::globalLayers();
+        foreach ($globalLayers as $layer) {
+            if ($this->layerContributes($layer, $module)) {
+                $version = $this->loadActiveVersion($layer);
+                if ($version !== null) {
+                    $contributing[] = ['layer' => $layer, 'version' => $version];
+                }
+            }
         }
+
+        // Team layers
+        if ($team) {
+            $teamLayers = SemanticLayer::forTeamLayers($team->id);
+            foreach ($teamLayers as $layer) {
+                if ($this->layerContributes($layer, $module)) {
+                    $version = $this->loadActiveVersion($layer);
+                    if ($version !== null) {
+                        $contributing[] = ['layer' => $layer, 'version' => $version];
+                    }
+                }
+            }
+        }
+
+        return $contributing;
+    }
+
+    /**
+     * Prüft, ob ein Layer zum Kontext beiträgt.
+     *
+     * - Layer muss aktiv sein (pilot/production)
+     * - Production-Status überschreibt Gate (Layer gilt überall)
+     * - Sonst: appliesToContext($module)
+     */
+    private function layerContributes(SemanticLayer $layer, ?string $module): bool
+    {
         if (!$layer->isActive()) {
-            return null;
+            return false;
         }
+
+        // Production überschreibt Gate — Layer gilt überall
+        if ($layer->status === SemanticLayer::STATUS_PRODUCTION) {
+            return true;
+        }
+
+        // Pilot: Gate prüfen
+        return $layer->appliesToContext($module);
+    }
+
+    private function loadActiveVersion(SemanticLayer $layer): ?SemanticLayerVersion
+    {
         if ($layer->current_version_id === null) {
             return null;
         }
         return SemanticLayerVersion::find($layer->current_version_id);
     }
 
-    private function buildResolved(
-        ?SemanticLayerVersion $globalVersion,
-        ?SemanticLayerVersion $teamVersion,
-    ): ResolvedLayer {
+    /**
+     * @param array<int, array{layer: SemanticLayer, version: SemanticLayerVersion}> $contributing
+     */
+    private function buildResolved(array $contributing): ResolvedLayer
+    {
         $scopeChain = [];
         $versionChain = [];
+        $labelChain = [];
 
         $perspektive = '';
         $ton = [];
         $heuristiken = [];
         $negativRaum = [];
 
-        if ($globalVersion !== null) {
-            $scopeChain[] = 'global';
-            $versionChain[] = $globalVersion->semver;
-            $perspektive = (string) $globalVersion->perspektive;
-            $ton = array_values($globalVersion->ton ?? []);
-            $heuristiken = array_values($globalVersion->heuristiken ?? []);
-            $negativRaum = array_values($globalVersion->negativ_raum ?? []);
-        }
+        foreach ($contributing as $entry) {
+            $layer = $entry['layer'];
+            $version = $entry['version'];
 
-        if ($teamVersion !== null) {
-            $teamLayer = $teamVersion->layer;
-            $scopeChain[] = 'team:' . ($teamLayer?->scope_id ?? '?');
-            $versionChain[] = $teamVersion->semver;
+            // Scope chain with label
+            if ($layer->scope_type === SemanticLayer::SCOPE_GLOBAL) {
+                $scopeChain[] = 'global:' . $layer->label;
+            } else {
+                $scopeChain[] = 'team:' . ($layer->scope_id ?? '?') . ':' . $layer->label;
+            }
 
-            // perspektive: Extension überschreibt nur, wenn gesetzt
-            $extPerspektive = trim((string) $teamVersion->perspektive);
+            $labelChain[] = $layer->label . ':v' . $version->semver;
+            $versionChain[] = $version->semver;
+
+            // Perspektive: letzte nicht-leere gewinnt
+            $extPerspektive = trim((string) $version->perspektive);
             if ($extPerspektive !== '') {
                 $perspektive = $extPerspektive;
             }
 
-            // Arrays: merge + deduplication (Case-sensitive, trim)
-            $ton = $this->mergeDedup($ton, $teamVersion->ton ?? []);
-            $heuristiken = $this->mergeDedup($heuristiken, $teamVersion->heuristiken ?? []);
-            $negativRaum = $this->mergeDedup($negativRaum, $teamVersion->negativ_raum ?? []);
+            // Arrays: merge + deduplication
+            $ton = $this->mergeDedup($ton, $version->ton ?? []);
+            $heuristiken = $this->mergeDedup($heuristiken, $version->heuristiken ?? []);
+            $negativRaum = $this->mergeDedup($negativRaum, $version->negativ_raum ?? []);
         }
 
         $rendered = $this->scaffold->render(
@@ -163,6 +190,7 @@ class SemanticLayerResolver
             heuristiken: $heuristiken,
             negativRaum: $negativRaum,
             versionChain: $versionChain,
+            labelChain: $labelChain,
         );
 
         $tokens = $this->validator->estimateTokens($rendered);
@@ -200,24 +228,30 @@ class SemanticLayerResolver
         return $result;
     }
 
+    /**
+     * @param array<int, array{layer: SemanticLayer, version: SemanticLayerVersion}> $contributing
+     */
     private function buildCacheKey(
         ?int $teamId,
         ?string $module,
-        ?int $globalVersionId,
-        ?int $teamVersionId,
+        array $contributing,
     ): string {
         $bump = (int) Cache::rememberForever(
             self::CACHE_KEY_PREFIX . ':version_bump',
             fn () => 1
         );
+
+        // Hash aller beitragenden Version-IDs
+        $versionIds = array_map(fn ($e) => $e['version']->id, $contributing);
+        $hash = md5(implode(',', $versionIds));
+
         return sprintf(
-            '%s:b%d:t%s:m%s:gv%s:tv%s',
+            '%s:b%d:t%s:m%s:h%s',
             self::CACHE_KEY_PREFIX,
             $bump,
             $teamId ?? 'none',
             $module ?? 'none',
-            $globalVersionId ?? 'none',
-            $teamVersionId ?? 'none',
+            substr($hash, 0, 12),
         );
     }
 }

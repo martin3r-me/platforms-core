@@ -216,22 +216,41 @@ Der Sprung auf `status=production` passiert **erst nach erfolgtem Validierungspr
 
 ---
 
+## Multi-Layer Konzept
+
+Ab V1.1 unterstützt der Semantic Layer **mehrere Layer pro Scope**. Jeder Layer wird durch ein `label` identifiziert:
+
+| Label | Zweck | `enabled_modules` | Merge-Verhalten |
+|---|---|---|---|
+| `leitbild` | Markenidentität — greift **überall** | `[]` (leer = ungated) | Immer in Scope-Chain |
+| `mcp` | MCP-spezifischer Ton/Stil | `["mcp"]` | Nur bei MCP-Kontext |
+| beliebig | Modul-spezifisch | `["planner"]` etc. | Nur bei passendem Kontext |
+
+**Resolver-Merge:** Alle zutreffenden Layer werden in `sort_order` gemergt:
+- `module='mcp'` → Global-Leitbild + Global-MCP + Team-Leitbild
+- `module='planner'` → Global-Leitbild + Team-Leitbild (kein MCP-Layer)
+- `module=null` → nur ungated Leitbild-Layer
+
+Jeder Tool-Aufruf (`versions.POST`, `layer.GET`, `status.PATCH`, `module.PATCH`) akzeptiert einen `label`-Parameter (Default: `"leitbild"`) oder eine direkte `layer_id`.
+
+---
+
 ## MCP — `core.semantic_layer.*`
 
 Sieben Tools im Namensraum `core.semantic_layer.*` machen alle UI-/Console-Aktionen auch über die MCP-Schnittstelle verfügbar — plus einen **Dryrun**-Pfad, der serverseitig einen echten LLM-Call mit Layer-Inject triggert und die Antwort 1:1 zurückgibt (A/B-Verifikation). Anwendungsfall: ein LLM (z.B. Claude über die MCP-Bridge) iteriert live mit dem Team-Owner — Layer anlegen, Preview prüfen, neue Version, Modul-Toggle, Status-Wechsel, LLM-Test — alles im selben Chat.
 
 | Tool | Entspricht UI/Console |
 |---|---|
-| `core.semantic_layer.layers.GET` | Layer-Liste / `layer:list` |
-| `core.semantic_layer.layer.GET` | Layer-Detail / `layer:show` |
-| `core.semantic_layer.versions.POST` | „+ Neue Version" / `layer:create` (auto-aktiviert) |
-| `core.semantic_layer.status.PATCH` | Status-Switcher / `layer:activate --status=…` |
-| `core.semantic_layer.module.PATCH` | Modul-Chip / `layer:enable-module` |
-| `core.semantic_layer.resolved.GET` | Resolved-Preview / `layer:show --resolved` |
+| `core.semantic_layer.layers.GET` | Layer-Liste / `layer:list` (zeigt mehrere Layer mit label + sort_order) |
+| `core.semantic_layer.layer.GET` | Layer-Detail / `layer:show` (akzeptiert `layer_id` oder `scope + label`) |
+| `core.semantic_layer.versions.POST` | „+ Neue Version" / `layer:create` (auto-aktiviert, `label` Parameter) |
+| `core.semantic_layer.status.PATCH` | Status-Switcher / `layer:activate --status=…` (akzeptiert `layer_id` oder `scope + label`) |
+| `core.semantic_layer.module.PATCH` | Kontext-Key-Toggle (validiert gegen `ContextKeyRegistry`, akzeptiert `layer_id` oder `scope + label`) |
+| `core.semantic_layer.resolved.GET` | Resolved-Preview / `layer:show --resolved` (merged alle zutreffenden Layer) |
 | `core.semantic_layer.dryrun.POST` | Serverseitiger LLM-Call mit Layer-Inject (A/B-Test) |
 
 **Auth:** alle Tools owner-only (identisch zur UI). Ausführung als Non-Owner → `ACCESS_DENIED`.
 
-**MCP-Instructions-Injection:** Der Semantic Layer wird automatisch in die MCP-Server-Instructions injiziert, wenn das Modul `mcp` im Layer enabled ist (`core.semantic_layer.module.PATCH` → `module="mcp"`, `enabled=true`). Claude.ai und andere MCP-Clients empfangen den Layer dann direkt als Teil der `serverInfo.instructions` — ohne clientseitige Logik.
+**MCP-Instructions-Injection:** Der Semantic Layer wird automatisch in die MCP-Server-Instructions injiziert. Alle Layer, deren `enabled_modules` den Key `mcp` enthält (oder die ungated sind), werden gemergt. Claude.ai und andere MCP-Clients empfangen den gemergten Layer als Teil der `serverInfo.instructions`.
 
 **Detaillierte Tool-Referenz** mit Parametern, Beispielen, Fehler-Codes: siehe [MCP-Tools](mcp-tools).

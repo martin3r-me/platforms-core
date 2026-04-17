@@ -6,8 +6,7 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
-use Platform\Core\Models\Module;
-use Platform\Core\Registry\ModuleRegistry;
+use Platform\Core\SemanticLayer\ContextKeyRegistry;
 use Platform\Core\SemanticLayer\Models\SemanticLayer;
 use Platform\Core\SemanticLayer\Models\SemanticLayerAudit;
 use Platform\Core\SemanticLayer\Services\SemanticLayerResolver;
@@ -15,10 +14,9 @@ use Platform\Core\SemanticLayer\Services\SemanticLayerResolver;
 /**
  * core.semantic_layer.module.PATCH
  *
- * Toggelt einen Modul-Key in der `enabled_modules`-Liste eines
- * Semantic-Layers (enable oder disable). Validiert den Modul-Key gegen
- * die existierenden Module (DB + registrierter In-Memory-Registry),
- * damit keine toten Keys in der Liste landen.
+ * Toggelt einen Kontext-Key in der `enabled_modules`-Liste eines
+ * Semantic-Layers (enable oder disable). Validiert den Key gegen
+ * die ContextKeyRegistry (entkoppelt von ModuleRegistry).
  *
  * Owner-only.
  */
@@ -38,10 +36,11 @@ class ToggleModuleTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'Aktiviert oder deaktiviert einen Modul-Eintrag in der enabled_modules-Liste eines Semantic-Layers. '
-            . 'Steuert das Cold-Start-Gate: Solange der Layer auf status=pilot steht, wirkt er nur in den hier eingetragenen Modulen. '
+        return 'Aktiviert oder deaktiviert einen Kontext-Key in der enabled_modules-Liste eines Semantic-Layers. '
+            . 'Steuert das Cold-Start-Gate: Solange der Layer auf status=pilot steht, wirkt er nur in den hier eingetragenen Kontexten. '
             . 'Bei status=production wirkt der Layer ohnehin überall (das Gate wird ignoriert). '
-            . 'Modul-Key wird gegen die existierenden Module geprüft (verhindert Typos). '
+            . 'Key wird gegen die ContextKeyRegistry geprüft (Module + builtins wie mcp, api, webhook). '
+            . 'Akzeptiert layer_id (direkt) ODER scope + label. '
             . 'Owner-only.';
     }
 
@@ -50,22 +49,30 @@ class ToggleModuleTool implements ToolContract, ToolMetadataContract
         return [
             'type' => 'object',
             'properties' => [
+                'layer_id' => [
+                    'type' => ['integer', 'null'],
+                    'description' => 'Direkte Layer-ID. Alternativ scope + label verwenden.',
+                ],
                 'scope' => [
                     'type' => 'string',
                     'enum' => [SemanticLayer::SCOPE_GLOBAL, SemanticLayer::SCOPE_TEAM],
-                    'description' => '"global" für den BHG-Core-Layer, "team" für den Venture-Extension-Layer. Default: "global".',
+                    'description' => '"global" oder "team". Default: "global". Nur relevant wenn keine layer_id angegeben.',
                 ],
                 'team_id' => [
                     'type' => ['integer', 'null'],
-                    'description' => 'Team-ID — nur bei scope=team relevant. Wenn nicht angegeben, wird der aktive Team-Kontext verwendet.',
+                    'description' => 'Team-ID — nur bei scope=team relevant.',
+                ],
+                'label' => [
+                    'type' => 'string',
+                    'description' => 'Layer-Label (z.B. "leitbild", "mcp"). Default: "leitbild". Nur relevant wenn keine layer_id angegeben.',
                 ],
                 'module' => [
                     'type' => 'string',
-                    'description' => 'Modul-Key (z.B. "okr", "canvas", "mcp"). Muss ein registriertes Modul sein.',
+                    'description' => 'Kontext-Key (z.B. "okr", "canvas", "mcp", "api"). Muss ein registrierter Key sein.',
                 ],
                 'enabled' => [
                     'type' => 'boolean',
-                    'description' => 'true = Modul in enabled_modules aufnehmen, false = entfernen.',
+                    'description' => 'true = Key in enabled_modules aufnehmen, false = entfernen.',
                 ],
             ],
             'required' => ['module', 'enabled'],
@@ -79,15 +86,9 @@ class ToggleModuleTool implements ToolContract, ToolMetadataContract
                 return $denied;
             }
 
-            $scopeResult = $this->resolveScope($arguments, $context);
-            if ($scopeResult instanceof ToolResult) {
-                return $scopeResult;
-            }
-            [$scope, $teamId] = $scopeResult;
-
             $module = $arguments['module'] ?? null;
             if (!is_string($module) || $module === '') {
-                return ToolResult::error('VALIDATION_ERROR', 'module ist erforderlich (Modul-Key als String).');
+                return ToolResult::error('VALIDATION_ERROR', 'module ist erforderlich (Kontext-Key als String).');
             }
 
             if (!array_key_exists('enabled', $arguments)) {
@@ -95,32 +96,20 @@ class ToggleModuleTool implements ToolContract, ToolMetadataContract
             }
             $enabled = (bool) $arguments['enabled'];
 
-            // Modul-Key-Validierung: erst DB-Module, dann in-memory ModuleRegistry.
-            // (DB-Module ist die persistente Wahrheit auf der Plattform; ModuleRegistry
-            // wird zur Laufzeit registriert und kann je nach Boot-Pfad leer sein.)
-            $isKnown = Module::where('key', $module)->exists()
-                || array_key_exists($module, ModuleRegistry::all());
-
-            if (!$isKnown) {
+            // Key-Validierung gegen ContextKeyRegistry
+            if (!ContextKeyRegistry::has($module)) {
                 return ToolResult::error(
                     'UNKNOWN_MODULE',
-                    'Unbekannter Modul-Key "' . $module . '". '
-                    . 'Nutze "core.modules.GET" um verfügbare Module zu sehen.'
+                    'Unbekannter Kontext-Key "' . $module . '". '
+                    . 'Registrierte Keys: ' . implode(', ', array_keys(ContextKeyRegistry::all())) . '.'
                 );
             }
 
-            $layer = SemanticLayer::where('scope_type', $scope)
-                ->where('scope_id', $teamId)
-                ->first();
-
-            if (!$layer) {
-                return ToolResult::error(
-                    'LAYER_NOT_FOUND',
-                    'Es existiert noch kein Semantic-Layer für scope=' . $scope
-                    . ($scope === SemanticLayer::SCOPE_TEAM ? ', team_id=' . $teamId : '')
-                    . '. Lege einen mit "core.semantic_layer.versions.POST" an.'
-                );
+            $layerResult = $this->resolveLayer($arguments, $context);
+            if ($layerResult instanceof ToolResult) {
+                return $layerResult;
             }
+            $layer = $layerResult;
 
             $current = $layer->enabled_modules ?? [];
             $wasEnabled = in_array($module, $current, true);
@@ -148,7 +137,7 @@ class ToggleModuleTool implements ToolContract, ToolMetadataContract
                     versionId: $layer->current_version_id,
                     diff: null,
                     userId: $context->user->id ?? null,
-                    context: ['module' => $module, 'source' => 'mcp'],
+                    context: ['module' => $module, 'label' => $layer->label, 'source' => 'mcp'],
                 );
 
                 $this->resolver->forgetCache();
@@ -156,6 +145,7 @@ class ToggleModuleTool implements ToolContract, ToolMetadataContract
 
             return ToolResult::success([
                 'layer_id' => $layer->id,
+                'label' => $layer->label,
                 'module' => $module,
                 'enabled' => $enabled,
                 'changed' => $changed,
