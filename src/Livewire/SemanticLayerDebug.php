@@ -35,6 +35,9 @@ class SemanticLayerDebug extends Component
     /** @var array<int, string> */
     public array $availableModules = [];
 
+    /** @var array<int, int> Layer-IDs whose content is expanded */
+    public array $expandedLayers = [];
+
     public ?string $selectedModule = null;
 
     public ?array $resolvedForCurrentTeam = null;
@@ -52,6 +55,8 @@ class SemanticLayerDebug extends Component
     public string $editScope = 'global';
 
     public ?int $editTeamId = null;
+
+    public string $editLabel = 'leitbild';
 
     public string $formSemver = '1.0.0';
 
@@ -187,6 +192,18 @@ class SemanticLayerDebug extends Component
         $this->loadData();
     }
 
+    public function toggleLayerContent(int $layerId): void
+    {
+        if (in_array($layerId, $this->expandedLayers, true)) {
+            $this->expandedLayers = array_values(array_filter(
+                $this->expandedLayers,
+                fn ($id) => $id !== $layerId
+            ));
+        } else {
+            $this->expandedLayers[] = $layerId;
+        }
+    }
+
     // ---------- Edit-Actions ----------
 
     /**
@@ -196,16 +213,6 @@ class SemanticLayerDebug extends Component
     public function openNewLayer(string $scope): void
     {
         if (! in_array($scope, [SemanticLayer::SCOPE_GLOBAL, SemanticLayer::SCOPE_TEAM], true)) {
-            return;
-        }
-
-        // Existiert schon ein Layer für diesen Scope? Dann stattdessen neue Version.
-        $existing = $scope === SemanticLayer::SCOPE_GLOBAL
-            ? SemanticLayer::global()
-            : ($this->currentTeamId ? SemanticLayer::forTeam($this->currentTeamId) : null);
-
-        if ($existing) {
-            $this->openNewVersion($existing->id);
             return;
         }
 
@@ -339,8 +346,16 @@ class SemanticLayerDebug extends Component
                 $layer = $this->editMode === 'new-version'
                     ? SemanticLayer::find($this->editLayerId)
                     : SemanticLayer::firstOrCreate(
-                        ['scope_type' => $this->editScope, 'scope_id' => $this->editTeamId],
-                        ['status' => SemanticLayer::STATUS_DRAFT, 'enabled_modules' => []],
+                        [
+                            'scope_type' => $this->editScope,
+                            'scope_id' => $this->editTeamId,
+                            'label' => $this->editLabel,
+                        ],
+                        [
+                            'status' => SemanticLayer::STATUS_DRAFT,
+                            'enabled_modules' => [],
+                            'sort_order' => $this->editLabel === SemanticLayer::LABEL_LEITBILD ? 0 : 10,
+                        ],
                     );
 
                 if (! $layer) {
@@ -416,6 +431,7 @@ class SemanticLayerDebug extends Component
         $this->editLayerId = null;
         $this->editScope = 'global';
         $this->editTeamId = null;
+        $this->editLabel = 'leitbild';
         $this->formSemver = '1.0.0';
         $this->formVersionType = 'minor';
         $this->formPerspektive = '';
@@ -546,24 +562,41 @@ class SemanticLayerDebug extends Component
             ->with(['currentVersion', 'team'])
             ->orderBy('scope_type')
             ->orderBy('scope_id')
+            ->orderBy('sort_order')
             ->get();
 
         $this->layers = $rows->map(function (SemanticLayer $layer) {
             $v = $layer->currentVersion;
-            return [
+            $data = [
                 'id' => $layer->id,
                 'scope_type' => $layer->scope_type,
                 'scope_id' => $layer->scope_id,
                 'scope_label' => $layer->scope_type === SemanticLayer::SCOPE_GLOBAL
                     ? 'global'
                     : 'team · ' . ($layer->team?->name ?? ('#' . $layer->scope_id)),
+                'label' => $layer->label,
+                'sort_order' => $layer->sort_order,
+                'is_ungated' => $layer->isUngated(),
                 'status' => $layer->status,
                 'enabled_modules' => $layer->enabled_modules ?? [],
                 'current_semver' => $v?->semver,
                 'token_count' => $v?->token_count,
                 'version_count' => $layer->versions()->count(),
                 'updated_at' => $layer->updated_at?->diffForHumans(),
+                'content' => null,
             ];
+
+            if ($v) {
+                $data['content'] = [
+                    'perspektive' => $v->perspektive,
+                    'ton' => $v->ton ?? [],
+                    'heuristiken' => $v->heuristiken ?? [],
+                    'negativ_raum' => $v->negativ_raum ?? [],
+                    'notes' => $v->notes,
+                ];
+            }
+
+            return $data;
         })->all();
 
         /** @var SemanticLayerResolver $resolver */

@@ -96,7 +96,7 @@
                     <div class="px-4 py-2 border-b border-[var(--ui-border)]/60 flex items-center justify-between">
                         <span class="text-xs font-semibold uppercase tracking-wider text-[var(--ui-primary)]">
                             @if($editMode === 'new-layer')
-                                Neuen Layer anlegen · {{ $editScope === 'global' ? 'global' : 'team · ' . $currentTeamLabel }}
+                                Neuen Layer anlegen · {{ $editScope === 'global' ? 'global' : 'team · ' . $currentTeamLabel }} · <span class="font-mono">{{ $editLabel }}</span>
                             @else
                                 Neue Version · Layer #{{ $editLayerId }}
                             @endif
@@ -111,6 +111,21 @@
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-0">
                         {{-- Form --}}
                         <div class="p-4 space-y-4 border-r border-[var(--ui-border)]/40">
+                            {{-- Label (nur bei neuem Layer) --}}
+                            @if($editMode === 'new-layer')
+                                <div>
+                                    <label class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)] mb-1 block">
+                                        Label
+                                        <span class="ml-1 text-[var(--ui-muted)]/70 font-normal normal-case">(z.B. leitbild, mcp, planner — pro Scope+Label max. 1 Layer)</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        wire:model.live.debounce.300ms="editLabel"
+                                        placeholder="leitbild"
+                                        class="w-full px-2 py-1.5 text-sm font-mono rounded-md border border-[var(--ui-border)]/60 bg-white/60 focus:outline-2 focus:outline-[var(--ui-primary)] focus:bg-white/80" />
+                                </div>
+                            @endif
+
                             {{-- SemVer + Type --}}
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
@@ -282,18 +297,16 @@
 
                     @if(! $editMode)
                         <div class="flex items-center gap-2">
-                            @if(! $this->hasGlobalLayer())
-                                <button
-                                    wire:click="openNewLayer('global')"
-                                    class="text-[10px] px-2 py-1 rounded-md bg-[var(--ui-primary)] text-white hover:opacity-90 transition-opacity">
-                                    + Global-Layer anlegen
-                                </button>
-                            @endif
-                            @if($currentTeamId && ! $this->hasTeamLayer())
+                            <button
+                                wire:click="openNewLayer('global')"
+                                class="text-[10px] px-2 py-1 rounded-md bg-[var(--ui-primary)] text-white hover:opacity-90 transition-opacity">
+                                + Global-Layer
+                            </button>
+                            @if($currentTeamId)
                                 <button
                                     wire:click="openNewLayer('team')"
                                     class="text-[10px] px-2 py-1 rounded-md border border-[var(--ui-primary)]/60 text-[var(--ui-primary)] hover:bg-[var(--ui-primary)]/10 transition-colors">
-                                    + Extension für «{{ $currentTeamLabel }}»
+                                    + Team-Layer «{{ $currentTeamLabel }}»
                                 </button>
                             @endif
                         </div>
@@ -319,11 +332,18 @@
                 @else
                     <div class="divide-y divide-[var(--ui-border)]/40">
                         @foreach($layers as $layer)
+                            @php $isExpanded = in_array($layer['id'], $expandedLayers, true); @endphp
                             <div class="p-4 space-y-3">
                                 <div class="flex items-center flex-wrap gap-3">
                                     <span class="text-sm font-semibold text-[var(--ui-secondary)]">
                                         {{ $layer['scope_label'] }}
                                     </span>
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded font-mono bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] border border-[var(--ui-border)]/40">
+                                        {{ $layer['label'] }}
+                                    </span>
+                                    @if($layer['is_ungated'])
+                                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20">ungated</span>
+                                    @endif
                                     <span class="text-[10px] px-2 py-0.5 rounded-full font-medium uppercase tracking-wider
                                         @if($layer['status'] === 'production') bg-emerald-500/15 text-emerald-700 border border-emerald-500/30
                                         @elseif($layer['status'] === 'pilot') bg-amber-500/15 text-amber-700 border border-amber-500/30
@@ -345,11 +365,20 @@
                                     @endif
 
                                     @if(! $editMode)
-                                        <button
-                                            wire:click="openNewVersion({{ $layer['id'] }})"
-                                            class="ml-auto text-[10px] px-2 py-0.5 rounded-md border border-[var(--ui-primary)]/60 text-[var(--ui-primary)] hover:bg-[var(--ui-primary)]/10 transition-colors">
-                                            + Neue Version
-                                        </button>
+                                        <div class="ml-auto flex items-center gap-2">
+                                            @if($layer['content'])
+                                                <button
+                                                    wire:click="toggleLayerContent({{ $layer['id'] }})"
+                                                    class="text-[10px] px-2 py-0.5 rounded-md border border-[var(--ui-border)]/60 text-[var(--ui-secondary)] hover:border-[var(--ui-primary)] hover:text-[var(--ui-primary)] transition-colors">
+                                                    {{ $isExpanded ? 'Content ausblenden' : 'Content anzeigen' }}
+                                                </button>
+                                            @endif
+                                            <button
+                                                wire:click="openNewVersion({{ $layer['id'] }})"
+                                                class="text-[10px] px-2 py-0.5 rounded-md border border-[var(--ui-primary)]/60 text-[var(--ui-primary)] hover:bg-[var(--ui-primary)]/10 transition-colors">
+                                                + Neue Version
+                                            </button>
+                                        </div>
                                     @endif
 
                                     @if($layer['updated_at'])
@@ -358,6 +387,69 @@
                                         </span>
                                     @endif
                                 </div>
+
+                                {{-- Version Content (expandable) --}}
+                                @if($isExpanded && $layer['content'])
+                                    <div class="rounded-lg border border-[var(--ui-border)]/40 bg-[var(--ui-muted-5)]/50 p-4 space-y-3">
+                                        <div class="text-[10px] font-semibold uppercase tracking-wider text-[var(--ui-muted)]">
+                                            Aktive Version · v{{ $layer['current_semver'] }}
+                                        </div>
+
+                                        {{-- Perspektive --}}
+                                        <div>
+                                            <div class="text-[10px] font-semibold text-[var(--ui-muted)] uppercase mb-1">Perspektive</div>
+                                            <div class="text-sm text-[var(--ui-secondary)] bg-white/60 rounded px-3 py-2 border border-[var(--ui-border)]/30">
+                                                {{ $layer['content']['perspektive'] ?: '—' }}
+                                            </div>
+                                        </div>
+
+                                        {{-- Ton --}}
+                                        @if(!empty($layer['content']['ton']))
+                                            <div>
+                                                <div class="text-[10px] font-semibold text-[var(--ui-muted)] uppercase mb-1">Ton</div>
+                                                <div class="flex flex-wrap gap-1.5">
+                                                    @foreach($layer['content']['ton'] as $item)
+                                                        <span class="text-[11px] px-2 py-0.5 rounded-md bg-white/60 border border-[var(--ui-border)]/30 text-[var(--ui-secondary)]">{{ $item }}</span>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @endif
+
+                                        {{-- Heuristiken --}}
+                                        @if(!empty($layer['content']['heuristiken']))
+                                            <div>
+                                                <div class="text-[10px] font-semibold text-[var(--ui-muted)] uppercase mb-1">Heuristiken</div>
+                                                <ul class="text-[11px] text-[var(--ui-secondary)] space-y-1 list-disc list-inside bg-white/60 rounded px-3 py-2 border border-[var(--ui-border)]/30">
+                                                    @foreach($layer['content']['heuristiken'] as $item)
+                                                        <li>{{ $item }}</li>
+                                                    @endforeach
+                                                </ul>
+                                            </div>
+                                        @endif
+
+                                        {{-- Negativ-Raum --}}
+                                        @if(!empty($layer['content']['negativ_raum']))
+                                            <div>
+                                                <div class="text-[10px] font-semibold text-[var(--ui-muted)] uppercase mb-1">Negativ-Raum</div>
+                                                <ul class="text-[11px] text-[var(--ui-secondary)] space-y-1 list-disc list-inside bg-white/60 rounded px-3 py-2 border border-[var(--ui-border)]/30">
+                                                    @foreach($layer['content']['negativ_raum'] as $item)
+                                                        <li>{{ $item }}</li>
+                                                    @endforeach
+                                                </ul>
+                                            </div>
+                                        @endif
+
+                                        {{-- Notes --}}
+                                        @if($layer['content']['notes'])
+                                            <div>
+                                                <div class="text-[10px] font-semibold text-[var(--ui-muted)] uppercase mb-1">Notizen</div>
+                                                <div class="text-[11px] text-[var(--ui-muted)] bg-white/60 rounded px-3 py-2 border border-[var(--ui-border)]/30 italic">
+                                                    {{ $layer['content']['notes'] }}
+                                                </div>
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endif
 
                                 {{-- Status-Switcher --}}
                                 <div class="flex items-center gap-2 flex-wrap">
