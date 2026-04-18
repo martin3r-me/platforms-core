@@ -37,6 +37,60 @@
                 @endif
             </div>
 
+            {{-- Neues Team anlegen --}}
+            <div>
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Neues Team anlegen</h3>
+                <form wire:submit.prevent="createTeam" class="space-y-4 p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                    <x-ui-input-text
+                        name="newTeamName"
+                        label="Team-Name"
+                        wire:model.live="newTeamName"
+                        placeholder="z.B. Marketing, Entwicklung, ..."
+                        required
+                    />
+
+                    @if(!empty($availableParentTeams) && count($availableParentTeams) > 0)
+                        <x-ui-input-select
+                            name="newParentTeamId"
+                            label="Parent-Team (optional)"
+                            :options="$availableParentTeams"
+                            :nullable="true"
+                            wire:model="newParentTeamId"
+                        />
+                        <p class="text-xs text-[var(--ui-muted)]">
+                            Optional: Kind-Teams erben Zugriff auf root-scoped Module (z.B. CRM, Organization).
+                        </p>
+                    @endif
+
+                    @if(!empty($availableUsersForTeam))
+                        <div>
+                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Mitglieder hinzufügen (optional)</label>
+                            <div class="space-y-2 max-h-40 overflow-y-auto">
+                                @foreach($availableUsersForTeam as $availableUser)
+                                    @php
+                                        $isSelected = collect($newInitialMembers)->contains(fn($m) => ($m['user_id'] ?? null) == $availableUser->id);
+                                    @endphp
+                                    <label class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-[var(--ui-muted-10)] transition-colors {{ $isSelected ? 'bg-blue-50 border border-blue-200' : '' }}">
+                                        <input type="checkbox" wire:click="toggleInitialMember({{ $availableUser->id }})" {{ $isSelected ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-7 h-7 bg-[var(--ui-primary)] text-[var(--ui-on-primary)] rounded-full flex items-center justify-center text-xs font-semibold">
+                                                {{ strtoupper(mb_substr(($availableUser->fullname ?? $availableUser->name), 0, 2)) }}
+                                            </div>
+                                            <span class="text-sm text-[var(--ui-secondary)]">{{ $availableUser->fullname ?? $availableUser->name }}</span>
+                                            @if($availableUser->isAiUser())
+                                                <x-ui-badge variant="purple" size="sm">AI</x-ui-badge>
+                                            @endif
+                                        </div>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    <x-ui-button type="submit">Team erstellen</x-ui-button>
+                </form>
+            </div>
+
             {{-- Team Settings (nur für Owner) --}}
             @if(isset($team) && ($team->user_id ?? null) === auth()->id())
             <div>
