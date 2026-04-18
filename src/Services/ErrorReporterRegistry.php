@@ -21,7 +21,9 @@ class ErrorReporterRegistry
     public function register(string $key, string $namespace): void
     {
         $envKey = 'DEV_ERROR_ENDPOINT_' . strtoupper(str_replace('-', '_', $key));
-        $endpoint = env($envKey);
+
+        // Use getenv() instead of env() to work with cached config
+        $endpoint = getenv($envKey) ?: env($envKey);
 
         if (!$endpoint) {
             return;
@@ -31,6 +33,8 @@ class ErrorReporterRegistry
             'namespace' => $namespace,
             'endpoint' => $endpoint,
         ];
+
+        Log::debug('[ErrorReporterRegistry] Registered', ['key' => $key, 'namespace' => $namespace]);
     }
 
     /**
@@ -45,12 +49,29 @@ class ErrorReporterRegistry
         $exceptionClass = get_class($e);
         $file = $e->getFile();
 
+        Log::debug('[ErrorReporterRegistry] Reporting', [
+            'exception' => $exceptionClass,
+            'file' => $file,
+            'reporters' => array_keys($this->reporters),
+        ]);
+
+        $matched = false;
+
         foreach ($this->reporters as $key => $config) {
             if (!$this->matches($exceptionClass, $file, $config['namespace'])) {
                 continue;
             }
 
+            $matched = true;
+            Log::info('[ErrorReporterRegistry] Matched', ['key' => $key, 'exception' => $exceptionClass]);
             $this->send($key, $config['endpoint'], $e, $context);
+        }
+
+        if (!$matched) {
+            Log::debug('[ErrorReporterRegistry] No match', [
+                'exception' => $exceptionClass,
+                'file' => $file,
+            ]);
         }
     }
 
@@ -122,9 +143,15 @@ class ErrorReporterRegistry
                 $payload['extra'] = $context['extra'];
             }
 
-            Http::timeout(5)
+            $response = Http::timeout(5)
                 ->retry(0)
                 ->post($endpoint, $payload);
+
+            Log::info('[ErrorReporterRegistry] Sent', [
+                'key' => $key,
+                'status' => $response->status(),
+                'body' => $response->json(),
+            ]);
         } catch (Throwable $sendError) {
             Log::warning('[ErrorReporterRegistry] Failed to send error report', [
                 'package' => $key,
