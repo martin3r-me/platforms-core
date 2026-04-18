@@ -525,7 +525,7 @@ class ModalTeam extends Component
         ]);
 
         // Harte Weiterleitung, damit Sidebar/Guards sauber neu laden
-        return $this->redirect(request()->fullUrl());
+        return $this->redirect(request()->header('Referer', '/'));
     }
 
     /**
