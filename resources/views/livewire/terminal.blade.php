@@ -3358,6 +3358,7 @@
 
   <!-- New DM Modal -->
   <div
+    wire:ignore
     x-data="{ showNewDm: false, members: [] }"
     x-on:terminal-show-new-dm.window="showNewDm = true; $wire.getTeamMembers().then(r => members = r)"
     x-show="showNewDm"
@@ -3396,6 +3397,7 @@
 
   <!-- New Channel Modal -->
   <div
+    wire:ignore
     x-data="{ showNewChannel: false, channelName: '', channelDesc: '', members: [], selectedIds: [] }"
     x-on:terminal-show-new-channel.window="showNewChannel = true; channelName = ''; channelDesc = ''; selectedIds = []; $wire.getTeamMembers().then(r => members = r)"
     x-show="showNewChannel"
@@ -3452,6 +3454,7 @@
 
   <!-- Channel Members Modal -->
   <div
+    wire:ignore
     x-data="{
       showMembers: false,
       members: [],
@@ -3561,6 +3564,7 @@
 
   <!-- Pins Panel Modal -->
   <div
+    wire:ignore
     x-data="{ showPins: false, pins: [], loading: false }"
     x-on:terminal-show-pins.window="showPins = true; loading = true; $wire.getPinnedMessages().then(r => { pins = r; loading = false; })"
     x-show="showPins"
@@ -3636,6 +3640,7 @@
 
   <!-- Forward Message Modal -->
   <div
+    wire:ignore
     x-data="{ showForward: false, forwardMessageId: null, targets: [], loading: false }"
     x-on:terminal-show-forward.window="showForward = true; forwardMessageId = $event.detail.messageId; loading = true; $wire.getForwardTargets().then(r => { targets = r; loading = false; })"
     x-show="showForward"
