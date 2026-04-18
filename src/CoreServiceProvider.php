@@ -196,6 +196,12 @@ class CoreServiceProvider extends ServiceProvider
             ]);
         }
 
+        // Error Reporter: Register core namespace
+        try {
+            resolve(\Platform\Core\Services\ErrorReporterRegistry::class)
+                ->register('core', 'Platform\\Core');
+        } catch (\Throwable $e) {}
+
         // Error Reporter: Hook into Laravel's exception handler
         try {
             $this->app->make(\Illuminate\Contracts\Debug\ExceptionHandler::class)
