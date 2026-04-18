@@ -196,6 +196,24 @@ class CoreServiceProvider extends ServiceProvider
             ]);
         }
 
+        // Error Reporter: Hook into Laravel's exception handler
+        try {
+            $this->app->make(\Illuminate\Contracts\Debug\ExceptionHandler::class)
+                ->reportable(function (\Throwable $e) {
+                    $registry = app(\Platform\Core\Services\ErrorReporterRegistry::class);
+                    if ($registry->hasReporters()) {
+                        $context = [];
+                        if (!app()->runningInConsole()) {
+                            $context['http_code'] = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : null;
+                        }
+                        $context['is_console'] = app()->runningInConsole();
+                        $registry->report($e, $context);
+                    }
+                })->stop(false);
+        } catch (\Throwable $e) {
+            // Silent: Exception handler nicht verfügbar
+        }
+
         // Terminal reminder scheduler
         $this->callAfterResolving(\Illuminate\Console\Scheduling\Schedule::class, function (\Illuminate\Console\Scheduling\Schedule $schedule) {
             $schedule->job(new \Platform\Core\Jobs\ProcessTerminalRemindersJob)->everyMinute();
@@ -279,6 +297,9 @@ class CoreServiceProvider extends ServiceProvider
         
         // Contact Resolution Registry (für CRM, HCM, etc.)
         $this->app->singleton(\Platform\Core\Services\Comms\ContactResolverRegistry::class);
+
+        // Error Reporter Registry (Dev-Modul Error Tracking)
+        $this->app->singleton(\Platform\Core\Services\ErrorReporterRegistry::class);
 
         // MS Teams Graph Service (outbound messaging)
         $this->app->singleton(\Platform\Core\Services\TeamsGraphService::class);
