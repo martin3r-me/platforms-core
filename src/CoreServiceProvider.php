@@ -148,7 +148,7 @@ class CoreServiceProvider extends ServiceProvider
 
         // Public Routes (keine Auth nötig)
         Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
-            ->middleware(['web'])
+            ->middleware(['web', \Platform\Core\Http\Middleware\NoCacheHeaders::class])
             ->group(__DIR__.'/../routes/public.php');
 
         // Routes registrieren
