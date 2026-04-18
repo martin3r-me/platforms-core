@@ -104,6 +104,15 @@ class ErrorReporterRegistry
             return true;
         }
 
+        // Match vendor path for deployed composer packages
+        // vendor/martin3r/platform-{kebab}/ or vendor/martin3r/platforms-{kebab}/
+        if (str_contains($file, '/vendor/martin3r/platform-' . $kebab . '/') ||
+            str_contains($file, '/vendor/martin3r/platforms-' . $kebab . '/') ||
+            str_contains($file, '/vendor/martin3r/platform-' . strtolower($moduleName) . '/') ||
+            str_contains($file, '/vendor/martin3r/platforms-' . strtolower($moduleName) . '/')) {
+            return true;
+        }
+
         return false;
     }
 
