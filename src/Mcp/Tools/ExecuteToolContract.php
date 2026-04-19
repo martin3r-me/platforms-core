@@ -5,6 +5,8 @@ namespace Platform\Core\Mcp\Tools;
 use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
+use Platform\Core\Events\ToolExecuted;
+use Platform\Core\Events\ToolFailed;
 use Platform\Core\Tools\ToolRegistry;
 use Platform\Core\Services\ToolPermissionService;
 use Illuminate\Support\Facades\Log;
@@ -110,11 +112,57 @@ class ExecuteToolContract implements ToolContract
                 'arguments' => array_keys($toolArguments),
             ]);
 
+            $start = microtime(true);
+            $memStart = memory_get_usage();
+            $traceId = bin2hex(random_bytes(8));
+
             $result = $tool->execute($toolArguments, $context);
+
+            $duration = microtime(true) - $start;
+            $memUsage = memory_get_usage() - $memStart;
+
+            try {
+                $result->metadata = array_merge($result->metadata ?? [], [
+                    'source' => 'mcp_execute',
+                    'token_estimate_input' => (int) (mb_strlen(json_encode($toolArguments)) / 4),
+                    'token_estimate_output' => (int) (mb_strlen(json_encode($result->data ?? [])) / 4),
+                ]);
+
+                event(new ToolExecuted(
+                    toolName: $toolName,
+                    arguments: $toolArguments,
+                    context: $context,
+                    result: $result,
+                    duration: $duration,
+                    memoryUsage: $memUsage,
+                    traceId: $traceId,
+                ));
+            } catch (\Throwable $e) {
+                Log::warning('[MCP Execute] Event-Tracking fehlgeschlagen', ['error' => $e->getMessage()]);
+            }
 
             return $result;
 
         } catch (\Throwable $e) {
+            $duration = isset($start) ? microtime(true) - $start : 0;
+            $memUsage = isset($memStart) ? memory_get_usage() - $memStart : 0;
+
+            try {
+                event(new ToolFailed(
+                    toolName: $toolName ?? 'unknown',
+                    arguments: $toolArguments ?? [],
+                    context: $context,
+                    errorMessage: $e->getMessage(),
+                    errorCode: 'EXECUTION_ERROR',
+                    exception: $e,
+                    duration: $duration,
+                    memoryUsage: $memUsage,
+                    traceId: $traceId ?? null,
+                ));
+            } catch (\Throwable $eventError) {
+                // Silent
+            }
+
             Log::error('[MCP Execute] Fehler', [
                 'tool' => $toolName ?? 'unknown',
                 'error' => $e->getMessage(),

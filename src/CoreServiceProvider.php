@@ -193,6 +193,7 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Console\Commands\CreateMcpClientCommand::class,
                 \Platform\Core\Console\Commands\CleanupTerminalChannelsCommand::class,
                 \Platform\Core\Console\Commands\HelpCacheCommand::class,
+                \Platform\Core\Console\Commands\RebuildToolCatalogsCommand::class,
             ]);
         }
 
@@ -223,6 +224,7 @@ class CoreServiceProvider extends ServiceProvider
         // Terminal reminder scheduler
         $this->callAfterResolving(\Illuminate\Console\Scheduling\Schedule::class, function (\Illuminate\Console\Scheduling\Schedule $schedule) {
             $schedule->job(new \Platform\Core\Jobs\ProcessTerminalRemindersJob)->everyMinute();
+            $schedule->job(new \Platform\Core\Jobs\RebuildToolCatalogsJob)->hourly();
         });
 
         // Automatische Modell-Registrierung entfernt
@@ -303,6 +305,9 @@ class CoreServiceProvider extends ServiceProvider
         
         // Contact Resolution Registry (für CRM, HCM, etc.)
         $this->app->singleton(\Platform\Core\Services\Comms\ContactResolverRegistry::class);
+
+        // Tool Catalog Service (Top-250 per Team, hourly rebuilt)
+        $this->app->singleton(\Platform\Core\Services\ToolCatalogService::class);
 
         // Error Reporter Registry (Dev-Modul Error Tracking)
         $this->app->singleton(\Platform\Core\Services\ErrorReporterRegistry::class);

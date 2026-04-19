@@ -58,6 +58,14 @@ Dieser Server verwendet ein Discovery-System für skalierbare Tool-Verwaltung:
    - Dann `tools__GET(module="...")` für benötigte Module
    - Die Tools sind danach verfügbar und können verwendet werden
 
+## Tool-Katalog
+
+`core__context__GET` liefert einen `tool_catalog` mit den häufigsten Tools dieses Teams.
+Du kannst Tools daraus direkt via `execute(tool="...", arguments={...})` aufrufen,
+ohne vorher `tools__GET` oder `core__modules__GET` aufzurufen.
+Nur wenn der Katalog leer ist oder kein passendes Tool enthält,
+nutze den klassischen Weg über `core__modules__GET` → `tools__GET`.
+
 MARKDOWN;
 
     /**

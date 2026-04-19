@@ -9,6 +9,7 @@ use Platform\Core\Registry\ModuleRegistry;
 use Platform\Core\Models\Module;
 use Platform\Core\Models\McpSession;
 use Platform\Core\Models\Team;
+use Platform\Core\Services\ToolCatalogService;
 
 /**
  * Tool zum Abrufen des aktuellen Kontexts
@@ -238,6 +239,18 @@ class GetContextTool implements ToolContract
                     ];
                 })->values()->toArray();
                 $result['member_count'] = count($result['members']);
+            }
+
+            // Tool-Katalog laden
+            try {
+                $catalogService = app(ToolCatalogService::class);
+                $catalogData = $catalogService->getForTeam($targetTeam);
+                if (!empty($catalogData['catalog'])) {
+                    $result['tool_catalog'] = $catalogData['catalog'];
+                    $result['tool_catalog_meta'] = $catalogData['meta'];
+                }
+            } catch (\Throwable $e) {
+                // Katalog nie brechen lassen
             }
 
             // Erweiterte Metadaten (wenn verfügbar)

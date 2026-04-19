@@ -5,6 +5,8 @@ namespace Platform\Core\Mcp\Adapters;
 use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
+use Platform\Core\Events\ToolExecuted;
+use Platform\Core\Events\ToolFailed;
 use Platform\Core\Services\ToolPermissionService;
 use Platform\Core\Services\ToolValidationService;
 use Platform\Core\Services\TeamContext;
@@ -220,7 +222,34 @@ class ToolContractAdapter extends Tool
                 }
 
                 // Tool ausführen
+                $start = microtime(true);
+                $memStart = memory_get_usage();
+                $traceId = bin2hex(random_bytes(8));
+
                 $result = $this->tool->execute($arguments, $context);
+
+                $duration = microtime(true) - $start;
+                $memUsage = memory_get_usage() - $memStart;
+
+                try {
+                    $result->metadata = array_merge($result->metadata ?? [], [
+                        'source' => 'mcp_direct',
+                        'token_estimate_input' => (int) (mb_strlen(json_encode($arguments)) / 4),
+                        'token_estimate_output' => (int) (mb_strlen(json_encode($result->data ?? [])) / 4),
+                    ]);
+
+                    event(new ToolExecuted(
+                        toolName: $toolName,
+                        arguments: $arguments,
+                        context: $context,
+                        result: $result,
+                        duration: $duration,
+                        memoryUsage: $memUsage,
+                        traceId: $traceId,
+                    ));
+                } catch (\Throwable $e) {
+                    Log::warning('[MCP ToolContractAdapter] Event-Tracking fehlgeschlagen', ['error' => $e->getMessage()]);
+                }
 
                 // ToolResult zu MCP Response konvertieren
                 return $this->convertToolResult($result);
@@ -228,8 +257,10 @@ class ToolContractAdapter extends Tool
                 TeamContext::clear();
             }
         } catch (\RuntimeException $e) {
+            $this->fireFailedEvent($toolName ?? 'unknown', $arguments ?? [], $context ?? null, $e, $start ?? null, $memStart ?? null, $traceId ?? null);
             return Response::error($e->getMessage());
         } catch (\Throwable $e) {
+            $this->fireFailedEvent($toolName ?? 'unknown', $arguments ?? [], $context ?? null, $e, $start ?? null, $memStart ?? null, $traceId ?? null);
             return Response::error('Tool execution failed: ' . $e->getMessage());
         }
     }
@@ -408,6 +439,32 @@ class ToolContractAdapter extends Tool
         }
 
         return Response::text((string) $data);
+    }
+
+    /**
+     * Feuert ein ToolFailed Event (graceful)
+     */
+    private function fireFailedEvent(string $toolName, array $arguments, ?ToolContext $context, \Throwable $exception, ?float $start, ?int $memStart, ?string $traceId): void
+    {
+        if (!$context) {
+            return;
+        }
+
+        try {
+            event(new ToolFailed(
+                toolName: $toolName,
+                arguments: $arguments,
+                context: $context,
+                errorMessage: $exception->getMessage(),
+                errorCode: 'EXECUTION_ERROR',
+                exception: $exception,
+                duration: $start ? microtime(true) - $start : 0,
+                memoryUsage: $memStart ? memory_get_usage() - $memStart : 0,
+                traceId: $traceId,
+            ));
+        } catch (\Throwable $e) {
+            // Silent
+        }
     }
 
     /**
