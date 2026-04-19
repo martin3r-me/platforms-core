@@ -32,7 +32,7 @@ class ErrorReporterRegistry
     protected function resolveEndpoint(): ?string
     {
         if (!$this->endpointResolved) {
-            $this->endpoint = getenv('DEV_ERROR_ENDPOINT') ?: env('DEV_ERROR_ENDPOINT') ?: null;
+            $this->endpoint = config('platform.error_endpoint');
             $this->endpointResolved = true;
 
             if ($this->endpoint) {

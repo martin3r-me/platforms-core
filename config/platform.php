@@ -3,6 +3,8 @@
 return [
     'routing_mode' => env('PLATFORM_ROUTING_MODE', 'subdomain'),
 
+    'error_endpoint' => env('DEV_ERROR_ENDPOINT'),
+
     'documents' => [
         'chromium_path' => env('BROWSERSHOT_CHROMIUM_PATH'),
         'node_path' => env('BROWSERSHOT_NODE_PATH'),
