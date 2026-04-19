@@ -122,17 +122,23 @@ class ExecuteToolContract implements ToolContract
             $memUsage = memory_get_usage() - $memStart;
 
             try {
-                $result->metadata = array_merge($result->metadata ?? [], [
-                    'source' => 'mcp_execute',
-                    'token_estimate_input' => (int) (mb_strlen(json_encode($toolArguments)) / 4),
-                    'token_estimate_output' => (int) (mb_strlen(json_encode($result->data ?? [])) / 4),
-                ]);
+                $trackedResult = new ToolResult(
+                    success: $result->success,
+                    data: $result->data,
+                    error: $result->error,
+                    errorCode: $result->errorCode,
+                    metadata: array_merge($result->metadata, [
+                        'source' => 'mcp_execute',
+                        'token_estimate_input' => (int) (mb_strlen(json_encode($toolArguments)) / 4),
+                        'token_estimate_output' => (int) (mb_strlen(json_encode($result->data ?? [])) / 4),
+                    ]),
+                );
 
                 event(new ToolExecuted(
                     toolName: $toolName,
                     arguments: $toolArguments,
                     context: $context,
-                    result: $result,
+                    result: $trackedResult,
                     duration: $duration,
                     memoryUsage: $memUsage,
                     traceId: $traceId,
