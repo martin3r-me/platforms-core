@@ -28,7 +28,6 @@ class McpSessionToolManager
         'core.context.GET',
         'core.modules.GET',
         'core.team.switch',
-        'core.session.debug',
         'tools.GET',
     ];
 
