@@ -2,8 +2,8 @@
 
 namespace Platform\Core\Services;
 
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Platform\Core\Jobs\SendErrorReportJob;
 use Throwable;
 
 class ErrorReporterRegistry
@@ -48,15 +48,32 @@ class ErrorReporterRegistry
 
     /**
      * Identify which package an exception belongs to.
+     *
+     * Checks exception class/file first, then walks the stack trace
+     * to find the originating module (e.g. a QueryException thrown in
+     * Illuminate\Database but triggered from Platform\Planner).
      */
     public function identifyPackage(Throwable $e): ?string
     {
         $exceptionClass = get_class($e);
         $file = $e->getFile();
 
+        // 1. Direct match: exception class or file belongs to a module
         foreach ($this->namespaces as $key => $namespace) {
             if ($this->matches($exceptionClass, $file, $namespace)) {
                 return $key;
+            }
+        }
+
+        // 2. Stack trace walk: find the first frame that belongs to a module
+        foreach ($e->getTrace() as $frame) {
+            $frameClass = $frame['class'] ?? '';
+            $frameFile = $frame['file'] ?? '';
+
+            foreach ($this->namespaces as $key => $namespace) {
+                if ($this->matches($frameClass, $frameFile, $namespace)) {
+                    return $key;
+                }
             }
         }
 
@@ -119,7 +136,7 @@ class ErrorReporterRegistry
     }
 
     /**
-     * Send error payload to the ingest endpoint.
+     * Build payload and dispatch to the ingest endpoint via queue.
      */
     protected function send(string $key, string $endpoint, Throwable $e, array $context): void
     {
@@ -154,16 +171,9 @@ class ErrorReporterRegistry
                 $payload['extra'] = $context['extra'];
             }
 
-            $response = Http::timeout(5)
-                ->retry(0)
-                ->post($endpoint, $payload);
-
-            Log::info('[ErrorReporter] Sent', [
-                'key' => $key,
-                'status' => $response->status(),
-            ]);
+            SendErrorReportJob::dispatch($endpoint, $payload);
         } catch (Throwable $sendError) {
-            Log::warning('[ErrorReporter] Send failed', [
+            Log::warning('[ErrorReporter] Dispatch failed', [
                 'package' => $key,
                 'error' => $sendError->getMessage(),
             ]);

@@ -209,11 +209,14 @@ class CoreServiceProvider extends ServiceProvider
                 ->reportable(function (\Throwable $e) {
                     $registry = app(\Platform\Core\Services\ErrorReporterRegistry::class);
                     if ($registry->hasReporters()) {
-                        $context = [];
+                        $context = ['is_console' => app()->runningInConsole()];
                         if (!app()->runningInConsole()) {
-                            $context['http_code'] = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : null;
+                            // HttpException has getStatusCode(), all other exceptions
+                            // are rendered as 500 by Laravel's exception handler
+                            $context['http_code'] = method_exists($e, 'getStatusCode')
+                                ? $e->getStatusCode()
+                                : 500;
                         }
-                        $context['is_console'] = app()->runningInConsole();
                         $registry->report($e, $context);
                     }
                 })->stop(false);
