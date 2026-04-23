@@ -79,7 +79,7 @@ var PlatformWorkshop=(()=>{var oo=Object.create;var pt=Object.defineProperty;var
   position: relative;
   flex: 1;
   padding: 0.75rem;
-  min-height: 120px;
+  min-height: 200px;
   overflow: visible;
 }
 
