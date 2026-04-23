@@ -1,10 +1,17 @@
-import Panzoom from '@panzoom/panzoom';
 import interact from 'interactjs';
 
 export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} } = {}) {
   return {
-    panzoom: null,
+    // Pan/zoom state (manual — no panzoom lib, no pointer conflicts)
+    panX: 0,
+    panY: 0,
     scale: 1,
+    _spaceDown: false,
+    _isPanning: false,
+    _panStart: null,
+    _onKeyDown: null,
+    _onKeyUp: null,
+
     _saveTimers: {},
     _textTimers: {},
     colorPickerOpen: null,
@@ -13,83 +20,144 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
 
     init() {
       this.$nextTick(() => {
-        this._initPanzoom();
+        this._initPanZoom();
         this._initDraggable();
         this._initResizable();
         this._initAdoptDropzones();
         this._restorePositions();
+        this._fitGrid();
       });
     },
 
     destroy() {
-      if (this.panzoom) {
-        this.panzoom.destroy();
-      }
+      if (this._onKeyDown) document.removeEventListener('keydown', this._onKeyDown);
+      if (this._onKeyUp) document.removeEventListener('keyup', this._onKeyUp);
       interact('.workshop-note').unset();
       interact('.workshop-grid-block').unset();
     },
 
-    // ─── Panzoom ─────────────────────────────────────────────
-    _initPanzoom() {
+    // ─── Manual Pan / Zoom ──────────────────────────────────
+    _applyTransform() {
+      const board = this.$refs.board;
+      if (board) {
+        board.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
+      }
+    },
+
+    _zoomToPoint(newScale, clientX, clientY) {
+      const parent = this.$refs.board?.parentElement;
+      if (!parent) return;
+      const rect = parent.getBoundingClientRect();
+      const px = clientX - rect.left;
+      const py = clientY - rect.top;
+      const clamped = Math.max(0.15, Math.min(3, newScale));
+      const ratio = clamped / this.scale;
+      this.panX = px - (px - this.panX) * ratio;
+      this.panY = py - (py - this.panY) * ratio;
+      this.scale = clamped;
+      this._applyTransform();
+    },
+
+    _zoomToCenter(newScale) {
+      const parent = this.$refs.board?.parentElement;
+      if (!parent) return;
+      const rect = parent.getBoundingClientRect();
+      this._zoomToPoint(newScale, rect.left + parent.clientWidth / 2, rect.top + parent.clientHeight / 2);
+    },
+
+    _initPanZoom() {
       const board = this.$refs.board;
       if (!board) return;
-
-      this.panzoom = Panzoom(board, {
-        minScale: 0.3,
-        maxScale: 2,
-        contain: false,
-        cursor: 'default',
-        canvas: true,
-      });
-
       const parent = board.parentElement;
+      board.style.transformOrigin = '0 0';
+
+      // Wheel: scroll = pan, Ctrl+scroll = zoom toward pointer
       parent.addEventListener('wheel', (e) => {
+        e.preventDefault();
         if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          this.panzoom.zoomWithWheel(e);
-          this.scale = this.panzoom.getScale();
+          const factor = -e.deltaY * 0.002;
+          this._zoomToPoint(this.scale * (1 + factor), e.clientX, e.clientY);
+        } else {
+          this.panX -= e.deltaX;
+          this.panY -= e.deltaY;
+          this._applyTransform();
         }
       }, { passive: false });
 
-      // Disable panzoom on interactive elements
-      board.addEventListener('pointerdown', (e) => {
-        const isNote = e.target.closest('.workshop-note');
-        const isButton = e.target.closest('button');
-        const isInput = e.target.closest('input, textarea');
-        if (isNote || isButton || isInput) {
-          e.stopPropagation();
+      // Space key → grab cursor, enable pointer-pan
+      this._onKeyDown = (e) => {
+        if (e.code === 'Space' && !e.repeat && !e.target.matches('input,textarea,[contenteditable]')) {
+          e.preventDefault();
+          this._spaceDown = true;
+          parent.style.cursor = 'grab';
+        }
+      };
+      this._onKeyUp = (e) => {
+        if (e.code === 'Space') {
+          this._spaceDown = false;
+          this._isPanning = false;
+          this._panStart = null;
+          parent.style.cursor = '';
+        }
+      };
+      document.addEventListener('keydown', this._onKeyDown);
+      document.addEventListener('keyup', this._onKeyUp);
+
+      // Space + pointer drag = pan
+      parent.addEventListener('pointerdown', (e) => {
+        if (this._spaceDown) {
+          this._isPanning = true;
+          this._panStart = { x: e.clientX, y: e.clientY, px: this.panX, py: this.panY };
+          parent.style.cursor = 'grabbing';
+          parent.setPointerCapture(e.pointerId);
+          e.preventDefault();
+        }
+      });
+      parent.addEventListener('pointermove', (e) => {
+        if (this._isPanning && this._panStart) {
+          this.panX = this._panStart.px + (e.clientX - this._panStart.x);
+          this.panY = this._panStart.py + (e.clientY - this._panStart.y);
+          this._applyTransform();
+        }
+      });
+      parent.addEventListener('pointerup', () => {
+        if (this._isPanning) {
+          this._isPanning = false;
+          this._panStart = null;
+          parent.style.cursor = this._spaceDown ? 'grab' : '';
         }
       });
     },
 
-    zoomIn() {
-      if (!this.panzoom) return;
-      this.panzoom.zoomIn();
-      this.scale = this.panzoom.getScale();
-    },
-
-    zoomOut() {
-      if (!this.panzoom) return;
-      this.panzoom.zoomOut();
-      this.scale = this.panzoom.getScale();
-    },
-
+    zoomIn() { this._zoomToCenter(this.scale * 1.25); },
+    zoomOut() { this._zoomToCenter(this.scale / 1.25); },
     resetZoom() {
-      if (!this.panzoom) return;
-      this.panzoom.reset();
       this.scale = 1;
+      this.panX = 0;
+      this.panY = 0;
+      this._applyTransform();
     },
+    fitToScreen() { this._fitGrid(); },
 
-    fitToScreen() {
-      if (!this.panzoom) return;
+    _fitGrid() {
       const board = this.$refs.board;
-      const parent = board.parentElement;
-      const scaleX = parent.clientWidth / board.scrollWidth;
-      const scaleY = parent.clientHeight / board.scrollHeight;
-      const fitScale = Math.min(scaleX, scaleY, 1) * 0.9;
-      this.panzoom.zoom(fitScale);
-      this.panzoom.pan(0, 0);
+      const parent = board?.parentElement;
+      const gridEl = board?.querySelector('.workshop-canvas-background');
+      if (!gridEl || !parent) return;
+
+      const gw = gridEl.offsetWidth;
+      const gh = gridEl.offsetHeight;
+      const gx = gridEl.offsetLeft;
+      const gy = gridEl.offsetTop;
+      const vw = parent.clientWidth;
+      const vh = parent.clientHeight;
+      const pad = 60;
+
+      const fitScale = Math.min((vw - pad * 2) / gw, (vh - pad * 2) / gh, 1);
       this.scale = fitScale;
+      this.panX = (vw - gw * fitScale) / 2 - gx * fitScale;
+      this.panY = (vh - gh * fitScale) / 2 - gy * fitScale;
+      this._applyTransform();
     },
 
     // ─── Restore positions from data attributes ─────────────
@@ -103,31 +171,26 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       });
     },
 
-    // ─── interact.js Draggable ──────────────────────────────
+    // ─── interact.js Draggable (scale-aware) ────────────────
     _initDraggable() {
+      const self = this;
       interact('.workshop-note').draggable({
         allowFrom: '.drag-handle',
-        inertia: true,
-        modifiers: [
-          interact.modifiers.snap({
-            targets: [interact.snappers.grid({ x: 10, y: 10 })],
-            range: Infinity,
-            relativePoints: [{ x: 0, y: 0 }],
-          }),
-        ],
+        inertia: false,
         listeners: {
-          start: (event) => {
+          start(event) {
             event.target.classList.add('dragging');
           },
-          move: (event) => {
+          move(event) {
             const target = event.target;
-            const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
-            const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+            // Divide by scale so mouse movement maps correctly to board coords
+            const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx / self.scale;
+            const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy / self.scale;
             target.style.transform = `translate(${x}px, ${y}px)`;
             target.setAttribute('data-x', x);
             target.setAttribute('data-y', y);
           },
-          end: (event) => {
+          end(event) {
             event.target.classList.remove('dragging');
             const target = event.target;
             const noteId = parseInt(target.dataset.noteId);
@@ -135,43 +198,43 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
             const y = parseFloat(target.getAttribute('data-y')) || 0;
             const w = parseInt(target.style.width) || null;
             const h = parseInt(target.style.height) || null;
-            this.savePosition(noteId, { x, y, width: w, height: h });
+            self.savePosition(noteId, { x, y, width: w, height: h });
           },
         },
       });
     },
 
-    // ─── interact.js Resizable ──────────────────────────────
+    // ─── interact.js Resizable (scale-aware) ────────────────
     _initResizable() {
+      const self = this;
       interact('.workshop-note').resizable({
         edges: { right: '.resize-handle', bottom: '.resize-handle' },
         modifiers: [
-          interact.modifiers.restrictSize({
-            min: { width: 150, height: 100 },
-          }),
+          interact.modifiers.restrictSize({ min: { width: 120, height: 80 } }),
         ],
         listeners: {
-          move: (event) => {
+          move(event) {
             const target = event.target;
             let x = parseFloat(target.getAttribute('data-x')) || 0;
             let y = parseFloat(target.getAttribute('data-y')) || 0;
 
-            target.style.width = event.rect.width + 'px';
-            target.style.height = event.rect.height + 'px';
+            // Scale-aware: convert screen-space rect to board-space
+            target.style.width = (event.rect.width / self.scale) + 'px';
+            target.style.height = (event.rect.height / self.scale) + 'px';
 
-            x += event.deltaRect.left;
-            y += event.deltaRect.top;
+            x += event.deltaRect.left / self.scale;
+            y += event.deltaRect.top / self.scale;
 
             target.style.transform = `translate(${x}px, ${y}px)`;
             target.setAttribute('data-x', x);
             target.setAttribute('data-y', y);
           },
-          end: (event) => {
+          end(event) {
             const target = event.target;
             const noteId = parseInt(target.dataset.noteId);
             const x = parseFloat(target.getAttribute('data-x')) || 0;
             const y = parseFloat(target.getAttribute('data-y')) || 0;
-            this.savePosition(noteId, {
+            self.savePosition(noteId, {
               x,
               y,
               width: parseInt(target.style.width),
@@ -184,16 +247,17 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
 
     // ─── Adopt Dropzones (grid blocks) ──────────────────────
     _initAdoptDropzones() {
+      const self = this;
       interact('.workshop-grid-block').dropzone({
         accept: '.workshop-note',
         overlap: 0.3,
-        ondragenter: (event) => {
+        ondragenter(event) {
           event.target.classList.add('adopt-highlight');
         },
-        ondragleave: (event) => {
+        ondragleave(event) {
           event.target.classList.remove('adopt-highlight');
         },
-        ondrop: (event) => {
+        ondrop(event) {
           event.target.classList.remove('adopt-highlight');
           const noteEl = event.relatedTarget;
           const blockEl = event.target;
@@ -201,9 +265,9 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
           const blockId = parseInt(blockEl.dataset.blockId);
 
           if (noteId && blockId) {
-            const blockLabel = blockEl.querySelector('.workshop-grid-block-header h4')?.textContent?.trim() || 'Block';
-            if (confirm(`Notiz in "${blockLabel}" uebernehmen?`)) {
-              this.$wire.call('adoptNote', noteId, blockId);
+            const label = blockEl.querySelector('h4')?.textContent?.trim() || 'Block';
+            if (confirm(`Notiz in "${label}" uebernehmen?`)) {
+              self.$wire.call('adoptNote', noteId, blockId);
             }
           }
         },
@@ -219,7 +283,15 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     },
 
     addNote() {
-      this.$wire.call('addWorkshopNote');
+      // Calculate viewport center in board coordinates
+      const parent = this.$refs.board?.parentElement;
+      if (parent) {
+        const cx = (parent.clientWidth / 2 - this.panX) / this.scale;
+        const cy = (parent.clientHeight / 2 - this.panY) / this.scale;
+        this.$wire.call('addWorkshopNote', { x: Math.round(cx - 100), y: Math.round(cy - 75) });
+      } else {
+        this.$wire.call('addWorkshopNote', {});
+      }
     },
 
     deleteNote(noteId) {
