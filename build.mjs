@@ -19,6 +19,13 @@ const bundles = [
     outfile: 'resources/dist/platform-echo.iife.js',
     banner: `/* platform-echo v${version} | MIT */`,
   },
+  {
+    entryPoints: ['resources/js/workshop/index.js'],
+    globalName: 'PlatformWorkshop',
+    outfile: 'resources/dist/platform-workshop.iife.js',
+    banner: `/* platform-workshop v${version} | MIT */`,
+    loader: { '.css': 'text' },
+  },
 ];
 
 const manifest = {};

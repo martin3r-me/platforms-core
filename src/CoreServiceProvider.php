@@ -85,6 +85,7 @@ class CoreServiceProvider extends ServiceProvider
             $manifest = json_decode(file_get_contents($manifestPath), true) ?? [];
             config(['platform.tiptap_hash' => $manifest['platform-tiptap.iife.js'] ?? '0']);
             config(['platform.echo_hash' => $manifest['platform-echo.iife.js'] ?? '0']);
+            config(['platform.workshop_hash' => $manifest['platform-workshop.iife.js'] ?? '0']);
         }
 
         // Blade Components

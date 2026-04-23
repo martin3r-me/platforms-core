@@ -31,6 +31,7 @@
 
   <script src="https://unpkg.com/@wotz/livewire-sortablejs@1.0.0/dist/livewire-sortable.js"></script>
   <script src="/_platform/assets/platform-tiptap.iife.js?v={{ config('platform.tiptap_hash', '0') }}" defer></script>
+  <script src="/_platform/assets/platform-workshop.iife.js?v={{ config('platform.workshop_hash', '0') }}" defer></script>
   @if(config('broadcasting.default') === 'reverb')
   <script src="/_platform/assets/platform-echo.iife.js?v={{ config('platform.echo_hash', '0') }}" defer></script>
   @endif
