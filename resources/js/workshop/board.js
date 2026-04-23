@@ -136,9 +136,6 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       textarea.addEventListener('blur', saveText);
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
 
-      // Close color picker on outside click
-      el.addEventListener('pointerdown', (e) => e.stopPropagation());
-
       return el;
     },
 
@@ -190,8 +187,9 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
         }
       }, { passive: false });
 
-      // Middle-click pan
+      // Middle-click pan (skip if target is inside a note or control)
       this._on(parent, 'pointerdown', (e) => {
+        if (e.target.closest('.workshop-note, .workshop-fab, .workshop-zoom-controls')) return;
         // Middle button (1), or left button (0) when space is held
         if (e.button === 1 || (e.button === 0 && this._spaceDown)) {
           this._isPanning = true;
