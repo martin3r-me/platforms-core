@@ -1,7 +1,7 @@
 import Panzoom from '@panzoom/panzoom';
 import interact from 'interactjs';
 
-export function workshopBoard({ entries = [], gridLayout = {}, blockDefs = [] } = {}) {
+export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} } = {}) {
   return {
     panzoom: null,
     scale: 1,
@@ -16,7 +16,7 @@ export function workshopBoard({ entries = [], gridLayout = {}, blockDefs = [] } 
         this._initPanzoom();
         this._initDraggable();
         this._initResizable();
-        this._initDropzones();
+        this._initAdoptDropzones();
         this._restorePositions();
       });
     },
@@ -26,7 +26,7 @@ export function workshopBoard({ entries = [], gridLayout = {}, blockDefs = [] } 
         this.panzoom.destroy();
       }
       interact('.workshop-note').unset();
-      interact('.workshop-block-body').unset();
+      interact('.workshop-grid-block').unset();
     },
 
     // ─── Panzoom ─────────────────────────────────────────────
@@ -130,12 +130,12 @@ export function workshopBoard({ entries = [], gridLayout = {}, blockDefs = [] } 
           end: (event) => {
             event.target.classList.remove('dragging');
             const target = event.target;
-            const entryId = parseInt(target.dataset.entryId);
+            const noteId = parseInt(target.dataset.noteId);
             const x = parseFloat(target.getAttribute('data-x')) || 0;
             const y = parseFloat(target.getAttribute('data-y')) || 0;
             const w = parseInt(target.style.width) || null;
             const h = parseInt(target.style.height) || null;
-            this.savePosition(entryId, { x, y, width: w, height: h });
+            this.savePosition(noteId, { x, y, width: w, height: h });
           },
         },
       });
@@ -168,10 +168,10 @@ export function workshopBoard({ entries = [], gridLayout = {}, blockDefs = [] } 
           },
           end: (event) => {
             const target = event.target;
-            const entryId = parseInt(target.dataset.entryId);
+            const noteId = parseInt(target.dataset.noteId);
             const x = parseFloat(target.getAttribute('data-x')) || 0;
             const y = parseFloat(target.getAttribute('data-y')) || 0;
-            this.savePosition(entryId, {
+            this.savePosition(noteId, {
               x,
               y,
               width: parseInt(target.style.width),
@@ -182,66 +182,64 @@ export function workshopBoard({ entries = [], gridLayout = {}, blockDefs = [] } 
       });
     },
 
-    // ─── interact.js Dropzones ──────────────────────────────
-    _initDropzones() {
-      interact('.workshop-block-body').dropzone({
+    // ─── Adopt Dropzones (grid blocks) ──────────────────────
+    _initAdoptDropzones() {
+      interact('.workshop-grid-block').dropzone({
         accept: '.workshop-note',
         overlap: 0.3,
         ondragenter: (event) => {
-          event.target.closest('.workshop-block')?.classList.add('drop-active');
+          event.target.classList.add('adopt-highlight');
         },
         ondragleave: (event) => {
-          event.target.closest('.workshop-block')?.classList.remove('drop-active');
+          event.target.classList.remove('adopt-highlight');
         },
         ondrop: (event) => {
-          event.target.closest('.workshop-block')?.classList.remove('drop-active');
+          event.target.classList.remove('adopt-highlight');
           const noteEl = event.relatedTarget;
-          const dropzone = event.target;
-          const entryId = parseInt(noteEl.dataset.entryId);
-          const newBlockId = parseInt(dropzone.dataset.blockId);
-          const currentBlockId = parseInt(noteEl.closest('.workshop-block-body')?.dataset.blockId);
+          const blockEl = event.target;
+          const noteId = parseInt(noteEl.dataset.noteId);
+          const blockId = parseInt(blockEl.dataset.blockId);
 
-          if (newBlockId && newBlockId !== currentBlockId) {
-            this.moveToBlock(entryId, newBlockId);
+          if (noteId && blockId) {
+            const blockLabel = blockEl.querySelector('.workshop-grid-block-header h4')?.textContent?.trim() || 'Block';
+            if (confirm(`Notiz in "${blockLabel}" uebernehmen?`)) {
+              this.$wire.call('adoptNote', noteId, blockId);
+            }
           }
         },
       });
     },
 
     // ─── Livewire calls ─────────────────────────────────────
-    savePosition(entryId, pos) {
-      clearTimeout(this._saveTimers[entryId]);
-      this._saveTimers[entryId] = setTimeout(() => {
-        this.$wire.call('updateNotePosition', entryId, pos);
+    savePosition(noteId, pos) {
+      clearTimeout(this._saveTimers[noteId]);
+      this._saveTimers[noteId] = setTimeout(() => {
+        this.$wire.call('updateNotePosition', noteId, pos);
       }, 500);
     },
 
-    moveToBlock(entryId, newBlockId) {
-      this.$wire.call('moveNoteToBlock', entryId, newBlockId);
+    addNote() {
+      this.$wire.call('addWorkshopNote');
     },
 
-    addNote(blockKey) {
-      this.$wire.call('addWorkshopNote', blockKey);
+    deleteNote(noteId) {
+      this.$wire.call('deleteWorkshopNote', noteId);
     },
 
-    deleteNote(entryId) {
-      this.$wire.call('deleteWorkshopNote', entryId);
-    },
-
-    updateNoteText(entryId, title, content) {
-      clearTimeout(this._textTimers[entryId]);
-      this._textTimers[entryId] = setTimeout(() => {
-        this.$wire.call('updateNoteText', entryId, title, content);
+    updateNoteText(noteId, title, content) {
+      clearTimeout(this._textTimers[noteId]);
+      this._textTimers[noteId] = setTimeout(() => {
+        this.$wire.call('updateNoteText', noteId, title, content);
       }, 500);
     },
 
-    changeColor(entryId, color) {
+    changeColor(noteId, color) {
       this.colorPickerOpen = null;
-      this.$wire.call('updateNoteColor', entryId, color);
+      this.$wire.call('updateNoteColor', noteId, color);
     },
 
-    toggleColorPicker(entryId) {
-      this.colorPickerOpen = this.colorPickerOpen === entryId ? null : entryId;
+    toggleColorPicker(noteId) {
+      this.colorPickerOpen = this.colorPickerOpen === noteId ? null : noteId;
     },
   };
 }
