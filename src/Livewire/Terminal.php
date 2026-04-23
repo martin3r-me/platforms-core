@@ -7,7 +7,6 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Platform\Core\Models\ContextFile;
-use Platform\Core\Models\ContextFileReference;
 use Platform\Core\Models\TerminalChannel;
 use Platform\Core\Models\TerminalChannelMember;
 use Platform\Core\Models\TerminalMention;
@@ -15,22 +14,14 @@ use Platform\Core\Models\TerminalMessage;
 use Platform\Core\Models\TerminalReaction;
 use Platform\Core\Models\TerminalAgenda;
 use Platform\Core\Models\TerminalAgendaMember;
-use Platform\Core\Models\TerminalAgendaItem;
-use Platform\Core\Models\TerminalAgendaSlot;
 use Platform\Core\Models\TerminalBookmark;
 use Platform\Core\Models\TerminalPin;
 use Platform\Core\Models\TerminalReminder;
 use Platform\Core\Models\User;
 use Platform\Core\Events\TerminalMessageSent;
 use Platform\Core\Events\TerminalReactionToggled;
-use Platform\Core\Models\Tag;
 use Platform\Core\Services\ContextFileService;
-use Platform\Organization\Models\OrganizationTimeEntry;
-use Platform\Organization\Models\OrganizationTimePlanned;
 use Platform\Organization\Models\OrganizationContext;
-use Platform\Organization\Services\StoreTimeEntry;
-use Platform\Organization\Services\StorePlannedTime;
-use Platform\Organization\Traits\HasTimeEntries;
 use Platform\Core\Models\CoreExtraFieldDefinition;
 use Platform\Core\Models\CoreExtraFieldValue;
 use Platform\Core\Models\CoreLookup;
@@ -69,8 +60,6 @@ class Terminal extends Component
     public array $onlineUserIds = [];
     public string $activeApp = 'chat';
     public array $availableApps = ['chat' => true, 'agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false];
-    public string $filesFilter = 'all'; // all | images | documents
-
     // ── Comms App ────────────────────────────────────────────
     public bool $commsInitialized = false;
     public bool $commsShowNewMessage = false;  // overlay panel above timeline
@@ -80,15 +69,6 @@ class Terminal extends Component
     public array $otherRecentThreads = [];
     public bool $showOtherThreads = false;
     public ?int $activeOtherThreadIndex = null;
-
-    // ── File Picker/Assign ───────────────────────────────────
-    public bool $filePickerActive = false;
-    public bool $filePickerMultiple = true;
-    public ?string $filePickerCallback = null;
-    public array $filePickerSelected = [];
-    public ?string $filePickerReferenceType = null;
-    public ?int $filePickerReferenceId = null;
-    public ?int $filePickerAssignReferenceId = null;
 
     // ── ExtraFields App ──────────────────────────────────────
     public ?string $efContextType = null;
@@ -597,86 +577,21 @@ class Terminal extends Component
     }
 
     /**
-     * Upload files to the current context (Files app).
-     */
-    public function uploadContextFiles(): void
-    {
-        if (! $this->contextType || ! $this->contextId) {
-            return;
-        }
-
-        if (empty($this->pendingFiles)) {
-            return;
-        }
-
-        $service = app(ContextFileService::class);
-
-        foreach ($this->pendingFiles as $file) {
-            try {
-                $service->uploadForContext(
-                    $file,
-                    $this->contextType,
-                    $this->contextId,
-                    [
-                        'keep_original' => false,
-                        'generate_variants' => true,
-                    ]
-                );
-            } catch (\Exception $e) {
-                // Continue with remaining files
-            }
-        }
-
-        $this->pendingFiles = [];
-        unset($this->contextFiles);
-    }
-
-    /**
-     * Delete a context file (Files app).
-     */
-    public function deleteContextFile(int $fileId): void
-    {
-        $file = ContextFile::find($fileId);
-        if (! $file) {
-            unset($this->contextFiles);
-            return;
-        }
-
-        // Verify the file belongs to the current context (prevent deleting arbitrary files)
-        if ($this->contextType && $this->contextId) {
-            if ($file->context_type !== $this->contextType || $file->context_id !== $this->contextId) {
-                return;
-            }
-        }
-
-        try {
-            $service = app(ContextFileService::class);
-            $service->delete($fileId);
-
-            $this->dispatch('notify', ['type' => 'success', 'message' => 'Datei gelöscht.']);
-        } catch (\Exception $e) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'Fehler beim Löschen: ' . $e->getMessage()]);
-        }
-
-        unset($this->contextFiles);
-    }
-
-    /**
      * Open terminal in file-picker mode (select files → return IDs).
      * Modules fire dispatch('terminal:files:pick', [...]) to trigger this.
      */
     #[On('terminal:files:pick')]
     public function openFilePicker(array $payload = []): void
     {
-        $this->filePickerActive = true;
-        $this->filePickerMultiple = $payload['multiple'] ?? true;
-        $this->filePickerCallback = $payload['callback'] ?? null;
-        $this->filePickerReferenceType = $payload['reference_type'] ?? null;
-        $this->filePickerReferenceId = isset($payload['reference_id']) ? (int) $payload['reference_id'] : null;
-        $this->filePickerAssignReferenceId = null;
-        $this->filePickerSelected = [];
         $this->activeApp = 'files';
         $this->dispatch('toggle-terminal-open');
+        $this->dispatch('terminal-file-picker-open',
+            multiple: $payload['multiple'] ?? true,
+            callback: $payload['callback'] ?? null,
+            referenceType: $payload['reference_type'] ?? null,
+            referenceId: isset($payload['reference_id']) ? (int) $payload['reference_id'] : null,
+            assignReferenceId: null,
+        );
     }
 
     /**
@@ -685,134 +600,24 @@ class Terminal extends Component
     #[On('terminal:files:assign')]
     public function openFileAssign(array $payload = []): void
     {
-        $this->filePickerActive = true;
-        $this->filePickerMultiple = false;
-        $this->filePickerAssignReferenceId = isset($payload['reference_id']) ? (int) $payload['reference_id'] : null;
-        $this->filePickerReferenceType = null;
-        $this->filePickerReferenceId = null;
-        $this->filePickerCallback = null;
-        $this->filePickerSelected = [];
         $this->activeApp = 'files';
         $this->dispatch('toggle-terminal-open');
+        $this->dispatch('terminal-file-picker-open',
+            multiple: false,
+            callback: null,
+            referenceType: null,
+            referenceId: null,
+            assignReferenceId: isset($payload['reference_id']) ? (int) $payload['reference_id'] : null,
+        );
     }
 
     /**
-     * Toggle a file's selection in picker mode.
+     * Refresh file badge count when Files child reports changes.
      */
-    public function toggleFilePickerSelection(int $fileId): void
+    #[On('terminal-files-changed')]
+    public function onFilesChanged(): void
     {
-        if (in_array($fileId, $this->filePickerSelected)) {
-            $this->filePickerSelected = array_values(array_diff($this->filePickerSelected, [$fileId]));
-        } else {
-            if ($this->filePickerMultiple) {
-                $this->filePickerSelected[] = $fileId;
-            } else {
-                $this->filePickerSelected = [$fileId];
-            }
-        }
-    }
-
-    /**
-     * Confirm file picker selection.
-     */
-    public function confirmFilePicker(): void
-    {
-        if (empty($this->filePickerSelected)) {
-            return;
-        }
-
-        // Assign mode: update existing reference
-        if ($this->filePickerAssignReferenceId) {
-            $reference = ContextFileReference::find($this->filePickerAssignReferenceId);
-            if ($reference) {
-                $file = ContextFile::find($this->filePickerSelected[0]);
-                if ($file) {
-                    $reference->update([
-                        'context_file_id' => $file->id,
-                        'context_file_variant_id' => null,
-                        'meta' => array_merge($reference->meta ?? [], ['title' => $file->original_name]),
-                    ]);
-                    $this->dispatch('terminal:files:reference-updated', [
-                        'reference_id' => $this->filePickerAssignReferenceId,
-                    ]);
-                }
-            }
-            $this->resetFilePicker();
-
-            return;
-        }
-
-        // Picker mode with reference_type: create ContextFileReference(s)
-        if ($this->filePickerReferenceType && $this->filePickerReferenceId) {
-            foreach ($this->filePickerSelected as $fileId) {
-                $file = ContextFile::find($fileId);
-                if (! $file) {
-                    continue;
-                }
-
-                $exists = ContextFileReference::where('context_file_id', $file->id)
-                    ->where('context_file_variant_id', null)
-                    ->where('reference_type', $this->filePickerReferenceType)
-                    ->where('reference_id', $this->filePickerReferenceId)
-                    ->exists();
-
-                if (! $exists) {
-                    ContextFileReference::create([
-                        'context_file_id' => $file->id,
-                        'context_file_variant_id' => null,
-                        'reference_type' => $this->filePickerReferenceType,
-                        'reference_id' => $this->filePickerReferenceId,
-                        'meta' => ['title' => $file->original_name],
-                    ]);
-                }
-            }
-
-            $this->dispatch('terminal:files:reference-created', [
-                'reference_type' => $this->filePickerReferenceType,
-                'reference_id' => $this->filePickerReferenceId,
-            ]);
-            $this->resetFilePicker();
-
-            return;
-        }
-
-        // Simple picker mode: return selected file data
-        $files = ContextFile::whereIn('id', $this->filePickerSelected)
-            ->with('variants')
-            ->get();
-
-        $this->dispatch('terminal:files:picked', [
-            'files' => $files->map(fn ($f) => [
-                'id' => $f->id,
-                'token' => $f->token,
-                'original_name' => $f->original_name,
-                'url' => $f->url,
-                'thumbnail' => $f->variants()->where('variant_type', 'thumbnail_4_3')->first()?->url
-                    ?? $f->variants()->where('variant_type', 'like', 'thumbnail_%')->first()?->url
-                    ?? $f->url,
-            ])->toArray(),
-            'callback' => $this->filePickerCallback,
-        ]);
-        $this->resetFilePicker();
-    }
-
-    /**
-     * Cancel file picker and reset state.
-     */
-    public function cancelFilePicker(): void
-    {
-        $this->resetFilePicker();
-    }
-
-    protected function resetFilePicker(): void
-    {
-        $this->filePickerActive = false;
-        $this->filePickerMultiple = true;
-        $this->filePickerCallback = null;
-        $this->filePickerSelected = [];
-        $this->filePickerReferenceType = null;
-        $this->filePickerReferenceId = null;
-        $this->filePickerAssignReferenceId = null;
+        unset($this->contextFiles);
     }
 
     /**
@@ -3643,77 +3448,6 @@ class Terminal extends Component
             ->toArray();
     }
 
-    #[Computed]
-    public function agendaItems(): array
-    {
-        if (! $this->activeAgendaId) {
-            return [];
-        }
-
-        $agenda = TerminalAgenda::find($this->activeAgendaId);
-        if (! $agenda) {
-            return [];
-        }
-
-        return $agenda->items()
-            ->ordered()
-            ->get()
-            ->map(fn ($item) => $this->formatAgendaItem($item))
-            ->toArray();
-    }
-
-    #[Computed]
-    public function myDayItems(): array
-    {
-        $teamId = $this->teamId();
-        if (! $teamId) {
-            return [];
-        }
-
-        $date = $this->agendaDayDate ?: now()->toDateString();
-
-        $agendaIds = TerminalAgendaMember::where('user_id', auth()->id())
-            ->whereHas('agenda', fn ($q) => $q->where('team_id', $teamId))
-            ->pluck('agenda_id');
-
-        if ($agendaIds->isEmpty()) {
-            return [];
-        }
-
-        return TerminalAgendaItem::whereIn('agenda_id', $agendaIds)
-            ->forDate($date)
-            ->ordered()
-            ->with('agenda:id,name,icon')
-            ->get()
-            ->map(fn ($item) => $this->formatAgendaItem($item, true))
-            ->toArray();
-    }
-
-    #[Computed]
-    public function myDayBacklogItems(): array
-    {
-        $teamId = $this->teamId();
-        if (! $teamId) {
-            return [];
-        }
-
-        $agendaIds = TerminalAgendaMember::where('user_id', auth()->id())
-            ->whereHas('agenda', fn ($q) => $q->where('team_id', $teamId))
-            ->pluck('agenda_id');
-
-        if ($agendaIds->isEmpty()) {
-            return [];
-        }
-
-        return TerminalAgendaItem::whereIn('agenda_id', $agendaIds)
-            ->backlog()
-            ->open()
-            ->ordered()
-            ->with('agenda:id,name,icon')
-            ->get()
-            ->map(fn ($item) => $this->formatAgendaItem($item, true))
-            ->toArray();
-    }
 
     public function selectAgenda(int $agendaId): void
     {
@@ -3721,7 +3455,7 @@ class Terminal extends Component
         if ($this->agendaView === 'day') {
             $this->agendaView = 'board';
         }
-        unset($this->agendaItems, $this->agendaSlots, $this->agendaBacklogItems, $this->agendaDoneItems);
+        $this->broadcastAgendaState();
     }
 
     public function openMyDay(): void
@@ -3729,19 +3463,22 @@ class Terminal extends Component
         $this->activeAgendaId = null;
         $this->agendaView = 'day';
         $this->agendaDayDate = now()->toDateString();
-        unset($this->myDayItems, $this->myDayBacklogItems);
+        $this->broadcastAgendaState();
     }
 
     public function navigateDay(string $direction): void
     {
-        $current = $this->agendaDayDate ?: now()->toDateString();
-        $date = \Carbon\Carbon::parse($current);
+        if ($direction === 'today') {
+            $this->agendaDayDate = now()->toDateString();
+        } else {
+            $current = $this->agendaDayDate ?: now()->toDateString();
+            $date = \Carbon\Carbon::parse($current);
+            $this->agendaDayDate = $direction === 'next'
+                ? $date->addDay()->toDateString()
+                : $date->subDay()->toDateString();
+        }
 
-        $this->agendaDayDate = $direction === 'next'
-            ? $date->addDay()->toDateString()
-            : $date->subDay()->toDateString();
-
-        unset($this->myDayItems);
+        $this->broadcastAgendaState();
     }
 
     public function createAgenda(string $name, ?string $description = null, ?string $icon = null): void
@@ -3766,7 +3503,17 @@ class Terminal extends Component
 
         $this->activeAgendaId = $agenda->id;
         $this->agendaView = 'board';
-        unset($this->agendas, $this->agendaItems);
+        unset($this->agendas);
+        $this->broadcastAgendaState();
+    }
+
+    protected function broadcastAgendaState(): void
+    {
+        $this->dispatch('terminal-agenda-state',
+            agendaId: $this->activeAgendaId,
+            view: $this->agendaView,
+            dayDate: $this->agendaDayDate,
+        );
     }
 
     public function updateAgenda(int $agendaId, string $name, ?string $description = null, ?string $icon = null): void
@@ -3805,6 +3552,7 @@ class Terminal extends Component
 
         if ($this->activeAgendaId === $agendaId) {
             $this->activeAgendaId = null;
+            $this->broadcastAgendaState();
         }
 
         unset($this->agendas);
@@ -3859,412 +3607,6 @@ class Terminal extends Component
         TerminalAgendaMember::where('agenda_id', $this->activeAgendaId)
             ->where('user_id', $userId)
             ->delete();
-    }
-
-    public function createAgendaItem(int $agendaId, string $title, ?string $notes = null, ?string $date = null, ?string $timeStart = null, ?string $timeEnd = null, ?string $color = null): void
-    {
-        $agenda = TerminalAgenda::find($agendaId);
-        if (! $agenda || empty(trim($title))) {
-            return;
-        }
-
-        $maxSort = TerminalAgendaItem::where('agenda_id', $agendaId)->max('sort_order') ?? 0;
-
-        TerminalAgendaItem::create([
-            'agenda_id' => $agendaId,
-            'title' => trim($title),
-            'notes' => $notes ? trim($notes) : null,
-            'date' => $date,
-            'time_start' => $timeStart,
-            'time_end' => $timeEnd,
-            'color' => $color,
-            'sort_order' => $maxSort + 1,
-        ]);
-
-        $agenda->refreshItemCount();
-        unset($this->agendaItems, $this->agendas, $this->myDayItems);
-    }
-
-    public function updateAgendaItem(int $itemId, ?string $title = null, ?string $notes = null, ?string $date = null, ?string $timeStart = null, ?string $timeEnd = null, ?string $color = null): void
-    {
-        $item = TerminalAgendaItem::find($itemId);
-        if (! $item) {
-            return;
-        }
-
-        $updates = [];
-        if ($title !== null) {
-            $updates['title'] = trim($title);
-        }
-        if ($notes !== null) {
-            $updates['notes'] = $notes === '' ? null : trim($notes);
-        }
-        if ($date !== null) {
-            $updates['date'] = $date === '' ? null : $date;
-        }
-        if ($timeStart !== null) {
-            $updates['time_start'] = $timeStart === '' ? null : $timeStart;
-        }
-        if ($timeEnd !== null) {
-            $updates['time_end'] = $timeEnd === '' ? null : $timeEnd;
-        }
-        if ($color !== null) {
-            $updates['color'] = $color === '' ? null : $color;
-        }
-
-        if (! empty($updates)) {
-            $item->update($updates);
-        }
-
-        unset($this->agendaItems, $this->myDayItems);
-    }
-
-    public function deleteAgendaItem(int $itemId): void
-    {
-        $item = TerminalAgendaItem::find($itemId);
-        if (! $item) {
-            return;
-        }
-
-        $agenda = $item->agenda;
-        $item->delete();
-        $agenda?->refreshItemCount();
-        unset($this->agendaItems, $this->agendas, $this->myDayItems, $this->myDayBacklogItems);
-    }
-
-    public function detachAgendaItem(int $itemId): void
-    {
-        $item = TerminalAgendaItem::find($itemId);
-        if (! $item) {
-            return;
-        }
-
-        $agenda = $item->agenda;
-        $item->delete();
-        $agenda?->refreshItemCount();
-        unset($this->agendaItems, $this->agendas, $this->myDayItems, $this->myDayBacklogItems);
-    }
-
-    public function toggleAgendaItemDone(int $itemId): void
-    {
-        $item = TerminalAgendaItem::find($itemId);
-        if (! $item) {
-            return;
-        }
-
-        $item->update(['is_done' => ! $item->is_done]);
-        $item->agenda?->refreshItemCount();
-        unset($this->agendaItems, $this->agendas, $this->myDayItems, $this->agendaSlots, $this->agendaBacklogItems, $this->agendaDoneItems);
-    }
-
-    public function updateAgendaItemOrder(array $items): void
-    {
-        foreach ($items as $entry) {
-            TerminalAgendaItem::where('id', $entry['value'])
-                ->update(['sort_order' => $entry['order']]);
-        }
-
-        unset($this->agendaItems, $this->myDayItems);
-    }
-
-    public function moveAgendaItemDate(int $itemId, ?string $date): void
-    {
-        $item = TerminalAgendaItem::find($itemId);
-        if (! $item) {
-            return;
-        }
-
-        $item->update(['date' => $date ?: null]);
-        unset($this->agendaItems, $this->myDayItems, $this->myDayBacklogItems);
-    }
-
-    private const AGENDABLE_TYPE_LABELS = [
-        \Platform\Planner\Models\PlannerTask::class => 'Aufgabe',
-        \Platform\Planner\Models\PlannerProject::class => 'Projekt',
-        \Platform\Canvas\Models\Canvas::class => 'Canvas',
-        \Platform\Helpdesk\Models\HelpdeskBoard::class => 'Board',
-        \Platform\Helpdesk\Models\HelpdeskTicket::class => 'Ticket',
-        \Platform\Okr\Models\Objective::class => 'Objective',
-        \Platform\Okr\Models\KeyResult::class => 'Key Result',
-        \Platform\Brands\Models\BrandsBrand::class => 'Marke',
-    ];
-
-    protected function formatAgendaItem(TerminalAgendaItem $item, bool $showAgenda = false): array
-    {
-        $isLinked = ! empty($item->agendable_type);
-
-        $data = [
-            'id' => $item->id,
-            'agenda_id' => $item->agenda_id,
-            'agenda_slot_id' => $item->agenda_slot_id,
-            'title' => $item->title,
-            'notes' => $item->notes,
-            'date' => $item->date?->toDateString(),
-            'date_label' => $item->date?->translatedFormat('D, d. M') ?? null,
-            'time_start' => $item->time_start ? substr($item->time_start, 0, 5) : null,
-            'time_end' => $item->time_end ? substr($item->time_end, 0, 5) : null,
-            'is_done' => $item->is_done,
-            'sort_order' => $item->sort_order,
-            'color' => $item->color,
-            'is_linked' => $isLinked,
-            'agendable_type_label' => $isLinked ? (self::AGENDABLE_TYPE_LABELS[$item->agendable_type] ?? 'Verknüpft') : null,
-            'linked_icon' => null,
-            'linked_status' => null,
-            'linked_status_color' => null,
-            'linked_description' => null,
-            'linked_url' => null,
-            'linked_meta' => [],
-        ];
-
-        // Enrich with AgendaRenderable data for linked entities
-        if ($isLinked && class_exists($item->agendable_type)) {
-            try {
-                $entity = $item->agendable_type::find($item->agendable_id);
-                if ($entity instanceof \Platform\Core\Contracts\AgendaRenderable) {
-                    $rendered = $entity->toAgendaItem();
-                    $data['linked_icon'] = $rendered['icon'] ?? null;
-                    $data['linked_status'] = $rendered['status'] ?? null;
-                    $data['linked_status_color'] = $rendered['status_color'] ?? null;
-                    $data['linked_description'] = $rendered['description'] ?? null;
-                    $data['linked_url'] = $rendered['url'] ?? null;
-                    $data['linked_meta'] = $rendered['meta'] ?? [];
-                }
-            } catch (\Throwable) {
-                // Entity may have been deleted or module unloaded
-            }
-        }
-
-        if ($showAgenda && $item->relationLoaded('agenda') && $item->agenda) {
-            $data['agenda_name'] = $item->agenda->name;
-            $data['agenda_icon'] = $item->agenda->icon ?? '📋';
-        }
-
-        return $data;
-    }
-
-    // ── Agenda Context Attach ──────────────────────────────────
-
-    private const CONTEXT_AGENDABLE_TYPES = [
-        \Platform\Planner\Models\PlannerTask::class => true,
-        \Platform\Planner\Models\PlannerProject::class => true,
-        \Platform\Canvas\Models\Canvas::class => true,
-        \Platform\Helpdesk\Models\HelpdeskBoard::class => true,
-        \Platform\Helpdesk\Models\HelpdeskTicket::class => true,
-        \Platform\Okr\Models\Objective::class => true,
-        \Platform\Okr\Models\KeyResult::class => true,
-        \Platform\Brands\Models\BrandsBrand::class => true,
-    ];
-
-    public function canAttachContextToAgenda(): bool
-    {
-        return $this->activeAgendaId
-            && $this->contextType
-            && $this->contextId
-            && isset(self::CONTEXT_AGENDABLE_TYPES[$this->contextType]);
-    }
-
-    public function isContextAttachedToAgenda(): bool
-    {
-        if (! $this->activeAgendaId || ! $this->contextType || ! $this->contextId) {
-            return false;
-        }
-
-        return TerminalAgendaItem::where('agenda_id', $this->activeAgendaId)
-            ->where('agendable_type', $this->contextType)
-            ->where('agendable_id', $this->contextId)
-            ->exists();
-    }
-
-    public function attachContextToAgenda(): void
-    {
-        if (! $this->canAttachContextToAgenda()) {
-            return;
-        }
-
-        // Already attached?
-        $existing = TerminalAgendaItem::where('agenda_id', $this->activeAgendaId)
-            ->where('agendable_type', $this->contextType)
-            ->where('agendable_id', $this->contextId)
-            ->first();
-
-        if ($existing) {
-            return;
-        }
-
-        $entity = $this->contextType::find($this->contextId);
-        if (! $entity) {
-            return;
-        }
-
-        $title = null;
-        $color = null;
-
-        if ($entity instanceof \Platform\Core\Contracts\AgendaRenderable) {
-            $rendered = $entity->toAgendaItem();
-            $title = $rendered['title'] ?? null;
-            $color = $rendered['color'] ?? null;
-        }
-
-        if (! $title) {
-            $title = $entity->title ?? $entity->name ?? class_basename($this->contextType) . ' #' . $this->contextId;
-        }
-
-        TerminalAgendaItem::create([
-            'agenda_id' => $this->activeAgendaId,
-            'agendable_type' => $this->contextType,
-            'agendable_id' => $this->contextId,
-            'title' => $title,
-            'color' => $color,
-            'created_by_user_id' => auth()->id(),
-        ]);
-
-        TerminalAgenda::find($this->activeAgendaId)?->refreshItemCount();
-        unset($this->agendaItems, $this->agendas, $this->agendaBacklogItems, $this->agendaSlots);
-    }
-
-    // ── Agenda Kanban Slots ────────────────────────────────────
-
-    #[Computed]
-    public function agendaSlots(): array
-    {
-        if (! $this->activeAgendaId) {
-            return [];
-        }
-
-        return TerminalAgendaSlot::where('agenda_id', $this->activeAgendaId)
-            ->orderBy('order')
-            ->get()
-            ->map(fn ($slot) => [
-                'id' => $slot->id,
-                'name' => $slot->name,
-                'order' => $slot->order,
-                'color' => $slot->color,
-                'items' => $slot->items()
-                    ->where('is_done', false)
-                    ->ordered()
-                    ->get()
-                    ->map(fn ($item) => $this->formatAgendaItem($item))
-                    ->toArray(),
-            ])
-            ->toArray();
-    }
-
-    #[Computed]
-    public function agendaBacklogItems(): array
-    {
-        if (! $this->activeAgendaId) {
-            return [];
-        }
-
-        return TerminalAgendaItem::where('agenda_id', $this->activeAgendaId)
-            ->whereNull('agenda_slot_id')
-            ->where('is_done', false)
-            ->ordered()
-            ->get()
-            ->map(fn ($item) => $this->formatAgendaItem($item))
-            ->toArray();
-    }
-
-    #[Computed]
-    public function agendaDoneItems(): array
-    {
-        if (! $this->activeAgendaId) {
-            return [];
-        }
-
-        return TerminalAgendaItem::where('agenda_id', $this->activeAgendaId)
-            ->where('is_done', true)
-            ->orderByDesc('updated_at')
-            ->limit(20)
-            ->get()
-            ->map(fn ($item) => $this->formatAgendaItem($item))
-            ->toArray();
-    }
-
-    public function createAgendaSlot(int $agendaId, string $name): void
-    {
-        $agenda = TerminalAgenda::find($agendaId);
-        if (! $agenda || empty(trim($name))) {
-            return;
-        }
-
-        $maxOrder = TerminalAgendaSlot::where('agenda_id', $agendaId)->max('order') ?? 0;
-
-        TerminalAgendaSlot::create([
-            'agenda_id' => $agendaId,
-            'name' => trim($name),
-            'order' => $maxOrder + 1,
-        ]);
-
-        unset($this->agendaSlots);
-    }
-
-    public function deleteAgendaSlot(int $slotId): void
-    {
-        $slot = TerminalAgendaSlot::find($slotId);
-        if (! $slot) {
-            return;
-        }
-
-        $slot->items()->update(['agenda_slot_id' => null]);
-        $slot->delete();
-
-        unset($this->agendaSlots, $this->agendaBacklogItems);
-    }
-
-    public function renameAgendaSlot(int $slotId, string $name): void
-    {
-        $slot = TerminalAgendaSlot::find($slotId);
-        if (! $slot || empty(trim($name))) {
-            return;
-        }
-
-        $slot->update(['name' => trim($name)]);
-        unset($this->agendaSlots);
-    }
-
-    public function updateAgendaItemSlotOrder(array $groups): void
-    {
-        foreach ($groups as $group) {
-            $rawSlotId = $group['value'];
-            $items = $group['items'] ?? [];
-
-            // Livewire Sortable sends 'null' as string when :sortable-id="null"
-            $isDone = $rawSlotId === 'done';
-            $slotId = ($rawSlotId === 'null' || $rawSlotId === null || $rawSlotId === 'backlog' || $rawSlotId === 'done' || (int) $rawSlotId === 0)
-                ? null
-                : (int) $rawSlotId;
-
-            foreach ($items as $item) {
-                TerminalAgendaItem::where('id', $item['value'])
-                    ->update([
-                        'agenda_slot_id' => $slotId,
-                        'is_done' => $isDone,
-                        'sort_order' => $item['order'],
-                    ]);
-            }
-        }
-
-        // Refresh item count on agenda
-        if ($this->activeAgendaId) {
-            TerminalAgenda::find($this->activeAgendaId)?->refreshItemCount();
-        }
-
-        unset($this->agendaSlots, $this->agendaBacklogItems, $this->agendaDoneItems, $this->agendaItems, $this->agendas);
-    }
-
-    public function updateAgendaSlotOrder(array $slots): void
-    {
-        foreach ($slots as $entry) {
-            // Skip virtual columns (backlog/done are not real slots)
-            if (in_array($entry['value'], ['backlog', 'done'], true) || ! is_numeric($entry['value'])) {
-                continue;
-            }
-            TerminalAgendaSlot::where('id', $entry['value'])
-                ->update(['order' => $entry['order']]);
-        }
-
-        unset($this->agendaSlots);
     }
 
     // ── Render ─────────────────────────────────────────────────
