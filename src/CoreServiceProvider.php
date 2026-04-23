@@ -777,7 +777,9 @@ class CoreServiceProvider extends ServiceProvider
             }
 
             // core.dashboard aus core + dashboard.php
-            $aliasPath = str_replace(['\\', '/'], '.', Str::kebab(str_replace('.php', '', $relativePath)));
+            // kebab-case pro Segment, damit Terminal/Activity → terminal.activity (nicht terminal.-activity)
+            $segments = explode(DIRECTORY_SEPARATOR, str_replace('.php', '', $relativePath));
+            $aliasPath = implode('.', array_map(fn ($s) => Str::kebab($s), $segments));
             $alias = $prefix . '.' . $aliasPath;
 
             // Debug: Ausgabe der registrierten Komponente (nur bei DEBUG-Level)
