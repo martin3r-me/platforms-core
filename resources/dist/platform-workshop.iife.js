@@ -71,6 +71,8 @@ var PlatformWorkshop=(()=>{var Br=Object.create;var Ve=Object.defineProperty;var
   border-radius: 4px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .workshop-canvas-background::after {
