@@ -366,13 +366,11 @@
 }
 
 /* ─── Fullscreen ──────────────────────────────────────── */
-.workshop-fullscreen {
+:fullscreen {
   height: 100vh !important;
+  width: 100vw !important;
   background: #eef0f4;
-}
-
-.workshop-fullscreen:fullscreen {
-  background: #eef0f4;
+  overflow: hidden;
 }
 
 /* ─── Touch ────────────────────────────────────────────── */
