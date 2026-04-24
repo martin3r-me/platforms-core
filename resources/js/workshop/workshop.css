@@ -16,6 +16,26 @@
   background: white;
   border-radius: 4px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  cursor: default;
+}
+
+.workshop-canvas-background::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: se-resize;
+  border-right: 3px solid #d1d5db;
+  border-bottom: 3px solid #d1d5db;
+  border-radius: 0 0 4px 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.workshop-canvas-background:hover::after {
+  opacity: 1;
 }
 
 .workshop-grid-block {
@@ -329,28 +349,39 @@
   z-index: 1000 !important;
 }
 
+/* Text: entire element is the drag handle, contains the input inside */
 .workshop-text .text-drag-handle {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  padding: 2px;
-  opacity: 0;
-  transition: opacity 0.15s;
+  flex: 1;
+  display: flex;
+  align-items: center;
   cursor: grab;
-  background: white;
+  padding: 0.25rem 0.375rem;
   border-radius: 4px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
-  z-index: 2;
+  transition: background 0.15s;
+  position: relative;
 }
 
 .workshop-text:hover .text-drag-handle {
-  opacity: 1;
+  background: rgba(0,0,0,0.02);
+}
+
+/* Delete floats top-right outside the element */
+.workshop-text .note-delete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: white;
+  border-radius: 9999px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 .workshop-text .text-body {
   flex: 1;
   display: flex;
   align-items: center;
+  min-width: 0;
 }
 
 .workshop-text .text-body input {
@@ -432,11 +463,8 @@
 .workshop-shape {
   position: absolute;
   cursor: default;
-  display: flex;
-  flex-direction: column;
   z-index: 10;
   touch-action: none;
-  transition: box-shadow 0.15s;
 }
 
 .workshop-shape:hover {
@@ -448,21 +476,46 @@
   z-index: 1000 !important;
 }
 
+/* Inner visual — takes the color + clip/radius, fills the parent */
+.workshop-shape .shape-visual {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* Shape variant clips/radius on the visual layer only */
+.workshop-shape-rect .shape-visual  { border-radius: 0.5rem; }
+.workshop-shape-circle .shape-visual { border-radius: 50%; }
+.workshop-shape-diamond .shape-visual { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+
+/* Color on visual */
+.workshop-shape-color-yellow .shape-visual { background: #fbbf24; }
+.workshop-shape-color-blue   .shape-visual { background: #60a5fa; }
+.workshop-shape-color-green  .shape-visual { background: #4ade80; }
+.workshop-shape-color-pink   .shape-visual { background: #f472b6; }
+.workshop-shape-color-purple .shape-visual { background: #a78bfa; }
+.workshop-shape-color-orange .shape-visual { background: #fb923c; }
+.workshop-shape-color-teal   .shape-visual { background: #2dd4bf; }
+.workshop-shape-color-red    .shape-visual { background: #f87171; }
+
+/* Controls toolbar — floats above the shape, always accessible */
 .workshop-shape .shape-drag-handle {
   position: absolute;
-  top: -6px;
-  right: -6px;
-  padding: 3px 4px;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 6px;
   opacity: 0;
   transition: opacity 0.15s;
   cursor: grab;
   background: white;
   border-radius: 6px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-  z-index: 2;
+  z-index: 3;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
+  white-space: nowrap;
 }
 
 .workshop-shape:hover .shape-drag-handle {
@@ -473,8 +526,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1rem;
-  height: 1rem;
+  width: 1.25rem;
+  height: 1.25rem;
   border-radius: 4px;
   border: none;
   background: transparent;
@@ -488,12 +541,15 @@
   color: #1a1a2e;
 }
 
+/* Text label centered over the shape */
 .workshop-shape .shape-body {
-  flex: 1;
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .workshop-shape .shape-body input {
@@ -504,37 +560,11 @@
   border: none;
   outline: none;
   text-align: center;
-  width: 80%;
+  width: 70%;
   padding: 0;
   cursor: text;
+  pointer-events: auto;
 }
-
-.workshop-shape .shape-body input::placeholder {
-  color: rgba(0,0,0,0.2);
-}
-
-/* Shape variants */
-.workshop-shape-rect {
-  border-radius: 0.5rem;
-}
-
-.workshop-shape-circle {
-  border-radius: 50%;
-}
-
-.workshop-shape-diamond {
-  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-}
-
-/* Shape Color Variants */
-.workshop-shape-color-yellow { background: #fbbf24; }
-.workshop-shape-color-blue   { background: #60a5fa; }
-.workshop-shape-color-green  { background: #4ade80; }
-.workshop-shape-color-pink   { background: #f472b6; }
-.workshop-shape-color-purple { background: #a78bfa; }
-.workshop-shape-color-orange { background: #fb923c; }
-.workshop-shape-color-teal   { background: #2dd4bf; }
-.workshop-shape-color-red    { background: #f87171; }
 
 /* ─── Element Toolbar ─────────────────────────────────── */
 .workshop-toolbar {

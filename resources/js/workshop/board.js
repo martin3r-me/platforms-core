@@ -73,6 +73,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       interact('.workshop-section').unset();
       interact('.workshop-shape').unset();
       interact('.workshop-grid-block').unset();
+      interact('.workshop-canvas-background').unset();
     },
 
     _on(el, ev, fn, opts) {
@@ -150,12 +151,14 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       el.dataset.y = y;
       el.style.cssText = `width:${w}px;height:${h}px;transform:translate(${x}px,${y}px);`;
 
+      // The entire element is the drag handle (class drag-handle on wrapper)
+      // Delete button floats top-right on hover
       el.innerHTML = `
         <div class="drag-handle text-drag-handle">
+          <div class="text-body">
+            <input type="text" value="${this._esc(n.title || '')}" placeholder="Text eingeben..." style="font-size:${fontSize}px;" />
+          </div>
           <button class="note-delete" data-action="delete" title="Loeschen">${DELETE_SVG}</button>
-        </div>
-        <div class="text-body">
-          <input type="text" value="${this._esc(n.title || '')}" placeholder="Text eingeben..." style="font-size:${fontSize}px;" />
         </div>
         <div class="resize-handle"></div>
       `;
@@ -217,12 +220,12 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       el.dataset.y = y;
       el.style.cssText = `width:${w}px;height:${h}px;transform:translate(${x}px,${y}px);`;
 
+      // Shape visual is the inner .shape-visual (clipped), controls float outside
       el.innerHTML = `
+        <div class="shape-visual"></div>
         <div class="drag-handle shape-drag-handle">
           <div style="display:flex;align-items:center;gap:4px;">
             ${this._colorDotHTML(color)}
-          </div>
-          <div style="display:flex;align-items:center;gap:2px;">
             <button class="shape-toggle" data-action="toggle-shape" title="Form wechseln">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:10px;height:10px;"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.598a.75.75 0 00-.75.75v3.634a.75.75 0 001.5 0v-2.033l.312.312a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.06-7.846a.75.75 0 00-1.5 0v2.034l-.312-.312A7 7 0 002.848 8.438a.75.75 0 001.449.39 5.5 5.5 0 019.201-2.466l.312.311H11.38a.75.75 0 000 1.5h3.634a.75.75 0 00.75-.75V3.578z" clip-rule="evenodd"/></svg>
             </button>
@@ -535,9 +538,10 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       const draggableSelector = '.workshop-note, .workshop-text, .workshop-section, .workshop-shape';
       const resizableSelector = draggableSelector;
 
-      // Draggable
+      // Draggable — all element types use .drag-handle
       interact(draggableSelector).draggable({
         allowFrom: '.drag-handle',
+        ignoreFrom: 'input, textarea, .note-delete, .shape-toggle, .color-dot, .color-picker-dd',
         inertia: false,
         listeners: {
           start(ev) { ev.target.classList.add('dragging'); },
@@ -559,7 +563,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
         },
       });
 
-      // Resizable
+      // Resizable — all element types
       interact(resizableSelector).resizable({
         edges: { right: '.resize-handle', bottom: '.resize-handle' },
         modifiers: [interact.modifiers.restrictSize({ min: { width: 60, height: 30 } })],
@@ -590,6 +594,19 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
             const id = parseInt(t.dataset.noteId);
             if (id < 0) return;
             self._savePos(id, t);
+          },
+        },
+      });
+
+      // Canvas grid background — resizable
+      interact('.workshop-canvas-background').resizable({
+        edges: { right: true, bottom: true },
+        modifiers: [interact.modifiers.restrictSize({ min: { width: 400, height: 300 } })],
+        listeners: {
+          move(ev) {
+            const t = ev.target;
+            t.style.width = ev.rect.width / self.scale + 'px';
+            t.style.minHeight = ev.rect.height / self.scale + 'px';
           },
         },
       });
@@ -696,6 +713,9 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     _changeShapeColor(el, noteId, color) {
       el.className = el.className
         .replace(/workshop-shape-color-\w+/, `workshop-shape-color-${color}`);
+      // Update the visual
+      const visual = el.querySelector('.shape-visual');
+      if (visual) visual.className = `shape-visual`;
       el.querySelector('.color-dot')?.setAttribute('style', `background:${COLOR_HEX[color]}`);
       el.querySelector('.color-picker-dd').style.display = 'none';
       el.querySelectorAll('.color-picker-dd .color-dot').forEach(d => {
