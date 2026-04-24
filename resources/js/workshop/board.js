@@ -34,13 +34,25 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
 
     colors: Object.keys(COLOR_HEX),
 
+    isFullscreen: false,
+
     // ─── Lifecycle ─────────────────────────────────────────
     init() {
+      // Guard against re-initialization (Livewire morphing)
+      if (this._initialized) return;
+      this._initialized = true;
+
       this.$nextTick(() => {
         this._renderNotes(notes);
         this._initPanZoom();
         this._initInteract();
         this._fitGrid();
+
+        // Sync fullscreen state when user presses Escape
+        this._on(document, 'fullscreenchange', () => {
+          this.isFullscreen = !!document.fullscreenElement;
+          setTimeout(() => this._fitGrid(), 100);
+        }, false);
       });
     },
 
@@ -248,6 +260,22 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     zoomOut() { this._zoomToCenter(this.scale / 1.3); },
     resetZoom() { this.scale = 1; this.panX = 0; this.panY = 0; this._applyTransform(); },
     fitToScreen() { this._fitGrid(); },
+
+    toggleFullscreen() {
+      const container = this.$el;
+      if (!document.fullscreenElement) {
+        container.requestFullscreen().then(() => {
+          this.isFullscreen = true;
+          // Re-fit after fullscreen transition
+          setTimeout(() => this._fitGrid(), 100);
+        }).catch(() => {});
+      } else {
+        document.exitFullscreen().then(() => {
+          this.isFullscreen = false;
+          setTimeout(() => this._fitGrid(), 100);
+        }).catch(() => {});
+      }
+    },
 
     _zoomToCenter(s) {
       const p = this.$refs.board?.parentElement;

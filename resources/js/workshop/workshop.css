@@ -365,6 +365,16 @@
   padding: 0.125rem 0;
 }
 
+/* ─── Fullscreen ──────────────────────────────────────── */
+.workshop-fullscreen {
+  height: 100vh !important;
+  background: #eef0f4;
+}
+
+.workshop-fullscreen:fullscreen {
+  background: #eef0f4;
+}
+
 /* ─── Touch ────────────────────────────────────────────── */
 @media (pointer: coarse) {
   .workshop-note .drag-handle { min-height: 2.5rem; }
