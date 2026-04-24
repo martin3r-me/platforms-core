@@ -75,7 +75,6 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       interact('.workshop-text').unset();
       interact('.workshop-section').unset();
       interact('.workshop-shape').unset();
-      interact('.workshop-grid-block').unset();
       interact('.workshop-canvas-background').unset();
     },
 
@@ -616,25 +615,8 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
         },
       });
 
-      // Dropzones on grid blocks (only for sticky notes)
-      interact('.workshop-grid-block').dropzone({
-        accept: '.workshop-note',
-        overlap: 0.3,
-        ondragenter(ev) { ev.target.classList.add('adopt-highlight'); },
-        ondragleave(ev) { ev.target.classList.remove('adopt-highlight'); },
-        ondrop(ev) {
-          ev.target.classList.remove('adopt-highlight');
-          const noteId = parseInt(ev.relatedTarget.dataset.noteId);
-          const blockId = parseInt(ev.target.dataset.blockId);
-          if (noteId > 0 && blockId) {
-            const label = ev.target.querySelector('h4')?.textContent?.trim() || 'Block';
-            if (confirm(`Notiz in "${label}" uebernehmen?`)) {
-              ev.relatedTarget.remove();
-              self.$wire.call('adoptNote', noteId, blockId);
-            }
-          }
-        },
-      });
+      // Dropzones on grid blocks — disabled for now
+      // interact('.workshop-grid-block').dropzone({ ... });
     },
 
     _savePos(noteId, el) {
