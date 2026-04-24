@@ -648,33 +648,14 @@
   padding: 0.125rem 0;
 }
 
-/* ─── Fullscreen ──────────────────────────────────────── */
-:fullscreen {
+/* ─── Fullscreen (CSS class, not Fullscreen API) ─────── */
+.workshop-fullscreen {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   height: 100vh !important;
   height: 100dvh !important;
-  max-height: 100vh !important;
-  max-height: 100dvh !important;
-  width: 100vw !important;
-  background: #eef0f4 !important;
-  overflow: hidden !important;
-  z-index: 99999 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-  border-radius: 0 !important;
-}
-
-/* Webkit/Safari fullscreen */
-:-webkit-full-screen {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  height: 100vh !important;
-  height: 100dvh !important;
-  max-height: 100vh !important;
+  max-height: none !important;
   width: 100vw !important;
   background: #eef0f4 !important;
   overflow: hidden !important;

@@ -57,10 +57,13 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
         this._initInteract();
         this._fitGrid();
 
-        // Sync fullscreen state when user presses Escape
-        this._on(document, 'fullscreenchange', () => {
-          this.isFullscreen = !!document.fullscreenElement;
-          this._fitAfterDelay();
+        // Close fullscreen on Escape key
+        this._on(document, 'keydown', (e) => {
+          if (e.key === 'Escape' && this.isFullscreen) {
+            e.preventDefault();
+            this.isFullscreen = false;
+            this._fitAfterDelay();
+          }
         }, false);
       });
     },
@@ -491,18 +494,8 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     fitToScreen() { this._fitGrid(); },
 
     toggleFullscreen() {
-      const container = this.$el;
-      if (!document.fullscreenElement) {
-        container.requestFullscreen().then(() => {
-          this.isFullscreen = true;
-          this._fitAfterDelay();
-        }).catch(() => {});
-      } else {
-        document.exitFullscreen().then(() => {
-          this.isFullscreen = false;
-          this._fitAfterDelay();
-        }).catch(() => {});
-      }
+      this.isFullscreen = !this.isFullscreen;
+      this._fitAfterDelay();
     },
 
     _fitAfterDelay() {
