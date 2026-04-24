@@ -14,6 +14,7 @@ var PlatformWorkshop=(()=>{var Br=Object.create;var Ve=Object.defineProperty;var
         <div class="resize-handle"></div>
       `,this._bindNoteEvents(E),this._bindTextSave(E),E},_createTextEl(d){let f=d.x??0,v=d.y??0,m=d.width??300,w=d.height??40,D=d.metadata?.fontSize||Math.max(14,Math.round(m/12)),E=document.createElement("div");return E.className="workshop-text",E.dataset.noteId=d.id,E.dataset.noteType="text",E.dataset.x=f,E.dataset.y=v,E.style.cssText=`width:${m}px;height:${w}px;transform:translate(${f}px,${v}px);`,E.innerHTML=`
         <div class="drag-handle text-drag-handle">
+          <div class="drag-dots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
           <div class="text-body">
             <input type="text" value="${this._esc(d.title||"")}" placeholder="Text eingeben..." style="font-size:${D}px;" />
           </div>
@@ -23,6 +24,7 @@ var PlatformWorkshop=(()=>{var Br=Object.create;var Ve=Object.defineProperty;var
       `,this._bindDeleteEvent(E),this._bindTextInputSave(E),E},_createSectionEl(d){let f=d.color||"yellow",v=d.x??0,m=d.y??0,w=d.width??500,D=d.height??400,E=document.createElement("div");return E.className=`workshop-section workshop-section-${f}`,E.dataset.noteId=d.id,E.dataset.noteType="section",E.dataset.x=v,E.dataset.y=m,E.style.cssText=`width:${w}px;height:${D}px;transform:translate(${v}px,${m}px);border-color:${Z[f]||Z.yellow};`,E.innerHTML=`
         <div class="drag-handle section-drag-handle">
           <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
+            <div class="drag-dots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
             ${this._colorDotHTML(f)}
             <input type="text" class="section-title" value="${this._esc(d.title||"")}" placeholder="Section..." />
           </div>
@@ -33,6 +35,7 @@ var PlatformWorkshop=(()=>{var Br=Object.create;var Ve=Object.defineProperty;var
         <div class="shape-visual"></div>
         <div class="drag-handle shape-drag-handle">
           <div style="display:flex;align-items:center;gap:4px;">
+            <div class="drag-dots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
             ${this._colorDotHTML(f)}
             <button class="shape-toggle" data-action="toggle-shape" title="Form wechseln">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:10px;height:10px;"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.598a.75.75 0 00-.75.75v3.634a.75.75 0 001.5 0v-2.033l.312.312a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.06-7.846a.75.75 0 00-1.5 0v2.034l-.312-.312A7 7 0 002.848 8.438a.75.75 0 001.449.39 5.5 5.5 0 019.201-2.466l.312.311H11.38a.75.75 0 000 1.5h3.634a.75.75 0 00.75-.75V3.578z" clip-rule="evenodd"/></svg>
@@ -705,11 +708,35 @@ var PlatformWorkshop=(()=>{var Br=Object.create;var Ve=Object.defineProperty;var
   top: 0 !important;
   left: 0 !important;
   height: 100vh !important;
+  height: 100dvh !important;
+  max-height: 100vh !important;
+  max-height: 100dvh !important;
+  width: 100vw !important;
+  background: #eef0f4 !important;
+  overflow: hidden !important;
+  z-index: 99999 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+/* Webkit/Safari fullscreen */
+:-webkit-full-screen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  height: 100vh !important;
+  height: 100dvh !important;
   max-height: 100vh !important;
   width: 100vw !important;
   background: #eef0f4 !important;
   overflow: hidden !important;
   z-index: 99999 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
 }
 
 /* \u2500\u2500\u2500 Touch \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */

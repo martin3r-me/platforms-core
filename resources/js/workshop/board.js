@@ -155,6 +155,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       // Delete button floats top-right on hover
       el.innerHTML = `
         <div class="drag-handle text-drag-handle">
+          <div class="drag-dots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
           <div class="text-body">
             <input type="text" value="${this._esc(n.title || '')}" placeholder="Text eingeben..." style="font-size:${fontSize}px;" />
           </div>
@@ -188,6 +189,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       el.innerHTML = `
         <div class="drag-handle section-drag-handle">
           <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
+            <div class="drag-dots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
             ${this._colorDotHTML(color)}
             <input type="text" class="section-title" value="${this._esc(n.title || '')}" placeholder="Section..." />
           </div>
@@ -225,6 +227,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
         <div class="shape-visual"></div>
         <div class="drag-handle shape-drag-handle">
           <div style="display:flex;align-items:center;gap:4px;">
+            <div class="drag-dots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
             ${this._colorDotHTML(color)}
             <button class="shape-toggle" data-action="toggle-shape" title="Form wechseln">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:10px;height:10px;"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.598a.75.75 0 00-.75.75v3.634a.75.75 0 001.5 0v-2.033l.312.312a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.06-7.846a.75.75 0 00-1.5 0v2.034l-.312-.312A7 7 0 002.848 8.438a.75.75 0 001.449.39 5.5 5.5 0 019.201-2.466l.312.311H11.38a.75.75 0 000 1.5h3.634a.75.75 0 00.75-.75V3.578z" clip-rule="evenodd"/></svg>
