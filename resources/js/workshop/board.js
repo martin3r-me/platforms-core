@@ -9,6 +9,15 @@ const COLOR_BG = {
   purple: '#f3e8ff', orange: '#ffedd5', teal: '#ccfbf1', red: '#fee2e2',
 };
 
+const TYPE_DEFAULTS = {
+  note:    { width: 200, height: 150, color: 'yellow' },
+  text:    { width: 300, height: 40,  color: 'yellow' },
+  section: { width: 500, height: 400, color: 'yellow' },
+  shape:   { width: 120, height: 120, color: 'blue' },
+};
+
+const DELETE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px;"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>';
+
 /**
  * workshopBoard — JS-owned infinite canvas.
  *
@@ -60,6 +69,9 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       this._listeners.forEach(([el, ev, fn, opts]) => el.removeEventListener(ev, fn, opts));
       this._listeners = [];
       interact('.workshop-note').unset();
+      interact('.workshop-text').unset();
+      interact('.workshop-section').unset();
+      interact('.workshop-shape').unset();
       interact('.workshop-grid-block').unset();
     },
 
@@ -74,7 +86,19 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       noteList.forEach(n => board.appendChild(this._createNoteEl(n)));
     },
 
+    // ─── Element Factory (dispatch by type) ────────────────
     _createNoteEl(n) {
+      const type = n.type || 'note';
+      switch (type) {
+        case 'text':    return this._createTextEl(n);
+        case 'section': return this._createSectionEl(n);
+        case 'shape':   return this._createShapeEl(n);
+        default:        return this._createStickyEl(n);
+      }
+    },
+
+    // ─── Sticky Note (default) ─────────────────────────────
+    _createStickyEl(n) {
       const color = n.color || 'yellow';
       const x = n.x ?? 0;
       const y = n.y ?? 0;
@@ -84,6 +108,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       const el = document.createElement('div');
       el.className = `workshop-note workshop-note-${color}`;
       el.dataset.noteId = n.id;
+      el.dataset.noteType = 'note';
       el.dataset.x = x;
       el.dataset.y = y;
       el.style.cssText = `width:${w}px;height:${h}px;transform:translate(${x}px,${y}px);`;
@@ -92,16 +117,9 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
         <div class="drag-handle">
           <div style="display:flex;align-items:center;gap:6px;">
             <div class="drag-dots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-            <div class="color-dot-wrap" style="position:relative;">
-              <div class="color-dot" style="background:${COLOR_HEX[color] || COLOR_HEX.yellow};" data-action="color"></div>
-              <div class="color-picker-dd" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;padding:4px;background:white;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);border:1px solid #e5e7eb;z-index:50;gap:3px;flex-wrap:nowrap;">
-                ${this.colors.map(c => `<div class="color-dot${c === color ? ' active' : ''}" style="background:${COLOR_HEX[c]};" data-pick-color="${c}"></div>`).join('')}
-              </div>
-            </div>
+            ${this._colorDotHTML(color)}
           </div>
-          <button class="note-delete" data-action="delete" title="Loeschen">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px;"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
-          </button>
+          <button class="note-delete" data-action="delete" title="Loeschen">${DELETE_SVG}</button>
         </div>
         <div class="note-body">
           <input type="text" value="${this._esc(n.title || '')}" placeholder="Titel..." />
@@ -110,7 +128,131 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
         <div class="resize-handle"></div>
       `;
 
-      // Event delegation for this note
+      this._bindNoteEvents(el);
+      this._bindTextSave(el);
+
+      return el;
+    },
+
+    // ─── Text Element ──────────────────────────────────────
+    _createTextEl(n) {
+      const x = n.x ?? 0;
+      const y = n.y ?? 0;
+      const w = n.width ?? 300;
+      const h = n.height ?? 40;
+      const fontSize = n.metadata?.fontSize || Math.max(14, Math.round(w / 12));
+
+      const el = document.createElement('div');
+      el.className = 'workshop-text';
+      el.dataset.noteId = n.id;
+      el.dataset.noteType = 'text';
+      el.dataset.x = x;
+      el.dataset.y = y;
+      el.style.cssText = `width:${w}px;height:${h}px;transform:translate(${x}px,${y}px);`;
+
+      el.innerHTML = `
+        <div class="drag-handle text-drag-handle">
+          <button class="note-delete" data-action="delete" title="Loeschen">${DELETE_SVG}</button>
+        </div>
+        <div class="text-body">
+          <input type="text" value="${this._esc(n.title || '')}" placeholder="Text eingeben..." style="font-size:${fontSize}px;" />
+        </div>
+        <div class="resize-handle"></div>
+      `;
+
+      this._bindDeleteEvent(el);
+      this._bindTextInputSave(el);
+
+      return el;
+    },
+
+    // ─── Section (Frame) ───────────────────────────────────
+    _createSectionEl(n) {
+      const color = n.color || 'yellow';
+      const x = n.x ?? 0;
+      const y = n.y ?? 0;
+      const w = n.width ?? 500;
+      const h = n.height ?? 400;
+
+      const el = document.createElement('div');
+      el.className = `workshop-section workshop-section-${color}`;
+      el.dataset.noteId = n.id;
+      el.dataset.noteType = 'section';
+      el.dataset.x = x;
+      el.dataset.y = y;
+      el.style.cssText = `width:${w}px;height:${h}px;transform:translate(${x}px,${y}px);border-color:${COLOR_HEX[color] || COLOR_HEX.yellow};`;
+
+      el.innerHTML = `
+        <div class="drag-handle section-drag-handle">
+          <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
+            ${this._colorDotHTML(color)}
+            <input type="text" class="section-title" value="${this._esc(n.title || '')}" placeholder="Section..." />
+          </div>
+          <button class="note-delete" data-action="delete" title="Loeschen">${DELETE_SVG}</button>
+        </div>
+        <div class="resize-handle"></div>
+      `;
+
+      this._bindNoteEvents(el);
+      this._bindSectionTextSave(el);
+
+      return el;
+    },
+
+    // ─── Shape ─────────────────────────────────────────────
+    _createShapeEl(n) {
+      const color = n.color || 'blue';
+      const shape = n.metadata?.shape || 'rect';
+      const x = n.x ?? 0;
+      const y = n.y ?? 0;
+      const w = n.width ?? 120;
+      const h = n.height ?? 120;
+
+      const el = document.createElement('div');
+      el.className = `workshop-shape workshop-shape-${shape} workshop-shape-color-${color}`;
+      el.dataset.noteId = n.id;
+      el.dataset.noteType = 'shape';
+      el.dataset.shape = shape;
+      el.dataset.x = x;
+      el.dataset.y = y;
+      el.style.cssText = `width:${w}px;height:${h}px;transform:translate(${x}px,${y}px);`;
+
+      el.innerHTML = `
+        <div class="drag-handle shape-drag-handle">
+          <div style="display:flex;align-items:center;gap:4px;">
+            ${this._colorDotHTML(color)}
+          </div>
+          <div style="display:flex;align-items:center;gap:2px;">
+            <button class="shape-toggle" data-action="toggle-shape" title="Form wechseln">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:10px;height:10px;"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.598a.75.75 0 00-.75.75v3.634a.75.75 0 001.5 0v-2.033l.312.312a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.06-7.846a.75.75 0 00-1.5 0v2.034l-.312-.312A7 7 0 002.848 8.438a.75.75 0 001.449.39 5.5 5.5 0 019.201-2.466l.312.311H11.38a.75.75 0 000 1.5h3.634a.75.75 0 00.75-.75V3.578z" clip-rule="evenodd"/></svg>
+            </button>
+            <button class="note-delete" data-action="delete" title="Loeschen">${DELETE_SVG}</button>
+          </div>
+        </div>
+        <div class="shape-body">
+          <input type="text" value="${this._esc(n.title || '')}" placeholder="..." />
+        </div>
+        <div class="resize-handle"></div>
+      `;
+
+      this._bindShapeEvents(el);
+      this._bindShapeTextSave(el);
+
+      return el;
+    },
+
+    // ─── Shared HTML helpers ───────────────────────────────
+    _colorDotHTML(color) {
+      return `<div class="color-dot-wrap" style="position:relative;">
+        <div class="color-dot" style="background:${COLOR_HEX[color] || COLOR_HEX.yellow};" data-action="color"></div>
+        <div class="color-picker-dd" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;padding:4px;background:white;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);border:1px solid #e5e7eb;z-index:50;gap:3px;flex-wrap:nowrap;">
+          ${this.colors.map(c => `<div class="color-dot${c === color ? ' active' : ''}" style="background:${COLOR_HEX[c]};" data-pick-color="${c}"></div>`).join('')}
+        </div>
+      </div>`;
+    },
+
+    // ─── Event Binding ─────────────────────────────────────
+    _bindNoteEvents(el) {
       el.addEventListener('click', (e) => {
         const action = e.target.closest('[data-action]')?.dataset.action;
         const pickColor = e.target.closest('[data-pick-color]')?.dataset.pickColor;
@@ -128,17 +270,58 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
         }
         if (action === 'delete') {
           e.stopPropagation();
-          if (confirm('Notiz loeschen?')) this._deleteNote(el, noteId);
+          if (confirm('Element loeschen?')) this._deleteNote(el, noteId);
           return;
         }
       });
+    },
 
-      // Text save on blur
+    _bindDeleteEvent(el) {
+      el.addEventListener('click', (e) => {
+        const action = e.target.closest('[data-action]')?.dataset.action;
+        const noteId = parseInt(el.dataset.noteId);
+        if (action === 'delete') {
+          e.stopPropagation();
+          if (confirm('Element loeschen?')) this._deleteNote(el, noteId);
+        }
+      });
+    },
+
+    _bindShapeEvents(el) {
+      el.addEventListener('click', (e) => {
+        const action = e.target.closest('[data-action]')?.dataset.action;
+        const pickColor = e.target.closest('[data-pick-color]')?.dataset.pickColor;
+        const noteId = parseInt(el.dataset.noteId);
+
+        if (pickColor) {
+          e.stopPropagation();
+          this._changeShapeColor(el, noteId, pickColor);
+          return;
+        }
+        if (action === 'color') {
+          e.stopPropagation();
+          this._toggleColorPicker(el);
+          return;
+        }
+        if (action === 'toggle-shape') {
+          e.stopPropagation();
+          this._toggleShape(el, noteId);
+          return;
+        }
+        if (action === 'delete') {
+          e.stopPropagation();
+          if (confirm('Element loeschen?')) this._deleteNote(el, noteId);
+          return;
+        }
+      });
+    },
+
+    _bindTextSave(el) {
       const input = el.querySelector('.note-body input');
       const textarea = el.querySelector('.note-body textarea');
       const saveText = () => {
         const noteId = parseInt(el.dataset.noteId);
-        if (noteId < 0) return; // temp note, not yet persisted
+        if (noteId < 0) return;
         clearTimeout(this._textTimers[noteId]);
         this._textTimers[noteId] = setTimeout(() => {
           this.$wire.call('updateNoteText', noteId, input.value, textarea.value);
@@ -147,8 +330,48 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       input.addEventListener('blur', saveText);
       textarea.addEventListener('blur', saveText);
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+    },
 
-      return el;
+    _bindTextInputSave(el) {
+      const input = el.querySelector('.text-body input');
+      const saveText = () => {
+        const noteId = parseInt(el.dataset.noteId);
+        if (noteId < 0) return;
+        clearTimeout(this._textTimers[noteId]);
+        this._textTimers[noteId] = setTimeout(() => {
+          this.$wire.call('updateNoteText', noteId, input.value, '');
+        }, 400);
+      };
+      input.addEventListener('blur', saveText);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+    },
+
+    _bindSectionTextSave(el) {
+      const input = el.querySelector('.section-title');
+      const saveText = () => {
+        const noteId = parseInt(el.dataset.noteId);
+        if (noteId < 0) return;
+        clearTimeout(this._textTimers[noteId]);
+        this._textTimers[noteId] = setTimeout(() => {
+          this.$wire.call('updateNoteText', noteId, input.value, '');
+        }, 400);
+      };
+      input.addEventListener('blur', saveText);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+    },
+
+    _bindShapeTextSave(el) {
+      const input = el.querySelector('.shape-body input');
+      const saveText = () => {
+        const noteId = parseInt(el.dataset.noteId);
+        if (noteId < 0) return;
+        clearTimeout(this._textTimers[noteId]);
+        this._textTimers[noteId] = setTimeout(() => {
+          this.$wire.call('updateNoteText', noteId, input.value, '');
+        }, 400);
+      };
+      input.addEventListener('blur', saveText);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
     },
 
     _esc(s) {
@@ -201,7 +424,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
 
       // Middle-click pan (skip if target is inside a note or control)
       this._on(parent, 'pointerdown', (e) => {
-        if (e.target.closest('.workshop-note, .workshop-fab, .workshop-zoom-controls')) return;
+        if (e.target.closest('.workshop-note, .workshop-text, .workshop-section, .workshop-shape, .workshop-toolbar, .workshop-zoom-controls')) return;
         // Middle button (1), or left button (0) when space is held
         if (e.button === 1 || (e.button === 0 && this._spaceDown)) {
           this._isPanning = true;
@@ -303,9 +526,11 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     // ─── interact.js ────────────────────────────────────────
     _initInteract() {
       const self = this;
+      const draggableSelector = '.workshop-note, .workshop-text, .workshop-section, .workshop-shape';
+      const resizableSelector = draggableSelector;
 
       // Draggable
-      interact('.workshop-note').draggable({
+      interact(draggableSelector).draggable({
         allowFrom: '.drag-handle',
         inertia: false,
         listeners: {
@@ -329,21 +554,30 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       });
 
       // Resizable
-      interact('.workshop-note').resizable({
+      interact(resizableSelector).resizable({
         edges: { right: '.resize-handle', bottom: '.resize-handle' },
-        modifiers: [interact.modifiers.restrictSize({ min: { width: 120, height: 80 } })],
+        modifiers: [interact.modifiers.restrictSize({ min: { width: 60, height: 30 } })],
         listeners: {
           move(ev) {
             const t = ev.target;
             let x = parseFloat(t.dataset.x) || 0;
             let y = parseFloat(t.dataset.y) || 0;
-            t.style.width = (ev.rect.width / self.scale) + 'px';
-            t.style.height = (ev.rect.height / self.scale) + 'px';
+            const newW = ev.rect.width / self.scale;
+            const newH = ev.rect.height / self.scale;
+            t.style.width = newW + 'px';
+            t.style.height = newH + 'px';
             x += ev.deltaRect.left / self.scale;
             y += ev.deltaRect.top / self.scale;
             t.style.transform = `translate(${x}px,${y}px)`;
             t.dataset.x = x;
             t.dataset.y = y;
+
+            // Text: scale font size proportionally
+            if (t.dataset.noteType === 'text') {
+              const fontSize = Math.max(14, Math.round(newW / 12));
+              const input = t.querySelector('.text-body input');
+              if (input) input.style.fontSize = fontSize + 'px';
+            }
           },
           end(ev) {
             const t = ev.target;
@@ -354,7 +588,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
         },
       });
 
-      // Dropzones on grid blocks
+      // Dropzones on grid blocks (only for sticky notes)
       interact('.workshop-grid-block').dropzone({
         accept: '.workshop-note',
         overlap: 0.3,
@@ -387,37 +621,47 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       }, 300);
     },
 
-    // ─── Note actions ───────────────────────────────────────
-    addNote() {
+    // ─── Element actions ─────────────────────────────────────
+    addElement(type = 'note') {
       const parent = this.$refs.board?.parentElement;
       if (!parent) return;
       const rect = parent.getBoundingClientRect();
+      const defaults = TYPE_DEFAULTS[type] || TYPE_DEFAULTS.note;
       const cx = (rect.width / 2 - this.panX) / this.scale;
       const cy = (rect.height / 2 - this.panY) / this.scale;
-      const x = Math.round(cx - 100);
-      const y = Math.round(cy - 75);
+      const x = Math.round(cx - defaults.width / 2);
+      const y = Math.round(cy - defaults.height / 2);
 
-      // Optimistic: add note to DOM immediately
+      // Optimistic: add to DOM immediately
       const tempId = this._nextTempId--;
-      const el = this._createNoteEl({ id: tempId, title: '', content: '', color: 'yellow', x, y, width: 200, height: 150 });
+      const metadata = type === 'shape' ? { shape: 'rect' } : null;
+      const el = this._createNoteEl({
+        id: tempId, type, title: '', content: '',
+        color: defaults.color, x, y,
+        width: defaults.width, height: defaults.height,
+        metadata,
+      });
       this.$refs.board.appendChild(el);
 
       // Persist and update ID
-      this.$wire.call('addWorkshopNote', { x, y }).then((result) => {
-        // After Livewire processes, we need the real ID
-        // Livewire will return the component state; we re-fetch notes
+      this.$wire.call('addWorkshopNote', { x, y }, type).then(() => {
         this.$wire.call('getWorkshopNotes').then((serverNotes) => {
           if (Array.isArray(serverNotes) && serverNotes.length > 0) {
-            // Find the note we just created (highest ID)
             const newest = serverNotes.reduce((a, b) => a.id > b.id ? a : b);
             el.dataset.noteId = newest.id;
           }
         });
       });
 
-      // Focus title
-      setTimeout(() => el.querySelector('.note-body input')?.focus(), 100);
+      // Focus title input
+      setTimeout(() => {
+        const input = el.querySelector('.note-body input, .text-body input, .section-title, .shape-body input');
+        input?.focus();
+      }, 100);
     },
+
+    // Keep legacy addNote for backwards compat
+    addNote() { this.addElement('note'); },
 
     _deleteNote(el, noteId) {
       el.remove();
@@ -425,15 +669,45 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     },
 
     _changeColor(el, noteId, color) {
-      // Update DOM immediately
-      el.className = `workshop-note workshop-note-${color}`;
+      const noteType = el.dataset.noteType || 'note';
+
+      // Update class-based color
+      if (noteType === 'note') {
+        el.className = el.className.replace(/workshop-note-\w+/, `workshop-note-${color}`);
+      } else if (noteType === 'section') {
+        el.className = el.className.replace(/workshop-section-\w+/, `workshop-section-${color}`);
+        el.style.borderColor = COLOR_HEX[color] || COLOR_HEX.yellow;
+      }
+
       el.querySelector('.drag-handle .color-dot')?.setAttribute('style', `background:${COLOR_HEX[color]}`);
       el.querySelector('.color-picker-dd').style.display = 'none';
-      // Update active state
       el.querySelectorAll('.color-picker-dd .color-dot').forEach(d => {
         d.classList.toggle('active', d.dataset.pickColor === color);
       });
       if (noteId > 0) this.$wire.call('updateNoteColor', noteId, color);
+    },
+
+    _changeShapeColor(el, noteId, color) {
+      el.className = el.className
+        .replace(/workshop-shape-color-\w+/, `workshop-shape-color-${color}`);
+      el.querySelector('.color-dot')?.setAttribute('style', `background:${COLOR_HEX[color]}`);
+      el.querySelector('.color-picker-dd').style.display = 'none';
+      el.querySelectorAll('.color-picker-dd .color-dot').forEach(d => {
+        d.classList.toggle('active', d.dataset.pickColor === color);
+      });
+      if (noteId > 0) this.$wire.call('updateNoteColor', noteId, color);
+    },
+
+    _toggleShape(el, noteId) {
+      const shapes = ['rect', 'circle', 'diamond'];
+      const current = el.dataset.shape || 'rect';
+      const next = shapes[(shapes.indexOf(current) + 1) % shapes.length];
+      el.dataset.shape = next;
+
+      // Update class
+      el.className = el.className.replace(/workshop-shape-(?:rect|circle|diamond)/, `workshop-shape-${next}`);
+
+      if (noteId > 0) this.$wire.call('updateNoteMetadata', noteId, { shape: next });
     },
 
     _toggleColorPicker(el) {
