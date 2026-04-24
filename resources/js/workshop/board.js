@@ -60,7 +60,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
         // Sync fullscreen state when user presses Escape
         this._on(document, 'fullscreenchange', () => {
           this.isFullscreen = !!document.fullscreenElement;
-          setTimeout(() => this._fitGrid(), 100);
+          this._fitAfterDelay();
         }, false);
       });
     },
@@ -489,15 +489,21 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       if (!document.fullscreenElement) {
         container.requestFullscreen().then(() => {
           this.isFullscreen = true;
-          // Re-fit after fullscreen transition
-          setTimeout(() => this._fitGrid(), 100);
+          this._fitAfterDelay();
         }).catch(() => {});
       } else {
         document.exitFullscreen().then(() => {
           this.isFullscreen = false;
-          setTimeout(() => this._fitGrid(), 100);
+          this._fitAfterDelay();
         }).catch(() => {});
       }
+    },
+
+    _fitAfterDelay() {
+      // Browser needs time to settle the fullscreen layout; retry multiple times
+      setTimeout(() => this._fitGrid(), 50);
+      setTimeout(() => this._fitGrid(), 200);
+      setTimeout(() => this._fitGrid(), 500);
     },
 
     _zoomToCenter(s) {

@@ -620,10 +620,15 @@
 
 /* ─── Fullscreen ──────────────────────────────────────── */
 :fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
   height: 100vh !important;
+  max-height: 100vh !important;
   width: 100vw !important;
-  background: #eef0f4;
-  overflow: hidden;
+  background: #eef0f4 !important;
+  overflow: hidden !important;
+  z-index: 99999 !important;
 }
 
 /* ─── Touch ────────────────────────────────────────────── */
