@@ -622,13 +622,37 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     _savePos(noteId, el) {
       clearTimeout(this._saveTimers[noteId]);
       this._saveTimers[noteId] = setTimeout(() => {
+        const blockId = this._detectBlock(el);
         this.$wire.call('updateNotePosition', noteId, {
           x: parseFloat(el.dataset.x) || 0,
           y: parseFloat(el.dataset.y) || 0,
           width: parseInt(el.style.width) || 200,
           height: parseInt(el.style.height) || 150,
+          blockId,
         });
       }, 300);
+    },
+
+    /** Check which grid block the note center overlaps (board-coordinate hit test) */
+    _detectBlock(el) {
+      const x = parseFloat(el.dataset.x) || 0;
+      const y = parseFloat(el.dataset.y) || 0;
+      const cx = x + (parseInt(el.style.width) || 0) / 2;
+      const cy = y + (parseInt(el.style.height) || 0) / 2;
+
+      const blocks = this.$refs.board?.querySelectorAll('.workshop-grid-block[data-block-id]');
+      if (!blocks) return null;
+
+      for (const block of blocks) {
+        const bx = block.offsetLeft + block.offsetParent?.offsetLeft || 0;
+        const by = block.offsetTop + block.offsetParent?.offsetTop || 0;
+        const bw = block.offsetWidth;
+        const bh = block.offsetHeight;
+        if (cx >= bx && cx <= bx + bw && cy >= by && cy <= by + bh) {
+          return parseInt(block.dataset.blockId) || null;
+        }
+      }
+      return null;
     },
 
     // ─── Element actions ─────────────────────────────────────
