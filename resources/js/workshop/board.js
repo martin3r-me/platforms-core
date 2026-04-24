@@ -598,7 +598,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
         },
       });
 
-      // Canvas grid background — resizable
+      // Canvas grid background — resizable + persist
       interact('.workshop-canvas-background').resizable({
         edges: { right: true, bottom: true },
         modifiers: [interact.modifiers.restrictSize({ min: { width: 400, height: 300 } })],
@@ -607,6 +607,15 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
             const t = ev.target;
             t.style.width = ev.rect.width / self.scale + 'px';
             t.style.minHeight = ev.rect.height / self.scale + 'px';
+          },
+          end(ev) {
+            const t = ev.target;
+            const w = parseInt(t.style.width) || 1200;
+            const h = parseInt(t.style.minHeight) || 800;
+            clearTimeout(self._gridSaveTimer);
+            self._gridSaveTimer = setTimeout(() => {
+              self.$wire.call('updateWorkshopSettings', { gridWidth: w, gridHeight: h });
+            }, 400);
           },
         },
       });
