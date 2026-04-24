@@ -41,14 +41,11 @@ var PlatformWorkshop=(()=>{var Br=Object.create;var He=Object.defineProperty;var
 
 .workshop-grid-block {
   background: white;
-  border: 1.5px solid #2d2d2d;
   min-height: 120px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  /* Collapse borders between adjacent blocks */
-  margin: -0.75px;
+  transition: box-shadow 0.2s;
 }
 
 .workshop-grid-block.adopt-highlight {
