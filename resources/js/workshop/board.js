@@ -644,8 +644,9 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       if (!blocks) return null;
 
       for (const block of blocks) {
-        const bx = block.offsetLeft + block.offsetParent?.offsetLeft || 0;
-        const by = block.offsetTop + block.offsetParent?.offsetTop || 0;
+        const parent = block.offsetParent;
+        const bx = block.offsetLeft + (parent?.offsetLeft || 0);
+        const by = block.offsetTop + (parent?.offsetTop || 0);
         const bw = block.offsetWidth;
         const bh = block.offsetHeight;
         if (cx >= bx && cx <= bx + bw && cy >= by && cy <= by + bh) {
