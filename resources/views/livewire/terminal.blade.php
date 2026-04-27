@@ -908,7 +908,7 @@
       </div>
 
       <!-- Main Content Area — keyed per channel so editor + messages fully rebuild -->
-      <div class="terminal-light flex-1 min-w-0 flex flex-col bg-[var(--ui-surface)]" wire:key="terminal-main-{{ $channelId }}">
+      <div class="terminal-light flex-1 min-w-0 flex flex-col bg-[var(--ui-surface)]" wire:key="terminal-main">
 
         {{-- Global context header — always visible as first element --}}
         @include('platform::livewire.partials.terminal-context-header')
