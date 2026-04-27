@@ -10,10 +10,11 @@ const COLOR_BG = {
 };
 
 const TYPE_DEFAULTS = {
-  note:    { width: 200, height: 150, color: 'yellow' },
-  text:    { width: 300, height: 40,  color: 'yellow' },
-  section: { width: 500, height: 400, color: 'yellow' },
-  shape:   { width: 120, height: 120, color: 'blue' },
+  note:      { width: 200, height: 150, color: 'yellow' },
+  text:      { width: 300, height: 40,  color: 'yellow' },
+  section:   { width: 500, height: 400, color: 'yellow' },
+  shape:     { width: 120, height: 120, color: 'blue' },
+  connector: { width: 0,   height: 0,   color: 'blue' },
 };
 
 const DELETE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px;"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>';
@@ -40,6 +41,9 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     _textTimers: {},
     _nextTempId: -1,
     colorPickerOpen: null,
+    _connectorMode: false,
+    _connectorFrom: null,
+    _svgLayer: null,
 
     colors: Object.keys(COLOR_HEX),
 
@@ -52,17 +56,36 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       this._initialized = true;
 
       this.$nextTick(() => {
+        // SVG overlay for connectors
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.classList.add('workshop-connectors-layer');
+        svg.setAttribute('style', 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;');
+        svg.innerHTML = `<defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/>
+          </marker>
+        </defs>`;
+        this.$refs.board.prepend(svg);
+        this._svgLayer = svg;
+
         this._renderNotes(notes);
         this._initPanZoom();
         this._initInteract();
         this._fitGrid();
 
-        // Close fullscreen on Escape key
+        // Close fullscreen on Escape key / cancel connector mode
         this._on(document, 'keydown', (e) => {
-          if (e.key === 'Escape' && this.isFullscreen) {
-            e.preventDefault();
-            this.isFullscreen = false;
-            this._fitAfterDelay();
+          if (e.key === 'Escape') {
+            if (this._connectorMode) {
+              e.preventDefault();
+              this._cancelConnectorMode();
+              return;
+            }
+            if (this.isFullscreen) {
+              e.preventDefault();
+              this.isFullscreen = false;
+              this._fitAfterDelay();
+            }
           }
         }, false);
       });
@@ -93,10 +116,11 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     _createNoteEl(n) {
       const type = n.type || 'note';
       switch (type) {
-        case 'text':    return this._createTextEl(n);
-        case 'section': return this._createSectionEl(n);
-        case 'shape':   return this._createShapeEl(n);
-        default:        return this._createStickyEl(n);
+        case 'text':      return this._createTextEl(n);
+        case 'section':   return this._createSectionEl(n);
+        case 'shape':     return this._createShapeEl(n);
+        case 'connector': return this._createConnectorEl(n);
+        default:          return this._createStickyEl(n);
       }
     },
 
@@ -262,6 +286,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     // ─── Event Binding ─────────────────────────────────────
     _bindNoteEvents(el) {
       el.addEventListener('click', (e) => {
+        if (this._handleConnectorClick(el)) { e.stopPropagation(); return; }
         const action = e.target.closest('[data-action]')?.dataset.action;
         const pickColor = e.target.closest('[data-pick-color]')?.dataset.pickColor;
         const noteId = parseInt(el.dataset.noteId);
@@ -286,6 +311,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
 
     _bindDeleteEvent(el) {
       el.addEventListener('click', (e) => {
+        if (this._handleConnectorClick(el)) { e.stopPropagation(); return; }
         const action = e.target.closest('[data-action]')?.dataset.action;
         const noteId = parseInt(el.dataset.noteId);
         if (action === 'delete') {
@@ -297,6 +323,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
 
     _bindShapeEvents(el) {
       el.addEventListener('click', (e) => {
+        if (this._handleConnectorClick(el)) { e.stopPropagation(); return; }
         const action = e.target.closest('[data-action]')?.dataset.action;
         const pickColor = e.target.closest('[data-pick-color]')?.dataset.pickColor;
         const noteId = parseInt(el.dataset.noteId);
@@ -450,6 +477,12 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
           this.panY = this._panStart.py + (e.clientY - this._panStart.y);
           this._applyTransform();
         }
+        // Update connector preview line
+        if (this._previewLine && this._connectorMode && this._connectorFrom) {
+          const pt = this._screenToBoard(e.clientX, e.clientY);
+          this._previewLine.setAttribute('x2', pt.x);
+          this._previewLine.setAttribute('y2', pt.y);
+        }
       }, false);
 
       this._on(parent, 'pointerup', (e) => {
@@ -531,6 +564,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     _initInteract() {
       const self = this;
       const draggableSelector = '.workshop-note, .workshop-text, .workshop-section, .workshop-shape';
+      // Note: connectors are not draggable (they are SVG paths)
       const resizableSelector = draggableSelector;
 
       // Draggable — all element types use .drag-handle
@@ -547,6 +581,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
             t.style.transform = `translate(${x}px,${y}px)`;
             t.dataset.x = x;
             t.dataset.y = y;
+            self._updateConnectors();
           },
           end(ev) {
             ev.target.classList.remove('dragging');
@@ -583,6 +618,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
               const input = t.querySelector('.text-body input');
               if (input) input.style.fontSize = fontSize + 'px';
             }
+            self._updateConnectors();
           },
           end(ev) {
             const t = ev.target;
@@ -700,6 +736,20 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
 
     _deleteNote(el, noteId) {
       el.remove();
+      // Remove connector SVG elements referencing this note
+      if (this._svgLayer) {
+        const noteIdStr = String(noteId);
+        this._svgLayer.querySelectorAll('.workshop-connector-path').forEach(path => {
+          if (path.dataset.fromNoteId === noteIdStr || path.dataset.toNoteId === noteIdStr) {
+            const fo = this._svgLayer.querySelector(`.connector-delete-fo[data-connector-id="${path.dataset.connectorId}"]`);
+            if (fo) fo.remove();
+            // Also remove the hidden anchor div
+            const anchor = this.$refs.board.querySelector(`[data-note-id="${path.dataset.connectorId}"][data-note-type="connector"]`);
+            if (anchor) anchor.remove();
+            path.remove();
+          }
+        });
+      }
       if (noteId > 0) this.$wire.call('deleteWorkshopNote', noteId);
     },
 
@@ -755,6 +805,261 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       // Close all others first
       this.$refs.board.querySelectorAll('.color-picker-dd').forEach(d => d.style.display = 'none');
       dd.style.display = isOpen ? 'none' : 'flex';
+    },
+
+    // ─── Connector (Arrow) System ──────────────────────────
+
+    _createConnectorEl(n) {
+      const meta = n.metadata || {};
+      // Create a hidden anchor div for ID tracking (not visible)
+      const el = document.createElement('div');
+      el.style.cssText = 'position:absolute;width:0;height:0;pointer-events:none;';
+      el.dataset.noteId = n.id;
+      el.dataset.noteType = 'connector';
+      el.dataset.fromNoteId = meta.fromNoteId || '';
+      el.dataset.toNoteId = meta.toNoteId || '';
+
+      // Create SVG path in the SVG layer
+      if (this._svgLayer) {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.classList.add('workshop-connector-path');
+        path.dataset.connectorId = n.id;
+        path.dataset.fromNoteId = meta.fromNoteId || '';
+        path.dataset.toNoteId = meta.toNoteId || '';
+        path.setAttribute('marker-end', 'url(#arrowhead)');
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', '#6b7280');
+        path.setAttribute('stroke-width', '2');
+        path.style.pointerEvents = 'stroke';
+        path.style.cursor = 'pointer';
+        this._svgLayer.appendChild(path);
+
+        // Delete button (foreignObject)
+        const fo = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+        fo.classList.add('connector-delete-fo');
+        fo.dataset.connectorId = n.id;
+        fo.setAttribute('width', '24');
+        fo.setAttribute('height', '24');
+        fo.style.overflow = 'visible';
+        fo.style.display = 'none';
+        fo.innerHTML = `<button xmlns="http://www.w3.org/1999/xhtml" class="connector-delete-btn" title="Loeschen">${DELETE_SVG}</button>`;
+        this._svgLayer.appendChild(fo);
+
+        // Show delete on hover
+        path.addEventListener('mouseenter', () => {
+          fo.style.display = '';
+          path.classList.add('hovered');
+        });
+        path.addEventListener('mouseleave', () => {
+          setTimeout(() => {
+            if (!fo.matches(':hover')) {
+              fo.style.display = 'none';
+              path.classList.remove('hovered');
+            }
+          }, 200);
+        });
+        fo.addEventListener('mouseleave', () => {
+          fo.style.display = 'none';
+          path.classList.remove('hovered');
+        });
+
+        // Delete connector on click
+        fo.querySelector('.connector-delete-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          const connId = parseInt(n.id);
+          path.remove();
+          fo.remove();
+          el.remove();
+          if (connId > 0) this.$wire.call('deleteWorkshopNote', connId);
+        });
+
+        // Compute initial path
+        this._updateSingleConnector(path, fo);
+      }
+
+      return el;
+    },
+
+    _getAnchorPoint(noteId) {
+      const el = this.$refs.board.querySelector(`[data-note-id="${noteId}"]:not([data-note-type="connector"])`);
+      if (!el) return null;
+      const x = parseFloat(el.dataset.x) || 0;
+      const y = parseFloat(el.dataset.y) || 0;
+      const w = parseInt(el.style.width) || 0;
+      const h = parseInt(el.style.height) || 0;
+      return { x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
+    },
+
+    _bestAnchors(fromRect, toRect) {
+      // Determine best side anchors based on relative position
+      const dx = toRect.cx - fromRect.cx;
+      const dy = toRect.cy - fromRect.cy;
+
+      let fromPt, toPt;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        // Horizontal dominant
+        if (dx > 0) {
+          fromPt = { x: fromRect.x + fromRect.w, y: fromRect.cy };
+          toPt   = { x: toRect.x,                y: toRect.cy };
+        } else {
+          fromPt = { x: fromRect.x,              y: fromRect.cy };
+          toPt   = { x: toRect.x + toRect.w,     y: toRect.cy };
+        }
+      } else {
+        // Vertical dominant
+        if (dy > 0) {
+          fromPt = { x: fromRect.cx, y: fromRect.y + fromRect.h };
+          toPt   = { x: toRect.cx,   y: toRect.y };
+        } else {
+          fromPt = { x: fromRect.cx, y: fromRect.y };
+          toPt   = { x: toRect.cx,   y: toRect.y + toRect.h };
+        }
+      }
+      return { from: fromPt, to: toPt };
+    },
+
+    _buildConnectorPath(from, to) {
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const offset = Math.min(dist * 0.4, 80);
+
+      // Determine control point direction based on whether connection is more horizontal or vertical
+      let cx1, cy1, cx2, cy2;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        cx1 = from.x + offset * Math.sign(dx);
+        cy1 = from.y;
+        cx2 = to.x - offset * Math.sign(dx);
+        cy2 = to.y;
+      } else {
+        cx1 = from.x;
+        cy1 = from.y + offset * Math.sign(dy);
+        cx2 = to.x;
+        cy2 = to.y - offset * Math.sign(dy);
+      }
+
+      return `M ${from.x},${from.y} C ${cx1},${cy1} ${cx2},${cy2} ${to.x},${to.y}`;
+    },
+
+    _updateSingleConnector(path, fo) {
+      const fromId = path.dataset.fromNoteId;
+      const toId = path.dataset.toNoteId;
+      if (!fromId || !toId) return;
+
+      const fromRect = this._getAnchorPoint(fromId);
+      const toRect = this._getAnchorPoint(toId);
+
+      if (!fromRect || !toRect) {
+        path.setAttribute('d', '');
+        return;
+      }
+
+      const { from, to } = this._bestAnchors(fromRect, toRect);
+      path.setAttribute('d', this._buildConnectorPath(from, to));
+
+      // Position delete button at midpoint
+      const mx = (from.x + to.x) / 2 - 12;
+      const my = (from.y + to.y) / 2 - 12;
+      fo.setAttribute('x', mx);
+      fo.setAttribute('y', my);
+    },
+
+    _updateConnectors() {
+      if (!this._svgLayer) return;
+      const paths = this._svgLayer.querySelectorAll('.workshop-connector-path');
+      paths.forEach(path => {
+        const fo = this._svgLayer.querySelector(`.connector-delete-fo[data-connector-id="${path.dataset.connectorId}"]`);
+        if (fo) this._updateSingleConnector(path, fo);
+      });
+    },
+
+    // ─── Connector Mode (creation flow) ────────────────────
+
+    startConnectorMode() {
+      if (this._connectorMode) {
+        this._cancelConnectorMode();
+        return;
+      }
+      this._connectorMode = true;
+      this._connectorFrom = null;
+      this.$refs.board.parentElement.classList.add('connector-mode');
+    },
+
+    _cancelConnectorMode() {
+      this._connectorMode = false;
+      this._connectorFrom = null;
+      this.$refs.board.parentElement.classList.remove('connector-mode');
+      this.$refs.board.querySelectorAll('.connector-source-selected').forEach(el => el.classList.remove('connector-source-selected'));
+      // Remove preview line
+      if (this._previewLine) { this._previewLine.remove(); this._previewLine = null; }
+    },
+
+    _handleConnectorClick(noteEl) {
+      if (!this._connectorMode) return false;
+      const noteId = parseInt(noteEl.dataset.noteId);
+      const noteType = noteEl.dataset.noteType;
+      if (noteType === 'connector') return false; // can't connect to a connector
+
+      if (!this._connectorFrom) {
+        // First click: select source
+        this._connectorFrom = noteId;
+        noteEl.classList.add('connector-source-selected');
+
+        // Create preview line
+        const preview = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        preview.classList.add('workshop-connector-preview');
+        preview.setAttribute('stroke', '#f2ca52');
+        preview.setAttribute('stroke-width', '2');
+        preview.setAttribute('stroke-dasharray', '6 4');
+        preview.style.pointerEvents = 'none';
+        const fromRect = this._getAnchorPoint(noteId);
+        if (fromRect) {
+          preview.setAttribute('x1', fromRect.cx);
+          preview.setAttribute('y1', fromRect.cy);
+          preview.setAttribute('x2', fromRect.cx);
+          preview.setAttribute('y2', fromRect.cy);
+        }
+        this._svgLayer.appendChild(preview);
+        this._previewLine = preview;
+
+        return true;
+      } else {
+        // Second click: select target and create connector
+        if (noteId === this._connectorFrom) return true; // same element, ignore
+
+        const fromId = this._connectorFrom;
+        const toId = noteId;
+
+        // Optimistic: create connector in DOM
+        const tempId = this._nextTempId--;
+        const connEl = this._createConnectorEl({
+          id: tempId, type: 'connector', title: '', content: '',
+          color: 'blue', x: 0, y: 0, width: 0, height: 0,
+          metadata: { fromNoteId: fromId, toNoteId: toId, style: 'solid', arrowHead: 'end' },
+        });
+        this.$refs.board.appendChild(connEl);
+
+        // Persist
+        this.$wire.call('addConnector', fromId, toId).then(() => {
+          this.$wire.call('getWorkshopNotes').then((serverNotes) => {
+            if (Array.isArray(serverNotes)) {
+              const connectors = serverNotes.filter(n => n.type === 'connector');
+              if (connectors.length > 0) {
+                const newest = connectors.reduce((a, b) => a.id > b.id ? a : b);
+                connEl.dataset.noteId = newest.id;
+                // Update SVG elements with real ID
+                const path = this._svgLayer.querySelector(`.workshop-connector-path[data-connector-id="${tempId}"]`);
+                const fo = this._svgLayer.querySelector(`.connector-delete-fo[data-connector-id="${tempId}"]`);
+                if (path) path.dataset.connectorId = newest.id;
+                if (fo) fo.dataset.connectorId = newest.id;
+              }
+            }
+          });
+        });
+
+        this._cancelConnectorMode();
+        return true;
+      }
     },
   };
 }
