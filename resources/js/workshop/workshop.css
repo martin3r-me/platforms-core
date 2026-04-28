@@ -182,7 +182,11 @@
 .workshop-note:hover .note-delete,
 .workshop-text:hover .note-delete,
 .workshop-section:hover .note-delete,
-.workshop-shape:hover .note-delete {
+.workshop-shape:hover .note-delete,
+.workshop-kanban:hover > .drag-handle .note-delete,
+.workshop-image:hover .note-delete,
+.workshop-image-grid:hover > .drag-handle .note-delete,
+.workshop-video:hover .note-delete {
   opacity: 1;
 }
 
@@ -226,7 +230,11 @@
 .workshop-note:hover .resize-handle,
 .workshop-text:hover .resize-handle,
 .workshop-section:hover .resize-handle,
-.workshop-shape:hover .resize-handle {
+.workshop-shape:hover .resize-handle,
+.workshop-kanban:hover .resize-handle,
+.workshop-image:hover .resize-handle,
+.workshop-image-grid:hover .resize-handle,
+.workshop-video:hover .resize-handle {
   opacity: 0.4;
 }
 
@@ -697,7 +705,11 @@
 .connector-mode .workshop-note,
 .connector-mode .workshop-text,
 .connector-mode .workshop-section,
-.connector-mode .workshop-shape {
+.connector-mode .workshop-shape,
+.connector-mode .workshop-kanban,
+.connector-mode .workshop-image,
+.connector-mode .workshop-image-grid,
+.connector-mode .workshop-video {
   cursor: crosshair;
 }
 
@@ -715,6 +727,625 @@
   background: #f2ca52;
   color: #1a1a2e;
 }
+
+/* ─── Kanban Board ────────────────────────────────────── */
+.workshop-kanban {
+  position: absolute;
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  touch-action: none;
+  border-top: 3px solid #60a5fa;
+  overflow: hidden;
+}
+
+.workshop-kanban:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.08);
+  z-index: 15;
+}
+
+.workshop-kanban.dragging {
+  opacity: 0.9;
+  z-index: 1000 !important;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+}
+
+/* Kanban color variants (border-top) */
+.workshop-kanban-yellow { border-top-color: #fbbf24; }
+.workshop-kanban-blue   { border-top-color: #60a5fa; }
+.workshop-kanban-green  { border-top-color: #4ade80; }
+.workshop-kanban-pink   { border-top-color: #f472b6; }
+.workshop-kanban-purple { border-top-color: #a78bfa; }
+.workshop-kanban-orange { border-top-color: #fb923c; }
+.workshop-kanban-teal   { border-top-color: #2dd4bf; }
+.workshop-kanban-red    { border-top-color: #f87171; }
+
+/* Kanban drag handle */
+.kanban-drag-handle {
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.kanban-board-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  background: transparent;
+  border: none;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  cursor: text;
+}
+
+.kanban-board-title::placeholder {
+  color: rgba(0,0,0,0.2);
+}
+
+.kanban-add-col-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.kanban-add-col-btn:hover {
+  background: #f3f4f6;
+  color: #1a1a2e;
+}
+
+/* Columns container */
+.kanban-columns {
+  display: flex;
+  flex: 1;
+  gap: 6px;
+  padding: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: #f3f4f6;
+}
+
+/* Single column */
+.kanban-column {
+  flex: 1;
+  min-width: 120px;
+  background: #e5e7eb;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.kanban-column.kanban-drop-target {
+  background: #dbeafe;
+  outline: 2px dashed #60a5fa;
+  outline-offset: -2px;
+}
+
+/* Column header */
+.kanban-column-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+.kanban-column-header.wip-exceeded {
+  background: #fecaca;
+}
+
+.kanban-col-title {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #374151;
+  background: transparent;
+  border: none;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  cursor: text;
+}
+
+.kanban-col-title::placeholder {
+  color: rgba(0,0,0,0.2);
+}
+
+.kanban-card-count {
+  font-size: 0.625rem;
+  color: #9ca3af;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.kanban-col-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  border: none;
+  background: transparent;
+  color: #d1d5db;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.kanban-column:hover .kanban-col-delete {
+  opacity: 1;
+}
+
+.kanban-col-delete:hover {
+  background: #fecaca;
+  color: #dc2626;
+}
+
+/* Cards container */
+.kanban-cards {
+  flex: 1;
+  padding: 4px 6px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 20px;
+}
+
+/* Single card */
+.kanban-card {
+  background: white;
+  border-radius: 4px;
+  padding: 6px 8px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  cursor: grab;
+  transition: opacity 0.15s, box-shadow 0.15s;
+}
+
+.kanban-card:hover {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.kanban-card.kanban-card-dragging {
+  opacity: 0.4;
+}
+
+.kanban-card-title {
+  font-size: 0.6875rem;
+  color: #374151;
+  background: transparent;
+  border: none;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  cursor: text;
+}
+
+.kanban-card-title::placeholder {
+  color: rgba(0,0,0,0.2);
+}
+
+.kanban-card-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  border: none;
+  background: transparent;
+  color: #d1d5db;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.kanban-card:hover .kanban-card-delete {
+  opacity: 1;
+}
+
+.kanban-card-delete:hover {
+  background: #fecaca;
+  color: #dc2626;
+}
+
+/* Add card button */
+.kanban-add-card {
+  display: block;
+  width: calc(100% - 12px);
+  margin: 2px 6px 6px;
+  padding: 4px;
+  border: 1px dashed #d1d5db;
+  border-radius: 4px;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 0.625rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.kanban-add-card:hover {
+  border-color: #9ca3af;
+  background: rgba(0,0,0,0.02);
+  color: #374151;
+}
+
+/* ─── Image Element ──────────────────────────────────── */
+.workshop-image {
+  position: absolute;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  touch-action: none;
+  overflow: hidden;
+  background: white;
+}
+
+.workshop-image:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.08);
+  z-index: 15;
+}
+
+.workshop-image.dragging {
+  opacity: 0.9;
+  z-index: 1000 !important;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+}
+
+.workshop-image .image-drag-handle {
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  background: white;
+  z-index: 2;
+}
+
+.workshop-image .image-alt-input {
+  font-size: 0.625rem;
+  color: #9ca3af;
+  background: transparent;
+  border: none;
+  outline: none;
+  width: 60px;
+  padding: 0;
+  cursor: text;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.workshop-image:hover .image-alt-input {
+  opacity: 1;
+}
+
+.workshop-image .image-alt-input::placeholder {
+  color: #d1d5db;
+}
+
+.workshop-image .image-container {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.workshop-image .image-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.workshop-image .image-upload-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border: 2px dashed #d1d5db;
+  border-radius: 0;
+  color: #9ca3af;
+  cursor: pointer;
+  gap: 6px;
+  font-size: 0.6875rem;
+  transition: all 0.15s;
+}
+
+.workshop-image .image-upload-zone:hover {
+  border-color: #f2ca52;
+  color: #6b7280;
+  background: rgba(242, 202, 82, 0.05);
+}
+
+/* Image color variants (subtle top border) */
+.workshop-image-yellow { border-top: 3px solid #fbbf24; }
+.workshop-image-blue   { border-top: 3px solid #60a5fa; }
+.workshop-image-green  { border-top: 3px solid #4ade80; }
+.workshop-image-pink   { border-top: 3px solid #f472b6; }
+.workshop-image-purple { border-top: 3px solid #a78bfa; }
+.workshop-image-orange { border-top: 3px solid #fb923c; }
+.workshop-image-teal   { border-top: 3px solid #2dd4bf; }
+.workshop-image-red    { border-top: 3px solid #f87171; }
+
+/* ─── Image Grid Element ─────────────────────────────── */
+.workshop-image-grid {
+  position: absolute;
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  touch-action: none;
+  overflow: hidden;
+}
+
+.workshop-image-grid:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.08);
+  z-index: 15;
+}
+
+.workshop-image-grid.dragging {
+  opacity: 0.9;
+  z-index: 1000 !important;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+}
+
+.workshop-image-grid .image-grid-drag-handle {
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.workshop-image-grid .image-grid-cols-control {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.625rem;
+  color: #6b7280;
+}
+
+.workshop-image-grid .image-grid-cols-control button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 4px;
+  border: none;
+  background: #f3f4f6;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  transition: all 0.15s;
+}
+
+.workshop-image-grid .image-grid-cols-control button:hover {
+  background: #e5e7eb;
+  color: #1a1a2e;
+}
+
+.workshop-image-grid .image-grid-cols-count {
+  min-width: 14px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.workshop-image-grid .image-grid-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.workshop-image-grid .image-grid-add-btn:hover {
+  background: #f3f4f6;
+  color: #1a1a2e;
+}
+
+.workshop-image-grid .image-grid-container {
+  flex: 1;
+  display: grid;
+  padding: 6px;
+  overflow-y: auto;
+}
+
+.workshop-image-grid .image-grid-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #f3f4f6;
+  aspect-ratio: 1;
+}
+
+.workshop-image-grid .image-grid-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.workshop-image-grid .image-grid-item-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  border: none;
+  background: rgba(255,255,255,0.9);
+  color: #d1d5db;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.workshop-image-grid .image-grid-item:hover .image-grid-item-delete {
+  opacity: 1;
+}
+
+.workshop-image-grid .image-grid-item-delete:hover {
+  background: #fecaca;
+  color: #dc2626;
+}
+
+/* Image Grid color variants */
+.workshop-image-grid-yellow { border-top: 3px solid #fbbf24; }
+.workshop-image-grid-blue   { border-top: 3px solid #60a5fa; }
+.workshop-image-grid-green  { border-top: 3px solid #4ade80; }
+.workshop-image-grid-pink   { border-top: 3px solid #f472b6; }
+.workshop-image-grid-purple { border-top: 3px solid #a78bfa; }
+.workshop-image-grid-orange { border-top: 3px solid #fb923c; }
+.workshop-image-grid-teal   { border-top: 3px solid #2dd4bf; }
+.workshop-image-grid-red    { border-top: 3px solid #f87171; }
+
+/* ─── Video Element ──────────────────────────────────── */
+.workshop-video {
+  position: absolute;
+  background: #1a1a2e;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.1);
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  touch-action: none;
+  overflow: hidden;
+}
+
+.workshop-video:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.12);
+  z-index: 15;
+}
+
+.workshop-video.dragging {
+  opacity: 0.9;
+  z-index: 1000 !important;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.25);
+}
+
+.workshop-video .video-drag-handle {
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.6);
+}
+
+.workshop-video .video-drag-handle .drag-dots span {
+  background: rgba(255,255,255,0.4);
+}
+
+.workshop-video .video-container {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.workshop-video .video-container iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.workshop-video .video-container video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.workshop-video .video-upload-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: rgba(255,255,255,0.5);
+  gap: 8px;
+  padding: 1rem;
+}
+
+.workshop-video .video-url-input {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 6px;
+  color: white;
+  font-size: 0.6875rem;
+  padding: 6px 10px;
+  width: 100%;
+  max-width: 280px;
+  outline: none;
+  transition: all 0.15s;
+}
+
+.workshop-video .video-url-input:focus {
+  border-color: #f2ca52;
+  background: rgba(255,255,255,0.15);
+}
+
+.workshop-video .video-url-input::placeholder {
+  color: rgba(255,255,255,0.3);
+}
+
+.workshop-video .video-upload-btn {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 6px;
+  color: rgba(255,255,255,0.6);
+  font-size: 0.625rem;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.workshop-video .video-upload-btn:hover {
+  background: rgba(255,255,255,0.2);
+  color: white;
+}
+
+/* Video color variants (subtle accent) */
+.workshop-video-yellow { border-top: 3px solid #fbbf24; }
+.workshop-video-blue   { border-top: 3px solid #60a5fa; }
+.workshop-video-green  { border-top: 3px solid #4ade80; }
+.workshop-video-pink   { border-top: 3px solid #f472b6; }
+.workshop-video-purple { border-top: 3px solid #a78bfa; }
+.workshop-video-orange { border-top: 3px solid #fb923c; }
+.workshop-video-teal   { border-top: 3px solid #2dd4bf; }
+.workshop-video-red    { border-top: 3px solid #f87171; }
 
 /* ─── Fullscreen (CSS class, not Fullscreen API) ─────── */
 .workshop-fullscreen {

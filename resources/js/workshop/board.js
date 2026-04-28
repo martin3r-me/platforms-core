@@ -10,11 +10,15 @@ const COLOR_BG = {
 };
 
 const TYPE_DEFAULTS = {
-  note:      { width: 200, height: 150, color: 'yellow' },
-  text:      { width: 300, height: 40,  color: 'yellow' },
-  section:   { width: 500, height: 400, color: 'yellow' },
-  shape:     { width: 120, height: 120, color: 'blue' },
-  connector: { width: 0,   height: 0,   color: 'blue' },
+  note:       { width: 200, height: 150, color: 'yellow' },
+  text:       { width: 300, height: 40,  color: 'yellow' },
+  section:    { width: 500, height: 400, color: 'yellow' },
+  shape:      { width: 120, height: 120, color: 'blue' },
+  connector:  { width: 0,   height: 0,   color: 'blue' },
+  kanban:     { width: 600, height: 400, color: 'blue' },
+  image:      { width: 300, height: 300, color: 'yellow' },
+  image_grid: { width: 500, height: 400, color: 'yellow' },
+  video:      { width: 480, height: 300, color: 'blue' },
 };
 
 const DELETE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px;"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>';
@@ -39,7 +43,10 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     _listeners: [],
     _saveTimers: {},
     _textTimers: {},
+    _kanbanTimers: {},
     _nextTempId: -1,
+    _pendingUploadTarget: null,
+    _mediaTimers: {},
     colorPickerOpen: null,
     _connectorMode: false,
     _connectorFrom: null,
@@ -67,6 +74,47 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
         </defs>`;
         this.$refs.board.prepend(svg);
         this._svgLayer = svg;
+
+        // Hidden file input for media uploads
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.id = 'workshop-file-input';
+        fileInput.style.display = 'none';
+        fileInput.accept = 'image/*,video/*';
+        this.$refs.board.parentElement.appendChild(fileInput);
+        this._fileInput = fileInput;
+
+        fileInput.addEventListener('change', (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          this.$wire.upload('workshopFile', file,
+            () => {}, // success handled by event
+            () => { console.error('Upload failed'); },
+            (ev) => {} // progress
+          );
+          fileInput.value = '';
+        });
+
+        // Listen for upload completion from Livewire
+        this.$wire.on('workshop-file-uploaded', ([data]) => {
+          const target = this._pendingUploadTarget;
+          this._pendingUploadTarget = null;
+          if (!target || !target.noteEl) return;
+
+          const noteEl = target.noteEl;
+          const noteId = parseInt(noteEl.dataset.noteId);
+
+          if (target.type === 'image') {
+            this._applyImageUpload(noteEl, data);
+            if (noteId > 0) this._saveMediaMetadata(noteEl, noteId);
+          } else if (target.type === 'image_grid') {
+            this._applyImageGridUpload(noteEl, data);
+            if (noteId > 0) this._saveMediaMetadata(noteEl, noteId);
+          } else if (target.type === 'video') {
+            this._applyVideoUpload(noteEl, data);
+            if (noteId > 0) this._saveMediaMetadata(noteEl, noteId);
+          }
+        });
 
         this._renderNotes(notes);
         this._initPanZoom();
@@ -98,7 +146,12 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       interact('.workshop-text').unset();
       interact('.workshop-section').unset();
       interact('.workshop-shape').unset();
+      interact('.workshop-kanban').unset();
+      interact('.workshop-image').unset();
+      interact('.workshop-image-grid').unset();
+      interact('.workshop-video').unset();
       interact('.workshop-canvas-background').unset();
+      if (this._fileInput) { this._fileInput.remove(); this._fileInput = null; }
     },
 
     _on(el, ev, fn, opts) {
@@ -116,11 +169,15 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     _createNoteEl(n) {
       const type = n.type || 'note';
       switch (type) {
-        case 'text':      return this._createTextEl(n);
-        case 'section':   return this._createSectionEl(n);
-        case 'shape':     return this._createShapeEl(n);
-        case 'connector': return this._createConnectorEl(n);
-        default:          return this._createStickyEl(n);
+        case 'text':       return this._createTextEl(n);
+        case 'section':    return this._createSectionEl(n);
+        case 'shape':      return this._createShapeEl(n);
+        case 'connector':  return this._createConnectorEl(n);
+        case 'kanban':     return this._createKanbanEl(n);
+        case 'image':      return this._createImageEl(n);
+        case 'image_grid': return this._createImageGridEl(n);
+        case 'video':      return this._createVideoEl(n);
+        default:           return this._createStickyEl(n);
       }
     },
 
@@ -409,6 +466,628 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
     },
 
+    // ─── Kanban Board ─────────────────────────────────────
+    _createKanbanEl(n) {
+      const color = n.color || 'blue';
+      const x = n.x ?? 0;
+      const y = n.y ?? 0;
+      const w = n.width ?? 600;
+      const h = n.height ?? 400;
+      const columns = n.metadata?.columns || [];
+
+      const el = document.createElement('div');
+      el.className = `workshop-kanban workshop-kanban-${color}`;
+      el.dataset.noteId = n.id;
+      el.dataset.noteType = 'kanban';
+      el.dataset.x = x;
+      el.dataset.y = y;
+      el.style.cssText = `width:${w}px;height:${h}px;transform:translate(${x}px,${y}px);`;
+
+      // Deep-clone columns as JS state
+      el._kanbanData = { columns: JSON.parse(JSON.stringify(columns)) };
+
+      el.innerHTML = `
+        <div class="drag-handle kanban-drag-handle">
+          <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
+            <div class="drag-dots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            ${this._colorDotHTML(color)}
+            <input type="text" class="kanban-board-title" value="${this._esc(n.title || '')}" placeholder="Board..." />
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <button class="kanban-add-col-btn" data-kanban-action="add-column" title="Spalte hinzufuegen">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px;"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
+            </button>
+            <button class="note-delete" data-action="delete" title="Loeschen">${DELETE_SVG}</button>
+          </div>
+        </div>
+        <div class="kanban-columns"></div>
+        <div class="resize-handle"></div>
+      `;
+
+      const colsContainer = el.querySelector('.kanban-columns');
+      el._kanbanData.columns.forEach(col => {
+        colsContainer.appendChild(this._createKanbanColumnEl(el, col));
+      });
+
+      this._bindKanbanEvents(el);
+      this._bindNoteEvents(el);
+      this._bindKanbanTitleSave(el);
+
+      return el;
+    },
+
+    _createKanbanColumnEl(kanbanEl, col) {
+      const colEl = document.createElement('div');
+      colEl.className = 'kanban-column';
+      colEl.dataset.colId = col.id;
+
+      const cardCount = col.cards?.length || 0;
+      const wipText = col.wipLimit > 0 ? `${cardCount}/${col.wipLimit}` : `${cardCount}`;
+      const wipExceeded = col.wipLimit > 0 && cardCount > col.wipLimit;
+
+      colEl.innerHTML = `
+        <div class="kanban-column-header${wipExceeded ? ' wip-exceeded' : ''}">
+          <div style="display:flex;align-items:center;gap:4px;flex:1;min-width:0;">
+            <input type="text" class="kanban-col-title" value="${this._esc(col.title || '')}" placeholder="Spalte..." />
+            <span class="kanban-card-count">${wipText}</span>
+          </div>
+          <button class="kanban-col-delete" data-kanban-action="delete-column" data-col-id="${col.id}" title="Spalte loeschen">${DELETE_SVG}</button>
+        </div>
+        <div class="kanban-cards"></div>
+        <button class="kanban-add-card" data-kanban-action="add-card" data-col-id="${col.id}">+ Karte</button>
+      `;
+
+      const cardsContainer = colEl.querySelector('.kanban-cards');
+      (col.cards || []).forEach(card => {
+        cardsContainer.appendChild(this._createKanbanCardEl(kanbanEl, card));
+      });
+
+      this._bindKanbanDropZone(kanbanEl, colEl);
+
+      // Column title save
+      const titleInput = colEl.querySelector('.kanban-col-title');
+      titleInput.addEventListener('blur', () => {
+        col.title = titleInput.value;
+        this._saveKanbanMetadata(kanbanEl);
+      });
+      titleInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+
+      return colEl;
+    },
+
+    _createKanbanCardEl(kanbanEl, card) {
+      const cardEl = document.createElement('div');
+      cardEl.className = 'kanban-card';
+      cardEl.draggable = true;
+      cardEl.dataset.cardId = card.id;
+
+      cardEl.innerHTML = `
+        <div style="display:flex;align-items:center;gap:4px;">
+          <input type="text" class="kanban-card-title" value="${this._esc(card.title || '')}" placeholder="Karte..." />
+          <button class="kanban-card-delete" data-kanban-action="delete-card" data-card-id="${card.id}" title="Karte loeschen">${DELETE_SVG}</button>
+        </div>
+      `;
+
+      // Drag start
+      cardEl.addEventListener('dragstart', (e) => {
+        e.stopPropagation();
+        const colEl = cardEl.closest('.kanban-column');
+        e.dataTransfer.setData('application/kanban-card', JSON.stringify({
+          cardId: card.id,
+          sourceColId: colEl?.dataset.colId || '',
+        }));
+        e.dataTransfer.effectAllowed = 'move';
+        cardEl.classList.add('kanban-card-dragging');
+      });
+      cardEl.addEventListener('dragend', () => {
+        cardEl.classList.remove('kanban-card-dragging');
+      });
+
+      // Card title save
+      const titleInput = cardEl.querySelector('.kanban-card-title');
+      titleInput.addEventListener('blur', () => {
+        card.title = titleInput.value;
+        this._saveKanbanMetadata(kanbanEl);
+      });
+      titleInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+
+      return cardEl;
+    },
+
+    _bindKanbanDropZone(kanbanEl, colEl) {
+      const cardsContainer = colEl.querySelector('.kanban-cards');
+
+      colEl.addEventListener('dragover', (e) => {
+        if (!e.dataTransfer.types.includes('application/kanban-card')) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        colEl.classList.add('kanban-drop-target');
+      });
+
+      colEl.addEventListener('dragleave', (e) => {
+        if (!colEl.contains(e.relatedTarget)) {
+          colEl.classList.remove('kanban-drop-target');
+        }
+      });
+
+      colEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        colEl.classList.remove('kanban-drop-target');
+        const raw = e.dataTransfer.getData('application/kanban-card');
+        if (!raw) return;
+        const { cardId, sourceColId } = JSON.parse(raw);
+        const targetColId = colEl.dataset.colId;
+
+        const data = kanbanEl._kanbanData;
+        const srcCol = data.columns.find(c => c.id === sourceColId);
+        const tgtCol = data.columns.find(c => c.id === targetColId);
+        if (!srcCol || !tgtCol) return;
+
+        // WIP check
+        if (tgtCol.wipLimit > 0 && tgtCol.cards.length >= tgtCol.wipLimit && sourceColId !== targetColId) return;
+
+        // Move card in data
+        const cardIdx = srcCol.cards.findIndex(c => c.id === cardId);
+        if (cardIdx === -1) return;
+        const [card] = srcCol.cards.splice(cardIdx, 1);
+        tgtCol.cards.push(card);
+
+        // Move card in DOM
+        const cardEl = kanbanEl.querySelector(`[data-card-id="${cardId}"]`);
+        if (cardEl) cardsContainer.appendChild(cardEl);
+
+        this._updateKanbanCounts(kanbanEl);
+        this._saveKanbanMetadata(kanbanEl);
+      });
+    },
+
+    _bindKanbanEvents(el) {
+      el.addEventListener('click', (e) => {
+        const action = e.target.closest('[data-kanban-action]')?.dataset.kanbanAction;
+        if (!action) return;
+
+        if (action === 'add-column') {
+          e.stopPropagation();
+          const newCol = {
+            id: 'col_' + Date.now().toString(36),
+            title: '',
+            wipLimit: 0,
+            cards: [],
+          };
+          el._kanbanData.columns.push(newCol);
+          const colEl = this._createKanbanColumnEl(el, newCol);
+          el.querySelector('.kanban-columns').appendChild(colEl);
+          this._saveKanbanMetadata(el);
+          setTimeout(() => colEl.querySelector('.kanban-col-title')?.focus(), 50);
+          return;
+        }
+
+        if (action === 'add-card') {
+          e.stopPropagation();
+          const colId = e.target.closest('[data-col-id]')?.dataset.colId;
+          const col = el._kanbanData.columns.find(c => c.id === colId);
+          if (!col) return;
+
+          // WIP check
+          if (col.wipLimit > 0 && col.cards.length >= col.wipLimit) return;
+
+          const newCard = {
+            id: 'card_' + Date.now().toString(36),
+            title: '',
+            content: '',
+          };
+          col.cards.push(newCard);
+          const colEl = el.querySelector(`[data-col-id="${colId}"]`);
+          const cardEl = this._createKanbanCardEl(el, newCard);
+          colEl.querySelector('.kanban-cards').appendChild(cardEl);
+          this._updateKanbanCounts(el);
+          this._saveKanbanMetadata(el);
+          setTimeout(() => cardEl.querySelector('.kanban-card-title')?.focus(), 50);
+          return;
+        }
+
+        if (action === 'delete-column') {
+          e.stopPropagation();
+          const colId = e.target.closest('[data-col-id]')?.dataset.colId;
+          el._kanbanData.columns = el._kanbanData.columns.filter(c => c.id !== colId);
+          el.querySelector(`[data-col-id="${colId}"]`)?.remove();
+          this._saveKanbanMetadata(el);
+          return;
+        }
+
+        if (action === 'delete-card') {
+          e.stopPropagation();
+          const cardId = e.target.closest('[data-card-id]')?.dataset.cardId;
+          for (const col of el._kanbanData.columns) {
+            col.cards = col.cards.filter(c => c.id !== cardId);
+          }
+          el.querySelector(`[data-card-id="${cardId}"]`)?.remove();
+          this._updateKanbanCounts(el);
+          this._saveKanbanMetadata(el);
+          return;
+        }
+      });
+    },
+
+    _bindKanbanTitleSave(el) {
+      const input = el.querySelector('.kanban-board-title');
+      const saveText = () => {
+        const noteId = parseInt(el.dataset.noteId);
+        if (noteId < 0) return;
+        clearTimeout(this._textTimers[noteId]);
+        this._textTimers[noteId] = setTimeout(() => {
+          this.$wire.call('updateNoteText', noteId, input.value, '');
+        }, 400);
+      };
+      input.addEventListener('blur', saveText);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+    },
+
+    _saveKanbanMetadata(el) {
+      const noteId = parseInt(el.dataset.noteId);
+      if (noteId < 0) return;
+      clearTimeout(this._kanbanTimers[noteId]);
+      this._kanbanTimers[noteId] = setTimeout(() => {
+        this.$wire.call('updateNoteMetadata', noteId, { columns: el._kanbanData.columns });
+      }, 400);
+    },
+
+    _updateKanbanCounts(el) {
+      const data = el._kanbanData;
+      data.columns.forEach(col => {
+        const colEl = el.querySelector(`[data-col-id="${col.id}"]`);
+        if (!colEl) return;
+        const count = col.cards.length;
+        const wipText = col.wipLimit > 0 ? `${count}/${col.wipLimit}` : `${count}`;
+        const header = colEl.querySelector('.kanban-column-header');
+        const countEl = colEl.querySelector('.kanban-card-count');
+        if (countEl) countEl.textContent = wipText;
+        if (header) {
+          header.classList.toggle('wip-exceeded', col.wipLimit > 0 && count > col.wipLimit);
+        }
+      });
+    },
+
+    // ─── Image Element ────────────────────────────────────
+    _createImageEl(n) {
+      const color = n.color || 'yellow';
+      const x = n.x ?? 0;
+      const y = n.y ?? 0;
+      const w = n.width ?? 300;
+      const h = n.height ?? 300;
+      const meta = n.metadata || {};
+
+      const el = document.createElement('div');
+      el.className = `workshop-image workshop-image-${color}`;
+      el.dataset.noteId = n.id;
+      el.dataset.noteType = 'image';
+      el.dataset.x = x;
+      el.dataset.y = y;
+      el.style.cssText = `width:${w}px;height:${h}px;transform:translate(${x}px,${y}px);`;
+
+      el._imageData = { contextFileId: meta.contextFileId || null, src: meta.src || '', alt: meta.alt || '', objectFit: meta.objectFit || 'cover' };
+
+      const hasImage = !!meta.src;
+      el.innerHTML = `
+        <div class="drag-handle image-drag-handle">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div class="drag-dots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            ${this._colorDotHTML(color)}
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <input type="text" class="image-alt-input" value="${this._esc(meta.alt || '')}" placeholder="Alt..." title="Bildbeschreibung" />
+            <button class="note-delete" data-action="delete" title="Loeschen">${DELETE_SVG}</button>
+          </div>
+        </div>
+        <div class="image-container">
+          ${hasImage
+            ? `<img src="${this._esc(meta.src)}" alt="${this._esc(meta.alt || '')}" style="object-fit:${meta.objectFit || 'cover'};" />`
+            : `<div class="image-upload-zone" data-action="upload-image">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:32px;height:32px;"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" /></svg>
+                <span>Bild hochladen</span>
+              </div>`
+          }
+        </div>
+        <div class="resize-handle"></div>
+      `;
+
+      this._bindNoteEvents(el);
+      this._bindImageEvents(el);
+
+      return el;
+    },
+
+    _bindImageEvents(el) {
+      // Upload zone click
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('[data-action="upload-image"]')) {
+          e.stopPropagation();
+          this._pendingUploadTarget = { noteEl: el, type: 'image' };
+          this._fileInput.accept = 'image/*';
+          this._fileInput.click();
+        }
+      });
+      // Alt text save
+      const altInput = el.querySelector('.image-alt-input');
+      if (altInput) {
+        altInput.addEventListener('blur', () => {
+          el._imageData.alt = altInput.value;
+          const img = el.querySelector('.image-container img');
+          if (img) img.alt = altInput.value;
+          const noteId = parseInt(el.dataset.noteId);
+          if (noteId > 0) this._saveMediaMetadata(el, noteId);
+        });
+        altInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+      }
+    },
+
+    _applyImageUpload(el, data) {
+      el._imageData.contextFileId = data.contextFileId;
+      el._imageData.src = data.url;
+      const container = el.querySelector('.image-container');
+      container.innerHTML = `<img src="${this._esc(data.url)}" alt="${this._esc(el._imageData.alt)}" style="object-fit:${el._imageData.objectFit};" />`;
+    },
+
+    // ─── Image Grid Element ─────────────────────────────────
+    _createImageGridEl(n) {
+      const color = n.color || 'yellow';
+      const x = n.x ?? 0;
+      const y = n.y ?? 0;
+      const w = n.width ?? 500;
+      const h = n.height ?? 400;
+      const meta = n.metadata || {};
+      const images = meta.images || [];
+      const columns = meta.columns || 2;
+      const gap = meta.gap || 4;
+
+      const el = document.createElement('div');
+      el.className = `workshop-image-grid workshop-image-grid-${color}`;
+      el.dataset.noteId = n.id;
+      el.dataset.noteType = 'image_grid';
+      el.dataset.x = x;
+      el.dataset.y = y;
+      el.style.cssText = `width:${w}px;height:${h}px;transform:translate(${x}px,${y}px);`;
+
+      el._imageGridData = { images: JSON.parse(JSON.stringify(images)), columns, gap };
+
+      el.innerHTML = `
+        <div class="drag-handle image-grid-drag-handle">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div class="drag-dots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            ${this._colorDotHTML(color)}
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <div class="image-grid-cols-control">
+              <button data-grid-action="cols-dec" title="Weniger Spalten">-</button>
+              <span class="image-grid-cols-count">${columns}</span>
+              <button data-grid-action="cols-inc" title="Mehr Spalten">+</button>
+            </div>
+            <button class="image-grid-add-btn" data-grid-action="add-image" title="Bild hinzufuegen">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px;"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
+            </button>
+            <button class="note-delete" data-action="delete" title="Loeschen">${DELETE_SVG}</button>
+          </div>
+        </div>
+        <div class="image-grid-container" style="grid-template-columns:repeat(${columns},1fr);gap:${gap}px;"></div>
+        <div class="resize-handle"></div>
+      `;
+
+      const gridContainer = el.querySelector('.image-grid-container');
+      images.forEach(img => gridContainer.appendChild(this._createGridItemEl(el, img)));
+
+      this._bindNoteEvents(el);
+      this._bindImageGridEvents(el);
+
+      return el;
+    },
+
+    _createGridItemEl(gridEl, img) {
+      const item = document.createElement('div');
+      item.className = 'image-grid-item';
+      item.dataset.imageId = img.id;
+      item.innerHTML = `
+        <img src="${this._esc(img.src)}" alt="${this._esc(img.alt || '')}" />
+        <button class="image-grid-item-delete" data-grid-action="delete-image" data-image-id="${img.id}" title="Entfernen">${DELETE_SVG}</button>
+      `;
+      return item;
+    },
+
+    _bindImageGridEvents(el) {
+      el.addEventListener('click', (e) => {
+        const action = e.target.closest('[data-grid-action]')?.dataset.gridAction;
+        if (!action) return;
+
+        if (action === 'add-image') {
+          e.stopPropagation();
+          this._pendingUploadTarget = { noteEl: el, type: 'image_grid' };
+          this._fileInput.accept = 'image/*';
+          this._fileInput.click();
+          return;
+        }
+
+        if (action === 'cols-dec') {
+          e.stopPropagation();
+          if (el._imageGridData.columns > 1) {
+            el._imageGridData.columns--;
+            this._updateGridLayout(el);
+            const noteId = parseInt(el.dataset.noteId);
+            if (noteId > 0) this._saveMediaMetadata(el, noteId);
+          }
+          return;
+        }
+
+        if (action === 'cols-inc') {
+          e.stopPropagation();
+          if (el._imageGridData.columns < 6) {
+            el._imageGridData.columns++;
+            this._updateGridLayout(el);
+            const noteId = parseInt(el.dataset.noteId);
+            if (noteId > 0) this._saveMediaMetadata(el, noteId);
+          }
+          return;
+        }
+
+        if (action === 'delete-image') {
+          e.stopPropagation();
+          const imageId = e.target.closest('[data-image-id]')?.dataset.imageId;
+          el._imageGridData.images = el._imageGridData.images.filter(i => i.id !== imageId);
+          el.querySelector(`[data-image-id="${imageId}"]`)?.closest('.image-grid-item')?.remove();
+          const noteId = parseInt(el.dataset.noteId);
+          if (noteId > 0) this._saveMediaMetadata(el, noteId);
+          return;
+        }
+      });
+    },
+
+    _updateGridLayout(el) {
+      const container = el.querySelector('.image-grid-container');
+      container.style.gridTemplateColumns = `repeat(${el._imageGridData.columns},1fr)`;
+      container.style.gap = `${el._imageGridData.gap}px`;
+      el.querySelector('.image-grid-cols-count').textContent = el._imageGridData.columns;
+    },
+
+    _applyImageGridUpload(el, data) {
+      const imgId = 'img_' + Date.now().toString(36);
+      const imgData = { id: imgId, contextFileId: data.contextFileId, src: data.url, alt: '' };
+      el._imageGridData.images.push(imgData);
+      const gridContainer = el.querySelector('.image-grid-container');
+      gridContainer.appendChild(this._createGridItemEl(el, imgData));
+    },
+
+    // ─── Video Element ──────────────────────────────────────
+    _createVideoEl(n) {
+      const color = n.color || 'blue';
+      const x = n.x ?? 0;
+      const y = n.y ?? 0;
+      const w = n.width ?? 480;
+      const h = n.height ?? 300;
+      const meta = n.metadata || {};
+
+      const el = document.createElement('div');
+      el.className = `workshop-video workshop-video-${color}`;
+      el.dataset.noteId = n.id;
+      el.dataset.noteType = 'video';
+      el.dataset.x = x;
+      el.dataset.y = y;
+      el.style.cssText = `width:${w}px;height:${h}px;transform:translate(${x}px,${y}px);`;
+
+      el._videoData = {
+        src: meta.src || '',
+        provider: meta.provider || '',
+        embedUrl: meta.embedUrl || '',
+        contextFileId: meta.contextFileId || null,
+      };
+
+      const hasContent = !!(meta.embedUrl || meta.src);
+      let contentHTML;
+      if (meta.embedUrl) {
+        contentHTML = `<iframe src="${this._esc(meta.embedUrl)}" allowfullscreen allow="autoplay; encrypted-media"></iframe>`;
+      } else if (meta.src && meta.provider === 'upload') {
+        contentHTML = `<video src="${this._esc(meta.src)}" controls></video>`;
+      } else if (meta.src) {
+        contentHTML = `<video src="${this._esc(meta.src)}" controls></video>`;
+      } else {
+        contentHTML = `
+          <div class="video-upload-zone">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:32px;height:32px;"><path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
+            <input type="text" class="video-url-input" placeholder="YouTube/Vimeo URL einfuegen..." />
+            <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+              <span style="font-size:10px;color:#9ca3af;">oder</span>
+              <button class="video-upload-btn" data-action="upload-video">Datei hochladen</button>
+            </div>
+          </div>
+        `;
+      }
+
+      el.innerHTML = `
+        <div class="drag-handle video-drag-handle">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div class="drag-dots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            ${this._colorDotHTML(color)}
+          </div>
+          <button class="note-delete" data-action="delete" title="Loeschen">${DELETE_SVG}</button>
+        </div>
+        <div class="video-container">${contentHTML}</div>
+        <div class="resize-handle"></div>
+      `;
+
+      this._bindNoteEvents(el);
+      this._bindVideoEvents(el);
+
+      return el;
+    },
+
+    _bindVideoEvents(el) {
+      // URL input
+      const urlInput = el.querySelector('.video-url-input');
+      if (urlInput) {
+        const applyUrl = () => {
+          const url = urlInput.value.trim();
+          if (!url) return;
+          const parsed = this._parseVideoUrl(url);
+          el._videoData = { ...el._videoData, ...parsed };
+          const container = el.querySelector('.video-container');
+          if (parsed.embedUrl) {
+            container.innerHTML = `<iframe src="${this._esc(parsed.embedUrl)}" allowfullscreen allow="autoplay; encrypted-media"></iframe>`;
+          } else if (parsed.src) {
+            container.innerHTML = `<video src="${this._esc(parsed.src)}" controls></video>`;
+          }
+          const noteId = parseInt(el.dataset.noteId);
+          if (noteId > 0) this._saveMediaMetadata(el, noteId);
+        };
+        urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); applyUrl(); } });
+        urlInput.addEventListener('blur', applyUrl);
+      }
+
+      // Upload button
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('[data-action="upload-video"]')) {
+          e.stopPropagation();
+          this._pendingUploadTarget = { noteEl: el, type: 'video' };
+          this._fileInput.accept = 'video/*';
+          this._fileInput.click();
+        }
+      });
+    },
+
+    _applyVideoUpload(el, data) {
+      el._videoData = { src: data.url, provider: 'upload', embedUrl: '', contextFileId: data.contextFileId };
+      const container = el.querySelector('.video-container');
+      container.innerHTML = `<video src="${this._esc(data.url)}" controls></video>`;
+    },
+
+    _parseVideoUrl(url) {
+      // YouTube
+      let match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+      if (match) {
+        return { provider: 'youtube', embedUrl: `https://www.youtube.com/embed/${match[1]}`, src: url };
+      }
+      // Vimeo
+      match = url.match(/vimeo\.com\/(\d+)/);
+      if (match) {
+        return { provider: 'vimeo', embedUrl: `https://player.vimeo.com/video/${match[1]}`, src: url };
+      }
+      // Direct
+      return { provider: 'direct', src: url, embedUrl: '' };
+    },
+
+    // ─── Shared media metadata save ─────────────────────────
+    _saveMediaMetadata(el, noteId) {
+      clearTimeout(this._mediaTimers[noteId]);
+      this._mediaTimers[noteId] = setTimeout(() => {
+        const type = el.dataset.noteType;
+        let meta = {};
+        if (type === 'image') {
+          meta = { ...el._imageData };
+        } else if (type === 'image_grid') {
+          meta = { images: el._imageGridData.images, columns: el._imageGridData.columns, gap: el._imageGridData.gap };
+        } else if (type === 'video') {
+          meta = { ...el._videoData };
+        }
+        this.$wire.call('updateNoteMetadata', noteId, meta);
+      }, 400);
+    },
+
     _esc(s) {
       const d = document.createElement('div');
       d.textContent = s;
@@ -459,7 +1138,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
 
       // Middle-click pan (skip if target is inside a note or control)
       this._on(parent, 'pointerdown', (e) => {
-        if (e.target.closest('.workshop-note, .workshop-text, .workshop-section, .workshop-shape, .workshop-toolbar, .workshop-zoom-controls')) return;
+        if (e.target.closest('.workshop-note, .workshop-text, .workshop-section, .workshop-shape, .workshop-kanban, .workshop-image, .workshop-image-grid, .workshop-video, .workshop-toolbar, .workshop-zoom-controls')) return;
         // Middle button (1), or left button (0) when space is held
         if (e.button === 1 || (e.button === 0 && this._spaceDown)) {
           this._isPanning = true;
@@ -563,14 +1242,14 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     // ─── interact.js ────────────────────────────────────────
     _initInteract() {
       const self = this;
-      const draggableSelector = '.workshop-note, .workshop-text, .workshop-section, .workshop-shape';
+      const draggableSelector = '.workshop-note, .workshop-text, .workshop-section, .workshop-shape, .workshop-kanban, .workshop-image, .workshop-image-grid, .workshop-video';
       // Note: connectors are not draggable (they are SVG paths)
       const resizableSelector = draggableSelector;
 
       // Draggable — all element types use .drag-handle
       interact(draggableSelector).draggable({
         allowFrom: '.drag-handle',
-        ignoreFrom: 'input, textarea, .note-delete, .shape-toggle, .color-dot, .color-picker-dd',
+        ignoreFrom: 'input, textarea, .note-delete, .shape-toggle, .color-dot, .color-picker-dd, .kanban-cards, .kanban-card, .kanban-column, .kanban-add-card, .kanban-add-col-btn, .kanban-col-title, .kanban-col-delete, .kanban-card-title, .kanban-card-delete, .image-upload-zone, .image-grid-add-btn, .image-grid-container, .image-grid-cols-control, .video-url-input, .video-upload-btn, .video-upload-zone, .video-container iframe, .video-container video',
         inertia: false,
         listeners: {
           start(ev) { ev.target.classList.add('dragging'); },
@@ -705,7 +1384,14 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
 
       // Optimistic: add to DOM immediately
       const tempId = this._nextTempId--;
-      const metadata = type === 'shape' ? { shape: 'rect' } : null;
+      const metadata = type === 'shape' ? { shape: 'rect' }
+        : type === 'kanban' ? { columns: [
+            { id: 'col_' + Date.now().toString(36) + 'a', title: 'To Do', wipLimit: 0, cards: [] },
+            { id: 'col_' + Date.now().toString(36) + 'b', title: 'In Progress', wipLimit: 3, cards: [] },
+            { id: 'col_' + Date.now().toString(36) + 'c', title: 'Done', wipLimit: 0, cards: [] },
+          ] }
+        : type === 'image_grid' ? { images: [], columns: 2, gap: 4 }
+        : null;
       const el = this._createNoteEl({
         id: tempId, type, title: '', content: '',
         color: defaults.color, x, y,
@@ -726,7 +1412,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
 
       // Focus title input
       setTimeout(() => {
-        const input = el.querySelector('.note-body input, .text-body input, .section-title, .shape-body input');
+        const input = el.querySelector('.note-body input, .text-body input, .section-title, .shape-body input, .kanban-board-title, .image-alt-input, .video-url-input');
         input?.focus();
       }, 100);
     },
@@ -762,6 +1448,14 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       } else if (noteType === 'section') {
         el.className = el.className.replace(/workshop-section-\w+/, `workshop-section-${color}`);
         el.style.borderColor = COLOR_HEX[color] || COLOR_HEX.yellow;
+      } else if (noteType === 'kanban') {
+        el.className = el.className.replace(/workshop-kanban-\w+/, `workshop-kanban-${color}`);
+      } else if (noteType === 'image') {
+        el.className = el.className.replace(/workshop-image-\w+/, `workshop-image-${color}`);
+      } else if (noteType === 'image_grid') {
+        el.className = el.className.replace(/workshop-image-grid-\w+/, `workshop-image-grid-${color}`);
+      } else if (noteType === 'video') {
+        el.className = el.className.replace(/workshop-video-\w+/, `workshop-video-${color}`);
       }
 
       el.querySelector('.drag-handle .color-dot')?.setAttribute('style', `background:${COLOR_HEX[color]}`);
