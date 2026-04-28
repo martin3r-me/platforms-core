@@ -1217,7 +1217,7 @@
   display: grid;
   padding: 6px;
   overflow-y: auto;
-  grid-auto-rows: minmax(80px, 1fr);
+  grid-auto-rows: auto;
   align-content: start;
 }
 
@@ -1248,13 +1248,13 @@
   overflow: hidden;
   border-radius: 4px;
   background: #f3f4f6;
-  min-height: 80px;
 }
 
 .workshop-image-grid .image-grid-item img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  display: block;
+  border-radius: 4px;
 }
 
 .workshop-image-grid .image-grid-item-delete {

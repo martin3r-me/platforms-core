@@ -84,19 +84,30 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
         this.$refs.board.parentElement.appendChild(fileInput);
         this._fileInput = fileInput;
 
+        this._uploadBusy = false;
+
         fileInput.addEventListener('change', (e) => {
           const file = e.target.files[0];
-          if (!file) return;
+          if (!file || this._uploadBusy) return;
+          this._uploadBusy = true;
           this.$wire.upload('workshopFile', file,
-            () => {}, // success handled by event
-            () => { console.error('Upload failed'); },
+            () => {
+              // Temp upload done — server will process and fire event
+            },
+            () => {
+              console.error('Upload failed');
+              this._uploadBusy = false;
+              this._pendingUploadTarget = null;
+            },
             (ev) => {} // progress
           );
+          // Reset for next selection (must be after File object is captured)
           fileInput.value = '';
         });
 
         // Listen for upload completion from Livewire
         this.$wire.on('workshop-file-uploaded', ([data]) => {
+          this._uploadBusy = false;
           const target = this._pendingUploadTarget;
           this._pendingUploadTarget = null;
           if (!target || !target.noteEl) return;
@@ -106,7 +117,10 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
 
           if (target.type === 'image') {
             this._applyImageUpload(noteEl, data);
-            if (noteId > 0) this._saveMediaMetadata(noteEl, noteId);
+            if (noteId > 0) {
+              this._savePos(noteId, noteEl);
+              this._saveMediaMetadata(noteEl, noteId);
+            }
           } else if (target.type === 'image_grid') {
             this._applyImageGridUpload(noteEl, data);
             if (noteId > 0) this._saveMediaMetadata(noteEl, noteId);
@@ -889,6 +903,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       el.addEventListener('click', (e) => {
         if (e.target.closest('[data-action="upload-image"]')) {
           e.stopPropagation();
+          if (this._uploadBusy) return;
           this._pendingUploadTarget = { noteEl: el, type: 'image' };
           this._fileInput.accept = 'image/*';
           this._fileInput.click();
@@ -913,6 +928,14 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       el._imageData.src = data.url;
       const container = el.querySelector('.image-container');
       container.innerHTML = `<img src="${this._esc(data.url)}" alt="${this._esc(el._imageData.alt)}" style="object-fit:${el._imageData.objectFit};" />`;
+
+      // Adapt element size to image aspect ratio
+      if (data.width && data.height) {
+        const currentW = parseInt(el.style.width) || 300;
+        const ratio = data.width / data.height;
+        const newH = Math.round(currentW / ratio);
+        el.style.height = newH + 'px';
+      }
     },
 
     // ─── Image Grid Element ─────────────────────────────────
@@ -993,6 +1016,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
 
         if (action === 'add-image') {
           e.stopPropagation();
+          if (this._uploadBusy) return; // wait for current upload
           this._pendingUploadTarget = { noteEl: el, type: 'image_grid' };
           this._fileInput.accept = 'image/*';
           this._fileInput.click();
@@ -1149,6 +1173,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       el.addEventListener('click', (e) => {
         if (e.target.closest('[data-action="upload-video"]')) {
           e.stopPropagation();
+          if (this._uploadBusy) return;
           this._pendingUploadTarget = { noteEl: el, type: 'video' };
           this._fileInput.accept = 'video/*';
           this._fileInput.click();
