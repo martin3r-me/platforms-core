@@ -542,8 +542,6 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
         cardsContainer.appendChild(this._createKanbanCardEl(kanbanEl, card));
       });
 
-      this._bindKanbanDropZone(kanbanEl, colEl);
-
       // Column title save
       const titleInput = colEl.querySelector('.kanban-col-title');
       titleInput.addEventListener('blur', () => {
@@ -558,30 +556,18 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     _createKanbanCardEl(kanbanEl, card) {
       const cardEl = document.createElement('div');
       cardEl.className = 'kanban-card';
-      cardEl.draggable = true;
       cardEl.dataset.cardId = card.id;
 
       cardEl.innerHTML = `
         <div style="display:flex;align-items:center;gap:4px;">
+          <span class="kanban-card-grip">&#x2630;</span>
           <input type="text" class="kanban-card-title" value="${this._esc(card.title || '')}" placeholder="Karte..." />
           <button class="kanban-card-delete" data-kanban-action="delete-card" data-card-id="${card.id}" title="Karte loeschen">${DELETE_SVG}</button>
         </div>
       `;
 
-      // Drag start
-      cardEl.addEventListener('dragstart', (e) => {
-        e.stopPropagation();
-        const colEl = cardEl.closest('.kanban-column');
-        e.dataTransfer.setData('application/kanban-card', JSON.stringify({
-          cardId: card.id,
-          sourceColId: colEl?.dataset.colId || '',
-        }));
-        e.dataTransfer.effectAllowed = 'move';
-        cardEl.classList.add('kanban-card-dragging');
-      });
-      cardEl.addEventListener('dragend', () => {
-        cardEl.classList.remove('kanban-card-dragging');
-      });
+      // Pointer-based card drag (replaces native HTML5 drag)
+      this._bindKanbanCardDrag(kanbanEl, cardEl, card);
 
       // Card title save
       const titleInput = cardEl.querySelector('.kanban-card-title');
@@ -594,51 +580,152 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       return cardEl;
     },
 
-    _bindKanbanDropZone(kanbanEl, colEl) {
-      const cardsContainer = colEl.querySelector('.kanban-cards');
+    _bindKanbanCardDrag(kanbanEl, cardEl, card) {
+      let dragging = false;
+      let placeholder = null;
+      let startY = 0;
+      let offsetY = 0;
+      let sourceColId = null;
 
-      colEl.addEventListener('dragover', (e) => {
-        if (!e.dataTransfer.types.includes('application/kanban-card')) return;
+      const grip = cardEl.querySelector('.kanban-card-grip');
+      const handle = grip || cardEl;
+
+      handle.addEventListener('pointerdown', (e) => {
+        // Only left-click, skip if on input/button
+        if (e.button !== 0 || e.target.closest('input, button')) return;
         e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        colEl.classList.add('kanban-drop-target');
+        e.stopPropagation();
+
+        dragging = true;
+        sourceColId = cardEl.closest('.kanban-column')?.dataset.colId || '';
+        const rect = cardEl.getBoundingClientRect();
+        startY = e.clientY;
+        offsetY = e.clientY - rect.top;
+
+        // Create placeholder
+        placeholder = document.createElement('div');
+        placeholder.className = 'kanban-card-placeholder';
+        placeholder.style.height = rect.height + 'px';
+        cardEl.parentNode.insertBefore(placeholder, cardEl);
+
+        // Make card float
+        cardEl.classList.add('kanban-card-floating');
+        cardEl.style.width = rect.width + 'px';
+        cardEl.style.position = 'fixed';
+        cardEl.style.left = rect.left + 'px';
+        cardEl.style.top = rect.top + 'px';
+        cardEl.style.zIndex = '9999';
+
+        handle.setPointerCapture(e.pointerId);
       });
 
-      colEl.addEventListener('dragleave', (e) => {
-        if (!colEl.contains(e.relatedTarget)) {
-          colEl.classList.remove('kanban-drop-target');
+      handle.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Move card visually
+        cardEl.style.top = (e.clientY - offsetY) + 'px';
+
+        // Find target column under pointer
+        const columns = kanbanEl.querySelectorAll('.kanban-column');
+        let targetCol = null;
+        for (const col of columns) {
+          const cr = col.getBoundingClientRect();
+          if (e.clientX >= cr.left && e.clientX <= cr.right) {
+            targetCol = col;
+            break;
+          }
+        }
+
+        // Highlight target column
+        columns.forEach(c => c.classList.remove('kanban-drop-target'));
+        if (targetCol) {
+          targetCol.classList.add('kanban-drop-target');
+
+          // Move placeholder to target column at correct position
+          const cardsContainer = targetCol.querySelector('.kanban-cards');
+          const cards = [...cardsContainer.querySelectorAll('.kanban-card:not(.kanban-card-floating)')];
+          let insertBefore = null;
+          for (const c of cards) {
+            const cr = c.getBoundingClientRect();
+            if (e.clientY < cr.top + cr.height / 2) {
+              insertBefore = c;
+              break;
+            }
+          }
+
+          if (placeholder.parentNode !== cardsContainer || placeholder.nextSibling !== insertBefore) {
+            cardsContainer.insertBefore(placeholder, insertBefore);
+          }
         }
       });
 
-      colEl.addEventListener('drop', (e) => {
-        e.preventDefault();
-        colEl.classList.remove('kanban-drop-target');
-        const raw = e.dataTransfer.getData('application/kanban-card');
-        if (!raw) return;
-        const { cardId, sourceColId } = JSON.parse(raw);
-        const targetColId = colEl.dataset.colId;
+      const endDrag = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        e?.stopPropagation();
 
+        // Find where placeholder ended up
+        const targetColEl = placeholder?.closest('.kanban-column');
+        const targetColId = targetColEl?.dataset.colId || sourceColId;
+
+        // Reset card styles
+        cardEl.classList.remove('kanban-card-floating');
+        cardEl.style.position = '';
+        cardEl.style.left = '';
+        cardEl.style.top = '';
+        cardEl.style.width = '';
+        cardEl.style.zIndex = '';
+
+        // Insert card where placeholder is
+        if (placeholder?.parentNode) {
+          placeholder.parentNode.insertBefore(cardEl, placeholder);
+          placeholder.remove();
+        }
+        placeholder = null;
+
+        // Clear highlights
+        kanbanEl.querySelectorAll('.kanban-column').forEach(c => c.classList.remove('kanban-drop-target'));
+
+        // Update data model
         const data = kanbanEl._kanbanData;
         const srcCol = data.columns.find(c => c.id === sourceColId);
         const tgtCol = data.columns.find(c => c.id === targetColId);
-        if (!srcCol || !tgtCol) return;
+        if (srcCol && tgtCol) {
+          // WIP check
+          if (tgtCol.wipLimit > 0 && tgtCol.cards.length >= tgtCol.wipLimit && sourceColId !== targetColId) {
+            // Revert: move card back
+            const origColEl = kanbanEl.querySelector(`[data-col-id="${sourceColId}"] .kanban-cards`);
+            if (origColEl) origColEl.appendChild(cardEl);
+            return;
+          }
 
-        // WIP check
-        if (tgtCol.wipLimit > 0 && tgtCol.cards.length >= tgtCol.wipLimit && sourceColId !== targetColId) return;
+          // Remove from source
+          const cardIdx = srcCol.cards.findIndex(c => c.id === card.id);
+          if (cardIdx !== -1) srcCol.cards.splice(cardIdx, 1);
 
-        // Move card in data
-        const cardIdx = srcCol.cards.findIndex(c => c.id === cardId);
-        if (cardIdx === -1) return;
-        const [card] = srcCol.cards.splice(cardIdx, 1);
-        tgtCol.cards.push(card);
+          // Determine insert index from DOM order
+          const targetCards = targetColEl.querySelector('.kanban-cards');
+          const domCards = [...targetCards.querySelectorAll('.kanban-card')];
+          const newIdx = domCards.indexOf(cardEl);
 
-        // Move card in DOM
-        const cardEl = kanbanEl.querySelector(`[data-card-id="${cardId}"]`);
-        if (cardEl) cardsContainer.appendChild(cardEl);
+          // Insert into target at correct position
+          if (newIdx >= 0 && newIdx < tgtCol.cards.length) {
+            tgtCol.cards.splice(newIdx, 0, card);
+          } else {
+            tgtCol.cards.push(card);
+          }
 
-        this._updateKanbanCounts(kanbanEl);
-        this._saveKanbanMetadata(kanbanEl);
-      });
+          this._updateKanbanCounts(kanbanEl);
+          this._saveKanbanMetadata(kanbanEl);
+        }
+
+        sourceColId = null;
+      };
+
+      handle.addEventListener('pointerup', endDrag);
+      handle.addEventListener('pointercancel', endDrag);
     },
 
     _bindKanbanEvents(el) {
@@ -868,12 +955,19 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
             <button class="note-delete" data-action="delete" title="Loeschen">${DELETE_SVG}</button>
           </div>
         </div>
-        <div class="image-grid-container" style="grid-template-columns:repeat(${columns},1fr);gap:${gap}px;"></div>
+        <div class="image-grid-body">
+          <div class="image-grid-container" style="grid-template-columns:repeat(${columns},1fr);gap:${gap}px;"></div>
+          <div class="image-grid-empty" data-grid-action="add-image">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px;"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" /></svg>
+            <span>Klicken oder + zum Hinzufuegen</span>
+          </div>
+        </div>
         <div class="resize-handle"></div>
       `;
 
       const gridContainer = el.querySelector('.image-grid-container');
       images.forEach(img => gridContainer.appendChild(this._createGridItemEl(el, img)));
+      this._updateGridEmptyState(el);
 
       this._bindNoteEvents(el);
       this._bindImageGridEvents(el);
@@ -932,6 +1026,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
           const imageId = e.target.closest('[data-image-id]')?.dataset.imageId;
           el._imageGridData.images = el._imageGridData.images.filter(i => i.id !== imageId);
           el.querySelector(`[data-image-id="${imageId}"]`)?.closest('.image-grid-item')?.remove();
+          this._updateGridEmptyState(el);
           const noteId = parseInt(el.dataset.noteId);
           if (noteId > 0) this._saveMediaMetadata(el, noteId);
           return;
@@ -946,12 +1041,23 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       el.querySelector('.image-grid-cols-count').textContent = el._imageGridData.columns;
     },
 
+    _updateGridEmptyState(el) {
+      const empty = el.querySelector('.image-grid-empty');
+      const container = el.querySelector('.image-grid-container');
+      if (!empty) return;
+      const hasImages = el._imageGridData.images.length > 0;
+      empty.style.display = hasImages ? 'none' : '';
+      container.style.display = hasImages ? '' : 'none';
+    },
+
     _applyImageGridUpload(el, data) {
       const imgId = 'img_' + Date.now().toString(36);
       const imgData = { id: imgId, contextFileId: data.contextFileId, src: data.url, alt: '' };
       el._imageGridData.images.push(imgData);
       const gridContainer = el.querySelector('.image-grid-container');
+      gridContainer.style.display = '';
       gridContainer.appendChild(this._createGridItemEl(el, imgData));
+      this._updateGridEmptyState(el);
     },
 
     // ─── Video Element ──────────────────────────────────────

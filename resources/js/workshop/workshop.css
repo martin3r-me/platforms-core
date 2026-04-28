@@ -921,8 +921,39 @@
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
-.kanban-card.kanban-card-dragging {
-  opacity: 0.4;
+.kanban-card.kanban-card-floating {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  opacity: 0.95;
+  pointer-events: none;
+  z-index: 9999;
+  transform: rotate(2deg);
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+
+.kanban-card-placeholder {
+  border: 2px dashed #d1d5db;
+  border-radius: 4px;
+  background: rgba(242, 202, 82, 0.08);
+  flex-shrink: 0;
+}
+
+.kanban-card-grip {
+  cursor: grab;
+  color: #d1d5db;
+  font-size: 0.625rem;
+  line-height: 1;
+  flex-shrink: 0;
+  user-select: none;
+  touch-action: none;
+  transition: color 0.15s;
+}
+
+.kanban-card:hover .kanban-card-grip {
+  color: #9ca3af;
+}
+
+.kanban-card-grip:active {
+  cursor: grabbing;
 }
 
 .kanban-card-title {
@@ -1173,11 +1204,43 @@
   color: #1a1a2e;
 }
 
+.workshop-image-grid .image-grid-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
 .workshop-image-grid .image-grid-container {
   flex: 1;
   display: grid;
   padding: 6px;
   overflow-y: auto;
+  grid-auto-rows: minmax(80px, 1fr);
+  align-content: start;
+}
+
+.workshop-image-grid .image-grid-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: #9ca3af;
+  gap: 8px;
+  font-size: 0.6875rem;
+  cursor: pointer;
+  border: 2px dashed #e5e7eb;
+  border-radius: 0 0 0.5rem 0.5rem;
+  margin: 0 6px 6px;
+  transition: all 0.15s;
+}
+
+.workshop-image-grid .image-grid-empty:hover {
+  border-color: #f2ca52;
+  color: #6b7280;
+  background: rgba(242, 202, 82, 0.05);
 }
 
 .workshop-image-grid .image-grid-item {
@@ -1185,7 +1248,7 @@
   overflow: hidden;
   border-radius: 4px;
   background: #f3f4f6;
-  aspect-ratio: 1;
+  min-height: 80px;
 }
 
 .workshop-image-grid .image-grid-item img {
