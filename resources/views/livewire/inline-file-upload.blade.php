@@ -104,9 +104,15 @@
 
                     {{-- Datei-Info --}}
                     <div class="flex-1 min-w-0">
-                        <p class="text-xs font-medium text-[var(--ui-secondary)] truncate" title="{{ $file['original_name'] }}">
+                        <a
+                            href="{{ $file['url'] }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="text-xs font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] truncate block transition-colors duration-150"
+                            title="{{ $file['original_name'] }}"
+                        >
                             {{ $file['original_name'] }}
-                        </p>
+                        </a>
                         <div class="flex items-center gap-2 mt-0.5">
                             <span class="text-[10px] text-[var(--ui-muted)]">
                                 {{ $this->formatFileSize($file['file_size']) }}
@@ -121,6 +127,16 @@
 
                     {{-- Aktionen --}}
                     <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                        {{-- Öffnen --}}
+                        <a
+                            href="{{ $file['url'] }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="p-1.5 text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-primary)]/5 rounded-lg transition-all duration-150"
+                            title="Datei öffnen"
+                        >
+                            @svg('heroicon-o-arrow-top-right-on-square', 'w-3.5 h-3.5')
+                        </a>
                         {{-- Austauschen --}}
                         <button
                             type="button"
