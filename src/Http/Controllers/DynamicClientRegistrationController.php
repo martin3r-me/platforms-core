@@ -29,6 +29,9 @@ class DynamicClientRegistrationController extends Controller
         'http://localhost*',
         // Claude Desktop
         'claude://callback',
+        // Interne Dienste (Open WebUI etc.)
+        'https://*.bhgdigital.de/*',
+        'https://*.bhgdigital.de:*/*',
     ];
 
     /**

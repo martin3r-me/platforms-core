@@ -36,6 +36,12 @@ class ModalUser extends Component
     public $newMcpClientSecret = null;
     public $showNewMcpClient = false;
 
+    // MCP Token Management Properties
+    public $newMcpTokenName = '';
+    public $newMcpTokenExpiry = 'never';
+    public $newMcpTokenCreated = null;
+    public $showNewMcpToken = false;
+
     // Obsidian Vault Properties
     public $vaultForm = [
         'name' => '',
@@ -69,6 +75,7 @@ class ModalUser extends Component
         $this->activeTab = 'profile';
         $this->resetTokenForm();
         $this->resetMcpClientForm();
+        $this->resetMcpTokenForm();
     }
 
     public function setTab($tab)
@@ -308,6 +315,70 @@ class ModalUser extends Component
         $this->newMcpClientCreated = null;
         $this->newMcpClientSecret = null;
         $this->showNewMcpClient = false;
+    }
+
+    // ========================================
+    // MCP Token Management (Bearer Token)
+    // ========================================
+
+    /**
+     * Erstellt einen neuen MCP Bearer Token
+     */
+    public function createMcpToken()
+    {
+        $this->validate([
+            'newMcpTokenName' => 'required|string|min:3|max:255',
+            'newMcpTokenExpiry' => 'required|in:30_days,1_year,never',
+        ]);
+
+        $expiresAt = match ($this->newMcpTokenExpiry) {
+            '30_days' => now()->addDays(30),
+            '1_year' => now()->addYear(),
+            'never' => null,
+            default => null,
+        };
+
+        try {
+            $tokenResult = Auth::user()->createToken($this->newMcpTokenName, ['*'], $expiresAt);
+        } catch (\LogicException $e) {
+            Log::error('Passport key error beim MCP Token erstellen', [
+                'userId' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('notice', [
+                'type' => 'error',
+                'message' => 'API-Tokens sind derzeit nicht verfügbar. Bitte kontaktiere den Administrator.',
+            ]);
+            return;
+        }
+
+        $this->newMcpTokenCreated = $tokenResult->accessToken;
+        $this->showNewMcpToken = true;
+
+        $this->dispatch('notice', [
+            'type' => 'success',
+            'message' => 'MCP Token erfolgreich erstellt!'
+        ]);
+    }
+
+    /**
+     * Schließt die MCP Token-Anzeige
+     */
+    public function closeMcpTokenDisplay()
+    {
+        $this->resetMcpTokenForm();
+    }
+
+    /**
+     * Setzt das MCP Token-Formular zurück
+     */
+    protected function resetMcpTokenForm()
+    {
+        $this->newMcpTokenName = '';
+        $this->newMcpTokenExpiry = 'never';
+        $this->newMcpTokenCreated = null;
+        $this->showNewMcpToken = false;
     }
 
     // ========================================

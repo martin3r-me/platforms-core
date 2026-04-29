@@ -22,6 +22,12 @@ Mcp::web('sse', DiscoveryMcpServer::class)
     ->middleware('auth:api')
     ->name('mcp.sse');
 
+// Streamable HTTP Endpoint - gleicher Server unter /mcp (für Open WebUI, etc.)
+// Open WebUI erwartet POST /mcp als Streamable HTTP Transport
+Mcp::web('/', DiscoveryMcpServer::class)
+    ->middleware('auth:api')
+    ->name('mcp.streamable');
+
 // Alternativer Endpoint mit allen Tools (für Clients die Discovery nicht unterstützen)
 Mcp::web('sse-full', DefaultMcpServer::class)
     ->middleware('auth:api')

@@ -420,6 +420,126 @@
                     @endif
                 </div>
 
+                {{-- MCP Bearer Token erstellen (für Open WebUI etc.) --}}
+                <div class="p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
+                    <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-2">API Token für MCP</h3>
+                    <p class="text-sm text-[var(--ui-muted)] mb-4">
+                        Erstelle einen Bearer Token für Clients wie Open WebUI, die kein OAuth unterstützen.
+                    </p>
+
+                    @if($showNewMcpToken && $newMcpTokenCreated)
+                        {{-- Token wurde erstellt - Anzeige --}}
+                        <div class="space-y-4">
+                            <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
+                                <div class="flex items-center gap-2 text-green-700 mb-2">
+                                    @svg('heroicon-o-check-circle', 'w-5 h-5')
+                                    <span class="font-medium">Token erfolgreich erstellt!</span>
+                                </div>
+                                <p class="text-sm text-green-600 mb-3">
+                                    Kopiere den Token jetzt. Er wird nur einmal angezeigt!
+                                </p>
+
+                                {{-- Token --}}
+                                <div class="mb-3">
+                                    <label class="block text-xs font-medium text-green-700 mb-1">Bearer Token</label>
+                                    <div class="relative">
+                                        <textarea
+                                            readonly
+                                            rows="4"
+                                            class="w-full p-3 pr-12 text-xs font-mono bg-white border border-green-300 rounded-lg resize-none"
+                                        >{{ $newMcpTokenCreated }}</textarea>
+                                        <button
+                                            type="button"
+                                            x-data="{ copied: false }"
+                                            @click="
+                                                navigator.clipboard.writeText($el.closest('.relative').querySelector('textarea').value);
+                                                copied = true;
+                                                setTimeout(() => copied = false, 2000);
+                                            "
+                                            class="absolute top-2 right-2 p-2 text-green-600 hover:text-green-800 hover:bg-green-100 rounded transition-colors"
+                                            title="In Zwischenablage kopieren"
+                                        >
+                                            <template x-if="!copied">
+                                                @svg('heroicon-o-clipboard', 'w-5 h-5')
+                                            </template>
+                                            <template x-if="copied">
+                                                @svg('heroicon-o-clipboard-document-check', 'w-5 h-5')
+                                            </template>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {{-- MCP URL --}}
+                                <div>
+                                    <label class="block text-xs font-medium text-green-700 mb-1">MCP Server URL</label>
+                                    <div class="relative">
+                                        <input
+                                            type="text"
+                                            readonly
+                                            value="{{ config('app.url') }}/mcp"
+                                            class="w-full p-2 pr-10 text-sm font-mono bg-white border border-green-300 rounded-lg"
+                                        />
+                                        <button
+                                            type="button"
+                                            x-data="{ copied: false }"
+                                            @click="
+                                                navigator.clipboard.writeText('{{ config('app.url') }}/mcp');
+                                                copied = true;
+                                                setTimeout(() => copied = false, 2000);
+                                            "
+                                            class="absolute top-1/2 -translate-y-1/2 right-2 p-1 text-green-600 hover:text-green-800 hover:bg-green-100 rounded transition-colors"
+                                        >
+                                            <template x-if="!copied">
+                                                @svg('heroicon-o-clipboard', 'w-4 h-4')
+                                            </template>
+                                            <template x-if="copied">
+                                                @svg('heroicon-o-clipboard-document-check', 'w-4 h-4')
+                                            </template>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <p class="mt-3 text-xs text-green-600">
+                                    Nutze diesen Token als Bearer Token in Open WebUI (Header: <code class="bg-green-100 px-1 rounded">Authorization: Bearer &lt;token&gt;</code>).
+                                </p>
+                            </div>
+                            <x-ui-button variant="secondary-outline" wire:click="closeMcpTokenDisplay">
+                                Fertig
+                            </x-ui-button>
+                        </div>
+                    @else
+                        {{-- Formular --}}
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <x-ui-input-text
+                                    name="newMcpTokenName"
+                                    label="Token-Name"
+                                    wire:model="newMcpTokenName"
+                                    placeholder="z.B. Open WebUI"
+                                    :errorKey="'newMcpTokenName'"
+                                />
+                                <div>
+                                    <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1.5">Ablaufdatum</label>
+                                    <select
+                                        wire:model="newMcpTokenExpiry"
+                                        class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
+                                    >
+                                        <option value="30_days">30 Tage</option>
+                                        <option value="1_year">1 Jahr</option>
+                                        <option value="never">Nie</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <x-ui-button variant="primary" wire:click="createMcpToken">
+                                <div class="flex items-center gap-2">
+                                    @svg('heroicon-o-plus', 'w-4 h-4')
+                                    Token erstellen
+                                </div>
+                            </x-ui-button>
+                        </div>
+                    @endif
+                </div>
+
                 {{-- Client-Liste --}}
                 <div>
                     <div class="flex items-center justify-between mb-4">
