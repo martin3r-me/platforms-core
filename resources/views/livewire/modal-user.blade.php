@@ -33,7 +33,7 @@
                 class="px-4 py-2 text-sm font-medium transition-colors border-b-2"
                 :class="$wire.activeTab === 'mcp' ? 'text-[var(--ui-primary)] border-[var(--ui-primary)]' : 'text-[var(--ui-muted)] border-transparent hover:text-[var(--ui-secondary)]'"
             >
-                MCP Clients
+                MCP
             </button>
             <button
                 type="button"
