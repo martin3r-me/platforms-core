@@ -151,6 +151,9 @@
             </div>
 
             <div class="h-6 w-px bg-[var(--ui-border)]/60 mx-0.5"></div>
+
+            {{-- Page Presence: who else is on this page --}}
+            @livewire('core.page-presence')
         </div>
 
         {{-- Team Flyout (always visible) --}}
