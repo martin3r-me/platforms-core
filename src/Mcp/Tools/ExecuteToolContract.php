@@ -57,6 +57,14 @@ class ExecuteToolContract implements ToolContract
             $toolName = $arguments['tool'] ?? null;
             $toolArguments = $arguments['arguments'] ?? [];
 
+            // Handle case where arguments arrives as JSON string instead of object
+            if (is_string($toolArguments)) {
+                $decoded = json_decode($toolArguments, true);
+                $toolArguments = (json_last_error() === JSON_ERROR_NONE && is_array($decoded))
+                    ? $decoded
+                    : [];
+            }
+
             if (!is_string($toolName) || trim($toolName) === '') {
                 return ToolResult::failure(
                     'Parameter "tool" ist erforderlich. Beispiel: execute(tool="planner.projects.GET")',
