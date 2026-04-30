@@ -42,7 +42,7 @@
            window.Echo.private(`terminal.channel.${channelId}`)
              .whisper('typing', {
                userId: {{ auth()->id() }},
-               userName: @js(auth()->user()->name),
+               userName: @js(auth()->user()?->name ?? 'Unknown'),
              });
          } catch(e) {}
        },
@@ -57,6 +57,7 @@
        @endif
      "
      x-on:scroll-to-message.window="$nextTick(() => { const el = document.getElementById('msg-' + $event.detail.messageId); if(el) { el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('!bg-amber-500/15'); setTimeout(() => el.classList.remove('!bg-amber-500/15'), 2000); } })"
+     x-on:chat-scroll-bottom.window="$nextTick(() => { if($refs.chatBody) $refs.chatBody.scrollTop = $refs.chatBody.scrollHeight })"
 >
 
   <!-- Messages -->
