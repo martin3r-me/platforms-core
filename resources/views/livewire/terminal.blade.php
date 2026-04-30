@@ -1210,34 +1210,64 @@
           <!-- ═══ App: Aktivitäten ═══ -->
           <div x-show="$wire.activeApp === 'activity'" class="flex-1 min-h-0 flex flex-col">
             @if($this->availableApps['activity'] ?? false)
-              <livewire:core.terminal.activity lazy wire:key="t-app-activity" />
+              <livewire:core.terminal.activity lazy wire:key="t-app-activity"
+                :context-type="$this->contextType"
+                :context-id="$this->contextId"
+                :context-subject="$this->contextSubject"
+                :context-source="$this->contextSource"
+                :context-url="$this->contextUrl"
+                :context-meta="$this->contextMeta" />
             @endif
           </div>
 
           <!-- ═══ App: Dateien ═══ -->
           <div x-show="$wire.activeApp === 'files'" class="flex-1 min-h-0 flex flex-col">
             @if($this->availableApps['files'] ?? false)
-              <livewire:core.terminal.files lazy wire:key="t-app-files" />
+              <livewire:core.terminal.files lazy wire:key="t-app-files"
+                :context-type="$this->contextType"
+                :context-id="$this->contextId"
+                :context-subject="$this->contextSubject"
+                :context-source="$this->contextSource"
+                :context-url="$this->contextUrl"
+                :context-meta="$this->contextMeta" />
             @endif
           </div>
           <!-- ═══ App: Tags ═══ -->
           <div x-show="$wire.activeApp === 'tags'" class="flex-1 min-h-0 flex flex-col">
             @if($this->availableApps['tags'] ?? false)
-              <livewire:core.terminal.tags lazy wire:key="t-app-tags" />
+              <livewire:core.terminal.tags lazy wire:key="t-app-tags"
+                :context-type="$this->contextType"
+                :context-id="$this->contextId"
+                :context-subject="$this->contextSubject"
+                :context-source="$this->contextSource"
+                :context-url="$this->contextUrl"
+                :context-meta="$this->contextMeta" />
             @endif
           </div>
 
           <!-- ═══ App: Zeit ═══ -->
           <div x-show="$wire.activeApp === 'time'" class="flex-1 min-h-0 flex flex-col">
             @if($this->availableApps['time'] ?? false)
-              <livewire:core.terminal.time lazy wire:key="t-app-time" />
+              <livewire:core.terminal.time lazy wire:key="t-app-time"
+                :context-type="$this->contextType"
+                :context-id="$this->contextId"
+                :context-subject="$this->contextSubject"
+                :context-source="$this->contextSource"
+                :context-url="$this->contextUrl"
+                :context-meta="$this->contextMeta" />
             @endif
           </div>
 
           <!-- ═══ App: OKR ═══ -->
           <div x-show="$wire.activeApp === 'okr'" class="flex-1 min-h-0 flex flex-col">
             @if($this->availableApps['okr'] ?? false)
-              <livewire:core.terminal.okr lazy wire:key="t-app-okr" />
+              <livewire:core.terminal.okr lazy wire:key="t-app-okr"
+                :context-type="$this->contextType"
+                :context-id="$this->contextId"
+                :context-subject="$this->contextSubject"
+                :context-source="$this->contextSource"
+                :context-url="$this->contextUrl"
+                :context-meta="$this->contextMeta" />
             @endif
           </div>
 
