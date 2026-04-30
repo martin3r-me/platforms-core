@@ -24,12 +24,15 @@
       <span class="text-[10px] text-[var(--t-text-muted)]">{{ $pageContext['label'] }}@if($appLabel) · {{ $appLabel }}@endif</span>
     </div>
     {{-- Context-Thread button — always visible regardless of active app --}}
-    @if($activeApp === 'chat' && ($this->activeChannel['type'] ?? '') === 'context')
+    @if($activeApp === 'chat'
+        && ($this->activeChannel['type'] ?? '') === 'context'
+        && ($this->activeChannel['context_type'] ?? '') === $contextType
+        && ($this->activeChannel['context_id'] ?? null) == $contextId)
       <span class="p-1 text-[var(--t-accent)] flex-shrink-0" title="Kontext-Diskussion aktiv">
         <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
       </span>
     @else
-      <button wire:click="openContextChannel(); $set('activeApp', 'chat')"
+      <button wire:click="openContextChannel"
               class="p-1 rounded hover:bg-[var(--t-accent)]/20 text-[var(--t-text-muted)] hover:text-[var(--t-accent)] transition flex-shrink-0"
               title="Kontext-Diskussion öffnen">
         <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 0 1-.923 1.785A5.969 5.969 0 0 0 6 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337Z"/></svg>

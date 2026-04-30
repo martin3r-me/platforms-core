@@ -777,6 +777,11 @@ class CoreServiceProvider extends ServiceProvider
                 continue;
             }
 
+            // Skip traits, abstract classes, and non-Component subclasses (e.g. Concerns/)
+            if (!is_subclass_of($class, \Livewire\Component::class)) {
+                continue;
+            }
+
             // core.dashboard aus core + dashboard.php
             // kebab-case pro Segment, damit Terminal/Activity → terminal.activity (nicht terminal.-activity)
             $segments = explode(DIRECTORY_SEPARATOR, str_replace('.php', '', $relativePath));
@@ -787,7 +792,7 @@ class CoreServiceProvider extends ServiceProvider
             // \Log::debug("Registering Livewire component: {$alias} -> {$class}");
 
             try {
-            Livewire::component($alias, $class);
+                Livewire::component($alias, $class);
             } catch (\Throwable $e) {
                 // Fehler beim Registrieren der Komponente loggen, aber nicht abbrechen
                 \Log::warning("Failed to register Livewire component {$alias}: " . $e->getMessage());

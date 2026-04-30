@@ -206,6 +206,9 @@ class Chat extends Component
         $this->markAsRead($message->id);
         $this->dispatchNotifications($channel, $message, $mentionUserIds);
 
+        unset($this->messages);
+        $this->dispatch('chat-scroll-bottom');
+
         try {
             TerminalMessageSent::dispatch($channel->id, $message->id, auth()->id());
         } catch (\Throwable $e) {
@@ -832,6 +835,7 @@ class Chat extends Component
     public function onMessageReceived($payload = null): void
     {
         unset($this->messages);
+        $this->dispatch('chat-scroll-bottom');
     }
 
     public function onReactionToggled($payload = null): void

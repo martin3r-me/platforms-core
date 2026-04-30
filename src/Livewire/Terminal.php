@@ -335,6 +335,7 @@ class Terminal extends Component
     {
         if ($this->contextType && $this->contextId) {
             $this->resolveContextChannel();
+            $this->activeApp = 'chat';
         }
     }
 
@@ -364,6 +365,10 @@ class Terminal extends Component
 
         $this->channelId = $channel->id;
         $this->ensureMembership($channel);
+
+        // Clear cached computeds so re-render picks up the new channel
+        unset($this->channels, $this->activeChannel);
+
         $this->dispatch('terminal-chat-channel', channelId: $channel->id);
     }
 
@@ -1082,6 +1087,7 @@ class Terminal extends Component
         $this->channelId = $channel->id;
         $this->activeApp = 'chat';
         $this->ensureMembership($channel);
+        unset($this->channels, $this->activeChannel);
         $this->dispatch('terminal-chat-channel', channelId: $channel->id);
     }
 
@@ -1121,6 +1127,7 @@ class Terminal extends Component
         $this->channelId = $channel->id;
         $this->activeApp = 'chat';
         $this->ensureMembership($channel);
+        unset($this->channels, $this->activeChannel);
         $this->dispatch('terminal-chat-channel', channelId: $channel->id);
     }
 
@@ -1161,6 +1168,7 @@ class Terminal extends Component
 
         $this->channelId = $channel->id;
         $this->activeApp = 'chat';
+        unset($this->channels, $this->activeChannel);
         $this->dispatch('terminal-chat-channel', channelId: $channel->id);
     }
 
@@ -1198,6 +1206,7 @@ class Terminal extends Component
         }
 
         $this->channelId = null;
+        unset($this->channels, $this->activeChannel);
         $this->dispatch('terminal-chat-channel', channelId: null);
     }
 
@@ -1212,6 +1221,7 @@ class Terminal extends Component
             ->delete();
 
         $this->channelId = null;
+        unset($this->channels, $this->activeChannel);
         $this->dispatch('terminal-chat-channel', channelId: null);
     }
 
@@ -1271,7 +1281,12 @@ class Terminal extends Component
             return [];
         }
 
-        return auth()->user()->currentTeam
+        $team = auth()->user()?->currentTeam;
+        if (! $team) {
+            return [];
+        }
+
+        return $team
             ->users()
             ->where('users.id', '!=', auth()->id())
             ->select('users.id', 'users.name', 'users.avatar')
@@ -1351,6 +1366,9 @@ class Terminal extends Component
         }
 
         $userId = auth()->id();
+        if (! $userId) {
+            return ['dms' => [], 'channels' => [], 'context_groups' => []];
+        }
 
         $memberships = TerminalChannelMember::where('user_id', $userId)
             ->whereHas('channel', fn ($q) => $q->where('team_id', $teamId))
@@ -1516,6 +1534,8 @@ class Terminal extends Component
             'name' => $channel->name,
             'icon' => $channel->icon,
             'description' => $channel->description,
+            'context_type' => $channel->context_type,
+            'context_id' => $channel->context_id,
             'member_count' => count($members),
             'members' => $members,
         ];
