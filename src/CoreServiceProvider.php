@@ -31,9 +31,11 @@ use Platform\Core\Services\NullCanvasForContextProvider;
 use Platform\Core\Contracts\CatalogArticleSearchProviderInterface;
 use Platform\Core\Contracts\CatalogArticleResolverInterface;
 use Platform\Core\Contracts\CatalogArticleProcurementMapProviderInterface;
+use Platform\Core\Contracts\CatalogListProviderInterface;
 use Platform\Core\Services\NullCatalogArticleSearchProvider;
 use Platform\Core\Services\NullCatalogArticleResolver;
 use Platform\Core\Services\NullCatalogArticleProcurementMapProvider;
+use Platform\Core\Services\NullCatalogListProvider;
 use Platform\Core\Services\IntelligentAgent;
 use Platform\Core\Services\AgentOrchestrator;
 use Platform\Core\Contracts\CounterKeyResultSyncer;
@@ -302,6 +304,9 @@ class CoreServiceProvider extends ServiceProvider
         });
         $this->app->singleton(CatalogArticleProcurementMapProviderInterface::class, function () {
             return new NullCatalogArticleProcurementMapProvider();
+        });
+        $this->app->singleton(CatalogListProviderInterface::class, function () {
+            return new NullCatalogListProvider();
         });
 
         // AI Agent Services entfernt – kommen in separates Modul

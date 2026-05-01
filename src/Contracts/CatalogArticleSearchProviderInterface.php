@@ -11,5 +11,5 @@ interface CatalogArticleSearchProviderInterface
      *
      * @return Collection<int, array{id: int, article_number: ?string, name: string, gebinde: ?string, ek: float, vk: float, mwst: ?string}>
      */
-    public function search(int $teamId, string $query, int $limit = 20): Collection;
+    public function search(int $teamId, string $query, int $limit = 20, ?int $catalogId = null): Collection;
 }
