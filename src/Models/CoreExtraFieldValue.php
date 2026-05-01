@@ -62,7 +62,7 @@ class CoreExtraFieldValue extends Model
     {
         static::saving(function ($model) {
             foreach (array_keys($model->getAttributes()) as $key) {
-                if (str_starts_with($key, '_plain_')) {
+                if (str_starts_with($key, '_plain_') || $key === 'definition') {
                     unset($model->attributes[$key]);
                 }
             }

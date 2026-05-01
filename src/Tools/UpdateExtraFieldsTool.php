@@ -249,6 +249,7 @@ class UpdateExtraFieldsTool implements ToolContract, ToolMetadataContract
                             'fieldable_type' => $model->getMorphClass(),
                             'fieldable_id' => $model->id,
                         ]);
+                        $valueRecord->setRelation('definition', \Platform\Core\Models\CoreExtraFieldDefinition::find($definitionId));
                     }
 
                     $valueRecord->setTypedValue($value);
