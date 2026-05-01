@@ -10,4 +10,9 @@ class NullCatalogArticleResolver implements CatalogArticleResolverInterface
     {
         return null;
     }
+
+    public function resolveByArticleNumber(string $articleNumber, int $teamId): ?array
+    {
+        return null;
+    }
 }
