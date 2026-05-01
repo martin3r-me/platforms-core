@@ -614,6 +614,27 @@
   box-shadow: 0 2px 8px rgba(242, 202, 82, 0.3);
 }
 
+/* ─── Board Presence ───────────────────────────────────── */
+.workshop-presence {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 50;
+  background: white;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  padding: 0.375rem 0.5rem;
+  min-height: 2rem;
+  display: flex;
+  align-items: center;
+}
+
+.workshop-presence:empty,
+.workshop-presence > div:empty {
+  display: none;
+}
+
 /* ─── Zoom Controls ────────────────────────────────────── */
 .workshop-zoom-controls {
   position: absolute;
