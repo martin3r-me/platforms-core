@@ -28,6 +28,12 @@ use Platform\Core\Contracts\CanvasForContextProviderInterface;
 use Platform\Core\Services\NullCanvasResolver;
 use Platform\Core\Services\NullCanvasOptionsProvider;
 use Platform\Core\Services\NullCanvasForContextProvider;
+use Platform\Core\Contracts\CatalogArticleSearchProviderInterface;
+use Platform\Core\Contracts\CatalogArticleResolverInterface;
+use Platform\Core\Contracts\CatalogArticleProcurementMapProviderInterface;
+use Platform\Core\Services\NullCatalogArticleSearchProvider;
+use Platform\Core\Services\NullCatalogArticleResolver;
+use Platform\Core\Services\NullCatalogArticleProcurementMapProvider;
 use Platform\Core\Services\IntelligentAgent;
 use Platform\Core\Services\AgentOrchestrator;
 use Platform\Core\Contracts\CounterKeyResultSyncer;
@@ -285,6 +291,17 @@ class CoreServiceProvider extends ServiceProvider
         });
         $this->app->singleton(CanvasForContextProviderInterface::class, function () {
             return new NullCanvasForContextProvider();
+        });
+
+        // Default-Catalog-Artikel-Resolver binden (können vom Commerce-Modul überschrieben werden)
+        $this->app->singleton(CatalogArticleSearchProviderInterface::class, function () {
+            return new NullCatalogArticleSearchProvider();
+        });
+        $this->app->singleton(CatalogArticleResolverInterface::class, function () {
+            return new NullCatalogArticleResolver();
+        });
+        $this->app->singleton(CatalogArticleProcurementMapProviderInterface::class, function () {
+            return new NullCatalogArticleProcurementMapProvider();
         });
 
         // AI Agent Services entfernt – kommen in separates Modul
