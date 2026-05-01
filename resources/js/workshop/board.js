@@ -47,6 +47,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     _nextTempId: -1,
     _pendingUploadTarget: null,
     _mediaTimers: {},
+    _lockedNoteIds: new Set(),
     colorPickerOpen: null,
     _connectorMode: false,
     _connectorFrom: null,
@@ -128,6 +129,11 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
             this._applyVideoUpload(noteEl, data);
             if (noteId > 0) this._saveMediaMetadata(noteEl, noteId);
           }
+        });
+
+        // Listen for real-time changes from other users
+        this.$wire.on('workshop-note-changed', ([payload]) => {
+          this._handleRemoteChange(payload);
         });
 
         this._renderNotes(notes);
@@ -425,7 +431,10 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
     _bindTextSave(el) {
       const input = el.querySelector('.note-body input');
       const textarea = el.querySelector('.note-body textarea');
+      const lock = () => { const id = parseInt(el.dataset.noteId); if (id > 0) this._lockedNoteIds.add(id); };
+      const unlock = () => { const id = parseInt(el.dataset.noteId); if (id > 0) this._lockedNoteIds.delete(id); };
       const saveText = () => {
+        unlock();
         const noteId = parseInt(el.dataset.noteId);
         if (noteId < 0) return;
         clearTimeout(this._textTimers[noteId]);
@@ -433,6 +442,8 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
           this.$wire.call('updateNoteText', noteId, input.value, textarea.value);
         }, 400);
       };
+      input.addEventListener('focus', lock);
+      textarea.addEventListener('focus', lock);
       input.addEventListener('blur', saveText);
       textarea.addEventListener('blur', saveText);
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
@@ -440,7 +451,10 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
 
     _bindTextInputSave(el) {
       const input = el.querySelector('.text-body input');
+      const lock = () => { const id = parseInt(el.dataset.noteId); if (id > 0) this._lockedNoteIds.add(id); };
+      const unlock = () => { const id = parseInt(el.dataset.noteId); if (id > 0) this._lockedNoteIds.delete(id); };
       const saveText = () => {
+        unlock();
         const noteId = parseInt(el.dataset.noteId);
         if (noteId < 0) return;
         clearTimeout(this._textTimers[noteId]);
@@ -448,13 +462,17 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
           this.$wire.call('updateNoteText', noteId, input.value, '');
         }, 400);
       };
+      input.addEventListener('focus', lock);
       input.addEventListener('blur', saveText);
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
     },
 
     _bindSectionTextSave(el) {
       const input = el.querySelector('.section-title');
+      const lock = () => { const id = parseInt(el.dataset.noteId); if (id > 0) this._lockedNoteIds.add(id); };
+      const unlock = () => { const id = parseInt(el.dataset.noteId); if (id > 0) this._lockedNoteIds.delete(id); };
       const saveText = () => {
+        unlock();
         const noteId = parseInt(el.dataset.noteId);
         if (noteId < 0) return;
         clearTimeout(this._textTimers[noteId]);
@@ -462,13 +480,17 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
           this.$wire.call('updateNoteText', noteId, input.value, '');
         }, 400);
       };
+      input.addEventListener('focus', lock);
       input.addEventListener('blur', saveText);
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
     },
 
     _bindShapeTextSave(el) {
       const input = el.querySelector('.shape-body input');
+      const lock = () => { const id = parseInt(el.dataset.noteId); if (id > 0) this._lockedNoteIds.add(id); };
+      const unlock = () => { const id = parseInt(el.dataset.noteId); if (id > 0) this._lockedNoteIds.delete(id); };
       const saveText = () => {
+        unlock();
         const noteId = parseInt(el.dataset.noteId);
         if (noteId < 0) return;
         clearTimeout(this._textTimers[noteId]);
@@ -476,6 +498,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
           this.$wire.call('updateNoteText', noteId, input.value, '');
         }, 400);
       };
+      input.addEventListener('focus', lock);
       input.addEventListener('blur', saveText);
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
     },
@@ -812,7 +835,10 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
 
     _bindKanbanTitleSave(el) {
       const input = el.querySelector('.kanban-board-title');
+      const lock = () => { const id = parseInt(el.dataset.noteId); if (id > 0) this._lockedNoteIds.add(id); };
+      const unlock = () => { const id = parseInt(el.dataset.noteId); if (id > 0) this._lockedNoteIds.delete(id); };
       const saveText = () => {
+        unlock();
         const noteId = parseInt(el.dataset.noteId);
         if (noteId < 0) return;
         clearTimeout(this._textTimers[noteId]);
@@ -820,6 +846,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
           this.$wire.call('updateNoteText', noteId, input.value, '');
         }, 400);
       };
+      input.addEventListener('focus', lock);
       input.addEventListener('blur', saveText);
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
     },
@@ -1219,6 +1246,148 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
       }, 400);
     },
 
+    // ─── Remote Change Handlers (Real-Time Sync) ──────────
+    _handleRemoteChange(payload) {
+      const { action, noteId, data } = payload;
+      switch (action) {
+        case 'created':       this._handleRemoteCreate(data); break;
+        case 'moved':         this._handleRemoteMove(noteId, data); break;
+        case 'text_updated':  this._handleRemoteTextUpdate(noteId, data); break;
+        case 'color_updated': this._handleRemoteColorUpdate(noteId, data); break;
+        case 'metadata_updated': this._handleRemoteMetadataUpdate(noteId, data); break;
+        case 'deleted':       this._handleRemoteDelete(noteId); break;
+      }
+    },
+
+    _handleRemoteCreate(data) {
+      if (!data || !data.id) return;
+      // Duplicate guard: skip if element already exists
+      if (this.$refs.board.querySelector(`[data-note-id="${data.id}"]`)) return;
+      const el = this._createNoteEl(data);
+      this.$refs.board.appendChild(el);
+    },
+
+    _handleRemoteMove(noteId, data) {
+      if (this._lockedNoteIds.has(noteId)) return;
+      const el = this.$refs.board.querySelector(`[data-note-id="${noteId}"]`);
+      if (!el) return;
+      const x = data.x ?? (parseFloat(el.dataset.x) || 0);
+      const y = data.y ?? (parseFloat(el.dataset.y) || 0);
+      el.dataset.x = x;
+      el.dataset.y = y;
+      el.style.transform = `translate(${x}px,${y}px)`;
+      if (data.width != null) el.style.width = data.width + 'px';
+      if (data.height != null) el.style.height = data.height + 'px';
+      this._updateConnectors();
+    },
+
+    _handleRemoteTextUpdate(noteId, data) {
+      if (this._lockedNoteIds.has(noteId)) return;
+      const el = this.$refs.board.querySelector(`[data-note-id="${noteId}"]`);
+      if (!el) return;
+      const type = el.dataset.noteType || 'note';
+
+      if (type === 'note') {
+        const input = el.querySelector('.note-body input');
+        const textarea = el.querySelector('.note-body textarea');
+        if (input && data.title != null) input.value = data.title;
+        if (textarea && data.content != null) textarea.value = data.content;
+      } else if (type === 'text') {
+        const input = el.querySelector('.text-body input');
+        if (input && data.title != null) input.value = data.title;
+      } else if (type === 'section') {
+        const input = el.querySelector('.section-title');
+        if (input && data.title != null) input.value = data.title;
+      } else if (type === 'shape') {
+        const input = el.querySelector('.shape-body input');
+        if (input && data.title != null) input.value = data.title;
+      } else if (type === 'kanban') {
+        const input = el.querySelector('.kanban-board-title');
+        if (input && data.title != null) input.value = data.title;
+      }
+    },
+
+    _handleRemoteColorUpdate(noteId, data) {
+      const el = this.$refs.board.querySelector(`[data-note-id="${noteId}"]`);
+      if (!el || !data.color) return;
+      const type = el.dataset.noteType || 'note';
+
+      if (type === 'shape') {
+        this._changeShapeColor(el, noteId, data.color);
+      } else {
+        this._changeColor(el, noteId, data.color);
+      }
+    },
+
+    _handleRemoteMetadataUpdate(noteId, data) {
+      if (this._lockedNoteIds.has(noteId)) return;
+      const el = this.$refs.board.querySelector(`[data-note-id="${noteId}"]`);
+      if (!el || !data.metadata) return;
+      const type = el.dataset.noteType || 'note';
+
+      if (type === 'shape' && data.metadata.shape) {
+        el.dataset.shape = data.metadata.shape;
+        el.className = el.className.replace(/workshop-shape-(?:rect|circle|diamond)/, `workshop-shape-${data.metadata.shape}`);
+      } else if (type === 'kanban' && data.metadata.columns) {
+        // Re-render kanban columns
+        el._kanbanData = { columns: JSON.parse(JSON.stringify(data.metadata.columns)) };
+        const colsContainer = el.querySelector('.kanban-columns');
+        if (colsContainer) {
+          colsContainer.innerHTML = '';
+          el._kanbanData.columns.forEach(col => {
+            colsContainer.appendChild(this._createKanbanColumnEl(el, col));
+          });
+        }
+      } else if (type === 'image' && data.metadata) {
+        el._imageData = { ...el._imageData, ...data.metadata };
+      } else if (type === 'image_grid' && data.metadata) {
+        el._imageGridData = { ...el._imageGridData, ...data.metadata };
+        if (data.metadata.images) {
+          const gridContainer = el.querySelector('.image-grid-container');
+          if (gridContainer) {
+            gridContainer.innerHTML = '';
+            data.metadata.images.forEach(img => gridContainer.appendChild(this._createGridItemEl(el, img)));
+            this._updateGridEmptyState(el);
+          }
+        }
+        if (data.metadata.columns) this._updateGridLayout(el);
+      } else if (type === 'video' && data.metadata) {
+        el._videoData = { ...el._videoData, ...data.metadata };
+      }
+    },
+
+    _handleRemoteDelete(noteId) {
+      const el = this.$refs.board.querySelector(`[data-note-id="${noteId}"]`);
+      if (!el) return;
+      const type = el.dataset.noteType;
+
+      if (type === 'connector') {
+        // Remove SVG elements
+        if (this._svgLayer) {
+          const path = this._svgLayer.querySelector(`.workshop-connector-path[data-connector-id="${noteId}"]`);
+          const fo = this._svgLayer.querySelector(`.connector-delete-fo[data-connector-id="${noteId}"]`);
+          if (path) path.remove();
+          if (fo) fo.remove();
+        }
+      } else {
+        // Remove connectors referencing this note
+        if (this._svgLayer) {
+          const noteIdStr = String(noteId);
+          this._svgLayer.querySelectorAll('.workshop-connector-path').forEach(path => {
+            if (path.dataset.fromNoteId === noteIdStr || path.dataset.toNoteId === noteIdStr) {
+              const fo = this._svgLayer.querySelector(`.connector-delete-fo[data-connector-id="${path.dataset.connectorId}"]`);
+              if (fo) fo.remove();
+              const anchor = this.$refs.board.querySelector(`[data-note-id="${path.dataset.connectorId}"][data-note-type="connector"]`);
+              if (anchor) anchor.remove();
+              path.remove();
+            }
+          });
+        }
+      }
+
+      el.remove();
+    },
+
     _esc(s) {
       const d = document.createElement('div');
       d.textContent = s;
@@ -1383,7 +1552,11 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
         ignoreFrom: 'input, textarea, .note-delete, .shape-toggle, .color-dot, .color-picker-dd, .kanban-cards, .kanban-card, .kanban-column, .kanban-add-card, .kanban-add-col-btn, .kanban-col-title, .kanban-col-delete, .kanban-card-title, .kanban-card-delete, .image-upload-zone, .image-grid-add-btn, .image-grid-container, .image-grid-cols-control, .video-url-input, .video-upload-btn, .video-upload-zone, .video-container iframe, .video-container video',
         inertia: false,
         listeners: {
-          start(ev) { ev.target.classList.add('dragging'); },
+          start(ev) {
+            ev.target.classList.add('dragging');
+            const id = parseInt(ev.target.dataset.noteId);
+            if (id > 0) self._lockedNoteIds.add(id);
+          },
           move(ev) {
             const t = ev.target;
             const x = (parseFloat(t.dataset.x) || 0) + ev.dx / self.scale;
@@ -1397,6 +1570,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
             ev.target.classList.remove('dragging');
             const t = ev.target;
             const id = parseInt(t.dataset.noteId);
+            if (id > 0) self._lockedNoteIds.delete(id);
             if (id < 0) return;
             self._savePos(id, t);
           },
@@ -1408,6 +1582,10 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
         edges: { right: '.resize-handle', bottom: '.resize-handle' },
         modifiers: [interact.modifiers.restrictSize({ min: { width: 60, height: 30 } })],
         listeners: {
+          start(ev) {
+            const id = parseInt(ev.target.dataset.noteId);
+            if (id > 0) self._lockedNoteIds.add(id);
+          },
           move(ev) {
             const t = ev.target;
             let x = parseFloat(t.dataset.x) || 0;
@@ -1433,6 +1611,7 @@ export function workshopBoard({ notes = [], canvasBlocks = [], gridLayout = {} }
           end(ev) {
             const t = ev.target;
             const id = parseInt(t.dataset.noteId);
+            if (id > 0) self._lockedNoteIds.delete(id);
             if (id < 0) return;
             self._savePos(id, t);
           },
