@@ -3,10 +3,9 @@
 namespace Platform\Core\Casts;
 
 use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
-use Illuminate\Contracts\Support\Stringable;
 use Illuminate\Support\Facades\Crypt;
 
-class EncryptedDecimal implements CastsAttributes, Stringable
+class EncryptedDecimal implements CastsAttributes, \Stringable
 {
     protected int $decimals;
 
