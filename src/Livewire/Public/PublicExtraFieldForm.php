@@ -24,6 +24,36 @@ class PublicExtraFieldForm extends Component
     public int $totalFields = 0;
     public int $filledFields = 0;
 
+    /**
+     * Pflicht/Optional-getrennte Counter — nur befuellt wenn das Linkable-
+     * Modell das Akkordeon-Layout opted-in hat (siehe usesAccordionLayout()).
+     */
+    public int $requiredTotal = 0;
+    public int $requiredFilled = 0;
+    public int $optionalTotal = 0;
+    public int $optionalFilled = 0;
+
+    /**
+     * Field-IDs aufgeteilt fuer Akkordeon-Render. Werden nur befuellt wenn
+     * Akkordeon-Layout aktiv ist; sonst leer und Blade rendert klassisch.
+     *
+     * @var int[]
+     */
+    public array $openFieldIds = [];
+    public array $accordionFieldIds = [];
+
+    /**
+     * True wenn das Linkable-Modell Akkordeon-Layout opted-in hat.
+     * Steuert ob das Blade die Aufteilung rendert oder klassisch.
+     */
+    public bool $useAccordionLayout = false;
+
+    /**
+     * Phase-Order des aktuellen Modells (fuer required_in_phase_orders).
+     * Wird in der Render-Logik fuers Pflicht-Sternchen genutzt.
+     */
+    public ?int $currentPhaseOrder = null;
+
     public array $pendingFileUploads = [];
     public array $uploadedFileData = [];
 
@@ -86,44 +116,83 @@ class PublicExtraFieldForm extends Component
         $this->allFieldDefinitions = $this->extraFieldDefinitions;
         $this->allFieldValues = $this->extraFieldValues;
 
-        // Filter: only show unfilled fields
+        $this->useAccordionLayout = $this->usesAccordionLayout($model);
+        $this->currentPhaseOrder = $this->resolveCurrentPhaseOrder($model);
+        $useAccordion = $this->useAccordionLayout;
+        $currentPhaseOrder = $this->currentPhaseOrder;
+
+        // Filter: only show unfilled fields — Felder mit options.always_show_in_form
+        // bleiben sichtbar auch wenn schon befuellt (zum Bestaetigen / Korrigieren).
         $filtered = [];
         $this->totalFields = 0;
         $this->filledFields = 0;
 
         foreach ($this->extraFieldDefinitions as $field) {
             $this->totalFields++;
-            $value = $this->extraFieldValues[$field['id']] ?? null;
-            // Phone-Felder: gefüllt wenn raw vorhanden (nach Normalisierung ist nur raw+country da)
-            if ($field['type'] === 'phone') {
-                $isFilled = is_array($value) && !empty(trim($value['raw'] ?? ''));
-            } elseif ($field['type'] === 'address') {
-                $isFilled = is_array($value) && !empty($value['street'] ?? null) && !empty($value['city'] ?? null);
-            } elseif ($field['type'] === 'date') {
-                $isFilled = is_array($value)
-                    ? (($value['day'] ?? '') !== '' && ($value['month'] ?? '') !== '' && ($value['year'] ?? '') !== '')
-                    : ($value !== null && $value !== '');
-            } else {
-                $isFilled = $value !== null && $value !== '' && $value !== [];
-            }
+            $isFilled = $this->isFieldValueFilled($field);
 
             if ($isFilled) {
                 $this->filledFields++;
+                if ($this->isAlwaysShownInForm($field)) {
+                    $filtered[] = $field; // bleibt sichtbar trotz "filled"
+                }
             } else {
                 $filtered[] = $field;
             }
         }
 
-        // Overwrite definitions with only unfilled fields
+        // Overwrite definitions with only unfilled fields (+ always_show)
         $this->extraFieldDefinitions = $filtered;
 
-        // Reset values to only contain filtered field IDs
+        // Reset values to only contain filtered field IDs (Werte fuer always_show
+        // bleiben dabei erhalten als Prefill)
         $filteredValues = [];
         foreach ($filtered as $field) {
             $filteredValues[$field['id']] = $this->extraFieldValues[$field['id']] ?? null;
         }
         $this->extraFieldValues = $filteredValues;
         $this->originalExtraFieldValues = $filteredValues;
+
+        // Akkordeon-Layout: aufteilen in openFields (Pflicht + bedingt sichtbar)
+        // und accordionFields (rein optional). Nur wenn das Linkable-Modell
+        // das opted-in hat. Sonst bleiben die Listen leer und das Blade
+        // rendert klassisch.
+        $this->openFieldIds = [];
+        $this->accordionFieldIds = [];
+        $this->requiredTotal = 0;
+        $this->requiredFilled = 0;
+        $this->optionalTotal = 0;
+        $this->optionalFilled = 0;
+
+        if ($useAccordion) {
+            foreach ($filtered as $field) {
+                $isFilled = $this->isFieldValueFilled($field);
+                $isRequired = $this->isFieldEffectivelyRequired($field, $currentPhaseOrder);
+                $isConditional = $this->isFieldConditionallyVisible($field);
+
+                if ($isRequired) {
+                    $this->requiredTotal++;
+                    if ($isFilled) {
+                        $this->requiredFilled++;
+                    }
+                    $this->openFieldIds[] = $field['id'];
+                } elseif ($isConditional) {
+                    // bedingt-sichtbares Feld zaehlt als optional aber
+                    // bleibt im Hauptbereich sichtbar
+                    $this->optionalTotal++;
+                    if ($isFilled) {
+                        $this->optionalFilled++;
+                    }
+                    $this->openFieldIds[] = $field['id'];
+                } else {
+                    $this->optionalTotal++;
+                    if ($isFilled) {
+                        $this->optionalFilled++;
+                    }
+                    $this->accordionFieldIds[] = $field['id'];
+                }
+            }
+        }
 
         $this->loadUploadedFileData();
 
@@ -132,6 +201,106 @@ class PublicExtraFieldForm extends Component
         } else {
             $this->state = 'form';
         }
+    }
+
+    /**
+     * Prueft ob ein Field-Wert als befuellt gilt (typ-aware).
+     */
+    protected function isFieldValueFilled(array $field): bool
+    {
+        $value = $this->extraFieldValues[$field['id']] ?? null;
+        if ($field['type'] === 'phone') {
+            return is_array($value) && !empty(trim($value['raw'] ?? ''));
+        }
+        if ($field['type'] === 'address') {
+            return is_array($value) && !empty($value['street'] ?? null) && !empty($value['city'] ?? null);
+        }
+        if ($field['type'] === 'date') {
+            return is_array($value)
+                ? (($value['day'] ?? '') !== '' && ($value['month'] ?? '') !== '' && ($value['year'] ?? '') !== '')
+                : ($value !== null && $value !== '');
+        }
+        return $value !== null && $value !== '' && $value !== [];
+    }
+
+    /**
+     * Effektiv-pflicht: is_mandatory ODER is_required ODER der Phase-Override
+     * options.required_in_phase_orders greift fuer die aktuelle Phase-Order.
+     *
+     * Wird sowohl fuer das Pflicht-Sternchen im Render als auch fuer die
+     * Pflicht/Optional-Aufteilung verwendet — Single Source of Truth.
+     */
+    public function isFieldEffectivelyRequired(array $field, ?int $currentPhaseOrder = null): bool
+    {
+        if (!empty($field['is_mandatory']) || !empty($field['is_required'])) {
+            return true;
+        }
+        $overrideOrders = $field['options']['required_in_phase_orders'] ?? [];
+        if (empty($overrideOrders) || !is_array($overrideOrders)) {
+            return false;
+        }
+        if ($currentPhaseOrder === null) {
+            return false;
+        }
+        return in_array((int) $currentPhaseOrder, array_map('intval', $overrideOrders), true);
+    }
+
+    /**
+     * Bedingt sichtbar: hat aktive visibility_config. Solche Felder werden
+     * im Akkordeon-Layout im Hauptbereich gerendert (nicht eingeklappt),
+     * weil sie kontextuell relevant sind sobald sie sichtbar werden.
+     */
+    public function isFieldConditionallyVisible(array $field): bool
+    {
+        return ($field['visibility_config']['enabled'] ?? false) === true;
+    }
+
+    /**
+     * options.always_show_in_form=true → das Feld bleibt im Form sichtbar
+     * auch wenn schon ein Wert gespeichert ist. Geeignet fuer kanonische
+     * Felder die der Bewerber bestaetigen oder ueberschreiben koennen soll
+     * (z.B. Mail die vom Inbound als Indeed-Proxy gesetzt wurde).
+     */
+    public function isAlwaysShownInForm(array $field): bool
+    {
+        return ($field['options']['always_show_in_form'] ?? false) === true;
+    }
+
+    /**
+     * Modell-Opt-In via method_exists-Check. Recruiting-Modelle haben den
+     * Trait UsesAccordionPublicForm, andere Module nicht — damit ist das
+     * Akkordeon-Layout strikt opt-in pro Modul ohne dass Core ein Modul
+     * kennen muss.
+     */
+    protected function usesAccordionLayout($model): bool
+    {
+        if (!$model) {
+            return false;
+        }
+        if (!method_exists($model, 'usesAccordionFormLayout')) {
+            return false;
+        }
+        return (bool) $model->usesAccordionFormLayout();
+    }
+
+    /**
+     * Phase-Order des aktuellen Modells fuer den required_in_phase_orders-
+     * Override-Check. Modul-agnostisch via method_exists — Recruiting
+     * RecApplicant hat phase()->order; andere Modelle ohne Phase-Konzept
+     * returnen null und der Override greift schlicht nicht.
+     */
+    protected function resolveCurrentPhaseOrder($model): ?int
+    {
+        if (!$model) {
+            return null;
+        }
+        if (method_exists($model, 'phase')) {
+            $phase = $model->phase;
+            if ($phase && isset($phase->order)) {
+                return (int) $phase->order;
+            }
+        }
+        return null;
     }
 
     private function loadUploadedFileData(): void
