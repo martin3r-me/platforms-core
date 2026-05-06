@@ -71,6 +71,28 @@ class PublicExtraFieldForm extends Component
         return ($this->modelClass)::find($this->modelId);
     }
 
+    /**
+     * Hook fuer Modul-spezifische Erweiterung der Saved/Completed-State-Cards.
+     *
+     * Wenn das Linkable-Model die Methode `renderPublicFormCompletionExtras($state)`
+     * implementiert, wird deren HTML-String unter dem Standard-Card eingebettet.
+     * Module wie Recruiting nutzen das fuer eine Schulungs-Bestaetigungsbox am
+     * Phase-Ende, ohne dass Core etwas davon wissen muss.
+     *
+     * Selbe Konvention wie usesAccordionFormLayout: opt-in pro Model via
+     * Trait/Methode — wenn nicht implementiert, faellt das Form auf das
+     * generische Default-Verhalten zurueck.
+     */
+    public function getCompletionExtras(): ?string
+    {
+        $model = $this->getModel();
+        if (!$model || !method_exists($model, 'renderPublicFormCompletionExtras')) {
+            return null;
+        }
+        $html = $model->renderPublicFormCompletionExtras($this->state);
+        return is_string($html) && $html !== '' ? $html : null;
+    }
+
     private function getLink(): ?CorePublicFormLink
     {
         if (!$this->linkId) {

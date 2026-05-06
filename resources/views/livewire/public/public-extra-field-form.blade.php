@@ -360,6 +360,12 @@
                         </span>
                     </button>
                 @endif
+
+                {{-- Modul-Hook: optionales Snippet (z.B. Recruiting Schulungs-Bestaetigung) --}}
+                @php $completionExtras = $this->getCompletionExtras(); @endphp
+                @if($completionExtras)
+                    <div class="mt-6">{!! $completionExtras !!}</div>
+                @endif
             </div>
         </div>
 
@@ -374,6 +380,12 @@
                 </div>
                 <h1 class="text-2xl font-bold text-gray-900 mb-3">Alles erledigt!</h1>
                 <p class="text-gray-500 text-lg">Vielen Dank! Alle Felder sind ausgefüllt. Sie können diese Seite jetzt schließen.</p>
+
+                {{-- Modul-Hook: optionales Snippet (z.B. Recruiting Schulungs-Bestaetigung) --}}
+                @php $completionExtras = $this->getCompletionExtras(); @endphp
+                @if($completionExtras)
+                    <div class="mt-6">{!! $completionExtras !!}</div>
+                @endif
             </div>
         </div>
     @endif
