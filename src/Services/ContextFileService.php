@@ -114,30 +114,34 @@ class ContextFileService
         $mimeType = $file->getMimeType();
         $isImage = str_starts_with($mimeType, 'image/');
 
+        // Optional: Folder-Prefix für organisierte Speicherung
+        $folder = rtrim($options['folder'] ?? '', '/');
+
         // Für Bilder: Original immer als WebP speichern
         if ($isImage) {
+            // EXIF GPS-Daten extrahieren VOR WebP-Konvertierung
+            $gps = $this->extractGpsFromExif($file->getRealPath());
+
             // Bild lesen und als WebP speichern
             $image = $this->imageManager->read($file->getRealPath());
             $width = $image->width();
             $height = $image->height();
-            
+
             $webpEncoder = new WebpEncoder(90); // 90% Qualität
             $webpContent = (string) $image->encode($webpEncoder);
-            
+
             // Dateiname: Token + .webp
             $fileName = "{$token}.webp";
-            // put() gibt den vollständigen Pfad zurück, aber wir wollen nur den Dateinamen
-            Storage::disk($this->disk)->put($fileName, $webpContent);
-            $path = $fileName; // Flache Struktur: nur Dateiname
-            
+            $storagePath = $folder ? "{$folder}/{$fileName}" : $fileName;
+            Storage::disk($this->disk)->put($storagePath, $webpContent);
+            $path = $storagePath;
+
             $mimeType = 'image/webp';
             $fileSize = strlen($webpContent);
         } else {
             // Nicht-Bilder: Original-Format behalten
             $fileName = "{$token}.{$extension}";
-            // putFileAs mit leerem Pfad speichert im Root
-            $path = Storage::disk($this->disk)->putFileAs('', $file, $fileName);
-            // putFileAs kann einen Pfad mit Slash zurückgeben, normalisieren
+            $path = Storage::disk($this->disk)->putFileAs($folder, $file, $fileName);
             $path = ltrim($path, '/');
             $fileSize = $file->getSize();
             $width = null;
@@ -154,10 +158,13 @@ class ContextFileService
             'uploaded_by' => $userId,
         ];
 
-        // Bild-Dimensionen in Meta speichern
+        // Bild-Dimensionen und GPS in Meta speichern
         if ($isImage) {
             $meta['width'] = $width;
             $meta['height'] = $height;
+            if (isset($gps) && $gps) {
+                $meta['gps'] = $gps;
+            }
         }
 
         // ContextFile in Datenbank speichern
@@ -298,9 +305,11 @@ class ContextFileService
                         $variantImage->cover($width, $height);
                     }
 
-                    // Token und Pfad generieren
+                    // Token und Pfad generieren (preserve folder from parent)
                     $variantToken = $this->generateToken();
-                    $variantPath = "{$variantToken}.webp";
+                    $parentFolder = dirname($contextFile->path);
+                    $parentFolder = ($parentFolder === '.') ? '' : $parentFolder;
+                    $variantPath = $parentFolder ? "{$parentFolder}/{$variantToken}.webp" : "{$variantToken}.webp";
 
                     // Variante speichern
                     Storage::disk($this->disk)->put($variantPath, (string) $variantImage->encode($webpEncoder));
@@ -393,6 +402,54 @@ class ContextFileService
 
         // DB-Eintrag löschen
         $contextFile->delete();
+    }
+
+    /**
+     * Extrahiert GPS-Koordinaten aus EXIF-Daten eines Bildes.
+     */
+    private function extractGpsFromExif(string $filePath): ?array
+    {
+        try {
+            $exif = @exif_read_data($filePath);
+            if (!$exif || empty($exif['GPSLatitude']) || empty($exif['GPSLongitude'])) {
+                return null;
+            }
+
+            $lat = $this->gpsToDecimal($exif['GPSLatitude'], $exif['GPSLatitudeRef'] ?? 'N');
+            $lng = $this->gpsToDecimal($exif['GPSLongitude'], $exif['GPSLongitudeRef'] ?? 'E');
+
+            if ($lat === 0.0 && $lng === 0.0) {
+                return null;
+            }
+
+            return ['latitude' => round($lat, 7), 'longitude' => round($lng, 7)];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function gpsToDecimal(array $dms, string $ref): float
+    {
+        $degrees = $this->fractionToFloat($dms[0]);
+        $minutes = $this->fractionToFloat($dms[1]);
+        $seconds = $this->fractionToFloat($dms[2]);
+
+        $decimal = $degrees + ($minutes / 60) + ($seconds / 3600);
+
+        if (in_array(strtoupper($ref), ['S', 'W'])) {
+            $decimal *= -1;
+        }
+
+        return $decimal;
+    }
+
+    private function fractionToFloat(string $fraction): float
+    {
+        $parts = explode('/', $fraction);
+        if (count($parts) === 2 && (float) $parts[1] !== 0.0) {
+            return (float) $parts[0] / (float) $parts[1];
+        }
+        return (float) $parts[0];
     }
 
     /**
