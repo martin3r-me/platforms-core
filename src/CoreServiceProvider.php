@@ -216,6 +216,7 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Console\Commands\HelpCacheCommand::class,
                 \Platform\Core\Console\Commands\RebuildToolCatalogsCommand::class,
                 \Platform\Core\Console\Commands\AuditTeamOrphansCommand::class,
+                \Platform\Core\Console\Commands\PurgeStaleRecordsCommand::class,
             ]);
         }
 
