@@ -251,6 +251,10 @@ class CoreServiceProvider extends ServiceProvider
         $this->callAfterResolving(\Illuminate\Console\Scheduling\Schedule::class, function (\Illuminate\Console\Scheduling\Schedule $schedule) {
             $schedule->job(new \Platform\Core\Jobs\ProcessTerminalRemindersJob)->everyMinute();
             $schedule->job(new \Platform\Core\Jobs\RebuildToolCatalogsJob)->hourly();
+
+            // Sonntags 03:00 Uhr: Stale Records purgen + Orphan-Audit
+            $schedule->command('platform:purge-stale-records --force')->weeklyOn(0, '03:00');
+            $schedule->command('platform:audit-team-orphans')->weeklyOn(0, '03:30');
         });
 
         // Automatische Modell-Registrierung entfernt
