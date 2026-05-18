@@ -38,6 +38,10 @@ use Platform\Core\Services\NullCatalogArticleResolver;
 use Platform\Core\Services\NullCatalogArticleProcurementMapProvider;
 use Platform\Core\Services\NullCatalogListProvider;
 use Platform\Core\Services\NullCatalogArticleCategoryListProvider;
+use Platform\Core\Contracts\SeoKeywordServiceInterface;
+use Platform\Core\Contracts\SeoAnalysisServiceInterface;
+use Platform\Core\Services\NullSeoKeywordService;
+use Platform\Core\Services\NullSeoAnalysisService;
 use Platform\Core\Services\IntelligentAgent;
 use Platform\Core\Services\AgentOrchestrator;
 use Platform\Core\Contracts\CounterKeyResultSyncer;
@@ -153,6 +157,12 @@ class CoreServiceProvider extends ServiceProvider
         // Event-Listener für Tools registrieren
         $this->registerToolEventListeners();
 
+        // Team-Deletion Listener registrieren
+        \Illuminate\Support\Facades\Event::listen(
+            \Platform\Core\Events\TeamDeleting::class,
+            \Platform\Core\Listeners\CleanupTeamCoreData::class
+        );
+
         // WhatsApp Channel Sync Listener registrieren
         // Livewire-Komponenten registrieren (mit Präfix "core")
         $this->registerLivewireComponents();
@@ -205,6 +215,7 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Console\Commands\CleanupTerminalChannelsCommand::class,
                 \Platform\Core\Console\Commands\HelpCacheCommand::class,
                 \Platform\Core\Console\Commands\RebuildToolCatalogsCommand::class,
+                \Platform\Core\Console\Commands\AuditTeamOrphansCommand::class,
             ]);
         }
 
@@ -312,6 +323,14 @@ class CoreServiceProvider extends ServiceProvider
         });
         $this->app->singleton(CatalogArticleCategoryListProviderInterface::class, function () {
             return new NullCatalogArticleCategoryListProvider();
+        });
+
+        // Default-SEO-Service binden (können vom SEO-Modul überschrieben werden)
+        $this->app->singleton(SeoKeywordServiceInterface::class, function () {
+            return new NullSeoKeywordService();
+        });
+        $this->app->singleton(SeoAnalysisServiceInterface::class, function () {
+            return new NullSeoAnalysisService();
         });
 
         // AI Agent Services entfernt – kommen in separates Modul

@@ -9,6 +9,8 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Enums\TeamRole;
+use Platform\Core\Events\TeamDeleting;
+use Platform\Core\Events\TeamDeleted;
 use Platform\Core\Models\Team;
 
 /**
@@ -173,7 +175,13 @@ class DeleteTeamTool implements ToolContract, ToolMetadataContract
             ]);
 
             // ── Löschung in Transaktion ─────────────────────────────
-            DB::transaction(function () use ($team) {
+            $userId = (int) $context->user->id;
+
+            DB::transaction(function () use ($team, $userId) {
+                // TeamDeleting Event VOR der Löschung (synchron, innerhalb Transaction)
+                // Listener können hier App-Level Cleanup durchführen (Storage, externe APIs etc.)
+                TeamDeleting::dispatch($team, $userId);
+
                 // team_user Pivot hat keinen DB-Cascade → manuell bereinigen
                 $team->users()->detach();
 
@@ -183,6 +191,16 @@ class DeleteTeamTool implements ToolContract, ToolMetadataContract
                 // Team löschen (DB-Cascades erledigen den Rest)
                 $team->delete();
             });
+
+            // TeamDeleted Event NACH der Transaction (async-fähig, non-critical)
+            try {
+                TeamDeleted::dispatch($teamData['id'], $teamData['name'], $userId);
+            } catch (\Throwable $e) {
+                Log::warning('[DeleteTeamTool] TeamDeleted Event konnte nicht dispatched werden', [
+                    'team_id' => $teamData['id'],
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             $result = [
                 'deleted_team' => $teamData,
