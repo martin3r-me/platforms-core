@@ -29,6 +29,8 @@ class DynamicClientRegistrationController extends Controller
         'http://localhost*',
         // Claude Desktop
         'claude://callback',
+        // ChatGPT Connector
+        'https://chatgpt.com/*',
         // Interne Dienste (Open WebUI etc.)
         'https://*.bhgdigital.de/*',
         'https://*.bhgdigital.de:*/*',
