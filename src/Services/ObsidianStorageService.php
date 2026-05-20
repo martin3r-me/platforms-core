@@ -202,16 +202,15 @@ class ObsidianStorageService
      */
     public function search(ObsidianVault $vault, ?string $query = null, ?string $namePattern = null, string $path = '/'): array
     {
-        $items = $this->listFilesRecursive($vault, $path);
+        $resolvedPath = $this->resolvePath($vault, $path);
         $disk = $this->disk($vault);
+
+        // Use allFiles() directly — avoids per-file size/lastModified HEAD requests
+        $allFiles = $disk->allFiles($resolvedPath);
         $results = [];
 
-        foreach ($items as $item) {
-            if ($item['type'] !== 'file') {
-                continue;
-            }
-
-            $filePath = $item['path'];
+        foreach ($allFiles as $rawPath) {
+            $filePath = $this->stripPrefix($vault, $rawPath);
 
             // Filter by name pattern (glob-like)
             if ($namePattern !== null) {
@@ -222,9 +221,8 @@ class ObsidianStorageService
 
             // Filter by content search
             if ($query !== null) {
-                $resolvedPath = $this->resolvePath($vault, $filePath);
                 try {
-                    $content = $disk->get($resolvedPath);
+                    $content = $disk->get($rawPath);
                 } catch (\Throwable) {
                     continue;
                 }
@@ -248,10 +246,17 @@ class ObsidianStorageService
                     }
                 }
 
-                $item['matches'] = $matchingLines;
+                $results[] = [
+                    'path' => $filePath,
+                    'type' => 'file',
+                    'matches' => $matchingLines,
+                ];
+            } else {
+                $results[] = [
+                    'path' => $filePath,
+                    'type' => 'file',
+                ];
             }
-
-            $results[] = $item;
         }
 
         return $results;
@@ -309,27 +314,56 @@ class ObsidianStorageService
     {
         $result = [];
         $lines = explode("\n", trim($yaml));
+        $currentKey = null;
 
         foreach ($lines as $line) {
-            $line = trim($line);
-            if ($line === '' || str_starts_with($line, '#')) {
+            $rawLine = $line;
+            $trimmed = trim($line);
+
+            if ($trimmed === '' || str_starts_with($trimmed, '#')) {
                 continue;
             }
-            $colonPos = strpos($line, ':');
+
+            // Block sequence item (indented "- value" under a key)
+            if (preg_match('/^\s+-\s+(.*)$/', $rawLine, $m) && $currentKey !== null) {
+                if (! is_array($result[$currentKey])) {
+                    $result[$currentKey] = [];
+                }
+                $itemValue = trim($m[1]);
+                // Strip quotes from list items
+                if ((str_starts_with($itemValue, '"') && str_ends_with($itemValue, '"'))
+                    || (str_starts_with($itemValue, "'") && str_ends_with($itemValue, "'"))) {
+                    $itemValue = substr($itemValue, 1, -1);
+                }
+                $result[$currentKey][] = $itemValue;
+                continue;
+            }
+
+            $colonPos = strpos($trimmed, ':');
             if ($colonPos === false) {
+                $currentKey = null;
                 continue;
             }
-            $key = trim(substr($line, 0, $colonPos));
-            $value = trim(substr($line, $colonPos + 1));
+
+            $key = trim(substr($trimmed, 0, $colonPos));
+            $value = trim(substr($trimmed, $colonPos + 1));
 
             // Handle arrays in [a, b, c] format
             if (str_starts_with($value, '[') && str_ends_with($value, ']')) {
                 $value = array_map('trim', explode(',', substr($value, 1, -1)));
+                $currentKey = null;
             }
             // Handle quoted strings
             elseif ((str_starts_with($value, '"') && str_ends_with($value, '"'))
                 || (str_starts_with($value, "'") && str_ends_with($value, "'"))) {
                 $value = substr($value, 1, -1);
+                $currentKey = null;
+            }
+            // Empty value — could be followed by block sequence
+            elseif ($value === '') {
+                $currentKey = $key;
+            } else {
+                $currentKey = null;
             }
 
             if ($key !== '') {
