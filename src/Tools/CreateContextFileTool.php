@@ -7,6 +7,7 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\ContextFile;
 use Platform\Core\Services\ContextFileService;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -108,6 +109,32 @@ class CreateContextFileTool implements ToolContract
             }
             if (!$fileName) {
                 return ToolResult::error('file_name ist erforderlich', 'VALIDATION_ERROR');
+            }
+
+            // Validate context_type is a real Eloquent model class
+            if (!class_exists($contextType) || !is_subclass_of($contextType, Model::class)) {
+                return ToolResult::error(
+                    "context_type '{$contextType}' ist kein gültiges Model. "
+                    . 'Verwende den vollqualifizierten Klassennamen, z.B. "Platform\\Planner\\Models\\PlannerTask".',
+                    'INVALID_CONTEXT_TYPE'
+                );
+            }
+
+            // Validate context_id exists
+            $contextModel = $contextType::find((int) $contextId);
+            if (!$contextModel) {
+                return ToolResult::error(
+                    "Kein {$contextType} mit ID {$contextId} gefunden.",
+                    'CONTEXT_NOT_FOUND'
+                );
+            }
+
+            // Validate team access if the model has a team_id
+            if (isset($contextModel->team_id) && $team && (int) $contextModel->team_id !== (int) $team->id) {
+                return ToolResult::error(
+                    'Das Context-Objekt gehört nicht zum aktuellen Team.',
+                    'ACCESS_DENIED'
+                );
             }
 
             // Need either base64_content, content, or url
