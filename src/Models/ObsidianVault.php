@@ -19,6 +19,7 @@ class ObsidianVault extends Model
         'secret_key',
         'prefix',
         'settings',
+        'team_id',
     ];
 
     protected $casts = [
@@ -37,6 +38,19 @@ class ObsidianVault extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class);
+    }
+
+    /**
+     * Ist dieser Vault einem Team zugeordnet?
+     */
+    public function isTeamVault(): bool
+    {
+        return $this->team_id !== null;
     }
 
     protected static function booted(): void

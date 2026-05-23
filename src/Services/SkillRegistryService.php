@@ -37,6 +37,9 @@ class SkillRegistryService
 
     /**
      * Suche über gecachten Index (Token/Score-Logik wie ToolRegistryService).
+     *
+     * @param int|null $teamVaultId Explizite Team-Vault-ID. Wenn null, werden Team-Vaults
+     *                              automatisch über die team_id-Spalte erkannt.
      */
     public function search(string $query, int $userId, ?int $teamVaultId = null, int $limit = 5): array
     {
@@ -140,11 +143,13 @@ class SkillRegistryService
     }
 
     /**
-     * Index aller persönlichen Vaults eines Users bauen.
+     * Index aller persönlichen Vaults eines Users bauen (nur Vaults ohne team_id).
      */
     private function buildUserIndex(int $userId): array
     {
-        $userVaults = ObsidianVault::where('user_id', $userId)->get();
+        $userVaults = ObsidianVault::where('user_id', $userId)
+            ->whereNull('team_id')
+            ->get();
         $index = [];
         foreach ($userVaults as $vault) {
             $index = array_merge($index, $this->buildIndexForVault($vault));
@@ -205,7 +210,7 @@ class SkillRegistryService
                         'status' => $frontmatter['status'] ?? 'active',
                         'tags' => (array) ($frontmatter['tags'] ?? []),
                         'body_preview' => $bodyPreview,
-                        'vault_source' => $vault->user_id ? 'personal' : 'team',
+                        'vault_source' => $vault->isTeamVault() ? 'team' : 'personal',
                         '_vault_id' => $vault->id,
                         '_file_path' => $file['path'],
                     ];
