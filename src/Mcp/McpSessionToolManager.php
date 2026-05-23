@@ -29,6 +29,7 @@ class McpSessionToolManager
         'core.modules.GET',
         'core.team.switch',
         'tools.GET',
+        'tool_registry.SEARCH',
     ];
 
     /**

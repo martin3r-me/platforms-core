@@ -8,6 +8,7 @@ use Platform\Core\Models\ToolExecution;
 use Platform\Core\Tools\ToolRegistry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Platform\Core\Services\ToolRegistryService;
 
 class ToolCatalogService
 {
@@ -57,6 +58,15 @@ class ToolCatalogService
                 'built_at' => now(),
             ]
         );
+
+        // Usage-Stats in der Tool-Registry synchronisieren
+        try {
+            app(ToolRegistryService::class)->syncUsageStats();
+        } catch (\Throwable $e) {
+            Log::warning('[ToolCatalog] Registry Usage-Sync fehlgeschlagen', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
