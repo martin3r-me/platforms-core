@@ -557,6 +557,20 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register($this->app->make(\Platform\Core\Tools\ListTeamUsersTool::class)); } catch (\Throwable $e) {}
         }
 
+        // Tool Registry (Discovery Layer)
+        if (!$registry->has('tool_registry.SEARCH')) {
+            try { $registry->register(new \Platform\Core\Tools\ToolRegistrySearchTool()); } catch (\Throwable $e) {}
+        }
+        if (!$registry->has('tool_registry.GET')) {
+            try { $registry->register(new \Platform\Core\Tools\ToolRegistryGetTool()); } catch (\Throwable $e) {}
+        }
+        if (!$registry->has('tool_registry.PUT')) {
+            try { $registry->register(new \Platform\Core\Tools\ToolRegistryUpsertTool()); } catch (\Throwable $e) {}
+        }
+        if (!$registry->has('tool_registry.BULK_POST')) {
+            try { $registry->register(new \Platform\Core\Tools\ToolRegistryBulkUpsertTool()); } catch (\Throwable $e) {}
+        }
+
         // Team membership management
         if (class_exists(\Platform\Core\Tools\AddTeamUserTool::class) && !$registry->has('core.teams.users.POST')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\AddTeamUserTool::class)); } catch (\Throwable $e) {}
