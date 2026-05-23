@@ -40,10 +40,6 @@ class ToolRegistryGetTool implements ToolContract
                     'type' => 'integer',
                     'description' => 'Max. Ergebnisse für Listen (Standard: 20).',
                 ],
-                'offset' => [
-                    'type' => 'integer',
-                    'description' => 'Offset für Paginierung (Standard: 0).',
-                ],
             ],
             'required' => [],
         ];
@@ -70,7 +66,7 @@ class ToolRegistryGetTool implements ToolContract
                 return ToolResult::success($result);
             }
 
-            // Listen-Abfrage
+            // Listen-Abfrage: delegiert an search('', filters, limit)
             $filters = [];
             if (!empty($arguments['namespace'])) {
                 $filters['namespace'] = $arguments['namespace'];
@@ -80,12 +76,14 @@ class ToolRegistryGetTool implements ToolContract
             }
 
             $limit = min(50, max(1, (int) ($arguments['limit'] ?? 20)));
-            $offset = max(0, (int) ($arguments['offset'] ?? 0));
 
             $service = app(ToolRegistryService::class);
-            $result = $service->list($filters, $limit, $offset);
+            $results = $service->search('', $filters, $limit);
 
-            return ToolResult::success($result);
+            return ToolResult::success([
+                'tools' => $results,
+                'count' => count($results),
+            ]);
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Abrufen: ' . $e->getMessage());
         }
