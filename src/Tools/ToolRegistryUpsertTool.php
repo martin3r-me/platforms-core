@@ -129,7 +129,7 @@ class ToolRegistryUpsertTool implements ToolContract
                 ?? ($context->team ? $context->user->teams()->where('teams.id', $context->team->id)->first()?->pivot?->role : null)
                 ?? null;
 
-            if ($role !== 'admin') {
+            if (!in_array($role, ['admin', 'owner'], true)) {
                 return ToolResult::error('FORBIDDEN', 'Nur Admins dürfen die Tool-Registry bearbeiten.');
             }
 
