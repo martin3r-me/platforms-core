@@ -55,7 +55,7 @@ return new class extends Migration
                 ->constrained('tool_registry_entries')
                 ->cascadeOnDelete();
             $table->string('required_tool_name', 255);
-            $table->string('for_param', 100)->nullable();
+            $table->string('for_param', 100)->default('');
 
             $table->primary(
                 ['tool_registry_entry_id', 'required_tool_name', 'for_param'],
