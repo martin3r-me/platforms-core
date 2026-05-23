@@ -251,14 +251,15 @@ class GetContextTool implements ToolContract
                 // Katalog nie brechen lassen
             }
 
-            // Discovery-Hint für Tool-Registry
+            // Discovery-Hint für Tool-Registry + Skill-Registry
             $result['discovery'] = [
                 'primary' => 'tool_registry.SEARCH',
-                'hint' => 'Use tool_registry.SEARCH(query="...") to find tools. Do NOT browse modules.',
+                'hint' => 'Use tool_registry.SEARCH(query="...") to find tools. Use skill_registry.SEARCH(query="...") to find reusable skill instructions. Do NOT browse modules.',
                 'examples' => [
                     'tool_registry.SEARCH(query="notizen in vault schreiben")',
                     'tool_registry.SEARCH(query="task anlegen")',
                     'tool_registry.SEARCH(name_glob="canvas.*")',
+                    'skill_registry.SEARCH(query="Q-Meeting vorbereiten")',
                 ],
             ];
 

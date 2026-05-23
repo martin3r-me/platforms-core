@@ -64,6 +64,12 @@ Nutze `tool_registry.SEARCH(query="...")` um Tools zu finden, dann
 `tool_registry.GET(name="...")` für volle Details inkl. Beispiele und häufige Folge-Tools.
 Alternativ: `core__modules__GET` → `tools__GET(module="...")` zum Aktivieren ganzer Module.
 
+## Skill Discovery
+
+Nutze `skill_registry.SEARCH(query="...")` um wiederverwendbare Skill-Anleitungen zu finden.
+Skills sind Markdown-Dateien mit Schritt-für-Schritt-Anleitungen und definierten Tool-Abhängigkeiten.
+`skill_registry.GET(code="...")` lädt die vollständige Anleitung inkl. Markdown-Body.
+
 MARKDOWN;
 
     /**

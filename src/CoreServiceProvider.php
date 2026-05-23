@@ -367,6 +367,9 @@ class CoreServiceProvider extends ServiceProvider
         // Tool Insights Service (Co-Occurrence + Examples, cache-based)
         $this->app->singleton(\Platform\Core\Services\ToolInsightsService::class);
 
+        // Skill Registry Service (Markdown-basierte Skills aus Obsidian-Vaults)
+        $this->app->singleton(\Platform\Core\Services\SkillRegistryService::class);
+
         // Error Reporter Registry (Dev-Modul Error Tracking)
         $this->app->singleton(\Platform\Core\Services\ErrorReporterRegistry::class);
 
@@ -571,6 +574,14 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register(new \Platform\Core\Tools\ToolRegistryGetTool()); } catch (\Throwable $e) {}
         }
         // tool_registry.PUT und tool_registry.BULK_POST entfernt — Metadaten leben im Code, nicht in DB
+
+        // Skill Registry (Markdown-basierte Skills aus Obsidian-Vaults)
+        if (!$registry->has('skill_registry.SEARCH')) {
+            try { $registry->register(new \Platform\Core\Tools\SkillRegistrySearchTool()); } catch (\Throwable $e) {}
+        }
+        if (!$registry->has('skill_registry.GET')) {
+            try { $registry->register(new \Platform\Core\Tools\SkillRegistryGetTool()); } catch (\Throwable $e) {}
+        }
 
         // Team membership management
         if (class_exists(\Platform\Core\Tools\AddTeamUserTool::class) && !$registry->has('core.teams.users.POST')) {
