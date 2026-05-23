@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (!Schema::hasTable('tool_registry_entries')) {
         Schema::create('tool_registry_entries', function (Blueprint $table) {
             $table->id();
             $table->string('name', 255)->unique();
@@ -34,7 +35,9 @@ return new class extends Migration
             $table->index('module');
             $table->index('deprecated');
         });
+        }
 
+        if (!Schema::hasTable('tool_registry_tags')) {
         Schema::create('tool_registry_tags', function (Blueprint $table) {
             $table->foreignId('tool_registry_entry_id')
                 ->constrained('tool_registry_entries')
@@ -44,7 +47,9 @@ return new class extends Migration
             $table->primary(['tool_registry_entry_id', 'tag']);
             $table->index('tag');
         });
+        }
 
+        if (!Schema::hasTable('tool_registry_requires')) {
         Schema::create('tool_registry_requires', function (Blueprint $table) {
             $table->foreignId('tool_registry_entry_id')
                 ->constrained('tool_registry_entries')
@@ -57,6 +62,7 @@ return new class extends Migration
                 'tool_registry_requires_pk'
             );
         });
+        }
     }
 
     public function down(): void
