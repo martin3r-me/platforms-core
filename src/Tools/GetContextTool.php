@@ -251,6 +251,25 @@ class GetContextTool implements ToolContract
                 // Katalog nie brechen lassen
             }
 
+            // Skill-Katalog: Kompakte Übersicht aller verfügbaren Skills als Priming
+            try {
+                if ($user) {
+                    $skillService = app(\Platform\Core\Services\SkillRegistryService::class);
+                    $teamVaultId = $skillService->resolveTeamVaultId($targetTeam);
+                    $allSkills = $skillService->search('', $user->id, $teamVaultId, 20);
+                    if (!empty($allSkills)) {
+                        $result['skill_catalog'] = array_map(fn($s) => [
+                            'code' => $s['code'],
+                            'name' => $s['name'],
+                            'trigger_phrases' => $s['trigger_phrases'] ?? [],
+                        ], $allSkills);
+                        $result['skill_catalog_hint'] = 'When user input matches a trigger_phrase, call skill_registry.GET(code="...") to load the full skill instructions, then follow them.';
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Skill-Katalog nie brechen lassen
+            }
+
             // Discovery-Hint für Tool-Registry + Skill-Registry
             $result['discovery'] = [
                 'primary' => 'tool_registry.SEARCH',

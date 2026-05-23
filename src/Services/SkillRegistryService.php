@@ -102,6 +102,22 @@ class SkillRegistryService
     }
 
     /**
+     * Findet die Vault-ID des Team-Skill-Vaults für ein gegebenes Team.
+     */
+    public function resolveTeamVaultId(?object $team): ?int
+    {
+        if (!$team || !isset($team->id)) {
+            return null;
+        }
+
+        $vault = ObsidianVault::where('team_id', $team->id)
+            ->get()
+            ->first(fn(ObsidianVault $v) => $this->isSkillsEnabled($v));
+
+        return $vault?->id;
+    }
+
+    /**
      * Merged Index: Team-Skills zuerst, dann persönliche. Duplikate → Team gewinnt.
      */
     private function getMergedIndex(int $userId, ?int $teamVaultId = null): array
