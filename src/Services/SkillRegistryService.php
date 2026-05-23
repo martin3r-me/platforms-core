@@ -102,6 +102,31 @@ class SkillRegistryService
     }
 
     /**
+     * Gibt nur die gecachten Skill-Codes zurück. Kein Vault-Scan — nur Cache-Read.
+     * Wenn kein Cache vorhanden, leeres Array (der nächste SEARCH/GET baut den Cache).
+     *
+     * @return array<string> Liste der Skill-Codes
+     */
+    public function getCachedCodes(int $userId, ?int $teamVaultId = null): array
+    {
+        $codes = [];
+
+        $personalIndex = Cache::get("skill_index:user:{$userId}");
+        if (is_array($personalIndex)) {
+            $codes = array_keys($personalIndex);
+        }
+
+        if ($teamVaultId) {
+            $teamIndex = Cache::get("skill_index:vault:{$teamVaultId}");
+            if (is_array($teamIndex)) {
+                $codes = array_merge($codes, array_keys($teamIndex));
+            }
+        }
+
+        return array_values(array_unique($codes));
+    }
+
+    /**
      * Findet die Vault-ID des Team-Skill-Vaults für ein gegebenes Team.
      */
     public function resolveTeamVaultId(?object $team): ?int

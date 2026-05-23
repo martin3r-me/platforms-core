@@ -251,34 +251,31 @@ class GetContextTool implements ToolContract
                 // Katalog nie brechen lassen
             }
 
-            // Skill-Katalog: Kompakte Übersicht aller verfügbaren Skills als Priming
+            // Skill-Codes: Nur gecachte Codes als kompakte Liste (kein Vault-Scan hier)
             try {
                 if ($user) {
                     $skillService = app(\Platform\Core\Services\SkillRegistryService::class);
                     $teamVaultId = $skillService->resolveTeamVaultId($targetTeam);
-                    $allSkills = $skillService->search('', $user->id, $teamVaultId, 20);
-                    if (!empty($allSkills)) {
-                        $result['skill_catalog'] = array_map(fn($s) => [
-                            'code' => $s['code'],
-                            'name' => $s['name'],
-                            'trigger_phrases' => $s['trigger_phrases'] ?? [],
-                        ], $allSkills);
-                        $result['skill_catalog_hint'] = 'When user input matches a trigger_phrase, call skill_registry.GET(code="...") to load the full skill instructions, then follow them.';
+                    $codes = $skillService->getCachedCodes($user->id, $teamVaultId);
+                    if (!empty($codes)) {
+                        $result['skills'] = [
+                            'available' => $codes,
+                            'hint' => 'Call skill_registry.GET(code="...") to load full instructions. Use skill_registry.SEARCH(query="...") for fuzzy matching.',
+                        ];
                     }
                 }
             } catch (\Throwable $e) {
-                // Skill-Katalog nie brechen lassen
+                // Skills nie brechen lassen
             }
 
-            // Discovery-Hint für Tool-Registry + Skill-Registry
+            // Discovery-Hint für Tool-Registry
             $result['discovery'] = [
                 'primary' => 'tool_registry.SEARCH',
-                'hint' => 'Use tool_registry.SEARCH(query="...") to find tools. Use skill_registry.SEARCH(query="...") to find reusable skill instructions. Do NOT browse modules.',
+                'hint' => 'Use tool_registry.SEARCH(query="...") to find tools. Do NOT browse modules.',
                 'examples' => [
                     'tool_registry.SEARCH(query="notizen in vault schreiben")',
                     'tool_registry.SEARCH(query="task anlegen")',
                     'tool_registry.SEARCH(name_glob="canvas.*")',
-                    'skill_registry.SEARCH(query="Q-Meeting vorbereiten")',
                 ],
             ];
 
