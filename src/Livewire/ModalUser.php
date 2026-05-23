@@ -53,6 +53,7 @@ class ModalUser extends Component
         'secret_key' => '',
         'prefix' => '',
         'team_id' => '',
+        'skills_enabled' => false,
     ];
     public $editingVaultId = null;
     public $showVaultForm = false;
@@ -420,6 +421,7 @@ class ModalUser extends Component
             'secret_key' => $vault->secret_key,
             'prefix' => $vault->prefix ?? '',
             'team_id' => $vault->team_id ?? '',
+            'skills_enabled' => (bool) ($vault->settings['skills_enabled'] ?? false),
         ];
         $this->showVaultForm = true;
     }
@@ -434,6 +436,15 @@ class ModalUser extends Component
             'vaultForm.driver' => 'required|string|in:s3,r2,minio,wasabi',
         ]);
 
+        // Team-Zuordnung: nur wenn User der Team-Owner ist
+        $teamId = $this->vaultForm['team_id'] ?: null;
+        if ($teamId) {
+            $team = \Platform\Core\Models\Team::find($teamId);
+            if (!$team || $team->user_id !== Auth::id()) {
+                $teamId = null; // Nicht-Owner darf kein Team-Vault setzen
+            }
+        }
+
         $data = [
             'name' => $this->vaultForm['name'],
             'driver' => $this->vaultForm['driver'],
@@ -443,7 +454,7 @@ class ModalUser extends Component
             'access_key' => $this->vaultForm['access_key'],
             'secret_key' => $this->vaultForm['secret_key'],
             'prefix' => $this->vaultForm['prefix'] ?: null,
-            'team_id' => $this->vaultForm['team_id'] ?: null,
+            'team_id' => $teamId,
         ];
 
         if ($this->editingVaultId) {
@@ -454,11 +465,15 @@ class ModalUser extends Component
             if ($vault) {
                 $vault->update($data);
                 $vault->slug = \Illuminate\Support\Str::slug($data['name']);
+                $settings = $vault->settings ?? [];
+                $settings['skills_enabled'] = (bool) $this->vaultForm['skills_enabled'];
+                $vault->settings = $settings;
                 $vault->save();
             }
         } else {
             $vault = new \Platform\Core\Models\ObsidianVault($data);
             $vault->user_id = Auth::id();
+            $vault->settings = ['skills_enabled' => (bool) $this->vaultForm['skills_enabled']];
             $vault->save();
         }
 
@@ -522,6 +537,7 @@ class ModalUser extends Component
             'secret_key' => '',
             'prefix' => '',
             'team_id' => '',
+            'skills_enabled' => false,
         ];
         $this->editingVaultId = null;
         $this->showVaultForm = false;

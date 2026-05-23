@@ -76,7 +76,7 @@ class SkillRegistrySearchTool implements ToolContract
     }
 
     /**
-     * Findet die Vault-ID des Team-Vaults über die team_id-Spalte.
+     * Findet die Vault-ID des Team-Skill-Vaults über team_id + skills_enabled.
      */
     private function resolveTeamVaultId(ToolContext $context): ?int
     {
@@ -85,7 +85,10 @@ class SkillRegistrySearchTool implements ToolContract
             return null;
         }
 
-        $vault = ObsidianVault::where('team_id', $team->id)->first();
+        $vault = ObsidianVault::where('team_id', $team->id)
+            ->get()
+            ->first(fn(ObsidianVault $v) => !empty($v->settings['skills_enabled']));
+
         return $vault?->id;
     }
 }

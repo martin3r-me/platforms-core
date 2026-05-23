@@ -17,22 +17,17 @@ class SkillRegistryService
      */
     public function rebuildIndex(int $userId, ?int $teamVaultId = null): void
     {
-        // Team-Vault
+        // Team-Vault (nur wenn skills_enabled)
         if ($teamVaultId) {
             $vault = ObsidianVault::find($teamVaultId);
-            if ($vault) {
+            if ($vault && !empty($vault->settings['skills_enabled'])) {
                 $index = $this->buildIndexForVault($vault);
                 Cache::put("skill_index:vault:{$teamVaultId}", $index, now()->addMinutes(15));
             }
         }
 
-        // Persönliche Vaults
-        $userVaults = ObsidianVault::where('user_id', $userId)->get();
-        $personalIndex = [];
-        foreach ($userVaults as $vault) {
-            $personalIndex = array_merge($personalIndex, $this->buildIndexForVault($vault));
-        }
-        Cache::put("skill_index:user:{$userId}", $personalIndex, now()->addMinutes(15));
+        // Persönliche Skill-Vaults
+        Cache::put("skill_index:user:{$userId}", $this->buildUserIndex($userId), now()->addMinutes(15));
     }
 
     /**
@@ -122,12 +117,12 @@ class SkillRegistryService
             $merged[$code] = $meta;
         }
 
-        // 2. Team-Vault-Skills (überschreiben persönliche bei Duplikaten)
+        // 2. Team-Vault-Skills (überschreiben persönliche bei Duplikaten, nur wenn skills_enabled)
         if ($teamVaultId) {
             $teamIndex = Cache::get("skill_index:vault:{$teamVaultId}");
             if ($teamIndex === null) {
                 $vault = ObsidianVault::find($teamVaultId);
-                if ($vault) {
+                if ($vault && !empty($vault->settings['skills_enabled'])) {
                     $teamIndex = $this->buildIndexForVault($vault);
                     Cache::put("skill_index:vault:{$teamVaultId}", $teamIndex, now()->addMinutes(15));
                 } else {
@@ -143,13 +138,15 @@ class SkillRegistryService
     }
 
     /**
-     * Index aller persönlichen Vaults eines Users bauen (nur Vaults ohne team_id).
+     * Index aller persönlichen Skill-Vaults eines Users bauen (nur Vaults ohne team_id mit skills_enabled).
      */
     private function buildUserIndex(int $userId): array
     {
         $userVaults = ObsidianVault::where('user_id', $userId)
             ->whereNull('team_id')
-            ->get();
+            ->get()
+            ->filter(fn(ObsidianVault $v) => !empty($v->settings['skills_enabled']));
+
         $index = [];
         foreach ($userVaults as $vault) {
             $index = array_merge($index, $this->buildIndexForVault($vault));
