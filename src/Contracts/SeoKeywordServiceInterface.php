@@ -11,21 +11,21 @@ use Platform\Core\Models\User;
  */
 interface SeoKeywordServiceInterface
 {
-    /** Projekt erstellen (Brands erstellt eins pro Brand, SJ eins pro Team) */
+    /** Team-Settings erstellen (auto per Team) */
     public function createProject(Team $team, User $user, array $data): ?object;
 
-    /** Keywords dem Team hinzufuegen + an Projekt binden */
+    /** Keywords dem Team hinzufuegen */
     public function attachKeywords(int $teamId, int $projectId, array $keywords): array;
 
     /** Metriken fuer Team-Keywords fetchen (dedupliziert) */
     public function fetchMetrics(int $teamId, ?int $projectId = null, ?User $user = null): array;
 
-    /** Rankings fuer ein Projekt fetchen (domain-spezifisch) */
-    public function fetchRankings(int $projectId, ?User $user = null): array;
+    /** Rankings fuer ein Team fetchen (domain-spezifisch) */
+    public function fetchRankings(int $teamId, ?User $user = null): array;
 
-    /** Keywords fuer ein Projekt abrufen */
-    public function getKeywordsForProject(int $projectId): Collection;
+    /** Keywords fuer ein Team abrufen */
+    public function getKeywordsForProject(int $teamId): Collection;
 
-    /** Keyword-Summary fuer ein Projekt */
-    public function getKeywordSummary(int $projectId): array;
+    /** Keyword-Summary fuer ein Team */
+    public function getKeywordSummary(int $teamId): array;
 }

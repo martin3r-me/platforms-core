@@ -4,6 +4,7 @@ namespace Platform\Core\Console\Commands;
 
 use Platform\Core\Models\Team;
 use Platform\Core\Services\ToolCatalogService;
+use Platform\Core\Services\ToolInsightsService;
 use Illuminate\Console\Command;
 
 class RebuildToolCatalogsCommand extends Command
@@ -12,7 +13,7 @@ class RebuildToolCatalogsCommand extends Command
 
     protected $description = 'Rebuild tool catalogs for all teams (or a specific team)';
 
-    public function handle(ToolCatalogService $service): int
+    public function handle(ToolCatalogService $service, ToolInsightsService $insightsService): int
     {
         $teamId = $this->option('team');
 
@@ -25,11 +26,13 @@ class RebuildToolCatalogsCommand extends Command
 
             $service->buildForTeam($team);
             $this->info("Catalog rebuilt for team {$team->name} (ID: {$team->id}).");
-            return self::SUCCESS;
+        } else {
+            $count = $service->rebuildAll();
+            $this->info("Rebuilt {$count} tool catalog(s).");
         }
 
-        $count = $service->rebuildAll();
-        $this->info("Rebuilt {$count} tool catalog(s).");
+        $insightsService->rebuild();
+        $this->info('Tool insights (co-occurrence + examples) rebuilt.');
 
         return self::SUCCESS;
     }

@@ -10,6 +10,7 @@ class ToolRegistryService
     public function __construct(
         private ToolRegistry $registry,
         private ToolPermissionService $permissionService,
+        private ToolInsightsService $insightsService,
     ) {}
 
     /**
@@ -73,7 +74,11 @@ class ToolRegistryService
             return null;
         }
 
-        return $this->formatFull($index[$name]);
+        $result = $this->formatFull($index[$name]);
+        $result['commonly_followed_by'] = $this->insightsService->getCooccurrence($name);
+        $result['examples'] = $this->insightsService->getExamples($name);
+
+        return $result;
     }
 
     // --- Tokenization & Scoring ---

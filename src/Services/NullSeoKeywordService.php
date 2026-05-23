@@ -27,17 +27,17 @@ class NullSeoKeywordService implements SeoKeywordServiceInterface
         return ['fetched' => 0, 'cost_cents' => 0];
     }
 
-    public function fetchRankings(int $projectId, ?User $user = null): array
+    public function fetchRankings(int $teamId, ?User $user = null): array
     {
         return ['fetched' => 0, 'cost_cents' => 0, 'position_snapshots' => 0];
     }
 
-    public function getKeywordsForProject(int $projectId): Collection
+    public function getKeywordsForProject(int $teamId): Collection
     {
         return collect();
     }
 
-    public function getKeywordSummary(int $projectId): array
+    public function getKeywordSummary(int $teamId): array
     {
         return [
             'total_keywords' => 0,
@@ -46,7 +46,6 @@ class NullSeoKeywordService implements SeoKeywordServiceInterface
             'avg_difficulty' => 0,
             'total_search_volume' => 0,
             'intents' => [],
-            'priorities' => [],
             'with_metrics' => 0,
             'without_metrics' => 0,
         ];

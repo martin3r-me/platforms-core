@@ -3,6 +3,7 @@
 namespace Platform\Core\Jobs;
 
 use Platform\Core\Services\ToolCatalogService;
+use Platform\Core\Services\ToolInsightsService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -14,10 +15,12 @@ class RebuildToolCatalogsJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function handle(ToolCatalogService $service): void
+    public function handle(ToolCatalogService $service, ToolInsightsService $insightsService): void
     {
         $count = $service->rebuildAll();
 
         Log::info('[ToolCatalog] Rebuild complete', ['catalogs_built' => $count]);
+
+        $insightsService->rebuild();
     }
 }

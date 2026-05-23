@@ -42,7 +42,7 @@ class ToolCatalogService
 
             return [
                 'tool' => $row->tool_name,
-                'desc' => $desc ? mb_substr($desc, 0, 120) : null,
+                'desc' => $desc,
                 'count' => (int) $row->cnt,
             ];
         })->all();

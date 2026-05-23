@@ -364,6 +364,9 @@ class CoreServiceProvider extends ServiceProvider
         // Tool Catalog Service (Top-250 per Team, hourly rebuilt)
         $this->app->singleton(\Platform\Core\Services\ToolCatalogService::class);
 
+        // Tool Insights Service (Co-Occurrence + Examples, cache-based)
+        $this->app->singleton(\Platform\Core\Services\ToolInsightsService::class);
+
         // Error Reporter Registry (Dev-Modul Error Tracking)
         $this->app->singleton(\Platform\Core\Services\ErrorReporterRegistry::class);
 

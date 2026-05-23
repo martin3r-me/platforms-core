@@ -7,11 +7,11 @@ namespace Platform\Core\Contracts;
  */
 interface SeoAnalysisServiceInterface
 {
-    public function getRankingTrends(int $projectId, int $days = 30): array;
+    public function getRankingTrends(int $teamId, int $days = 30): array;
 
-    public function getCompetitorGaps(int $projectId): array;
+    public function getCompetitorGaps(int $teamId): array;
 
-    public function getVisibilityScore(int $projectId): array;
+    public function getVisibilityScore(int $teamId): array;
 
-    public function getQuickWins(int $projectId): array;
+    public function getQuickWins(int $teamId): array;
 }
