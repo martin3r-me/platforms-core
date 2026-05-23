@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('tool_registry_entries', function (Blueprint $table) {
             $table->id();
-            $table->text('name')->unique();
+            $table->string('name', 255)->unique();
             $table->string('kind', 20)->nullable();
             $table->string('module', 50)->nullable();
             $table->string('namespace', 50)->nullable();
