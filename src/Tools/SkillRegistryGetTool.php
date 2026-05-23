@@ -91,7 +91,7 @@ class SkillRegistryGetTool implements ToolContract
 
         $vault = ObsidianVault::where('team_id', $team->id)
             ->get()
-            ->first(fn(ObsidianVault $v) => !empty($v->settings['skills_enabled']));
+            ->first(fn(ObsidianVault $v) => filter_var($v->settings['skills_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN));
 
         return $vault?->id;
     }

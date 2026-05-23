@@ -5,6 +5,7 @@ namespace Platform\Core\Services;
 use Platform\Core\Models\ObsidianVault;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Platform\Core\Models\Team;
 
 class SkillRegistryService
 {
@@ -20,7 +21,7 @@ class SkillRegistryService
         // Team-Vault (nur wenn skills_enabled)
         if ($teamVaultId) {
             $vault = ObsidianVault::find($teamVaultId);
-            if ($vault && !empty($vault->settings['skills_enabled'])) {
+            if ($vault && $this->isSkillsEnabled($vault)) {
                 $index = $this->buildIndexForVault($vault);
                 Cache::put("skill_index:vault:{$teamVaultId}", $index, now()->addMinutes(15));
             }
@@ -122,7 +123,7 @@ class SkillRegistryService
             $teamIndex = Cache::get("skill_index:vault:{$teamVaultId}");
             if ($teamIndex === null) {
                 $vault = ObsidianVault::find($teamVaultId);
-                if ($vault && !empty($vault->settings['skills_enabled'])) {
+                if ($vault && $this->isSkillsEnabled($vault)) {
                     $teamIndex = $this->buildIndexForVault($vault);
                     Cache::put("skill_index:vault:{$teamVaultId}", $teamIndex, now()->addMinutes(15));
                 } else {
@@ -145,13 +146,29 @@ class SkillRegistryService
         $userVaults = ObsidianVault::where('user_id', $userId)
             ->whereNull('team_id')
             ->get()
-            ->filter(fn(ObsidianVault $v) => !empty($v->settings['skills_enabled']));
+            ->filter(fn(ObsidianVault $v) => $this->isSkillsEnabled($v));
 
         $index = [];
         foreach ($userVaults as $vault) {
             $index = array_merge($index, $this->buildIndexForVault($vault));
         }
         return $index;
+    }
+
+    /**
+     * Prüft ob ein Vault als Skill-Vault konfiguriert ist.
+     * Robust gegen verschiedene Typen (bool, string "1", "true", etc.).
+     */
+    private function isSkillsEnabled(ObsidianVault $vault): bool
+    {
+        $settings = $vault->settings;
+        if (!is_array($settings)) {
+            return false;
+        }
+
+        $value = $settings['skills_enabled'] ?? false;
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }
 
     /**
