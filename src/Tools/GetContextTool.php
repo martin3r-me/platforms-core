@@ -9,7 +9,6 @@ use Platform\Core\Registry\ModuleRegistry;
 use Platform\Core\Models\Module;
 use Platform\Core\Models\McpSession;
 use Platform\Core\Models\Team;
-use Platform\Core\Services\ToolCatalogService;
 
 /**
  * Tool zum Abrufen des aktuellen Kontexts
@@ -241,23 +240,9 @@ class GetContextTool implements ToolContract
                 $result['member_count'] = count($result['members']);
             }
 
-            // Tool-Katalog laden
-            try {
-                $catalogService = app(ToolCatalogService::class);
-                $catalogData = $catalogService->getForTeam($targetTeam);
-                if (!empty($catalogData['catalog'])) {
-                    // Descriptions kürzen für kompakte Context-Response
-                    $result['tool_catalog'] = array_map(function (array $entry) {
-                        if (isset($entry['desc']) && mb_strlen($entry['desc']) > 120) {
-                            $entry['desc'] = mb_substr($entry['desc'], 0, 120) . '…';
-                        }
-                        return $entry;
-                    }, $catalogData['catalog']);
-                    $result['tool_catalog_meta'] = $catalogData['meta'];
-                }
-            } catch (\Throwable $e) {
-                // Katalog nie brechen lassen
-            }
+            // Tool-Katalog: Daten werden weiterhin gebaut (ToolCatalogService, RebuildToolCatalogsJob),
+            // aber nicht mehr in die Context-Response eingebettet — spart ~7.500 Tokens pro Request.
+            // Discovery läuft über tool_registry.SEARCH.
 
             // Discovery-Hint für Tool-Registry
             $result['discovery'] = [
