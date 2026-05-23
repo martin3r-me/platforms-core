@@ -52,6 +52,7 @@ class ModalUser extends Component
         'access_key' => '',
         'secret_key' => '',
         'prefix' => '',
+        'team_id' => '',
     ];
     public $editingVaultId = null;
     public $showVaultForm = false;
@@ -418,6 +419,7 @@ class ModalUser extends Component
             'access_key' => $vault->access_key,
             'secret_key' => $vault->secret_key,
             'prefix' => $vault->prefix ?? '',
+            'team_id' => $vault->team_id ?? '',
         ];
         $this->showVaultForm = true;
     }
@@ -441,6 +443,7 @@ class ModalUser extends Component
             'access_key' => $this->vaultForm['access_key'],
             'secret_key' => $this->vaultForm['secret_key'],
             'prefix' => $this->vaultForm['prefix'] ?: null,
+            'team_id' => $this->vaultForm['team_id'] ?: null,
         ];
 
         if ($this->editingVaultId) {
@@ -518,6 +521,7 @@ class ModalUser extends Component
             'access_key' => '',
             'secret_key' => '',
             'prefix' => '',
+            'team_id' => '',
         ];
         $this->editingVaultId = null;
         $this->showVaultForm = false;

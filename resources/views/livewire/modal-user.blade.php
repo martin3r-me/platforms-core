@@ -667,12 +667,27 @@
                                     @enderror
                                 </div>
                             </div>
-                            <x-ui-input-text
-                                name="vaultForm.prefix"
-                                label="Prefix / Subfolder"
-                                wire:model="vaultForm.prefix"
-                                placeholder="obsidian/ (optional)"
-                            />
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <x-ui-input-text
+                                    name="vaultForm.prefix"
+                                    label="Prefix / Subfolder"
+                                    wire:model="vaultForm.prefix"
+                                    placeholder="obsidian/ (optional)"
+                                />
+                                <div>
+                                    <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1.5">Team-Zuordnung</label>
+                                    <select
+                                        wire:model="vaultForm.team_id"
+                                        class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg bg-[var(--ui-surface)] text-[var(--ui-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent"
+                                    >
+                                        <option value="">Persönlicher Vault</option>
+                                        @foreach(auth()->user()->teams as $team)
+                                            <option value="{{ $team->id }}">{{ $team->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <p class="mt-1 text-xs text-[var(--ui-muted)]">Team-Vaults stellen Skills & Inhalte für alle Team-Mitglieder bereit.</p>
+                                </div>
+                            </div>
                             <div class="flex gap-2">
                                 <x-ui-button variant="primary" wire:click="saveVault">
                                     <div class="flex items-center gap-2">
@@ -712,7 +727,12 @@
                                 <div class="p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
                                     <div class="flex items-start justify-between gap-4">
                                         <div class="min-w-0 flex-1">
-                                            <div class="font-medium text-[var(--ui-secondary)]">{{ $vault->name }}</div>
+                                            <div class="flex items-center gap-2">
+                                                <span class="font-medium text-[var(--ui-secondary)]">{{ $vault->name }}</span>
+                                                @if($vault->team_id)
+                                                    <span class="px-2 py-0.5 text-xs font-medium text-purple-700 bg-purple-100 rounded-full">{{ $vault->team?->name ?? 'Team' }}</span>
+                                                @endif
+                                            </div>
                                             <div class="mt-1 text-xs text-[var(--ui-muted)] space-y-0.5">
                                                 <div>Driver: {{ strtoupper($vault->driver) }} &middot; Bucket: {{ $vault->bucket }}</div>
                                                 @if($vault->region)
