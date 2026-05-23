@@ -33,7 +33,7 @@ class ToolPermissionService
         // Zusätzlich behandeln wir "communication" als virtuelles Discovery-Modul:
         // Die echten Comms-Tools leben unter core.comms.*; communication.* ist nur ein Einstiegspunkt
         // und darf NICHT an Modul-Freischaltungen hängen.
-        if (in_array($moduleKey, ['core', 'tools', 'communication', 'obsidian', 'notifications', 'terminal'])) {
+        if (in_array($moduleKey, ['core', 'tools', 'tool_registry', 'communication', 'obsidian', 'notifications', 'terminal'])) {
             return null; // Core-Tools sind immer erlaubt
         }
         
