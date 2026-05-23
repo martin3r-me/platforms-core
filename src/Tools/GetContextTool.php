@@ -246,7 +246,13 @@ class GetContextTool implements ToolContract
                 $catalogService = app(ToolCatalogService::class);
                 $catalogData = $catalogService->getForTeam($targetTeam);
                 if (!empty($catalogData['catalog'])) {
-                    $result['tool_catalog'] = $catalogData['catalog'];
+                    // Descriptions kürzen für kompakte Context-Response
+                    $result['tool_catalog'] = array_map(function (array $entry) {
+                        if (isset($entry['desc']) && mb_strlen($entry['desc']) > 120) {
+                            $entry['desc'] = mb_substr($entry['desc'], 0, 120) . '…';
+                        }
+                        return $entry;
+                    }, $catalogData['catalog']);
                     $result['tool_catalog_meta'] = $catalogData['meta'];
                 }
             } catch (\Throwable $e) {
