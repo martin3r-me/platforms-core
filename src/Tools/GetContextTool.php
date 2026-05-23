@@ -240,9 +240,16 @@ class GetContextTool implements ToolContract
                 $result['member_count'] = count($result['members']);
             }
 
-            // Tool-Katalog: Daten werden weiterhin gebaut (ToolCatalogService, RebuildToolCatalogsJob),
-            // aber nicht mehr in die Context-Response eingebettet — spart ~7.500 Tokens pro Request.
-            // Discovery läuft über tool_registry.SEARCH.
+            // Tool-Katalog: Top-25 mit voller Description als Priming-Hint
+            try {
+                $catalogService = app(\Platform\Core\Services\ToolCatalogService::class);
+                $catalogData = $catalogService->getForTeam($targetTeam);
+                if (!empty($catalogData['catalog'])) {
+                    $result['tool_catalog'] = array_slice($catalogData['catalog'], 0, 25);
+                }
+            } catch (\Throwable $e) {
+                // Katalog nie brechen lassen
+            }
 
             // Discovery-Hint für Tool-Registry
             $result['discovery'] = [
