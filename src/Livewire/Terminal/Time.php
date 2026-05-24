@@ -7,7 +7,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Platform\Core\Livewire\Terminal\Concerns\WithTerminalContext;
 use Platform\Core\Models\User;
-use Platform\Organization\Models\OrganizationContext;
+use Platform\Organization\Contracts\HasChildContextRelations;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Models\OrganizationTimePlanned;
 use Platform\Organization\Services\StoreTimeEntry;
@@ -417,17 +417,11 @@ class Time extends Component
 
     protected function collectTimeChildContextPairs(array &$pairs): void
     {
-        $orgContext = OrganizationContext::query()
-            ->where('contextable_type', $this->contextType)
-            ->where('contextable_id', $this->contextId)
-            ->where('is_active', true)
-            ->first();
-
-        if (! $orgContext || empty($orgContext->include_children_relations)) {
+        if (! class_exists($this->contextType)) {
             return;
         }
 
-        if (! class_exists($this->contextType)) {
+        if (! is_a($this->contextType, HasChildContextRelations::class, true)) {
             return;
         }
 
@@ -436,7 +430,7 @@ class Time extends Component
             return;
         }
 
-        foreach ($orgContext->include_children_relations as $relationPath) {
+        foreach ($this->contextType::childContextRelations() as $relationPath) {
             $this->resolveTimeRelationPathForPairs($model, $relationPath, $pairs);
         }
     }
