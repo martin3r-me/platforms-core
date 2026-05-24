@@ -5,7 +5,6 @@ namespace Platform\Core\Services;
 use Platform\Core\Models\ObsidianVault;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Platform\Core\Models\Team;
 
 class SkillRegistryService
 {
@@ -29,6 +28,21 @@ class SkillRegistryService
 
         // Persönliche Skill-Vaults
         Cache::put("skill_index:user:{$userId}", $this->buildUserIndex($userId), now()->addMinutes(15));
+    }
+
+    /**
+     * Invalidiert den Skill-Cache für einen User und/oder Vault.
+     */
+    public function invalidateCache(int $userId, ?int $vaultId = null): void
+    {
+        Cache::forget("skill_index:user:{$userId}");
+
+        if ($vaultId) {
+            Cache::forget("skill_index:vault:{$vaultId}");
+        }
+
+        // Team-Vault-Resolution-Cache auch invalidieren
+        Cache::forget("skill_team_vault:{$userId}");
     }
 
     /**
@@ -128,6 +142,7 @@ class SkillRegistryService
 
     /**
      * Findet die Vault-ID des Team-Skill-Vaults für ein gegebenes Team.
+     * Gecacht für 15 Minuten um DB-Queries zu sparen.
      */
     public function resolveTeamVaultId(?object $team): ?int
     {
@@ -135,11 +150,13 @@ class SkillRegistryService
             return null;
         }
 
-        $vault = ObsidianVault::where('team_id', $team->id)
-            ->get()
-            ->first(fn(ObsidianVault $v) => $this->isSkillsEnabled($v));
+        return Cache::remember("skill_team_vault:team:{$team->id}", now()->addMinutes(15), function () use ($team) {
+            $vault = ObsidianVault::where('team_id', $team->id)
+                ->get()
+                ->first(fn(ObsidianVault $v) => $this->isSkillsEnabled($v));
 
-        return $vault?->id;
+            return $vault?->id;
+        });
     }
 
     /**
@@ -214,6 +231,7 @@ class SkillRegistryService
 
     /**
      * Scannt skills/-Ordner eines Vaults und parsed Frontmatter.
+     * Liest jede Datei nur einmal (Frontmatter + Body-Preview aus demselben Read).
      *
      * @return array<string, array> Code => Metadata
      */
@@ -222,11 +240,6 @@ class SkillRegistryService
         $index = [];
 
         try {
-            // Prüfe ob skills/ existiert
-            if (!$this->storage->exists($vault, 'skills')) {
-                return [];
-            }
-
             $files = $this->storage->listFiles($vault, 'skills');
 
             foreach ($files as $file) {
@@ -238,22 +251,22 @@ class SkillRegistryService
                 }
 
                 try {
-                    $frontmatter = $this->storage->parseFrontmatter($vault, $file['path']);
+                    // Ein einziger S3-Read pro Datei
+                    $content = $this->storage->readFile($vault, $file['path']);
+
+                    $frontmatter = $this->parseFrontmatterFromContent($content);
                     if (!$frontmatter || empty($frontmatter['code'])) {
                         continue;
                     }
 
                     $code = $frontmatter['code'];
 
-                    // Body-Preview für Scoring (erste 200 Zeichen des Body)
+                    // Body-Preview aus demselben Content
                     $bodyPreview = '';
-                    try {
-                        $content = $this->storage->readFile($vault, $file['path']);
-                        $body = $this->extractBody($content);
-                        if ($body) {
-                            $bodyPreview = mb_substr($body, 0, 200);
-                        }
-                    } catch (\Throwable) {}
+                    $body = $this->extractBody($content);
+                    if ($body) {
+                        $bodyPreview = mb_substr($body, 0, 200);
+                    }
 
                     $index[$code] = [
                         'code' => $code,
@@ -285,6 +298,40 @@ class SkillRegistryService
         }
 
         return $index;
+    }
+
+    /**
+     * Parsed YAML-Frontmatter aus einem bereits gelesenen Content-String.
+     * Vermeidet einen zweiten S3-Read (im Gegensatz zu ObsidianStorageService::parseFrontmatter).
+     */
+    private function parseFrontmatterFromContent(string $content): ?array
+    {
+        // Strip BOM
+        if (str_starts_with($content, "\xEF\xBB\xBF")) {
+            $content = substr($content, 3);
+        }
+
+        $content = str_replace("\r\n", "\n", $content);
+        $content = str_replace("\r", "\n", $content);
+        $content = ltrim($content);
+
+        if (!str_starts_with($content, "---\n")) {
+            return null;
+        }
+
+        $endPos = strpos($content, "\n---", 3);
+        if ($endPos === false) {
+            return null;
+        }
+
+        $yaml = substr($content, 4, $endPos - 4);
+
+        try {
+            $parsed = \Symfony\Component\Yaml\Yaml::parse(trim($yaml));
+            return is_array($parsed) ? $parsed : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**

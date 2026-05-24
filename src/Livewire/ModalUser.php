@@ -477,6 +477,12 @@ class ModalUser extends Component
             $vault->save();
         }
 
+        // Skill-Cache invalidieren wenn skills_enabled sich geändert hat
+        try {
+            app(\Platform\Core\Services\SkillRegistryService::class)
+                ->invalidateCache(Auth::id(), $vault->id ?? null);
+        } catch (\Throwable) {}
+
         $this->resetVaultForm();
 
         $this->dispatch('notice', [

@@ -5,7 +5,6 @@ namespace Platform\Core\Tools;
 use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
-use Platform\Core\Models\ObsidianVault;
 use Platform\Core\Services\SkillRegistryService;
 
 class SkillRegistryGetTool implements ToolContract
@@ -57,12 +56,13 @@ class SkillRegistryGetTool implements ToolContract
                 return ToolResult::error('VALIDATION_ERROR', 'code darf nicht leer sein.');
             }
 
+            $service = app(SkillRegistryService::class);
+
             // Team-Vault-ID: aus Argument, Team-Zuordnung, oder Config
             $teamVaultId = $vaultId
-                ?? $this->resolveTeamVaultId($context)
+                ?? $service->resolveTeamVaultId($context->team ?? ($context->user->currentTeam ?? null))
                 ?? config('platform.skills_vault_id');
 
-            $service = app(SkillRegistryService::class);
             $result = $service->get($code, $context->user->id, $teamVaultId);
 
             if (!$result) {
@@ -77,22 +77,5 @@ class SkillRegistryGetTool implements ToolContract
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Abrufen des Skills: ' . $e->getMessage());
         }
-    }
-
-    /**
-     * Findet die Vault-ID des Team-Skill-Vaults über team_id + skills_enabled.
-     */
-    private function resolveTeamVaultId(ToolContext $context): ?int
-    {
-        $team = $context->team ?? ($context->user?->currentTeam ?? null);
-        if (!$team) {
-            return null;
-        }
-
-        $vault = ObsidianVault::where('team_id', $team->id)
-            ->get()
-            ->first(fn(ObsidianVault $v) => filter_var($v->settings['skills_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN));
-
-        return $vault?->id;
     }
 }
