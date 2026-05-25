@@ -245,7 +245,45 @@ class GetContextTool implements ToolContract
                 $catalogService = app(\Platform\Core\Services\ToolCatalogService::class);
                 $catalogData = $catalogService->getForTeam($targetTeam);
                 if (!empty($catalogData['catalog'])) {
-                    $result['tool_catalog'] = array_slice($catalogData['catalog'], 0, 25);
+                    // tools.GET rausfiltern — LLMs sollen tool_registry.SEARCH nutzen
+                    $catalog = array_values(array_filter(
+                        $catalogData['catalog'],
+                        fn ($entry) => ($entry['tool'] ?? '') !== 'tools.GET',
+                    ));
+
+                    // tool_registry.SEARCH an Position 1 pinnen (nach core.context.GET)
+                    $pinned = [
+                        'tool' => 'tool_registry.SEARCH',
+                        'desc' => 'Semantische Tool-Suche. query="..." für Freitext, name_glob="modul.*" für exakte Matches. IMMER dieses Tool nutzen statt tools.GET.',
+                        'count' => null,
+                        'pinned' => true,
+                    ];
+
+                    // Duplikat entfernen falls schon im Katalog
+                    $catalog = array_values(array_filter(
+                        $catalog,
+                        fn ($entry) => ($entry['tool'] ?? '') !== 'tool_registry.SEARCH',
+                    ));
+
+                    // core.context.GET bleibt an Position 0, danach pinned, dann Rest
+                    $contextEntry = null;
+                    $rest = [];
+                    foreach ($catalog as $entry) {
+                        if (($entry['tool'] ?? '') === 'core.context.GET') {
+                            $contextEntry = $entry;
+                        } else {
+                            $rest[] = $entry;
+                        }
+                    }
+
+                    $finalCatalog = [];
+                    if ($contextEntry) {
+                        $finalCatalog[] = $contextEntry;
+                    }
+                    $finalCatalog[] = $pinned;
+                    $finalCatalog = array_merge($finalCatalog, $rest);
+
+                    $result['tool_catalog'] = array_slice($finalCatalog, 0, 25);
                 }
             } catch (\Throwable $e) {
                 // Katalog nie brechen lassen
