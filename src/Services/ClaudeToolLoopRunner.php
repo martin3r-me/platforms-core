@@ -28,7 +28,7 @@ class ClaudeToolLoopRunner
 {
     protected string $baseUrl = 'https://api.anthropic.com/v1';
     protected string $apiVersion = '2023-06-01';
-    protected string $defaultModel = 'claude-sonnet-4-20250514';
+    protected string $defaultModel = 'claude-sonnet-4-6-20250219';
     protected int $defaultMaxTokens = 4096;
     protected int $maxIterations = 50;
     protected int $timeoutSeconds = 120;
