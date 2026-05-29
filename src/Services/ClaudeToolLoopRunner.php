@@ -19,8 +19,7 @@ use Platform\Core\Tools\ToolRegistry;
  * access to the entire ToolRegistry, plus optional direct tool definitions.
  *
  * Claude gets ~5 tools:
- *   - discover_tools: search the full ToolRegistry
- *   - execute_tool: execute any registered tool
+ *   - execute_tool: execute any registered tool (discovery via tool_registry.SEARCH)
  *   - + direct action tools (e.g. create_signal, do_nothing)
  *
  * Security: ToolExecutor handles permissions via ToolPermissionService.
@@ -210,11 +209,8 @@ class ClaudeToolLoopRunner
                 $toolUseId = $toolUse['id'];
                 $targetArgs = $toolArgs;
 
-                // Handle meta-tools internally
-                if ($rawToolName === 'discover_tools') {
-                    $result = $this->handleDiscoverTools($toolArgs);
-                    $canonicalName = 'discover_tools';
-                } elseif ($rawToolName === 'execute_tool') {
+                // Handle meta-tool
+                if ($rawToolName === 'execute_tool') {
                     $canonicalName = $toolArgs['tool'] ?? '';
                     $targetArgs = $toolArgs['arguments'] ?? [];
                     if (is_string($targetArgs)) {
@@ -282,7 +278,7 @@ class ClaudeToolLoopRunner
     }
 
     /**
-     * Build tool definitions: direct tools + meta-tools (discover + execute).
+     * Build tool definitions: direct tools + execute_tool meta-tool.
      */
     protected function buildToolDefinitions(array $directToolNames, bool $includeMetaTools): array
     {
@@ -302,39 +298,21 @@ class ClaudeToolLoopRunner
             ];
         }
 
-        // 2. Meta-tools: full ToolRegistry access (like MCP's tools__GET + execute)
+        // 2. execute_tool: runs any registered tool (discovery via tool_registry.SEARCH)
         if ($includeMetaTools) {
             $definitions[] = [
-                'name' => 'discover_tools',
-                'description' => 'Suche nach verfügbaren Tools in der gesamten Platform. Gibt Tool-Namen, Beschreibungen und Schemas zurück. Nutze dies um herauszufinden welche Tools es gibt, bevor du execute_tool aufrufst.',
-                'input_schema' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'query' => [
-                            'type' => 'string',
-                            'description' => 'Suchbegriff (z.B. "entities", "signals", "time_entries", "memory"). Durchsucht Tool-Namen und Beschreibungen.',
-                        ],
-                        'module' => [
-                            'type' => 'string',
-                            'description' => 'Optional: Filter nach Modul-Prefix (z.B. "organization", "planner", "helpdesk").',
-                        ],
-                    ],
-                ],
-            ];
-
-            $definitions[] = [
                 'name' => 'execute_tool',
-                'description' => 'Führt ein beliebiges registriertes Tool aus. Nutze discover_tools um verfügbare Tools und deren Schemas zu finden.',
+                'description' => 'Führt ein beliebiges registriertes Tool aus. Nutze execute_tool(tool="tool_registry.SEARCH", arguments={"query": "..."}) um verfügbare Tools zu finden.',
                 'input_schema' => [
                     'type' => 'object',
                     'properties' => [
                         'tool' => [
                             'type' => 'string',
-                            'description' => 'Tool-Name mit Punkten (z.B. "organization.entities.GET", "organization.signals.GET").',
+                            'description' => 'Tool-Name mit Punkten (z.B. "organization.entities.GET", "tool_registry.SEARCH").',
                         ],
                         'arguments' => [
                             'type' => 'object',
-                            'description' => 'Argumente für das Tool als JSON-Objekt. Siehe Schema via discover_tools.',
+                            'description' => 'Argumente für das Tool als JSON-Objekt.',
                         ],
                     ],
                     'required' => ['tool'],
@@ -343,54 +321,6 @@ class ClaudeToolLoopRunner
         }
 
         return $definitions;
-    }
-
-    /**
-     * Handle the discover_tools meta-tool: search the entire ToolRegistry.
-     */
-    protected function handleDiscoverTools(array $args): array
-    {
-        $query = strtolower(trim($args['query'] ?? ''));
-        $module = strtolower(trim($args['module'] ?? ''));
-
-        $tools = [];
-
-        foreach ($this->registry->all() as $name => $tool) {
-            // Filter by module prefix
-            if ($module !== '' && ! str_starts_with(strtolower($name), $module . '.')) {
-                continue;
-            }
-
-            // Filter by search query (match against name + description)
-            if ($query !== '') {
-                $nameMatch = str_contains(strtolower($name), $query);
-                $descMatch = str_contains(strtolower($tool->getDescription()), $query);
-                if (! $nameMatch && ! $descMatch) {
-                    continue;
-                }
-            }
-
-            $entry = [
-                'name' => $name,
-                'description' => $tool->getDescription(),
-            ];
-
-            // Include schema when filtering (not when listing all — too much data)
-            if ($query !== '' || $module !== '') {
-                $entry['schema'] = $tool->getSchema();
-            }
-
-            $tools[] = $entry;
-        }
-
-        return [
-            'ok' => true,
-            'data' => [
-                'tools' => $tools,
-                'total' => count($tools),
-                'hint' => 'Nutze execute_tool(tool="<name>", arguments={...}) um ein Tool auszuführen.',
-            ],
-        ];
     }
 
     /**
