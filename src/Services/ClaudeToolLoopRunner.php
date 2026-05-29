@@ -2,6 +2,7 @@
 
 namespace Platform\Core\Services;
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Contracts\ToolContext;
@@ -73,6 +74,38 @@ class ClaudeToolLoopRunner
      * }
      */
     public function run(array $messages, ToolContext $context, array $options = []): array
+    {
+        // Establish auth context for ToolPermissionService (uses Auth::user()).
+        // In queue jobs there is no authenticated user, so we set it from ToolContext.
+        $previousUser = Auth::user();
+        $hadTeamOverride = TeamContext::hasOverride();
+
+        if ($context->user) {
+            Auth::setUser($context->user);
+        }
+        if ($context->team) {
+            TeamContext::setTeam($context->team);
+        }
+
+        try {
+            return $this->executeLoop($messages, $context, $options);
+        } finally {
+            // Restore previous auth state
+            if ($previousUser) {
+                Auth::setUser($previousUser);
+            } else {
+                Auth::guard()->forgetUser();
+            }
+            if (! $hadTeamOverride) {
+                TeamContext::clear();
+            }
+        }
+    }
+
+    /**
+     * Internal: execute the agentic tool loop.
+     */
+    protected function executeLoop(array $messages, ToolContext $context, array $options): array
     {
         $apiKey = $this->resolveApiKey();
         $model = $options['model'] ?? $this->defaultModel;
@@ -204,6 +237,7 @@ class ClaudeToolLoopRunner
                     'iteration' => $iteration,
                     'tool' => $canonicalName,
                     'ok' => $result['ok'] ?? false,
+                    'error' => ($result['ok'] ?? false) ? null : ($result['error'] ?? null),
                 ]);
 
                 $allToolCalls[] = [
@@ -412,28 +446,51 @@ class ClaudeToolLoopRunner
     }
 
     /**
-     * Call the Anthropic Messages API.
+     * Call the Anthropic Messages API with retry on rate limit (429).
      */
     protected function callApi(string $apiKey, array $payload): array
     {
-        $response = Http::timeout($this->timeoutSeconds)
-            ->withHeaders([
-                'x-api-key' => $apiKey,
-                'anthropic-version' => $this->apiVersion,
-                'content-type' => 'application/json',
-            ])
-            ->post("{$this->baseUrl}/messages", $payload);
+        $maxRetries = 3;
 
-        if ($response->failed()) {
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            $response = Http::timeout($this->timeoutSeconds)
+                ->withHeaders([
+                    'x-api-key' => $apiKey,
+                    'anthropic-version' => $this->apiVersion,
+                    'content-type' => 'application/json',
+                ])
+                ->post("{$this->baseUrl}/messages", $payload);
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            $statusCode = $response->status();
             $body = $response->json();
             $errorMessage = $body['error']['message'] ?? $response->body();
             $errorType = $body['error']['type'] ?? 'api_error';
-            $statusCode = $response->status();
+
+            // Retry on rate limit (429) or overloaded (529) with exponential backoff
+            if (in_array($statusCode, [429, 529]) && $attempt < $maxRetries) {
+                $retryAfter = (int) ($response->header('retry-after') ?: 0);
+                $waitSeconds = max($retryAfter, $attempt * 30);
+
+                Log::warning('[ClaudeToolLoop] Rate limited, retrying', [
+                    'status' => $statusCode,
+                    'attempt' => $attempt,
+                    'wait_seconds' => $waitSeconds,
+                ]);
+
+                sleep($waitSeconds);
+
+                continue;
+            }
 
             Log::error('[ClaudeToolLoop] API call failed', [
                 'status' => $statusCode,
                 'error_type' => $errorType,
                 'error_message' => $errorMessage,
+                'attempt' => $attempt,
             ]);
 
             throw new \RuntimeException(
@@ -441,7 +498,7 @@ class ClaudeToolLoopRunner
             );
         }
 
-        return $response->json();
+        throw new \RuntimeException('Anthropic API: max retries exhausted');
     }
 
     /**
