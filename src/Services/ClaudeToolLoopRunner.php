@@ -449,7 +449,7 @@ class ClaudeToolLoopRunner
      */
     protected function resolveApiKey(): string
     {
-        $key = config('services.anthropic.api_key', '');
+        $key = config('ai.anthropic.api_key', '');
 
         if ($key === '' || $key === null) {
             $key = env('ANTHROPIC_API_KEY', '');

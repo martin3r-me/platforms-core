@@ -264,6 +264,7 @@ class CoreServiceProvider extends ServiceProvider
     {
         $this->app->register(LivewireServiceProvider::class);
         $this->mergeConfigFrom(__DIR__.'/../config/platform.php', 'platform');
+        $this->mergeConfigFrom(__DIR__.'/../config/ai.php', 'ai');
         $this->mergeConfigFrom(__DIR__.'/../config/security.php', 'security');
         $this->mergeConfigFrom(__DIR__.'/../config/checkins.php', 'checkins');
         // Agent-Config entfernt – Agent ausgelagert
