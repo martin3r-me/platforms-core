@@ -386,6 +386,9 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(\Platform\Core\Services\ActionSummaryService::class);
         $this->app->singleton(\Platform\Core\Services\ToolExecutionContextService::class);
         $this->app->singleton(\Platform\Core\Services\IntentionVerificationService::class);
+
+        // Claude Tool Loop Runner (Anthropic Messages API with tool use)
+        $this->app->singleton(\Platform\Core\Services\ClaudeToolLoopRunner::class);
         
         // Document Service bindings
         $this->app->singleton(DocumentRendererContract::class, PdfRenderer::class);
