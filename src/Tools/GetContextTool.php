@@ -152,6 +152,38 @@ class GetContextTool implements ToolContract
                 ?? ($user?->currentTeamRelation ?? null)
                 ?? ($user?->currentTeam ?? null);
 
+            // Organization-Orientierung — nur wenn User Zugriff auf organization-Modul hat
+            try {
+                $orgModuleKey = 'organization';
+                $orgModule = Module::where('key', $orgModuleKey)->first();
+                $hasOrgAccess = $orgModule && $user && $baseTeam && $orgModule->hasAccess($user, $baseTeam);
+
+                if ($hasOrgAccess) {
+                    $rootTeam = ($targetTeam ?? $baseTeam)->getRootTeam();
+                    $rootEntity = \Platform\Organization\Models\OrganizationEntity::where('team_id', $rootTeam->id)
+                        ->whereNull('parent_entity_id')
+                        ->where('is_active', true)
+                        ->first();
+
+                    if ($rootEntity) {
+                        $result['organization'] = [
+                            'root' => [
+                                'name' => $rootEntity->name,
+                                'uuid' => $rootEntity->uuid,
+                                'entity_id' => $rootEntity->id,
+                            ],
+                            'hint' => 'Die Organisation ist das Rückgrat (VSM/Beer). Entities bilden einen Baum mit Perspektiven. '
+                                . 'Über DimensionLinks hängen alle Modul-Objekte (Projekte, Aufgaben, Kontakte, ...) an Entities. '
+                                . 'Zwei Richtungen: organization.dimension_links.GET mit context_type+context_id (forward: was hängt an Objekt X?) '
+                                . 'oder dimension_item_id (reverse: was hängt an Entity Y?). '
+                                . 'Einstieg: organization.entities.GET(parent_entity_id=null) für den Root-Knoten.',
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Organization-Orientierung ist additiv, darf nie brechen
+            }
+
             // Modul-Berechtigungen (kompakt)
             if ($includeModules) {
                 $allowed = [];
