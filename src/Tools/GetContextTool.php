@@ -213,6 +213,61 @@ class GetContextTool implements ToolContract
                 // Organization-Orientierung ist additiv, darf nie brechen
             }
 
+            // Strategie-Orientierung — nur wenn User Zugriff auf okr-Modul hat
+            try {
+                $okrModuleKey = 'okr';
+                $okrModule = Module::where('key', $okrModuleKey)->first();
+                $hasOkrAccess = $okrModule && $user && $baseTeam && $okrModule->hasAccess($user, $baseTeam);
+
+                if ($hasOkrAccess) {
+                    $okrRootTeam = ($targetTeam ?? $baseTeam)->getRootTeam();
+                    $strategy = [];
+
+                    // Aktiver Forecast mit Fokusräumen
+                    $forecast = \Platform\Okr\Models\Forecast::where('team_id', $okrRootTeam->id)
+                        ->latest()
+                        ->first();
+
+                    if ($forecast) {
+                        $focusAreas = $forecast->focusAreas()
+                            ->orderBy('order')
+                            ->get(['id', 'uuid', 'title']);
+
+                        $strategy['forecast'] = [
+                            'title' => $forecast->title,
+                            'uuid' => $forecast->uuid,
+                            'target_date' => $forecast->target_date?->toDateString(),
+                            'focus_areas' => $focusAreas->map(fn ($fa) => [
+                                'title' => $fa->title,
+                                'uuid' => $fa->uuid,
+                            ])->values()->toArray(),
+                        ];
+                    }
+
+                    // Aktiver Cycle
+                    $currentCycle = \Platform\Okr\Models\Cycle::where('team_id', $okrRootTeam->id)
+                        ->where('status', 'current')
+                        ->first();
+
+                    if ($currentCycle) {
+                        $strategy['current_cycle'] = [
+                            'label' => $currentCycle->label,
+                            'uuid' => $currentCycle->uuid,
+                            'status' => $currentCycle->status,
+                            'ends_at' => $currentCycle->ends_at?->toDateString(),
+                        ];
+                    }
+
+                    if (!empty($strategy)) {
+                        $strategy['module'] = 'okr';
+                        $strategy['hint'] = 'Strategischer Kontext. Details via okr.forecasts.GET, okr.focus_areas.GET, okr.cycles.GET.';
+                        $result['strategy'] = $strategy;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Strategie-Orientierung ist additiv, darf nie brechen
+            }
+
             // Modul-Berechtigungen (kompakt)
             if ($includeModules) {
                 $allowed = [];
