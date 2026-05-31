@@ -180,6 +180,28 @@ class GetContextTool implements ToolContract
                         ];
                     }
 
+                    // User-Entities — welche Person-Entities sind mit dem aktuellen User verknüpft?
+                    $userEntities = \Platform\Organization\Models\OrganizationEntity::where('linked_user_id', $user->id)
+                        ->where('is_active', true)
+                        ->get(['id', 'uuid', 'name', 'entity_type_id', 'parent_entity_id']);
+
+                    if ($userEntities->isNotEmpty()) {
+                        $result['organization']['user_entities'] = $userEntities->map(function ($entity) {
+                            $entry = [
+                                'name' => $entity->name,
+                                'uuid' => $entity->uuid,
+                                'entity_id' => $entity->id,
+                            ];
+                            if ($entity->parent_entity_id) {
+                                $parent = \Platform\Organization\Models\OrganizationEntity::find($entity->parent_entity_id);
+                                if ($parent) {
+                                    $entry['parent'] = $parent->name;
+                                }
+                            }
+                            return $entry;
+                        })->values()->toArray();
+                    }
+
                     // VSM-Tools — konzeptionell zentral, unabhängig von Usage-Statistik
                     $result['vsm_tools'] = [
                         'diagnose' => 'organization.entity.summary.GET — Gesundheit einer Entity: Signals, Items, Cashflow, Completion. include_children=true für den ganzen Baum.',
