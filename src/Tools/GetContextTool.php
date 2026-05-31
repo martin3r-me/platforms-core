@@ -246,7 +246,8 @@ class GetContextTool implements ToolContract
 
                     // Aktiver Cycle
                     $currentCycle = \Platform\Okr\Models\Cycle::where('team_id', $okrRootTeam->id)
-                        ->where('status', 'current')
+                        ->where('status', 'active')
+                        ->with('template')
                         ->first();
 
                     if ($currentCycle) {
