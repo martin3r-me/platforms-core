@@ -179,6 +179,13 @@ class GetContextTool implements ToolContract
                                 . 'Einstieg: organization.entities.GET(parent_entity_id=null) für den Root-Knoten.',
                         ];
                     }
+
+                    // VSM-Tools — konzeptionell zentral, unabhängig von Usage-Statistik
+                    $result['vsm_tools'] = [
+                        'diagnose' => 'organization.entity.summary.GET — Gesundheit einer Entity: Signals, Items, Cashflow, Completion. include_children=true für den ganzen Baum.',
+                        'navigate' => 'organization.context.resolve.GET — Von jedem Objekt zur zugehörigen Entity. object_type + object_id → Org-Pfad.',
+                        'traverse' => 'organization.entities.GET — entity_type_id oder parent_entity_id für Baum-Navigation.',
+                    ];
                 }
             } catch (\Throwable $e) {
                 // Organization-Orientierung ist additiv, darf nie brechen
