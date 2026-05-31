@@ -234,12 +234,12 @@ class GetContextTool implements ToolContract
                             ->get(['id', 'uuid', 'title']);
 
                         $strategy['forecast'] = [
+                            'id' => $forecast->id,
                             'title' => $forecast->title,
-                            'uuid' => $forecast->uuid,
                             'target_date' => $forecast->target_date?->toDateString(),
                             'focus_areas' => $focusAreas->map(fn ($fa) => [
+                                'id' => $fa->id,
                                 'title' => $fa->title,
-                                'uuid' => $fa->uuid,
                             ])->values()->toArray(),
                         ];
                     }
