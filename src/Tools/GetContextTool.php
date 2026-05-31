@@ -250,12 +250,14 @@ class GetContextTool implements ToolContract
                         ->first();
 
                     if ($currentCycle) {
-                        $strategy['current_cycle'] = [
+                        $cycleData = [
+                            'id' => $currentCycle->id,
                             'label' => $currentCycle->label,
-                            'uuid' => $currentCycle->uuid,
-                            'status' => $currentCycle->status,
-                            'ends_at' => $currentCycle->ends_at?->toDateString(),
                         ];
+                        if ($currentCycle->ends_at) {
+                            $cycleData['ends_in_days'] = (int) now()->diffInDays($currentCycle->ends_at, false);
+                        }
+                        $strategy['cycle'] = $cycleData;
                     }
 
                     if (!empty($strategy)) {
