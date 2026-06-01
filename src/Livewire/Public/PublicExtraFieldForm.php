@@ -372,12 +372,22 @@ class PublicExtraFieldForm extends Component
             $files = is_array($file) ? $file : [$file];
 
             foreach ($files as $uploadedFile) {
-                $result = $service->uploadForContext(
-                    $uploadedFile,
-                    get_class($model),
-                    $model->id,
-                    ['team_id' => $model->team_id, 'user_id' => null]
-                );
+                try {
+                    $result = $service->uploadForContext(
+                        $uploadedFile,
+                        get_class($model),
+                        $model->id,
+                        ['team_id' => $model->team_id, 'user_id' => null]
+                    );
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('[PublicExtraFieldForm] File upload failed', [
+                        'field_id' => $fieldId,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $this->addError("extraFieldValues.{$fieldId}", 'Upload fehlgeschlagen. Bitte erneut versuchen.');
+                    continue;
+                }
+
                 if ($isMultiple) {
                     $current = $this->extraFieldValues[$fieldId] ?? [];
                     $current = is_array($current) ? $current : [];
@@ -391,6 +401,12 @@ class PublicExtraFieldForm extends Component
 
         $this->pendingFileUploads = [];
         $this->loadUploadedFileData();
+
+        // Sync allFieldValues damit Alpine.js-Visibility-Conditions
+        // nach dem Upload korrekt auswerten.
+        foreach ($this->extraFieldValues as $id => $value) {
+            $this->allFieldValues[$id] = $value;
+        }
     }
 
     public function removeFile(int $fieldId, int $fileId): void
@@ -402,6 +418,9 @@ class PublicExtraFieldForm extends Component
             $this->extraFieldValues[$fieldId] = null;
         }
         unset($this->uploadedFileData[$fileId]);
+
+        // Sync allFieldValues fuer Alpine.js-Visibility-Conditions
+        $this->allFieldValues[$fieldId] = $this->extraFieldValues[$fieldId];
     }
 
     public function formatFileSize(int $bytes): string
