@@ -490,6 +490,24 @@ trait WithExtraFields
     }
 
     /**
+     * Check if a single extra field value has changed from its original.
+     */
+    public function isExtraFieldDirty(int $fieldId): bool
+    {
+        $value = $this->extraFieldValues[$fieldId] ?? null;
+        $original = $this->originalExtraFieldValues[$fieldId] ?? null;
+
+        $normalizedValue = ($value === '' || $value === null || $value === []) ? null : $value;
+        $normalizedOriginal = ($original === '' || $original === null || $original === []) ? null : $original;
+
+        if (is_array($normalizedValue) || is_array($normalizedOriginal)) {
+            return $normalizedValue != $normalizedOriginal;
+        }
+
+        return $normalizedValue !== $normalizedOriginal;
+    }
+
+    /**
      * Get validation rules for extra fields.
      *
      * Fields that are hidden due to visibility conditions are always nullable
@@ -514,7 +532,14 @@ trait WithExtraFields
                 continue;
             }
 
-            if ($field['is_mandatory'] ?? false) {
+            // Guard: mandatory-Felder die der User nicht angefasst hat
+            // (Wert identisch zum Original) werden nullable validiert.
+            // Verhindert dass leere Pflichtfelder, die der Bewerber im
+            // Self-Service noch nicht ausgefuellt hat, das Admin-Speichern
+            // blockieren.
+            $isDirty = $this->isExtraFieldDirty($field['id']);
+
+            if (($field['is_mandatory'] ?? false) && $isDirty) {
                 $fieldRules[] = 'required';
             } else {
                 $fieldRules[] = 'nullable';
