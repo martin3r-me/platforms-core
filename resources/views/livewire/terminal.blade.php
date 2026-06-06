@@ -1804,8 +1804,8 @@
             requestAnimationFrame(() => {
               this.fullscreen = true;
               localStorage.setItem('terminal_fullscreen', '1');
-              if (Alpine?.store('page') && !Alpine.store('page').terminalOpen) {
-                Alpine.store('page').terminalOpen = true;
+              if (Alpine?.store('ui') && !Alpine.store('ui').m('terminal', 'open')) {
+                Alpine.store('ui').mSet('terminal', 'open', true);
               }
               document.body.style.overflow = 'hidden';
               requestAnimationFrame(() => {
@@ -1834,8 +1834,8 @@
             this.fullscreen = !this.fullscreen;
             localStorage.setItem('terminal_fullscreen', this.fullscreen ? '1' : '0');
             if (this.fullscreen) {
-              if (Alpine?.store('page') && !Alpine.store('page').terminalOpen) {
-                Alpine.store('page').terminalOpen = true;
+              if (Alpine?.store('ui') && !Alpine.store('ui').m('terminal', 'open')) {
+                Alpine.store('ui').mSet('terminal', 'open', true);
               }
               document.body.style.overflow = 'hidden';
             } else {
@@ -1848,8 +1848,8 @@
           });
         },
 
-        get open(){ return Alpine?.store('page')?.terminalOpen ?? false; },
-        toggle(){ if(Alpine?.store('page')) Alpine.store('page').terminalOpen = !Alpine.store('page').terminalOpen; },
+        get open(){ return Alpine?.store('ui')?.m('terminal', 'open') ?? false; },
+        toggle(){ Alpine?.store('ui')?.mToggle('terminal', 'open'); },
 
         startResize(e) {
           this.resizing = true;
@@ -1911,8 +1911,8 @@
           // Restore fullscreen body lock
           if (this.fullscreen) {
             document.body.style.overflow = 'hidden';
-            if (Alpine?.store('page') && !Alpine.store('page').terminalOpen) {
-              Alpine.store('page').terminalOpen = true;
+            if (Alpine?.store('ui') && !Alpine.store('ui').m('terminal', 'open')) {
+              Alpine.store('ui').mSet('terminal', 'open', true);
             }
           }
 

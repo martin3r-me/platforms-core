@@ -40,8 +40,79 @@
 
 <body class="bg-[var(--ui-body-bg)] text-[var(--ui-body-color)] overflow-hidden">
 
+  @auth
+  @php
+    $uiState = \Platform\Core\Models\UserUiPreference::where('user_id', auth()->id())->value('state') ?? new \stdClass();
+    $uiModule = explode('.', request()->route()?->getName() ?? '')[0] ?: 'core';
+  @endphp
+  <script>
+    window.__UI_PREFS__ = @json($uiState);
+    window.__UI_MODULE__ = @json($uiModule);
+    window.__UI_PREFS_URL__ = @json(route('platform.ui-preferences.update'));
+  </script>
+  <script>
+    document.addEventListener('alpine:init', () => {
+      const DEFAULTS = {
+        main_sidebar: { collapsed: false, width: 288 },
+        page_sidebar: { open: true, width: 320 },
+        activity: { open: false, width: 320 },
+        terminal: { open: false },
+      };
+
+      Alpine.store('ui', {
+        state: (window.__UI_PREFS__ && typeof window.__UI_PREFS__ === 'object') ? window.__UI_PREFS__ : {},
+        module: window.__UI_MODULE__ || 'core',
+        _syncTimer: null,
+
+        g(scope, field) {
+          return this.state?.[scope]?.[field] ?? DEFAULTS[scope]?.[field];
+        },
+        gSet(scope, field, value) {
+          if (!this.state[scope]) this.state[scope] = {};
+          this.state[scope][field] = value;
+          this._scheduleSync();
+        },
+
+        m(scope, field) {
+          const mod = this.state?.modules?.[this.module];
+          return mod?.[scope]?.[field] ?? DEFAULTS[scope]?.[field];
+        },
+        mSet(scope, field, value) {
+          if (!this.state.modules) this.state.modules = {};
+          if (!this.state.modules[this.module]) this.state.modules[this.module] = {};
+          if (!this.state.modules[this.module][scope]) this.state.modules[this.module][scope] = {};
+          this.state.modules[this.module][scope][field] = value;
+          this._scheduleSync();
+        },
+        mToggle(scope, field) {
+          this.mSet(scope, field, !this.m(scope, field));
+        },
+
+        _scheduleSync() {
+          clearTimeout(this._syncTimer);
+          this._syncTimer = setTimeout(() => this._sync(), 300);
+        },
+        _sync() {
+          const token = document.querySelector('meta[name="csrf-token"]')?.content;
+          fetch(window.__UI_PREFS_URL__, {
+            method: 'PUT',
+            credentials: 'same-origin',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'X-CSRF-TOKEN': token || '',
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ state: this.state }),
+          }).catch(() => { /* silent — UI bleibt intakt */ });
+        },
+      });
+    });
+  </script>
+  @endauth
+
   {{-- Modals früh laden, damit sie Events empfangen können --}}
-  @auth 
+  @auth
     @livewire('core.modal-team')
     @livewire('core.modal-user')
     @livewire('core.modal-checkin')

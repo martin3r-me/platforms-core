@@ -92,7 +92,7 @@
                 <button x-data
                     @click="window.dispatchEvent(new CustomEvent('toggle-main-sidebar'))"
                     class="inline-flex items-center justify-center w-7 h-7 rounded transition"
-                    :class="Alpine.store('page')?.mainSidebarOpen
+                    :class="!$store.ui?.g('main_sidebar', 'collapsed')
                         ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]'
                         : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
                     title="Navigation">
@@ -104,9 +104,9 @@
 
                 {{-- Page Sidebar (left) --}}
                 <button x-data
-                    @click="Alpine.store('page') && (Alpine.store('page').sidebarOpen = !Alpine.store('page').sidebarOpen)"
+                    @click="$store.ui?.mToggle('page_sidebar', 'open')"
                     class="inline-flex items-center justify-center w-7 h-7 rounded transition"
-                    :class="Alpine.store('page')?.sidebarOpen
+                    :class="$store.ui?.m('page_sidebar', 'open')
                         ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]'
                         : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
                     title="Seiten-Sidebar">
@@ -120,7 +120,7 @@
                 <button x-data
                     @click="window.dispatchEvent(new CustomEvent('toggle-terminal'))"
                     class="inline-flex items-center justify-center w-7 h-7 rounded transition"
-                    :class="Alpine.store('page')?.terminalOpen
+                    :class="$store.ui?.m('terminal', 'open')
                         ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]'
                         : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
                     title="Terminal">
@@ -132,9 +132,9 @@
 
                 {{-- Activity Sidebar (right) --}}
                 <button x-data
-                    @click="Alpine.store('page') && (Alpine.store('page').activityOpen = !Alpine.store('page').activityOpen)"
+                    @click="$store.ui?.mToggle('activity', 'open')"
                     class="inline-flex items-center justify-center w-7 h-7 rounded transition"
-                    :class="Alpine.store('page')?.activityOpen
+                    :class="$store.ui?.m('activity', 'open')
                         ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]'
                         : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
                     title="Aktivitäten">

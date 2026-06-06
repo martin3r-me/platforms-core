@@ -365,3 +365,10 @@ Route::middleware(['web', 'auth'])->group(function () {
     })->name('core.playground.attachment.delete');
 });
 
+Route::middleware(['web', 'auth'])->group(function () {
+    Route::get('/platform/ui-preferences', [\Platform\Core\Http\Controllers\UserUiPreferenceController::class, 'show'])
+        ->name('platform.ui-preferences.show');
+    Route::put('/platform/ui-preferences', [\Platform\Core\Http\Controllers\UserUiPreferenceController::class, 'update'])
+        ->name('platform.ui-preferences.update');
+});
+
