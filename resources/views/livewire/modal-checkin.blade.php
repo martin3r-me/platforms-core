@@ -1,411 +1,262 @@
-    <x-ui-modal size="xl" wire:model="modalShow">
-        <x-slot name="header">
-            <div class="flex items-center justify-between w-full">
-                <div class="flex items-center gap-3">
-                    <h2 class="text-xl font-semibold text-[var(--ui-secondary)] m-0">Täglicher Check-in</h2>
-                    <span class="text-xs text-[var(--ui-muted)] bg-[var(--ui-muted-5)] px-2 py-1 rounded-full">SELBSTREFLEXION</span>
-                </div>
-                <div class="text-right">
-                    <div class="text-xs text-[var(--ui-muted)] bg-[var(--ui-muted-5)] px-2 py-1 rounded-full">
-                        {{ \Carbon\Carbon::parse($selectedDate)->locale('de')->isoFormat('DD. MMMM YYYY') }}
-                    </div>
-                </div>
-            </div>
-        </x-slot>
+<x-ui-modal size="xl" wire:model="modalShow">
+    <x-slot name="header">
+        <div class="flex items-center gap-3">
+            @svg('heroicon-o-sun', 'w-5 h-5 text-[var(--ui-primary)]')
+            <h2 class="text-xl font-semibold text-[var(--ui-secondary)] m-0">Täglicher Check-in</h2>
+            <span class="ml-auto text-xs text-[var(--ui-muted)]">
+                {{ \Carbon\Carbon::parse($selectedDate)->locale('de')->isoFormat('dddd, DD. MMMM YYYY') }}
+            </span>
+        </div>
+    </x-slot>
 
-        {{-- Tabs --}}
-        <div class="flex items-center gap-1 mb-4 border-b border-[var(--ui-border)]/60">
-            <button type="button"
-                wire:click="setTab('today')"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition -mb-px
-                    {{ $activeTab === 'today'
-                        ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]'
-                        : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}">
-                @svg('heroicon-o-sun', 'w-4 h-4')
-                Heute
-            </button>
-            <button type="button"
-                wire:click="setTab('trends')"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition -mb-px
-                    {{ $activeTab === 'trends'
-                        ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]'
-                        : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}">
-                @svg('heroicon-o-chart-bar', 'w-4 h-4')
-                Trends
-                <span class="text-[10px] text-[var(--ui-muted)]">30 Tage</span>
-            </button>
+    {{-- Tabs --}}
+    <div class="flex items-center gap-1 mb-4 border-b border-[var(--ui-border)]/60">
+        <button type="button"
+            wire:click="setTab('today')"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition -mb-px
+                {{ $activeTab === 'today'
+                    ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]'
+                    : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}">
+            @svg('heroicon-o-sun', 'w-4 h-4')
+            Heute
+        </button>
+        <button type="button"
+            wire:click="setTab('trends')"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition -mb-px
+                {{ $activeTab === 'trends'
+                    ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]'
+                    : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}">
+            @svg('heroicon-o-chart-bar', 'w-4 h-4')
+            Trends
+            <span class="text-[10px] text-[var(--ui-muted)]">30 Tage</span>
+        </button>
+    </div>
+
+    @if($activeTab === 'trends')
+        @include('platform::livewire.partials.modal-checkin-trends')
+    @else
+
+    {{-- 7-Tage-Strip --}}
+    <div class="flex items-center gap-1 mb-4">
+        <button type="button" wire:click="previousWeek"
+            class="inline-flex items-center justify-center w-9 h-12 rounded-md text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)] transition"
+            title="Vorherige Woche">
+            @svg('heroicon-o-chevron-left', 'w-4 h-4')
+        </button>
+
+        <div class="flex-1 grid grid-cols-7 gap-1">
+            @foreach($this->visibleDays as $day)
+                <button type="button"
+                    wire:click="selectDate('{{ $day['date'] }}')"
+                    @disabled($day['is_future'])
+                    class="relative flex flex-col items-center justify-center h-12 rounded-md text-xs transition
+                        {{ $day['is_selected']
+                            ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] font-semibold shadow-sm'
+                            : ($day['is_future']
+                                ? 'text-[var(--ui-muted)] opacity-40 cursor-not-allowed'
+                                : 'text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]') }}
+                        {{ $day['is_today'] && !$day['is_selected'] ? 'ring-1 ring-[var(--ui-primary)]/40' : '' }}">
+                    <span class="text-[10px] uppercase tracking-wider {{ $day['is_selected'] ? 'opacity-90' : 'text-[var(--ui-muted)]' }}">{{ $day['weekday'] }}</span>
+                    <span class="text-sm font-medium leading-tight">{{ $day['day'] }}</span>
+                    @if($day['has_checkin'] && !$day['is_selected'])
+                        <span class="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[var(--ui-primary)]"></span>
+                    @endif
+                </button>
+            @endforeach
         </div>
 
-        @if($activeTab === 'trends')
-            @include('platform::livewire.partials.modal-checkin-trends')
-        @else
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-            {{-- Linke Spalte: Kalender + Pomodoro --}}
-            <div class="order-1 lg:order-1 h-full overflow-y-auto space-y-6">
-                {{-- Kalender --}}
-                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
-                    <div class="flex items-center gap-3 mb-6">
-                        @svg('heroicon-o-calendar-days', 'w-6 h-6 text-[var(--ui-primary)]')
-                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Kalender</h3>
-                    </div>
+        <button type="button" wire:click="nextWeek"
+            class="inline-flex items-center justify-center w-9 h-12 rounded-md text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)] transition"
+            title="Nächste Woche">
+            @svg('heroicon-o-chevron-right', 'w-4 h-4')
+        </button>
 
-                    <div class="flex items-center justify-between mb-6">
-                        <button wire:click="previousMonth" class="group p-2 hover:bg-[var(--ui-primary)]/10 rounded-lg transition-all duration-200 hover:scale-105">
-                            @svg('heroicon-o-chevron-left', 'w-5 h-5 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)]')
-                        </button>
-                        <div class="text-center">
-                            <h4 class="text-lg font-semibold text-[var(--ui-secondary)]">
-                                {{ \Carbon\Carbon::create($currentYear, $currentMonth, 1)->locale('de')->isoFormat('MMMM YYYY') }}
-                            </h4>
-                            <p class="text-xs text-[var(--ui-muted)] mt-1">
-                                {{ count($checkins) }} Check-ins diesen Monat
-                            </p>
-                        </div>
-                        <button wire:click="nextMonth" class="group p-2 hover:bg-[var(--ui-primary)]/10 rounded-lg transition-all duration-200 hover:scale-105">
-                            @svg('heroicon-o-chevron-right', 'w-5 h-5 text-[var(--ui-muted)] group-hover:text-[var(--ui-primary)]')
-                        </button>
-                    </div>
+        <button type="button" wire:click="goToToday"
+            class="inline-flex items-center gap-1 h-12 px-3 ml-1 rounded-md text-xs font-medium text-[var(--ui-secondary)] border border-[var(--ui-border)] hover:bg-[var(--ui-muted-5)] hover:text-[var(--ui-primary)] transition"
+            title="Heute">
+            @svg('heroicon-o-calendar-days', 'w-4 h-4')
+            Heute
+        </button>
+    </div>
 
-                    <div class="mb-4">
-                        <x-ui-button 
-                            wire:click="goToToday()" 
-                            variant="secondary-outline" 
-                            size="sm" 
-                            class="w-full"
-                        >
-                            <div class="flex items-center gap-2">
-                                @svg('heroicon-o-calendar-days', 'w-4 h-4')
-                                Heute ({{ now()->format('d.m.') }})
-                            </div>
-                        </x-ui-button>
-                    </div>
+    {{-- 2 Spalten: Form | To-Dos + Notes --}}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-                    <div class="grid grid-cols-7 gap-1 mb-3">
-                        @foreach(['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'] as $day)
-                            <div class="text-center text-xs font-semibold text-[var(--ui-muted)] py-2 uppercase tracking-wide">{{ $day }}</div>
-                        @endforeach
-                    </div>
+        {{-- Spalte 1: Check-in Formular --}}
+        <div class="space-y-4">
+            {{-- Tagesziel + Kategorie + Mood + Energie --}}
+            <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-5 space-y-4">
 
-                    <div class="grid grid-cols-7 gap-1">
-                        @php
-                            $startOfMonth = \Carbon\Carbon::create($currentYear, $currentMonth, 1);
-                            $endOfMonth = $startOfMonth->copy()->endOfMonth();
-                            $startOfWeek = $startOfMonth->copy()->startOfWeek(\Carbon\Carbon::MONDAY);
-                            $endOfWeek = $endOfMonth->copy()->endOfWeek(\Carbon\Carbon::SUNDAY);
-                            $currentDate = $startOfWeek->copy();
-                        @endphp
-
-                        @while($currentDate->lte($endOfWeek))
-                            @php
-                                $isCurrentMonth = $currentDate->month === $currentMonth;
-                                $isToday = $currentDate->isToday();
-                                $isSelected = $currentDate->format('Y-m-d') === $selectedDate;
-                                $hasCheckin = in_array($currentDate->format('Y-m-d'), $checkins);
-                                $dateString = $currentDate->format('Y-m-d');
-                            @endphp
-
-                            <button
-                                wire:click="selectDate('{{ $dateString }}')"
-                                class="group relative p-2 text-sm rounded-lg transition-colors duration-200
-                                    {{ $isCurrentMonth ? 'text-[var(--ui-secondary)]' : 'text-[var(--ui-muted)]' }}
-                                    {{ $isToday ? 'bg-gradient-to-br from-[var(--ui-primary)] to-[var(--ui-primary)]/80 text-[var(--ui-on-primary)] font-semibold shadow-md' : '' }}
-                                    {{ $isSelected && !$isToday ? 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] font-semibold border border-[var(--ui-primary)]/20' : '' }}
-                                    {{ !$isSelected && !$isToday ? 'hover:bg-[var(--ui-primary)]/5 hover:text-[var(--ui-primary)]' : '' }}
-                                "
-                            >
-                                <span class="relative z-10">{{ $currentDate->day }}</span>
-                                @if($hasCheckin)
-                                    <div class="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-[var(--ui-primary)] rounded-full shadow-sm"></div>
-                                @endif
-                                @if($isToday)
-                                    <div class="absolute inset-0 bg-gradient-to-br from-[var(--ui-primary)]/20 to-transparent rounded-lg"></div>
-                                @endif
-                            </button>
-
-                            @php $currentDate->addDay(); @endphp
-                        @endwhile
-                    </div>
-                </div>
-                {{-- Pomodoro Timer --}}
-                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
-                    <div class="flex items-center gap-3 mb-4">
-                        @svg('heroicon-o-clock', 'w-5 h-5 text-[var(--ui-primary)]')
-                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Pomodoro Timer</h3>
-                    </div>
-
-                    <div x-data="pomodoroTimer()" x-init="init()" class="text-center" 
-                         x-pomodoro-session='@json($pomodoroStats["active_session"])'
-                         x-pomodoro-stats='@json($pomodoroStats)'
-                         wire:poll.30s="loadPomodoroStats">
-                        <div class="mb-6">
-                            <div class="text-4xl font-bold text-[var(--ui-primary)] mb-2">
-                                <span x-text="formatTime(timeLeft)"></span> Min
-                            </div>
-                            <div class="text-sm text-[var(--ui-muted)]">Fokuszeit</div>
-                        </div>
-
-                        <div class="flex items-center justify-center gap-2 mb-4">
-                            <x-ui-button size="sm" variant="secondary-outline" @click="setTime(15)">15</x-ui-button>
-                            <x-ui-button size="sm" variant="secondary-outline" @click="setTime(25)">25</x-ui-button>
-                            <x-ui-button size="sm" variant="secondary-outline" @click="setTime(45)">45</x-ui-button>
-                            <x-ui-button size="sm" variant="secondary-outline" @click="setTime(60)">60</x-ui-button>
-                        </div>
-
-                        <div class="flex items-center justify-center gap-3 mb-2">
-                            <x-ui-button size="sm" variant="primary" @click="startTimer()" x-show="!isRunning">Start</x-ui-button>
-                            <x-ui-button size="sm" variant="secondary" @click="pauseTimer()" x-show="isRunning" wire:click="stopPomodoro()">Pause</x-ui-button>
-                            <x-ui-button size="sm" variant="secondary-outline" @click="resetTimer()" wire:click="stopActivePomodoro()">Reset</x-ui-button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        {{-- Mittlere Spalte: Check-in Formular --}}
-        <div class="order-2 lg:order-2">
-            <div class="space-y-4 h-full overflow-y-auto">
-                {{-- Datum und Grunddaten --}}
-                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
-                    <div class="flex items-center gap-3 mb-4">
-                        @svg('heroicon-o-flag', 'w-5 h-5 text-[var(--ui-primary)]')
-                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">
-                            {{ \Carbon\Carbon::parse($selectedDate)->locale('de')->isoFormat('dddd, DD. MMMM YYYY') }}
-                        </h3>
-                    </div>
-
-                    <div class="space-y-4">
-                        {{-- Tagesziel --}}
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2 flex items-center gap-2">
-                                @svg('heroicon-o-flag', 'w-4 h-4 text-[var(--ui-primary)]')
-                                Wichtigstes Ziel für heute
-                            </label>
-                            <textarea 
-                                wire:model.live.debounce.500ms="checkinData.daily_goal"
-                                placeholder="Was ist dein wichtigstes Ziel heute?"
-                                class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent resize-none"
-                                rows="2"
-                            ></textarea>
-                        </div>
-
-                        {{-- Zielkategorie --}}
-                        <div>
-                            <x-ui-input-select
-                                name="checkinData.goal_category"
-                                label="Kategorie"
-                                wire:model.live="checkinData.goal_category"
-                                :options="$this->getGoalCategoryOptions()"
-                                placeholder="Kategorie wählen (optional)"
-                                :errorKey="'checkinData.goal_category'"
-                            >
-                                <x-slot name="label">
-                                    <div class="flex items-center gap-2">
-                                        @svg('heroicon-o-tag', 'w-4 h-4 text-[var(--ui-primary)]')
-                                        Kategorie
-                                    </div>
-                                </x-slot>
-                            </x-ui-input-select>
-                            <p class="text-xs text-[var(--ui-muted)] mt-1">
-                                Wähle eine Kategorie, um dein Ziel besser zu kategorisieren und später auswerten zu können.
-                            </p>
-                        </div>
-
-                        {{-- Stimmung (0-4) --}}
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2 flex items-center gap-2">
-                                @svg('heroicon-o-face-smile', 'w-4 h-4 text-[var(--ui-primary)]')
-                                Stimmung
-                            </label>
-                            <div class="flex items-center gap-2">
-                                @foreach([0, 1, 2, 3, 4] as $score)
-                                    <button
-                                        type="button"
-                                        wire:click="$set('checkinData.mood_score', {{ $score }})"
-                                        class="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all duration-200
-                                            {{ isset($checkinData['mood_score']) && $checkinData['mood_score'] == $score 
-                                                ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] shadow-md' 
-                                                : 'bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] hover:bg-[var(--ui-primary)]/10 hover:text-[var(--ui-primary)]' }}
-                                        "
-                                    >
-                                        {{ $score }}
-                                    </button>
-                                @endforeach
-                            </div>
-                            @if(isset($checkinData['mood_score']))
-                                <p class="text-xs text-[var(--ui-muted)] mt-1">
-                                    {{ \Platform\Core\Models\Checkin::getMoodScoreOptions()[$checkinData['mood_score']] ?? '' }}
-                                </p>
-                            @endif
-                        </div>
-
-                        {{-- Energie (0-4) --}}
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2 flex items-center gap-2">
-                                @svg('heroicon-o-bolt', 'w-4 h-4 text-[var(--ui-primary)]')
-                                Energie
-                            </label>
-                            <div class="flex items-center gap-2">
-                                @foreach([0, 1, 2, 3, 4] as $score)
-                                    <button
-                                        type="button"
-                                        wire:click="$set('checkinData.energy_score', {{ $score }})"
-                                        class="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all duration-200
-                                            {{ isset($checkinData['energy_score']) && $checkinData['energy_score'] == $score 
-                                                ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] shadow-md' 
-                                                : 'bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] hover:bg-[var(--ui-primary)]/10 hover:text-[var(--ui-primary)]' }}
-                                        "
-                                    >
-                                        {{ $score }}
-                                    </button>
-                                @endforeach
-                            </div>
-                            @if(isset($checkinData['energy_score']))
-                                <p class="text-xs text-[var(--ui-muted)] mt-1">
-                                    {{ \Platform\Core\Models\Checkin::getEnergyScoreOptions()[$checkinData['energy_score']] ?? '' }}
-                                </p>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Selbstreflexion --}}
-                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
-                    <div class="flex items-center gap-3 mb-4">
-                        @svg('heroicon-o-sparkles', 'w-5 h-5 text-[var(--ui-primary)]')
-                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Selbstreflexion</h3>
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-3">
-                        <label class="group flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-[var(--ui-primary)]/5 transition-colors">
-                            <input type="checkbox" wire:model.live="checkinData.hydrated" class="w-4 h-4 text-[var(--ui-primary)] rounded border-[var(--ui-border)] focus:ring-2 focus:ring-[var(--ui-primary)]/20">
-                            <div class="flex items-center gap-2">
-                                @svg('heroicon-o-beaker', 'w-4 h-4 text-[var(--ui-primary)]')
-                                <span class="text-sm text-[var(--ui-secondary)] group-hover:text-[var(--ui-primary)]">Genug getrunken</span>
-                            </div>
-                        </label>
-                        
-                        <label class="group flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-[var(--ui-primary)]/5 transition-colors">
-                            <input type="checkbox" wire:model.live="checkinData.exercised" class="w-4 h-4 text-[var(--ui-primary)] rounded border-[var(--ui-border)] focus:ring-2 focus:ring-[var(--ui-primary)]/20">
-                            <div class="flex items-center gap-2">
-                                @svg('heroicon-o-fire', 'w-4 h-4 text-[var(--ui-primary)]')
-                                <span class="text-sm text-[var(--ui-secondary)] group-hover:text-[var(--ui-primary)]">Sich bewegt</span>
-                            </div>
-                        </label>
-                        
-                        <label class="group flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-[var(--ui-primary)]/5 transition-colors">
-                            <input type="checkbox" wire:model.live="checkinData.slept_well" class="w-4 h-4 text-[var(--ui-primary)] rounded border-[var(--ui-border)] focus:ring-2 focus:ring-[var(--ui-primary)]/20">
-                            <div class="flex items-center gap-2">
-                                @svg('heroicon-o-moon', 'w-4 h-4 text-[var(--ui-primary)]')
-                                <span class="text-sm text-[var(--ui-secondary)] group-hover:text-[var(--ui-primary)]">Gut geschlafen</span>
-                            </div>
-                        </label>
-                        
-                        <label class="group flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-[var(--ui-primary)]/5 transition-colors">
-                            <input type="checkbox" wire:model.live="checkinData.focused_work" class="w-4 h-4 text-[var(--ui-primary)] rounded border-[var(--ui-border)] focus:ring-2 focus:ring-[var(--ui-primary)]/20">
-                            <div class="flex items-center gap-2">
-                                @svg('heroicon-o-eye', 'w-4 h-4 text-[var(--ui-primary)]')
-                                <span class="text-sm text-[var(--ui-secondary)] group-hover:text-[var(--ui-primary)]">Fokussiert gearbeitet</span>
-                            </div>
-                        </label>
-                        
-                        <label class="group flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-[var(--ui-primary)]/5 transition-colors">
-                            <input type="checkbox" wire:model.live="checkinData.social_time" class="w-4 h-4 text-[var(--ui-primary)] rounded border-[var(--ui-border)] focus:ring-2 focus:ring-[var(--ui-primary)]/20">
-                            <div class="flex items-center gap-2">
-                                @svg('heroicon-o-users', 'w-4 h-4 text-[var(--ui-primary)]')
-                                <span class="text-sm text-[var(--ui-secondary)] group-hover:text-[var(--ui-primary)]">Zeit mit anderen</span>
-                            </div>
-                        </label>
-                        
-                        <label class="group flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-[var(--ui-primary)]/5 transition-colors">
-                            <input type="checkbox" wire:model.live="checkinData.needs_support" class="w-4 h-4 text-[var(--ui-primary)] rounded border-[var(--ui-border)] focus:ring-2 focus:ring-[var(--ui-primary)]/20">
-                            <div class="flex items-center gap-2">
-                                @svg('heroicon-o-question-mark-circle', 'w-4 h-4 text-[var(--ui-primary)]')
-                                <span class="text-sm text-[var(--ui-secondary)] group-hover:text-[var(--ui-primary)]">Unterstützung nötig</span>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-
-        {{-- Rechte Spalte: Aufgaben & Notizen --}}
-        <div class="order-3 lg:order-3">
-            <div class="h-full overflow-y-auto">
-                {{-- To-Do Liste --}}
-                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm">
-                    <div class="flex items-center gap-3 mb-4">
-                        @svg('heroicon-o-clipboard-document-list', 'w-5 h-5 text-[var(--ui-primary)]')
-                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Tagesaufgaben</h3>
-                    </div>
-
-                    {{-- Neue Aufgabe hinzufügen --}}
-                    <div class="flex items-center gap-2 mb-4" x-data="{ todoTitle: '' }" @keydown.enter.stop>
-                        <x-ui-input-text
-                            name="newTodoTitle"
-                            x-model="todoTitle"
-                            placeholder="Neue Aufgabe hinzufügen..."
-                            class="flex-1"
-                            @keydown.enter="$wire.set('newTodoTitle', todoTitle); $wire.addTodo(); todoTitle = '';"
-                        />
-                        <x-ui-button wire:click="addTodo" variant="primary" iconOnly>
-                            @svg('heroicon-o-plus', 'w-4 h-4')
-                        </x-ui-button>
-                    </div>
-
-                    {{-- To-Do Liste --}}
-                    <div class="space-y-2 max-h-96 overflow-y-auto">
-                        @forelse($todos as $todo)
-                            <div class="group flex items-center gap-3 p-3 bg-[var(--ui-muted-5)] rounded-lg hover:bg-[var(--ui-primary)]/5 transition-colors">
-                                <input
-                                    type="checkbox"
-                                    wire:click="toggleTodo({{ $todo['id'] }})"
-                                    {{ $todo['done'] ? 'checked' : '' }}
-                                    class="w-4 h-4 text-[var(--ui-primary)] rounded border-[var(--ui-border)] focus:ring-2 focus:ring-[var(--ui-primary)]/20"
-                                >
-                                <span
-                                    wire:click="toggleTodo({{ $todo['id'] }})"
-                                    class="flex-1 text-sm cursor-pointer {{ $todo['done'] ? 'line-through text-[var(--ui-muted)]' : 'text-[var(--ui-secondary)]' }} hover:text-[var(--ui-primary)] transition-colors"
-                                >
-                                    {{ $todo['title'] }}
-                                </span>
-                                <button
-                                    wire:click="postponeTodo({{ $todo['id'] }})"
-                                    class="opacity-0 group-hover:opacity-100 p-1 hover:bg-[var(--ui-warning)] hover:text-[var(--ui-on-warning)] rounded transition-all duration-200"
-                                    title="Auf morgen verschieben"
-                                >
-                                    @svg('heroicon-o-arrow-right', 'w-4 h-4')
-                                </button>
-                                <button
-                                    wire:click="deleteTodo({{ $todo['id'] }})"
-                                    class="opacity-0 group-hover:opacity-100 p-1 hover:bg-[var(--ui-danger)] hover:text-[var(--ui-on-danger)] rounded transition-all duration-200"
-                                >
-                                    @svg('heroicon-o-trash', 'w-4 h-4')
-                                </button>
-                            </div>
-                        @empty
-                            <div class="text-center py-6">
-                                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-[var(--ui-muted-5)] flex items-center justify-center">
-                                    @svg('heroicon-o-clipboard-document-list', 'w-6 h-6 text-[var(--ui-muted)]')
-                                </div>
-                                <p class="text-sm text-[var(--ui-muted)]">Noch keine Aufgaben für heute</p>
-                            </div>
-                        @endforelse
-                    </div>
-                </div>
-
-                {{-- Notizen --}}
-                <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-6 shadow-sm mt-6">
-                    <div class="flex items-center gap-3 mb-4">
-                        @svg('heroicon-o-document-text', 'w-5 h-5 text-[var(--ui-primary)]')
-                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">Zusätzliche Notizen</h3>
-                    </div>
+                {{-- Tagesziel --}}
+                <div>
+                    <label class="flex items-center gap-2 text-sm font-medium text-[var(--ui-secondary)] mb-2">
+                        @svg('heroicon-o-flag', 'w-4 h-4 text-[var(--ui-primary)]')
+                        Wichtigstes Ziel für heute
+                    </label>
                     <textarea
-                        wire:model.live.debounce.500ms="checkinData.notes"
-                        placeholder="Weitere Gedanken oder Notizen..."
-                        class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent resize-none"
-                        rows="3"
+                        wire:model.live.debounce.500ms="checkinData.daily_goal"
+                        placeholder="Was ist heute wichtig?"
+                        class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent resize-none text-sm"
+                        rows="2"
                     ></textarea>
                 </div>
+
+                {{-- Zielkategorie --}}
+                <div>
+                    <x-ui-input-select
+                        name="checkinData.goal_category"
+                        label="Kategorie"
+                        wire:model.live="checkinData.goal_category"
+                        :options="$this->getGoalCategoryOptions()"
+                        placeholder="Kategorie wählen (optional)"
+                        :errorKey="'checkinData.goal_category'"
+                    />
+                </div>
+
+                {{-- Stimmung --}}
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="flex items-center gap-2 text-sm font-medium text-[var(--ui-secondary)]">
+                            @svg('heroicon-o-face-smile', 'w-4 h-4 text-[var(--ui-primary)]')
+                            Stimmung
+                        </label>
+                        @if(isset($checkinData['mood_score']) && $checkinData['mood_score'] !== null)
+                            <span class="text-[11px] text-[var(--ui-muted)]">{{ \Platform\Core\Models\Checkin::getMoodScoreOptions()[$checkinData['mood_score']] ?? '' }}</span>
+                        @endif
+                    </div>
+                    <div class="grid grid-cols-5 gap-1">
+                        @foreach([0, 1, 2, 3, 4] as $score)
+                            <button type="button"
+                                wire:click="$set('checkinData.mood_score', {{ $score }})"
+                                class="py-2 rounded-md text-sm font-medium transition
+                                    {{ isset($checkinData['mood_score']) && (int) $checkinData['mood_score'] === $score
+                                        ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] shadow-sm'
+                                        : 'bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] hover:bg-[var(--ui-primary)]/10 hover:text-[var(--ui-primary)]' }}">
+                                {{ $score }}
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Energie --}}
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="flex items-center gap-2 text-sm font-medium text-[var(--ui-secondary)]">
+                            @svg('heroicon-o-bolt', 'w-4 h-4 text-[var(--ui-primary)]')
+                            Energie
+                        </label>
+                        @if(isset($checkinData['energy_score']) && $checkinData['energy_score'] !== null)
+                            <span class="text-[11px] text-[var(--ui-muted)]">{{ \Platform\Core\Models\Checkin::getEnergyScoreOptions()[$checkinData['energy_score']] ?? '' }}</span>
+                        @endif
+                    </div>
+                    <div class="grid grid-cols-5 gap-1">
+                        @foreach([0, 1, 2, 3, 4] as $score)
+                            <button type="button"
+                                wire:click="$set('checkinData.energy_score', {{ $score }})"
+                                class="py-2 rounded-md text-sm font-medium transition
+                                    {{ isset($checkinData['energy_score']) && (int) $checkinData['energy_score'] === $score
+                                        ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] shadow-sm'
+                                        : 'bg-[var(--ui-muted-5)] text-[var(--ui-secondary)] hover:bg-[var(--ui-primary)]/10 hover:text-[var(--ui-primary)]' }}">
+                                {{ $score }}
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+
+            {{-- Selbstreflexion-Checkboxen --}}
+            <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-5">
+                <div class="grid grid-cols-2 gap-2">
+                    @php
+                        $habits = [
+                            'hydrated' => ['Getrunken', 'heroicon-o-beaker'],
+                            'exercised' => ['Bewegt', 'heroicon-o-fire'],
+                            'slept_well' => ['Geschlafen', 'heroicon-o-moon'],
+                            'focused_work' => ['Fokussiert', 'heroicon-o-eye'],
+                            'social_time' => ['Sozial', 'heroicon-o-users'],
+                            'needs_support' => ['Brauche Hilfe', 'heroicon-o-question-mark-circle'],
+                        ];
+                    @endphp
+                    @foreach($habits as $key => [$label, $icon])
+                        <label class="flex items-center gap-2.5 cursor-pointer p-2 rounded-md hover:bg-[var(--ui-primary)]/5 transition-colors">
+                            <input type="checkbox"
+                                wire:model.live="checkinData.{{ $key }}"
+                                class="w-4 h-4 text-[var(--ui-primary)] rounded border-[var(--ui-border)] focus:ring-2 focus:ring-[var(--ui-primary)]/20">
+                            <x-dynamic-component :component="$icon" class="w-4 h-4 text-[var(--ui-primary)]" />
+                            <span class="text-sm text-[var(--ui-secondary)]">{{ $label }}</span>
+                        </label>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+
+        {{-- Spalte 2: To-Dos + Notes --}}
+        <div class="space-y-4">
+
+            {{-- To-Do Liste --}}
+            <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-5">
+                <div class="flex items-center gap-2 mb-3">
+                    @svg('heroicon-o-clipboard-document-list', 'w-4 h-4 text-[var(--ui-primary)]')
+                    <h3 class="text-sm font-semibold text-[var(--ui-secondary)] m-0">Tagesaufgaben</h3>
+                </div>
+
+                {{-- Neue Aufgabe --}}
+                <div class="flex items-center gap-2 mb-3" x-data="{ todoTitle: '' }" @keydown.enter.stop>
+                    <x-ui-input-text
+                        name="newTodoTitle"
+                        x-model="todoTitle"
+                        placeholder="Neue Aufgabe…"
+                        class="flex-1"
+                        @keydown.enter="$wire.set('newTodoTitle', todoTitle); $wire.addTodo(); todoTitle = '';"
+                    />
+                    <x-ui-button wire:click="addTodo" variant="primary" iconOnly>
+                        @svg('heroicon-o-plus', 'w-4 h-4')
+                    </x-ui-button>
+                </div>
+
+                {{-- Liste --}}
+                <div class="space-y-1.5 max-h-72 overflow-y-auto">
+                    @forelse($todos as $todo)
+                        <div class="group flex items-center gap-2 p-2 bg-[var(--ui-muted-5)] rounded-md hover:bg-[var(--ui-primary)]/5 transition-colors">
+                            <input type="checkbox"
+                                wire:click="toggleTodo({{ $todo['id'] }})"
+                                {{ $todo['done'] ? 'checked' : '' }}
+                                class="w-4 h-4 text-[var(--ui-primary)] rounded border-[var(--ui-border)] focus:ring-2 focus:ring-[var(--ui-primary)]/20">
+                            <span wire:click="toggleTodo({{ $todo['id'] }})"
+                                class="flex-1 text-sm cursor-pointer {{ $todo['done'] ? 'line-through text-[var(--ui-muted)]' : 'text-[var(--ui-secondary)]' }} hover:text-[var(--ui-primary)] transition-colors">
+                                {{ $todo['title'] }}
+                            </span>
+                            <button wire:click="postponeTodo({{ $todo['id'] }})"
+                                class="opacity-0 group-hover:opacity-100 p-1 hover:bg-[var(--ui-warning)] hover:text-[var(--ui-on-warning)] rounded transition-all"
+                                title="Auf morgen verschieben">
+                                @svg('heroicon-o-arrow-right', 'w-3.5 h-3.5')
+                            </button>
+                            <button wire:click="deleteTodo({{ $todo['id'] }})"
+                                class="opacity-0 group-hover:opacity-100 p-1 hover:bg-[var(--ui-danger)] hover:text-[var(--ui-on-danger)] rounded transition-all"
+                                title="Löschen">
+                                @svg('heroicon-o-trash', 'w-3.5 h-3.5')
+                            </button>
+                        </div>
+                    @empty
+                        <div class="text-center py-6 text-xs text-[var(--ui-muted)]">
+                            Noch keine Aufgaben für diesen Tag.
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+
+            {{-- Notizen --}}
+            <div class="bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 p-5">
+                <div class="flex items-center gap-2 mb-3">
+                    @svg('heroicon-o-document-text', 'w-4 h-4 text-[var(--ui-primary)]')
+                    <h3 class="text-sm font-semibold text-[var(--ui-secondary)] m-0">Notizen</h3>
+                </div>
+                <textarea
+                    wire:model.live.debounce.500ms="checkinData.notes"
+                    placeholder="Weitere Gedanken…"
+                    class="w-full px-3 py-2 border border-[var(--ui-border)] rounded-lg focus:ring-2 focus:ring-[var(--ui-primary)] focus:border-transparent resize-none text-sm"
+                    rows="3"
+                ></textarea>
             </div>
         </div>
     </div>
@@ -430,193 +281,3 @@
         </div>
     </x-slot>
 </x-ui-modal>
-
-<script>
-function pomodoroTimer() {
-    return {
-        // Timer Settings
-        workTime: 25 * 60, // 25 minutes (default)
-        
-            // Current State
-            timeLeft: 25 * 60,
-            isRunning: false,
-            sessionCount: 1,
-            pomodoroCount: 0,
-            syncInterval: null,
-        
-        // Timer Interval
-        timer: null,
-        
-        // Computed Properties
-        get progress() {
-            return (this.workTime - this.timeLeft) / this.workTime;
-        },
-        
-        init() {
-            this.loadFromServer();
-            
-            // Listen for Livewire updates
-            this.$el.addEventListener('livewire:updated', () => {
-                this.loadFromServer();
-            });
-            
-            // Listen for timer expiration
-            this.$el.addEventListener('timer-expired', () => {
-                this.completeSession();
-            });
-            
-            // Start server sync for real-time updates
-            this.startServerSync();
-        },
-        
-            startServerSync() {
-                // Sync with server every 30 seconds when timer is running
-                this.syncInterval = setInterval(() => {
-                    if (this.isRunning) {
-                        this.$wire.loadPomodoroStats();
-                    }
-                }, 30000);
-            },
-            
-            stopServerSync() {
-                if (this.syncInterval) {
-                    clearInterval(this.syncInterval);
-                    this.syncInterval = null;
-                }
-            },
-        
-        loadFromServer() {
-            // Load from server data
-            const sessionData = this.$el.getAttribute('x-pomodoro-session');
-            const statsData = this.$el.getAttribute('x-pomodoro-stats');
-            
-            if (sessionData && sessionData !== 'null') {
-                const session = JSON.parse(sessionData);
-                this.timeLeft = (session.remaining_minutes || 0) * 60; // Convert to seconds for internal calculation
-                this.isRunning = session.is_active;
-                this.pomodoroCount = statsData ? JSON.parse(statsData).today_count : 0;
-                
-                // Start timer if session is active and has time left
-                if (this.isRunning && this.timeLeft > 0) {
-                    // Only start if not already running
-                    if (!this.timer) {
-                        this.startTimer();
-                    }
-                } else if (this.isRunning && this.timeLeft <= 0) {
-                    // Session expired, complete it
-                    this.completeSession();
-                }
-            } else {
-                // No active session - reset to default state
-                this.resetToDefault();
-            }
-            
-            this.updateDisplay();
-        },
-        
-            startTimer() {
-                if (this.isRunning) return;
-                
-                // Get the current time setting and start Livewire session
-                const minutes = Math.ceil(this.timeLeft / 60);
-                this.$wire.startPomodoro('work', minutes);
-                
-                this.isRunning = true;
-                this.timer = setInterval(() => {
-                    this.timeLeft -= 30; // Update every 30 seconds
-                    this.updateDisplay();
-                    
-                    if (this.timeLeft <= 0) {
-                        this.completeSession();
-                    }
-                }, 30000); // Update every 30 seconds
-                
-                // Timer started
-            },
-        
-        pauseTimer() {
-            this.isRunning = false;
-            if (this.timer) {
-                clearInterval(this.timer);
-                this.timer = null;
-            }
-            this.stopServerSync();
-            this.updateDisplay();
-        },
-        
-        resetTimer() {
-            this.pauseTimer();
-            this.timeLeft = this.workTime;
-            this.sessionCount = 1;
-            this.updateDisplay();
-        },
-        
-        resetToDefault() {
-            this.pauseTimer();
-            this.timeLeft = 25 * 60; // Reset to 25 minutes
-            this.workTime = 25 * 60; // Reset work time to 25 minutes
-            this.isRunning = false;
-            this.sessionCount = 1;
-            this.updateDisplay();
-        },
-        
-        setTime(minutes) {
-            this.pauseTimer();
-            this.timeLeft = minutes * 60;
-            this.workTime = minutes * 60;
-            this.updateDisplay();
-        },
-        
-            completeSession() {
-                this.pauseTimer();
-                this.stopServerSync();
-                
-                // Play notification sound (if available)
-                this.playNotification();
-                
-                // Just increment counters, no break logic
-                this.pomodoroCount++;
-                this.sessionCount++;
-                
-                // Trigger Livewire to update database
-                this.$wire.stopPomodoro();
-                
-                // Reset to default state after completion
-                this.resetToDefault();
-            },
-        
-        formatTime(seconds) {
-            const minutes = Math.ceil(seconds / 60);
-            return `${minutes}`;
-        },
-        
-            updateDisplay() {
-                // No tab title updates - timer only in sidebar
-            },
-        
-        playNotification() {
-            // Try to play notification sound
-            try {
-                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
-                audio.volume = 0.3;
-                audio.play().catch(() => {
-                    // Fallback: use system beep
-                    console.log('\u0007'); // ASCII bell character
-                });
-            } catch (e) {
-                console.log('\u0007'); // Fallback beep
-            }
-        },
-        
-        clearData() {
-            if (confirm('Alle Pomodoro-Daten löschen?')) {
-                this.pomodoroCount = 0;
-                this.sessionCount = 1;
-                this.timeLeft = this.workTime;
-                this.pauseTimer();
-                this.updateDisplay();
-            }
-        }
-    }
-}
-</script>

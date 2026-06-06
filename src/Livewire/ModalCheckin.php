@@ -2,65 +2,39 @@
 
 namespace Platform\Core\Livewire;
 
+use Carbon\Carbon;
+use Illuminate\Validation\Rule;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Platform\Core\Enums\GoalCategory;
 use Platform\Core\Models\Checkin;
 use Platform\Core\Models\CheckinTodo;
-use Platform\Core\Models\PomodoroSession;
-use Platform\Core\Enums\GoalCategory;
-use Illuminate\Validation\Rule;
-use Carbon\Carbon;
 
 class ModalCheckin extends Component
 {
-    public $modalShow = false;
-    public $selectedDate;
-    public $checkin;
-    public $checkinData = [];
-    public $todos = [];
-    public $newTodoTitle = '';
-    public $currentMonth;
-    public $currentYear;
-    public $checkins = [];
+    public bool $modalShow = false;
+    public string $selectedDate;
+    public string $windowStart;
+    public ?Checkin $checkin = null;
+    public array $checkinData = [];
+    public array $todos = [];
+    public string $newTodoTitle = '';
+    public array $checkins = [];
 
     public string $activeTab = 'today';
     public array $trendData = [];
 
-    // Pomodoro Properties
-    public $pomodoroStats = [];
-
     protected $listeners = ['open-modal-checkin' => 'openModal'];
 
-    // Computed Properties
-    public function getRemainingTime()
+    public function mount(): void
     {
-        if (isset($this->pomodoroStats['active_session']) && $this->pomodoroStats['active_session']) {
-            $session = $this->pomodoroStats['active_session'];
-            $remainingMinutes = $session['remaining_minutes'] ?? 0;
-            return max(0, $remainingMinutes);
-        }
-        return 0;
-    }
-
-    public function mount()
-    {
-        $this->selectedDate = now()->format('Y-m-d');
-        $this->currentMonth = now()->month;
-        $this->currentYear = now()->year;
-        $this->loadCheckins();
-        $this->loadCheckinForDate($this->selectedDate);
-        $this->loadPomodoroStats();
-    }
-
-    public function goToToday()
-    {
-        $this->selectedDate = now()->format('Y-m-d');
-        $this->currentMonth = now()->month;
-        $this->currentYear = now()->year;
+        $this->selectedDate = now()->toDateString();
+        $this->windowStart = now()->subDays(6)->toDateString();
         $this->loadCheckins();
         $this->loadCheckinForDate($this->selectedDate);
     }
 
-    public function openModal()
+    public function openModal(): void
     {
         $this->modalShow = true;
         $this->loadCheckins();
@@ -72,6 +46,182 @@ class ModalCheckin extends Component
         if ($tab === 'trends') {
             $this->loadTrends();
         }
+    }
+
+    public function selectDate(string $date): void
+    {
+        $this->selectedDate = $date;
+        $this->loadCheckinForDate($date);
+    }
+
+    public function goToToday(): void
+    {
+        $this->selectedDate = now()->toDateString();
+        $this->windowStart = now()->subDays(6)->toDateString();
+        $this->loadCheckins();
+        $this->loadCheckinForDate($this->selectedDate);
+    }
+
+    public function previousWeek(): void
+    {
+        $this->windowStart = Carbon::parse($this->windowStart)->subDays(7)->toDateString();
+        $this->loadCheckins();
+    }
+
+    public function nextWeek(): void
+    {
+        $next = Carbon::parse($this->windowStart)->addDays(7);
+        if ($next->copy()->addDays(6)->gt(now())) {
+            $this->goToToday();
+            return;
+        }
+        $this->windowStart = $next->toDateString();
+        $this->loadCheckins();
+    }
+
+    public function loadCheckinForDate(string $date): void
+    {
+        $this->checkin = Checkin::where('user_id', auth()->id())
+            ->where('date', $date)
+            ->with('todos')
+            ->first();
+
+        if ($this->checkin) {
+            $this->checkinData = $this->checkin->toArray();
+            $this->todos = $this->checkin->todos->toArray();
+        } else {
+            $this->checkinData = $this->emptyCheckinData($date);
+            $this->todos = [];
+        }
+    }
+
+    public function loadCheckins(): void
+    {
+        $start = Carbon::parse($this->windowStart);
+        $end = $start->copy()->addDays(6);
+
+        $this->checkins = Checkin::where('user_id', auth()->id())
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->pluck('date')
+            ->map(fn ($d) => Carbon::parse($d)->toDateString())
+            ->toArray();
+    }
+
+    #[Computed]
+    public function visibleDays(): array
+    {
+        $start = Carbon::parse($this->windowStart);
+        $days = [];
+        for ($i = 0; $i < 7; $i++) {
+            $date = $start->copy()->addDays($i);
+            $key = $date->toDateString();
+            $days[] = [
+                'date' => $key,
+                'day' => $date->format('d.'),
+                'weekday' => $date->locale('de')->isoFormat('dd'),
+                'is_today' => $date->isToday(),
+                'is_selected' => $key === $this->selectedDate,
+                'is_future' => $date->isFuture(),
+                'has_checkin' => in_array($key, $this->checkins),
+            ];
+        }
+        return $days;
+    }
+
+    public function save(bool $close = true): void
+    {
+        $this->validate([
+            'checkinData.daily_goal' => 'nullable|string|max:1000',
+            'checkinData.goal_category' => ['nullable', 'string', Rule::in(GoalCategory::values())],
+            'checkinData.mood_score' => 'nullable|integer|min:0|max:4',
+            'checkinData.energy_score' => 'nullable|integer|min:0|max:4',
+            'checkinData.hydrated' => 'boolean',
+            'checkinData.exercised' => 'boolean',
+            'checkinData.slept_well' => 'boolean',
+            'checkinData.focused_work' => 'boolean',
+            'checkinData.social_time' => 'boolean',
+            'checkinData.needs_support' => 'boolean',
+            'checkinData.notes' => 'nullable|string|max:2000',
+        ]);
+
+        $data = array_merge($this->checkinData, [
+            'user_id' => auth()->id(),
+            'date' => $this->selectedDate,
+            'mood_score' => $this->nullableInt($this->checkinData['mood_score'] ?? null),
+            'energy_score' => $this->nullableInt($this->checkinData['energy_score'] ?? null),
+        ]);
+
+        if ($this->checkin) {
+            $this->checkin->update($data);
+        } else {
+            $this->checkin = Checkin::create($data);
+        }
+
+        $this->loadCheckins();
+        $this->dispatch('checkin-saved');
+
+        if ($close) {
+            $this->dispatch('notice', [
+                'type' => 'success',
+                'message' => 'Check-in erfolgreich gespeichert!',
+            ]);
+            $this->modalShow = false;
+        }
+    }
+
+    public function addTodo(): void
+    {
+        if (trim($this->newTodoTitle) === '') {
+            return;
+        }
+
+        $checkin = Checkin::firstOrCreate(
+            ['user_id' => auth()->id(), 'date' => $this->selectedDate],
+        );
+
+        CheckinTodo::create([
+            'checkin_id' => $checkin->id,
+            'title' => $this->newTodoTitle,
+            'done' => false,
+        ]);
+
+        $this->newTodoTitle = '';
+        $this->loadCheckinForDate($this->selectedDate);
+    }
+
+    public function toggleTodo(int $todoId): void
+    {
+        $todo = CheckinTodo::find($todoId);
+        if ($todo) {
+            $todo->update(['done' => !$todo->done]);
+            $this->loadCheckinForDate($this->selectedDate);
+        }
+    }
+
+    public function deleteTodo(int $todoId): void
+    {
+        CheckinTodo::find($todoId)?->delete();
+        $this->loadCheckinForDate($this->selectedDate);
+    }
+
+    public function postponeTodo(int $todoId): void
+    {
+        $todo = CheckinTodo::with('checkin')->find($todoId);
+        if (!$todo || !$todo->checkin) {
+            return;
+        }
+        if ((int) $todo->checkin->user_id !== (int) auth()->id()) {
+            return;
+        }
+
+        $nextDate = Carbon::parse($todo->checkin->date)->addDay()->toDateString();
+
+        $target = Checkin::firstOrCreate(
+            ['user_id' => auth()->id(), 'date' => $nextDate],
+        );
+
+        $todo->update(['checkin_id' => $target->id]);
+        $this->loadCheckinForDate($this->selectedDate);
     }
 
     public function loadTrends(): void
@@ -145,373 +295,39 @@ class ModalCheckin extends Component
         ];
     }
 
-    public function selectDate($date)
-    {
-        $this->selectedDate = $date;
-        $this->loadCheckinForDate($date);
-    }
-
-    public function loadCheckinForDate($date)
-    {
-        $this->checkin = Checkin::where('user_id', auth()->id())
-            ->where('date', $date)
-            ->with('todos')
-            ->first();
-
-        if ($this->checkin) {
-            $this->checkinData = $this->checkin->toArray();
-            $this->todos = $this->checkin->todos->toArray();
-        } else {
-            $this->checkinData = [
-                'date' => $date,
-                'daily_goal' => '',
-                'goal_category' => null,
-                'mood' => null,
-                'happiness' => null,
-                'mood_score' => null,
-                'energy_score' => null,
-                'needs_support' => false,
-                'hydrated' => false,
-                'exercised' => false,
-                'slept_well' => false,
-                'focused_work' => false,
-                'social_time' => false,
-                'notes' => ''
-            ];
-            $this->todos = [];
-        }
-    }
-
-    public function loadCheckins()
-    {
-        $startOfMonth = Carbon::create($this->currentYear, $this->currentMonth, 1)->startOfMonth();
-        $endOfMonth = Carbon::create($this->currentYear, $this->currentMonth, 1)->endOfMonth();
-
-        $this->checkins = Checkin::where('user_id', auth()->id())
-            ->whereBetween('date', [$startOfMonth, $endOfMonth])
-            ->pluck('date')
-            ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
-            ->toArray();
-    }
-
-    public function previousMonth()
-    {
-        $date = Carbon::create($this->currentYear, $this->currentMonth, 1)->subMonth();
-        $this->currentMonth = $date->month;
-        $this->currentYear = $date->year;
-        $this->loadCheckins();
-    }
-
-    public function nextMonth()
-    {
-        $date = Carbon::create($this->currentYear, $this->currentMonth, 1)->addMonth();
-        $this->currentMonth = $date->month;
-        $this->currentYear = $date->year;
-        $this->loadCheckins();
-    }
-
-    public function save()
-    {
-            $this->validate([
-                'checkinData.daily_goal' => 'nullable|string|max:1000',
-                'checkinData.goal_category' => ['nullable', 'string', Rule::in(GoalCategory::values())],
-                'checkinData.mood_score' => 'nullable|integer|min:0|max:4',
-                'checkinData.energy_score' => 'nullable|integer|min:0|max:4',
-            'checkinData.hydrated' => 'boolean',
-            'checkinData.exercised' => 'boolean',
-            'checkinData.slept_well' => 'boolean',
-            'checkinData.focused_work' => 'boolean',
-            'checkinData.social_time' => 'boolean',
-            'checkinData.needs_support' => 'boolean',
-            'checkinData.notes' => 'nullable|string|max:2000',
-        ]);
-
-            $checkinData = array_merge($this->checkinData, [
-                'user_id' => auth()->id(),
-                'date' => $this->selectedDate,
-                'mood_score' => isset($this->checkinData['mood_score']) && $this->checkinData['mood_score'] !== '' ? (int)$this->checkinData['mood_score'] : null,
-                'energy_score' => isset($this->checkinData['energy_score']) && $this->checkinData['energy_score'] !== '' ? (int)$this->checkinData['energy_score'] : null,
-                // Alte Felder bereinigen (leere Strings zu null)
-                'mood' => !empty($this->checkinData['mood']) ? (int)$this->checkinData['mood'] : null,
-                'happiness' => !empty($this->checkinData['happiness']) ? (int)$this->checkinData['happiness'] : null,
-            ]);
-
-        if ($this->checkin) {
-            $this->checkin->update($checkinData);
-        } else {
-            $this->checkin = Checkin::create($checkinData);
-        }
-
-            $this->dispatch('notice', [
-                'type' => 'success',
-                'message' => 'Check-in erfolgreich gespeichert!'
-            ]);
-
-            $this->loadCheckins();
-
-            $this->dispatch('checkin-saved');
-
-            // Modal schließen
-            $this->modalShow = false;
-    }
-
-    public function saveWithoutClosing()
-    {
-        $this->validate([
-            'checkinData.daily_goal' => 'nullable|string|max:1000',
-            'checkinData.goal_category' => ['nullable', 'string', \Illuminate\Validation\Rule::in(\Platform\Core\Enums\GoalCategory::values())],
-            'checkinData.mood_score' => 'nullable|integer|min:0|max:4',
-            'checkinData.energy_score' => 'nullable|integer|min:0|max:4',
-            'checkinData.hydrated' => 'boolean',
-            'checkinData.exercised' => 'boolean',
-            'checkinData.slept_well' => 'boolean',
-            'checkinData.focused_work' => 'boolean',
-            'checkinData.social_time' => 'boolean',
-            'checkinData.needs_support' => 'boolean',
-            'checkinData.notes' => 'nullable|string|max:2000',
-        ]);
-
-        $checkinData = array_merge($this->checkinData, [
-            'user_id' => auth()->id(),
-            'date' => $this->selectedDate,
-            'mood_score' => isset($this->checkinData['mood_score']) && $this->checkinData['mood_score'] !== '' ? (int)$this->checkinData['mood_score'] : null,
-            'energy_score' => isset($this->checkinData['energy_score']) && $this->checkinData['energy_score'] !== '' ? (int)$this->checkinData['energy_score'] : null,
-            // Alte Felder bereinigen (leere Strings zu null)
-            'mood' => !empty($this->checkinData['mood']) ? (int)$this->checkinData['mood'] : null,
-            'happiness' => !empty($this->checkinData['happiness']) ? (int)$this->checkinData['happiness'] : null,
-        ]);
-
-        if ($this->checkin) {
-            $this->checkin->update($checkinData);
-        } else {
-            $this->checkin = Checkin::create($checkinData);
-        }
-
-        $this->loadCheckins();
-
-        $this->dispatch('checkin-saved');
-    }
-
-    public function addTodo()
-    {
-        if (empty($this->newTodoTitle)) return;
-
-        if (!$this->checkin) {
-            $this->saveWithoutClosing();
-        }
-
-        CheckinTodo::create([
-            'checkin_id' => $this->checkin->id,
-            'title' => $this->newTodoTitle,
-            'done' => false
-        ]);
-
-        $this->newTodoTitle = '';
-        $this->loadCheckinForDate($this->selectedDate);
-    }
-
-    public function toggleTodo($todoId)
-    {
-        $todo = CheckinTodo::find($todoId);
-        if ($todo) {
-            $todo->update(['done' => !$todo->done]);
-            $this->loadCheckinForDate($this->selectedDate);
-            
-            // Dispatch Event für Badge-Update
-        }
-    }
-
-    public function deleteTodo($todoId)
-    {
-        CheckinTodo::find($todoId)?->delete();
-        $this->loadCheckinForDate($this->selectedDate);
-        
-        // Dispatch Event für Badge-Update
-    }
-
-    public function postponeTodo($todoId)
-    {
-        $todo = CheckinTodo::with('checkin')->find($todoId);
-        if (!$todo || !$todo->checkin) {
-            return;
-        }
-
-        // Sicherstellen, dass der Todo dem aktuellen Nutzer gehört
-        if ((int)$todo->checkin->user_id !== (int)auth()->id()) {
-            return;
-        }
-
-        // Nächsten Tag bestimmen basierend auf dem ursprünglichen Check-in Datum
-        $nextDate = Carbon::parse($todo->checkin->date)->addDay()->format('Y-m-d');
-
-        // Ziel-Check-in für den nächsten Tag finden oder anlegen
-        $targetCheckin = Checkin::firstOrCreate(
-            [
-                'user_id' => auth()->id(),
-                'date' => $nextDate,
-            ],
-            [
-                'daily_goal' => '',
-                'goal_category' => null,
-                'mood' => null,
-                'happiness' => null,
-                'mood_score' => null,
-                'energy_score' => null,
-                'needs_support' => false,
-                'hydrated' => false,
-                'exercised' => false,
-                'slept_well' => false,
-                'focused_work' => false,
-                'social_time' => false,
-                'notes' => '',
-            ]
-        );
-
-        // Todo auf den nächsten Tag verschieben
-        $todo->update([
-            'checkin_id' => $targetCheckin->id,
-        ]);
-
-        // Aktuelle Liste neu laden
-        $this->loadCheckinForDate($this->selectedDate);
-    }
-
-    public function getMoodOptions()
-    {
-        return Checkin::getMoodOptions();
-    }
-
-    public function getHappinessOptions()
-    {
-        return Checkin::getHappinessOptions();
-    }
-
-    public function getMoodScoreOptions()
-    {
-        return Checkin::getMoodScoreOptions();
-    }
-
-    public function getEnergyScoreOptions()
-    {
-        return Checkin::getEnergyScoreOptions();
-    }
-
-    public function getGoalCategoryOptions()
+    public function getGoalCategoryOptions(): array
     {
         return Checkin::getGoalCategoryOptions();
     }
 
-    // Pomodoro Methods
-    public function startPomodoro($type = 'work', $minutes = 25)
+    protected function emptyCheckinData(string $date): array
     {
-        // Stop any active session first
-        $this->stopActivePomodoro();
-        
-        $duration = $minutes * 60; // Convert minutes to seconds
-        
-        PomodoroSession::create([
-            'user_id' => auth()->id(),
-            'type' => $type,
-            'duration_seconds' => $duration,
-            'started_at' => now(),
-            'is_active' => true,
-        ]);
-        
-        $this->loadPomodoroStats();
-        
-        // Dispatch to sidebar for real-time update
-        $this->dispatch('pomodoro-started');
-    }
-    
-    public function stopPomodoro()
-    {
-        $activeSession = PomodoroSession::where('user_id', auth()->id())
-            ->where('is_active', true)
-            ->first();
-            
-        if ($activeSession) {
-            $activeSession->complete();
-        }
-        $this->loadPomodoroStats();
-        
-        // Dispatch to sidebar for real-time update
-        $this->dispatch('pomodoro-stopped');
-    }
-    
-    public function stopActivePomodoro()
-    {
-        PomodoroSession::where('user_id', auth()->id())
-            ->where('is_active', true)
-            ->update(['is_active' => false, 'completed_at' => now()]);
-        $this->loadPomodoroStats();
-        
-        // Dispatch to sidebar for real-time update
-        $this->dispatch('pomodoro-stopped');
-    }
-    
-    public function loadPomodoroStats()
-    {
-        $today = now()->startOfDay();
-        
-        // Get all active sessions for this user
-        $activeSessions = PomodoroSession::where('user_id', auth()->id())
-            ->where('is_active', true)
-            ->get();
-        
-        // Check each active session and complete expired ones
-        foreach ($activeSessions as $session) {
-            if ($session->is_expired) {
-                $session->complete();
-                $this->dispatch('timer-expired');
-            }
-        }
-        
-        // Get the current active session (after completing expired ones)
-        $activeSession = PomodoroSession::where('user_id', auth()->id())
-            ->where('is_active', true)
-            ->first();
-        
-        $this->pomodoroStats = [
-            'today_count' => PomodoroSession::where('user_id', auth()->id())
-                ->where('type', 'work')
-                ->where('started_at', '>=', $today)
-                ->where('is_active', false) // Only count completed sessions
-                ->count(),
-            'active_session' => $activeSession ? [
-                'id' => $activeSession->id,
-                'type' => $activeSession->type,
-                'duration_seconds' => $activeSession->duration_seconds,
-                'started_at' => $activeSession->started_at->toISOString(),
-                'is_active' => $activeSession->is_active,
-                'remaining_minutes' => $activeSession->remaining_minutes,
-                'progress_percentage' => $activeSession->progress_percentage,
-            ] : null,
+        return [
+            'date' => $date,
+            'daily_goal' => '',
+            'goal_category' => null,
+            'mood_score' => null,
+            'energy_score' => null,
+            'needs_support' => false,
+            'hydrated' => false,
+            'exercised' => false,
+            'slept_well' => false,
+            'focused_work' => false,
+            'social_time' => false,
+            'notes' => '',
         ];
     }
-    
-    public function getActivePomodoro()
+
+    protected function nullableInt(mixed $value): ?int
     {
-        $active = PomodoroSession::where('user_id', auth()->id())
-            ->where('is_active', true)
-            ->first();
-            
-        if ($active && $active->is_expired) {
-            $active->complete();
+        if ($value === null || $value === '') {
             return null;
         }
-        
-        return $active;
-    }
-    
-    public function clearPomodoroData()
-    {
-        PomodoroSession::where('user_id', auth()->id())->delete();
-        $this->loadPomodoroStats();
+        return (int) $value;
     }
 
     public function render()
     {
-        $this->loadPomodoroStats();
         return view('platform::livewire.modal-checkin');
     }
 }
