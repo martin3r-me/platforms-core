@@ -61,12 +61,7 @@
             @endphp
 
             {{-- Actions: Check-in, Comms, Help, Playground --}}
-            <button x-data
-                @click="$dispatch('open-modal-checkin')"
-                class="inline-flex items-center justify-center w-7 h-7 rounded-md transition text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]"
-                title="Täglicher Check-in">
-                @svg('heroicon-o-sun', 'w-4 h-4')
-            </button>
+            @livewire('core.navbar-checkin')
 
             <button x-data
                 @click="$dispatch('open-modal-comms')"

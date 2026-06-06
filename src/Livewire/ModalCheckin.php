@@ -9,7 +9,6 @@ use Platform\Core\Models\PomodoroSession;
 use Platform\Core\Enums\GoalCategory;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
-use Platform\Core\Services\Checkins\CheckinReminderService;
 
 class ModalCheckin extends Component
 {
@@ -22,6 +21,9 @@ class ModalCheckin extends Component
     public $currentMonth;
     public $currentYear;
     public $checkins = [];
+
+    public string $activeTab = 'today';
+    public array $trendData = [];
 
     // Pomodoro Properties
     public $pomodoroStats = [];
@@ -39,18 +41,14 @@ class ModalCheckin extends Component
         return 0;
     }
 
-    public function mount(CheckinReminderService $checkinReminderService)
+    public function mount()
     {
         $this->selectedDate = now()->format('Y-m-d');
         $this->currentMonth = now()->month;
         $this->currentYear = now()->year;
         $this->loadCheckins();
         $this->loadCheckinForDate($this->selectedDate);
-        $this->loadPomodoroStats(); // Load pomodoro stats on mount
-
-        if (auth()->check() && $checkinReminderService->shouldForceModal(auth()->user())) {
-            $this->modalShow = true;
-        }
+        $this->loadPomodoroStats();
     }
 
     public function goToToday()
@@ -66,6 +64,85 @@ class ModalCheckin extends Component
     {
         $this->modalShow = true;
         $this->loadCheckins();
+    }
+
+    public function setTab(string $tab): void
+    {
+        $this->activeTab = $tab;
+        if ($tab === 'trends') {
+            $this->loadTrends();
+        }
+    }
+
+    public function loadTrends(): void
+    {
+        $userId = auth()->id();
+        if (!$userId) {
+            $this->trendData = [];
+            return;
+        }
+
+        $start = now()->subDays(29)->startOfDay();
+        $end = now()->endOfDay();
+
+        $checkins = Checkin::where('user_id', $userId)
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->get()
+            ->keyBy(fn ($c) => Carbon::parse($c->date)->toDateString());
+
+        $days = [];
+        $moods = [];
+        $energies = [];
+        $habits = [
+            'hydrated' => 0,
+            'exercised' => 0,
+            'slept_well' => 0,
+            'focused_work' => 0,
+            'social_time' => 0,
+        ];
+
+        for ($i = 29; $i >= 0; $i--) {
+            $date = now()->subDays($i);
+            $key = $date->toDateString();
+            $checkin = $checkins->get($key);
+
+            $days[] = [
+                'date' => $key,
+                'label' => $date->format('d.m.'),
+                'weekday' => $date->locale('de')->isoFormat('dd'),
+                'is_today' => $date->isToday(),
+                'is_weekend' => $date->isWeekend(),
+                'mood' => $checkin?->mood_score,
+                'energy' => $checkin?->energy_score,
+                'has_checkin' => (bool) $checkin,
+            ];
+
+            if ($checkin) {
+                if ($checkin->mood_score !== null) {
+                    $moods[] = $checkin->mood_score;
+                }
+                if ($checkin->energy_score !== null) {
+                    $energies[] = $checkin->energy_score;
+                }
+                foreach (array_keys($habits) as $habitKey) {
+                    if ($checkin->$habitKey) {
+                        $habits[$habitKey]++;
+                    }
+                }
+            }
+        }
+
+        $this->trendData = [
+            'days' => $days,
+            'avg_mood' => count($moods) ? round(array_sum($moods) / count($moods), 1) : null,
+            'avg_energy' => count($energies) ? round(array_sum($energies) / count($energies), 1) : null,
+            'mood_count' => count($moods),
+            'energy_count' => count($energies),
+            'habits' => $habits,
+            'total_checkins' => $checkins->count(),
+            'current_streak' => Checkin::currentStreak($userId),
+            'window_days' => 30,
+        ];
     }
 
     public function selectDate($date)
@@ -172,8 +249,8 @@ class ModalCheckin extends Component
 
             $this->loadCheckins();
 
-            // Dispatch Event für Badge-Update
-            
+            $this->dispatch('checkin-saved');
+
             // Modal schließen
             $this->modalShow = false;
     }
@@ -211,6 +288,8 @@ class ModalCheckin extends Component
         }
 
         $this->loadCheckins();
+
+        $this->dispatch('checkin-saved');
     }
 
     public function addTodo()

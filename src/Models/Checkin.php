@@ -99,4 +99,42 @@ class Checkin extends Model
     {
         return $this->hasMany(CheckinTodo::class);
     }
+
+    public static function currentStreak(int $userId): int
+    {
+        $dates = static::where('user_id', $userId)
+            ->where('date', '<=', now()->toDateString())
+            ->orderBy('date', 'desc')
+            ->limit(400)
+            ->pluck('date')
+            ->map(fn ($d) => \Carbon\Carbon::parse($d)->toDateString())
+            ->unique()
+            ->values();
+
+        if ($dates->isEmpty()) {
+            return 0;
+        }
+
+        $today = now()->toDateString();
+        $yesterday = now()->subDay()->toDateString();
+        $cursor = $dates->first() === $today
+            ? \Carbon\Carbon::today()
+            : ($dates->first() === $yesterday ? \Carbon\Carbon::yesterday() : null);
+
+        if ($cursor === null) {
+            return 0;
+        }
+
+        $streak = 0;
+        foreach ($dates as $date) {
+            if ($date === $cursor->toDateString()) {
+                $streak++;
+                $cursor->subDay();
+            } else {
+                break;
+            }
+        }
+
+        return $streak;
+    }
 }

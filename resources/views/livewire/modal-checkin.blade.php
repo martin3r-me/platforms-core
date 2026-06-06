@@ -1,4 +1,4 @@
-    <x-ui-modal size="xl" wire:model="modalShow" :escClosable="false">
+    <x-ui-modal size="xl" wire:model="modalShow">
         <x-slot name="header">
             <div class="flex items-center justify-between w-full">
                 <div class="flex items-center gap-3">
@@ -13,6 +13,32 @@
             </div>
         </x-slot>
 
+        {{-- Tabs --}}
+        <div class="flex items-center gap-1 mb-4 border-b border-[var(--ui-border)]/60">
+            <button type="button"
+                wire:click="setTab('today')"
+                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition -mb-px
+                    {{ $activeTab === 'today'
+                        ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]'
+                        : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}">
+                @svg('heroicon-o-sun', 'w-4 h-4')
+                Heute
+            </button>
+            <button type="button"
+                wire:click="setTab('trends')"
+                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition -mb-px
+                    {{ $activeTab === 'trends'
+                        ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]'
+                        : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}">
+                @svg('heroicon-o-chart-bar', 'w-4 h-4')
+                Trends
+                <span class="text-[10px] text-[var(--ui-muted)]">30 Tage</span>
+            </button>
+        </div>
+
+        @if($activeTab === 'trends')
+            @include('platform::livewire.partials.modal-checkin-trends')
+        @else
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
             {{-- Linke Spalte: Kalender + Pomodoro --}}
             <div class="order-1 lg:order-1 h-full overflow-y-auto space-y-6">
@@ -383,6 +409,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     <x-slot name="footer">
         <div class="flex justify-between gap-4">
@@ -392,12 +419,14 @@
                     Schließen
                 </div>
             </x-ui-button>
-            <x-ui-button variant="primary" wire:click="save">
-                <div class="flex items-center gap-2">
-                    @svg('heroicon-o-check', 'w-4 h-4')
-                    Check-in speichern
-                </div>
-            </x-ui-button>
+            @if($activeTab === 'today')
+                <x-ui-button variant="primary" wire:click="save">
+                    <div class="flex items-center gap-2">
+                        @svg('heroicon-o-check', 'w-4 h-4')
+                        Check-in speichern
+                    </div>
+                </x-ui-button>
+            @endif
         </div>
     </x-slot>
 </x-ui-modal>
