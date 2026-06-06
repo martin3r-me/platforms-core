@@ -9,8 +9,8 @@
         </div>
     </x-slot>
 
-    {{-- Tabs --}}
-    <div class="flex items-center gap-1 mb-4 border-b border-[var(--ui-border)]/60">
+    {{-- Tabs (sticky am oberen Rand des Bodys, voller Breite) --}}
+    <div class="sticky top-0 z-20 -mt-6 -mx-6 px-6 pt-3 mb-4 bg-[var(--ui-surface)]/95 backdrop-blur border-b border-[var(--ui-border)]/60 flex items-center gap-1">
         <button type="button"
             wire:click="setTab('today')"
             class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition -mb-px
@@ -66,7 +66,11 @@
         </div>
 
         <button type="button" wire:click="nextWeek"
-            class="inline-flex items-center justify-center w-9 h-12 rounded-md text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)] transition"
+            @disabled(!$this->canGoNextWeek)
+            class="inline-flex items-center justify-center w-9 h-12 rounded-md transition
+                {{ $this->canGoNextWeek
+                    ? 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'
+                    : 'text-[var(--ui-muted)] opacity-30 cursor-not-allowed' }}"
             title="Nächste Woche">
             @svg('heroicon-o-chevron-right', 'w-4 h-4')
         </button>

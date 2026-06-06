@@ -108,6 +108,12 @@ class ModalCheckin extends Component
     }
 
     #[Computed]
+    public function canGoNextWeek(): bool
+    {
+        return Carbon::parse($this->windowStart)->lt(now()->subDays(6)->startOfDay());
+    }
+
+    #[Computed]
     public function visibleDays(): array
     {
         $start = Carbon::parse($this->windowStart);
