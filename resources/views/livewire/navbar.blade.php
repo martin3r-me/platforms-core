@@ -92,7 +92,7 @@
                 <button x-data
                     @click="window.dispatchEvent(new CustomEvent('toggle-main-sidebar'))"
                     class="inline-flex items-center justify-center w-7 h-7 rounded transition"
-                    :class="!$store.ui?.g('main_sidebar', 'collapsed')
+                    :class="!$store.ui?.m('main_sidebar', 'collapsed')
                         ? 'text-[var(--ui-primary)] bg-[var(--ui-primary-5)]'
                         : 'text-[var(--ui-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-muted-5)]'"
                     title="Navigation">
