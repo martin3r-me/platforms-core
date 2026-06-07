@@ -37,7 +37,14 @@ class ModalCheckin extends Component
     public function openModal(): void
     {
         $this->modalShow = true;
+
+        // Frischer Stand bei jedem Öffnen — verhindert Stale-State, wenn:
+        //  - die Seite über Mitternacht offen blieb (selectedDate war noch gestern)
+        //  - der User über Navbar-Quick-Checkin schon eine Zeile angelegt hat
+        $this->selectedDate = now()->toDateString();
+        $this->windowStart = now()->subDays(6)->toDateString();
         $this->loadCheckins();
+        $this->loadCheckinForDate($this->selectedDate);
     }
 
     public function setTab(string $tab): void
@@ -151,17 +158,15 @@ class ModalCheckin extends Component
         ]);
 
         $data = array_merge($this->checkinData, [
-            'user_id' => auth()->id(),
-            'date' => $this->selectedDate,
             'mood_score' => $this->nullableInt($this->checkinData['mood_score'] ?? null),
             'energy_score' => $this->nullableInt($this->checkinData['energy_score'] ?? null),
         ]);
+        unset($data['user_id'], $data['date']);
 
-        if ($this->checkin) {
-            $this->checkin->update($data);
-        } else {
-            $this->checkin = Checkin::create($data);
-        }
+        $this->checkin = Checkin::updateOrCreate(
+            ['user_id' => auth()->id(), 'date' => $this->selectedDate],
+            $data,
+        );
 
         $this->loadCheckins();
         $this->dispatch('checkin-saved');
