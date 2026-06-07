@@ -774,14 +774,7 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register($this->app->make(\Platform\Core\Tools\SnapshotDocumentTool::class)); } catch (\Throwable $e) {}
         }
 
-        // MS Teams Communication Tools (core.comms.teams.*)
-        if (class_exists(\Platform\Core\Tools\ListTeamsChannelsTool::class) && !$registry->has('core.comms.teams.GET')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\ListTeamsChannelsTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\SendTeamsMessageTool::class) && !$registry->has('core.comms.teams_messages.POST')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\SendTeamsMessageTool::class)); } catch (\Throwable $e) {}
-        }
-
+        // MS Teams tools live in the user-connectors module (Microsoft365.*)
         // Communication Tools moved to CRM module (crm.comms.*)
 
         // Obsidian Vault Tools (obsidian.vaults.*, obsidian.files.*)
