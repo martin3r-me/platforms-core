@@ -70,6 +70,7 @@ class ClaudeToolLoopRunner
      *   on_tool_call?: callable,
      *   on_tool_result?: callable,
      *   on_iteration?: callable,
+     *   on_assistant_message?: callable, // signature: (int $iteration, string $text)
      * }
      */
     public function run(array $messages, ToolContext $context, array $options = []): array
@@ -116,6 +117,7 @@ class ClaudeToolLoopRunner
         $onToolCall = $options['on_tool_call'] ?? null;
         $onToolResult = $options['on_tool_result'] ?? null;
         $onIteration = $options['on_iteration'] ?? null;
+        $onAssistantMessage = $options['on_assistant_message'] ?? null;
         $includeMetaTools = $options['include_meta_tools'] ?? true;
 
         // Direct tools: exposed as individual Anthropic tool definitions
@@ -182,13 +184,22 @@ class ClaudeToolLoopRunner
 
             // Process response content blocks
             $toolUseBlocks = [];
+            $iterationText = '';
 
             foreach ($content as $block) {
                 if ($block['type'] === 'text') {
                     $assistantText .= $block['text'];
+                    $iterationText .= $block['text'];
                 } elseif ($block['type'] === 'tool_use') {
                     $toolUseBlocks[] = $block;
                 }
+            }
+
+            // Reasoning-Hook: pro Iteration wird der LLM-Text (zwischen den Tool-Calls)
+            // weitergegeben, sofern vorhanden. Erlaubt feingranulares Logging der
+            // Assistant-Messages, nicht nur der Tool-Calls.
+            if ($onAssistantMessage && $iterationText !== '') {
+                $onAssistantMessage($iteration, $iterationText);
             }
 
             if (empty($toolUseBlocks)) {
