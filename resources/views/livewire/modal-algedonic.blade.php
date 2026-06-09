@@ -40,10 +40,38 @@
             </div>
         </x-slot>
     @else
-        <div class="space-y-4" x-data="{ showSuggestions: false }">
+        <div class="space-y-4" x-data="{ showSuggestions: false, showHelp: false }">
             <p class="text-sm text-[var(--ui-muted)]">
                 Der Algedonic-Kanal nach Stafford Beer: ein Signal, das alle Hierarchien überspringt und unmittelbar das normative Top-Level erreicht. Nutze diesen Knopf, wenn etwas <span class="font-medium text-[var(--ui-secondary)]">jetzt</span> Aufmerksamkeit von ganz oben braucht.
+                <button type="button" @click="showHelp = !showHelp" class="ml-1 text-[var(--ui-primary)] hover:underline text-xs">
+                    <span x-text="showHelp ? 'weniger' : 'wann genau?'"></span>
+                </button>
             </p>
+
+            <div x-show="showHelp" x-transition x-cloak class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div class="rounded-md border border-red-200 bg-red-50/60 p-3">
+                    <div class="font-semibold text-red-800 mb-1.5 flex items-center gap-1">
+                        @svg('heroicon-o-bell-alert', 'w-3.5 h-3.5')
+                        Klingele wenn …
+                    </div>
+                    <ul class="space-y-1 text-red-900/90">
+                        <li>etwas schief läuft und die normalen Wege es nicht auffangen.</li>
+                        <li>wir kurz davor sind, einen schwerwiegenden Fehler zu machen.</li>
+                        <li>du etwas siehst, das das Top-Level <em>jetzt</em> wissen muss.</li>
+                    </ul>
+                </div>
+                <div class="rounded-md border border-[var(--ui-border)] bg-gray-50 p-3">
+                    <div class="font-semibold text-[var(--ui-secondary)] mb-1.5 flex items-center gap-1">
+                        @svg('heroicon-o-hand-raised', 'w-3.5 h-3.5')
+                        Lieber den normalen Weg …
+                    </div>
+                    <ul class="space-y-1 text-[var(--ui-muted)]">
+                        <li>für „ich brauche Hilfe bei meiner Aufgabe" → S3 / direkte Führung.</li>
+                        <li>für Ideen, Verbesserungen, strategische Beobachtungen → S4.</li>
+                        <li>für Routinekoordination zwischen Teams → S2.</li>
+                    </ul>
+                </div>
+            </div>
 
             <div>
                 <label for="algedonic-message" class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">
@@ -123,6 +151,24 @@
         </div>
 
         <x-slot name="footer">
+            @php($routing = $this->routingInfo)
+            @if(! empty($routing))
+                <div class="mb-3 flex items-start gap-2 rounded-md border border-red-200/70 bg-red-50/40 p-2.5 text-xs">
+                    @svg('heroicon-o-arrow-right-circle', 'w-4 h-4 text-red-700 mt-0.5 flex-shrink-0')
+                    <div class="text-[var(--ui-secondary)] leading-relaxed">
+                        Dieses Signal geht an
+                        @if($routing['owner_vacant'])
+                            <span class="font-medium">{{ $routing['perspective_name'] }}</span>
+                            <span class="text-[var(--ui-muted)]">(S5-Owner vakant — landet beim Carrier selbst)</span>
+                        @else
+                            <span class="font-medium">{{ $routing['owner_name'] }}</span>
+                            <span class="text-[var(--ui-muted)]">(S5-Owner in Perspektive {{ $routing['perspective_name'] }})</span>
+                        @endif
+                        — mit <span class="font-medium">Deadline {{ $routing['deadline_hours'] }}h</span>.
+                    </div>
+                </div>
+            @endif
+
             <div class="flex items-center justify-end gap-2">
                 <button
                     type="button"

@@ -48,6 +48,64 @@ class ModalAlgedonic extends Component
     }
 
     #[Computed]
+    public function routingInfo(): array
+    {
+        $teamId = auth()->user()?->currentTeam?->id;
+        $userId = auth()->id();
+
+        $perspectiveClass = '\\Platform\\Organization\\Services\\PerspectiveService';
+        $entityClass = '\\Platform\\Organization\\Models\\OrganizationEntity';
+        $assignmentClass = '\\Platform\\Organization\\Models\\OrganizationEntityVsmAssignment';
+
+        if (! $teamId || ! class_exists($perspectiveClass) || ! class_exists($entityClass) || ! class_exists($assignmentClass)) {
+            return [];
+        }
+
+        // Anonym: keinen User-Lookup, damit nicht via Modal-Anzeige geleakt wird
+        $perspective = null;
+        if (! $this->anonymous && $userId) {
+            $perspective = $perspectiveClass::getActiveEntity($teamId, $userId);
+        }
+
+        if (! $perspective) {
+            $perspective = $entityClass::query()
+                ->where('team_id', $teamId)
+                ->whereNull('parent_entity_id')
+                ->whereHas('type', fn ($q) => $q->where('vsm_class', 'carrier'))
+                ->orderBy('id')
+                ->first();
+        }
+
+        if (! $perspective) {
+            return [];
+        }
+
+        $ownerId = $assignmentClass::query()
+            ->where('perspective_entity_id', $perspective->id)
+            ->where('vsm_system', 's5')
+            ->activeAt()
+            ->orderBy('id')
+            ->value('assigned_entity_id');
+
+        $ownerName = null;
+        $ownerVacant = true;
+        if ($ownerId) {
+            $owner = $entityClass::query()->find($ownerId);
+            if ($owner) {
+                $ownerName = $owner->name;
+                $ownerVacant = false;
+            }
+        }
+
+        return [
+            'perspective_name' => $perspective->name,
+            'owner_name' => $ownerName ?? $perspective->name,
+            'owner_vacant' => $ownerVacant,
+            'deadline_hours' => (int) config('organization.signal_deadlines.algedonic', 1),
+        ];
+    }
+
+    #[Computed]
     public function entitySuggestions(): array
     {
         $term = trim($this->entitySearch);
