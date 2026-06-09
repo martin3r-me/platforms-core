@@ -60,8 +60,16 @@
                 $routeModule = is_string($routeName) && str_contains($routeName, '.') ? strstr($routeName, '.', true) : null;
             @endphp
 
-            {{-- Actions: Check-in, Comms, Help, Playground --}}
+            {{-- Actions: Check-in, Algedonic, Comms, Help, Playground --}}
             @livewire('core.navbar-checkin')
+
+            <button x-data
+                @click="$dispatch('open-modal-algedonic')"
+                class="relative inline-flex items-center justify-center w-7 h-7 rounded-md transition text-red-600 hover:text-white hover:bg-red-600 hover:shadow-sm group"
+                title="Algedonic-Signal — direkt an die oberste Ebene (Stafford Beer)">
+                <span class="absolute inset-0 rounded-md bg-red-500 opacity-0 group-hover:opacity-20 animate-pulse"></span>
+                @svg('heroicon-o-bell-alert', 'w-4 h-4 relative')
+            </button>
 
             <button x-data
                 @click="$dispatch('open-modal-comms')"
