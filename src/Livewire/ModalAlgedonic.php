@@ -75,12 +75,20 @@ class ModalAlgedonic extends Component
             return [];
         }
 
-        $ownerId = $assignmentClass::query()
-            ->where('perspective_entity_id', $perspective->id)
-            ->where('vsm_system', 's5')
-            ->activeAt()
-            ->orderBy('id')
-            ->value('assigned_entity_id');
+        // Owner = naechster MENSCHLICHER Owner ab S5 (resolveHumanOwner skippt Agenten).
+        // Wenn die Methode existiert, nehmen wir sie; sonst Fallback auf den klassischen Query.
+        $ownerId = null;
+        if (method_exists($perspectiveClass, 'resolveHumanOwner')) {
+            $ownerId = $perspectiveClass::resolveHumanOwner($perspective->id, 's5');
+        }
+        if (! $ownerId) {
+            $ownerId = $assignmentClass::query()
+                ->where('perspective_entity_id', $perspective->id)
+                ->where('vsm_system', 's5')
+                ->activeAt()
+                ->orderBy('id')
+                ->value('assigned_entity_id');
+        }
 
         $ownerName = null;
         $ownerVacant = true;
