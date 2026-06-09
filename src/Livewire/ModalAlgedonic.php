@@ -61,21 +61,16 @@ class ModalAlgedonic extends Component
             return [];
         }
 
-        // Anonym: keinen User-Lookup, damit nicht via Modal-Anzeige geleakt wird
+        // Anonym: keinen User-Session-Lookup, damit nicht via Modal-Anzeige geleakt wird.
+        // Fallback in beiden Faellen auf getDefaultEntity — beruecksichtigt das
+        // Team-Default-Mapping und faellt sonst auf Root-Carrier zurueck.
         $perspective = null;
         if (! $this->anonymous && $userId) {
             $perspective = $perspectiveClass::getActiveEntity($teamId, $userId);
         }
-
         if (! $perspective) {
-            $perspective = $entityClass::query()
-                ->where('team_id', $teamId)
-                ->whereNull('parent_entity_id')
-                ->whereHas('type', fn ($q) => $q->where('vsm_class', 'carrier'))
-                ->orderBy('id')
-                ->first();
+            $perspective = $perspectiveClass::getDefaultEntity($teamId);
         }
-
         if (! $perspective) {
             return [];
         }
