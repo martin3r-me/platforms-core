@@ -52,6 +52,12 @@ use Platform\Core\Contracts\DocumentRendererContract;
 use Platform\Core\Services\Documents\PdfRenderer;
 use Platform\Core\Services\Documents\DocumentTemplateRegistry;
 use Platform\Core\Services\Documents\DocumentService;
+use Platform\Core\Contracts\EmbeddingStoreContract;
+use Platform\Core\Services\EmbeddingProviderRegistry;
+use Platform\Core\Services\EmbeddingService;
+use Platform\Core\Services\GeminiEmbeddingProvider;
+use Platform\Core\Services\MySqlJsonEmbeddingStore;
+use Platform\Core\Services\OpenAiEmbeddingProvider;
 use Laravel\Passport\Passport;
 
 // Command-Klasse importieren!
@@ -269,7 +275,31 @@ class CoreServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/ai.php', 'ai');
         $this->mergeConfigFrom(__DIR__.'/../config/security.php', 'security');
         $this->mergeConfigFrom(__DIR__.'/../config/checkins.php', 'checkins');
+        $this->mergeConfigFrom(__DIR__.'/../config/embeddings.php', 'embeddings');
         // Agent-Config entfernt – Agent ausgelagert
+
+        // Embedding-Infrastruktur (Provider + Store separat, austauschbar)
+        $this->app->singleton(EmbeddingStoreContract::class, MySqlJsonEmbeddingStore::class);
+        $this->app->singleton(EmbeddingProviderRegistry::class, function () {
+            $registry = new EmbeddingProviderRegistry();
+
+            if (config('embeddings.openai.enabled', true)) {
+                $registry->register(new OpenAiEmbeddingProvider(
+                    model: (string) config('embeddings.openai.model', OpenAiEmbeddingProvider::DEFAULT_MODEL),
+                    dimensions: (int) config('embeddings.openai.dimensions', OpenAiEmbeddingProvider::DEFAULT_DIMENSIONS),
+                ));
+            }
+
+            if (config('embeddings.gemini.enabled', false)) {
+                $registry->register(new GeminiEmbeddingProvider(
+                    model: (string) config('embeddings.gemini.model', GeminiEmbeddingProvider::DEFAULT_MODEL),
+                    dimensions: (int) config('embeddings.gemini.dimensions', GeminiEmbeddingProvider::DEFAULT_DIMENSIONS),
+                ));
+            }
+
+            return $registry;
+        });
+        $this->app->singleton(EmbeddingService::class);
 
         // Passport Contracts binden (für OAuth Authorization Views)
         $this->registerPassportBindings();
