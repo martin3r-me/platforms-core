@@ -5,6 +5,7 @@ namespace Platform\Core\Verbalization;
 use Platform\Core\Contracts\LLMProviderContract;
 use Platform\Core\Services\LLMProviderRegistry;
 use Platform\Core\Verbalization\Enums\FactPriority;
+use Platform\Core\Verbalization\Recipe\CollectionRecipe;
 use Platform\Core\Verbalization\Template\NarrativeTemplate;
 use Platform\Core\Verbalization\Template\TemplateRegistry;
 
@@ -33,9 +34,18 @@ class Verbalizer
         ?GuardRails $rails = null,
         ?string $providerKey = null,
         ?string $modelOverride = null,
+        ?CollectionRecipe $recipe = null,
     ): VerbalizationResult {
         $style ??= StyleProfile::formal();
         $rails ??= new GuardRails();
+
+        // Recipe darf Style + Guards anreichern (Recipe-Werte ueberschreiben Defaults,
+        // aber NICHT explizite Caller-Werte — wenn Caller bewusst etwas gesetzt hat,
+        // bleibt das. Pragmatik: nur Felder mergen, die Recipe gesetzt hat.)
+        if ($recipe) {
+            $style = $this->mergeRecipeStyle($style, $recipe);
+            $rails = $this->mergeRecipeGuards($rails, $recipe);
+        }
 
         $llm = $this->resolveProvider($providerKey);
 
@@ -74,6 +84,36 @@ class Verbalizer
                 'template_used' => $template ? get_class($template) : 'generic',
                 'provider' => $llm->getName(),
             ],
+        );
+    }
+
+    protected function mergeRecipeStyle(StyleProfile $base, CollectionRecipe $recipe): StyleProfile
+    {
+        $s = $recipe->style;
+        if (empty($s)) {
+            return $base;
+        }
+        return new StyleProfile(
+            address: $s['address'] ?? $base->address,
+            tone: $s['tone'] ?? $base->tone,
+            rhythm: $s['rhythm'] ?? $base->rhythm,
+            perspective: $s['perspective'] ?? $base->perspective,
+            semanticLayer: $base->semanticLayer, // Layer kommt vom Caller, nicht aus Recipe
+            extraInstruction: $s['extra_instruction'] ?? $base->extraInstruction,
+        );
+    }
+
+    protected function mergeRecipeGuards(GuardRails $base, CollectionRecipe $recipe): GuardRails
+    {
+        $g = $recipe->guards;
+        if (empty($g)) {
+            return $base;
+        }
+        return new GuardRails(
+            factsOnly: (bool) ($g['factsOnly'] ?? $base->factsOnly),
+            admitGaps: (bool) ($g['admitGaps'] ?? $base->admitGaps),
+            noSpeculation: (bool) ($g['noSpeculation'] ?? $base->noSpeculation),
+            consistent: (bool) ($g['consistent'] ?? $base->consistent),
         );
     }
 
