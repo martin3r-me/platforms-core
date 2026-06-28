@@ -230,17 +230,24 @@ class SkillRegistryService
     }
 
     /**
-     * Scannt skills/-Ordner eines Vaults und parsed Frontmatter.
+     * Scannt den Skills-Ordner eines Vaults und parsed Frontmatter.
      * Liest jede Datei nur einmal (Frontmatter + Body-Preview aus demselben Read).
+     *
+     * Konvention: Skills liegen unter `99_skills/`. Pfad kann pro Vault
+     * via settings.skills_path uebersteuert werden.
      *
      * @return array<string, array> Code => Metadata
      */
     private function buildIndexForVault(ObsidianVault $vault): array
     {
         $index = [];
+        $settings = is_array($vault->settings) ? $vault->settings : [];
+        $skillsPath = isset($settings['skills_path']) && is_string($settings['skills_path']) && trim($settings['skills_path']) !== ''
+            ? trim($settings['skills_path'])
+            : '99_skills';
 
         try {
-            $files = $this->storage->listFiles($vault, 'skills');
+            $files = $this->storage->listFiles($vault, $skillsPath);
 
             foreach ($files as $file) {
                 if ($file['type'] !== 'file') {
