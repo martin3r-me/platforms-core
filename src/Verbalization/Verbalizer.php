@@ -1,0 +1,199 @@
+<?php
+
+namespace Platform\Core\Verbalization;
+
+use Platform\Core\Contracts\LLMProviderContract;
+use Platform\Core\Services\LLMProviderRegistry;
+use Platform\Core\Verbalization\Enums\FactPriority;
+use Platform\Core\Verbalization\Template\NarrativeTemplate;
+use Platform\Core\Verbalization\Template\TemplateRegistry;
+
+/**
+ * Verbalizer — Orchestriert die 6 Bausteine zu Prosa.
+ *
+ *  1) Subject ist schon befuellt (vom Sammler).
+ *  2) Priorisierer: implizit in Subject->facts/edges via priority/weight.
+ *  3) Gruppierer: V1 nicht implementiert.
+ *  4) Erzaehlvorlage: Template aus Registry, sonst generisch.
+ *  5) Faktenbasis: Template::renderFactSheet — deterministische Wahrheit.
+ *  6) LLM-Politur mit Leine: kleiner Auftrag, harte Guards.
+ *
+ * Die Klasse selbst kennt keine Domaene, keine DB, keine Module.
+ */
+class Verbalizer
+{
+    public function __construct(
+        protected LLMProviderRegistry $providers,
+        protected TemplateRegistry $templates,
+    ) {}
+
+    public function verbalize(
+        Subject $subject,
+        ?StyleProfile $style = null,
+        ?GuardRails $rails = null,
+        ?string $providerKey = null,
+        ?string $modelOverride = null,
+    ): VerbalizationResult {
+        $style ??= StyleProfile::formal();
+        $rails ??= new GuardRails();
+
+        $llm = $this->resolveProvider($providerKey);
+
+        $template = $this->templates->resolve($subject->type);
+        $factSheet = $template
+            ? $template->renderFactSheet($subject)
+            : $this->renderGenericFactSheet($subject);
+
+        $systemPrompt = $this->buildSystemPrompt($style, $rails);
+        $userPrompt = $this->buildUserPrompt($factSheet, $style);
+
+        $options = [
+            'system' => $systemPrompt,
+            'temperature' => 0.3,
+            'max_tokens' => 1024,
+        ];
+        if ($modelOverride) {
+            $options['model'] = $modelOverride;
+        }
+
+        $response = $llm->chat(
+            messages: [
+                ['role' => 'user', 'content' => $userPrompt],
+            ],
+            options: $options,
+        );
+
+        return new VerbalizationResult(
+            prose: trim($response['content'] ?? ''),
+            factSheet: $factSheet,
+            model: $response['model'] ?? 'unknown',
+            usage: $response['usage'] ?? [],
+            meta: [
+                'subject_type' => $subject->type,
+                'subject_id' => $subject->id,
+                'template_used' => $template ? get_class($template) : 'generic',
+                'provider' => $llm->getName(),
+            ],
+        );
+    }
+
+    protected function resolveProvider(?string $key): LLMProviderContract
+    {
+        if ($key) {
+            $p = $this->providers->get($key);
+            if (! $p) {
+                throw new \RuntimeException("Verbalizer: Provider '{$key}' ist nicht registriert.");
+            }
+            if (! $p->isAvailable()) {
+                throw new \RuntimeException("Verbalizer: Provider '{$key}' ist nicht verfuegbar (API-Key fehlt?).");
+            }
+            return $p;
+        }
+
+        $configured = config('verbalization.default_provider');
+        if ($configured) {
+            $p = $this->providers->get($configured);
+            if ($p && $p->isAvailable()) {
+                return $p;
+            }
+        }
+
+        return $this->providers->getDefaultProvider()
+            ?? throw new \RuntimeException('Verbalizer: kein LLM-Provider verfuegbar.');
+    }
+
+    protected function buildSystemPrompt(StyleProfile $style, GuardRails $rails): string
+    {
+        $parts = [];
+
+        if ($style->semanticLayer) {
+            $parts[] = $style->semanticLayer;
+            $parts[] = '';
+        }
+
+        $parts[] = 'Du bist ein praeziser Verbalisierer. Deine Aufgabe ist NICHT zu denken oder zu erfinden, sondern eine vorgegebene Faktenliste in fluessige Prosa zu giessen.';
+        $parts[] = '';
+        $parts[] = 'Harte Regeln:';
+        $parts[] = $rails->asPromptRules();
+        $parts[] = '';
+        $parts[] = 'Stil:';
+        $parts[] = '- Anrede: ' . ($style->address === 'du' ? 'Du-Form' : 'Sie-Form / unpersoenlich');
+        $parts[] = '- Tonalitaet: ' . match ($style->tone) {
+            'formal' => 'sachlich, klar, professionell',
+            'collegial' => 'kollegial, direkt, intern',
+            'evocative' => 'evokativ, bildhaft (Atmosphaere transportieren, aber nur durch wahre Fakten)',
+            default => 'sachlich',
+        };
+        $parts[] = '- Satzrhythmus: ' . ($style->rhythm === 'short' ? 'kurze Saetze' : 'fluessige, verknuepfte Saetze');
+
+        if ($style->extraInstruction) {
+            $parts[] = '';
+            $parts[] = 'Zusatz:';
+            $parts[] = $style->extraInstruction;
+        }
+
+        return implode("\n", $parts);
+    }
+
+    protected function buildUserPrompt(string $factSheet, StyleProfile $style): string
+    {
+        return <<<TXT
+Hier ist die Faktenbasis. Wandle sie in fluessige Prosa um — in der Reihenfolge, die die Faktenbasis vorgibt. KEIN Fakt darf dazu- oder weggelassen werden. Antworte NUR mit der Prosa, ohne Vorrede oder Meta-Kommentar.
+
+----- FAKTENBASIS -----
+{$factSheet}
+----- ENDE FAKTENBASIS -----
+TXT;
+    }
+
+    /**
+     * Fallback-Faktenbasis wenn kein typ-spezifisches Template registriert ist.
+     * Listet Identitaet, Facts (nach Priority sortiert), Edges (nach Weight), Freshness.
+     */
+    protected function renderGenericFactSheet(Subject $subject): string
+    {
+        $lines = [];
+
+        $lines[] = 'Knoten: ' . $subject->identity->primaryName;
+        $lines[] = 'Typ: ' . $subject->type;
+        $lines[] = '';
+
+        $sortedFacts = collect($subject->facts)
+            ->sortBy(fn ($f) => match ($f->priority) {
+                FactPriority::CORE => 0,
+                FactPriority::QUALIFYING => 1,
+                FactPriority::CONTEXT => 2,
+            });
+
+        if ($sortedFacts->isNotEmpty()) {
+            $lines[] = 'Fakten (Reihenfolge = Wichtigkeit):';
+            foreach ($sortedFacts as $f) {
+                $lines[] = '  - [' . $f->priority->value . '] ' . $f->text;
+            }
+            $lines[] = '';
+        }
+
+        $sortedEdges = collect($subject->edges)
+            ->sortBy(fn ($e) => match ($e->weight) {
+                FactPriority::CORE => 0,
+                FactPriority::QUALIFYING => 1,
+                FactPriority::CONTEXT => 2,
+            });
+
+        if ($sortedEdges->isNotEmpty()) {
+            $lines[] = 'Beziehungen:';
+            foreach ($sortedEdges as $e) {
+                $claimMarker = $e->claim->type->value === 'system_verified'
+                    ? ''
+                    : ' [' . $e->claim->type->value . '/' . $e->claim->level->value . ($e->claim->sourceName ? ', ' . $e->claim->sourceName : '') . ']';
+                $lines[] = '  - ' . $e->relation . ' -> ' . $e->targetLabel . $claimMarker;
+            }
+            $lines[] = '';
+        }
+
+        $lines[] = 'Frische: ' . $subject->freshness->source->value
+            . ' (Stand: ' . $subject->freshness->asOf->format('Y-m-d H:i') . ')';
+
+        return implode("\n", $lines);
+    }
+}

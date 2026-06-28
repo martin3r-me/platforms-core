@@ -276,6 +276,7 @@ class CoreServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/security.php', 'security');
         $this->mergeConfigFrom(__DIR__.'/../config/checkins.php', 'checkins');
         $this->mergeConfigFrom(__DIR__.'/../config/embeddings.php', 'embeddings');
+        $this->mergeConfigFrom(__DIR__.'/../config/verbalization.php', 'verbalization');
         // Agent-Config entfernt – Agent ausgelagert
 
         // Embedding-Infrastruktur (Provider + Store separat, austauschbar)
@@ -300,6 +301,28 @@ class CoreServiceProvider extends ServiceProvider
             return $registry;
         });
         $this->app->singleton(EmbeddingService::class);
+
+        // LLM-Provider-Infrastruktur fuer Verbalizer (und andere Konsumenten).
+        $this->app->singleton(\Platform\Core\Services\LLMProviderRegistry::class, function ($app) {
+            $registry = new \Platform\Core\Services\LLMProviderRegistry();
+            $anthropic = new \Platform\Core\Services\AnthropicProvider();
+            if ($anthropic->isAvailable()) {
+                $registry->register($anthropic);
+            }
+            try {
+                $openai = $app->make(\Platform\Core\Services\OpenAiProvider::class);
+                if ($openai->isAvailable()) {
+                    $registry->register($openai);
+                }
+            } catch (\Throwable $e) {
+                // OpenAiProvider braucht OpenAiService — falls nicht resolvebar, ueberspringen.
+            }
+            return $registry;
+        });
+
+        // Verbalization: Template-Registry + Verbalizer.
+        $this->app->singleton(\Platform\Core\Verbalization\Template\TemplateRegistry::class);
+        $this->app->singleton(\Platform\Core\Verbalization\Verbalizer::class);
 
         // Passport Contracts binden (für OAuth Authorization Views)
         $this->registerPassportBindings();
