@@ -28,4 +28,33 @@ final class StyleProfile
     {
         return new self(address: 'du', tone: 'collegial', rhythm: 'short');
     }
+
+    /**
+     * Builder: gibt eine Kopie zurueck mit neuem Semantic Layer (rendered_block aus
+     * SemanticLayerResolver). Bewusst Inject-Pattern — StyleProfile kennt den Resolver
+     * NICHT, das macht der Caller (= Tool, das den Team-Kontext kennt).
+     */
+    public function withSemanticLayer(?string $renderedBlock): self
+    {
+        return new self(
+            address: $this->address,
+            tone: $this->tone,
+            rhythm: $this->rhythm,
+            perspective: $this->perspective,
+            semanticLayer: $renderedBlock,
+            extraInstruction: $this->extraInstruction,
+        );
+    }
+
+    public function withExtraInstruction(?string $instruction): self
+    {
+        return new self(
+            address: $this->address,
+            tone: $this->tone,
+            rhythm: $this->rhythm,
+            perspective: $this->perspective,
+            semanticLayer: $this->semanticLayer,
+            extraInstruction: $instruction,
+        );
+    }
 }
