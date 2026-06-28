@@ -74,6 +74,47 @@ class ObsidianStorageService
         return $this->disk($vault)->delete($path);
     }
 
+    /**
+     * Delete multiple files in one call. For S3-backed disks this uses
+     * the DeleteObjects API (up to 1000 keys per request). Returns the
+     * input paths split into deleted vs. failed.
+     */
+    public function deleteMany(ObsidianVault $vault, array $paths): array
+    {
+        $disk = $this->disk($vault);
+
+        $reverseMap = [];
+        foreach ($paths as $path) {
+            $reverseMap[$this->resolvePath($vault, $path)] = $path;
+        }
+
+        $deleted = [];
+        $failed = [];
+
+        foreach (array_chunk(array_keys($reverseMap), 1000) as $chunk) {
+            if ($disk->delete($chunk)) {
+                foreach ($chunk as $r) {
+                    $deleted[] = $reverseMap[$r];
+                }
+                continue;
+            }
+
+            foreach ($chunk as $r) {
+                try {
+                    if (! $disk->exists($r)) {
+                        $deleted[] = $reverseMap[$r];
+                    } else {
+                        $failed[] = ['path' => $reverseMap[$r], 'error' => 'delete returned false'];
+                    }
+                } catch (\Throwable $e) {
+                    $failed[] = ['path' => $reverseMap[$r], 'error' => $e->getMessage()];
+                }
+            }
+        }
+
+        return ['deleted' => $deleted, 'failed' => $failed];
+    }
+
     public function moveFile(ObsidianVault $vault, string $from, string $to): bool
     {
         $from = $this->resolvePath($vault, $from);
