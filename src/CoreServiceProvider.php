@@ -686,6 +686,20 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register($this->app->make(\Platform\Core\Tools\SemanticLayer\DryrunTool::class)); } catch (\Throwable $e) {}
         }
 
+        // Verbalization Recipes (core.verbalization.recipes.*)
+        if (class_exists(\Platform\Core\Tools\Verbalization\ListRecipesTool::class) && !$registry->has('core.verbalization.recipes.LIST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\ListRecipesTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Verbalization\CreateRecipeTool::class) && !$registry->has('core.verbalization.recipes.POST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\CreateRecipeTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Verbalization\UpdateRecipeTool::class) && !$registry->has('core.verbalization.recipes.PUT')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\UpdateRecipeTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Verbalization\DeleteRecipeTool::class) && !$registry->has('core.verbalization.recipes.DELETE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\DeleteRecipeTool::class)); } catch (\Throwable $e) {}
+        }
+
         // Core AI Models (DB Source of Truth): tools for listing/updating models must be discoverable via module=core
         if (class_exists(\Platform\Core\Tools\ListAiModelsTool::class) && !$registry->has('core.ai_models.GET')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\ListAiModelsTool::class)); } catch (\Throwable $e) {}
