@@ -444,6 +444,74 @@ class ObsidianStorageService
     }
 
     /**
+     * Move every file under fromPrefix to the corresponding location
+     * under toPrefix (prefix replace in the path). Per-file move via
+     * Laravel filesystem — for S3 this is CopyObject + DeleteObject.
+     * Files that already exist at the target are skipped.
+     */
+    public function moveByPrefix(ObsidianVault $vault, string $fromPrefix, string $toPrefix): array
+    {
+        $disk = $this->disk($vault);
+        $resolvedFrom = $this->resolvePath($vault, $fromPrefix);
+
+        $normalizedFrom = trim($fromPrefix, '/');
+        $normalizedTo = trim($toPrefix, '/');
+
+        $moved = [];
+        $failed = [];
+
+        foreach ($disk->allFiles($resolvedFrom) as $rawOldPath) {
+            $oldRelative = $this->stripPrefix($vault, $rawOldPath);
+            $oldNormalized = trim($oldRelative, '/');
+
+            if ($oldNormalized === $normalizedFrom) {
+                $tail = '';
+            } elseif (str_starts_with($oldNormalized, $normalizedFrom . '/')) {
+                $tail = substr($oldNormalized, strlen($normalizedFrom));
+            } else {
+                $failed[] = ['from' => $oldRelative, 'error' => 'prefix mismatch (defensive skip)'];
+                continue;
+            }
+
+            $newRelative = $normalizedTo . $tail;
+            $rawNewPath = $this->resolvePath($vault, $newRelative);
+
+            try {
+                if ($disk->exists($rawNewPath)) {
+                    $failed[] = ['from' => $oldRelative, 'to' => $newRelative, 'error' => 'target already exists'];
+                    continue;
+                }
+
+                if ($disk->move($rawOldPath, $rawNewPath)) {
+                    $moved[] = ['from' => $oldRelative, 'to' => $newRelative];
+                } else {
+                    $failed[] = ['from' => $oldRelative, 'to' => $newRelative, 'error' => 'move returned false'];
+                }
+            } catch (\Throwable $e) {
+                $failed[] = ['from' => $oldRelative, 'to' => $newRelative, 'error' => $e->getMessage()];
+            }
+        }
+
+        return ['moved' => $moved, 'failed' => $failed];
+    }
+
+    /**
+     * List file paths under prefix without moving — for dry-run previews.
+     */
+    public function listByPrefix(ObsidianVault $vault, string $fromPrefix): array
+    {
+        $disk = $this->disk($vault);
+        $resolvedFrom = $this->resolvePath($vault, $fromPrefix);
+
+        $paths = [];
+        foreach ($disk->allFiles($resolvedFrom) as $rawPath) {
+            $paths[] = $this->stripPrefix($vault, $rawPath);
+        }
+
+        return $paths;
+    }
+
+    /**
      * Find files by glob pattern only (no content read). Cheap variant
      * of search() — one allFiles() call + fnmatch() per entry.
      */

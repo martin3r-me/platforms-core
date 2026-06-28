@@ -828,6 +828,7 @@ class CoreServiceProvider extends ServiceProvider
             \Platform\Core\Tools\Obsidian\PatchFileTool::class => 'obsidian.files.PATCH',
             \Platform\Core\Tools\Obsidian\BulkDeleteFilesTool::class => 'obsidian.files.BULK_DELETE',
             \Platform\Core\Tools\Obsidian\BulkDeleteByPatternTool::class => 'obsidian.files.BULK_DELETE_PATTERN',
+            \Platform\Core\Tools\Obsidian\BulkMoveFilesTool::class => 'obsidian.files.BULK_MOVE',
         ];
         foreach ($obsidianTools as $class => $name) {
             if (class_exists($class) && !$registry->has($name)) {
