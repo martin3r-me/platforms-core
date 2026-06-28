@@ -27,8 +27,18 @@ class OpenAiProvider implements LLMProviderContract
     public function chat(array $messages, array $options = []): array
     {
         $model = $options['model'] ?? self::DEFAULT_MODEL;
+
+        // OpenAI erwartet system als inline-Message mit role=system; das LLMProviderContract
+        // erlaubt aber auch options['system'] (so wie Anthropic). Wir mappen hier um.
+        if (isset($options['system']) && is_string($options['system']) && $options['system'] !== '') {
+            $messages = array_merge(
+                [['role' => 'system', 'content' => $options['system']]],
+                $messages,
+            );
+        }
+
         $result = $this->openAiService->chat($messages, $model, $options);
-        
+
         return [
             'content' => $result['content'] ?? '',
             'usage' => $result['usage'] ?? [],
