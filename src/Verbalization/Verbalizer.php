@@ -156,6 +156,14 @@ class Verbalizer
         $parts[] = 'Harte Regeln:';
         $parts[] = $rails->asPromptRules();
         $parts[] = '';
+        $parts[] = 'Format:';
+        $parts[] = '- Antwort ist lesbares Markdown.';
+        $parts[] = '- Headings (##/###) NUR setzen, wenn mehrere echt unterscheidbare Sektionen vorliegen — niemals einfach die Headings aus der Faktenbasis kopieren.';
+        $parts[] = '- **fett** fuer Schluesselzahlen (Health-Score, Prozent-Fortschritte, kritische Counts).';
+        $parts[] = '- Listen nur wenn 3 oder mehr gleichartige Punkte aneinandergereiht waeren; bei 1-2 Punkten Fliesstext.';
+        $parts[] = '- Keine leeren Zierfloskeln ("Im Rahmen von", "In Bezug auf", "Hinsichtlich"). Aktive, kurze Saetze.';
+        $parts[] = '- Wenn die extra_instruction "kein Markdown" oder "Telegramm" verlangt, gilt das — Markdown deaktivieren, reines Klartext.';
+        $parts[] = '';
         $parts[] = 'Stil:';
         $parts[] = '- Anrede: ' . ($style->address === 'du' ? 'Du-Form' : 'Sie-Form / unpersoenlich');
         $parts[] = '- Tonalitaet: ' . match ($style->tone) {
