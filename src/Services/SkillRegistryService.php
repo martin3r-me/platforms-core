@@ -230,11 +230,18 @@ class SkillRegistryService
     }
 
     /**
-     * Scannt den Skills-Ordner eines Vaults und parsed Frontmatter.
+     * Scannt den Skills-Ordner eines Vaults REKURSIV und parsed Frontmatter.
      * Liest jede Datei nur einmal (Frontmatter + Body-Preview aus demselben Read).
      *
      * Konvention: Skills liegen unter `99_skills/`. Pfad kann pro Vault
      * via settings.skills_path uebersteuert werden.
+     *
+     * Capsule-Struktur unterstuetzt: jede .md unter dem Skills-Pfad wird
+     * geprueft. Nur Dateien mit `code:` im Frontmatter werden indexiert —
+     * `_index.md`, `README.md` etc. ohne `code:` werden automatisch
+     * ignoriert. Empfohlene Konvention pro Capsule: `_skill.md` als
+     * indexierter Eintrag, weitere .md (README, lessons-learned, etc.)
+     * als reine Doku.
      *
      * @return array<string, array> Code => Metadata
      */
@@ -247,7 +254,7 @@ class SkillRegistryService
             : '99_skills';
 
         try {
-            $files = $this->storage->listFiles($vault, $skillsPath);
+            $files = $this->storage->listFilesRecursive($vault, $skillsPath);
 
             foreach ($files as $file) {
                 if ($file['type'] !== 'file') {
