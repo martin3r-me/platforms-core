@@ -443,6 +443,26 @@ class ObsidianStorageService
         return $results;
     }
 
+    /**
+     * Find files by glob pattern only (no content read). Cheap variant
+     * of search() — one allFiles() call + fnmatch() per entry.
+     */
+    public function findByPattern(ObsidianVault $vault, string $namePattern, string $path = '/'): array
+    {
+        $resolvedPath = $this->resolvePath($vault, $path);
+        $disk = $this->disk($vault);
+
+        $matches = [];
+        foreach ($disk->allFiles($resolvedPath) as $rawPath) {
+            $filePath = $this->stripPrefix($vault, $rawPath);
+            if (fnmatch($namePattern, basename($filePath)) || fnmatch($namePattern, $filePath)) {
+                $matches[] = $filePath;
+            }
+        }
+
+        return $matches;
+    }
+
     public function testConnection(ObsidianVault $vault): bool
     {
         try {
