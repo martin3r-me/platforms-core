@@ -38,4 +38,46 @@ final class Subject
         public readonly array $children = [],
         public readonly array $meta = [],
     ) {}
+
+    /**
+     * Inhalts-Hash ueber Identity + Facts + Edges (OHNE Freshness, OHNE meta).
+     *
+     * Zweck: Dedup beim Feed-Refresh — wenn der State sich nicht veraendert hat,
+     * wird kein neuer Output erzeugt (sonst Spam im RSS-Reader).
+     *
+     * Nicht enthalten:
+     *  - Freshness (taken_at aendert sich auch ohne Substanz)
+     *  - meta (Debug-Info, nicht inhaltlich)
+     *  - movement / children (V1 nicht aktiv, kommen mit eigenem Hash)
+     */
+    public function stateHash(): string
+    {
+        $parts = [
+            'type' => $this->type,
+            'id' => $this->id,
+            'identity' => [
+                'primary' => $this->identity->primaryName,
+                'short' => $this->identity->shortLabel,
+            ],
+            'facts' => collect($this->facts)
+                ->map(fn ($f) => $f->priority->value . '|' . $f->text)
+                ->sort()
+                ->values()
+                ->all(),
+            'edges' => collect($this->edges)
+                ->map(fn ($e) => implode('|', [
+                    $e->relation,
+                    $e->targetType,
+                    (string) $e->targetId,
+                    $e->targetLabel,
+                    $e->weight->value,
+                    $e->claim->type->value,
+                    $e->claim->level->value,
+                ]))
+                ->sort()
+                ->values()
+                ->all(),
+        ];
+        return hash('sha256', json_encode($parts, JSON_UNESCAPED_UNICODE));
+    }
 }

@@ -28,6 +28,7 @@ class VerbalizationOutput extends Model
         'llm_model',
         'input_tokens',
         'output_tokens',
+        'state_hash',
         'team_id',
     ];
 

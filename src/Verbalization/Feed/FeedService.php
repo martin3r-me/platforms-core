@@ -151,13 +151,18 @@ class FeedService
     /**
      * Generiert die Verbalisierungen fuer alle Subjects des Feeds und persistiert sie.
      *
-     * @return array{outputs_created:int, subjects_resolved:int, errors:array}
+     * Dedup: vor jedem LLM-Call wird der state_hash des Subjects mit dem juengsten
+     * Output (pro feed+subject) verglichen. Bei Gleichheit wird kein neuer Output
+     * erzeugt — Reader bekommen sonst Spam.
+     *
+     * @return array{outputs_created:int, skipped_no_change:int, subjects_resolved:int, errors:array}
      */
     public function refresh(VerbalizationFeed $feed, ?StyleProfile $baseStyle = null): array
     {
         $subjects = $this->resolveSubjects($feed);
         $errors = [];
         $created = 0;
+        $skipped = 0;
 
         foreach ($subjects as $s) {
             try {
@@ -180,6 +185,20 @@ class FeedService
                 }
 
                 $subject = $collector->collectState($s['id'], $recipe);
+                $stateHash = $subject->stateHash();
+
+                // Dedup: wenn der juengste Output dieses Feeds fuer dieses Subject
+                // denselben Hash hat, ueberspringen — kein Delta = kein neuer Output.
+                $lastOutput = VerbalizationOutput::where('feed_id', $feed->id)
+                    ->where('subject_type', $subject->type)
+                    ->where('subject_id', (string) $subject->id)
+                    ->orderByDesc('created_at')
+                    ->first();
+                if ($lastOutput && $lastOutput->state_hash === $stateHash) {
+                    $skipped++;
+                    continue;
+                }
+
                 $result = $this->verbalizer->verbalize(
                     subject: $subject,
                     style: $baseStyle ?? StyleProfile::formal(),
@@ -200,6 +219,7 @@ class FeedService
                     'llm_model' => $result->model,
                     'input_tokens' => $result->usage['input_tokens'] ?? null,
                     'output_tokens' => $result->usage['output_tokens'] ?? null,
+                    'state_hash' => $stateHash,
                     'team_id' => $feed->team_id,
                 ]);
                 $created++;
@@ -221,6 +241,7 @@ class FeedService
 
         return [
             'outputs_created' => $created,
+            'skipped_no_change' => $skipped,
             'subjects_resolved' => $subjects->count(),
             'errors' => $errors,
         ];
