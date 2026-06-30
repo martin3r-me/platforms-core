@@ -158,6 +158,8 @@ class Verbalizer
         $parts[] = '';
         $parts[] = 'Format:';
         $parts[] = '- Antwort ist lesbares Markdown.';
+        $parts[] = '- **Absaetze trennen Themen.** Wenn die Faktenbasis verschiedene Themenbloecke hat (Status, Beteiligte, Termine, Daten-Grundlage), gehoeren die in EIGENE Absaetze, getrennt durch Leerzeilen. KEINE Wand-aus-Text.';
+        $parts[] = '- Max. 3-4 Saetze pro Absatz. Wenn ein Absatz zu lang wird, splitten.';
         $parts[] = '- Headings (##/###) NUR setzen, wenn mehrere echt unterscheidbare Sektionen vorliegen — niemals einfach die Headings aus der Faktenbasis kopieren.';
         $parts[] = '- **fett** fuer Schluesselzahlen (Health-Score, Prozent-Fortschritte, kritische Counts).';
         $parts[] = '- Listen nur wenn 3 oder mehr gleichartige Punkte aneinandergereiht waeren; bei 1-2 Punkten Fliesstext.';
