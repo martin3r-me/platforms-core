@@ -107,19 +107,30 @@ class FeedService
         }
         $dbTypes = array_values(array_unique($dbTypes));
 
-        // dimension_links: jede Zeile hat dimension_value_id, das mappt auf entity
-        // ueber organization_dimension_values.entity_id. Wir filtern direkt auf entity.
+        // dimension_links → dimension_value → metadata.source_entity_id.
+        // Es gibt kein FK-Feld v.entity_id; die Entity-Verknuepfung steht im
+        // JSON-Feld metadata. Wir lesen sie ueber den JSON-Pfad.
         if (! \Schema::hasTable('organization_dimension_values')) {
             return collect();
         }
 
         $links = DB::table('organization_dimension_links as l')
             ->join('organization_dimension_values as v', 'v.id', '=', 'l.dimension_value_id')
-            ->where('v.entity_id', $entityId)
+            ->where('v.metadata->source_entity_id', $entityId)
             ->whereIn('l.linkable_type', $dbTypes)
             ->select('l.linkable_type', 'l.linkable_id')
             ->distinct()
             ->get();
+
+        // Fallback: alte organization_entity_links-Tabelle (deprecated, fuer Rollback noch da).
+        if ($links->isEmpty() && \Schema::hasTable('organization_entity_links')) {
+            $links = DB::table('organization_entity_links')
+                ->where('entity_id', $entityId)
+                ->whereIn('linkable_type', $dbTypes)
+                ->select('linkable_type', 'linkable_id')
+                ->distinct()
+                ->get();
+        }
 
         return $links->map(function ($row) use ($aliases) {
             $subjectType = $aliases[$row->linkable_type] ?? $row->linkable_type;
