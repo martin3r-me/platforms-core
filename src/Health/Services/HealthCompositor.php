@@ -22,10 +22,16 @@ class HealthCompositor
     public const DEFAULT_CONFIDENCE_THRESHOLD = 50;
 
     /**
-     * @param array<string,int> $axes       achsKey → score (0..100). Nur vorhandene Achsen!
-     * @param array<string,int> $weights    achsKey → gewicht. Sum sollte 100 sein.
-     * @param int|null          $confidence 0..100, optional fuer Gate. Null = kein Gate.
-     * @param int               $confidenceThreshold Score unter dem das Gate greift.
+     * @param array<string,int>       $axes            achsKey → score (0..100). Nur vorhandene Achsen!
+     * @param array<string,int>       $weights         achsKey → gewicht. Sum sollte 100 sein.
+     * @param int|null                $confidence      0..100, optional fuer Gate. Null = kein Gate.
+     * @param int                     $confidenceThreshold Score unter dem das Gate greift.
+     * @param array<string,float>|null $axisConfidence  achsKey → confidence 0..1, optional.
+     *   Wenn gesetzt: Gewicht pro Achse = original_weight * axisConfidence[axis]. Achsen mit
+     *   confidence=0 fliessen NICHT in den Composite-Score ein, auch nicht in worst-of-Color.
+     *   Damit: "junges Projekt, progress=0 unaussagekraeftig" → progress wird nicht gerechnet,
+     *   andere Achsen behalten ihren Einfluss. Achsen, die nicht im Array sind, werden mit 1.0
+     *   (volle Aussagekraft) gerechnet.
      *
      * @return array{score:int|null,color:string|null,worst_axis:string|null,axis_scores:array<string,int>}
      */
@@ -34,6 +40,7 @@ class HealthCompositor
         array $weights,
         ?int $confidence = null,
         int $confidenceThreshold = self::DEFAULT_CONFIDENCE_THRESHOLD,
+        ?array $axisConfidence = null,
     ): array {
         if (empty($axes)) {
             return [
@@ -54,9 +61,27 @@ class HealthCompositor
             ];
         }
 
-        $score = $this->weightedScore($axes, $weights);
-        $color = $this->worstColor($axes);
-        $worst = $this->resolveWorstAxis($axes);
+        // Axis-Confidence (C): Achsen mit niedriger Aussagekraft werden runter-gewichtet
+        // bzw. ganz uebersprungen. Composite kommt aus den verbleibenden, aussagekraeftigen Achsen.
+        $effectiveAxes = $axes;
+        $effectiveWeights = $weights;
+        if ($axisConfidence) {
+            [$effectiveAxes, $effectiveWeights] = $this->applyAxisConfidence($axes, $weights, $axisConfidence);
+        }
+
+        if (empty($effectiveAxes)) {
+            // Alle Achsen wurden ausgewertet als nicht-aussagekraeftig → ehrlich grau.
+            return [
+                'score' => null,
+                'color' => HealthColor::GRAY->value,
+                'worst_axis' => null,
+                'axis_scores' => $axes,
+            ];
+        }
+
+        $score = $this->weightedScore($effectiveAxes, $effectiveWeights);
+        $color = $this->worstColor($effectiveAxes);
+        $worst = $this->resolveWorstAxis($effectiveAxes);
 
         return [
             'score' => $score,
@@ -64,6 +89,31 @@ class HealthCompositor
             'worst_axis' => $worst,
             'axis_scores' => $axes,
         ];
+    }
+
+    /**
+     * Wendet die axis-Confidence auf Achsen + Gewichte an.
+     *  - confidence 1.0 (oder fehlend) → Achse bleibt unveraendert
+     *  - confidence 0.0               → Achse wird komplett uebersprungen
+     *  - 0.0 < c < 1.0                → Gewicht * c
+     *
+     * @return array{0: array<string,int>, 1: array<string,int>}
+     */
+    protected function applyAxisConfidence(array $axes, array $weights, array $axisConfidence): array
+    {
+        $outAxes = [];
+        $outWeights = [];
+        foreach ($axes as $key => $val) {
+            $c = (float) ($axisConfidence[$key] ?? 1.0);
+            if ($c <= 0.0) {
+                continue; // Achse wird ignoriert
+            }
+            $c = min(1.0, $c);
+            $outAxes[$key] = $val;
+            $w = (int) ($weights[$key] ?? 25);
+            $outWeights[$key] = (int) max(1, round($w * $c));
+        }
+        return [$outAxes, $outWeights];
     }
 
     /**
