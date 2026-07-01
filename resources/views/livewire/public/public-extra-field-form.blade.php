@@ -126,6 +126,7 @@
                     allFieldValues: @entangle('allFieldValues').live,
                     fieldDefinitions: @js($defsForJs),
                     allFieldDefinitions: @js($allDefsForJs),
+                    requiredBasisFieldIds: @js($requiredBasisFieldIds ?? []),
 
                     init() {
                         this.$watch('fieldValues', (values) => {
@@ -228,6 +229,35 @@
                         const idx = v.indexOf(value);
                         if (idx > -1) { v.splice(idx, 1); } else { v.push(value); }
                         $wire.set('extraFieldValues.' + fieldId, [...v]);
+                    },
+
+                    // A4: sind alle sichtbaren Basis-Pflichtfelder befüllt?
+                    // Steuert das Upload-Gate (options.locked_until_basics).
+                    basisComplete() {
+                        return this.requiredBasisFieldIds.every(id => {
+                            if (!this.isFieldVisible(id)) return true;
+                            const field = this.allFieldDefinitions.find(f => f.id === id);
+                            const val = this.allFieldValues[id] !== undefined
+                                ? this.allFieldValues[id]
+                                : this.fieldValues[id];
+                            return this.isValueFilled(field, val);
+                        });
+                    },
+
+                    isValueFilled(field, value) {
+                        const type = field ? field.type : null;
+                        if (type === 'phone') {
+                            return !!value && typeof value === 'object' && !this.isEmpty(value.raw);
+                        }
+                        if (type === 'address') {
+                            return !!value && typeof value === 'object'
+                                && !this.isEmpty(value.street) && !this.isEmpty(value.city);
+                        }
+                        if (type === 'date') {
+                            return !!value && typeof value === 'object'
+                                && !this.isEmpty(value.day) && !this.isEmpty(value.month) && !this.isEmpty(value.year);
+                        }
+                        return !this.isEmpty(value);
                     }
                 }"
             >

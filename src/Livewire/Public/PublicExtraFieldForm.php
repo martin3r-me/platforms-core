@@ -51,6 +51,15 @@ class PublicExtraFieldForm extends Component
     public array $missingRequiredFields = [];
 
     /**
+     * IDs der Basis-Pflichtfelder (required & NICHT vom Typ file), die noch
+     * offen sind. Steuert das "Upload gesperrt bis Basis komplett"-Gate (A4)
+     * für file-Felder mit options.locked_until_basics. Nur im Akkordeon befüllt.
+     *
+     * @var int[]
+     */
+    public array $requiredBasisFieldIds = [];
+
+    /**
      * True wenn das Linkable-Modell Akkordeon-Layout opted-in hat.
      * Steuert ob das Blade die Aufteilung rendert oder klassisch.
      */
@@ -194,6 +203,7 @@ class PublicExtraFieldForm extends Component
         $this->optionalTotal = 0;
         $this->optionalFilled = 0;
         $this->missingRequiredFields = [];
+        $this->requiredBasisFieldIds = [];
 
         if ($useAccordion) {
             foreach ($filtered as $field) {
@@ -211,6 +221,11 @@ class PublicExtraFieldForm extends Component
                             'id' => $field['id'],
                             'label' => $field['label'],
                         ];
+                        // A4: offene Basis-Pflichtfelder (alles außer Upload)
+                        // steuern das Upload-Gate.
+                        if (($field['type'] ?? null) !== 'file') {
+                            $this->requiredBasisFieldIds[] = $field['id'];
+                        }
                     }
                     $this->openFieldIds[] = $field['id'];
                 } elseif ($isConditional) {
