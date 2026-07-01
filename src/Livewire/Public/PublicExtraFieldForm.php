@@ -43,6 +43,14 @@ class PublicExtraFieldForm extends Component
     public array $accordionFieldIds = [];
 
     /**
+     * Noch offene Pflichtfelder (id + label) für die "diese Felder fehlen
+     * noch"-Anzeige (A3). Nur im Akkordeon-Layout befüllt.
+     *
+     * @var array<int, array{id:int,label:string}>
+     */
+    public array $missingRequiredFields = [];
+
+    /**
      * True wenn das Linkable-Modell Akkordeon-Layout opted-in hat.
      * Steuert ob das Blade die Aufteilung rendert oder klassisch.
      */
@@ -185,6 +193,7 @@ class PublicExtraFieldForm extends Component
         $this->requiredFilled = 0;
         $this->optionalTotal = 0;
         $this->optionalFilled = 0;
+        $this->missingRequiredFields = [];
 
         if ($useAccordion) {
             foreach ($filtered as $field) {
@@ -196,6 +205,12 @@ class PublicExtraFieldForm extends Component
                     $this->requiredTotal++;
                     if ($isFilled) {
                         $this->requiredFilled++;
+                    } else {
+                        // A3: offenes Pflichtfeld für "diese Felder fehlen noch"
+                        $this->missingRequiredFields[] = [
+                            'id' => $field['id'],
+                            'label' => $field['label'],
+                        ];
                     }
                     $this->openFieldIds[] = $field['id'];
                 } elseif ($isConditional) {

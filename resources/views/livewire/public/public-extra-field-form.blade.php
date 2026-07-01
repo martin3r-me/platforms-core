@@ -250,6 +250,24 @@
                                     @endif
                                 </div>
                             @endif
+
+                            {{-- A3: welche Pflichtfelder noch fehlen (klickbar → scrollt zum Feld) --}}
+                            @if(count($missingRequiredFields ?? []) > 0)
+                                <div class="mt-3">
+                                    <p class="text-xs font-medium text-gray-500 mb-1.5">Diese Pflichtfelder fehlen noch:</p>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        @foreach($missingRequiredFields as $missingField)
+                                            <button
+                                                type="button"
+                                                x-on:click="$dispatch('scroll-to-field', { fieldId: {{ $missingField['id'] }} })"
+                                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-50 text-red-600 text-xs font-medium hover:bg-red-100 transition-colors"
+                                            >
+                                                {{ $missingField['label'] }}
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
                         </div>
                         @include('platform::livewire.public._public-extra-field-form-loop', ['renderBlock' => 'open'])
                     </div>
