@@ -104,7 +104,7 @@ class CoreExtraFieldDefinition extends Model
         ],
         'file' => [
             'icon' => 'heroicon-o-paper-clip',
-            'description' => 'Datei-Upload für Dokumente, Bilder oder andere Anhänge. Optional mit KI-Verifikation.',
+            'description' => 'Datei-Upload für Dokumente, Bilder oder andere Anhänge. Optional mit KI-Verifikation. Optionen: {"accept": ["jpg","png","pdf"], "max_size_mb": 10} beschränken erlaubte Formate/Größe (ohne Angabe: keine Beschränkung).',
         ],
         'phone' => [
             'icon' => 'heroicon-o-phone',

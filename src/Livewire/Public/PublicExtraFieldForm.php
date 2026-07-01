@@ -372,6 +372,19 @@ class PublicExtraFieldForm extends Component
             $files = is_array($file) ? $file : [$file];
 
             foreach ($files as $uploadedFile) {
+                // Pro-Feld konfigurierbare Upload-Beschraenkung (accept / max_size_mb).
+                // Ohne gesetzte Optionen ist alles erlaubt → andere Module unveraendert.
+                $uploadError = \Platform\Core\Support\FileUploadValidator::validate(
+                    $uploadedFile->getClientOriginalExtension(),
+                    null,
+                    (int) $uploadedFile->getSize(),
+                    $field['options'] ?? [],
+                );
+                if ($uploadError !== null) {
+                    $this->addError("extraFieldValues.{$fieldId}", $uploadError);
+                    continue;
+                }
+
                 try {
                     $result = $service->uploadForContext(
                         $uploadedFile,

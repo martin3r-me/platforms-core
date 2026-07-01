@@ -522,6 +522,33 @@
                                             $isMultiple = $options['multiple'] ?? false;
                                             $currentFileIds = $extraFieldValues[$fieldId] ?? ($isMultiple ? [] : null);
                                             $currentFileIds = is_array($currentFileIds) ? $currentFileIds : ($currentFileIds ? [$currentFileIds] : []);
+
+                                            // accept-Attribut aus den Feld-Optionen (nur UX-Vorfilterung;
+                                            // die verbindliche Pruefung passiert server-seitig).
+                                            $acceptAttr = '';
+                                            if (!empty($options['accept']) && is_array($options['accept'])) {
+                                                $acceptExts = [];
+                                                foreach ($options['accept'] as $ext) {
+                                                    $ext = ltrim(strtolower(trim((string) $ext)), '.');
+                                                    if ($ext === '') continue;
+                                                    $acceptExts[] = '.' . $ext;
+                                                    if ($ext === 'jpg') $acceptExts[] = '.jpeg';
+                                                }
+                                                $acceptAttr = implode(',', array_values(array_unique($acceptExts)));
+                                            }
+                                            $maxSizeMb = $options['max_size_mb'] ?? null;
+
+                                            // Hinweistext (erlaubte Formate / max. Größe) vorab bauen —
+                                            // keine inline-@if-Ketten im Markup (Blade-Kompilierung).
+                                            $uploadHintParts = [];
+                                            if ($acceptAttr) {
+                                                $hintExts = array_filter(explode(',', $acceptAttr), fn($e) => $e !== '.jpeg');
+                                                $uploadHintParts[] = strtoupper(implode(', ', array_map(fn($e) => ltrim($e, '.'), $hintExts)));
+                                            }
+                                            if ($maxSizeMb) {
+                                                $uploadHintParts[] = 'max. ' . rtrim(rtrim(number_format((float) $maxSizeMb, 1, ',', ''), '0'), ',') . ' MB';
+                                            }
+                                            $uploadHint = implode(' · ', $uploadHintParts);
                                         @endphp
                                         <div>
                                             @if(!empty($currentFileIds))
@@ -589,10 +616,14 @@
                                                             x-ref="fileInput{{ $fieldId }}"
                                                             wire:model="pendingFileUploads.{{ $fieldId }}"
                                                             class="hidden"
+                                                            @if($acceptAttr) accept="{{ $acceptAttr }}" @endif
                                                             @if($isMultiple) multiple @endif
                                                         >
                                                     </label>
                                                 </div>
+                                                @if($uploadHint)
+                                                    <p class="mt-1.5 text-xs text-gray-400">{{ $uploadHint }}</p>
+                                                @endif
                                             @endif
                                         </div>
                                         @break
