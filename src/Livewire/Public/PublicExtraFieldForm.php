@@ -160,18 +160,35 @@ class PublicExtraFieldForm extends Component
         $useAccordion = $this->useAccordionLayout;
         $currentPhaseOrder = $this->currentPhaseOrder;
 
+        // Sichtbarkeits-Evaluator + Werte-nach-Name (fuer bedingte Felder).
+        // Werte aus dem noch UNgefilterten Voll-Satz (allFieldValues).
+        $evaluator = new \Platform\Core\Services\ExtraFieldConditionEvaluator();
+        $valuesByName = [];
+        foreach ($this->allFieldDefinitions as $def) {
+            $valuesByName[$def['name']] = $this->allFieldValues[$def['id']] ?? null;
+        }
+
         // Filter: only show unfilled fields — Felder mit options.always_show_in_form
         // bleiben sichtbar auch wenn schon befuellt (zum Bestaetigen / Korrigieren).
+        // Fortschritt (filledFields/totalFields) zaehlt NUR sichtbare Pflichtfelder
+        // — deckt sich mit calculateProgress(); ausgeblendete (nicht zutreffende
+        // bedingte) und rein optionale Felder verfaelschen den Zaehler nicht mehr.
         $filtered = [];
         $this->totalFields = 0;
         $this->filledFields = 0;
 
         foreach ($this->extraFieldDefinitions as $field) {
-            $this->totalFields++;
             $isFilled = $this->isFieldValueFilled($field);
 
+            if ($this->isFieldEffectivelyRequired($field, $currentPhaseOrder)
+                && $this->isFieldVisibleByConfig($field, $valuesByName, $evaluator)) {
+                $this->totalFields++;
+                if ($isFilled) {
+                    $this->filledFields++;
+                }
+            }
+
             if ($isFilled) {
-                $this->filledFields++;
                 if ($this->isAlwaysShownInForm($field)) {
                     $filtered[] = $field; // bleibt sichtbar trotz "filled"
                 }
@@ -210,6 +227,23 @@ class PublicExtraFieldForm extends Component
                 $isFilled = $this->isFieldValueFilled($field);
                 $isRequired = $this->isFieldEffectivelyRequired($field, $currentPhaseOrder);
                 $isConditional = $this->isFieldConditionallyVisible($field);
+                $isVisible = $this->isFieldVisibleByConfig($field, $valuesByName, $evaluator);
+
+                // Render-Zuordnung IMMER (unabhaengig von aktueller Sichtbarkeit):
+                // bedingte Felder muessen im DOM bleiben, damit sie bei passender
+                // Auswahl auftauchen. openFieldIds = Pflicht + bedingt sichtbar,
+                // accordionFieldIds = rein optional (eingeklappt).
+                if ($isRequired || $isConditional) {
+                    $this->openFieldIds[] = $field['id'];
+                } else {
+                    $this->accordionFieldIds[] = $field['id'];
+                }
+
+                // Zaehler NUR fuer aktuell sichtbare Felder — kein Mitzaehlen
+                // ausgeblendeter, nicht zutreffender bedingter Felder.
+                if (!$isVisible) {
+                    continue;
+                }
 
                 if ($isRequired) {
                     $this->requiredTotal++;
@@ -227,21 +261,11 @@ class PublicExtraFieldForm extends Component
                             $this->requiredBasisFieldIds[] = $field['id'];
                         }
                     }
-                    $this->openFieldIds[] = $field['id'];
-                } elseif ($isConditional) {
-                    // bedingt-sichtbares Feld zaehlt als optional aber
-                    // bleibt im Hauptbereich sichtbar
-                    $this->optionalTotal++;
-                    if ($isFilled) {
-                        $this->optionalFilled++;
-                    }
-                    $this->openFieldIds[] = $field['id'];
                 } else {
                     $this->optionalTotal++;
                     if ($isFilled) {
                         $this->optionalFilled++;
                     }
-                    $this->accordionFieldIds[] = $field['id'];
                 }
             }
         }
@@ -295,6 +319,21 @@ class PublicExtraFieldForm extends Component
             return false;
         }
         return in_array((int) $currentPhaseOrder, array_map('intval', $overrideOrders), true);
+    }
+
+    /**
+     * True wenn das Feld aktuell sichtbar ist (visibility_config gegen die
+     * aktuellen Werte ausgewertet). Ohne aktive Config immer sichtbar.
+     * Spiegelt die Logik von RecApplicant::calculateProgress() — damit die
+     * Formular-Zaehler nur zaehlen, was der Bewerber wirklich sieht.
+     */
+    private function isFieldVisibleByConfig(array $field, array $valuesByName, \Platform\Core\Services\ExtraFieldConditionEvaluator $evaluator): bool
+    {
+        $vc = $field['visibility_config'] ?? null;
+        if (!$vc || !($vc['enabled'] ?? false)) {
+            return true;
+        }
+        return $evaluator->evaluate($vc, $valuesByName);
     }
 
     /**
@@ -524,13 +563,26 @@ class PublicExtraFieldForm extends Component
             $model->syncExtraFieldsToCrmContact();
         }
 
-        // Recount filled fields
-        $this->filledFields = 0;
+        // Recount: nur SICHTBARE PFLICHT-Felder (deckt sich mit der Lade-Zaehlung
+        // und calculateProgress). Ausgeblendete (nicht zutreffende bedingte) und
+        // rein optionale Felder zaehlen weder in den Fortschritt noch in den
+        // completed-Status — sonst wuerde die Maske nie "completed".
+        $evaluator = new \Platform\Core\Services\ExtraFieldConditionEvaluator();
         $allDefinitions = $model->getExtraFieldsWithLabels();
+        $valuesByName = [];
+        foreach ($allDefinitions as $def) {
+            $valuesByName[$def['name']] = $def['value'] ?? null;
+        }
+
+        $this->filledFields = 0;
         $this->totalFields = 0;
         $remainingUnfilled = 0;
 
         foreach ($allDefinitions as $field) {
+            if (!$this->isFieldEffectivelyRequired($field, $this->currentPhaseOrder)
+                || !$this->isFieldVisibleByConfig($field, $valuesByName, $evaluator)) {
+                continue;
+            }
             $this->totalFields++;
             if ($field['type'] === 'phone') {
                 $isFilled = is_array($field['value']) && (!empty($field['value']['e164'] ?? null) || !empty(trim($field['value']['raw'] ?? '')));
