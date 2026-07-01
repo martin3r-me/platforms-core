@@ -445,7 +445,25 @@ class PublicExtraFieldForm extends Component
 
     public function save(): void
     {
-        $this->validate($this->getExtraFieldValidationRules(), $this->getExtraFieldValidationMessages());
+        $validator = \Illuminate\Support\Facades\Validator::make(
+            ['extraFieldValues' => $this->extraFieldValues],
+            $this->getExtraFieldValidationRules(),
+            $this->getExtraFieldValidationMessages(),
+        );
+
+        if ($validator->fails()) {
+            $this->setErrorBag($validator->errors());
+
+            // A2: zum ersten fehlerhaften Pflichtfeld scrollen. Fehler-Keys sind
+            // "extraFieldValues.<id>[.sub]" — die erste ID entspricht dem ersten
+            // Fehlerfeld in Definitions-/Anzeige-Reihenfolge.
+            $firstKey = array_key_first($validator->errors()->messages());
+            if ($firstKey && preg_match('/extraFieldValues\.(\d+)/', $firstKey, $m)) {
+                $this->dispatch('scroll-to-field', fieldId: (int) $m[1]);
+            }
+
+            return;
+        }
 
         $model = $this->getModel();
         if (!$model) {

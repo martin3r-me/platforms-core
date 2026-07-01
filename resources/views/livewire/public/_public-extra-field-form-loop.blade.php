@@ -27,6 +27,7 @@
                             @endphp
 
                             <div
+                                id="ef-field-{{ $fieldId }}"
                                 x-show="isFieldVisible({{ $fieldId }})"
                                 x-transition:enter="transition ease-out duration-200"
                                 x-transition:enter-start="opacity-0 -translate-y-2"

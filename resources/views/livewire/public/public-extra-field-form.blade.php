@@ -120,6 +120,7 @@
 
         <main class="max-w-3xl mx-auto px-4 sm:px-6 py-8">
             <form wire:submit="save"
+                x-on:scroll-to-field.window="$nextTick(() => { const el = document.getElementById('ef-field-' + $event.detail.fieldId); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); const inp = el.querySelector('input, select, textarea'); if (inp) inp.focus({ preventScroll: true }); } })"
                 x-data="{
                     fieldValues: @entangle('extraFieldValues').live,
                     allFieldValues: @entangle('allFieldValues').live,
