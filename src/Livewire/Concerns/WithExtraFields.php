@@ -620,14 +620,19 @@ trait WithExtraFields
                     $fieldRules = ['nullable', 'array'];
                     $rules["extraFieldValues.{$field['id']}"] = $fieldRules;
                     $currentYear = (int) date('Y');
+                    // Obere Jahresgrenze folgt der pro-Feld-Zukunfts-Range, damit
+                    // "Gültig bis"-Datumsfelder in der Zukunft valide sind.
+                    $futureRange = (int) ($field['options']['year_range_future']
+                        ?? \Platform\Core\Models\CoreExtraFieldDefinition::DATE_YEAR_RANGE_FUTURE_DEFAULT);
+                    $maxYear = \Platform\Core\Support\DateFieldRange::maxYear($currentYear, $futureRange);
                     if ($field['is_mandatory'] ?? false) {
                         $rules["extraFieldValues.{$field['id']}.day"] = ['required', 'integer', 'between:1,31'];
                         $rules["extraFieldValues.{$field['id']}.month"] = ['required', 'integer', 'between:1,12'];
-                        $rules["extraFieldValues.{$field['id']}.year"] = ['required', 'integer', 'between:1900,' . $currentYear];
+                        $rules["extraFieldValues.{$field['id']}.year"] = ['required', 'integer', 'between:1900,' . $maxYear];
                     } else {
                         $rules["extraFieldValues.{$field['id']}.day"] = ['nullable', 'integer', 'between:1,31'];
                         $rules["extraFieldValues.{$field['id']}.month"] = ['nullable', 'integer', 'between:1,12'];
-                        $rules["extraFieldValues.{$field['id']}.year"] = ['nullable', 'integer', 'between:1900,' . $currentYear];
+                        $rules["extraFieldValues.{$field['id']}.year"] = ['nullable', 'integer', 'between:1900,' . $maxYear];
                     }
                     continue 2;
                 case 'address':

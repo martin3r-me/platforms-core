@@ -75,6 +75,13 @@ class CoreExtraFieldDefinition extends Model
     public const DATE_YEAR_RANGE_DEFAULT = 100;
 
     /**
+     * Standard Jahr-Range für Datums-Felder in die Zukunft (Jahre voraus von
+     * heute). Ermöglicht "Gültig bis"-/Ablauf-Datumsfelder ohne per-Feld-Konfig.
+     * Pro Feld via options.year_range_future überschreibbar (0 = nur Vergangenheit).
+     */
+    public const DATE_YEAR_RANGE_FUTURE_DEFAULT = 15;
+
+    /**
      * Beschreibungen und Icons für Feldtypen
      */
     public const TYPE_DESCRIPTIONS = [
@@ -120,7 +127,7 @@ class CoreExtraFieldDefinition extends Model
         ],
         'date' => [
             'icon' => 'heroicon-o-calendar-days',
-            'description' => 'Datumsfeld mit Tag, Monat und Jahr als einzelne Auswahlfelder.',
+            'description' => 'Datumsfeld mit Tag, Monat und Jahr als einzelne Auswahlfelder. Optionen: {"year_range": 100, "year_range_future": 15} steuern Jahre zurück/voraus (year_range_future: 0 = nur Vergangenheit, z.B. Geburtsdatum).',
         ],
         'email' => [
             'icon' => 'heroicon-o-envelope',
