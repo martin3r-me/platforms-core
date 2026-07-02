@@ -512,8 +512,14 @@ trait WithExtraFields
      *
      * Fields that are hidden due to visibility conditions are always nullable
      * and never required, regardless of their is_mandatory setting.
+     *
+     * @param int[]|null $forceRequiredIds Feld-IDs, die HART required validiert
+     *        werden — unabhaengig vom isDirty-Guard. Fuer den strikten
+     *        "Absenden"-Modus des oeffentlichen Formulars (Bewerber darf nicht
+     *        absenden solange sichtbare Pflichtfelder fehlen). Ohne Param
+     *        (Admin-Speichern) bleibt das Verhalten exakt wie bisher.
      */
-    public function getExtraFieldValidationRules(): array
+    public function getExtraFieldValidationRules(?array $forceRequiredIds = null): array
     {
         $rules = [];
         $evaluator = new ExtraFieldConditionEvaluator();
@@ -536,10 +542,13 @@ trait WithExtraFields
             // (Wert identisch zum Original) werden nullable validiert.
             // Verhindert dass leere Pflichtfelder, die der Bewerber im
             // Self-Service noch nicht ausgefuellt hat, das Admin-Speichern
-            // blockieren.
+            // blockieren. Forced-Felder (strikter Absenden-Modus) umgehen
+            // diesen Guard.
             $isDirty = $this->isExtraFieldDirty($field['id']);
+            $isForced = $forceRequiredIds !== null && in_array($field['id'], $forceRequiredIds, true);
+            $isEffectivelyMandatory = ($field['is_mandatory'] ?? false) || $isForced;
 
-            if (($field['is_mandatory'] ?? false) && $isDirty) {
+            if ($isEffectivelyMandatory && ($isDirty || $isForced)) {
                 $fieldRules[] = 'required';
             } else {
                 $fieldRules[] = 'nullable';
@@ -569,7 +578,7 @@ trait WithExtraFields
                     $isMultiple = $field['options']['multiple'] ?? false;
                     if ($isMultiple) {
                         $fieldRules[] = 'array';
-                        if ($field['is_mandatory'] ?? false) {
+                        if ($isEffectivelyMandatory) {
                             $fieldRules[] = 'min:1';
                         }
                     } else {
@@ -583,7 +592,7 @@ trait WithExtraFields
                     $isMultiple = $field['options']['multiple'] ?? false;
                     if ($isMultiple) {
                         $fieldRules[] = 'array';
-                        if ($field['is_mandatory'] ?? false) {
+                        if ($isEffectivelyMandatory) {
                             $fieldRules[] = 'min:1';
                         }
                     }
@@ -599,7 +608,7 @@ trait WithExtraFields
                 case 'phone':
                     $fieldRules = ['nullable', 'array'];
                     $rules["extraFieldValues.{$field['id']}"] = $fieldRules;
-                    if ($field['is_mandatory'] ?? false) {
+                    if ($isEffectivelyMandatory) {
                         $rules["extraFieldValues.{$field['id']}.raw"] = ['required', 'string'];
                     }
                     continue 2;
@@ -625,7 +634,7 @@ trait WithExtraFields
                     $futureRange = (int) ($field['options']['year_range_future']
                         ?? \Platform\Core\Models\CoreExtraFieldDefinition::DATE_YEAR_RANGE_FUTURE_DEFAULT);
                     $maxYear = \Platform\Core\Support\DateFieldRange::maxYear($currentYear, $futureRange);
-                    if ($field['is_mandatory'] ?? false) {
+                    if ($isEffectivelyMandatory) {
                         $rules["extraFieldValues.{$field['id']}.day"] = ['required', 'integer', 'between:1,31'];
                         $rules["extraFieldValues.{$field['id']}.month"] = ['required', 'integer', 'between:1,12'];
                         $rules["extraFieldValues.{$field['id']}.year"] = ['required', 'integer', 'between:1900,' . $maxYear];
@@ -638,7 +647,7 @@ trait WithExtraFields
                 case 'address':
                     $fieldRules = ['nullable', 'array'];
                     $rules["extraFieldValues.{$field['id']}"] = $fieldRules;
-                    if ($field['is_mandatory'] ?? false) {
+                    if ($isEffectivelyMandatory) {
                         $rules["extraFieldValues.{$field['id']}.street"] = ['required', 'string', 'max:255'];
                         $rules["extraFieldValues.{$field['id']}.zip"] = ['required', 'string', 'max:20'];
                         $rules["extraFieldValues.{$field['id']}.city"] = ['required', 'string', 'max:255'];
@@ -674,12 +683,21 @@ trait WithExtraFields
             $messages["extraFieldValues.{$field['id']}.raw.required"] = "Das Feld \"{$field['label']}\" ist ein Pflichtfeld.";
             $messages["extraFieldValues.{$field['id']}.email"] = "Das Feld \"{$field['label']}\" muss eine gültige E-Mail-Adresse sein.";
             if ($field['type'] === 'date') {
+                // Obergrenze konsistent zur Validierungsregel (inkl. Zukunfts-Range).
+                $maxYear = \Platform\Core\Support\DateFieldRange::maxYear(
+                    (int) date('Y'),
+                    (int) ($field['options']['year_range_future']
+                        ?? \Platform\Core\Models\CoreExtraFieldDefinition::DATE_YEAR_RANGE_FUTURE_DEFAULT),
+                );
                 $messages["extraFieldValues.{$field['id']}.day.required"] = "Tag ist ein Pflichtfeld.";
                 $messages["extraFieldValues.{$field['id']}.day.between"] = "Tag muss zwischen 1 und 31 liegen.";
                 $messages["extraFieldValues.{$field['id']}.month.required"] = "Monat ist ein Pflichtfeld.";
                 $messages["extraFieldValues.{$field['id']}.month.between"] = "Monat muss zwischen 1 und 12 liegen.";
                 $messages["extraFieldValues.{$field['id']}.year.required"] = "Jahr ist ein Pflichtfeld.";
-                $messages["extraFieldValues.{$field['id']}.year.between"] = "Jahr muss zwischen 1900 und " . date('Y') . " liegen.";
+                $messages["extraFieldValues.{$field['id']}.year.between"] = "Jahr muss zwischen 1900 und {$maxYear} liegen.";
+            }
+            if (in_array($field['type'], ['select', 'lookup'], true) && ($field['options']['multiple'] ?? false)) {
+                $messages["extraFieldValues.{$field['id']}.min"] = "Bitte wähle bei \"{$field['label']}\" mindestens eine Option aus.";
             }
             if ($field['type'] === 'address') {
                 $messages["extraFieldValues.{$field['id']}.street.required"] = "Straße ist ein Pflichtfeld.";

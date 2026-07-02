@@ -327,17 +327,19 @@
                         </div>
                     @endif
 
-                    {{-- Submit-Button (auf der Form-Ebene, ausserhalb der Cards) --}}
+                    {{-- Submit-Button (auf der Form-Ebene, ausserhalb der Cards).
+                         Akkordeon-Modus = strikter Absenden-Flow (save() erzwingt
+                         alle sichtbaren Pflichtfelder), daher "Absenden". --}}
                     <div class="mt-10 flex justify-end">
                         <button
                             type="submit"
                             wire:loading.attr="disabled"
                             class="px-7 py-3 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <span wire:loading.remove wire:target="save">Speichern</span>
+                            <span wire:loading.remove wire:target="save">Absenden</span>
                             <span wire:loading wire:target="save" class="inline-flex items-center gap-2">
                                 <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                                Wird gespeichert...
+                                Wird gesendet...
                             </span>
                         </button>
                     </div>

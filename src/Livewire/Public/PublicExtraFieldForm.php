@@ -514,9 +514,32 @@ class PublicExtraFieldForm extends Component
 
     public function save(): void
     {
+        // Strikter "Absenden"-Modus (nur Akkordeon-Layout = Bewerberformular):
+        // alle aktuell SICHTBAREN Pflichtfelder werden hart required validiert —
+        // kein Absenden solange etwas fehlt. Der isDirty-Guard des Traits (fuer
+        // Admin-Speichern) wird fuer diese Felder umgangen. Klassisches Layout
+        // (andere Module) behaelt das leniente Zwischenspeichern.
+        $forceRequiredIds = null;
+        if ($this->useAccordionLayout) {
+            $evaluator = new \Platform\Core\Services\ExtraFieldConditionEvaluator();
+            $valuesByName = [];
+            foreach ($this->allFieldDefinitions as $def) {
+                $valuesByName[$def['name']] = $this->extraFieldValues[$def['id']]
+                    ?? $this->allFieldValues[$def['id']]
+                    ?? null;
+            }
+            $forceRequiredIds = [];
+            foreach ($this->extraFieldDefinitions as $field) {
+                if ($this->isFieldEffectivelyRequired($field, $this->currentPhaseOrder)
+                    && $this->isFieldVisibleByConfig($field, $valuesByName, $evaluator)) {
+                    $forceRequiredIds[] = $field['id'];
+                }
+            }
+        }
+
         $validator = \Illuminate\Support\Facades\Validator::make(
             ['extraFieldValues' => $this->extraFieldValues],
-            $this->getExtraFieldValidationRules(),
+            $this->getExtraFieldValidationRules($forceRequiredIds),
             $this->getExtraFieldValidationMessages(),
         );
 
