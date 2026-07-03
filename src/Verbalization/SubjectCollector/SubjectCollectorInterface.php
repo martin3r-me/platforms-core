@@ -24,6 +24,15 @@ interface SubjectCollectorInterface
      * Baut ein Subject aus einer Subject-ID oder einer bereits geladenen Entity-Instanz.
      * Erstparameter ist bewusst mixed — Module-Implementierungen duerfen ihre
      * Models direkt als Shortcut akzeptieren.
+     *
+     * $since: optionaler Zeitpunkt fuer Bewegungs-Facts. Wenn gesetzt, kann der Sammler
+     * Delta-Facts (Movement-Summary, Scope-Fulfillment, Ball-Position) gegen diesen
+     * Zeitpunkt berechnen. Wenn null oder unbenutzt: reiner Zustand-Bericht.
+     * Recipe entscheidet, ob Movement-Facts ueberhaupt gebaut werden.
      */
-    public function collectState(mixed $subject, ?CollectionRecipe $recipe = null): Subject;
+    public function collectState(
+        mixed $subject,
+        ?CollectionRecipe $recipe = null,
+        ?\DateTimeInterface $since = null,
+    ): Subject;
 }

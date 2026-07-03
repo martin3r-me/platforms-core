@@ -184,16 +184,21 @@ class FeedService
                     continue;
                 }
 
-                $subject = $collector->collectState($s['id'], $recipe);
-                $stateHash = $subject->stateHash();
-
-                // Dedup: wenn der juengste Output dieses Feeds fuer dieses Subject
-                // denselben Hash hat, ueberspringen — kein Delta = kein neuer Output.
+                // Zuerst den juengsten Output holen — dessen created_at ist der "since"-Zeitpunkt
+                // fuer Bewegungs-Facts. Damit weiss der Sammler: "was hat sich seit dem letzten
+                // Bericht getan?"
                 $lastOutput = VerbalizationOutput::where('feed_id', $feed->id)
-                    ->where('subject_type', $subject->type)
-                    ->where('subject_id', (string) $subject->id)
+                    ->where('subject_type', $s['type'])
+                    ->where('subject_id', (string) $s['id'])
                     ->orderByDesc('created_at')
                     ->first();
+                $since = $lastOutput?->created_at;
+
+                $subject = $collector->collectState($s['id'], $recipe, $since);
+                $stateHash = $subject->stateHash();
+
+                // Dedup: wenn der juengste Output denselben Hash hat, ueberspringen —
+                // kein Delta = kein neuer Output.
                 if ($lastOutput && $lastOutput->state_hash === $stateHash) {
                     $skipped++;
                     continue;
