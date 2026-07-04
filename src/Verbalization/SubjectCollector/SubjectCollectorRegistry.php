@@ -29,4 +29,12 @@ class SubjectCollectorRegistry
     {
         return array_keys($this->collectors);
     }
+
+    /**
+     * @return array<string, SubjectCollectorInterface>
+     */
+    public function all(): array
+    {
+        return $this->collectors;
+    }
 }

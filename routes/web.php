@@ -370,5 +370,9 @@ Route::middleware(['web', 'auth'])->group(function () {
         ->name('platform.ui-preferences.show');
     Route::put('/platform/ui-preferences', [\Platform\Core\Http\Controllers\UserUiPreferenceController::class, 'update'])
         ->name('platform.ui-preferences.update');
+
+    // System-Baukasten-Uebersicht fuer den Verbalizer.
+    Route::get('/verbalization/factory', \Platform\Core\Livewire\Verbalization\Factory::class)
+        ->name('core.verbalization.factory');
 });
 
