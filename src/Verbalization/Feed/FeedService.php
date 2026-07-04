@@ -32,6 +32,7 @@ class FeedService
         protected SubjectCollectorRegistry $collectors,
         protected RecipeResolver $recipes,
         protected Verbalizer $verbalizer,
+        protected ?\Platform\Core\Verbalization\Channel\ChannelRendererRegistry $channels = null,
     ) {}
 
     /**
@@ -266,7 +267,7 @@ class FeedService
                     recipe: $recipe,
                 );
 
-                VerbalizationOutput::create([
+                $output = VerbalizationOutput::create([
                     'feed_id' => $feed->id,
                     'recipe_key' => $recipe->key,
                     'subject_type' => $subject->type,
@@ -281,6 +282,15 @@ class FeedService
                     'team_id' => $feed->team_id,
                 ]);
                 $created++;
+
+                // Push-Kanaele bedienen — Obsidian schreibt eine MD-Datei, Email
+                // versendet, Slack pusht ins Webhook. Renderer-Ausfaelle einzelner
+                // Kanaele killen den Bericht nicht: Fehler werden geloggt und
+                // gesammelt, aber der Output ist bereits persistiert.
+                $errors = array_merge(
+                    $errors,
+                    $this->deliverPushChannels($feed, $output),
+                );
             } catch (\Throwable $e) {
                 Log::warning('[FeedService] verbalize failed', [
                     'feed_id' => $feed->id,
@@ -303,6 +313,53 @@ class FeedService
             'subjects_resolved' => $subjects->count(),
             'errors' => $errors,
         ];
+    }
+
+    /**
+     * Ruft alle aktiven Push-Kanaele des Feeds mit dem frischen Output auf.
+     * Fehler pro Kanal werden gesammelt und zurueckgegeben, killen aber nicht
+     * den Refresh — der Output ist bereits persistiert, andere Kanaele laufen weiter.
+     *
+     * @return string[]  Fehlermeldungen (leer wenn alles gut)
+     */
+    protected function deliverPushChannels(
+        VerbalizationFeed $feed,
+        VerbalizationOutput $output,
+    ): array {
+        if (! $this->channels) {
+            return [];
+        }
+
+        $errors = [];
+        $channels = \Platform\Core\Models\VerbalizationChannel::where('verbalization_feed_id', $feed->id)
+            ->where('is_active', true)
+            ->get();
+
+        foreach ($channels as $channel) {
+            $renderer = $this->channels->resolve($channel->type);
+            if (! $renderer instanceof \Platform\Core\Verbalization\Channel\PushChannelInterface) {
+                // Pull-Kanaele oder unbekannter Typ — nichts zu tun.
+                continue;
+            }
+
+            try {
+                $r = $renderer->deliver($channel, $feed, $output);
+                if (! empty($r['success'])) {
+                    $channel->last_delivered_at = now();
+                    $channel->save();
+                } else {
+                    $errors[] = "channel[{$channel->type}#{$channel->id}]: " . ($r['error'] ?? 'unknown');
+                }
+            } catch (\Throwable $e) {
+                Log::warning('[FeedService] channel deliver failed', [
+                    'channel_id' => $channel->id,
+                    'channel_type' => $channel->type,
+                    'error' => $e->getMessage(),
+                ]);
+                $errors[] = "channel[{$channel->type}#{$channel->id}]: " . $e->getMessage();
+            }
+        }
+        return $errors;
     }
 
     protected function enforceRetention(VerbalizationFeed $feed): void

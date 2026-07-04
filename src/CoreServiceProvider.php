@@ -327,7 +327,14 @@ class CoreServiceProvider extends ServiceProvider
 
         // Verbalization Feed-Pipeline (Subject-Collector-Registry, FeedService, RSS-Renderer)
         $this->app->singleton(\Platform\Core\Verbalization\SubjectCollector\SubjectCollectorRegistry::class);
-        $this->app->singleton(\Platform\Core\Verbalization\Feed\FeedService::class);
+        $this->app->singleton(\Platform\Core\Verbalization\Feed\FeedService::class, function ($app) {
+            return new \Platform\Core\Verbalization\Feed\FeedService(
+                $app->make(\Platform\Core\Verbalization\SubjectCollector\SubjectCollectorRegistry::class),
+                $app->make(\Platform\Core\Verbalization\Recipe\RecipeResolver::class),
+                $app->make(\Platform\Core\Verbalization\Verbalizer::class),
+                $app->make(\Platform\Core\Verbalization\Channel\ChannelRendererRegistry::class),
+            );
+        });
         $this->app->singleton(\Platform\Core\Verbalization\Feed\AtomFeedRenderer::class, function ($app) {
             return new \Platform\Core\Verbalization\Feed\AtomFeedRenderer(
                 publicBaseUrl: rtrim((string) config('app.url'), '/'),
@@ -341,6 +348,9 @@ class CoreServiceProvider extends ServiceProvider
             $registry = new \Platform\Core\Verbalization\Channel\ChannelRendererRegistry();
             $registry->register(new \Platform\Core\Verbalization\Channel\RssChannelRenderer(
                 $app->make(\Platform\Core\Verbalization\Feed\AtomFeedRenderer::class),
+            ));
+            $registry->register(new \Platform\Core\Verbalization\Channel\ObsidianChannelRenderer(
+                $app->make(\Platform\Core\Services\ObsidianStorageService::class),
             ));
             return $registry;
         });
@@ -764,6 +774,20 @@ class CoreServiceProvider extends ServiceProvider
         }
         if (class_exists(\Platform\Core\Tools\Verbalization\ListOutputsTool::class) && !$registry->has('core.verbalization.outputs.LIST')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\ListOutputsTool::class)); } catch (\Throwable $e) {}
+        }
+
+        // Verbalization Channels (core.verbalization.channels.*)
+        if (class_exists(\Platform\Core\Tools\Verbalization\ListChannelsTool::class) && !$registry->has('core.verbalization.channels.LIST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\ListChannelsTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Verbalization\CreateChannelTool::class) && !$registry->has('core.verbalization.channels.POST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\CreateChannelTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Verbalization\UpdateChannelTool::class) && !$registry->has('core.verbalization.channels.PUT')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\UpdateChannelTool::class)); } catch (\Throwable $e) {}
+        }
+        if (class_exists(\Platform\Core\Tools\Verbalization\DeleteChannelTool::class) && !$registry->has('core.verbalization.channels.DELETE')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\DeleteChannelTool::class)); } catch (\Throwable $e) {}
         }
 
         // Core AI Models (DB Source of Truth): tools for listing/updating models must be discoverable via module=core
