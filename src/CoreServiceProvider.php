@@ -334,6 +334,17 @@ class CoreServiceProvider extends ServiceProvider
             );
         });
 
+        // Channel-Renderer-Registry — Kanal-Ebene entkoppelt vom RSS-Renderer.
+        // Weitere Renderer (Email, PDF, Slack, Webhook) klemmen sich hier an, ohne
+        // dass der oeffentliche Endpoint oder der Delivery-Loop veraendert werden muss.
+        $this->app->singleton(\Platform\Core\Verbalization\Channel\ChannelRendererRegistry::class, function ($app) {
+            $registry = new \Platform\Core\Verbalization\Channel\ChannelRendererRegistry();
+            $registry->register(new \Platform\Core\Verbalization\Channel\RssChannelRenderer(
+                $app->make(\Platform\Core\Verbalization\Feed\AtomFeedRenderer::class),
+            ));
+            return $registry;
+        });
+
         // LLM-Provider-Infrastruktur fuer Verbalizer (und andere Konsumenten).
         $this->app->singleton(\Platform\Core\Services\LLMProviderRegistry::class, function ($app) {
             $registry = new \Platform\Core\Services\LLMProviderRegistry();
