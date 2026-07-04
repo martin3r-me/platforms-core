@@ -333,10 +333,11 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
             return [];
         }
 
-        // Alle DimensionLinks aller Scope-Entities, gruppiert nach linkable_type.
-        // Metrik-Werte werden am Root-Entity-Slot gebuendelt (Beer-mäßig aggregiert).
-        $linksByAlias = $this->linksByAliasForEntities($entityScope);
-        if (empty($linksByAlias)) {
+        // Links pro Alias, aufgeschluesselt nach Entity — damit der Provider pro
+        // Sub-Entity rechnet und wir das Ergebnis anschliessend gem. der
+        // roll_up_function der Metric aggregieren (sum / avg / max / min).
+        $linksByAliasAndEntity = $this->linksByAliasByEntityForEntities($entityScope);
+        if (empty($linksByAliasAndEntity)) {
             return [];
         }
 
@@ -351,7 +352,7 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
         $linkTypeConfig = $this->safeLinkTypeConfig($registry);
 
         $facts = [];
-        foreach ($linksByAlias as $alias => $ids) {
+        foreach ($linksByAliasAndEntity as $alias => $idsPerEntity) {
             if ($include !== null && ! in_array($alias, (array) $include, true)) {
                 continue;
             }
@@ -365,19 +366,26 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
             }
 
             try {
-                // Aggregation am Root-Entity-Slot: alle Sub-Baum-Links wandern in einen einzigen Bag.
-                $metrics = $provider->metrics($alias, [$rootEntityId => array_values($ids)]);
+                // Provider rechnet pro Entity — wir aggregieren danach ehrlich per
+                // roll_up_function der Metric-Definition (sum / avg / max / min).
+                // Modulatoren (Raten, Modulator-Faktoren) landen so nicht in einer
+                // Bag-Rechnung, sondern als Mittelwert ueber die Sub-Entities.
+                $metrics = $provider->metrics($alias, $idsPerEntity);
             } catch (\Throwable $e) {
                 continue; // Provider-Fehler killt den Pulse-Bericht nicht.
             }
-            $values = $metrics[$rootEntityId] ?? [];
-            if (empty($values)) {
+            if (empty($metrics)) {
+                continue;
+            }
+
+            $rolledUp = $this->rollUpMetrics($metrics, $allDefs);
+            if (empty($rolledUp)) {
                 continue;
             }
 
             $aliasLabel = $linkTypeConfig[$alias]['label'] ?? $alias;
 
-            foreach ($values as $key => $value) {
+            foreach ($rolledUp as $key => $value) {
                 if ($skipZero && (is_numeric($value) && (float) $value === 0.0)) {
                     continue;
                 }
@@ -411,6 +419,84 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    /**
+     * Erweiterte Variante: Links pro Alias UND pro Sub-Entity aufgeschluesselt,
+     * damit der Provider pro Entity rechnet und wir die Metriken korrekt
+     * roll-up-en (sum vs avg vs max ...).
+     *
+     * @param int[] $entityIds
+     * @return array<string, array<int, int[]>>  morph-Alias → [entity_id → [linkable_ids]]
+     */
+    protected function linksByAliasByEntityForEntities(array $entityIds): array
+    {
+        if (empty($entityIds)
+            || ! \Schema::hasTable('organization_dimension_links')
+            || ! \Schema::hasTable('organization_dimension_values')) {
+            return [];
+        }
+        $rows = DB::table('organization_dimension_links as l')
+            ->join('organization_dimension_values as v', 'v.id', '=', 'l.dimension_value_id')
+            ->whereIn(DB::raw("CAST(JSON_UNQUOTE(JSON_EXTRACT(v.metadata, '$.source_entity_id')) AS UNSIGNED)"), $entityIds)
+            ->select(
+                'l.linkable_type',
+                'l.linkable_id',
+                DB::raw("CAST(JSON_UNQUOTE(JSON_EXTRACT(v.metadata, '$.source_entity_id')) AS UNSIGNED) as source_entity_id"),
+            )
+            ->get();
+
+        $out = [];
+        foreach ($rows as $row) {
+            $eid = (int) $row->source_entity_id;
+            $out[$row->linkable_type][$eid][] = (int) $row->linkable_id;
+        }
+        // Dedup pro (alias, entity_id).
+        foreach ($out as $alias => $byEntity) {
+            foreach ($byEntity as $eid => $ids) {
+                $out[$alias][$eid] = array_values(array_unique($ids));
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Aggregiert pro-Entity-Metrik-Werte gemaess der roll_up_function der
+     * jeweiligen Metric-Definition:
+     *   - sum (default)   → einfache Summe
+     *   - avg             → Mittelwert (fuer Modulatoren wie Raten)
+     *   - max / min       → Extrem-Werte
+     *
+     * @param array<int, array<string, mixed>> $metricsByEntity
+     * @param array<string, array>              $defs
+     * @return array<string, float|int>
+     */
+    protected function rollUpMetrics(array $metricsByEntity, array $defs): array
+    {
+        $bucket = [];
+        foreach ($metricsByEntity as $entityId => $values) {
+            if (! is_array($values)) {
+                continue;
+            }
+            foreach ($values as $key => $value) {
+                if (! is_numeric($value)) {
+                    continue;
+                }
+                $bucket[$key][] = (float) $value;
+            }
+        }
+
+        $result = [];
+        foreach ($bucket as $key => $values) {
+            $fn = $defs[$key]['roll_up_function'] ?? 'sum';
+            $result[$key] = match ($fn) {
+                'avg' => count($values) > 0 ? round(array_sum($values) / count($values), 2) : 0,
+                'max' => ! empty($values) ? max($values) : 0,
+                'min' => ! empty($values) ? min($values) : 0,
+                default => array_sum($values), // sum
+            };
+        }
+        return $result;
     }
 
     /**
