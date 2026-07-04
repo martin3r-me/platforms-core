@@ -23,7 +23,7 @@ class CreateRecipeTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /verbalization/recipes - Legt eine Verbalization-Recipe an. Pflicht: key, name, subject_type, sources, style. Optional: description, guards, freshness_requirement, scope ("global"|"team", default "team"). Beispiel-sources: {"description": true, "frogs": {"enabled": true, "top_n": 3}, "canvas": {"enabled": true, "max_highlights": 2}}. Beispiel-style: {"address": "sie", "tone": "formal", "rhythm": "short", "extra_instruction": "Maximal 3 Saetze."}.';
+        return 'POST /verbalization/recipes - Legt eine Verbalization-Recipe an. Pflicht: key, name, subject_type, sources, style. Optional: description, guards, llm, freshness_requirement, scope ("global"|"team", default "team"). Beispiel-sources: {"description": true, "frogs": {"enabled": true, "top_n": 3}, "canvas": {"enabled": true, "max_highlights": 2}}. Beispiel-style: {"address": "sie", "tone": "formal", "rhythm": "short", "extra_instruction": "Maximal 3 Saetze."}. Beispiel-llm: {"provider": "openai", "model": "gpt-4o-2024-08-06"}.';
     }
 
     public function getSchema(): array
@@ -46,6 +46,10 @@ class CreateRecipeTool implements ToolContract, ToolMetadataContract
                 'guards' => [
                     'type' => 'object',
                     'description' => 'Optional: Guard-Overrides als JSON. Default ist alles strikt true.',
+                ],
+                'llm' => [
+                    'type' => 'object',
+                    'description' => 'Optional: LLM-Praeferenz {"provider": "openai|anthropic|...", "model": "..."}. Beide Felder optional. Feed-Override sticht Recipe, Recipe sticht Config-Default.',
                 ],
                 'freshness_requirement' => [
                     'type' => 'string',
@@ -108,6 +112,7 @@ class CreateRecipeTool implements ToolContract, ToolMetadataContract
             'sources' => $sources,
             'style' => $style,
             'guards' => $arguments['guards'] ?? null,
+            'llm' => $arguments['llm'] ?? null,
             'freshness_requirement' => $arguments['freshness_requirement'] ?? null,
             'team_id' => $teamId,
             'is_active' => $arguments['is_active'] ?? true,

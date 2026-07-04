@@ -47,7 +47,8 @@ class Verbalizer
             $rails = $this->mergeRecipeGuards($rails, $recipe);
         }
 
-        $llm = $this->resolveProvider($providerKey);
+        $llm = $this->resolveProvider($providerKey, $recipe);
+        $effectiveModel = $modelOverride ?? $recipe?->llmModel();
 
         $template = $this->templates->resolve($subject->type);
         $factSheet = $template
@@ -62,8 +63,8 @@ class Verbalizer
             'temperature' => 0.3,
             'max_tokens' => 1024,
         ];
-        if ($modelOverride) {
-            $options['model'] = $modelOverride;
+        if ($effectiveModel) {
+            $options['model'] = $effectiveModel;
         }
 
         $response = $llm->chat(
@@ -117,17 +118,26 @@ class Verbalizer
         );
     }
 
-    protected function resolveProvider(?string $key): LLMProviderContract
+    /**
+     * Aufloesungs-Reihenfolge fuer den LLM-Provider:
+     *   1) Feed-/Caller-Override ($key)
+     *   2) Recipe-Praeferenz ($recipe->llmProvider())
+     *   3) Config-Default (verbalization.default_provider)
+     *   4) Registry-First-Available
+     *
+     * Feed und Recipe muessen — wenn gesetzt — auch verfuegbar sein; sonst fliegt
+     * der Provider explizit als Fehler durch (keine stillen Fallbacks, sonst
+     * versendet man Prosa vom "falschen" Modell ohne es zu merken).
+     */
+    protected function resolveProvider(?string $key, ?CollectionRecipe $recipe = null): LLMProviderContract
     {
         if ($key) {
-            $p = $this->providers->get($key);
-            if (! $p) {
-                throw new \RuntimeException("Verbalizer: Provider '{$key}' ist nicht registriert.");
-            }
-            if (! $p->isAvailable()) {
-                throw new \RuntimeException("Verbalizer: Provider '{$key}' ist nicht verfuegbar (API-Key fehlt?).");
-            }
-            return $p;
+            return $this->requireProvider($key, 'Feed');
+        }
+
+        $recipeProvider = $recipe?->llmProvider();
+        if ($recipeProvider) {
+            return $this->requireProvider($recipeProvider, "Recipe '{$recipe->key}'");
         }
 
         $configured = config('verbalization.default_provider');
@@ -140,6 +150,18 @@ class Verbalizer
 
         return $this->providers->getDefaultProvider()
             ?? throw new \RuntimeException('Verbalizer: kein LLM-Provider verfuegbar.');
+    }
+
+    protected function requireProvider(string $key, string $source): LLMProviderContract
+    {
+        $p = $this->providers->get($key);
+        if (! $p) {
+            throw new \RuntimeException("Verbalizer: Provider '{$key}' ({$source}) ist nicht registriert.");
+        }
+        if (! $p->isAvailable()) {
+            throw new \RuntimeException("Verbalizer: Provider '{$key}' ({$source}) ist nicht verfuegbar (API-Key fehlt?).");
+        }
+        return $p;
     }
 
     protected function buildSystemPrompt(StyleProfile $style, GuardRails $rails): string

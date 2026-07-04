@@ -27,6 +27,7 @@ class VerbalizationRecipe extends Model
         'sources',
         'style',
         'guards',
+        'llm',
         'freshness_requirement',
         'team_id',
         'is_active',
@@ -37,6 +38,7 @@ class VerbalizationRecipe extends Model
         'sources' => 'array',
         'style' => 'array',
         'guards' => 'array',
+        'llm' => 'array',
         'is_active' => 'boolean',
     ];
 

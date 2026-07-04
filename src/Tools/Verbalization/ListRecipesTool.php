@@ -89,6 +89,7 @@ class ListRecipesTool implements ToolContract, ToolMetadataContract
             'sources' => $r->sources,
             'style' => $r->style,
             'guards' => $r->guards,
+            'llm' => $r->llm,
         ])->all();
 
         return ToolResult::success([

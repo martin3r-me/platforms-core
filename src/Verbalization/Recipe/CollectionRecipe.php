@@ -25,6 +25,7 @@ final class CollectionRecipe
         public readonly array $sources,
         public readonly array $style,
         public readonly ?array $guards,
+        public readonly ?array $llm,
         public readonly ?string $freshnessRequirement,
         public readonly ?int $teamId,
     ) {}
@@ -39,9 +40,28 @@ final class CollectionRecipe
             sources: $m->sources ?? [],
             style: $m->style ?? [],
             guards: $m->guards,
+            llm: $m->llm,
             freshnessRequirement: $m->freshness_requirement,
             teamId: $m->team_id,
         );
+    }
+
+    /**
+     * Provider-Praeferenz der Recipe ("openai", "anthropic", ...) oder null wenn nicht gesetzt.
+     */
+    public function llmProvider(): ?string
+    {
+        $p = $this->llm['provider'] ?? null;
+        return is_string($p) && $p !== '' ? $p : null;
+    }
+
+    /**
+     * Modell-Praeferenz der Recipe (z.B. "gpt-4o-2024-08-06") oder null wenn nicht gesetzt.
+     */
+    public function llmModel(): ?string
+    {
+        $m = $this->llm['model'] ?? null;
+        return is_string($m) && $m !== '' ? $m : null;
     }
 
     /**
