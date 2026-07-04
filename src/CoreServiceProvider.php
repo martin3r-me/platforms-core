@@ -288,6 +288,48 @@ class CoreServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Core\Verbalization\Pulse\EntityPulseSubjectCollector($registry));
         } catch (\Throwable $e) {}
 
+        // Verbalization als Modul registrieren — damit Nav und Sidebar greifen.
+        // Der Verbalizer ist konzeptionell Kernfaehigkeit, aber ueber den
+        // Modul-Mechanismus wird die Baukasten-Seite ordentlich im Layout sichtbar.
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('modules')) {
+                \Platform\Core\PlatformCore::registerModule([
+                    'key' => 'verbalization',
+                    'title' => 'Verbalization',
+                    'group' => 'admin',
+                    'routing' => [
+                        'prefix' => 'verbalization',
+                        'middleware' => ['web', 'auth'],
+                    ],
+                    'guard' => 'web',
+                    'navigation' => [
+                        'main' => [
+                            'verbalization' => [
+                                'title' => 'Verbalization',
+                                'icon' => 'heroicon-o-newspaper',
+                                'route' => 'core.verbalization.factory',
+                            ],
+                        ],
+                    ],
+                    'sidebar' => [
+                        'verbalization' => [
+                            'title' => 'Verbalization',
+                            'icon' => 'heroicon-o-newspaper',
+                            'items' => [
+                                'factory' => [
+                                    'title' => 'Baukasten',
+                                    'route' => 'core.verbalization.factory',
+                                    'icon' => 'heroicon-o-squares-2x2',
+                                ],
+                            ],
+                        ],
+                    ],
+                ]);
+            }
+        } catch (\Throwable $e) {
+            // Boot ohne DB oder ohne modules-Tabelle nicht abbrechen.
+        }
+
         // Automatische Modell-Registrierung entfernt
     }
 
