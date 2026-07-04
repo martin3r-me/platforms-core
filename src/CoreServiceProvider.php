@@ -275,6 +275,19 @@ class CoreServiceProvider extends ServiceProvider
             $schedule->command('verbalization:refresh-feeds --cadence=weekly')->weeklyOn(1, '04:30');
         });
 
+        // Entity-Pulse: cross-modularer Aggregator-Collector + Template. Wohnt im
+        // Core, weil er auf die SubjectCollectorRegistry angewiesen ist, nicht auf
+        // konkrete Module.
+        try {
+            resolve(\Platform\Core\Verbalization\Template\TemplateRegistry::class)
+                ->register(new \Platform\Core\Verbalization\Pulse\EntityPulseTemplate());
+        } catch (\Throwable $e) {}
+
+        try {
+            $registry = resolve(\Platform\Core\Verbalization\SubjectCollector\SubjectCollectorRegistry::class);
+            $registry->register(new \Platform\Core\Verbalization\Pulse\EntityPulseSubjectCollector($registry));
+        } catch (\Throwable $e) {}
+
         // Automatische Modell-Registrierung entfernt
     }
 
