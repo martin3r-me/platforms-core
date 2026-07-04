@@ -80,6 +80,11 @@ class FeedService
      *   ...
      * Wir gehen pragmatisch davon aus, dass linkable_type == subject_type, mit
      * einer kleinen Aliase-Map fuer Sonderfaelle.
+     *
+     * Rekursion: subject_selector.descend (false | true | int) sammelt zusaetzlich
+     * DimensionLinks aller Descendants ueber parent_entity_id. Damit greift ein
+     * Feed am Kunden-Knoten automatisch auf alle Sub-Ebenen (Engagements,
+     * Initiativen, ...), ohne pro Ebene konfigurieren zu muessen.
      */
     protected function resolveByEntity(array $selector, array $recipesMap): Collection
     {
@@ -114,9 +119,13 @@ class FeedService
             return collect();
         }
 
+        // Rekursion: Root + optional Descendants.
+        $descend = $selector['descend'] ?? false;
+        $entityScope = $this->collectEntityScope((int) $entityId, $descend);
+
         $links = DB::table('organization_dimension_links as l')
             ->join('organization_dimension_values as v', 'v.id', '=', 'l.dimension_value_id')
-            ->where('v.metadata->source_entity_id', $entityId)
+            ->whereIn(DB::raw("CAST(JSON_UNQUOTE(JSON_EXTRACT(v.metadata, '$.source_entity_id')) AS UNSIGNED)"), $entityScope)
             ->whereIn('l.linkable_type', $dbTypes)
             ->select('l.linkable_type', 'l.linkable_id')
             ->distinct()
@@ -125,7 +134,7 @@ class FeedService
         // Fallback: alte organization_entity_links-Tabelle (deprecated, fuer Rollback noch da).
         if ($links->isEmpty() && \Schema::hasTable('organization_entity_links')) {
             $links = DB::table('organization_entity_links')
-                ->where('entity_id', $entityId)
+                ->whereIn('entity_id', $entityScope)
                 ->whereIn('linkable_type', $dbTypes)
                 ->select('linkable_type', 'linkable_id')
                 ->distinct()
@@ -136,6 +145,48 @@ class FeedService
             $subjectType = $aliases[$row->linkable_type] ?? $row->linkable_type;
             return ['type' => $subjectType, 'id' => $row->linkable_id];
         })->values();
+    }
+
+    /**
+     * Traversiert den Entity-Baum breitenfirst und liefert alle Entity-IDs im Scope.
+     * $descend: false = nur Root; true = alle Descendants; int = bis zu N Ebenen tief.
+     *
+     * @return int[]
+     */
+    protected function collectEntityScope(int $rootId, mixed $descend): array
+    {
+        if ($descend === false || $descend === null) {
+            return [$rootId];
+        }
+        if (! \Schema::hasTable('organization_entities')) {
+            return [$rootId];
+        }
+        $maxDepth = ($descend === true) ? null : max(0, (int) $descend);
+
+        $visited = [$rootId => true];
+        $result = [$rootId];
+        $queue = [[$rootId, 0]];
+
+        while (! empty($queue)) {
+            [$id, $depth] = array_shift($queue);
+            if ($maxDepth !== null && $depth >= $maxDepth) {
+                continue;
+            }
+            $children = DB::table('organization_entities')
+                ->where('parent_entity_id', $id)
+                ->pluck('id')
+                ->all();
+            foreach ($children as $cid) {
+                $cid = (int) $cid;
+                if (isset($visited[$cid])) {
+                    continue;
+                }
+                $visited[$cid] = true;
+                $result[] = $cid;
+                $queue[] = [$cid, $depth + 1];
+            }
+        }
+        return $result;
     }
 
     /**
