@@ -37,6 +37,9 @@ use Platform\Core\Verbalization\SubjectCollector\SubjectCollectorRegistry;
 class EntityPulseSubjectCollector implements SubjectCollectorInterface
 {
     private const DEFAULT_SOURCES = [
+        'descend' => false,          // Rekursion durch den Entity-Baum. false | true | int (max depth).
+                                     // true = alle Descendants; int = bis zu N Ebenen tief.
+                                     // Wirkt auf ALLE Sub-Sammlungen (Signals, Planner, Registry-Metriken).
         'signals' => true,           // Signal-Sub-Subject einbeziehen
         'planner_projects' => [      // Alle angelinkten Planner-Projekte (qualitative Text-Facts)
             'enabled' => true,
@@ -76,11 +79,20 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
         $isOn = fn (string $key) => $this->sourceOn($sources, $key);
         $cfg = fn (string $key) => $this->sourceCfg($sources, $key);
 
+        // Rekursions-Scope: Root + optional Descendants. Wirkt auf alle Sub-Sammlungen.
+        $descend = $sources['descend'] ?? false;
+        $entityScope = $this->collectEntityScope($entityId, $descend);
+
         $facts = [];
 
-        // Signal-Sub-Subject aggregieren
+        // Signal-Sub-Subject aggregieren — nutzt Entity-Scope wenn descend gesetzt.
         if ($isOn('signals')) {
-            $signalsSubject = $this->safeCollect('organization_signals', $entityId, null, $since);
+            $signalsSubject = $this->safeCollect(
+                'organization_signals',
+                count($entityScope) > 1 ? $entityScope : $entityId,
+                null,
+                $since,
+            );
             if ($signalsSubject) {
                 $facts = array_merge($facts, $this->extractHighlights(
                     $signalsSubject,
@@ -90,13 +102,13 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
             }
         }
 
-        // Planner-Projekte aggregieren
+        // Planner-Projekte aggregieren — sammelt IDs ueber das gesamte Entity-Scope.
         if ($isOn('planner_projects')) {
             $ppCfg = $cfg('planner_projects');
             $topN = (int) ($ppCfg['top_n'] ?? 8);
             $skipIdle = (bool) ($ppCfg['skip_if_no_movement'] ?? false);
 
-            foreach ($this->plannerProjectIdsForEntity($entityId, $topN) as $projectId) {
+            foreach ($this->plannerProjectIdsForEntities($entityScope, $topN) as $projectId) {
                 $projectSubject = $this->safeCollect('planner_project', $projectId, null, $since);
                 if (! $projectSubject) {
                     continue;
@@ -112,10 +124,11 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
             }
         }
 
-        // Registry-Metriken aggregieren (14+ Provider, ohne pro-Modul-Code).
+        // Registry-Metriken aggregieren (14+ Provider) — ueber das gesamte Entity-Scope.
         if ($isOn('entity_link_providers')) {
             $facts = array_merge($facts, $this->factsFromEntityLinkMetrics(
                 $entityId,
+                $entityScope,
                 $cfg('entity_link_providers'),
             ));
         }
@@ -164,19 +177,22 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
     }
 
     /**
-     * IDs aller planner_project-Objekte, die per dimension_link an dieser Entity haengen.
+     * IDs aller planner_project-Objekte, die per dimension_link an mindestens einer
+     * der uebergebenen Entities haengen (Root + optional Descendants).
      *
+     * @param int[] $entityIds
      * @return int[]
      */
-    protected function plannerProjectIdsForEntity(int $entityId, int $limit): array
+    protected function plannerProjectIdsForEntities(array $entityIds, int $limit): array
     {
-        if (! \Schema::hasTable('organization_dimension_links')
+        if (empty($entityIds)
+            || ! \Schema::hasTable('organization_dimension_links')
             || ! \Schema::hasTable('organization_dimension_values')) {
             return [];
         }
         $rows = DB::table('organization_dimension_links as l')
             ->join('organization_dimension_values as v', 'v.id', '=', 'l.dimension_value_id')
-            ->where('v.metadata->source_entity_id', $entityId)
+            ->whereIn(DB::raw("CAST(JSON_UNQUOTE(JSON_EXTRACT(v.metadata, '$.source_entity_id')) AS UNSIGNED)"), $entityIds)
             ->whereIn('l.linkable_type', ['project', 'planner_project'])
             ->select('l.linkable_id')
             ->distinct()
@@ -184,6 +200,48 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
             ->pluck('l.linkable_id')
             ->all();
         return array_map('intval', $rows);
+    }
+
+    /**
+     * Traversiert den Entity-Baum breitenfirst und liefert alle Entity-IDs im Scope.
+     * $descend: false = nur Root; true = alle Descendants; int = bis zu N Ebenen tief.
+     *
+     * @return int[]  Root + Descendants (dedupliziert).
+     */
+    protected function collectEntityScope(int $rootId, mixed $descend): array
+    {
+        if ($descend === false || $descend === null) {
+            return [$rootId];
+        }
+        if (! \Schema::hasTable('organization_entities')) {
+            return [$rootId];
+        }
+        $maxDepth = ($descend === true) ? null : max(0, (int) $descend);
+
+        $visited = [$rootId => true];
+        $result = [$rootId];
+        $queue = [[$rootId, 0]];
+
+        while (! empty($queue)) {
+            [$id, $depth] = array_shift($queue);
+            if ($maxDepth !== null && $depth >= $maxDepth) {
+                continue;
+            }
+            $children = DB::table('organization_entities')
+                ->where('parent_entity_id', $id)
+                ->pluck('id')
+                ->all();
+            foreach ($children as $cid) {
+                $cid = (int) $cid;
+                if (isset($visited[$cid])) {
+                    continue;
+                }
+                $visited[$cid] = true;
+                $result[] = $cid;
+                $queue[] = [$cid, $depth + 1];
+            }
+        }
+        return $result;
     }
 
     /**
@@ -265,17 +323,19 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
      * `metrics.types`. Standard: alle Aliases, alle Dimensionen, alle Typen.
      * Werte == 0 werden per `skip_zero=true` uebersprungen (Kompaktheit).
      *
+     * @param int[] $entityScope  Root + optional Descendants (rekursiv).
      * @return Fact[]
      */
-    protected function factsFromEntityLinkMetrics(int $entityId, array $cfg): array
+    protected function factsFromEntityLinkMetrics(int $rootEntityId, array $entityScope, array $cfg): array
     {
         $registry = $this->entityLinkRegistry();
         if (! $registry) {
             return [];
         }
 
-        // Alle DimensionLinks der Entity gruppiert nach linkable_type.
-        $linksByAlias = $this->linksByAliasForEntity($entityId);
+        // Alle DimensionLinks aller Scope-Entities, gruppiert nach linkable_type.
+        // Metrik-Werte werden am Root-Entity-Slot gebuendelt (Beer-mäßig aggregiert).
+        $linksByAlias = $this->linksByAliasForEntities($entityScope);
         if (empty($linksByAlias)) {
             return [];
         }
@@ -305,11 +365,12 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
             }
 
             try {
-                $metrics = $provider->metrics($alias, [$entityId => array_values($ids)]);
+                // Aggregation am Root-Entity-Slot: alle Sub-Baum-Links wandern in einen einzigen Bag.
+                $metrics = $provider->metrics($alias, [$rootEntityId => array_values($ids)]);
             } catch (\Throwable $e) {
                 continue; // Provider-Fehler killt den Pulse-Bericht nicht.
             }
-            $values = $metrics[$entityId] ?? [];
+            $values = $metrics[$rootEntityId] ?? [];
             if (empty($values)) {
                 continue;
             }
@@ -353,23 +414,29 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
     }
 
     /**
-     * @return array<string, int[]>  morph-Alias → [linkable_id, ...]
+     * @param int[] $entityIds
+     * @return array<string, int[]>  morph-Alias → [linkable_id, ...] (dedupliziert ueber Baum).
      */
-    protected function linksByAliasForEntity(int $entityId): array
+    protected function linksByAliasForEntities(array $entityIds): array
     {
-        if (! \Schema::hasTable('organization_dimension_links')
+        if (empty($entityIds)
+            || ! \Schema::hasTable('organization_dimension_links')
             || ! \Schema::hasTable('organization_dimension_values')) {
             return [];
         }
         $rows = DB::table('organization_dimension_links as l')
             ->join('organization_dimension_values as v', 'v.id', '=', 'l.dimension_value_id')
-            ->where('v.metadata->source_entity_id', $entityId)
+            ->whereIn(DB::raw("CAST(JSON_UNQUOTE(JSON_EXTRACT(v.metadata, '$.source_entity_id')) AS UNSIGNED)"), $entityIds)
             ->select('l.linkable_type', 'l.linkable_id')
             ->distinct()
             ->get();
         $out = [];
         foreach ($rows as $row) {
             $out[$row->linkable_type][] = (int) $row->linkable_id;
+        }
+        // Deduplizieren pro Alias (falls dieselbe ID von mehreren Sub-Entities gefunden wird).
+        foreach ($out as $alias => $ids) {
+            $out[$alias] = array_values(array_unique($ids));
         }
         return $out;
     }
