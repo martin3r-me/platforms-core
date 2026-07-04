@@ -50,10 +50,18 @@ class Verbalizer
         $llm = $this->resolveProvider($providerKey, $recipe);
         $effectiveModel = $modelOverride ?? $recipe?->llmModel();
 
+        // Recipe-Nature-Filter: der Sammler liefert alles, was er hat. Erst hier
+        // filtern wir auf die von der Recipe erlaubten Fact-Naturen (state/movement/
+        // derivation). Damit werden Rezepte wie change_ticker (nur movement+derivation)
+        // oder state_only (nur state) zu reinen Konfigurations-Umschaltungen.
+        $subjectForRender = $recipe
+            ? $subject->withFilteredFacts(fn ($f) => $recipe->includesNature($f->nature))
+            : $subject;
+
         $template = $this->templates->resolve($subject->type);
         $factSheet = $template
-            ? $template->renderFactSheet($subject)
-            : $this->renderGenericFactSheet($subject);
+            ? $template->renderFactSheet($subjectForRender)
+            : $this->renderGenericFactSheet($subjectForRender);
 
         $systemPrompt = $this->buildSystemPrompt($style, $rails);
         $userPrompt = $this->buildUserPrompt($factSheet, $style);

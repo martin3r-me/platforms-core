@@ -40,6 +40,11 @@ class UpdateRecipeTool implements ToolContract, ToolMetadataContract
                 'style' => ['type' => 'object'],
                 'guards' => ['type' => 'object'],
                 'llm' => ['type' => 'object', 'description' => 'LLM-Praeferenz {"provider": "...", "model": "..."}. null loescht die Praeferenz und faellt auf Config-Default zurueck.'],
+                'include_natures' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string', 'enum' => ['state', 'movement', 'derivation']],
+                    'description' => 'Fact-Naturen-Filter. null/leer = alle Naturen zugelassen.',
+                ],
                 'freshness_requirement' => ['type' => 'string', 'enum' => ['live', 'snapshot', 'snapshot_with_live_topup']],
                 'is_active' => ['type' => 'boolean'],
             ],
@@ -72,7 +77,7 @@ class UpdateRecipeTool implements ToolContract, ToolMetadataContract
             return ToolResult::error('RECIPE_NOT_FOUND', 'Recipe nicht gefunden. Gib id oder key+scope an.');
         }
 
-        foreach (['name', 'description', 'sources', 'style', 'guards', 'llm', 'freshness_requirement', 'is_active'] as $field) {
+        foreach (['name', 'description', 'sources', 'style', 'guards', 'llm', 'include_natures', 'freshness_requirement', 'is_active'] as $field) {
             if (array_key_exists($field, $arguments)) {
                 $recipe->{$field} = $arguments[$field];
             }

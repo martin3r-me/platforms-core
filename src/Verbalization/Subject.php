@@ -60,7 +60,7 @@ final class Subject
                 'short' => $this->identity->shortLabel,
             ],
             'facts' => collect($this->facts)
-                ->map(fn ($f) => $f->priority->value . '|' . $f->text)
+                ->map(fn ($f) => $f->priority->value . '|' . $f->nature->value . '|' . $f->text)
                 ->sort()
                 ->values()
                 ->all(),
@@ -79,5 +79,27 @@ final class Subject
                 ->all(),
         ];
         return hash('sha256', json_encode($parts, JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * Liefert eine Kopie des Subjects mit gefilterten Facts. Andere Felder bleiben
+     * gleich (Identity/Edges/Freshness). Wird vom Verbalizer genutzt, um Recipe-Filter
+     * (z.B. include_natures) vor dem Rendering anzuwenden — der Collector selbst sammelt
+     * immer alles, was er hat.
+     */
+    public function withFilteredFacts(callable $keep): self
+    {
+        return new self(
+            kind: $this->kind,
+            type: $this->type,
+            id: $this->id,
+            identity: $this->identity,
+            facts: array_values(array_filter($this->facts, $keep)),
+            edges: $this->edges,
+            freshness: $this->freshness,
+            movement: $this->movement,
+            children: $this->children,
+            meta: $this->meta,
+        );
     }
 }

@@ -51,6 +51,11 @@ class CreateRecipeTool implements ToolContract, ToolMetadataContract
                     'type' => 'object',
                     'description' => 'Optional: LLM-Praeferenz {"provider": "openai|anthropic|...", "model": "..."}. Beide Felder optional. Feed-Override sticht Recipe, Recipe sticht Config-Default.',
                 ],
+                'include_natures' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string', 'enum' => ['state', 'movement', 'derivation']],
+                    'description' => 'Optional: Fact-Naturen, die in die Prosa fliessen sollen. null/leer = alle. Beispiele: ["state"] fuer reinen Zustandsbericht (Wall-Display), ["movement","derivation"] fuer Change-Ticker, ["state","movement","derivation"] fuer Hybrid.',
+                ],
                 'freshness_requirement' => [
                     'type' => 'string',
                     'enum' => ['live', 'snapshot', 'snapshot_with_live_topup'],
@@ -113,6 +118,7 @@ class CreateRecipeTool implements ToolContract, ToolMetadataContract
             'style' => $style,
             'guards' => $arguments['guards'] ?? null,
             'llm' => $arguments['llm'] ?? null,
+            'include_natures' => $arguments['include_natures'] ?? null,
             'freshness_requirement' => $arguments['freshness_requirement'] ?? null,
             'team_id' => $teamId,
             'is_active' => $arguments['is_active'] ?? true,

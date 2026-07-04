@@ -3,6 +3,7 @@
 namespace Platform\Core\Verbalization\Recipe;
 
 use Platform\Core\Models\VerbalizationRecipe;
+use Platform\Core\Verbalization\Enums\FactNature;
 
 /**
  * Recipe als Read-Only-DTO.
@@ -26,6 +27,7 @@ final class CollectionRecipe
         public readonly array $style,
         public readonly ?array $guards,
         public readonly ?array $llm,
+        public readonly ?array $includeNatures,
         public readonly ?string $freshnessRequirement,
         public readonly ?int $teamId,
     ) {}
@@ -41,9 +43,22 @@ final class CollectionRecipe
             style: $m->style ?? [],
             guards: $m->guards,
             llm: $m->llm,
+            includeNatures: $m->include_natures,
             freshnessRequirement: $m->freshness_requirement,
             teamId: $m->team_id,
         );
+    }
+
+    /**
+     * Prueft, ob eine Fact-Nature laut Recipe zugelassen ist. Wenn includeNatures
+     * leer/null ist, sind alle Naturen zugelassen (Standard).
+     */
+    public function includesNature(FactNature $nature): bool
+    {
+        if (empty($this->includeNatures)) {
+            return true;
+        }
+        return in_array($nature->value, $this->includeNatures, true);
     }
 
     /**

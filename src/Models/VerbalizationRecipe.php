@@ -28,6 +28,7 @@ class VerbalizationRecipe extends Model
         'style',
         'guards',
         'llm',
+        'include_natures',
         'freshness_requirement',
         'team_id',
         'is_active',
@@ -39,6 +40,7 @@ class VerbalizationRecipe extends Model
         'style' => 'array',
         'guards' => 'array',
         'llm' => 'array',
+        'include_natures' => 'array',
         'is_active' => 'boolean',
     ];
 
