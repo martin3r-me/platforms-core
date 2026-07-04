@@ -17,7 +17,7 @@ class RefreshFeedTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'REFRESH /verbalization/feeds/{id} - Triggert die Verbalisierung aller Feed-Subjects (manueller Refresh). Loest Subjects auf, ruft Verbalizer pro Subject, persistiert Outputs. Gibt Anzahl der erzeugten Outputs + Fehler zurueck. Vorsicht: kostet Tokens — pro Subject ~1500-2500.';
+        return 'REFRESH /verbalization/feeds/{id} - Triggert die Verbalisierung aller Feed-Subjects (manueller Refresh). Loest Subjects auf, ruft Verbalizer pro Subject, persistiert Outputs. Gibt Anzahl der erzeugten Outputs + Fehler zurueck. Vorsicht: kostet Tokens — pro Subject ~1500-2500. Mit force=true wird die state_hash-Dedup uebergangen (fuer Template/Prompt-Aenderungen ohne State-Delta).';
     }
 
     public function getSchema(): array
@@ -28,6 +28,7 @@ class RefreshFeedTool implements ToolContract, ToolMetadataContract
                 'id' => ['type' => 'integer'],
                 'uuid' => ['type' => 'string'],
                 'inject_semantic_layer' => ['type' => 'boolean', 'description' => 'Default true — Semantic Layer aus Team-Kontext in den System-Prompt mergen.'],
+                'force' => ['type' => 'boolean', 'description' => 'Default false. Uebergeht die state_hash-Dedup — nutzen wenn sich Template/Prompt geaendert hat, aber der State gleich geblieben ist.'],
             ],
         ];
     }
@@ -66,7 +67,7 @@ class RefreshFeedTool implements ToolContract, ToolMetadataContract
 
         /** @var FeedService $service */
         $service = app(FeedService::class);
-        $result = $service->refresh($feed, $style);
+        $result = $service->refresh($feed, $style, (bool) ($arguments['force'] ?? false));
 
         return ToolResult::success(array_merge($result, [
             'feed_id' => $feed->id,

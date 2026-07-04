@@ -157,7 +157,7 @@ class FeedService
      *
      * @return array{outputs_created:int, skipped_no_change:int, subjects_resolved:int, errors:array}
      */
-    public function refresh(VerbalizationFeed $feed, ?StyleProfile $baseStyle = null): array
+    public function refresh(VerbalizationFeed $feed, ?StyleProfile $baseStyle = null, bool $force = false): array
     {
         $subjects = $this->resolveSubjects($feed);
         $errors = [];
@@ -198,8 +198,10 @@ class FeedService
                 $stateHash = $subject->stateHash();
 
                 // Dedup: wenn der juengste Output denselben Hash hat, ueberspringen —
-                // kein Delta = kein neuer Output.
-                if ($lastOutput && $lastOutput->state_hash === $stateHash) {
+                // kein Delta = kein neuer Output. Mit $force wird der Skip uebergangen,
+                // z.B. wenn sich das Template oder Prompt geaendert hat (State gleich,
+                // aber Rendering anders).
+                if (! $force && $lastOutput && $lastOutput->state_hash === $stateHash) {
                     $skipped++;
                     continue;
                 }
