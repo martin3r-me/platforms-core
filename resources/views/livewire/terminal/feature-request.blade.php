@@ -8,24 +8,43 @@
         </div>
       @else
 
-        {{-- ── Target package: auto-resolved from the current module; the
-             picker only surfaces when nothing could be resolved. ── --}}
+        {{-- ── Target package: bound to the current module. No picker in the
+             normal case; if the module isn't mapped yet, pick once — it's
+             remembered. ── --}}
         @php($selectedPackage = collect($packageOptions)->firstWhere('id', $packageId))
-        @if($selectedPackage)
+        @if($selectedPackage && !$needsMapping)
           <div class="flex items-center gap-1.5 text-[11px] text-[var(--t-text-muted)]">
             <svg class="w-3.5 h-3.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" /></svg>
             <span>Package: <span class="text-[var(--t-text)] font-medium">{{ $selectedPackage['name'] }}</span></span>
             @if($autoResolved)
-              <span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[var(--t-accent)]/15 text-[var(--t-accent)]">aktuelles Modul</span>
+              <span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[var(--t-accent)]/15 text-[var(--t-accent)]">{{ $moduleKey ? 'Modul ' . $moduleKey : 'aktuell' }}</span>
             @endif
-            @if(count($packageOptions) > 1)
-              <button type="button" wire:click="changePackage"
-                      class="ml-auto text-[10px] text-[var(--t-text-muted)] hover:text-[var(--t-text)] underline decoration-dotted">
-                ändern
-              </button>
+            <button type="button" wire:click="changePackage"
+                    class="ml-auto text-[10px] text-[var(--t-text-muted)] hover:text-[var(--t-text)] underline decoration-dotted">
+              ändern
+            </button>
+          </div>
+        @elseif($needsMapping)
+          <div>
+            <h4 class="text-xs font-semibold text-[var(--t-text)] mb-1">Package für dieses Modul</h4>
+            <p class="text-[11px] text-[var(--t-text-muted)] mb-2">
+              Modul <span class="text-[var(--t-text)] font-medium">{{ $moduleKey }}</span> ist noch keinem Dev-Package zugeordnet. Einmal wählen — wird gemerkt.
+            </p>
+            @if(empty($packageOptions))
+              <p class="text-[11px] text-[var(--t-text-muted)]">Keine Dev-Packages in diesem Team. Erst eins im Dev-Modul anlegen.</p>
+            @else
+              <div class="flex flex-wrap gap-1.5">
+                @foreach($packageOptions as $opt)
+                  <button type="button" wire:click="chooseAndMap({{ $opt['id'] }})"
+                          class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border border-[var(--t-border)]/40 text-[var(--t-text)] hover:bg-white/[0.06] transition">
+                    {{ $opt['name'] }}
+                  </button>
+                @endforeach
+              </div>
             @endif
           </div>
         @else
+          {{-- No module context — plain one-off picker (not persisted). --}}
           <div>
             <h4 class="text-xs font-semibold text-[var(--t-text)] mb-2">Package</h4>
             @if(empty($packageOptions))

@@ -10,6 +10,10 @@ use Platform\Core\Livewire\Terminal\Concerns\WithTerminalContext;
  * of the module they are currently in. Talks to the dev module in-process via
  * DevFeatureRequestService, guarded so core degrades gracefully if the dev
  * module is not installed.
+ *
+ * Coupling stays loose: the only contract with dev is the module key string
+ * (which core already tracks in the session) passed through a guarded service
+ * call — no compile-time reference to dev classes.
  */
 class FeatureRequest extends Component
 {
@@ -26,6 +30,7 @@ class FeatureRequest extends Component
     /** @var array<int, array{id:int,name:string}> */
     public array $packageOptions = [];
     public bool $autoResolved = false;
+    public bool $needsMapping = false;
     public ?string $moduleKey = null;
     public bool $devAvailable = true;
 
@@ -53,13 +58,43 @@ class FeatureRequest extends Component
             ->values()
             ->all();
 
-        $matched = $service->resolvePackageByKey($teamId, $this->moduleKey);
+        $matched = $service->resolveForModule($teamId, $this->moduleKey);
 
         if ($matched) {
             $this->packageId = $matched->id;
             $this->autoResolved = true;
+        } elseif ($this->moduleKey) {
+            // Module is known but not mapped yet — ask once, then remember.
+            $this->needsMapping = true;
         } elseif (count($this->packageOptions) === 1) {
             $this->packageId = $this->packageOptions[0]['id'];
+        }
+    }
+
+    /**
+     * Pick a package for the current module and persist the mapping so it
+     * resolves automatically next time.
+     */
+    public function chooseAndMap(int $packageId): void
+    {
+        $this->packageId = $packageId;
+        $this->needsMapping = false;
+        $this->autoResolved = true;
+
+        if (!$this->devAvailable || !$this->moduleKey) {
+            return;
+        }
+
+        $teamId = $this->teamId();
+        $service = app(self::SERVICE);
+        $package = $service->packagesForTeam($teamId)->firstWhere('id', $packageId);
+
+        if ($package) {
+            $service->mapModule($package, $this->moduleKey);
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => "Modul „{$this->moduleKey}“ → {$package->name} gemerkt.",
+            ]);
         }
     }
 
@@ -67,6 +102,8 @@ class FeatureRequest extends Component
     {
         $this->autoResolved = false;
         $this->packageId = null;
+        // If we know the module, re-run the (remembered) mapping step.
+        $this->needsMapping = (bool) $this->moduleKey;
     }
 
     public function submit(): void
