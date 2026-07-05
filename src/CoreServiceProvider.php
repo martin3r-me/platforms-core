@@ -222,6 +222,7 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Console\Commands\SyncAiModelsCommand::class,
                 \Platform\Core\Console\Commands\ListToolsCommand::class,
                 \Platform\Core\Console\Commands\RefreshVerbalizationFeedsCommand::class,
+                \Platform\Core\Console\Commands\PruneStaleModulesCommand::class,
                 \Platform\Core\Console\Commands\TestToolOrchestrationCommand::class,
                 \Platform\Core\Console\Commands\MakeToolCommand::class,
                 \Platform\Core\Console\Commands\AutoFillExtraFieldsCommand::class,
