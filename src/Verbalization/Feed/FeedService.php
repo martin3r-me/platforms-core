@@ -236,15 +236,20 @@ class FeedService
                     continue;
                 }
 
-                // Zuerst den juengsten Output holen — dessen created_at ist der "since"-Zeitpunkt
-                // fuer Bewegungs-Facts. Damit weiss der Sammler: "was hat sich seit dem letzten
-                // Bericht getan?"
+                // Zuerst den juengsten Output holen — dessen created_at ist der Fallback-
+                // "since"-Zeitpunkt (bisheriges Verhalten). Wenn die Recipe ein
+                // sinceWindow deklariert (z.B. "7d"), gewinnt das: der Sammler bekommt
+                // dann konsequent now()-N Tage, unabhaengig vom letzten Refresh. Damit
+                // sind Wochen-/Tages-/Monats-Berichte semantisch klar.
                 $lastOutput = VerbalizationOutput::where('feed_id', $feed->id)
                     ->where('subject_type', $s['type'])
                     ->where('subject_id', (string) $s['id'])
                     ->orderByDesc('created_at')
                     ->first();
-                $since = $lastOutput?->created_at;
+                $windowDays = $recipe->sinceWindowDays();
+                $since = $windowDays > 0
+                    ? now()->subDays($windowDays)
+                    : $lastOutput?->created_at;
 
                 $subject = $collector->collectState($s['id'], $recipe, $since);
                 $stateHash = $subject->stateHash();
@@ -282,6 +287,23 @@ class FeedService
                     'team_id' => $feed->team_id,
                 ]);
                 $created++;
+
+                // Baseline-Snapshot: sobald der Collector einen Metric-Bag im
+                // Subject.meta mitliefert, wird der aktuelle Stand persistiert.
+                // Damit hat der naechste Refresh eine echte Vergleichsbasis.
+                $metricsBag = $subject->meta['metrics_bag'] ?? null;
+                if (is_array($metricsBag) && ! empty($metricsBag)) {
+                    try {
+                        app(\Platform\Core\Verbalization\Baseline\BaselineService::class)
+                            ->snapshot($subject->type, (string) $subject->id, $metricsBag);
+                    } catch (\Throwable $e) {
+                        Log::warning('[FeedService] baseline snapshot failed', [
+                            'feed_id' => $feed->id,
+                            'subject' => $subject->type . '#' . $subject->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
 
                 // Push-Kanaele bedienen — Obsidian schreibt eine MD-Datei, Email
                 // versendet, Slack pusht ins Webhook. Renderer-Ausfaelle einzelner

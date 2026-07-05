@@ -45,6 +45,7 @@ class UpdateRecipeTool implements ToolContract, ToolMetadataContract
                     'items' => ['type' => 'string', 'enum' => ['state', 'movement', 'derivation']],
                     'description' => 'Fact-Naturen-Filter. null/leer = alle Naturen zugelassen.',
                 ],
+                'since_window' => ['type' => 'string', 'description' => 'Zeitfenster ("7d"/"1w"/"30d"/"1m"/"1y"). null = Fallback letzter Output.'],
                 'freshness_requirement' => ['type' => 'string', 'enum' => ['live', 'snapshot', 'snapshot_with_live_topup']],
                 'is_active' => ['type' => 'boolean'],
             ],
@@ -77,7 +78,7 @@ class UpdateRecipeTool implements ToolContract, ToolMetadataContract
             return ToolResult::error('RECIPE_NOT_FOUND', 'Recipe nicht gefunden. Gib id oder key+scope an.');
         }
 
-        foreach (['name', 'description', 'sources', 'style', 'guards', 'llm', 'include_natures', 'freshness_requirement', 'is_active'] as $field) {
+        foreach (['name', 'description', 'sources', 'style', 'guards', 'llm', 'include_natures', 'since_window', 'freshness_requirement', 'is_active'] as $field) {
             if (array_key_exists($field, $arguments)) {
                 $recipe->{$field} = $arguments[$field];
             }

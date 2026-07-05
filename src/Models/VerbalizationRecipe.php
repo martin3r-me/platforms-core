@@ -29,6 +29,7 @@ class VerbalizationRecipe extends Model
         'guards',
         'llm',
         'include_natures',
+        'since_window',
         'freshness_requirement',
         'team_id',
         'is_active',

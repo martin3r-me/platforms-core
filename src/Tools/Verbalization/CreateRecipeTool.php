@@ -56,6 +56,10 @@ class CreateRecipeTool implements ToolContract, ToolMetadataContract
                     'items' => ['type' => 'string', 'enum' => ['state', 'movement', 'derivation']],
                     'description' => 'Optional: Fact-Naturen, die in die Prosa fliessen sollen. null/leer = alle. Beispiele: ["state"] fuer reinen Zustandsbericht (Wall-Display), ["movement","derivation"] fuer Change-Ticker, ["state","movement","derivation"] fuer Hybrid.',
                 ],
+                'since_window' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Zeitfenster fuer "seit"-Berechnungen. Format "7d" / "1w" / "30d" / "1m" / "1y". Wenn gesetzt, greift der Collector konsequent now()-N Tage statt des letzten Outputs. Ohne Wert: Fallback = letzter Output. Fuer entity_pulse aktiviert es zusaetzlich Delta-Facts gegen die Baseline vor N Tagen.',
+                ],
                 'freshness_requirement' => [
                     'type' => 'string',
                     'enum' => ['live', 'snapshot', 'snapshot_with_live_topup'],
@@ -119,6 +123,7 @@ class CreateRecipeTool implements ToolContract, ToolMetadataContract
             'guards' => $arguments['guards'] ?? null,
             'llm' => $arguments['llm'] ?? null,
             'include_natures' => $arguments['include_natures'] ?? null,
+            'since_window' => $arguments['since_window'] ?? null,
             'freshness_requirement' => $arguments['freshness_requirement'] ?? null,
             'team_id' => $teamId,
             'is_active' => $arguments['is_active'] ?? true,

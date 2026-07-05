@@ -125,12 +125,25 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
         }
 
         // Registry-Metriken aggregieren (14+ Provider) — ueber das gesamte Entity-Scope.
+        // Liefert Facts UND den aggregierten Metric-Bag; letzterer wird fuer
+        // Delta-Facts (vs. Baseline) und den Snapshot nach dem Refresh gebraucht.
+        $metricsBag = [];
         if ($isOn('entity_link_providers')) {
-            $facts = array_merge($facts, $this->factsFromEntityLinkMetrics(
+            [$metricFacts, $metricsBag] = $this->collectMetricFacts(
                 $entityId,
                 $entityScope,
                 $cfg('entity_link_providers'),
-            ));
+            );
+            $facts = array_merge($facts, $metricFacts);
+        }
+
+        // Delta-Facts gegen Baseline — nur wenn die Recipe ein Fenster deklariert.
+        // Beispiel: Recipe mit since_window="7d" → Delta gegen den Snapshot vor 7 Tagen.
+        if ($recipe && $recipe->sinceWindowDays() > 0 && ! empty($metricsBag)) {
+            $facts = array_merge(
+                $facts,
+                $this->factsFromDelta((string) $entityId, $metricsBag, $recipe),
+            );
         }
 
         // Wenn nach Filter nichts uebrig: sag es ehrlich statt zu halluzinieren.
@@ -156,6 +169,11 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
             facts: $facts,
             edges: [],
             freshness: new Freshness(source: DataSource::LIVE, asOf: $now),
+            // Metric-Bag im meta mitliefern — der FeedService nutzt ihn nach dem
+            // erfolgreichen Output fuer BaselineService::snapshot().
+            meta: [
+                'metrics_bag' => $metricsBag,
+            ],
         );
     }
 
@@ -323,14 +341,27 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
      * `metrics.types`. Standard: alle Aliases, alle Dimensionen, alle Typen.
      * Werte == 0 werden per `skip_zero=true` uebersprungen (Kompaktheit).
      *
-     * @param int[] $entityScope  Root + optional Descendants (rekursiv).
-     * @return Fact[]
+     * Aggregiert Metriken pro Provider und liefert BOTH Facts UND den globalen
+     * Metric-Bag (Key → aggregierter Wert). Der Bag wird fuer Delta-Rechnung
+     * gegen die Baseline und fuer den nachfolgenden Snapshot gebraucht.
+     *
+     * @param int[] $entityScope
+     * @return array{0: Fact[], 1: array<string, float|int>}
+     */
+    protected function collectMetricFacts(int $rootEntityId, array $entityScope, array $cfg): array
+    {
+        return $this->factsFromEntityLinkMetrics($rootEntityId, $entityScope, $cfg);
+    }
+
+    /**
+     * @param int[] $entityScope
+     * @return array{0: Fact[], 1: array<string, float|int>}
      */
     protected function factsFromEntityLinkMetrics(int $rootEntityId, array $entityScope, array $cfg): array
     {
         $registry = $this->entityLinkRegistry();
         if (! $registry) {
-            return [];
+            return [[], []];
         }
 
         // Links pro Alias, aufgeschluesselt nach Entity — damit der Provider pro
@@ -338,7 +369,7 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
         // roll_up_function der Metric aggregieren (sum / avg / max / min).
         $linksByAliasAndEntity = $this->linksByAliasByEntityForEntities($entityScope);
         if (empty($linksByAliasAndEntity)) {
-            return [];
+            return [[], []];
         }
 
         $include = $cfg['include'] ?? null;
@@ -352,6 +383,7 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
         $linkTypeConfig = $this->safeLinkTypeConfig($registry);
 
         $facts = [];
+        $bag = [];
         foreach ($linksByAliasAndEntity as $alias => $idsPerEntity) {
             if ($include !== null && ! in_array($alias, (array) $include, true)) {
                 continue;
@@ -386,6 +418,12 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
             $aliasLabel = $linkTypeConfig[$alias]['label'] ?? $alias;
 
             foreach ($rolledUp as $key => $value) {
+                // Bag befuellen — unabhaengig von skip_zero/Filter, damit Baseline
+                // vollstaendig snapshot-baar bleibt.
+                if (is_numeric($value)) {
+                    $bag[$alias . '.' . $key] = (float) $value;
+                }
+
                 if ($skipZero && (is_numeric($value) && (float) $value === 0.0)) {
                     continue;
                 }
@@ -409,7 +447,73 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
             }
         }
 
+        return [$facts, $bag];
+    }
+
+    /**
+     * Delta-Facts aus dem aktuellen Metric-Bag gegen die letzte Baseline.
+     * Nur Metriken mit signifikantem Delta (0.5% oder ganze Zaehler) fliessen ein.
+     *
+     * @param  array<string, float> $currentBag
+     * @return Fact[]
+     */
+    protected function factsFromDelta(string $subjectId, array $currentBag, CollectionRecipe $recipe): array
+    {
+        $days = $recipe->sinceWindowDays();
+        if ($days <= 0 || empty($currentBag)) {
+            return [];
+        }
+
+        try {
+            /** @var \Platform\Core\Verbalization\Baseline\BaselineService $svc */
+            $svc = app(\Platform\Core\Verbalization\Baseline\BaselineService::class);
+            $deltas = $svc->deltaFor('entity_pulse', $subjectId, $days, $currentBag);
+        } catch (\Throwable $e) {
+            return [];
+        }
+        if (empty($deltas)) {
+            return [];
+        }
+
+        $window = $recipe->sinceWindow;
+        $facts = [];
+        foreach ($deltas as $key => $d) {
+            $delta = (float) $d['delta'];
+            $baseline = (float) $d['baseline'];
+            // Skip triviale Nullen und minimale Rauschbewegungen.
+            if ($delta === 0.0) {
+                continue;
+            }
+            if ($baseline != 0.0 && abs($delta) < 0.5 && abs($d['delta_pct'] ?? 0) < 0.5) {
+                continue;
+            }
+
+            $arrow = $delta > 0 ? '↑' : '↓';
+            $pct = $d['delta_pct'] !== null ? ' (' . sprintf('%+.1f', $d['delta_pct']) . ' %)' : '';
+            $facts[] = new Fact(
+                priority: FactPriority::CORE,
+                text: sprintf(
+                    'Delta %s (%s): %s %s → %s%s',
+                    $key,
+                    $window,
+                    $this->formatNumber($baseline),
+                    $arrow,
+                    $this->formatNumber((float) $d['current']),
+                    $pct,
+                ),
+                sourceCode: 'pulse:delta:' . $key,
+                nature: FactNature::MOVEMENT,
+            );
+        }
         return $facts;
+    }
+
+    protected function formatNumber(float $v): string
+    {
+        if ((float) (int) $v === $v) {
+            return (string) (int) $v;
+        }
+        return number_format($v, 1, ',', '.');
     }
 
     protected function entityLinkRegistry(): ?\Platform\Organization\Services\EntityLinkRegistry

@@ -28,6 +28,7 @@ final class CollectionRecipe
         public readonly ?array $guards,
         public readonly ?array $llm,
         public readonly ?array $includeNatures,
+        public readonly ?string $sinceWindow,
         public readonly ?string $freshnessRequirement,
         public readonly ?int $teamId,
     ) {}
@@ -44,9 +45,19 @@ final class CollectionRecipe
             guards: $m->guards,
             llm: $m->llm,
             includeNatures: $m->include_natures,
+            sinceWindow: $m->since_window,
             freshnessRequirement: $m->freshness_requirement,
             teamId: $m->team_id,
         );
+    }
+
+    /**
+     * Fenster in Tagen als int, aufgeloest aus sinceWindow ("7d"/"1w"/"30d"/"1m"/"1y").
+     * 0 wenn nicht gesetzt oder unparsebar.
+     */
+    public function sinceWindowDays(): int
+    {
+        return \Platform\Core\Verbalization\Baseline\BaselineService::parseWindowDays($this->sinceWindow);
     }
 
     /**
