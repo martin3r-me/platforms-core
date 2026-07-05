@@ -208,6 +208,17 @@
               <span class="hidden sm:inline">Tags</span>
             </button>
           @endif
+          <button
+            @click.stop="$wire.set('activeApp', 'feature-request'); if(!open) toggle()"
+            class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
+            :class="$wire.activeApp === 'feature-request'
+              ? 'bg-white/15 text-white'
+              : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5'"
+            title="Feature Request"
+          >
+            <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
+            <span class="hidden sm:inline">Feature</span>
+          </button>
           @if($this->availableApps['time'])
             <button
               @click.stop="$wire.set('activeApp', 'time'); if(!open) toggle()"
@@ -1236,6 +1247,19 @@
           <div x-show="$wire.activeApp === 'tags'" class="flex-1 min-h-0 flex flex-col">
             @if($this->availableApps['tags'] ?? false)
               <livewire:core.terminal.tags lazy wire:key="t-app-tags"
+                :context-type="$this->contextType"
+                :context-id="$this->contextId"
+                :context-subject="$this->contextSubject"
+                :context-source="$this->contextSource"
+                :context-url="$this->contextUrl"
+                :context-meta="$this->contextMeta" />
+            @endif
+          </div>
+
+          <!-- ═══ App: Feature Request ═══ -->
+          <div x-show="$wire.activeApp === 'feature-request'" class="flex-1 min-h-0 flex flex-col">
+            @if($this->availableApps['feature-request'] ?? false)
+              <livewire:core.terminal.feature-request lazy wire:key="t-app-feature-request"
                 :context-type="$this->contextType"
                 :context-id="$this->contextId"
                 :context-subject="$this->contextSubject"

@@ -52,7 +52,7 @@ class Terminal extends Component
     public ?int $channelId = null;
     public array $onlineUserIds = [];
     public string $activeApp = 'chat';
-    public array $availableApps = ['chat' => true, 'agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false];
+    public array $availableApps = ['chat' => true, 'agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false, 'feature-request' => true];
     // ── Comms App ────────────────────────────────────────────
     public bool $commsInitialized = false;
     public bool $commsShowNewMessage = false;  // overlay panel above timeline
@@ -215,7 +215,7 @@ class Terminal extends Component
 
         // Reset available apps when context changes
         if ($model !== $this->contextType || (int) $modelId !== $this->contextId) {
-            $this->availableApps = ['chat' => true, 'agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false];
+            $this->availableApps = ['chat' => true, 'agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false, 'feature-request' => true];
             $this->commsInitialized = false;
             $this->commsShowNewMessage = false;
             $this->commsShowSettings = false;
