@@ -83,7 +83,7 @@
             <input type="checkbox" wire:model="attachContext"
                    class="rounded border-[var(--t-border)]/40 bg-[var(--t-glass-surface)] text-[var(--t-accent)] focus:ring-[var(--t-accent)]" />
             <span class="text-[11px] text-[var(--t-text-muted)]">
-              Aktuellen Kontext anhängen@if($contextSubject) · {{ \Illuminate\Support\Str::limit($contextSubject, 40) }}@endif
+              Aktuellen Kontext anhängen{{ $contextSubject ? ' · ' . \Illuminate\Support\Str::limit($contextSubject, 40) : '' }}
             </span>
           </label>
         @endif
