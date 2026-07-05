@@ -353,6 +353,7 @@ class CoreServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Core\Verbalization\Channel\ObsidianChannelRenderer(
                 $app->make(\Platform\Core\Services\ObsidianStorageService::class),
             ));
+            $registry->register(new \Platform\Core\Verbalization\Channel\WebChannelRenderer());
             return $registry;
         });
 
