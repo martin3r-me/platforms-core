@@ -387,6 +387,9 @@ class CoreServiceProvider extends ServiceProvider
             return new NullCounterKeyResultSyncer();
         });
 
+        // KR-Metrik-Registry: Module registrieren ihre KeyResultMetricProvider im Boot.
+        $this->app->singleton(\Platform\Core\Services\KeyResultMetricRegistry::class);
+
         // Auth Policy Config einbinden und Service binden
         $this->mergeConfigFrom(__DIR__.'/../config/auth-policy.php', 'auth-policy');
         $this->app->singleton(AuthAccessPolicy::class, function () {
