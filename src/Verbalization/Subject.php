@@ -60,7 +60,10 @@ final class Subject
                 'short' => $this->identity->shortLabel,
             ],
             'facts' => collect($this->facts)
-                ->map(fn ($f) => $f->priority->value . '|' . $f->nature->value . '|' . $f->text)
+                // hashSignature() nimmt hashKey vor text — Facts mit zeit-driftigen
+                // Formulierungen (z.B. "vor 5 Tagen") liefern eine stabile Signatur,
+                // damit der Dedup nicht durch reine Zeit-Verstreichung ausgehebelt wird.
+                ->map(fn ($f) => $f->priority->value . '|' . $f->nature->value . '|' . $f->hashSignature())
                 ->sort()
                 ->values()
                 ->all(),
