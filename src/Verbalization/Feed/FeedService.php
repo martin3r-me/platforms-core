@@ -263,6 +263,25 @@ class FeedService
                     continue;
                 }
 
+                // Movement-Gate: wenn Recipe.sources.skip_if_no_movement true ist und
+                // KEIN einziger MOVEMENT-Fact im Subject entstanden ist, kein Bericht.
+                // Semantik: "sag nur was, wenn was passiert ist". Wirkt auch bei
+                // Snapshot-Drift, die den state_hash minimal aendert obwohl inhaltlich
+                // nichts Neues zu sagen waere.
+                if (! $force && (bool) ($recipe->sources['skip_if_no_movement'] ?? false)) {
+                    $hasMovement = false;
+                    foreach ($subject->facts as $f) {
+                        if ($f->nature === \Platform\Core\Verbalization\Enums\FactNature::MOVEMENT) {
+                            $hasMovement = true;
+                            break;
+                        }
+                    }
+                    if (! $hasMovement) {
+                        $skipped++;
+                        continue;
+                    }
+                }
+
                 $result = $this->verbalizer->verbalize(
                     subject: $subject,
                     style: $baseStyle ?? StyleProfile::formal(),
