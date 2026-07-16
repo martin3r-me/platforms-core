@@ -310,7 +310,7 @@
                                     class="w-full text-left px-6 sm:px-8 py-5 flex items-center justify-between hover:bg-gray-50 transition">
                                 <div>
                                     <h3 class="text-base font-semibold text-gray-900">Weitere Angaben (optional)</h3>
-                                    <p class="text-sm text-gray-400 mt-0.5">Diese kannst du gerne machen — sie sind freiwillig.</p>
+                                    <p class="text-sm text-gray-400 mt-0.5">{{ $duzen ? 'Diese kannst du gerne machen — sie sind freiwillig.' : 'Diese können Sie gerne machen — sie sind freiwillig.' }}</p>
                                     @if($optionalTotal > 0)
                                         <div class="mt-2 inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-gray-50 text-xs text-gray-500">
                                             {{ $optionalFilled }}/{{ $optionalTotal }} ausgefüllt
@@ -348,7 +348,7 @@
                     <div class="bg-white rounded-3xl border border-black/[0.06] shadow-2xl p-6 sm:p-8">
                         <div class="mb-8">
                             <h2 class="text-xl font-bold text-gray-900 mb-1">Offene Felder</h2>
-                            <p class="text-sm text-gray-400">Bitte füllen Sie die folgenden Felder aus.</p>
+                            <p class="text-sm text-gray-400">{{ $duzen ? 'Bitte füll die folgenden Felder aus.' : 'Bitte füllen Sie die folgenden Felder aus.' }}</p>
                         </div>
                         @include('platform::livewire.public._public-extra-field-form-loop', ['renderBlock' => null])
 
@@ -385,7 +385,7 @@
                     </svg>
                 </div>
                 <h1 class="text-2xl font-bold text-gray-900 mb-3">Gespeichert!</h1>
-                <p class="text-gray-500 text-lg mb-2">Ihre Angaben wurden erfolgreich gespeichert.</p>
+                <p class="text-gray-500 text-lg mb-2">{{ $duzen ? 'Deine Angaben wurden erfolgreich gespeichert.' : 'Ihre Angaben wurden erfolgreich gespeichert.' }}</p>
 
                 @if($totalFields > 0)
                     <div class="mt-6 mb-6">
@@ -430,7 +430,7 @@
                     </svg>
                 </div>
                 <h1 class="text-2xl font-bold text-gray-900 mb-3">Alles erledigt!</h1>
-                <p class="text-gray-500 text-lg">Vielen Dank! Alle Felder sind ausgefüllt. Sie können diese Seite jetzt schließen.</p>
+                <p class="text-gray-500 text-lg">{{ $duzen ? 'Vielen Dank! Alle Felder sind ausgefüllt. Du kannst diese Seite jetzt schließen.' : 'Vielen Dank! Alle Felder sind ausgefüllt. Sie können diese Seite jetzt schließen.' }}</p>
 
                 {{-- Modul-Hook: optionales Snippet (z.B. Recruiting Schulungs-Bestaetigung) --}}
                 @php $completionExtras = $this->getCompletionExtras(); @endphp

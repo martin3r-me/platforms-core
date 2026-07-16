@@ -66,6 +66,13 @@ class PublicExtraFieldForm extends Component
     public bool $useAccordionLayout = false;
 
     /**
+     * True wenn das Linkable-Modell informelle Anrede (Duzen) opted-in hat.
+     * Steuert die Sie/du-Variante der statischen Blade-Texte. Ohne Opt-in
+     * (Modelle anderer Module) bleibt es beim Default Sie.
+     */
+    public bool $duzen = false;
+
+    /**
      * Phase-Order des aktuellen Modells (fuer required_in_phase_orders).
      * Wird in der Render-Logik fuers Pflicht-Sternchen genutzt.
      */
@@ -156,6 +163,7 @@ class PublicExtraFieldForm extends Component
         $this->allFieldValues = $this->extraFieldValues;
 
         $this->useAccordionLayout = $this->usesAccordionLayout($model);
+        $this->duzen = $this->usesInformalAddress($model);
         $this->currentPhaseOrder = $this->resolveCurrentPhaseOrder($model);
         $useAccordion = $this->useAccordionLayout;
         $currentPhaseOrder = $this->currentPhaseOrder;
@@ -372,6 +380,22 @@ class PublicExtraFieldForm extends Component
             return false;
         }
         return (bool) $model->usesAccordionFormLayout();
+    }
+
+    /**
+     * Informelle Anrede (Duzen) — selbes Opt-In-Muster wie das Akkordeon-
+     * Layout: Recruiting-Modelle liefern usesInformalAddress() aus dem
+     * Team-Setting, Modelle anderer Module ohne die Methode bleiben Sie.
+     */
+    protected function usesInformalAddress($model): bool
+    {
+        if (!$model) {
+            return false;
+        }
+        if (!method_exists($model, 'usesInformalAddress')) {
+            return false;
+        }
+        return (bool) $model->usesInformalAddress();
     }
 
     /**
