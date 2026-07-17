@@ -478,6 +478,15 @@ class CoreServiceProvider extends ServiceProvider
         // Contact Resolution Registry (für CRM, HCM, etc.)
         $this->app->singleton(\Platform\Core\Services\Comms\ContactResolverRegistry::class);
 
+        // Audience-Auflösung (Ziel → User-IDs). Module registrieren eigene Resolver
+        // (z.B. Organisation: 'org_entity'); eingebaut sind 'user' und 'team'.
+        $this->app->singleton(\Platform\Core\Registry\AudienceResolverRegistry::class, function () {
+            $registry = new \Platform\Core\Registry\AudienceResolverRegistry();
+            $registry->register(new \Platform\Core\Services\Audience\UserAudienceResolver());
+            $registry->register(new \Platform\Core\Services\Audience\TeamAudienceResolver());
+            return $registry;
+        });
+
         // Tool Catalog Service (Top-250 per Team, hourly rebuilt)
         $this->app->singleton(\Platform\Core\Services\ToolCatalogService::class);
 
