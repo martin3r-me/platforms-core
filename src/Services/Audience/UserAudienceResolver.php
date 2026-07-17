@@ -2,8 +2,8 @@
 
 namespace Platform\Core\Services\Audience;
 
-use App\Models\User;
 use Platform\Core\Contracts\AudienceResolverInterface;
+use Platform\Core\Models\User;
 use Platform\Core\Models\Team;
 
 /** Ziel = eine einzelne Person. */
