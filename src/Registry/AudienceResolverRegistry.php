@@ -31,6 +31,26 @@ class AudienceResolverRegistry
     }
 
     /**
+     * Alle registrierten Ziel-Typen mit Label — für den Picker.
+     *
+     * @return array<int,array{type:string,label:string}>
+     */
+    public function types(): array
+    {
+        $out = [];
+        foreach ($this->resolvers as $type => $resolver) {
+            $out[] = ['type' => $type, 'label' => $resolver->typeLabel()];
+        }
+
+        return $out;
+    }
+
+    public function typeLabel(string $type): ?string
+    {
+        return isset($this->resolvers[$type]) ? $this->resolvers[$type]->typeLabel() : null;
+    }
+
+    /**
      * @param  array<string,mixed>  $options
      * @return array<int,int>  eindeutige User-IDs
      */
@@ -52,5 +72,17 @@ class AudienceResolverRegistry
         return isset($this->resolvers[$type])
             ? $this->resolvers[$type]->label($targetId, $teamId)
             : null;
+    }
+
+    /**
+     * Auswählbare Ziele eines Typs (für den Picker).
+     *
+     * @return array<int,array{id:int,label:string}>
+     */
+    public function options(string $type, ?int $teamId = null): array
+    {
+        return isset($this->resolvers[$type])
+            ? $this->resolvers[$type]->options($teamId)
+            : [];
     }
 }
