@@ -116,6 +116,13 @@ class CoreServiceProvider extends ServiceProvider
 
         // Teams SSO Routes laden
         $this->loadRoutesFrom(__DIR__.'/../routes/teams-sso.php');
+
+        // DAV-Server (CardDAV/CalDAV) – ohne Session-Guard, eigene HTTP-Basic-Auth.
+        // Default true: bei gecachter Config ohne publizierte dav.php greift der
+        // mergeConfigFrom nicht -> ohne Default würde die Route still verschwinden.
+        if (config('dav.enabled', true)) {
+            $this->loadRoutesFrom(__DIR__.'/../routes/dav.php');
+        }
         
         // Teams SSO Middleware registrieren
         $this->app->make(\Illuminate\Routing\Router::class)->aliasMiddleware(
@@ -301,6 +308,10 @@ class CoreServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/checkins.php', 'checkins');
         $this->mergeConfigFrom(__DIR__.'/../config/embeddings.php', 'embeddings');
         $this->mergeConfigFrom(__DIR__.'/../config/verbalization.php', 'verbalization');
+        $this->mergeConfigFrom(__DIR__.'/../config/dav.php', 'dav');
+
+        // DAV-Modul-Registry (CardDAV/CalDAV) – Module registrieren hier ihre Backends.
+        $this->app->singleton(\Platform\Core\Dav\DavModuleRegistry::class);
         // Agent-Config entfernt – Agent ausgelagert
 
         // Embedding-Infrastruktur (Provider + Store separat, austauschbar)
