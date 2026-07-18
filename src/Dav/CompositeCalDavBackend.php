@@ -117,17 +117,23 @@ class CompositeCalDavBackend extends AbstractBackend implements SyncSupport
 
     public function createCalendarObject($calendarId, $objectUri, $calendarData)
     {
-        throw new Forbidden('Der Kalender ist schreibgeschützt.');
+        [$backend, $innerId] = $this->route($calendarId);
+
+        return $backend->createCalendarObject($innerId, $objectUri, $calendarData);
     }
 
     public function updateCalendarObject($calendarId, $objectUri, $calendarData)
     {
-        throw new Forbidden('Der Kalender ist schreibgeschützt.');
+        [$backend, $innerId] = $this->route($calendarId);
+
+        return $backend->updateCalendarObject($innerId, $objectUri, $calendarData);
     }
 
     public function deleteCalendarObject($calendarId, $objectUri)
     {
-        throw new Forbidden('Der Kalender ist schreibgeschützt.');
+        [$backend, $innerId] = $this->route($calendarId);
+
+        $backend->deleteCalendarObject($innerId, $objectUri);
     }
 
     /**
