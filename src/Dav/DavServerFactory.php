@@ -54,6 +54,9 @@ class DavServerFactory
         if ($calBackends !== []) {
             $tree[] = new CalendarRoot($principalBackend, new CompositeCalDavBackend($calBackends, $context));
             $plugins[] = new CalDavPlugin();
+            // WebDAV-Sync (sync-collection) — Apple Erinnerungen zeigt VTODO-Listen
+            // nur mit sync-token an.
+            $plugins[] = new \Sabre\DAV\Sync\Plugin();
         }
 
         // CapturingSapi fängt den Output ab -> exec() im Controller liefert eine

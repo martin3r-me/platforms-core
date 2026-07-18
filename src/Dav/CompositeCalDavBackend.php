@@ -4,6 +4,7 @@ namespace Platform\Core\Dav;
 
 use Sabre\CalDAV\Backend\AbstractBackend;
 use Sabre\CalDAV\Backend\BackendInterface;
+use Sabre\CalDAV\Backend\SyncSupport;
 use Sabre\DAV\Exception\Forbidden;
 use Sabre\DAV\Exception\NotFound;
 use Sabre\DAV\PropPatch;
@@ -16,7 +17,7 @@ use Sabre\DAV\PropPatch;
  * Collection-IDs/URIs werden per Modul-Key genamespaced, damit sabre die Objekt-
  * Zugriffe an das richtige Modul-Backend routen kann. Siehe docs/dav-core-extraction.md.
  */
-class CompositeCalDavBackend extends AbstractBackend
+class CompositeCalDavBackend extends AbstractBackend implements SyncSupport
 {
     private const SEP = "\x1f"; // interner ID-Trenner (nicht URL-sichtbar)
 
@@ -81,6 +82,20 @@ class CompositeCalDavBackend extends AbstractBackend
         }
 
         return $object;
+    }
+
+    /**
+     * WebDAV-Sync (nötig für Apple Erinnerungen) — an das zuständige Modul routen.
+     */
+    public function getChangesForCalendar($calendarId, $syncToken, $syncLevel, $limit = null)
+    {
+        [$backend, $innerId] = $this->route($calendarId);
+
+        if (! $backend instanceof SyncSupport) {
+            return null;
+        }
+
+        return $backend->getChangesForCalendar($innerId, $syncToken, $syncLevel, $limit);
     }
 
     // ---- read-only -------------------------------------------------
