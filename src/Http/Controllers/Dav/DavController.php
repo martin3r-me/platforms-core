@@ -39,31 +39,9 @@ class DavController
         $server->exec();
 
         $sabreResponse = $server->httpResponse;
-        $body = $sabreResponse->getBodyAsString();
-
-        // TEMP-Diagnose: welche Requests fährt der Client (iOS/Erinnerungen)?
-        // Abrufbar über /dav-debug/{token}. Nach der iOS-Fehlersuche entfernen.
-        $line = sprintf(
-            "%s  %-9s %s -> %d | UA: %s",
-            now()->format('H:i:s'),
-            $request->getMethod(),
-            $request->getRequestUri(),
-            $sabreResponse->getStatus(),
-            (string) $request->userAgent(),
-        );
-        if (in_array($request->getMethod(), ['REPORT', 'PROPFIND', 'PROPPATCH'], true)) {
-            $line .= "\n   REQ: ".substr(preg_replace('/\s+/', ' ', (string) $request->getContent()), 0, 1400);
-            $line .= "\n   RES: ".substr(preg_replace('/\s+/', ' ', $body), 0, 1400);
-        }
-        \Illuminate\Support\Facades\Log::info('[DAV] '.$line);
-        $debugFile = storage_path('logs/dav-debug.log');
-        if (is_file($debugFile) && filesize($debugFile) > 800000) {
-            @file_put_contents($debugFile, '');
-        }
-        @file_put_contents($debugFile, $line."\n", FILE_APPEND | LOCK_EX);
 
         return response(
-            $body,
+            $sabreResponse->getBodyAsString(),
             $sabreResponse->getStatus(),
             $sabreResponse->getHeaders(),
         );
