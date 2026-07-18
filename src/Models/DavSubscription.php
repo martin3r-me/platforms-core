@@ -24,6 +24,7 @@ class DavSubscription extends Model
     protected $fillable = [
         'user_id',
         'team_id',
+        'handle',
         'module',
         'type',
         'resource_id',
@@ -53,6 +54,14 @@ class DavSubscription extends Model
                 } while (self::where('secret', $secret)->exists());
 
                 $model->secret = $secret;
+            }
+
+            if (empty($model->handle)) {
+                do {
+                    $handle = Str::random(16);
+                } while (self::where('handle', $handle)->exists());
+
+                $model->handle = $handle;
             }
         });
     }

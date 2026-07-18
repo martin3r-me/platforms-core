@@ -25,6 +25,7 @@ class TokenAuthBackend extends AbstractBasic
 
     public function __construct(
         private readonly DavContext $context,
+        private readonly ?string $expectedHandle = null,
     ) {
     }
 
@@ -34,10 +35,16 @@ class TokenAuthBackend extends AbstractBasic
             return false;
         }
 
-        $subscription = DavSubscription::query()
+        $query = DavSubscription::query()
             ->active()
-            ->where('secret', $password)
-            ->first();
+            ->where('secret', $password);
+
+        // Handle aus dem URL-Pfad muss zum Abo passen (jedes Abo = eigene URL).
+        if ($this->expectedHandle !== null) {
+            $query->where('handle', $this->expectedHandle);
+        }
+
+        $subscription = $query->first();
 
         if (! $subscription || ! $subscription->user) {
             return false;

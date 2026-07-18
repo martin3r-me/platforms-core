@@ -20,12 +20,13 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class DavController
 {
-    public function __invoke(Request $request): Response
+    public function __invoke(Request $request, string $handle): Response
     {
-        $path = trim((string) config('dav.path', 'crm/dav'), '/');
-        $baseUri = '/'.$path.'/';
+        $path = trim((string) config('dav.path', 'dav'), '/');
+        // Jedes Abo hat seine eigene URL: /dav/{handle}/… -> eigener iOS-Account.
+        $baseUri = '/'.$path.'/'.$handle.'/';
 
-        $server = app(DavServerFactory::class)->make($baseUri);
+        $server = app(DavServerFactory::class)->make($baseUri, $handle);
 
         $server->httpRequest = new SabreRequest(
             $request->getMethod(),

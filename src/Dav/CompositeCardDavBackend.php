@@ -24,7 +24,18 @@ class CompositeCardDavBackend extends AbstractBackend
      */
     public function __construct(
         private readonly array $backends,
+        private readonly DavContext $context,
     ) {
+    }
+
+    /**
+     * Ist ein Modul für das aktive Abo freigegeben? (module=null → alle).
+     */
+    private function allows(string $key): bool
+    {
+        $scope = $this->context->subscription()->module;
+
+        return $scope === null || $scope === $key;
     }
 
     public function getAddressBooksForUser($principalUri)
@@ -32,6 +43,10 @@ class CompositeCardDavBackend extends AbstractBackend
         $addressBooks = [];
 
         foreach ($this->backends as $key => $backend) {
+            if (! $this->allows($key)) {
+                continue;
+            }
+
             foreach ($backend->getAddressBooksForUser($principalUri) as $book) {
                 $book['id'] = $key.self::SEP.$book['id'];
                 $book['uri'] = $key.'-'.$book['uri'];
@@ -101,7 +116,7 @@ class CompositeCardDavBackend extends AbstractBackend
     private function route($addressBookId): array
     {
         $parts = explode(self::SEP, (string) $addressBookId, 2);
-        if (count($parts) !== 2 || ! isset($this->backends[$parts[0]])) {
+        if (count($parts) !== 2 || ! isset($this->backends[$parts[0]]) || ! $this->allows($parts[0])) {
             throw new NotFound('Adressbuch nicht gefunden.');
         }
 

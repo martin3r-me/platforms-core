@@ -26,10 +26,10 @@ class DavServerFactory
     ) {
     }
 
-    public function make(string $baseUri): Server
+    public function make(string $baseUri, ?string $handle = null): Server
     {
         $context = new DavContext();
-        $authBackend = new TokenAuthBackend($context);
+        $authBackend = new TokenAuthBackend($context, $handle);
         $principalBackend = new PrincipalBackend($context);
 
         // Modul-Backends nach Typ sammeln (Key => Backend).
@@ -47,12 +47,12 @@ class DavServerFactory
         $plugins = [];
 
         if ($cardBackends !== []) {
-            $tree[] = new AddressBookRoot($principalBackend, new CompositeCardDavBackend($cardBackends));
+            $tree[] = new AddressBookRoot($principalBackend, new CompositeCardDavBackend($cardBackends, $context));
             $plugins[] = new CardDavPlugin();
         }
 
         if ($calBackends !== []) {
-            $tree[] = new CalendarRoot($principalBackend, new CompositeCalDavBackend($calBackends));
+            $tree[] = new CalendarRoot($principalBackend, new CompositeCalDavBackend($calBackends, $context));
             $plugins[] = new CalDavPlugin();
         }
 

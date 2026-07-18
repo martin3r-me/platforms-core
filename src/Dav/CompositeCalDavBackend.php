@@ -25,7 +25,18 @@ class CompositeCalDavBackend extends AbstractBackend
      */
     public function __construct(
         private readonly array $backends,
+        private readonly DavContext $context,
     ) {
+    }
+
+    /**
+     * Ist ein Modul für das aktive Abo freigegeben? (module=null → alle).
+     */
+    private function allows(string $key): bool
+    {
+        $scope = $this->context->subscription()->module;
+
+        return $scope === null || $scope === $key;
     }
 
     public function getCalendarsForUser($principalUri)
@@ -33,6 +44,10 @@ class CompositeCalDavBackend extends AbstractBackend
         $calendars = [];
 
         foreach ($this->backends as $key => $backend) {
+            if (! $this->allows($key)) {
+                continue;
+            }
+
             foreach ($backend->getCalendarsForUser($principalUri) as $calendar) {
                 $calendar['id'] = $key.self::SEP.$calendar['id'];
                 $calendar['uri'] = $key.'-'.$calendar['uri'];
@@ -108,7 +123,7 @@ class CompositeCalDavBackend extends AbstractBackend
     private function route($calendarId): array
     {
         $parts = explode(self::SEP, (string) $calendarId, 2);
-        if (count($parts) !== 2 || ! isset($this->backends[$parts[0]])) {
+        if (count($parts) !== 2 || ! isset($this->backends[$parts[0]]) || ! $this->allows($parts[0])) {
             throw new NotFound('Kalender nicht gefunden.');
         }
 
