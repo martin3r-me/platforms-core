@@ -2,20 +2,22 @@
 
 namespace Platform\Core\Dav;
 
+use Sabre\CalDAV\CalendarRoot;
+use Sabre\CalDAV\Plugin as CalDavPlugin;
+use Sabre\CardDAV\AddressBookRoot;
+use Sabre\CardDAV\Plugin as CardDavPlugin;
 use Sabre\DAV\Auth\Plugin as AuthPlugin;
 use Sabre\DAV\Server;
 use Sabre\DAVACL\Plugin as AclPlugin;
 use Sabre\DAVACL\PrincipalCollection;
 
 /**
- * Baut einen konfigurierten, read-only DAV-`Server` aus allen registrierten
- * {@see \Platform\Core\Contracts\DavModuleInterface}-Modulen.
+ * Baut einen read-only DAV-`Server` aus allen registrierten Modulen.
  *
- * Auth-, Principal- und Modul-Backends teilen sich einen {@see DavContext}: die
- * Auth schreibt das Abo hinein, die Backends lesen es und scopen darüber (ein
- * carddav-Abo sieht nur Adressbücher, caldav-Collections bleiben leer usw.).
- *
- * Siehe modules/crm/docs/dav-core-extraction.md.
+ * Module werden pro Protokoll-Typ zusammengefasst: ALLE carddav-Module unter EINEM
+ * {@see CompositeCardDavBackend}/AddressBookRoot, ALLE caldav-Module unter EINEM
+ * {@see CompositeCalDavBackend}/CalendarRoot. So bedient ein einziger Account alle
+ * Listen aller Module. Siehe modules/crm/docs/dav-core-extraction.md.
  */
 class DavServerFactory
 {
@@ -30,16 +32,28 @@ class DavServerFactory
         $authBackend = new TokenAuthBackend($context);
         $principalBackend = new PrincipalBackend($context);
 
+        // Modul-Backends nach Typ sammeln (Key => Backend).
+        $cardBackends = [];
+        $calBackends = [];
+        foreach ($this->registry->all() as $module) {
+            if ($module->type() === 'carddav') {
+                $cardBackends[$module->key()] = $module->backend($context);
+            } elseif ($module->type() === 'caldav') {
+                $calBackends[$module->key()] = $module->backend($context);
+            }
+        }
+
         $tree = [new PrincipalCollection($principalBackend)];
         $plugins = [];
 
-        foreach ($this->registry->all() as $module) {
-            $tree[] = $module->rootNode($context, $principalBackend);
-            foreach ($module->plugins() as $plugin) {
-                // Nach Klasse deduplizieren (mehrere Module könnten dasselbe
-                // Protokoll-Plugin beisteuern, z. B. zwei CardDAV-Module).
-                $plugins[$plugin::class] = $plugin;
-            }
+        if ($cardBackends !== []) {
+            $tree[] = new AddressBookRoot($principalBackend, new CompositeCardDavBackend($cardBackends));
+            $plugins[] = new CardDavPlugin();
+        }
+
+        if ($calBackends !== []) {
+            $tree[] = new CalendarRoot($principalBackend, new CompositeCalDavBackend($calBackends));
+            $plugins[] = new CalDavPlugin();
         }
 
         // CapturingSapi fängt den Output ab -> exec() im Controller liefert eine

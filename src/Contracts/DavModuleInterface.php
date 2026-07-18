@@ -3,37 +3,33 @@
 namespace Platform\Core\Contracts;
 
 use Platform\Core\Dav\DavContext;
-use Platform\Core\Dav\PrincipalBackend;
-use Sabre\DAV\ICollection;
 
 /**
  * Ein Modul, das WebDAV-Collections über die Core-DAV-Infrastruktur bereitstellt
- * (z. B. CRM → CardDAV/Adressbücher, Planner → CalDAV/Aufgaben).
+ * (z. B. CRM → CardDAV/Adressbücher, Planner/Helpdesk → CalDAV/Aufgaben+Tickets).
  *
- * Module registrieren ihre Implementierung via {@see \Platform\Core\Dav\DavModuleRegistry}.
- * Der Core übernimmt Protokoll, Auth, Routing und Team-Kontext; das Modul liefert
- * nur den Wurzelknoten (welche Collections/Objekte) samt Sichtbarkeits-Scoping.
+ * Der Core aggregiert ALLE Module eines Typs unter EINEM Wurzelknoten (ein
+ * AddressBookRoot für alle carddav, ein CalendarRoot für alle caldav) — so zeigt
+ * ein einziger Account alle Listen aller Module. Das Modul liefert nur seinen
+ * Protokoll-Backend (welche Collections/Objekte, samt Sichtbarkeit).
  *
+ * Module registrieren sich via {@see \Platform\Core\Dav\DavModuleRegistry}.
  * Siehe modules/crm/docs/dav-core-extraction.md.
  */
 interface DavModuleInterface
 {
-    /** Modul-Diskriminator, muss zu DavSubscription.module passen (z. B. 'crm'). */
+    /** Modul-Diskriminator, dient als Namespace für Collection-IDs/URIs (z. B. 'crm'). */
     public function key(): string;
 
-    /** Protokoll-Typ, muss zu DavSubscription.type passen ('carddav' | 'caldav'). */
+    /** Protokoll-Typ: 'carddav' | 'caldav'. */
     public function type(): string;
 
     /**
-     * Der Wurzelknoten des Moduls (z. B. AddressBookRoot / CalendarRoot),
-     * verdrahtet mit dem Modul-eigenen Backend.
-     */
-    public function rootNode(DavContext $context, PrincipalBackend $principals): ICollection;
-
-    /**
-     * Protokoll-Plugins, die der Server braucht, z. B. [new \Sabre\CardDAV\Plugin()].
+     * Der Protokoll-Backend des Moduls:
+     * - type 'carddav' → \Sabre\CardDAV\Backend\BackendInterface
+     * - type 'caldav'  → \Sabre\CalDAV\Backend\BackendInterface
      *
-     * @return array<int, \Sabre\DAV\ServerPlugin>
+     * Bekommt den geteilten {@see DavContext} (enthält das authentifizierte Abo).
      */
-    public function plugins(): array;
+    public function backend(DavContext $context): object;
 }
