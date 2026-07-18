@@ -40,6 +40,16 @@ class DavController
 
         $sabreResponse = $server->httpResponse;
 
+        // TEMP-Diagnose: welche Requests fährt der Client (iOS/Erinnerungen)?
+        // Grep: [DAV] — nach Abschluss der iOS-Fehlersuche wieder entfernen.
+        \Illuminate\Support\Facades\Log::info(sprintf(
+            '[DAV] %s %s -> %d | UA: %s',
+            $request->getMethod(),
+            $request->getRequestUri(),
+            $sabreResponse->getStatus(),
+            (string) $request->userAgent(),
+        ));
+
         return response(
             $sabreResponse->getBodyAsString(),
             $sabreResponse->getStatus(),
