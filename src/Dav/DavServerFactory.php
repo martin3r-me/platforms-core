@@ -7,7 +7,10 @@ use Sabre\CalDAV\Plugin as CalDavPlugin;
 use Sabre\CardDAV\AddressBookRoot;
 use Sabre\CardDAV\Plugin as CardDavPlugin;
 use Sabre\DAV\Auth\Plugin as AuthPlugin;
+use Sabre\DAV\INode;
+use Sabre\DAV\PropFind;
 use Sabre\DAV\Server;
+use Sabre\DAV\Xml\Property\LocalHref;
 use Sabre\DAVACL\Plugin as AclPlugin;
 use Sabre\DAVACL\PrincipalCollection;
 
@@ -73,6 +76,27 @@ class DavServerFactory
         $aclPlugin = new AclPlugin();
         $aclPlugin->allowUnauthenticatedAccess = false;
         $server->addPlugin($aclPlugin);
+
+        // Apple Erinnerungen (remindd) PROPFINDet die eingegebene URL (= die Wurzel)
+        // und erwartet dort calendar-home-set direkt; es folgt current-user-principal
+        // NICHT weiter. Daher home-sets des authentifizierten Users an der Wurzel
+        // zurückgeben, damit Clients das calendar-/addressbook-home finden.
+        $hasCal = $calBackends !== [];
+        $hasCard = $cardBackends !== [];
+        $server->on('propFind', function (PropFind $propFind, INode $node) use ($context, $hasCal, $hasCard) {
+            if ($propFind->getPath() !== '' || ! $context->hasSubscription()) {
+                return;
+            }
+
+            $userId = $context->subscription()->user_id;
+
+            if ($hasCal) {
+                $propFind->set('{urn:ietf:params:xml:ns:caldav}calendar-home-set', new LocalHref('calendars/'.$userId.'/'), 200);
+            }
+            if ($hasCard) {
+                $propFind->set('{urn:ietf:params:xml:ns:carddav}addressbook-home-set', new LocalHref('addressbooks/'.$userId.'/'), 200);
+            }
+        });
 
         return $server;
     }
