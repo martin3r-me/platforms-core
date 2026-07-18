@@ -41,14 +41,21 @@ class DavController
         $sabreResponse = $server->httpResponse;
 
         // TEMP-Diagnose: welche Requests fährt der Client (iOS/Erinnerungen)?
-        // Grep: [DAV] — nach Abschluss der iOS-Fehlersuche wieder entfernen.
-        \Illuminate\Support\Facades\Log::info(sprintf(
-            '[DAV] %s %s -> %d | UA: %s',
+        // Abrufbar über /dav-debug/{token}. Nach der iOS-Fehlersuche entfernen.
+        $line = sprintf(
+            '%s  %-9s %s -> %d | UA: %s',
+            now()->format('H:i:s'),
             $request->getMethod(),
             $request->getRequestUri(),
             $sabreResponse->getStatus(),
             (string) $request->userAgent(),
-        ));
+        );
+        \Illuminate\Support\Facades\Log::info('[DAV] '.$line);
+        $debugFile = storage_path('logs/dav-debug.log');
+        if (is_file($debugFile) && filesize($debugFile) > 300000) {
+            @file_put_contents($debugFile, '');
+        }
+        @file_put_contents($debugFile, $line."\n", FILE_APPEND | LOCK_EX);
 
         return response(
             $sabreResponse->getBodyAsString(),
