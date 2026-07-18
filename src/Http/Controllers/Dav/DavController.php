@@ -39,9 +39,33 @@ class DavController
         $server->exec();
 
         $sabreResponse = $server->httpResponse;
+        $body = $sabreResponse->getBodyAsString();
+
+        // TEMP-Diagnose (Write-Back iOS/Mac): abrufbar über /dav-debug/{token}.
+        $line = sprintf(
+            "%s  %-9s %s -> %d | UA: %s | If-Match: %s",
+            now()->format('H:i:s'),
+            $request->getMethod(),
+            $request->getRequestUri(),
+            $sabreResponse->getStatus(),
+            (string) $request->userAgent(),
+            (string) ($request->header('If-Match') ?? '—'),
+        );
+        if (in_array($request->getMethod(), ['PUT', 'DELETE', 'REPORT', 'PROPPATCH'], true)) {
+            $line .= "\n   REQ: ".substr(preg_replace('/\s+/', ' ', (string) $request->getContent()), 0, 1200);
+            if ($sabreResponse->getStatus() >= 400) {
+                $line .= "\n   RES: ".substr(preg_replace('/\s+/', ' ', $body), 0, 600);
+            }
+        }
+        \Illuminate\Support\Facades\Log::info('[DAV] '.$line);
+        $debugFile = storage_path('logs/dav-debug.log');
+        if (is_file($debugFile) && filesize($debugFile) > 800000) {
+            @file_put_contents($debugFile, '');
+        }
+        @file_put_contents($debugFile, $line."\n", FILE_APPEND | LOCK_EX);
 
         return response(
-            $sabreResponse->getBodyAsString(),
+            $body,
             $sabreResponse->getStatus(),
             $sabreResponse->getHeaders(),
         );

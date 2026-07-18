@@ -21,3 +21,22 @@ Route::match($davMethods, $path.'/{handle}/{any?}', DavController::class)
     ->where('handle', '[A-Za-z0-9]+')
     ->where('any', '.*')
     ->name('core.dav');
+
+// TEMP-Diagnose (Write-Back): token-geschützter Zugriff auf die letzten DAV-Requests.
+Route::get('dav-debug/{token}', function (string $token) {
+    if (! hash_equals('z9Kq3Wp7Lm2Rt5xB', $token)) {
+        abort(404);
+    }
+    $file = storage_path('logs/dav-debug.log');
+    if (request()->boolean('clear')) {
+        @file_put_contents($file, '');
+
+        return response('cleared', 200, ['Content-Type' => 'text/plain']);
+    }
+
+    return response(
+        is_file($file) ? (file_get_contents($file) ?: '(leer)') : '(noch nichts)',
+        200,
+        ['Content-Type' => 'text/plain; charset=utf-8'],
+    );
+})->name('core.dav.debug');
