@@ -34,4 +34,12 @@ interface SeoSignalServiceInterface
      * @return array<int,array>  [source_id => Bündel]
      */
     public function getSignalsBySource(int $teamId, string $sourceModule, array $sourceIds): array;
+
+    /**
+     * Ein Signal (z.B. eine Empfehlung aus dem recommendations[]-Bündel) zentral
+     * als erledigt markieren — der Rückweg für Fremdmodule, die auf eine zentrale
+     * Empfehlung reagiert haben. Team-scoped. Gibt true zurück, wenn ein offenes
+     * Signal geschlossen wurde.
+     */
+    public function resolveSignal(int $teamId, int $signalId): bool;
 }

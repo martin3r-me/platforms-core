@@ -23,4 +23,9 @@ class NullSeoSignalService implements SeoSignalServiceInterface
     {
         return [];
     }
+
+    public function resolveSignal(int $teamId, int $signalId): bool
+    {
+        return false;
+    }
 }
