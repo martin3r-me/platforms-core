@@ -223,13 +223,14 @@ class SyncAiModelsCommand extends Command
                     'deprecated_at' => now(),
                 ]);
 
-            // Default model bootstrap: if none set yet, use gpt-5.2 when available.
+            // Default model bootstrap: if none set yet, prefer gpt-5.5, fall back to gpt-5.2.
             $provider->refresh();
             if (empty($provider->default_model_id)) {
                 $default = CoreAiModel::where('provider_id', $provider->id)
-                    ->where('model_id', 'gpt-5.2')
+                    ->whereIn('model_id', ['gpt-5.5', 'gpt-5.2'])
                     ->where('is_active', true)
                     ->where('is_deprecated', false)
+                    ->orderByRaw("model_id = 'gpt-5.5' DESC")
                     ->first();
                 if ($default) {
                     $provider->update(['default_model_id' => $default->id]);
