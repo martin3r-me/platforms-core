@@ -35,19 +35,19 @@
       --t-sidebar-hover: rgba(255,255,255,0.08);
       --t-sidebar-active: rgba(255,255,255,0.14);
     }
-    /* Light scope — nx: flache Pastell-Konsole (weiches Blau, Near-Black-Text) */
+    /* Light scope — nx: flache Pastell-Konsole (Notion-Pastellblau, Near-Black-Text) */
     .terminal-light {
       --t-text: var(--nx-text);
       --t-text-muted: var(--nx-muted);
       --t-border: rgba(55,53,47,0.10);
-      --t-border-bright: rgba(55,53,47,0.14);
+      --t-border-bright: rgba(55,53,47,0.12);
       --t-accent: var(--nx-accent);
-      --t-glass: #dde9f4;
-      --t-glass-surface: #e8f0f8;
+      --t-glass: #eef5fe;
+      --t-glass-surface: #f3f8fe;
       --t-glass-hover: rgba(55,53,47,0.05);
       --t-glow: rgba(55,53,47,0.06);
-      --t-sidebar-from: #dde9f4;
-      --t-sidebar-to: #d6e3f0;
+      --t-sidebar-from: #dcebfb;
+      --t-sidebar-to: #d3e6fa;
       --t-sidebar-hover: rgba(55,53,47,0.06);
       --t-sidebar-active: rgba(55,53,47,0.12);
     }
