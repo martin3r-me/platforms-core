@@ -35,21 +35,21 @@
       --t-sidebar-hover: rgba(255,255,255,0.08);
       --t-sidebar-active: rgba(255,255,255,0.14);
     }
-    /* Light scope — nx: Notion Smart-Notes-Blau (#67aeeb), dunkler Text der darauf liest */
+    /* Light scope — nx: neutrales Chrome wie die Sidebars (warmes Grau, Near-Black-Text) */
     .terminal-light {
-      --t-text: #1f2d3a;
-      --t-text-muted: #385169;
-      --t-border: rgba(20,45,75,0.18);
-      --t-border-bright: rgba(20,45,75,0.22);
+      --t-text: var(--nx-text);
+      --t-text-muted: var(--nx-muted);
+      --t-border: rgba(55,53,47,0.10);
+      --t-border-bright: rgba(55,53,47,0.12);
       --t-accent: var(--nx-accent);
-      --t-glass: #7ab8ee;
-      --t-glass-surface: #e8f2fc;
-      --t-glass-hover: rgba(20,45,75,0.08);
-      --t-glow: rgba(20,45,75,0.06);
-      --t-sidebar-from: #67aeeb;
-      --t-sidebar-to: #5aa6e9;
-      --t-sidebar-hover: rgba(20,45,75,0.10);
-      --t-sidebar-active: rgba(255,255,255,0.30);
+      --t-glass: #eeede8;
+      --t-glass-surface: #faf9f6;
+      --t-glass-hover: rgba(55,53,47,0.05);
+      --t-glow: rgba(55,53,47,0.06);
+      --t-sidebar-from: #f4f3ee;
+      --t-sidebar-to: #f0efe9;
+      --t-sidebar-hover: rgba(55,53,47,0.055);
+      --t-sidebar-active: rgba(55,53,47,0.09);
     }
     /* Override white-overlay utilities inside light scope (white-on-white → dark-on-white) */
     .terminal-light .bg-white\/5,
@@ -65,8 +65,8 @@
     .terminal-light .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(0,0,0,0.06) !important; }
     /* Aktiver Tab/Chip: bg-white/15 text-white -> dezenter Dunkel-Tint + Near-Black-Text.
        Nur die Kombination bg-white/15 + text-white flippen (farbige Badges bleiben weiss). */
-    .terminal-light .bg-white\/15 { background-color: rgba(255,255,255,0.35) !important; }
-    .terminal-light .bg-white\/15.text-white { color: #1f2d3a !important; }
+    .terminal-light .bg-white\/15 { background-color: rgba(55,53,47,0.09) !important; }
+    .terminal-light .bg-white\/15.text-white { color: var(--nx-text) !important; }
     .terminal-light .border-white\/\[0\.08\] { border-color: rgba(55,53,47,0.10) !important; }
     @keyframes t-spring-in { 0% { transform: translateY(16px); opacity: 0.5; } 60% { transform: translateY(-4px); opacity: 1; } 100% { transform: translateY(0); } }
     @keyframes t-badge-pop { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
