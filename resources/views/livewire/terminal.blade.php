@@ -101,7 +101,7 @@
     <div
       @click.self="if(!fullscreen) toggle()"
       class="relative flex-shrink-0 px-4 flex items-center gap-1.5 overflow-x-auto scrollbar-none select-none group/bar"
-      :class="fullscreen ? 'h-12 border-b border-[var(--t-border)]' : 'h-9 cursor-pointer'"
+      :class="fullscreen ? 'h-12 border-b border-[var(--t-border)]' : 'h-11 cursor-pointer'"
     >
       {{-- macOS traffic lights --}}
       <div class="flex items-center gap-1.5 mr-1 flex-shrink-0 group/dots" @click.stop>
