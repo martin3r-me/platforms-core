@@ -4,35 +4,36 @@
   x-on:toggle-terminal.window="toggle()"
   x-on:toggle-terminal-open.window="if(!open) toggle()"
   x-on:keydown.escape.window="if(fullscreen) toggleFullscreen()"
-  style="height:36px;min-height:36px;max-height:36px"
+  style="height:44px;min-height:44px;max-height:44px"
   :class="[
     fullscreen ? 'fixed inset-0 z-[60]' : 'w-full flex-none relative',
     resizing ? '' : 'transition-[height,min-height,max-height] duration-300 ease-[cubic-bezier(0.33,1,0.68,1)]'
   ]"
   x-bind:style="fullscreen
     ? 'height:100vh;min-height:100vh;max-height:100vh'
-    : (open ? 'height:' + panelHeight + 'px;min-height:' + panelHeight + 'px;max-height:' + panelHeight + 'px' : 'height:36px;min-height:36px;max-height:36px')"
+    : (open ? 'height:' + panelHeight + 'px;min-height:' + panelHeight + 'px;max-height:' + panelHeight + 'px' : 'height:44px;min-height:44px;max-height:44px')"
   wire:ignore.self
   wire:key="terminal-root"
 >
   <style>
     :root {
-      --t-glass: rgba(var(--ui-primary-rgb), 0.72);
-      --t-glass-surface: rgba(var(--ui-primary-rgb), 0.65);
-      --t-glass-hover: rgba(var(--ui-primary-rgb), 0.55);
+      /* nx: feste warme Konsole — env-UNABHÄNGIG (dunkles Gegenstück zur nx-Palette) */
+      --t-glass: rgba(38,37,34,0.85);
+      --t-glass-surface: #302f2b;
+      --t-glass-hover: #3a3935;
       --t-blur: 24px;
       --t-border: rgba(255,255,255,0.08);
       --t-border-bright: rgba(255,255,255,0.14);
-      --t-text: #e4e4e7;
-      --t-text-muted: #a1a1aa;
-      --t-accent: var(--ui-secondary);
-      --t-glow: rgba(var(--ui-secondary-rgb), 0.15);
+      --t-text: #e8e7e3;
+      --t-text-muted: #a9a7a2;
+      --t-accent: #d6d5d1;
+      --t-glow: rgba(255,255,255,0.10);
       --t-unread-glow: rgba(var(--ui-danger-rgb), 0.3);
-      /* Sidebar — dark primary base with subtle secondary tint */
-      --t-sidebar-from: rgb(var(--ui-primary-rgb));
-      --t-sidebar-to: color-mix(in srgb, rgb(var(--ui-primary-rgb)) 75%, rgb(var(--ui-secondary-rgb)));
-      --t-sidebar-hover: rgba(var(--ui-secondary-rgb), 0.12);
-      --t-sidebar-active: var(--ui-secondary);
+      /* Dock-Grund — fester warmer Near-Black, dezenter Verlauf */
+      --t-sidebar-from: #2b2a26;
+      --t-sidebar-to: #211f1c;
+      --t-sidebar-hover: rgba(255,255,255,0.08);
+      --t-sidebar-active: rgba(255,255,255,0.14);
     }
     /* Light scope — remaps terminal vars to platform light theme for content area + modals */
     .terminal-light {
