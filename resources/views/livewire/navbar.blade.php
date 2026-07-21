@@ -1,5 +1,5 @@
 <nav x-data="{ mobileMenuOpen: false }"
-     class="w-full h-12 border-b border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] flex items-center px-3 gap-2 shrink-0">
+     class="w-full h-11 border-b border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] flex items-center px-3 gap-2 shrink-0">
 
     {{-- ═══ ZONE 1: Logo + Favorites (left) ═══ --}}
     <div class="flex items-center gap-1 min-w-0">
@@ -184,7 +184,7 @@
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-2"
              @click.outside="mobileMenuOpen = false"
-             class="fixed top-12 left-0 right-0 z-[98] bg-[color:var(--nx-surface)] border-b border-[color:var(--nx-line)] shadow-lg md:hidden">
+             class="fixed top-11 left-0 right-0 z-[98] bg-[color:var(--nx-surface)] border-b border-[color:var(--nx-line)] shadow-lg md:hidden">
             <div class="p-3 space-y-1">
                 {{-- Favorite links --}}
                 @foreach($favorites as $fav)
