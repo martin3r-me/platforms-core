@@ -1133,7 +1133,7 @@ class Terminal extends Component
 
     // ── Group Channel ──────────────────────────────────────────
 
-    public function createChannel(string $name, ?string $description = null, ?string $icon = null, array $memberIds = []): void
+    public function createChatChannel(string $name, ?string $description = null, ?string $icon = null, array $memberIds = []): void
     {
         $teamId = $this->teamId();
         if (! $teamId || empty(trim($name))) {

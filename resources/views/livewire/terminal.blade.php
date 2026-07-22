@@ -1771,7 +1771,7 @@
       <div class="px-4 py-3 space-y-3">
         <div>
           <label class="block text-[10px] font-medium text-[var(--t-text-muted)] uppercase tracking-wider mb-1">Name</label>
-          <input x-model="channelName" type="text" placeholder="z.B. general" class="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--t-border)]/60 bg-transparent text-[var(--t-text)] placeholder:text-[var(--t-text-muted)]/50 focus:border-[var(--t-accent)]/40 outline-none transition" @keydown.enter="if(channelName.trim()) { $wire.createChannel(channelName.trim(), channelDesc.trim() || null, null, selectedIds); showNewChannel = false; }">
+          <input x-model="channelName" type="text" placeholder="z.B. general" class="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--t-border)]/60 bg-transparent text-[var(--t-text)] placeholder:text-[var(--t-text-muted)]/50 focus:border-[var(--t-accent)]/40 outline-none transition" @keydown.enter="if(channelName.trim()) { $wire.createChatChannel(channelName.trim(), channelDesc.trim() || null, null, selectedIds); showNewChannel = false; }">
         </div>
         <div>
           <label class="block text-[10px] font-medium text-[var(--t-text-muted)] uppercase tracking-wider mb-1">Beschreibung (optional)</label>
@@ -1801,7 +1801,7 @@
       <div class="px-4 py-3 border-t border-[var(--t-border)]/60 flex justify-end gap-2">
         <button @click="showNewChannel = false" class="text-xs px-3 py-1.5 rounded text-[var(--t-text-muted)] hover:text-[var(--t-text)] transition">Abbrechen</button>
         <button
-          @click="if(channelName.trim()) { $wire.createChannel(channelName.trim(), channelDesc.trim() || null, null, selectedIds); showNewChannel = false; }"
+          @click="if(channelName.trim()) { $wire.createChatChannel(channelName.trim(), channelDesc.trim() || null, null, selectedIds); showNewChannel = false; }"
           :disabled="!channelName.trim()"
           :class="channelName.trim() ? 'bg-[var(--t-accent)] text-white hover:bg-[var(--t-accent)]/80' : 'bg-[var(--t-text-muted)]/20 text-[var(--t-text-muted)] cursor-not-allowed'"
           class="text-xs px-3 py-1.5 rounded transition"
