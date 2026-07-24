@@ -5,18 +5,18 @@
                 <div class="relative flex-shrink-0">
                     @if(!empty($pu['avatar']))
                         <img src="{{ $pu['avatar'] }}" alt="{{ $pu['name'] ?? '' }}"
-                             class="w-6 h-6 rounded-full object-cover ring-2 ring-[var(--ui-surface)]" />
+                             class="w-6 h-6 rounded-full object-cover ring-2 ring-[color:var(--nx-surface)]" />
                     @else
-                        <div class="w-6 h-6 rounded-full bg-[var(--ui-primary-5)] ring-2 ring-[var(--ui-surface)] flex items-center justify-center text-[10px] font-medium text-[var(--ui-primary)]">
+                        <div class="w-6 h-6 rounded-full bg-[color:var(--nx-accent-soft)] ring-2 ring-[color:var(--nx-surface)] flex items-center justify-center text-[10px] font-medium text-[color:var(--nx-text)]">
                             {{ strtoupper(substr($pu['name'] ?? '?', 0, 1)) }}
                         </div>
                     @endif
-                    <span class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-[var(--ui-surface)]"></span>
+                    <span class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-[color:var(--nx-success)] ring-1 ring-[color:var(--nx-surface)]"></span>
                 </div>
             @endforeach
 
             @if(count($pagePresenceUsers) > 4)
-                <div class="w-6 h-6 rounded-full bg-[var(--ui-muted-5)] ring-2 ring-[var(--ui-surface)] flex items-center justify-center text-[10px] font-medium text-[var(--ui-secondary)]">
+                <div class="w-6 h-6 rounded-full bg-[color:var(--nx-accent-soft)] ring-2 ring-[color:var(--nx-surface)] flex items-center justify-center text-[10px] font-medium text-[color:var(--nx-text)]">
                     +{{ count($pagePresenceUsers) - 4 }}
                 </div>
             @endif
