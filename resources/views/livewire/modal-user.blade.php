@@ -1,4 +1,4 @@
-<x-nx-modal size="lg" wire:model="modalShow">
+<x-nx-modal size="lg" height="fixed" wire:model="modalShow">
     <x-slot name="header">
         <div class="flex items-center justify-between w-full">
             <div class="flex items-center gap-3">
@@ -133,17 +133,12 @@
                                     placeholder="z.B. Datawarehouse Token"
                                     :errorKey="'newTokenName'"
                                 />
-                                <div>
-                                    <label class="block text-sm font-medium text-[color:var(--nx-text)] mb-1.5">Ablaufdatum</label>
-                                    <select
-                                        wire:model="newTokenExpiry"
-                                        class="w-full px-3 py-2 border border-[color:var(--nx-line-strong)] rounded-lg bg-[color:var(--nx-surface)] text-[color:var(--nx-text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--nx-accent)] focus:border-transparent"
-                                    >
-                                        <option value="30_days">30 Tage</option>
-                                        <option value="1_year">1 Jahr</option>
-                                        <option value="never">Nie</option>
-                                    </select>
-                                </div>
+                                <x-nx-input-select
+                                    name="newTokenExpiry"
+                                    label="Ablaufdatum"
+                                    wire:model="newTokenExpiry"
+                                    :options="[['value' => '30_days', 'label' => '30 Tage'], ['value' => '1_year', 'label' => '1 Jahr'], ['value' => 'never', 'label' => 'Nie']]"
+                                />
                             </div>
                             <x-nx-button variant="primary" wire:click="createApiToken">
                                 <div class="flex items-center gap-2">
@@ -479,17 +474,12 @@
                                     placeholder="z.B. Open WebUI"
                                     :errorKey="'newMcpTokenName'"
                                 />
-                                <div>
-                                    <label class="block text-sm font-medium text-[color:var(--nx-text)] mb-1.5">Ablaufdatum</label>
-                                    <select
-                                        wire:model="newMcpTokenExpiry"
-                                        class="w-full px-3 py-2 border border-[color:var(--nx-line-strong)] rounded-lg bg-[color:var(--nx-surface)] text-[color:var(--nx-text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--nx-accent)] focus:border-transparent"
-                                    >
-                                        <option value="30_days">30 Tage</option>
-                                        <option value="1_year">1 Jahr</option>
-                                        <option value="never">Nie</option>
-                                    </select>
-                                </div>
+                                <x-nx-input-select
+                                    name="newMcpTokenExpiry"
+                                    label="Ablaufdatum"
+                                    wire:model="newMcpTokenExpiry"
+                                    :options="[['value' => '30_days', 'label' => '30 Tage'], ['value' => '1_year', 'label' => '1 Jahr'], ['value' => 'never', 'label' => 'Nie']]"
+                                />
                             </div>
                             <x-nx-button variant="primary" wire:click="createMcpToken">
                                 <div class="flex items-center gap-2">
@@ -573,18 +563,12 @@
                                     placeholder="z.B. Work, Personal"
                                     :errorKey="'vaultForm.name'"
                                 />
-                                <div>
-                                    <label class="block text-sm font-medium text-[color:var(--nx-text)] mb-1.5">Driver</label>
-                                    <select
-                                        wire:model="vaultForm.driver"
-                                        class="w-full px-3 py-2 border border-[color:var(--nx-line-strong)] rounded-lg bg-[color:var(--nx-surface)] text-[color:var(--nx-text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--nx-accent)] focus:border-transparent"
-                                    >
-                                        <option value="s3">AWS S3</option>
-                                        <option value="r2">Cloudflare R2</option>
-                                        <option value="minio">MinIO</option>
-                                        <option value="wasabi">Wasabi</option>
-                                    </select>
-                                </div>
+                                <x-nx-input-select
+                                    name="vaultForm.driver"
+                                    label="Driver"
+                                    wire:model="vaultForm.driver"
+                                    :options="[['value' => 's3', 'label' => 'AWS S3'], ['value' => 'r2', 'label' => 'Cloudflare R2'], ['value' => 'minio', 'label' => 'MinIO'], ['value' => 'wasabi', 'label' => 'Wasabi']]"
+                                />
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <x-nx-input-text
@@ -655,16 +639,16 @@
                                 @endphp
                                 @if($ownedTeams->isNotEmpty())
                                     <div>
-                                        <label class="block text-sm font-medium text-[color:var(--nx-text)] mb-1.5">Team-Zuordnung</label>
-                                        <select
+                                        <x-nx-input-select
+                                            name="vaultForm.team_id"
+                                            label="Team-Zuordnung"
                                             wire:model="vaultForm.team_id"
-                                            class="w-full px-3 py-2 border border-[color:var(--nx-line-strong)] rounded-lg bg-[color:var(--nx-surface)] text-[color:var(--nx-text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--nx-accent)] focus:border-transparent"
-                                        >
-                                            <option value="">Persönlicher Vault</option>
-                                            @foreach($ownedTeams as $team)
-                                                <option value="{{ $team->id }}">{{ $team->name }}</option>
-                                            @endforeach
-                                        </select>
+                                            :options="$ownedTeams"
+                                            optionValue="id"
+                                            optionLabel="name"
+                                            nullable
+                                            nullLabel="Persönlicher Vault"
+                                        />
                                         <p class="mt-1 text-xs text-[color:var(--nx-muted)]">Team-Vaults stellen Skills & Inhalte für alle Team-Mitglieder bereit.</p>
                                     </div>
                                 @endif
