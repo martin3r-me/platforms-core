@@ -13,6 +13,7 @@ class ModuleFlyout extends Component
     public $modules = [];
     public $groupedModules = [];
     public $currentModule;
+    public bool $isAdmin = false;
 
     #[On('open-module-flyout')]
     public function openFlyout()
@@ -39,6 +40,14 @@ class ModuleFlyout extends Component
         if (!$baseTeam) {
             $this->modules = collect();
             return;
+        }
+
+        // Admin-Rolle im aktuellen Team → steuert Sichtbarkeit der Admin-Gruppe
+        $currentTeam = $user->currentTeam;
+        $this->isAdmin = false;
+        if ($currentTeam) {
+            $pivot = $user->teams()->where('team_id', $currentTeam->id)->first()?->pivot;
+            $this->isAdmin = $pivot && in_array($pivot->role, ['owner', 'admin']);
         }
 
         $rootTeam = $baseTeam->getRootTeam();
@@ -91,11 +100,15 @@ class ModuleFlyout extends Component
             $grouped[$groupKey][] = $module;
         }
 
-        // Admin-Module werden im AdminFlyout angezeigt
-        unset($grouped['admin']);
+        // Admin-Module nur für Admins zeigen (als eigene Gruppe ganz unten)
+        if (!$this->isAdmin) {
+            unset($grouped['admin']);
+        }
 
-        // Nach Gruppen-Order sortieren
+        // Nach Gruppen-Order sortieren; Admin-Gruppe immer ganz unten
         uksort($grouped, function ($a, $b) use ($groups) {
+            if ($a === 'admin') return 1;
+            if ($b === 'admin') return -1;
             $orderA = $groups[$a]['order'] ?? 999;
             $orderB = $groups[$b]['order'] ?? 999;
             return $orderA <=> $orderB;
@@ -103,7 +116,9 @@ class ModuleFlyout extends Component
 
         $this->groupedModules = collect($grouped)->map(function ($modules, $groupKey) use ($groups) {
             return [
-                'label'   => $groups[$groupKey]['label'] ?? ucfirst($groupKey),
+                'label'   => $groupKey === 'admin'
+                    ? ($groups['admin']['label'] ?? 'Administration')
+                    : ($groups[$groupKey]['label'] ?? ucfirst($groupKey)),
                 'modules' => $modules,
             ];
         })->toArray();

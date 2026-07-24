@@ -37,6 +37,7 @@
             {{-- Gruppierte Module --}}
             @foreach($groupedModules as $groupKey => $group)
                 <div x-data="{ hasVisible: false }"
+                     @class(['mt-2 border-t border-[color:var(--nx-line)] pt-1' => $groupKey === 'admin'])
                      x-effect="hasVisible = !search || Array.from($el.querySelectorAll('[data-module-title]')).some(el => el.dataset.moduleTitle.toLowerCase().includes(search.toLowerCase()))">
                     <h3 x-show="hasVisible" class="mb-1 mt-3 px-2 text-[11px] font-medium text-[color:var(--nx-faint)]">
                         {{ $group['label'] }}
