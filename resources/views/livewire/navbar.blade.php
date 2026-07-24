@@ -103,15 +103,9 @@
         {{-- User avatar --}}
         <button type="button"
             @click="$dispatch('open-modal-user')"
-            class="flex items-center justify-center w-8 h-8 rounded-full hover:ring-2 hover:ring-[color:var(--nx-line-strong)] transition overflow-hidden"
+            class="flex items-center justify-center rounded-[6px] hover:ring-2 hover:ring-[color:var(--nx-line-strong)] transition"
             title="{{ $userName }}">
-            @if($userAvatar)
-                <img src="{{ $userAvatar }}" alt="{{ $userName }}" class="w-7 h-7 rounded-full object-cover" />
-            @else
-                <div class="w-7 h-7 rounded-full bg-[color:var(--nx-accent-soft)] flex items-center justify-center text-xs font-medium text-[color:var(--nx-text)]">
-                    {{ strtoupper(substr($userName ?? '?', 0, 1)) }}
-                </div>
-            @endif
+            <x-nx-avatar :name="$userName" :src="$userAvatar" size="md" />
         </button>
     </div>
 
