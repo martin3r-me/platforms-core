@@ -4,23 +4,32 @@ namespace Platform\Core\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Platform\Core\Models\Module;
+use Platform\Core\Models\Team;
+use Platform\Core\Models\User;
 
 /**
- * Spiegelt den heutigen Zustand (team_user.role) in den Grant-Store.
+ * Spiegelt den heutigen Zustand (team_user + modulables) in den Grant-Store.
  *
- * Damit reproduziert der Graph im Shadow-Mode die bestehende Team-Rolle
- * exakt. Idempotent: löscht zuerst alle Grants mit source='seed:team_user'
- * und schreibt sie neu.
+ * - CONTENT: pro Mitgliedschaft ein Grant auf die Team-Wurzel (aus team_user.role).
+ * - MODULE:  pro User die TATSÄCHLICH erlaubten Module (via Module::hasAccess),
+ *            als authz_grant(scope=module, capability=use). Ersetzt das frühere
+ *            grobe `use '*'` durch den echten per-User-Alt-Stand.
  *
- * Rollen-Mapping (Hypothese — Abweichungen zeigt authz_shadow_log):
- *   owner  → owner     admin → owner
- *   member → write     viewer → read     (null → write)
+ * Subjekt der Modul-Grants: das Person-Entity (linked_user_id), falls vorhanden
+ * — damit der "Module"-Tab sie zeigt; sonst der User selbst (Fallback, greift
+ * trotzdem, weil der Resolver User- UND Entity-Subjekt prüft).
+ *
+ * Idempotent: löscht die eigenen seed-Quellen und schreibt neu. Manuell/per UI
+ * gesetzte Grants (source "ui:" bzw. "mcp:") bleiben unberührt und nicht doppelt.
+ *
+ * Rollen-Mapping (Content):  owner→owner  admin→owner  member→write  viewer→read  (null→write)
  */
 class AuthzSeedGrantsCommand extends Command
 {
-    protected $signature = 'authz:seed-grants {--fresh : seed-Grants vorher komplett entfernen}';
+    protected $signature = 'authz:seed-grants';
 
-    protected $description = 'Spiegelt team_user.role in den Autorisierungs-Graphen (authz_grant).';
+    protected $description = 'Spiegelt team_user.role + den echten per-User-Modul-Stand (hasAccess) in authz_grant.';
 
     private const ROLE_TO_CAPABILITY = [
         'owner'  => 'owner',
@@ -29,69 +38,119 @@ class AuthzSeedGrantsCommand extends Command
         'viewer' => 'read',
     ];
 
+    private const CONTENT_SOURCE = 'seed:team_user';
+    private const MODULE_SOURCE  = 'seed:module';
+
+    // Pseudo-Module, die immer erlaubt sind — kein Grant nötig.
+    private const ALWAYS_ALLOWED = ['core', 'tools', 'communication'];
+
     public function handle(): int
     {
-        $source = 'seed:team_user';
-
-        DB::table('authz_grant')->where('source', $source)->delete();
-        DB::table('authz_grant')->where('source', 'seed:team_user_module')->delete();
+        // Idempotent: eigene Seeds entfernen (Content + alter Wildcard + Modul-Seed).
+        DB::table('authz_grant')
+            ->whereIn('source', [self::CONTENT_SOURCE, 'seed:team_user_module', self::MODULE_SOURCE])
+            ->delete();
 
         $now = now();
+        $hasEntities = DB::getSchemaBuilder()->hasTable('organization_entities');
+        $modules = Module::all();
+
+        $memberships = 0;
+        $moduleGrants = 0;
         $contentRows = [];
-        $moduleRows = [];
-        $count = 0;
 
-        DB::table('team_user')->orderBy('id')->each(function ($row) use (&$contentRows, &$moduleRows, &$count, $now, $source) {
-            $capability = self::ROLE_TO_CAPABILITY[$row->role] ?? 'write';
+        DB::table('team_user')->orderBy('id')->each(function ($row) use (
+            &$memberships, &$moduleGrants, &$contentRows, $now, $hasEntities, $modules
+        ) {
+            $user = User::find($row->user_id);
+            $team = Team::find($row->team_id);
+            if (! $user || ! $team) {
+                return;
+            }
+            $memberships++;
 
-            // (a) Content: Grant auf die Team-Wurzel (Bootstrap-Scope).
+            // Subjekt bestimmen: Person-Entity falls vorhanden, sonst User.
+            $subjectType = 'user';
+            $subjectId = (int) $row->user_id;
+            if ($hasEntities) {
+                $entityId = DB::table('organization_entities')
+                    ->where('linked_user_id', $row->user_id)
+                    ->where('team_id', $row->team_id)
+                    ->value('id');
+                if ($entityId) {
+                    $subjectType = 'entity';
+                    $subjectId = (int) $entityId;
+                }
+            }
+
+            // (a) Content-Grant auf die Team-Wurzel (aus Rolle) — Subjekt = User.
             $contentRows[] = [
                 'subject_type' => 'user',
-                'subject_id'   => $row->user_id,
-                'capability'   => $capability,
+                'subject_id'   => (int) $row->user_id,
+                'capability'   => self::ROLE_TO_CAPABILITY[$row->role] ?? 'write',
                 'scope_type'   => 'team',
-                'scope_id'     => $row->team_id,
+                'scope_id'     => (int) $row->team_id,
                 'scope_key'    => null,
-                'source'       => $source,
+                'source'       => self::CONTENT_SOURCE,
                 'valid_from'   => null,
                 'valid_to'     => null,
-                'team_id'      => $row->team_id,
+                'team_id'      => (int) $row->team_id,
                 'created_at'   => $now,
                 'updated_at'   => $now,
             ];
 
-            // (b) Toolbelt: pauschaler Modul-Zugang (alle Module verfügbar).
-            $moduleRows[] = [
-                'subject_type' => 'user',
-                'subject_id'   => $row->user_id,
-                'capability'   => 'use',
-                'scope_type'   => 'module',
-                'scope_id'     => null,
-                'scope_key'    => '*',
-                'source'       => 'seed:team_user_module',
-                'valid_from'   => null,
-                'valid_to'     => null,
-                'team_id'      => $row->team_id,
-                'created_at'   => $now,
-                'updated_at'   => $now,
-            ];
+            // (b) Modul-Grants: reale erlaubte Module via hasAccess.
+            foreach ($modules as $module) {
+                if (in_array($module->key, self::ALWAYS_ALLOWED, true)) {
+                    continue;
+                }
+                try {
+                    if (! $module->hasAccess($user, $team)) {
+                        continue;
+                    }
+                } catch (\Throwable $e) {
+                    continue;
+                }
 
-            $count++;
+                // Nicht doppeln, wenn (z.B. per UI/MCP) schon ein Grant existiert.
+                $exists = DB::table('authz_grant')
+                    ->where('subject_type', $subjectType)
+                    ->where('subject_id', $subjectId)
+                    ->where('scope_type', 'module')
+                    ->where('scope_key', $module->key)
+                    ->where('capability', 'use')
+                    ->exists();
+                if ($exists) {
+                    continue;
+                }
 
-            if (count($contentRows) >= 500) {
-                DB::table('authz_grant')->insert($contentRows);
-                DB::table('authz_grant')->insert($moduleRows);
-                $contentRows = [];
-                $moduleRows = [];
+                DB::table('authz_grant')->insert([
+                    'subject_type' => $subjectType,
+                    'subject_id'   => $subjectId,
+                    'capability'   => 'use',
+                    'scope_type'   => 'module',
+                    'scope_id'     => null,
+                    'scope_key'    => $module->key,
+                    'source'       => self::MODULE_SOURCE,
+                    'valid_from'   => null,
+                    'valid_to'     => null,
+                    'team_id'      => (int) $row->team_id,
+                    'created_at'   => $now,
+                    'updated_at'   => $now,
+                ]);
+                $moduleGrants++;
             }
         });
 
-        if ($contentRows !== []) {
-            DB::table('authz_grant')->insert($contentRows);
-            DB::table('authz_grant')->insert($moduleRows);
+        foreach (array_chunk($contentRows, 500) as $chunk) {
+            DB::table('authz_grant')->insert($chunk);
         }
 
-        $this->info("Seeded {$count} Mitgliedschaften → ".($count * 2)." Grants (Content + Modul).");
+        $this->info(sprintf(
+            'Seeded %d Mitgliedschaften: Content-Grants (Team-Wurzel) + %d Modul-Grants (echter Alt-Stand via hasAccess).',
+            $memberships,
+            $moduleGrants
+        ));
 
         return self::SUCCESS;
     }

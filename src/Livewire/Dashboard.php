@@ -3,20 +3,42 @@
 namespace Platform\Core\Livewire;
 
 use Livewire\Component;
+use Livewire\Attributes\On;
 use Platform\Core\PlatformCore;
 use Platform\Core\Models\TeamBillableUsage;
 use Platform\Core\Models\TeamUserLastModule;
 use Platform\Core\Models\Module;
+use Platform\Core\Models\Checkin;
+use Platform\Core\Models\CheckinTodo;
 use Illuminate\Support\Facades\Auth;
 
 class Dashboard extends Component
 {
+    /** Freigeschaltete Module (für „Weiterarbeiten"). */
     public array $modules = [];
+
+    /** UI-Team des Users. */
     public $currentTeam;
-    public array $teamMembers = [];
+
+    /** Key des zuletzt genutzten Moduls (Hervorhebung in „Weiterarbeiten"). */
+    public ?string $lastModuleKey = null;
+
+    // --- „Mein Tag" ---
+    public string $firstName = '';
+    public string $greeting = '';
+    public int $streak = 0;
+
+    /** Heutiger Check-in als Array (oder null, wenn noch keiner gemacht). */
+    public ?array $todayCheckin = null;
+
+    /** Offene Todos: [['id' => int, 'title' => string], ...]. */
+    public array $openTodos = [];
+
+    // --- Team-Kontext (dezent im Fuß) ---
+    public int $memberCount = 0;
     public float $monthlyTotal = 0.0;
 
-    public function mount()
+    public function mount(): void
     {
         if (!Auth::check()) {
             return;
@@ -29,23 +51,72 @@ class Dashboard extends Component
             return;
         }
 
+        $this->firstName = trim(explode(' ', (string) $user->name)[0] ?? '');
+        $this->greeting = $this->greetingForHour((int) now()->format('G'));
+
         $baseTeam = $user->currentTeamRelation;
 
-        if ($baseTeam) {
-            $lastModuleKey = TeamUserLastModule::getLastModule($user->id, $this->currentTeam->id);
+        $this->lastModuleKey = TeamUserLastModule::getLastModule($user->id, $this->currentTeam->id);
+        $this->modules = $this->loadAccessibleModules($user, $baseTeam);
 
-            if ($lastModuleKey && $lastModuleKey !== 'dashboard') {
-                $moduleModel = Module::where('key', $lastModuleKey)->first();
-                if ($moduleModel && $moduleModel->hasAccess($user, $baseTeam)) {
-                    $this->redirect('/' . $lastModuleKey, navigate: false);
-                    return;
-                }
-            }
+        $this->memberCount = $this->currentTeam->users()->count();
+        $this->loadDay();
+        $this->loadMonthlyCosts();
+    }
+
+    /**
+     * Lädt heutigen Check-in, Streak und offene Todos neu.
+     * Wird auch nach dem Speichern eines Check-ins aufgerufen.
+     */
+    #[On('checkin-saved')]
+    public function loadDay(): void
+    {
+        $userId = Auth::id();
+        if (!$userId) {
+            return;
         }
 
-        $this->teamMembers = $this->currentTeam->users()->get()->all();
-        $this->modules = $this->loadAccessibleModules($user, $baseTeam);
-        $this->loadMonthlyCosts();
+        $this->streak = Checkin::currentStreak($userId);
+
+        $checkin = Checkin::where('user_id', $userId)
+            ->where('date', now()->toDateString())
+            ->first();
+        $this->todayCheckin = $checkin?->toArray();
+
+        $this->openTodos = CheckinTodo::whereHas(
+                'checkin',
+                fn ($q) => $q->where('user_id', $userId)
+            )
+            ->where('done', false)
+            ->orderByDesc('checkin_id')
+            ->limit(12)
+            ->get()
+            ->map(fn (CheckinTodo $t) => ['id' => $t->id, 'title' => $t->title])
+            ->all();
+    }
+
+    /**
+     * Todo abhaken/wieder öffnen. Nur eigene Todos.
+     */
+    public function toggleTodo(int $id): void
+    {
+        $todo = CheckinTodo::with('checkin')->find($id);
+
+        if (!$todo || (int) $todo->checkin?->user_id !== (int) Auth::id()) {
+            return;
+        }
+
+        $todo->update(['done' => !$todo->done]);
+        $this->loadDay();
+    }
+
+    protected function greetingForHour(int $hour): string
+    {
+        return match (true) {
+            $hour < 11 => 'Guten Morgen',
+            $hour < 18 => 'Guten Tag',
+            default    => 'Guten Abend',
+        };
     }
 
     /**

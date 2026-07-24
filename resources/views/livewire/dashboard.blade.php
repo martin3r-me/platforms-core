@@ -1,188 +1,159 @@
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="Platform Dashboard" icon="heroicon-o-home" />
+        <x-ui-page-navbar title="Mein Tag" icon="heroicon-o-home" />
     </x-slot>
 
     <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Schnellzugriff" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Team-Info</h3>
-                    <div class="space-y-3">
-                        <div class="p-3 bg-[var(--ui-muted-5)] rounded-lg">
-                            <div class="text-sm text-[var(--ui-muted)]">Aktuelles Team</div>
-                            <div class="font-semibold text-[var(--ui-secondary)]">{{ $currentTeam?->name ?? 'Kein Team' }}</div>
-                        </div>
-                        <div class="p-3 bg-[var(--ui-muted-5)] rounded-lg">
-                            <div class="text-sm text-[var(--ui-muted)]">Mitglieder</div>
-                            <div class="font-semibold text-[var(--ui-secondary)]">{{ count($teamMembers) }}</div>
-                        </div>
-                        <div class="p-3 bg-[var(--ui-muted-5)] rounded-lg">
-                            <div class="text-sm text-[var(--ui-muted)]">Module</div>
-                            <div class="font-semibold text-[var(--ui-secondary)]">{{ count($modules) }}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Aktionen</h3>
-                    <div class="space-y-2">
-                        <x-ui-button variant="primary" size="sm" x-data @click="$dispatch('open-modal-team')" class="w-full">
-                            Team verwalten
-                        </x-ui-button>
-                        <x-ui-button variant="secondary" size="sm" x-data @click="$dispatch('open-modal-modules')" class="w-full">
-                            Module verwalten
-                        </x-ui-button>
-                        <x-ui-button variant="secondary" size="sm" x-data @click="$dispatch('open-modal-user')" class="w-full">
-                            Benutzer-Einstellungen
-                        </x-ui-button>
-                        <x-ui-button variant="secondary" size="sm" x-data @click="$dispatch('open-modal-checkin')" class="w-full">
-                            Täglicher Check-in
-                        </x-ui-button>
-                    </div>
-                </div>
-
-                @if(count($modules) > 0)
-                    <div>
-                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Meine Module</h3>
-                        <div class="space-y-2">
-                            @foreach($modules as $module)
-                                @php
-                                    $title = $module['title'] ?? $module['label'] ?? ucfirst($module['key']);
-                                    $routeName = $module['navigation']['route'] ?? null;
-                                    $finalUrl = $routeName && \Illuminate\Support\Facades\Route::has($routeName)
-                                        ? route($routeName)
-                                        : ($module['url'] ?? '#');
-                                @endphp
-                                <a href="{{ $finalUrl }}" class="block p-2 rounded-lg hover:bg-[var(--ui-muted-5)] transition">
-                                    <div class="font-medium text-[var(--ui-secondary)] text-sm">{{ $title }}</div>
-                                </a>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
+        <x-ui-page-sidebar title="Schnellzugriff" width="w-72" :defaultOpen="true" side="left">
+            <div class="flex flex-col gap-2 p-4">
+                <span class="px-1 pb-1 text-xs font-medium uppercase tracking-wide text-[color:var(--nx-faint)]">Aktionen</span>
+                <x-nx-button variant="secondary" class="w-full justify-start" x-data @click="$dispatch('open-modal-checkin')">
+                    @svg('heroicon-o-check-circle', 'w-4 h-4') Täglicher Check-in
+                </x-nx-button>
+                <x-nx-button variant="ghost" class="w-full justify-start" x-data @click="$dispatch('open-modal-team')">
+                    @svg('heroicon-o-user-group', 'w-4 h-4') Team verwalten
+                </x-nx-button>
+                <x-nx-button variant="ghost" class="w-full justify-start" x-data @click="$dispatch('open-modal-modules')">
+                    @svg('heroicon-o-squares-2x2', 'w-4 h-4') Module verwalten
+                </x-nx-button>
+                <x-nx-button variant="ghost" class="w-full justify-start" x-data @click="$dispatch('open-modal-user')">
+                    @svg('heroicon-o-user-circle', 'w-4 h-4') Benutzer-Einstellungen
+                </x-nx-button>
             </div>
         </x-ui-page-sidebar>
     </x-slot>
 
-    <x-ui-page-container>
-        <!-- Platform Stats -->
-        <div class="bg-[var(--ui-surface)] py-16 sm:py-24 rounded-xl border border-[var(--ui-border)]/60 mb-8">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                <div class="mx-auto max-w-2xl lg:mx-0">
-                    <h2 class="text-3xl font-semibold tracking-tight text-[var(--ui-secondary)] sm:text-4xl">{{ $currentTeam?->name ?? 'Dein Team' }}</h2>
-                    <p class="mt-6 text-lg text-[var(--ui-muted)]">Überblick über dein aktuelles Team und die für dich freigeschalteten Module.</p>
-                </div>
-                <div class="mx-auto mt-16 flex max-w-2xl flex-col gap-8 lg:mx-0 lg:mt-20 lg:max-w-none lg:flex-row lg:items-end">
-                    <div class="flex flex-col-reverse justify-between gap-x-16 gap-y-8 rounded-2xl bg-[var(--ui-muted-5)] p-8 sm:w-3/4 sm:max-w-md sm:flex-row-reverse sm:items-end lg:w-72 lg:max-w-none lg:flex-none lg:flex-col lg:items-start">
-                        <p class="flex-none text-3xl font-bold tracking-tight text-[var(--ui-secondary)]">{{ count($teamMembers) }}</p>
-                        <div class="sm:w-80 sm:shrink lg:w-auto lg:flex-none">
-                            <p class="text-lg font-semibold tracking-tight text-[var(--ui-secondary)]">Team-Mitglieder</p>
-                            <p class="mt-2 text-base/7 text-[var(--ui-muted)]">Aktive Nutzer in {{ $currentTeam?->name ?? 'deinem Team' }}.</p>
-                        </div>
-                    </div>
-                    <div class="flex flex-col-reverse justify-between gap-x-16 gap-y-8 rounded-2xl bg-[var(--ui-primary)] p-8 sm:flex-row-reverse sm:items-end lg:w-full lg:max-w-sm lg:flex-auto lg:flex-col lg:items-start lg:gap-y-44">
-                        <p class="flex-none text-3xl font-bold tracking-tight text-white">€{{ number_format($monthlyTotal, 2, ',', '.') }}</p>
-                        <div class="sm:w-80 sm:shrink lg:w-auto lg:flex-none">
-                            <p class="text-lg font-semibold tracking-tight text-white">Monatliche Kosten</p>
-                            <p class="mt-2 text-base/7 text-[var(--ui-primary-200)]">Aktuelle Ausgaben für Module und Services.</p>
-                        </div>
-                    </div>
-                    <div class="flex flex-col-reverse justify-between gap-x-16 gap-y-8 rounded-2xl bg-[var(--ui-success)] p-8 sm:w-11/12 sm:max-w-xl sm:flex-row-reverse sm:items-end lg:w-full lg:max-w-none lg:flex-auto lg:flex-col lg:items-start lg:gap-y-28">
-                        <p class="flex-none text-3xl font-bold tracking-tight text-white">{{ count($modules) }}</p>
-                        <div class="sm:w-80 sm:shrink lg:w-auto lg:flex-none">
-                            <p class="text-lg font-semibold tracking-tight text-white">Meine Module</p>
-                            <p class="mt-2 text-base/7 text-[var(--ui-success-200)]">Module, auf die du im aktuellen Team Zugriff hast.</p>
-                        </div>
-                    </div>
-                </div>
+    <x-ui-page-container width="contained">
+        {{-- Begrüßung --}}
+        <div class="mb-8 flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h1 class="text-2xl font-semibold text-[color:var(--nx-text)]">
+                    {{ $greeting }}{{ $firstName ? ', ' . $firstName : '' }}
+                </h1>
+                <p class="mt-1 text-sm text-[color:var(--nx-muted)]">
+                    {{ \Illuminate\Support\Carbon::now()->locale('de')->isoFormat('dddd, D. MMMM YYYY') }}
+                </p>
             </div>
+            @if($streak > 0)
+                <x-nx-badge variant="accent">🔥 {{ $streak }} {{ $streak === 1 ? 'Tag' : 'Tage' }} Streak</x-nx-badge>
+            @endif
         </div>
 
-        <!-- Module mit Zugriff -->
-        <div class="bg-[var(--ui-surface)] py-16 sm:py-24 rounded-xl border border-[var(--ui-border)]/60 mb-8">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                <div class="mx-auto max-w-2xl lg:mx-0">
-                    <h2 class="text-3xl font-semibold tracking-tight text-[var(--ui-secondary)] sm:text-4xl">Meine Module</h2>
-                    <p class="mt-6 text-lg text-[var(--ui-muted)]">Alle Module, auf die du im Team „{{ $currentTeam?->name ?? '–' }}“ Zugriff hast.</p>
+        <div class="space-y-6">
+            {{-- Heute: Check-in --}}
+            @if(!$todayCheckin)
+                <x-nx-callout variant="warning" title="Noch kein Check-in heute" icon="heroicon-o-sun">
+                    Starte deinen Tag mit einem kurzen Check-in — Ziel setzen, Stimmung festhalten.
+                    <x-slot name="action">
+                        <x-nx-button variant="primary" x-data @click="$dispatch('open-modal-checkin')">
+                            Jetzt einchecken
+                        </x-nx-button>
+                    </x-slot>
+                </x-nx-callout>
+            @else
+                @php
+                    $moodLabels = \Platform\Core\Models\Checkin::getMoodScoreOptions();
+                    $energyLabels = \Platform\Core\Models\Checkin::getEnergyScoreOptions();
+                    $goal = trim((string) ($todayCheckin['daily_goal'] ?? ''));
+                    $moodScore = $todayCheckin['mood_score'] ?? null;
+                    $energyScore = $todayCheckin['energy_score'] ?? null;
+                @endphp
+                <x-nx-card>
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-[color:var(--nx-faint)]">
+                            @svg('heroicon-o-check-circle', 'w-4 h-4 text-[color:var(--nx-success)]')
+                            Heute eingecheckt
+                        </div>
+                        <button type="button" x-data @click="$dispatch('open-modal-checkin')"
+                                class="text-xs font-medium text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] transition-colors">
+                            bearbeiten
+                        </button>
+                    </div>
+
+                    <div class="mt-3">
+                        <div class="text-xs text-[color:var(--nx-faint)]">Tagesziel</div>
+                        <div class="mt-0.5 text-[color:var(--nx-text)]">
+                            {{ $goal !== '' ? $goal : '— kein Ziel gesetzt —' }}
+                        </div>
+                    </div>
+
+                    @if($moodScore !== null || $energyScore !== null)
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            @if($moodScore !== null)
+                                <x-nx-badge variant="neutral" dot>Stimmung: {{ $moodLabels[$moodScore] ?? $moodScore }}</x-nx-badge>
+                            @endif
+                            @if($energyScore !== null)
+                                <x-nx-badge variant="neutral" dot>Energie: {{ $energyLabels[$energyScore] ?? $energyScore }}</x-nx-badge>
+                            @endif
+                        </div>
+                    @endif
+                </x-nx-card>
+            @endif
+
+            {{-- Offene Todos --}}
+            <x-nx-card flush>
+                <div class="flex items-center justify-between px-4 py-3">
+                    <h2 class="text-sm font-semibold text-[color:var(--nx-text)]">Offene Todos</h2>
+                    @if(count($openTodos) > 0)
+                        <span class="text-xs text-[color:var(--nx-faint)] tabular-nums">{{ count($openTodos) }}</span>
+                    @endif
                 </div>
 
-                @if(count($modules) === 0)
-                    <div class="mt-16 rounded-2xl bg-[var(--ui-muted-5)] p-8 text-[var(--ui-muted)]">
-                        Du hast aktuell keine Module freigeschaltet. Über „Module verwalten“ kannst du Zugriffe anfordern.
-                    </div>
+                @if(count($openTodos) === 0)
+                    <x-nx-empty icon="heroicon-o-check-circle">
+                        Keine offenen Todos — alles erledigt.
+                    </x-nx-empty>
                 @else
-                    <div class="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-8 lg:mx-0 lg:max-w-none lg:grid-cols-2 xl:grid-cols-3">
+                    <ul class="divide-y divide-[color:var(--nx-line)] border-t border-[color:var(--nx-line)]">
+                        @foreach($openTodos as $todo)
+                            <li class="flex items-center gap-3 px-4 py-2.5">
+                                <button type="button" wire:click="toggleTodo({{ $todo['id'] }})"
+                                        class="flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border border-[color:var(--nx-line-strong)] text-transparent hover:border-[color:var(--nx-accent)] hover:text-[color:var(--nx-faint)] transition-colors"
+                                        aria-label="Als erledigt markieren">
+                                    @svg('heroicon-o-check', 'w-3.5 h-3.5')
+                                </button>
+                                <span class="min-w-0 flex-1 text-sm text-[color:var(--nx-text)]">{{ $todo['title'] }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </x-nx-card>
+
+            {{-- Weiterarbeiten --}}
+            @if(count($modules) > 0)
+                <div>
+                    <h2 class="mb-3 text-sm font-semibold text-[color:var(--nx-text)]">Weiterarbeiten</h2>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         @foreach($modules as $module)
                             @php
                                 $title = $module['title'] ?? $module['label'] ?? ucfirst($module['key']);
-                                $description = $module['description'] ?? null;
-                                $icon = $module['navigation']['icon'] ?? ($module['icon'] ?? null);
+                                $icon = $module['navigation']['icon'] ?? ($module['icon'] ?? 'heroicon-o-cube');
                                 $routeName = $module['navigation']['route'] ?? null;
                                 $finalUrl = $routeName && \Illuminate\Support\Facades\Route::has($routeName)
                                     ? route($routeName)
                                     : ($module['url'] ?? '#');
+                                $isLast = ($module['key'] ?? null) === $lastModuleKey;
                             @endphp
-                            <a href="{{ $finalUrl }}" class="group relative flex flex-col gap-6 rounded-2xl bg-[var(--ui-muted-5)] p-8 hover:bg-[var(--ui-primary-5)] transition-colors">
-                                <div class="flex items-center gap-4">
-                                    <div class="flex-shrink-0">
-                                        @if(!empty($icon))
-                                            <x-dynamic-component :component="$icon" class="w-8 h-8 text-[var(--ui-primary)]" />
-                                        @else
-                                            @svg('heroicon-o-cube', 'w-8 h-8 text-[var(--ui-primary)]')
-                                        @endif
-                                    </div>
-                                    <div class="min-w-0 flex-1">
-                                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)] group-hover:text-[var(--ui-primary)] transition-colors">{{ $title }}</h3>
-                                    </div>
-                                </div>
-                                @if($description)
-                                    <p class="text-[var(--ui-muted)] text-sm leading-relaxed">{{ $description }}</p>
+                            <a href="{{ $finalUrl }}"
+                               class="group flex items-center gap-3 rounded-[8px] border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] p-3 transition-colors hover:bg-[color:var(--nx-hover)]">
+                                <x-dynamic-component :component="$icon" class="w-5 h-5 shrink-0 text-[color:var(--nx-muted)] group-hover:text-[color:var(--nx-text)]" />
+                                <span class="min-w-0 flex-1 truncate text-sm font-medium text-[color:var(--nx-text)]">{{ $title }}</span>
+                                @if($isLast)
+                                    <x-nx-badge variant="neutral">zuletzt</x-nx-badge>
                                 @endif
-                                <div class="mt-auto inline-flex items-center gap-2 text-sm font-medium text-[var(--ui-primary)]">
-                                    Tool öffnen
-                                    @svg('heroicon-o-arrow-right', 'w-4 h-4')
-                                </div>
                             </a>
                         @endforeach
                     </div>
-                @endif
+                </div>
+            @endif
+
+            {{-- Team-Kontext (dezent) --}}
+            <div class="grid grid-cols-2 gap-3 border-t border-[color:var(--nx-line)] pt-6">
+                <x-nx-stat label="Team-Mitglieder" :value="$memberCount"
+                           hint="{{ $currentTeam?->name ?? 'aktuelles Team' }}" icon="heroicon-o-user-group" />
+                <x-nx-stat label="Kosten (Monat)" value="€{{ number_format($monthlyTotal, 2, ',', '.') }}"
+                           hint="Module & Services" icon="heroicon-o-banknotes" />
             </div>
         </div>
-
-        <!-- Team -->
-        @if(count($teamMembers) > 0)
-            <div class="bg-[var(--ui-surface)] py-16 sm:py-24 rounded-xl border border-[var(--ui-border)]/60">
-                <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                    <div class="mx-auto max-w-2xl lg:mx-0">
-                        <h2 class="text-3xl font-semibold tracking-tight text-[var(--ui-secondary)] sm:text-4xl">Team</h2>
-                        <p class="mt-6 text-lg text-[var(--ui-muted)]">Mitglieder von „{{ $currentTeam?->name ?? '–' }}“.</p>
-                    </div>
-                    <ul role="list" class="mx-auto mt-16 grid max-w-2xl grid-cols-2 gap-x-8 gap-y-16 text-center sm:grid-cols-3 md:grid-cols-4 lg:mx-0 lg:max-w-none lg:grid-cols-5 xl:grid-cols-6">
-                        @foreach($teamMembers as $member)
-                            <li>
-                                <div class="mx-auto size-24 rounded-full bg-[var(--ui-primary-5)] flex items-center justify-center outline-1 -outline-offset-1 outline-[var(--ui-border)] overflow-hidden">
-                                    @if($member->avatar)
-                                        <img src="{{ $member->avatar }}" alt="{{ $member->name }}" class="w-full h-full object-cover rounded-full">
-                                    @else
-                                        <span class="text-2xl font-semibold text-[var(--ui-primary)]">
-                                            {{ strtoupper(substr($member->name, 0, 2)) }}
-                                        </span>
-                                    @endif
-                                </div>
-                                <h3 class="mt-6 text-base/7 font-semibold tracking-tight text-[var(--ui-secondary)]">{{ $member->name }}</h3>
-                                <p class="text-sm/6 text-[var(--ui-muted)]">
-                                    @if($member->id === $currentTeam?->user_id)
-                                        Team-Leiter
-                                    @else
-                                        Team-Mitglied
-                                    @endif
-                                </p>
-                            </li>
-                        @endforeach
-                    </ul>
-                </div>
-            </div>
-        @endif
     </x-ui-page-container>
 </x-ui-page>
