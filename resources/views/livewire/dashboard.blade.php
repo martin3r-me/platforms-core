@@ -64,10 +64,9 @@
                             @svg('heroicon-o-check-circle', 'w-4 h-4 text-[color:var(--nx-success)]')
                             Heute eingecheckt
                         </div>
-                        <button type="button" x-data @click="$dispatch('open-modal-checkin')"
-                                class="text-xs font-medium text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] transition-colors">
+                        <x-nx-button variant="ghost" size="sm" x-data @click="$dispatch('open-modal-checkin')">
                             bearbeiten
-                        </button>
+                        </x-nx-button>
                     </div>
 
                     <div class="mt-3">
@@ -106,13 +105,13 @@
                 @else
                     <ul class="divide-y divide-[color:var(--nx-line)] border-t border-[color:var(--nx-line)]">
                         @foreach($openTodos as $todo)
-                            <li class="flex items-center gap-3 px-4 py-2.5">
+                            <li>
                                 <button type="button" wire:click="toggleTodo({{ $todo['id'] }})"
-                                        class="flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border border-[color:var(--nx-line-strong)] text-transparent hover:border-[color:var(--nx-accent)] hover:text-[color:var(--nx-faint)] transition-colors"
+                                        class="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[color:var(--nx-hover)]"
                                         aria-label="Als erledigt markieren">
-                                    @svg('heroicon-o-check', 'w-3.5 h-3.5')
+                                    <span class="h-5 w-5 shrink-0 rounded-[6px] border border-[color:var(--nx-line-strong)]"></span>
+                                    <span class="min-w-0 flex-1 text-sm text-[color:var(--nx-text)]">{{ $todo['title'] }}</span>
                                 </button>
-                                <span class="min-w-0 flex-1 text-sm text-[color:var(--nx-text)]">{{ $todo['title'] }}</span>
                             </li>
                         @endforeach
                     </ul>
@@ -135,8 +134,8 @@
                                 $isLast = ($module['key'] ?? null) === $lastModuleKey;
                             @endphp
                             <a href="{{ $finalUrl }}"
-                               class="group flex items-center gap-3 rounded-[8px] border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] p-3 transition-colors hover:bg-[color:var(--nx-hover)]">
-                                <x-dynamic-component :component="$icon" class="w-5 h-5 shrink-0 text-[color:var(--nx-muted)] group-hover:text-[color:var(--nx-text)]" />
+                               class="flex items-center gap-3 rounded-[8px] border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] p-3 transition-colors hover:bg-[color:var(--nx-hover)]">
+                                <x-dynamic-component :component="$icon" class="w-5 h-5 shrink-0 text-[color:var(--nx-muted)]" />
                                 <span class="min-w-0 flex-1 truncate text-sm font-medium text-[color:var(--nx-text)]">{{ $title }}</span>
                                 @if($isLast)
                                     <x-nx-badge variant="neutral">zuletzt</x-nx-badge>

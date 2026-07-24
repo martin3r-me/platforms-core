@@ -97,6 +97,19 @@ class Module extends Model
             }
         }
 
-        return $hasPermission;
+        $legacy = $hasPermission;
+
+        // Phase 3 (Modul-Achse): Graph autoritativ — aber nur für MIGRIERTE User.
+        // Wer keinen Modul-Grant hat (nicht in den Graphen überführt), fällt auf
+        // den alten modulables-Stand zurück → kein Lockout. Schaltbar via Flag.
+        if (config('authz.enforce_modules')) {
+            $teamId = $this->isRootScoped() ? $rootTeamId : $baseTeamId;
+            $resolver = app(\Platform\Core\Authz\AuthzResolver::class);
+            if ($resolver->hasAnyModuleGrant($user, $teamId)) {
+                return $resolver->mayUseModule($user, $this->key, $teamId);
+            }
+        }
+
+        return $legacy;
     }
 }

@@ -14,4 +14,17 @@ return [
     |
     */
     'mode' => env('AUTHZ_MODE', 'shadow'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Modul-Zugang durchsetzen (Phase 3, Modul-Achse)
+    |--------------------------------------------------------------------------
+    |
+    | false — Module::hasAccess() nutzt weiter die alte modulables-Matrix.
+    | true  — Hybrid: migrierte User (mit Modul-Grant) werden vom Graphen
+    |         entschieden; nicht migrierte User fallen auf modulables zurück
+    |         (kein Lockout). Getrennt vom content-mode oben schaltbar.
+    |
+    */
+    'enforce_modules' => (bool) env('AUTHZ_ENFORCE_MODULES', false),
 ];

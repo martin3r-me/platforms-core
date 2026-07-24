@@ -27,9 +27,9 @@ class AuthzResolver
     /**
      * Darf der User dieses Modul / Tool überhaupt nutzen? (pauschal)
      */
-    public function mayUseModule(User $user, string $module): bool
+    public function mayUseModule(User $user, string $module, ?int $teamId = null): bool
     {
-        $teamId = $this->teamId($user);
+        $teamId ??= $this->teamId($user);
         if ($teamId === null) {
             return false;
         }
@@ -37,6 +37,23 @@ class AuthzResolver
         return $this->baseGrantQuery($user, $teamId)
             ->where('scope_type', 'module')
             ->where(fn ($q) => $q->where('scope_key', $module)->orWhere('scope_key', '*'))
+            ->exists();
+    }
+
+    /**
+     * Hat der User ÜBERHAUPT irgendeinen Modul-Grant in diesem Team?
+     * Dient als "wurde migriert?"-Weiche: nur dann darf der Graph den
+     * Modul-Zugang autoritativ entscheiden (sonst Lockout für nicht migrierte User).
+     */
+    public function hasAnyModuleGrant(User $user, ?int $teamId = null): bool
+    {
+        $teamId ??= $this->teamId($user);
+        if ($teamId === null) {
+            return false;
+        }
+
+        return $this->baseGrantQuery($user, $teamId)
+            ->where('scope_type', 'module')
             ->exists();
     }
 
