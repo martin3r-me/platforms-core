@@ -58,35 +58,13 @@ class ModuleFlyout extends Component
         $modules = PlatformCore::getVisibleModules();
 
         // Filtere Module nach Berechtigung
-        $this->modules = collect($modules)->filter(function($module) use ($user, $baseTeam, $baseTeamId, $rootTeam, $rootTeamId) {
+        $this->modules = collect($modules)->filter(function($module) use ($user, $baseTeam) {
             $moduleModel = \Platform\Core\Models\Module::where('key', $module['key'])->first();
             if (!$moduleModel) return false;
 
-            // Für Parent-Module: Rechte aus Root-Team prüfen
-            // Für Single-Module: Rechte aus aktuellem Team prüfen
-            if ($moduleModel->isRootScoped()) {
-                $userAllowed = $user->modules()
-                    ->where('module_id', $moduleModel->id)
-                    ->wherePivot('team_id', $rootTeamId)
-                    ->wherePivot('enabled', true)
-                    ->exists();
-                $teamAllowed = $rootTeam->modules()
-                    ->where('module_id', $moduleModel->id)
-                    ->wherePivot('enabled', true)
-                    ->exists();
-            } else {
-            $userAllowed = $user->modules()
-                ->where('module_id', $moduleModel->id)
-                    ->wherePivot('team_id', $baseTeamId)
-                    ->wherePivot('enabled', true)
-                    ->exists();
-                $teamAllowed = $baseTeam->modules()
-                    ->where('module_id', $moduleModel->id)
-                ->wherePivot('enabled', true)
-                ->exists();
-            }
-
-            return $userAllowed || $teamAllowed;
+            // Einheitlich über hasAccess: respektiert unter Enforcement den Graphen,
+            // sonst die modulables (Fallback). Kein direkter modulables-Bypass mehr.
+            return $moduleModel->hasAccess($user, $baseTeam);
         })->sortBy(function($module) {
             return $module['title'] ?? $module['label'] ?? '';
         })->values();

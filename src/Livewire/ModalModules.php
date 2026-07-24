@@ -36,33 +36,12 @@ class ModalModules extends Component
 
         $modules = PlatformCore::getVisibleModules();
 
-        $this->modules = collect($modules)->filter(function ($module) use ($user, $baseTeam, $baseTeamId, $rootTeam, $rootTeamId) {
+        $this->modules = collect($modules)->filter(function ($module) use ($user, $baseTeam) {
             $moduleModel = \Platform\Core\Models\Module::where('key', $module['key'])->first();
             if (!$moduleModel) return false;
 
-            if ($moduleModel->isRootScoped()) {
-                $userAllowed = $user->modules()
-                    ->where('module_id', $moduleModel->id)
-                    ->wherePivot('team_id', $rootTeamId)
-                    ->wherePivot('enabled', true)
-                    ->exists();
-                $teamAllowed = $rootTeam->modules()
-                    ->where('module_id', $moduleModel->id)
-                    ->wherePivot('enabled', true)
-                    ->exists();
-            } else {
-                $userAllowed = $user->modules()
-                    ->where('module_id', $moduleModel->id)
-                    ->wherePivot('team_id', $baseTeamId)
-                    ->wherePivot('enabled', true)
-                    ->exists();
-                $teamAllowed = $baseTeam->modules()
-                    ->where('module_id', $moduleModel->id)
-                    ->wherePivot('enabled', true)
-                    ->exists();
-            }
-
-            return $userAllowed || $teamAllowed;
+            // Einheitlich über hasAccess (Graph unter Enforcement, sonst modulables).
+            return $moduleModel->hasAccess($user, $baseTeam);
         })->values();
     }
 
