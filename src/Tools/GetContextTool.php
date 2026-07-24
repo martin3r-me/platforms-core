@@ -42,6 +42,10 @@ class GetContextTool implements ToolContract
                     'type' => 'integer',
                     'description' => 'Optional: ID eines Teams, dessen Kontext (Module, Members) abgerufen werden soll. Der User muss Mitglied dieses Teams sein. Wenn nicht angegeben, wird das aktuelle Team verwendet. Nutze "core.teams.GET" um verfügbare Team-IDs zu sehen.'
                 ],
+                'user_id' => [
+                    'type' => 'integer',
+                    'description' => 'Optional: Kontext (v.a. allowed_modules/denied_modules) eines ANDEREN Users abrufen. Nur für Team-Owner/Admins. Der Ziel-User muss Mitglied des (Ziel-)Teams sein. Default: aktueller User.'
+                ],
                 'include_metadata' => [
                     'type' => 'boolean',
                     'description' => 'Optional: Soll auch erweiterte Metadaten (Zeit, Zeitzone, etc.) enthalten sein? Standard: true'
@@ -93,6 +97,27 @@ class GetContextTool implements ToolContract
                 $isCurrentTeam = $context->team && $context->team->id === $targetTeam->id;
             } else {
                 $targetTeam = $context->team;
+            }
+
+            // Optional: Kontext eines ANDEREN Users abfragen (nur Team-Owner/Admin).
+            // Zweck: den Alt-Stand pro User ziehen (z.B. für die Authz-Migration),
+            // damit man ihn übertragen und die alte modulables-Matrix später entfernen kann.
+            $requestedUserId = $arguments['user_id'] ?? null;
+            if ($requestedUserId !== null && $user && (int) $requestedUserId !== (int) $user->id) {
+                if (!$targetTeam) {
+                    return ToolResult::error('TEAM_NOT_FOUND', 'Für user_id muss ein Team bestimmbar sein (team_id angeben oder aktives Team setzen).');
+                }
+                // Root of Trust: nur Owner/Admin des Ziel-Teams darf fremde Kontexte sehen.
+                $requesterRole = $user->teams()->where('teams.id', $targetTeam->id)->first()?->pivot?->role;
+                if (!in_array($requesterRole, \Platform\Core\Enums\StandardRole::getAdminRoles(), true)) {
+                    return ToolResult::error('ACCESS_DENIED', 'Nur Team-Owner/Admins dürfen den Kontext anderer User abfragen.');
+                }
+                $targetUser = \Platform\Core\Models\User::find((int) $requestedUserId);
+                if (!$targetUser || !$targetUser->teams()->where('teams.id', $targetTeam->id)->exists()) {
+                    return ToolResult::error('USER_NOT_FOUND', 'User nicht gefunden oder nicht Mitglied des Ziel-Teams.');
+                }
+                // Ab hier wird der gesamte Kontext (Module, Entities) für den Ziel-User berechnet.
+                $user = $targetUser;
             }
 
             // Prüfe ob ein MCP-Team-Override aktiv ist (team_id in mcp_sessions)
