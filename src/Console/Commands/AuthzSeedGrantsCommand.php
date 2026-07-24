@@ -9,27 +9,30 @@ use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
 
 /**
- * Spiegelt den heutigen Zustand (team_user + modulables) in den Grant-Store.
+ * Migriert den Alt-Stand EINES Teams in den Autorisierungs-Graphen.
  *
- * - CONTENT: pro Mitgliedschaft ein Grant auf die Team-Wurzel (aus team_user.role).
- * - MODULE:  pro User die TATSÄCHLICH erlaubten Module (via Module::hasAccess),
- *            als authz_grant(scope=module, capability=use). Ersetzt das frühere
- *            grobe `use '*'` durch den echten per-User-Alt-Stand.
+ * Bewusst team-scoped (--team=): es geht nur um das eine Team (z.B. BHG.DIGITAL);
+ * andere Teams werden nicht angefasst.
  *
- * Subjekt der Modul-Grants: das Person-Entity (linked_user_id), falls vorhanden
- * — damit der "Module"-Tab sie zeigt; sonst der User selbst (Fallback, greift
- * trotzdem, weil der Resolver User- UND Entity-Subjekt prüft).
+ * Bewusst entity-gated: nur User MIT Person-Entity (linked_user_id) werden
+ * migriert. Wer keinen Bezug in die Organisation hat, wird STILL ignoriert
+ * (kein Fallback) — der Org-Graph ist die alleinige Autorität.
  *
- * Idempotent: löscht die eigenen seed-Quellen und schreibt neu. Manuell/per UI
- * gesetzte Grants (source "ui:" bzw. "mcp:") bleiben unberührt und nicht doppelt.
+ * Pro migriertem User:
+ *  - CONTENT: Grant auf die Team-Wurzel (aus team_user.role), Subjekt = Person-Entity.
+ *  - MODULE:  die TATSÄCHLICH erlaubten Module (via Module::hasAccess) als
+ *             authz_grant(scope=module, capability=use), Subjekt = Person-Entity.
  *
- * Rollen-Mapping (Content):  owner→owner  admin→owner  member→write  viewer→read  (null→write)
+ * Idempotent (pro Team): löscht die eigenen seed-Quellen dieses Teams und
+ * schreibt neu. UI/MCP-Grants (source "ui:" bzw. "mcp:") bleiben unberührt.
+ *
+ * Rollen-Mapping (Content): owner→owner  admin→owner  member→write  viewer→read  (null→write)
  */
 class AuthzSeedGrantsCommand extends Command
 {
-    protected $signature = 'authz:seed-grants';
+    protected $signature = 'authz:seed-grants {--team= : Team-ID, die migriert werden soll (Pflicht)}';
 
-    protected $description = 'Spiegelt team_user.role + den echten per-User-Modul-Stand (hasAccess) in authz_grant.';
+    protected $description = 'Migriert den echten Alt-Stand (Rolle + hasAccess-Module) EINES Teams in authz_grant — nur org-verknüpfte User.';
 
     private const ROLE_TO_CAPABILITY = [
         'owner'  => 'owner',
@@ -41,65 +44,81 @@ class AuthzSeedGrantsCommand extends Command
     private const CONTENT_SOURCE = 'seed:team_user';
     private const MODULE_SOURCE  = 'seed:module';
 
-    // Pseudo-Module, die immer erlaubt sind — kein Grant nötig.
     private const ALWAYS_ALLOWED = ['core', 'tools', 'communication'];
 
     public function handle(): int
     {
-        // Idempotent: eigene Seeds entfernen (Content + alter Wildcard + Modul-Seed).
+        $teamId = (int) $this->option('team');
+        if ($teamId <= 0) {
+            $this->error('Bitte Team angeben: php artisan authz:seed-grants --team=<id>');
+            return self::FAILURE;
+        }
+
+        $team = Team::find($teamId);
+        if (! $team) {
+            $this->error("Team {$teamId} nicht gefunden.");
+            return self::FAILURE;
+        }
+
+        if (! DB::getSchemaBuilder()->hasTable('organization_entities')) {
+            $this->error('organization ist nicht installiert/migriert — ohne Org-Graph keine Migration.');
+            return self::FAILURE;
+        }
+
+        // Idempotent, aber team-scoped: nur die Seeds DIESES Teams entfernen.
         DB::table('authz_grant')
+            ->where('team_id', $teamId)
             ->whereIn('source', [self::CONTENT_SOURCE, 'seed:team_user_module', self::MODULE_SOURCE])
             ->delete();
 
         $now = now();
-        $hasEntities = DB::getSchemaBuilder()->hasTable('organization_entities');
         $modules = Module::all();
 
-        $memberships = 0;
+        $migrated = 0;
         $moduleGrants = 0;
+        $skipped = [];
         $contentRows = [];
 
-        DB::table('team_user')->orderBy('id')->each(function ($row) use (
-            &$memberships, &$moduleGrants, &$contentRows, $now, $hasEntities, $modules
+        DB::table('team_user')->where('team_id', $teamId)->orderBy('id')->each(function ($row) use (
+            &$migrated, &$moduleGrants, &$skipped, &$contentRows, $now, $teamId, $modules
         ) {
             $user = User::find($row->user_id);
-            $team = Team::find($row->team_id);
-            if (! $user || ! $team) {
+            if (! $user) {
                 return;
             }
-            $memberships++;
 
-            // Subjekt bestimmen: Person-Entity falls vorhanden, sonst User.
-            $subjectType = 'user';
-            $subjectId = (int) $row->user_id;
-            if ($hasEntities) {
-                $entityId = DB::table('organization_entities')
-                    ->where('linked_user_id', $row->user_id)
-                    ->where('team_id', $row->team_id)
-                    ->value('id');
-                if ($entityId) {
-                    $subjectType = 'entity';
-                    $subjectId = (int) $entityId;
-                }
+            // Entity-Gate: nur User MIT Person-Entity in diesem Team.
+            $entityId = DB::table('organization_entities')
+                ->where('linked_user_id', $row->user_id)
+                ->where('team_id', $teamId)
+                ->value('id');
+
+            if (! $entityId) {
+                $skipped[] = $user->name ?? ('User '.$row->user_id);
+                return; // still ignorieren — kein Fallback
             }
+            $entityId = (int) $entityId;
 
-            // (a) Content-Grant auf die Team-Wurzel (aus Rolle) — Subjekt = User.
+            $team = Team::find($teamId);
+            $migrated++;
+
+            // (a) Content-Grant auf die Team-Wurzel (aus Rolle), Subjekt = Person-Entity.
             $contentRows[] = [
-                'subject_type' => 'user',
-                'subject_id'   => (int) $row->user_id,
+                'subject_type' => 'entity',
+                'subject_id'   => $entityId,
                 'capability'   => self::ROLE_TO_CAPABILITY[$row->role] ?? 'write',
                 'scope_type'   => 'team',
-                'scope_id'     => (int) $row->team_id,
+                'scope_id'     => $teamId,
                 'scope_key'    => null,
                 'source'       => self::CONTENT_SOURCE,
                 'valid_from'   => null,
                 'valid_to'     => null,
-                'team_id'      => (int) $row->team_id,
+                'team_id'      => $teamId,
                 'created_at'   => $now,
                 'updated_at'   => $now,
             ];
 
-            // (b) Modul-Grants: reale erlaubte Module via hasAccess.
+            // (b) Modul-Grants: reale erlaubte Module via hasAccess, Subjekt = Person-Entity.
             foreach ($modules as $module) {
                 if (in_array($module->key, self::ALWAYS_ALLOWED, true)) {
                     continue;
@@ -112,10 +131,9 @@ class AuthzSeedGrantsCommand extends Command
                     continue;
                 }
 
-                // Nicht doppeln, wenn (z.B. per UI/MCP) schon ein Grant existiert.
                 $exists = DB::table('authz_grant')
-                    ->where('subject_type', $subjectType)
-                    ->where('subject_id', $subjectId)
+                    ->where('subject_type', 'entity')
+                    ->where('subject_id', $entityId)
                     ->where('scope_type', 'module')
                     ->where('scope_key', $module->key)
                     ->where('capability', 'use')
@@ -125,8 +143,8 @@ class AuthzSeedGrantsCommand extends Command
                 }
 
                 DB::table('authz_grant')->insert([
-                    'subject_type' => $subjectType,
-                    'subject_id'   => $subjectId,
+                    'subject_type' => 'entity',
+                    'subject_id'   => $entityId,
                     'capability'   => 'use',
                     'scope_type'   => 'module',
                     'scope_id'     => null,
@@ -134,7 +152,7 @@ class AuthzSeedGrantsCommand extends Command
                     'source'       => self::MODULE_SOURCE,
                     'valid_from'   => null,
                     'valid_to'     => null,
-                    'team_id'      => (int) $row->team_id,
+                    'team_id'      => $teamId,
                     'created_at'   => $now,
                     'updated_at'   => $now,
                 ]);
@@ -147,10 +165,16 @@ class AuthzSeedGrantsCommand extends Command
         }
 
         $this->info(sprintf(
-            'Seeded %d Mitgliedschaften: Content-Grants (Team-Wurzel) + %d Modul-Grants (echter Alt-Stand via hasAccess).',
-            $memberships,
-            $moduleGrants
+            'Team %d (%s): %d User migriert, %d Modul-Grants. %d ohne Person-Entity ignoriert.',
+            $teamId,
+            $team->name ?? '?',
+            $migrated,
+            $moduleGrants,
+            count($skipped)
         ));
+        if ($skipped !== []) {
+            $this->line('Ignoriert (kein Org-Bezug): '.implode(', ', $skipped));
+        }
 
         return self::SUCCESS;
     }
