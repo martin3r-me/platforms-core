@@ -65,6 +65,13 @@ class AuthzSeedGrantsCommand extends Command
             return self::FAILURE;
         }
 
+        // KRITISCH: Beim Seeden muss Module::hasAccess den ALTEN modulables-Stand
+        // lesen, NICHT den Graphen. Sonst vergiftet sich der Seed selbst — nach
+        // dem ersten eingefügten Grant würde hasAccess für die Folgemodule den
+        // noch unvollständigen Graphen befragen und sie fälschlich verweigern.
+        // Enforcement daher prozesslokal für die Dauer des Seeds abschalten.
+        config(['authz.enforce_modules' => false]);
+
         // Idempotent, aber team-scoped: nur die Seeds DIESES Teams entfernen.
         DB::table('authz_grant')
             ->where('team_id', $teamId)
