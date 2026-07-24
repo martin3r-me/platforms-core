@@ -1,16 +1,18 @@
 <div x-data="{ tab: 'team' }" x-init="
     window.addEventListener('open-modal-team', (e) => { tab = e?.detail?.tab || 'team'; });
 ">
-<x-ui-modal size="xl" wire:model="modalShow">
+<x-nx-modal size="xl" wire:model="modalShow">
     <x-slot name="header">
         <div class="flex items-center justify-between w-full">
             <div class="flex items-center gap-3">
-                <h2 class="text-xl font-semibold text-[var(--ui-secondary)] m-0">Team verwalten</h2>
-                <span class="text-xs text-[var(--ui-muted)] bg-[var(--ui-muted-5)] px-2 py-1 rounded-full">TEAM</span>
+                <h2 class="text-xl font-semibold text-[color:var(--nx-text)] m-0">Team verwalten</h2>
+                <span class="text-xs text-[color:var(--nx-muted)] bg-[color:var(--nx-bg)] px-2 py-1 rounded-full">TEAM</span>
             </div>
         </div>
-        <div class="flex gap-1 mt-4 border-b border-gray-200">
-            <button type="button" class="px-3 py-2 text-sm font-medium rounded-t-lg transition-colors" :class="{ 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : tab === 'team', 'text-gray-500 hover:text-gray-700' : tab !== 'team' }" x-on:click="tab = 'team'">Team</button>
+        <div class="flex gap-1 mt-4 border-b border-[color:var(--nx-line)]">
+            <button type="button" class="px-3 py-2 text-sm font-medium border-b-2 transition-colors"
+                :class="tab === 'team' ? 'text-[color:var(--nx-text)] border-[color:var(--nx-accent)]' : 'text-[color:var(--nx-muted)] border-transparent hover:text-[color:var(--nx-text)]'"
+                x-on:click="tab = 'team'">Team</button>
         </div>
     </x-slot>
 
@@ -19,9 +21,9 @@
         <div class="space-y-6">
             {{-- Team Switch --}}
             <div>
-                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Aktuelles Team wechseln</h3>
+                <h3 class="text-lg font-semibold text-[color:var(--nx-text)] mb-4">Aktuelles Team wechseln</h3>
                 @if(!empty($allTeams) && count($allTeams) > 1)
-                    <x-ui-input-select
+                    <x-nx-input-select
                         name="user.current_team_id"
                         label="Team auswählen"
                         :options="$allTeams"
@@ -33,15 +35,15 @@
                         x-on:change="$wire.changeCurrentTeam($event.target.value)"
                     />
                 @else
-                    <div class="text-sm text-[var(--ui-muted)] p-4 bg-[var(--ui-muted-5)] rounded-lg">Nur ein Team vorhanden. Lege unten ein neues Team an.</div>
+                    <div class="text-sm text-[color:var(--nx-muted)] p-4 bg-[color:var(--nx-bg)] rounded-lg">Nur ein Team vorhanden. Lege unten ein neues Team an.</div>
                 @endif
             </div>
 
             {{-- Neues Team anlegen --}}
             <div>
-                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Neues Team anlegen</h3>
-                <form wire:submit.prevent="createTeam" class="space-y-4 p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                    <x-ui-input-text
+                <h3 class="text-lg font-semibold text-[color:var(--nx-text)] mb-4">Neues Team anlegen</h3>
+                <form wire:submit.prevent="createTeam" class="space-y-4 p-4 bg-[color:var(--nx-bg)] rounded-lg border border-[color:var(--nx-line)]">
+                    <x-nx-input-text
                         name="newTeamName"
                         label="Team-Name"
                         wire:model.live="newTeamName"
@@ -50,35 +52,33 @@
                     />
 
                     @if(!empty($availableParentTeams) && count($availableParentTeams) > 0)
-                        <x-ui-input-select
+                        <x-nx-input-select
                             name="newParentTeamId"
                             label="Parent-Team (optional)"
                             :options="$availableParentTeams"
                             :nullable="true"
                             wire:model="newParentTeamId"
                         />
-                        <p class="text-xs text-[var(--ui-muted)]">
+                        <p class="text-xs text-[color:var(--nx-muted)]">
                             Optional: Kind-Teams erben Zugriff auf root-scoped Module (z.B. CRM, Organization).
                         </p>
                     @endif
 
                     @if(!empty($availableUsersForTeam))
                         <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Mitglieder hinzufügen (optional)</label>
+                            <label class="block text-sm font-medium text-[color:var(--nx-text)] mb-2">Mitglieder hinzufügen (optional)</label>
                             <div class="space-y-2 max-h-40 overflow-y-auto">
                                 @foreach($availableUsersForTeam as $availableUser)
                                     @php
                                         $isSelected = collect($newInitialMembers)->contains(fn($m) => ($m['user_id'] ?? null) == $availableUser->id);
                                     @endphp
-                                    <label class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-[var(--ui-muted-10)] transition-colors {{ $isSelected ? 'bg-blue-50 border border-blue-200' : '' }}">
-                                        <input type="checkbox" wire:click="toggleInitialMember({{ $availableUser->id }})" {{ $isSelected ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                    <label class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-[color:var(--nx-hover)] transition-colors {{ $isSelected ? 'bg-[color:var(--nx-accent-soft)] border border-[color:var(--nx-line-strong)]' : '' }}">
+                                        <input type="checkbox" wire:click="toggleInitialMember({{ $availableUser->id }})" {{ $isSelected ? 'checked' : '' }} class="rounded border-[color:var(--nx-line-strong)] text-[color:var(--nx-accent)] focus:ring-[color:var(--nx-accent)]" />
                                         <div class="flex items-center gap-2">
-                                            <div class="w-7 h-7 bg-[var(--ui-primary)] text-[var(--ui-on-primary)] rounded-full flex items-center justify-center text-xs font-semibold">
-                                                {{ strtoupper(mb_substr(($availableUser->fullname ?? $availableUser->name), 0, 2)) }}
-                                            </div>
-                                            <span class="text-sm text-[var(--ui-secondary)]">{{ $availableUser->fullname ?? $availableUser->name }}</span>
+                                            <x-nx-avatar :name="$availableUser->fullname ?? $availableUser->name" :src="$availableUser->avatar ?? null" size="md" />
+                                            <span class="text-sm text-[color:var(--nx-text)]">{{ $availableUser->fullname ?? $availableUser->name }}</span>
                                             @if($availableUser->isAiUser())
-                                                <x-ui-badge variant="purple" size="sm">AI</x-ui-badge>
+                                                <x-nx-badge variant="info">AI</x-nx-badge>
                                             @endif
                                         </div>
                                     </label>
@@ -87,33 +87,31 @@
                         </div>
                     @endif
 
-                    <x-ui-button type="submit">Team erstellen</x-ui-button>
+                    <x-nx-button type="submit" variant="primary">Team erstellen</x-nx-button>
                 </form>
             </div>
 
             {{-- Team Settings (nur für Owner) --}}
             @if(isset($team) && ($team->user_id ?? null) === auth()->id())
             <div>
-                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Team-Einstellungen</h3>
-                <div class="space-y-4 p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                <h3 class="text-lg font-semibold text-[color:var(--nx-text)] mb-4">Team-Einstellungen</h3>
+                <div class="space-y-4 p-4 bg-[color:var(--nx-bg)] rounded-lg border border-[color:var(--nx-line)]">
                     @if(!empty($availableParentTeams) && count($availableParentTeams) > 0)
                         <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">
-                                Parent-Team
-                            </label>
-                            <x-ui-input-select
+                            <x-nx-input-select
                                 name="currentParentTeamId"
+                                label="Parent-Team"
                                 :options="$availableParentTeams"
                                 :nullable="true"
                                 wire:model="currentParentTeamId"
                                 wire:change="updateParentTeam"
                             />
-                            <p class="text-xs text-[var(--ui-muted)] mt-2">
+                            <p class="text-xs text-[color:var(--nx-muted)] mt-2">
                                 Optional: Wähle ein Root-Team als Parent-Team. Kind-Teams erben Zugriff auf root-scoped Module (z.B. CRM, Organization).
                             </p>
                         </div>
                     @else
-                        <div class="text-sm text-[var(--ui-muted)]">
+                        <div class="text-sm text-[color:var(--nx-muted)]">
                             Keine verfügbaren Parent-Teams. Erstelle zuerst ein Root-Team.
                         </div>
                     @endif
@@ -124,35 +122,29 @@
             {{-- Team Members --}}
             @if(isset($team))
             <div>
-                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Team-Mitglieder</h3>
+                <h3 class="text-lg font-semibold text-[color:var(--nx-text)] mb-4">Team-Mitglieder</h3>
                 <div class="space-y-3">
                     @foreach($team->users ?? [] as $member)
-                        <div class="flex items-center justify-between p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                        <div class="flex items-center justify-between p-4 bg-[color:var(--nx-bg)] rounded-lg border border-[color:var(--nx-line)]">
                             <div class="flex items-center gap-3">
-                                @if(!empty($member->avatar))
-                                    <img src="{{ $member->avatar }}" alt="{{ $member->fullname ?? $member->name }}" class="w-10 h-10 rounded-full object-cover" />
-                                @else
-                                <div class="w-10 h-10 bg-[var(--ui-primary)] text-[var(--ui-on-primary)] rounded-full flex items-center justify-center">
-                                    <span class="text-sm font-semibold">{{ strtoupper(mb_substr(($member->fullname ?? $member->name), 0, 2)) }}</span>
-                                </div>
-                                @endif
+                                <x-nx-avatar :name="$member->fullname ?? $member->name" :src="$member->avatar ?? null" size="lg" />
                                 <div>
                                     <div class="flex items-center gap-2">
-                                        <div class="font-semibold text-[var(--ui-secondary)]">{{ $member->fullname ?? $member->name }}</div>
+                                        <div class="font-semibold text-[color:var(--nx-text)]">{{ $member->fullname ?? $member->name }}</div>
                                         @if($member->isAiUser())
-                                            <x-ui-badge variant="purple" size="sm">AI</x-ui-badge>
+                                            <x-nx-badge variant="info">AI</x-nx-badge>
                                         @endif
                                     </div>
                                     @if($member->email)
-                                        <div class="text-sm text-[var(--ui-muted)]">{{ $member->email }}</div>
+                                        <div class="text-sm text-[color:var(--nx-muted)]">{{ $member->email }}</div>
                                     @elseif($member->isAiUser())
-                                        <div class="text-sm text-[var(--ui-muted)]">AI-User</div>
+                                        <div class="text-sm text-[color:var(--nx-muted)]">AI-User</div>
                                     @endif
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
                                 @if(($team->user_id ?? null) === auth()->id())
-                                    <x-ui-input-select
+                                    <x-nx-input-select
                                         name="member_role_{{ $member->id }}"
                                         :options="['owner' => 'Owner', 'admin' => 'Admin', 'member' => 'Member', 'viewer' => 'Viewer']"
                                         :nullable="false"
@@ -162,20 +154,16 @@
                                     />
 
                                     @if(($member->id ?? null) !== auth()->id())
-                                        <x-ui-confirm-button
-                                            action="removeMember"
-                                            :value="$member->id"
-                                            text="Entfernen"
-                                            confirmText="Mitglied wirklich entfernen?"
-                                            variant="danger"
-                                        />
+                                        <x-nx-button variant="danger" wire:click="removeMember({{ $member->id }})" wire:confirm="Mitglied wirklich entfernen?">
+                                            Entfernen
+                                        </x-nx-button>
                                     @else
-                                        <x-ui-badge variant="success" size="sm">Du</x-ui-badge>
+                                        <x-nx-badge variant="success">Du</x-nx-badge>
                                     @endif
                                 @else
-                                    <x-ui-badge variant="primary" size="sm">{{ ucfirst($member->pivot->role ?? 'member') }}</x-ui-badge>
+                                    <x-nx-badge>{{ ucfirst($member->pivot->role ?? 'member') }}</x-nx-badge>
                                     @if(($member->id ?? null) === auth()->id())
-                                        <x-ui-badge variant="success" size="sm">Du</x-ui-badge>
+                                        <x-nx-badge variant="success">Du</x-nx-badge>
                                     @endif
                                 @endif
                             </div>
@@ -188,10 +176,10 @@
             {{-- Invite Member --}}
             @if(isset($team) && !($team->personal_team ?? true))
             <div>
-                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Mitglied einladen</h3>
+                <h3 class="text-lg font-semibold text-[color:var(--nx-text)] mb-4">Mitglied einladen</h3>
                 @php($roles = \Platform\Core\Enums\TeamRole::cases())
                 <form wire:submit.prevent="inviteToTeam" class="space-y-4">
-                    <x-ui-input-text
+                    <x-nx-input-text
                         name="inviteEmails"
                         label="E-Mail(s)"
                         wire:model.live="inviteEmails"
@@ -199,36 +187,36 @@
                         required
                         :errorKey="'inviteEmails'"
                     />
-                    <p class="text-xs text-[var(--ui-muted)]">Beispiel: alice@example.com, bob@example.com</p>
-                    <x-ui-input-select name="inviteRole" label="Rolle" :options="$roles" optionValue="value" optionLabel="name" :nullable="false" wire:model.live="inviteRole" />
-                    <x-ui-button type="submit">Einladung senden</x-ui-button>
+                    <p class="text-xs text-[color:var(--nx-muted)]">Beispiel: alice@example.com, bob@example.com</p>
+                    <x-nx-input-select name="inviteRole" label="Rolle" :options="$roles" optionValue="value" optionLabel="name" :nullable="false" wire:model.live="inviteRole" />
+                    <x-nx-button type="submit" variant="primary">Einladung senden</x-nx-button>
                 </form>
 
                 {{-- Offene Einladungen --}}
                 <div class="mt-6">
-                    <h4 class="text-md font-semibold text-[var(--ui-secondary)] mb-3">Offene Einladungen</h4>
+                    <h4 class="text-md font-semibold text-[color:var(--nx-text)] mb-3">Offene Einladungen</h4>
                     @php($pending = $this->pendingInvitations)
                     @if($pending && count($pending))
                         <div class="space-y-2">
                             @foreach($pending as $inv)
-                                <div class="flex items-center justify-between p-3 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                                <div class="flex items-center justify-between p-3 bg-[color:var(--nx-bg)] rounded-lg border border-[color:var(--nx-line)]">
                                     <div>
-                                        <div class="font-medium text-[var(--ui-secondary)]">{{ $inv->email }}</div>
-                                        <div class="text-xs text-[var(--ui-muted)]">Rolle: {{ ucfirst($inv->role ?? 'member') }}</div>
+                                        <div class="font-medium text-[color:var(--nx-text)]">{{ $inv->email }}</div>
+                                        <div class="text-xs text-[color:var(--nx-muted)]">Rolle: {{ ucfirst($inv->role ?? 'member') }}</div>
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <x-ui-button variant="secondary-outline" x-data x-on:click="navigator.clipboard.writeText('{{ url('/invitations/accept/'.$inv->token) }}'); $dispatch('notify', { type: 'success', message: 'Einladungslink kopiert' })">
+                                        <x-nx-button variant="secondary" x-data x-on:click="navigator.clipboard.writeText('{{ url('/invitations/accept/'.$inv->token) }}'); $dispatch('notify', { type: 'success', message: 'Einladungslink kopiert' })">
                                             Link kopieren
-                                        </x-ui-button>
-                                        <x-ui-button variant="danger" wire:click="revokeInvitation({{ $inv->id }})">
+                                        </x-nx-button>
+                                        <x-nx-button variant="danger" wire:click="revokeInvitation({{ $inv->id }})">
                                             Widerrufen
-                                        </x-ui-button>
+                                        </x-nx-button>
                                     </div>
                                 </div>
                             @endforeach
                         </div>
                     @else
-                        <div class="text-sm text-[var(--ui-muted)]">Keine offenen Einladungen.</div>
+                        <div class="text-sm text-[color:var(--nx-muted)]">Keine offenen Einladungen.</div>
                     @endif
                 </div>
             </div>
@@ -238,10 +226,10 @@
 
     <x-slot name="footer">
         <div class="flex justify-end">
-            <x-ui-button variant="secondary-outline" x-on:click="modalShow = false">
+            <x-nx-button variant="secondary" x-on:click="modalShow = false">
                 Schließen
-            </x-ui-button>
+            </x-nx-button>
         </div>
     </x-slot>
-</x-ui-modal>
+</x-nx-modal>
 </div>
