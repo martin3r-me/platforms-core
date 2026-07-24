@@ -55,16 +55,8 @@
     <div class="flex items-center gap-1">
         {{-- Action buttons (desktop/tablet) --}}
         <div class="hidden md:flex items-center gap-1">
-            {{-- Actions: Check-in, Algedonic, Comms, Terminal --}}
+            {{-- Actions: Check-in, Comms, Terminal --}}
             @livewire('core.navbar-checkin')
-
-            <button x-data
-                @click="$dispatch('open-modal-algedonic')"
-                class="relative inline-flex items-center justify-center w-7 h-7 rounded-md transition text-red-600 hover:text-white hover:bg-red-600 hover:shadow-sm group"
-                title="Algedonic-Signal — direkt an die oberste Ebene (Stafford Beer)">
-                <span class="absolute inset-0 rounded-md bg-red-500 opacity-0 group-hover:opacity-20 animate-pulse"></span>
-                @svg('heroicon-o-bell-alert', 'w-4 h-4 relative')
-            </button>
 
             <button x-data
                 @click="$dispatch('open-modal-comms')"
@@ -85,6 +77,18 @@
                     <rect x="3" y="5" width="18" height="8.5" rx="1.5" />
                     <rect x="3" y="15" width="18" height="4" rx="1.5" fill="currentColor" opacity="0.9" stroke="none" />
                 </svg>
+            </button>
+
+            <div class="h-6 w-px bg-[color:var(--nx-line)] mx-0.5"></div>
+
+            {{-- Algedonic-Signal — Eskalation direkt an die oberste Ebene (Stafford Beer).
+                 Bewusst isoliert zwischen zwei Hairlines, warm-rot wie der Team-Warnzustand. --}}
+            <button x-data
+                @click="$dispatch('open-modal-algedonic')"
+                class="relative inline-flex items-center justify-center w-7 h-7 rounded-md transition text-[color:var(--nx-warning)] hover:text-white hover:bg-[color:var(--nx-warning)] group"
+                title="Algedonic-Signal — direkt an die oberste Ebene (Stafford Beer)">
+                <span class="absolute inset-0 rounded-md bg-[color:var(--nx-warning)] opacity-0 group-hover:opacity-20 animate-pulse"></span>
+                @svg('heroicon-o-bell-alert', 'w-4 h-4 relative')
             </button>
 
             <div class="h-6 w-px bg-[color:var(--nx-line)] mx-0.5"></div>
