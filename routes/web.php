@@ -126,11 +126,6 @@ Route::get('/embedded/config/helpdesk', function () {
     return $response;
 })->name('embedded.config.helpdesk');
 
-// AI SSE Streaming (auth required)
-// Module Matrix (Owner-only, auth in component)
-Route::get('/admin/module-matrix', \Platform\Core\Livewire\ModuleMatrix::class)
-    ->middleware(['web', 'auth'])
-    ->name('platform.admin.module-matrix');
 
 // Semantic Layer Debug-Panel (Owner-only, auth in component)
 Route::get('/admin/semantic-layer', \Platform\Core\Livewire\SemanticLayerDebug::class)

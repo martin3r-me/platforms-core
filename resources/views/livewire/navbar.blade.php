@@ -146,12 +146,6 @@
                         <span>Team-Einstellungen</span>
                     </button>
 
-                    <a href="{{ route('platform.admin.module-matrix') }}" @click="userMenuOpen = false"
-                        class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition">
-                        @svg('heroicon-o-table-cells', 'w-4 h-4 text-[color:var(--nx-muted)]')
-                        <span>Modul-Matrix</span>
-                    </a>
-
                     @if($isOwner)
                         <a href="{{ route('platform.admin.semantic-layer') }}" @click="userMenuOpen = false"
                             class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition">
@@ -197,15 +191,6 @@
                     @svg('heroicon-o-squares-2x2', 'w-4 h-4 flex-shrink-0')
                     <span>Alle Module</span>
                 </button>
-
-                {{-- Admin button --}}
-                @if($isAdmin)
-                    <button type="button" @click="$dispatch('open-modal-modules', { tab: 'matrix' }); mobileMenuOpen = false"
-                        class="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition">
-                        @svg('heroicon-o-cog-6-tooth', 'w-4 h-4 flex-shrink-0')
-                        <span>Administration</span>
-                    </button>
-                @endif
 
                 <div class="border-t border-[color:var(--nx-line)] my-2"></div>
 
