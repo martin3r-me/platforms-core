@@ -713,6 +713,9 @@ class CoreServiceProvider extends ServiceProvider
         if (!$registry->has('core.session.debug')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\SessionDebugTool::class)); } catch (\Throwable $e) {}
         }
+        if (!$registry->has('core.authz.shadow_log.GET')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\AuthzShadowLogTool::class)); } catch (\Throwable $e) {}
+        }
 
         // Core: Team erstellen (wird von LLM häufig gebraucht, darf nicht "unsichtbar" sein)
         if (class_exists(\Platform\Core\Tools\CreateTeamTool::class) && !$registry->has('core.teams.POST')) {
