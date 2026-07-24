@@ -19,6 +19,11 @@
             </svg>
         </button>
 
+        {{-- Modul-Switcher (desktop) — links, direkt vor den Favoriten --}}
+        <div class="hidden md:block ml-1">
+            @livewire('core.module-flyout')
+        </div>
+
         {{-- Favorites (desktop/tablet) --}}
         <div class="hidden md:flex items-center gap-0.5 ml-1">
             @foreach($favorites as $fav)
@@ -42,16 +47,7 @@
     {{-- ═══ Spacer ═══ --}}
     <div class="flex-1"></div>
 
-    {{-- ═══ ZONE 2: Module + Admin Switcher (center-right, desktop only) ═══ --}}
-    <div class="hidden md:flex items-center gap-1">
-        @livewire('core.module-flyout')
-
-        @if($isAdmin)
-            @livewire('core.admin-flyout')
-        @endif
-    </div>
-
-    {{-- ═══ ZONE 3: Actions + Team + User (right) ═══ --}}
+    {{-- ═══ ZONE 2: Actions + Team + User (right) ═══ --}}
     <div class="flex items-center gap-1">
         {{-- Action buttons (desktop/tablet) --}}
         <div class="hidden md:flex items-center gap-1">
@@ -100,13 +96,72 @@
         {{-- Team Flyout (always visible) --}}
         @livewire('core.team-flyout')
 
-        {{-- User avatar --}}
-        <button type="button"
-            @click="$dispatch('open-modal-user')"
-            class="flex items-center justify-center rounded-[6px] hover:ring-2 hover:ring-[color:var(--nx-line-strong)] transition"
-            title="{{ $userName }}">
-            <x-nx-avatar :name="$userName" :src="$userAvatar" size="md" />
-        </button>
+        {{-- User-Menü: Profil + (für Admins) Administration --}}
+        <div x-data="{ userMenuOpen: false }" @click.outside="userMenuOpen = false"
+             @keydown.escape.window="userMenuOpen = false" class="relative">
+            <button type="button"
+                @click="userMenuOpen = !userMenuOpen"
+                class="flex items-center justify-center rounded-[6px] transition hover:ring-2 hover:ring-[color:var(--nx-line-strong)]"
+                :class="userMenuOpen ? 'ring-2 ring-[color:var(--nx-line-strong)]' : ''"
+                title="{{ $userName }}">
+                <x-nx-avatar :name="$userName" :src="$userAvatar" size="md" />
+            </button>
+
+            <div x-show="userMenuOpen" x-cloak
+                 x-transition:enter="transition ease-out duration-150"
+                 x-transition:enter-start="opacity-0 -translate-y-1"
+                 x-transition:enter-end="opacity-100 translate-y-0"
+                 x-transition:leave="transition ease-in duration-100"
+                 x-transition:leave-start="opacity-100 translate-y-0"
+                 x-transition:leave-end="opacity-0 -translate-y-1"
+                 class="absolute right-0 mt-2 w-60 z-[99] bg-[color:var(--nx-surface)] rounded-[8px] border border-[color:var(--nx-line)] shadow-[var(--nx-shadow-pop)] p-1">
+
+                {{-- Kopf: wer bin ich --}}
+                <div class="flex items-center gap-2 px-2 py-2">
+                    <x-nx-avatar :name="$userName" :src="$userAvatar" size="sm" />
+                    <div class="min-w-0">
+                        <div class="text-xs font-medium text-[color:var(--nx-text)] truncate">{{ $userName }}</div>
+                        @if($currentTeamName)
+                            <div class="text-[11px] text-[color:var(--nx-faint)] truncate">{{ $currentTeamName }}</div>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="border-t border-[color:var(--nx-line)] my-1"></div>
+
+                {{-- Profil --}}
+                <button type="button" @click="$dispatch('open-modal-user'); userMenuOpen = false"
+                    class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition">
+                    @svg('heroicon-o-user-circle', 'w-4 h-4 text-[color:var(--nx-muted)]')
+                    <span>Mein Profil</span>
+                </button>
+
+                @if($isAdmin)
+                    <div class="border-t border-[color:var(--nx-line)] my-1"></div>
+                    <div class="px-2 pt-1 pb-0.5 text-[0.625rem] font-semibold text-[color:var(--nx-faint)]">Administration</div>
+
+                    <button type="button" @click="$dispatch('open-modal-team'); userMenuOpen = false"
+                        class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition">
+                        @svg('heroicon-o-user-group', 'w-4 h-4 text-[color:var(--nx-muted)]')
+                        <span>Team-Einstellungen</span>
+                    </button>
+
+                    <a href="{{ route('platform.admin.module-matrix') }}" @click="userMenuOpen = false"
+                        class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition">
+                        @svg('heroicon-o-table-cells', 'w-4 h-4 text-[color:var(--nx-muted)]')
+                        <span>Modul-Matrix</span>
+                    </a>
+
+                    @if($isOwner)
+                        <a href="{{ route('platform.admin.semantic-layer') }}" @click="userMenuOpen = false"
+                            class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition">
+                            @svg('heroicon-o-rectangle-stack', 'w-4 h-4 text-[color:var(--nx-muted)]')
+                            <span>Semantic Layer</span>
+                        </a>
+                    @endif
+                @endif
+            </div>
+        </div>
     </div>
 
     {{-- ═══ Mobile Menu Panel ═══ --}}

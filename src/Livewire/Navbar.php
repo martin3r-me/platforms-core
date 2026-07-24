@@ -13,6 +13,7 @@ class Navbar extends Component
     public array $favorites = [];
     public ?string $currentModuleKey = null;
     public bool $isAdmin = false;
+    public bool $isOwner = false;
     public ?string $currentTeamName = null;
     public ?string $userName = null;
     public ?string $userAvatar = null;
@@ -35,6 +36,7 @@ class Navbar extends Component
         if ($team) {
             $pivot = $user->teams()->where('team_id', $team->id)->first()?->pivot;
             $this->isAdmin = $pivot && in_array($pivot->role, ['owner', 'admin']);
+            $this->isOwner = $pivot && $pivot->role === 'owner';
         }
 
         $this->loadFavorites();
