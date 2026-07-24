@@ -101,10 +101,10 @@
              @keydown.escape.window="userMenuOpen = false" class="relative">
             <button type="button"
                 @click="userMenuOpen = !userMenuOpen"
-                class="flex items-center justify-center rounded-[6px] transition hover:ring-2 hover:ring-[color:var(--nx-line-strong)]"
+                class="flex h-7 w-7 items-center justify-center rounded-[6px] transition hover:ring-2 hover:ring-[color:var(--nx-line-strong)]"
                 :class="userMenuOpen ? 'ring-2 ring-[color:var(--nx-line-strong)]' : ''"
                 title="{{ $userName }}">
-                <x-nx-avatar :name="$userName" :src="$userAvatar" size="md" />
+                <x-nx-avatar :name="$userName" :src="$userAvatar" size="sm" />
             </button>
 
             <div x-show="userMenuOpen" x-cloak
