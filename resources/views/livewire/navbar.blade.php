@@ -55,12 +55,7 @@
     <div class="flex items-center gap-1">
         {{-- Action buttons (desktop/tablet) --}}
         <div class="hidden md:flex items-center gap-1">
-            @php
-                $routeName = request()->route()?->getName();
-                $routeModule = is_string($routeName) && str_contains($routeName, '.') ? strstr($routeName, '.', true) : null;
-            @endphp
-
-            {{-- Actions: Check-in, Algedonic, Comms, Help, Playground --}}
+            {{-- Actions: Check-in, Algedonic, Comms, Terminal --}}
             @livewire('core.navbar-checkin')
 
             <button x-data
@@ -78,80 +73,19 @@
                 @svg('heroicon-o-paper-airplane', 'w-4 h-4')
             </button>
 
+            {{-- Terminal (bottom) — einziges Panel ohne eigenen Griff (kollabiert vollständig) --}}
             <button x-data
-                @click="$dispatch('open-help', { module: @js($routeModule) })"
-                class="inline-flex items-center justify-center w-7 h-7 rounded-md transition text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)]"
-                title="Hilfe">
-                @svg('heroicon-o-question-mark-circle', 'w-4 h-4')
+                @click="window.dispatchEvent(new CustomEvent('toggle-terminal'))"
+                class="inline-flex items-center justify-center w-7 h-7 rounded-md transition"
+                :class="$store.ui?.m('terminal', 'open')
+                    ? 'text-[color:var(--nx-text)] bg-[color:var(--nx-accent-soft)]'
+                    : 'text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)]'"
+                title="Terminal">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4">
+                    <rect x="3" y="5" width="18" height="8.5" rx="1.5" />
+                    <rect x="3" y="15" width="18" height="4" rx="1.5" fill="currentColor" opacity="0.9" stroke="none" />
+                </svg>
             </button>
-
-            <button x-data
-                @click="$dispatch('playground:open', { context: { source_route: @js($routeName), source_module: @js($routeModule), source_url: window.location.href } })"
-                class="inline-flex items-center justify-center w-7 h-7 rounded-md transition text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)]"
-                title="Playground öffnen">
-                @svg('heroicon-o-sparkles', 'w-4 h-4')
-            </button>
-
-            <div class="h-6 w-px bg-[color:var(--nx-line)] mx-0.5"></div>
-
-            {{-- Layout Toggles: Main Sidebar, Page Sidebar, Terminal, Activity — grouped --}}
-            <div class="flex items-center gap-0 rounded-md border border-[color:var(--nx-line)] p-0.5">
-                {{-- Main Sidebar (Navigation) --}}
-                <button x-data
-                    @click="window.dispatchEvent(new CustomEvent('toggle-main-sidebar'))"
-                    class="inline-flex items-center justify-center w-7 h-7 rounded transition"
-                    :class="!$store.ui?.m('main_sidebar', 'collapsed')
-                        ? 'text-[color:var(--nx-text)] bg-[color:var(--nx-accent-soft)]'
-                        : 'text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)]'"
-                    title="Navigation">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4">
-                        <rect x="3" y="5" width="6" height="14" rx="1.5" fill="currentColor" opacity="0.9" stroke="none" />
-                        <rect x="10.5" y="5" width="10.5" height="14" rx="1.5" />
-                    </svg>
-                </button>
-
-                {{-- Page Sidebar (left) --}}
-                <button x-data
-                    @click="$store.ui?.mToggle('page_sidebar', 'open')"
-                    class="inline-flex items-center justify-center w-7 h-7 rounded transition"
-                    :class="$store.ui?.m('page_sidebar', 'open')
-                        ? 'text-[color:var(--nx-text)] bg-[color:var(--nx-accent-soft)]'
-                        : 'text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)]'"
-                    title="Seiten-Sidebar">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4">
-                        <rect x="3" y="5" width="8" height="14" rx="1.5" fill="currentColor" opacity="0.9" stroke="none" />
-                        <rect x="12.5" y="5" width="8.5" height="14" rx="1.5" />
-                    </svg>
-                </button>
-
-                {{-- Terminal (bottom) --}}
-                <button x-data
-                    @click="window.dispatchEvent(new CustomEvent('toggle-terminal'))"
-                    class="inline-flex items-center justify-center w-7 h-7 rounded transition"
-                    :class="$store.ui?.m('terminal', 'open')
-                        ? 'text-[color:var(--nx-text)] bg-[color:var(--nx-accent-soft)]'
-                        : 'text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)]'"
-                    title="Terminal">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4">
-                        <rect x="3" y="5" width="18" height="8.5" rx="1.5" />
-                        <rect x="3" y="15" width="18" height="4" rx="1.5" fill="currentColor" opacity="0.9" stroke="none" />
-                    </svg>
-                </button>
-
-                {{-- Activity Sidebar (right) --}}
-                <button x-data
-                    @click="$store.ui?.mToggle('activity', 'open')"
-                    class="inline-flex items-center justify-center w-7 h-7 rounded transition"
-                    :class="$store.ui?.m('activity', 'open')
-                        ? 'text-[color:var(--nx-text)] bg-[color:var(--nx-accent-soft)]'
-                        : 'text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)]'"
-                    title="Aktivitäten">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4">
-                        <rect x="3" y="5" width="10" height="14" rx="1.5" />
-                        <rect x="14.5" y="5" width="6.5" height="14" rx="1.5" fill="currentColor" opacity="0.9" stroke="none" />
-                    </svg>
-                </button>
-            </div>
 
             <div class="h-6 w-px bg-[color:var(--nx-line)] mx-0.5"></div>
 
@@ -233,12 +167,6 @@
                     class="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition">
                     @svg('heroicon-o-paper-airplane', 'w-4 h-4 flex-shrink-0')
                     <span>Kommunikation</span>
-                </button>
-
-                <button type="button" @click="$dispatch('open-help', { module: @js($routeModule) }); mobileMenuOpen = false"
-                    class="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition">
-                    @svg('heroicon-o-question-mark-circle', 'w-4 h-4 flex-shrink-0')
-                    <span>Hilfe</span>
                 </button>
             </div>
         </div>
