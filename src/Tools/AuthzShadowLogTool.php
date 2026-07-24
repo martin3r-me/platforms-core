@@ -37,6 +37,7 @@ class AuthzShadowLogTool implements ToolContract, ToolMetadataContract
                 'resource_type' => ['type' => 'string',  'description' => 'Optional: nur dieser Model-Typ (z.B. Platform\\Planner\\Models\\PlannerProject).'],
                 'ability'       => ['type' => 'string',  'description' => 'Optional: nur diese Gate-Ability (view/update/delete/...).'],
                 'limit'         => ['type' => 'integer', 'description' => 'Optional: max. Gruppen (Default 50).'],
+                'since_minutes' => ['type' => 'integer', 'description' => 'Optional: nur Abweichungen der letzten N Minuten (für saubere Messung nach Materialisierung; der Log ist kumulativ).'],
             ],
         ];
     }
@@ -61,6 +62,9 @@ class AuthzShadowLogTool implements ToolContract, ToolMetadataContract
             $limit = max(1, min(200, (int) ($arguments['limit'] ?? 50)));
 
             $base = DB::table('authz_shadow_log')->where('team_id', $teamId);
+            if (! empty($arguments['since_minutes'])) {
+                $base->where('created_at', '>=', now()->subMinutes((int) $arguments['since_minutes']));
+            }
             if (! empty($arguments['resource_type'])) {
                 $base->where('resource_type', (string) $arguments['resource_type']);
             }
