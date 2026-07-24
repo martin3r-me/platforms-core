@@ -160,6 +160,23 @@ class CoreServiceProvider extends ServiceProvider
             \Platform\Core\Policies\ObsidianVaultPolicy::class
         );
 
+        // Autorisierungs-Kernel im Shadow-Mode: Graph-Entscheidung PARALLEL
+        // berechnen und nur Abweichungen protokollieren — ändert NIE das Ergebnis.
+        if (config('authz.mode') === 'shadow') {
+            \Illuminate\Support\Facades\Gate::after(function ($user, $ability, $result, $arguments) {
+                try {
+                    if (\Illuminate\Support\Facades\Schema::hasTable('authz_shadow_log')) {
+                        app(\Platform\Core\Authz\ShadowComparator::class)
+                            ->record($user, $ability, $result, (array) $arguments);
+                    }
+                } catch (\Throwable $e) {
+                    // Shadow darf niemals den Request beeinflussen.
+                }
+
+                return null; // Entscheidung unverändert lassen
+            });
+        }
+
         // Broadcast Channel Authorization (Terminal WebSocket)
         if (class_exists(\Illuminate\Support\Facades\Broadcast::class)) {
             \Illuminate\Support\Facades\Broadcast::routes(['middleware' => ['web', 'auth']]);
@@ -218,6 +235,7 @@ class CoreServiceProvider extends ServiceProvider
             $this->commands([
                 TrackBillableUsage::class,
                 CreateMonthlyInvoices::class,
+                \Platform\Core\Console\Commands\AuthzSeedGrantsCommand::class,
                 \Platform\Core\Console\Commands\SecurityHashKeyCommand::class,
                 \Platform\Core\Console\Commands\CreateApiTokenCommand::class,
                 \Platform\Core\Console\Commands\CreateEndpointApiTokenCommand::class,
@@ -309,6 +327,11 @@ class CoreServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/embeddings.php', 'embeddings');
         $this->mergeConfigFrom(__DIR__.'/../config/verbalization.php', 'verbalization');
         $this->mergeConfigFrom(__DIR__.'/../config/dav.php', 'dav');
+        $this->mergeConfigFrom(__DIR__.'/../config/authz.php', 'authz');
+
+        // Autorisierungs-Kernel (graph-basiert). Resolver + Shadow-Vergleicher.
+        $this->app->singleton(\Platform\Core\Authz\AuthzResolver::class);
+        $this->app->singleton(\Platform\Core\Authz\ShadowComparator::class);
 
         // DAV-Modul-Registry (CardDAV/CalDAV) – Module registrieren hier ihre Backends.
         $this->app->singleton(\Platform\Core\Dav\DavModuleRegistry::class);
