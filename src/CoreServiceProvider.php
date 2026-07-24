@@ -186,6 +186,9 @@ class CoreServiceProvider extends ServiceProvider
         // Terminal Notification Types registrieren
         $this->registerTerminalNotificationTypes();
 
+        // Terminal Apps in die Registry eintragen (Plug-in-Seam der Shell)
+        $this->registerTerminalApps();
+
         // Event-Listener für Tools registrieren
         $this->registerToolEventListeners();
 
@@ -1194,6 +1197,21 @@ class CoreServiceProvider extends ServiceProvider
             $this->app->bind(
                 \Laravel\Passport\Contracts\DenyAuthorizationResponse::class,
                 \Platform\Core\Http\Responses\Passport\DenyAuthorizationResponse::class
+            );
+        }
+    }
+
+    /**
+     * Register Terminal Apps into the TerminalAppRegistry — the shell's plug-in
+     * seam. Native + core apps are registered here; module-owned apps register
+     * from their own providers. Currently only the (opt-in) demo app that
+     * verifies the seam end-to-end.
+     */
+    protected function registerTerminalApps(): void
+    {
+        if (env('TERMINAL_DEMO_APP', false)) {
+            \Platform\Core\Terminal\TerminalAppRegistry::register(
+                new \Platform\Core\Terminal\Apps\DemoTerminalApp()
             );
         }
     }

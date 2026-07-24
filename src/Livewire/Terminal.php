@@ -16,6 +16,8 @@ use Platform\Core\Models\TerminalBookmark;
 use Platform\Core\Models\TerminalPin;
 use Platform\Core\Models\User;
 use Platform\Core\Services\ContextFileService;
+use Platform\Core\Terminal\TerminalContext;
+use Platform\Core\Terminal\TerminalAppRegistry;
 use Platform\Organization\Models\OrganizationContext;
 use Platform\Core\Models\CoreExtraFieldDefinition;
 use Platform\Core\Models\CoreExtraFieldValue;
@@ -2864,6 +2866,34 @@ class Terminal extends Component
     }
 
     // ── Render ─────────────────────────────────────────────────
+
+    /**
+     * The Terminal's current context as a typed value object, handed to apps
+     * for availability checks and passed down on mount.
+     */
+    public function terminalContext(): TerminalContext
+    {
+        return new TerminalContext(
+            teamId:      $this->teamId(),
+            contextType: $this->contextType,
+            contextId:   $this->contextId,
+            subject:     $this->contextSubject,
+            source:      $this->contextSource,
+        );
+    }
+
+    /**
+     * Apps contributed via TerminalAppRegistry that are available for the
+     * current context, in rail order. Rendered alongside the built-in apps
+     * while the shell is progressively migrated onto the registry.
+     *
+     * @return array<string, \Platform\Core\Terminal\Contracts\TerminalApp>
+     */
+    #[Computed]
+    public function registryApps(): array
+    {
+        return TerminalAppRegistry::availableFor($this->terminalContext());
+    }
 
     public function render()
     {

@@ -314,6 +314,20 @@
             </button>
           @endif
 
+          {{-- Registry-contributed app tabs (TerminalAppRegistry) --}}
+          @foreach($this->registryApps as $rkey => $rapp)
+            <button
+              @click.stop="$wire.set('activeApp', '{{ $rkey }}'); if(!open) toggle()"
+              class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
+              :class="$wire.activeApp === '{{ $rkey }}'
+                ? 'bg-white/15 text-white'
+                : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5'"
+              title="{{ $rapp->label() }}"
+            >
+              <span class="hidden sm:inline">{{ $rapp->label() }}</span>
+            </button>
+          @endforeach
+
         <div class="w-px h-4 bg-[var(--t-border)] ml-0.5"></div>
       </div>
 
@@ -1305,6 +1319,20 @@
                 :context-meta="$this->contextMeta" />
             @endif
           </div>
+
+          {{-- ═══ Registry-contributed app panels (TerminalAppRegistry) ═══ --}}
+          @foreach($this->registryApps as $rkey => $rapp)
+            <div x-show="$wire.activeApp === '{{ $rkey }}'" class="flex-1 min-h-0 flex flex-col" wire:key="t-app-{{ $rkey }}-wrap">
+              @livewire($rapp->livewireComponent(), [
+                'contextType'    => $this->contextType,
+                'contextId'      => $this->contextId,
+                'contextSubject' => $this->contextSubject,
+                'contextSource'  => $this->contextSource,
+                'contextUrl'     => $this->contextUrl,
+                'contextMeta'    => $this->contextMeta,
+              ], key: 't-app-'.$rkey)
+            </div>
+          @endforeach
 
           <!-- ═══ App: ExtraFields ═══ -->
           <div x-show="$wire.activeApp === 'extrafields'" class="flex-1 min-h-0 flex flex-col overflow-y-auto">
