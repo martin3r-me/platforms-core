@@ -38,6 +38,7 @@ class AuthzShadowLogTool implements ToolContract, ToolMetadataContract
                 'ability'       => ['type' => 'string',  'description' => 'Optional: nur diese Gate-Ability (view/update/delete/...).'],
                 'limit'         => ['type' => 'integer', 'description' => 'Optional: max. Gruppen (Default 50).'],
                 'since_minutes' => ['type' => 'integer', 'description' => 'Optional: nur Abweichungen der letzten N Minuten (für saubere Messung nach Materialisierung; der Log ist kumulativ).'],
+                'raw'           => ['type' => 'boolean', 'description' => 'Optional: liefert zusätzlich die einzelnen Zeilen (user_id, resource_id …) statt nur Aggregate — zum Nachverfolgen konkreter Fälle.'],
             ],
         ];
     }
@@ -95,9 +96,29 @@ class AuthzShadowLogTool implements ToolContract, ToolMetadataContract
                     'count'          => (int) $r->cnt,
                 ]);
 
+            $rawRows = null;
+            if (! empty($arguments['raw'])) {
+                $rawRows = (clone $base)
+                    ->orderByDesc('id')
+                    ->limit(min($limit, 100))
+                    ->get(['user_id', 'ability', 'capability', 'resource_type', 'resource_id', 'legacy_result', 'graph_result', 'created_at'])
+                    ->map(fn ($r) => [
+                        'user_id'        => $r->user_id,
+                        'ability'        => $r->ability,
+                        'capability'     => $r->capability,
+                        'resource_type'  => $r->resource_type,
+                        'resource_id'    => $r->resource_id,
+                        'legacy_allowed' => (bool) $r->legacy_result,
+                        'graph_allowed'  => (bool) $r->graph_result,
+                        'at'             => $r->created_at,
+                    ])
+                    ->all();
+            }
+
             return ToolResult::success([
                 'team_id'          => (int) $teamId,
                 'total_divergences' => $total,
+                'rows'             => $rawRows,
                 'summary'          => [
                     'graph_strenger'  => $graphStricter,   // Graph verweigert, was Legacy erlaubt (unkritisch, oft Owner/Pivot-Regeln)
                     'graph_lockerer'  => $graphLooser,     // Graph erlaubt, was Legacy verweigert (SICHERHEITSKRITISCH)
