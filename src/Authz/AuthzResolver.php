@@ -70,33 +70,32 @@ class AuthzResolver
             return false;
         }
 
+        // Kein konkretes Objekt (create / viewAny / Liste): immer erlaubt.
+        // Anlegen ist frei — das Objekt ist Ersteller-privat, bis es verortet wird;
+        // Listen filtern pro Zeile über den Query-Scope, nicht hier.
+        if ($resourceType === null || $resourceId === null) {
+            return true;
+        }
+
         $allowedCaps = Capability::satisfying($capability);
         if ($allowedCaps === []) {
             return false;
         }
 
+        // "Nichts pauschal": Zugriff NUR strukturell — ein Entity-Grant, dessen
+        // Scope ein Vorfahre der Entity ist, an der die Ressource hängt (Closure).
+        // KEIN Team-Wurzel-Pauschal mehr. Ersteller-Ownership ist Residual-Policy
+        // außerhalb des Graphen.
         return $this->baseGrantQuery($user, $teamId)
-            ->whereIn('scope_type', ['team', 'entity'])
+            ->where('scope_type', 'entity')
             ->whereIn('capability', $allowedCaps)
-            ->where(function ($q) use ($teamId, $resourceType, $resourceId) {
-                // (a) Team-Wurzel-Grant erreicht per Definition allen Content.
-                $q->where(fn ($q) => $q->where('scope_type', 'team')->where('scope_id', $teamId));
-
-                // (b) Entity-Grant erreicht die Ressource, wenn sein Scope ein
-                //     Vorfahre der Entity ist, an der die Ressource hängt.
-                if ($resourceType !== null && $resourceId !== null) {
-                    $q->orWhere(function ($q) use ($teamId, $resourceType, $resourceId) {
-                        $q->where('scope_type', 'entity')
-                            ->whereIn('scope_id', function (Builder $sub) use ($teamId, $resourceType, $resourceId) {
-                                $sub->select('c.ancestor_id')
-                                    ->from('authz_scope_closure as c')
-                                    ->join('authz_resource_link as l', 'l.scope_id', '=', 'c.descendant_id')
-                                    ->where('l.resource_type', $resourceType)
-                                    ->where('l.resource_id', $resourceId)
-                                    ->where('c.team_id', $teamId);
-                            });
-                    });
-                }
+            ->whereIn('scope_id', function (Builder $sub) use ($teamId, $resourceType, $resourceId) {
+                $sub->select('c.ancestor_id')
+                    ->from('authz_scope_closure as c')
+                    ->join('authz_resource_link as l', 'l.scope_id', '=', 'c.descendant_id')
+                    ->where('l.resource_type', $resourceType)
+                    ->where('l.resource_id', $resourceId)
+                    ->where('c.team_id', $teamId);
             })
             ->exists();
     }

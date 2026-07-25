@@ -40,6 +40,12 @@ class ShadowComparator
 
         [$resourceType, $resourceId] = $this->extractResource($arguments);
 
+        // Content-Autorisierung gilt pro konkretem Objekt. create/viewAny/Listen
+        // (kein konkretes Objekt) sind nicht content-scoped → nicht vergleichen.
+        if ($resourceId === null) {
+            return;
+        }
+
         $graph = $this->resolver->may($user, $capability, $resourceType, $resourceId);
 
         if ($graph === $legacy) {
