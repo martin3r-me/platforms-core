@@ -41,7 +41,8 @@ Eloquent-Scope/Trait, den JEDES Modul auf Listen legt:
 `WHERE ersteller_spalte = $user->id OR id IN (authz_resource_link.resource_id
 für resource_type = <Model> und scope_id ∈ reachableEntityIds)`.
 Eine Zeile pro Liste. Kein modul-spezifischer Authz-Code.
-Umgesetzt als `VisibilityScope` + Builder-Macro `->visibleTo($user, $cap)`.
+Umgesetzt als `VisibilityScope` + Builder-Macro `->authzVisibleTo($user, $cap)`
+(NICHT `visibleTo` — kollidiert mit planner-eigenem lokalem Scope).
 - Start: 2026-07-26 12:21 · Ende: 2026-07-26 12:23
 
 ### #3 — Planner-Sidebar filtern

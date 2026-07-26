@@ -177,9 +177,11 @@ class CoreServiceProvider extends ServiceProvider
             });
         }
 
-        // Query-Scope-Macro: $query->visibleTo($user) filtert Listen nach
+        // Query-Scope-Macro: $query->authzVisibleTo($user) filtert Listen nach
         // "nichts pauschal" (Ersteller ODER über den Baum erreichbar).
-        \Illuminate\Database\Eloquent\Builder::macro('visibleTo', function ($user = null, string $cap = 'read') {
+        // Bewusst NICHT "visibleTo" — das ist im planner schon ein lokaler Scope
+        // (Owner + Projekt-Mitgliedschaft), den wir nicht überschreiben wollen.
+        \Illuminate\Database\Eloquent\Builder::macro('authzVisibleTo', function ($user = null, string $cap = 'read') {
             /** @var \Illuminate\Database\Eloquent\Builder $this */
             return \Platform\Core\Authz\VisibilityScope::apply($this, $user, $cap);
         });
