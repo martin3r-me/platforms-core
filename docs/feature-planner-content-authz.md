@@ -25,8 +25,8 @@ Start reversibel/geflaggt (Shadow → planner-Enforce), damit vorher/nachher ver
 |---|-------|--------|-------|------|
 | 1 | Resolver: `reachableEntityIds($user, $cap)` | ✅ Done | 2026-07-26 12:21 | 2026-07-26 12:23 |
 | 2 | Query-Scope `visibleTo()` (wiederverwendbar, core) | ✅ Done | 2026-07-26 12:21 | 2026-07-26 12:23 |
-| 3 | Planner-Sidebar: Projekte/Tasks filtern | Todo | — | — |
-| 4 | Planner-Listen: Projekt-/Task-Queries filtern | Todo | — | — |
+| 3 | Planner-Sidebar: Projekte/Tasks filtern | ✅ Done | 2026-07-26 12:49 | 2026-07-26 12:53 |
+| 4 | Planner-Listen: Projekt-/Task-Queries filtern | ✅ Done | 2026-07-26 12:49 | 2026-07-26 12:53 |
 | 5 | Policy PlannerProject/PlannerTask (view/update/delete → may()||owns()) | ✅ Done | 2026-07-26 12:31 | 2026-07-26 12:39 |
 | 6 | Flag `authz.enforce_planner` + Verifikation, dann scharf | Todo | — | — |
 | 7 | Alt-Struktur entfernen: projectUsers/PlannerProjectUser + "User hinzufügen"-UI + ProjectRole (nach stabilem Enforce) | Todo | — | — |
@@ -53,13 +53,18 @@ Umgesetzt als `VisibilityScope` + Builder-Macro `->authzVisibleTo($user, $cap)`
 - Start: 2026-07-26 12:21 · Ende: 2026-07-26 12:23
 
 ### #3 — Planner-Sidebar filtern
-`visibleTo()` auf die Projekt-/Task-Abfragen der Sidebar legen. Sichtbarster
-Effekt: „ich sehe nur meine + meine Bereiche".
-- Start: — · Ende: —
+Umgesetzt über die Model-Scopes (unten) + Gate des `projectUsers`-Zweigs in
+`Sidebar::projectsWithUserTasks` (nur Alt-Modus). „Alle Projekte" via `viewableBy`
+→ Graph.
+- Start: 2026-07-26 12:49 · Ende: 2026-07-26 12:53
 
 ### #4 — Planner-Listen filtern
-`visibleTo()` auf die Projekt-/Task-Listen (Index/Board) legen.
-- Start: — · Ende: —
+Kern: die Model-Scopes hinter `authz.enforce_planner`:
+`PlannerProject::scopeVisibleTo` + `scopeViewableBy` → `authzVisibleTo()`;
+`PlannerTask::scopeVisibleTo` → Ersteller ODER Zuständiger ODER erreichbares
+Projekt (Tasks erben Projekt-Verortung). Dashboard/Listen nutzen die Scopes →
+automatisch mit. Flag aus → altes Verhalten.
+- Start: 2026-07-26 12:49 · Ende: 2026-07-26 12:53
 
 ### #5 — Policy PlannerProject/PlannerTask
 `view/update/delete` → Graph (`may()`) ODER Ersteller (`owns()`). Detail-Zugriff.
