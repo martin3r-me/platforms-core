@@ -60,7 +60,7 @@ class AuthzResolver
     /**
      * Darf der User die geforderte Capability auf der Ressource ausüben?
      *
-     * @param  string       $capability   read | write | owner
+     * @param  string       $capability   read | write | manage
      * @param  string|null  $resourceType Klassenname/Alias des Objekts (null = kontextfrei)
      */
     public function may(User $user, string $capability, ?string $resourceType = null, ?int $resourceId = null): bool

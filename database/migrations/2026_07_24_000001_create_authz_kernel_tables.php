@@ -34,7 +34,7 @@ return new class extends Migration
             ['code' => 'use',   'applies_to' => 'module', 'rank' => 0,  'label' => 'Modul nutzen'],
             ['code' => 'read',  'applies_to' => 'entity', 'rank' => 10, 'label' => 'Lesen'],
             ['code' => 'write', 'applies_to' => 'entity', 'rank' => 20, 'label' => 'Schreiben'],
-            ['code' => 'owner', 'applies_to' => 'entity', 'rank' => 30, 'label' => 'Owner'],
+            ['code' => 'manage', 'applies_to' => 'entity', 'rank' => 30, 'label' => 'Verwalten'],
         ]);
 
         Schema::create('authz_grant', function (Blueprint $table) {

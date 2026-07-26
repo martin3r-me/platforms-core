@@ -14,9 +14,9 @@ final class Capability
 {
     /** Content-Capabilities, geordnet. 'write' erfüllt 'read'. */
     public const RANKS = [
-        'read'  => 10,
-        'write' => 20,
-        'owner' => 30,
+        'read'   => 10,
+        'write'  => 20,
+        'manage' => 30,
     ];
 
     public static function rank(string $capability): int
@@ -41,9 +41,9 @@ final class Capability
     {
         $a = strtolower($ability);
 
-        foreach (['delete', 'forcedelete', 'restore', 'manage', 'admin', 'owner'] as $needle) {
+        foreach (['delete', 'forcedelete', 'restore', 'manage', 'admin'] as $needle) {
             if (str_contains($a, $needle)) {
-                return 'owner';
+                return 'manage';
             }
         }
 

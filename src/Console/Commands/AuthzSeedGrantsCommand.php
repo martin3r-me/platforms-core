@@ -35,8 +35,8 @@ class AuthzSeedGrantsCommand extends Command
     protected $description = 'Migriert den echten Alt-Stand (Rolle + hasAccess-Module) EINES Teams in authz_grant — nur org-verknüpfte User.';
 
     private const ROLE_TO_CAPABILITY = [
-        'owner'  => 'owner',
-        'admin'  => 'owner',
+        'owner'  => 'manage',
+        'admin'  => 'manage',
         'member' => 'write',
         'viewer' => 'read',
     ];
