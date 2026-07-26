@@ -109,18 +109,36 @@ class AuthzResolver
      */
     public function owns(User $user, ?string $resourceType, ?int $resourceId): bool
     {
-        if ($resourceType === null || $resourceId === null || ! class_exists($resourceType)) {
+        if ($resourceType === null || $resourceId === null) {
+            return false;
+        }
+        $col = $this->ownerColumn($resourceType);
+        if ($col === null) {
             return false;
         }
 
+        $val = DB::table((new $resourceType)->getTable())->where('id', $resourceId)->value($col);
+
+        return $val !== null && (int) $val === (int) $user->id;
+    }
+
+    /**
+     * Ersteller-Spalte eines Models (per Konvention), oder null. Gecacht.
+     * Genutzt von owns() und vom Listen-Query-Scope (VisibleToScope).
+     */
+    public function ownerColumn(string $resourceType): ?string
+    {
+        if (! class_exists($resourceType)) {
+            return null;
+        }
         try {
             $table = (new $resourceType)->getTable();
         } catch (\Throwable $e) {
-            return false;
+            return null;
         }
 
-        static $ownerColumn = [];
-        if (! array_key_exists($table, $ownerColumn)) {
+        static $cache = [];
+        if (! array_key_exists($table, $cache)) {
             $found = null;
             foreach (['user_id', 'created_by_user_id', 'created_by', 'owner_id', 'author_id', 'organizer_id'] as $candidate) {
                 if (\Illuminate\Support\Facades\Schema::hasColumn($table, $candidate)) {
@@ -128,17 +146,48 @@ class AuthzResolver
                     break;
                 }
             }
-            $ownerColumn[$table] = $found;
+            $cache[$table] = $found;
         }
 
-        $col = $ownerColumn[$table];
-        if ($col === null) {
-            return false;
+        return $cache[$table];
+    }
+
+    /**
+     * Alle Entity-IDs, die der User mit mindestens $cap erreicht: die Descendants
+     * der Entities, an denen er (bzw. sein Person-Entity) einen ausreichenden
+     * Grant hält (via Closure). Basis für den Listen-Query-Scope.
+     */
+    public function reachableEntityIds(User $user, string $cap = 'read'): array
+    {
+        $teamId = $this->teamId($user);
+        if ($teamId === null) {
+            return [];
+        }
+        $allowedCaps = Capability::satisfying($cap);
+        if ($allowedCaps === []) {
+            return [];
         }
 
-        $val = DB::table($table)->where('id', $resourceId)->value($col);
+        $grantScopeIds = $this->baseGrantQuery($user, $teamId)
+            ->where('scope_type', 'entity')
+            ->whereIn('capability', $allowedCaps)
+            ->pluck('scope_id')
+            ->filter()
+            ->unique()
+            ->all();
 
-        return $val !== null && (int) $val === (int) $user->id;
+        if ($grantScopeIds === []) {
+            return [];
+        }
+
+        return DB::table('authz_scope_closure')
+            ->where('team_id', $teamId)
+            ->whereIn('ancestor_id', $grantScopeIds)
+            ->pluck('descendant_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

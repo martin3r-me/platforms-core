@@ -177,6 +177,13 @@ class CoreServiceProvider extends ServiceProvider
             });
         }
 
+        // Query-Scope-Macro: $query->visibleTo($user) filtert Listen nach
+        // "nichts pauschal" (Ersteller ODER über den Baum erreichbar).
+        \Illuminate\Database\Eloquent\Builder::macro('visibleTo', function ($user = null, string $cap = 'read') {
+            /** @var \Illuminate\Database\Eloquent\Builder $this */
+            return \Platform\Core\Authz\VisibilityScope::apply($this, $user, $cap);
+        });
+
         // Broadcast Channel Authorization (Terminal WebSocket)
         if (class_exists(\Illuminate\Support\Facades\Broadcast::class)) {
             \Illuminate\Support\Facades\Broadcast::routes(['middleware' => ['web', 'auth']]);
