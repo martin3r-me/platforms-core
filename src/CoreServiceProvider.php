@@ -425,6 +425,14 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(\Platform\Core\Verbalization\Template\TemplateRegistry::class);
         $this->app->singleton(\Platform\Core\Verbalization\Verbalizer::class);
 
+        // ReportEngine-Facade: Produzenten-Module (planner, org, …) hängen nur an
+        // diesem Contract, nie an der konkreten Engine. Binding zieht später in den
+        // reporting-ServiceProvider um, wenn die Engine aus Core auswandert.
+        $this->app->singleton(
+            \Platform\Core\Verbalization\Contracts\ReportEngine::class,
+            \Platform\Core\Verbalization\CoreVerbalizationEngine::class,
+        );
+
         // Passport Contracts binden (für OAuth Authorization Views)
         $this->registerPassportBindings();
 

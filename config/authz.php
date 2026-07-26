@@ -27,4 +27,20 @@ return [
     |
     */
     'enforce_modules' => (bool) env('AUTHZ_ENFORCE_MODULES', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Content-Enforcement pro Modul (Phase: Content-Achse)
+    |--------------------------------------------------------------------------
+    |
+    | false — Modul nutzt weiter seine alte Sichtbarkeit (Mitgliedschaft etc.).
+    | true  — Sichtbarkeit/Policies laufen über den Graphen: Ersteller (owns())
+    |         ODER strukturell erreichbar (may()/authzVisibleTo). Alte Strukturen
+    |         (z.B. planner projectUsers) greifen dann NICHT mehr.
+    |
+    | Pro Modul einzeln schaltbar, damit man Modul für Modul verifiziert cutovern
+    | kann (Shadow → Enforce → alte Struktur entfernen).
+    |
+    */
+    'enforce_planner' => (bool) env('AUTHZ_ENFORCE_PLANNER', false),
 ];
