@@ -15,7 +15,15 @@ Weg dorthin (sicher, wegen geteiltem Code + Rollen-Abdeckung): hinter Flag
 
 Start reversibel/geflaggt (Shadow → planner-Enforce), damit vorher/nachher vergleichbar.
 
-**Status:** In Arbeit · **Start:** 2026-07-26 12:20 · **Ende:** —
+**Status:** ✅ Abgeschlossen · **Start:** 2026-07-26 12:20 · **Ende:** 2026-07-26
+
+> **Endstand:** Kein Flag mehr — der Planner läuft fest graph-only. Zugriff =
+> Ersteller (`user_id`) ODER strukturell im Org-Graphen erreichbar. Alte Struktur
+> (`planner_project_users`, `PlannerProjectUser`, `ProjectRole`, „User hinzufügen"-UI,
+> Add/RemoveProjectUser-Tools) vollständig entfernt. Kalender-Abo (CalDAV) lebt jetzt
+> entkoppelt in `planner_calendar_exposures`. MCP-Tools (List/Detail/Aggregat) filtern
+> über dieselben Scopes/Policies wie die UI — die KI sieht nie mehr als der User.
+> Umgesetzt in 5 Stufen (jede lauffähig committet). Nur `office.bhgdigital` betroffen.
 
 ---
 
@@ -28,8 +36,8 @@ Start reversibel/geflaggt (Shadow → planner-Enforce), damit vorher/nachher ver
 | 3 | Planner-Sidebar: Projekte/Tasks filtern | ✅ Done | 2026-07-26 12:49 | 2026-07-26 12:53 |
 | 4 | Planner-Listen: Projekt-/Task-Queries filtern | ✅ Done | 2026-07-26 12:49 | 2026-07-26 12:53 |
 | 5 | Policy PlannerProject/PlannerTask (view/update/delete → may()||owns()) | ✅ Done | 2026-07-26 12:31 | 2026-07-26 12:39 |
-| 6 | Flag `authz.enforce_planner` + Verifikation, dann scharf | Todo | — | — |
-| 7 | Alt-Struktur entfernen: projectUsers/PlannerProjectUser + "User hinzufügen"-UI + ProjectRole (nach stabilem Enforce) | Todo | — | — |
+| 6 | Flag `authz.enforce_planner` + Verifikation, dann scharf | ✅ Done | 2026-07-26 | 2026-07-26 |
+| 7 | Alt-Struktur entfernen: projectUsers/PlannerProjectUser + "User hinzufügen"-UI + ProjectRole + Flag (graph-only fest) | ✅ Done | 2026-07-26 | 2026-07-26 |
 
 ---
 
