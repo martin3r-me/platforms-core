@@ -248,27 +248,6 @@ class GetContextTool implements ToolContract
                     $okrRootTeam = ($targetTeam ?? $baseTeam)->getRootTeam();
                     $strategy = [];
 
-                    // Aktiver Forecast mit Fokusräumen
-                    $forecast = \Platform\Okr\Models\Forecast::where('team_id', $okrRootTeam->id)
-                        ->latest()
-                        ->first();
-
-                    if ($forecast) {
-                        $focusAreas = $forecast->focusAreas()
-                            ->orderBy('order')
-                            ->get(['id', 'uuid', 'title']);
-
-                        $strategy['forecast'] = [
-                            'id' => $forecast->id,
-                            'title' => $forecast->title,
-                            'target_date' => $forecast->target_date?->toDateString(),
-                            'focus_areas' => $focusAreas->map(fn ($fa) => [
-                                'id' => $fa->id,
-                                'title' => $fa->title,
-                            ])->values()->toArray(),
-                        ];
-                    }
-
                     // Aktiver Cycle
                     $currentCycle = \Platform\Okr\Models\Cycle::where('team_id', $okrRootTeam->id)
                         ->where('status', 'active')
@@ -288,7 +267,7 @@ class GetContextTool implements ToolContract
 
                     if (!empty($strategy)) {
                         $strategy['module'] = 'okr';
-                        $strategy['hint'] = 'Strategischer Kontext. Details via okr.forecasts.GET, okr.focus_areas.GET, okr.cycles.GET.';
+                        $strategy['hint'] = 'Strategischer Kontext. Details via okr.cycles.GET.';
                         $result['strategy'] = $strategy;
                     }
                 }
