@@ -47,6 +47,10 @@ class ShadowComparator
         }
 
         $graph = $this->resolver->may($user, $capability, $resourceType, $resourceId);
+        if (! $graph) {
+            // Ersteller-Residual: eigenes Objekt sieht/bearbeitet man immer.
+            $graph = $this->resolver->owns($user, $resourceType, $resourceId);
+        }
 
         if ($graph === $legacy) {
             return; // Übereinstimmung → keine Zeile

@@ -101,6 +101,47 @@ class AuthzResolver
     }
 
     /**
+     * Ersteller-Residual: sieht/bearbeitet man sein EIGENES Objekt, egal ob es
+     * im Baum hängt. Das ist die einzige Regel außerhalb des Graphen — „was nicht
+     * aufgehängt ist, sieht nur der Ersteller".
+     *
+     * Generisch: prüft die übliche Ersteller-Spalte auf der Model-Tabelle.
+     */
+    public function owns(User $user, ?string $resourceType, ?int $resourceId): bool
+    {
+        if ($resourceType === null || $resourceId === null || ! class_exists($resourceType)) {
+            return false;
+        }
+
+        try {
+            $table = (new $resourceType)->getTable();
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        static $ownerColumn = [];
+        if (! array_key_exists($table, $ownerColumn)) {
+            $found = null;
+            foreach (['user_id', 'created_by_user_id', 'created_by', 'owner_id', 'author_id', 'organizer_id'] as $candidate) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn($table, $candidate)) {
+                    $found = $candidate;
+                    break;
+                }
+            }
+            $ownerColumn[$table] = $found;
+        }
+
+        $col = $ownerColumn[$table];
+        if ($col === null) {
+            return false;
+        }
+
+        $val = DB::table($table)->where('id', $resourceId)->value($col);
+
+        return $val !== null && (int) $val === (int) $user->id;
+    }
+
+    /**
      * Basis-Query: gültige Grants dieses Subjekts (User + ggf. Person-Entity)
      * im aktuellen Team.
      */
