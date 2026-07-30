@@ -125,6 +125,9 @@
     @endif
     @livewire('core.modal-simple-tool-playground')
     @livewire('organization.modal-organization')
+
+    {{-- App-Launcher: Hot-Corner-Overlay mit den Modulen des Users (Navbar bleibt bestehen) --}}
+    @livewire('core.launchpad')
   @endauth
 
   @php
