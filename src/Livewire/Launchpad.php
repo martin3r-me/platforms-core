@@ -17,6 +17,7 @@ use Platform\Core\PlatformCore;
 class Launchpad extends Component
 {
     public array $modules = [];
+    public array $anchors = [];
 
     public function mount(): void
     {
@@ -37,7 +38,7 @@ class Launchpad extends Component
             return;
         }
 
-        $this->modules = collect(PlatformCore::getVisibleModules())
+        $all = collect(PlatformCore::getVisibleModules())
             ->filter(function ($module) use ($user, $baseTeam) {
                 $moduleModel = \Platform\Core\Models\Module::where('key', $module['key'])->first();
 
@@ -60,6 +61,21 @@ class Launchpad extends Component
                 ];
             })
             ->sortBy(fn ($m) => $m['title'])
+            ->values();
+
+        // Anker (strukturelle Einstiegspunkte) nach vorn, in Config-Reihenfolge,
+        // aus dem Kategorie-Raster herausgelöst.
+        $anchorKeys = (array) config('platform.launchpad.anchors', []);
+        $byKey      = $all->keyBy('key');
+
+        $this->anchors = collect($anchorKeys)
+            ->map(fn ($k) => $byKey->get($k))
+            ->filter()
+            ->values()
+            ->toArray();
+
+        $this->modules = $all
+            ->reject(fn ($m) => in_array($m['key'], $anchorKeys, true))
             ->values()
             ->toArray();
     }

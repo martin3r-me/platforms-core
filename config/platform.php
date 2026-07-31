@@ -18,4 +18,14 @@ return [
             'print_background' => true,
         ],
     ],
+
+    /*
+     * Launchpad — App-Launcher (nx-launchpad).
+     * anchors: Modul-Keys, die als neutrale Anker-Reihe VOR den farbigen
+     * Kategorien stehen (strukturelle Einstiegspunkte, keine Kategorie).
+     * Reihenfolge = Anzeige-Reihenfolge. Bewusst kurz halten (2–4).
+     */
+    'launchpad' => [
+        'anchors' => ['home', 'organization'],
+    ],
 ];

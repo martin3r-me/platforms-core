@@ -1,3 +1,3 @@
 <div>
-    <x-nx-launchpad :modules="$modules" />
+    <x-nx-launchpad :modules="$modules" :anchors="$anchors" />
 </div>
