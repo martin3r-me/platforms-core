@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Platform\Core\Http\Controllers\AgentInboxController;
 use Platform\Core\Http\Controllers\ApiController;
 
 /**
@@ -10,6 +11,14 @@ use Platform\Core\Http\Controllers\ApiController;
  * Diese Datei enthält die Basis-API-Routen des Cores.
  * Module sollten ihre eigenen API-Routen über ModuleRouter::apiGroup() registrieren.
  */
+
+// Agent-Inbox: token-freier Delta-Kanal für die Chat-Konsumption im Worker-Loop
+// (kontextlose DMs/Threads lesen, acken, antworten — Kontext-Threads sind der Resume-Pfad).
+Route::middleware('api.auth')->prefix('terminal/agent')->name('core.terminal.agent.')->group(function () {
+    Route::get('/inbox', [AgentInboxController::class, 'inbox'])->name('inbox');
+    Route::post('/inbox/ack', [AgentInboxController::class, 'ack'])->name('inbox.ack');
+    Route::post('/reply', [AgentInboxController::class, 'reply'])->name('reply');
+});
 
 // Basis-Endpunkt: Aktueller Benutzer (mit Authentifizierung)
 Route::middleware('api.auth')->get('/user', function (Request $request) {
