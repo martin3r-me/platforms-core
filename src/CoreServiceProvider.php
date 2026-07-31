@@ -425,6 +425,13 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(\Platform\Core\Verbalization\Template\TemplateRegistry::class);
         $this->app->singleton(\Platform\Core\Verbalization\Verbalizer::class);
 
+        // Content-Rendering-Schicht: Markdown (+Callouts/Applets) → Block-Liste.
+        // Design-agnostisch; nx rendert die Blöcke via <x-nx-content>.
+        $this->app->singleton(
+            \Platform\Core\Content\ContentParser::class,
+            \Platform\Core\Content\CommonMarkContentParser::class,
+        );
+
         // ReportEngine-Facade: Produzenten-Module (planner, org, …) hängen nur an
         // diesem Contract, nie an der konkreten Engine. Binding zieht später in den
         // reporting-ServiceProvider um, wenn die Engine aus Core auswandert.

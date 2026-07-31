@@ -8,6 +8,7 @@
       "openai-php/client": "^0.8.0",
       "wildbit/postmark-php": "^7.0",
       "intervention/image": "^3.11",
+      "league/commonmark": "^2.4",
       "league/flysystem-aws-s3-v3": "^3.0",
     "laravel/mcp": "^0.5.7",
     "laravel/reverb": "^1.0",
