@@ -1,3 +1,3 @@
 <div>
-    <x-nx-launchpad :modules="$modules" :anchors="$anchors" />
+    <x-nx-launchpad :modules="$modules" :anchors="$anchors" :favorites="$favorites" />
 </div>

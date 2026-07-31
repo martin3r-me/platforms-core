@@ -18,6 +18,7 @@ class Launchpad extends Component
 {
     public array $modules = [];
     public array $anchors = [];
+    public array $favorites = [];
 
     public function mount(): void
     {
@@ -76,6 +77,21 @@ class Launchpad extends Component
 
         $this->modules = $all
             ->reject(fn ($m) => in_array($m['key'], $anchorKeys, true))
+            ->values()
+            ->toArray();
+
+        // Favoriten = meistgenutzte Module (ModuleUsageCount), ohne Anker,
+        // max. eine Zeile. Team-Kontext wie in der Navbar (currentTeam).
+        $currentTeam = $user->currentTeam;
+        $favKeys = $currentTeam
+            ? \Platform\Core\Models\ModuleUsageCount::topModules($user->id, $currentTeam->id, 8)
+            : [];
+
+        $this->favorites = collect($favKeys)
+            ->reject(fn ($k) => in_array($k, $anchorKeys, true))
+            ->map(fn ($k) => $byKey->get($k))
+            ->filter()
+            ->take(7)
             ->values()
             ->toArray();
     }
