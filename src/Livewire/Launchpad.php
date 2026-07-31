@@ -56,6 +56,7 @@ class Launchpad extends Component
                     'title' => $title,
                     'icon'  => $icon,
                     'url'   => $url,
+                    'group' => $module['group'] ?? 'other',
                 ];
             })
             ->sortBy(fn ($m) => $m['title'])

@@ -8,6 +8,13 @@
             <img src="/logo.png" alt="Home" class="h-5 w-5 rounded object-contain" />
         </a>
 
+        {{-- Launchpad öffnen (⌘/Strg + ⇧ + L) --}}
+        <button x-data @click="window.dispatchEvent(new Event('open-launchpad'))"
+            class="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-md hover:bg-[color:var(--nx-hover)] transition text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]"
+            title="Launchpad — ⌘/Strg + ⇧ + L">
+            @svg('heroicon-o-rocket-launch', 'w-5 h-5')
+        </button>
+
         {{-- Mobile hamburger --}}
         <button @click="mobileMenuOpen = !mobileMenuOpen"
             class="md:hidden flex items-center justify-center w-8 h-8 rounded-md hover:bg-[color:var(--nx-hover)] transition text-[color:var(--nx-text)]">
