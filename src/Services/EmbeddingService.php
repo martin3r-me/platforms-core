@@ -33,6 +33,7 @@ class EmbeddingService
         string $text,
         ?string $providerName = null,
         ?array $metadata = null,
+        bool $force = false,
     ): void {
         $provider = $this->resolveProvider($providerName);
         $hash = $this->hashText($text);
@@ -42,7 +43,9 @@ class EmbeddingService
             $provider->getName(), $provider->getModel(),
         );
 
-        if ($existing === $hash) {
+        // $force: auch bei unverändertem Text neu ablegen — z. B. wenn nur die Metadaten
+        // (nachträglich gelernte Lösung) aktualisiert werden sollen.
+        if (! $force && $existing === $hash) {
             return;
         }
 
