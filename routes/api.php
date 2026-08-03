@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Platform\Core\Http\Controllers\AgentInboxController;
+use Platform\Core\Http\Controllers\AgentUsersController;
 use Platform\Core\Http\Controllers\ApiController;
 
 /**
@@ -18,6 +19,12 @@ Route::middleware('api.auth')->prefix('terminal/agent')->name('core.terminal.age
     Route::get('/inbox', [AgentInboxController::class, 'inbox'])->name('inbox');
     Route::post('/inbox/ack', [AgentInboxController::class, 'ack'])->name('inbox.ack');
     Route::post('/reply', [AgentInboxController::class, 'reply'])->name('reply');
+});
+
+// Agent-Verzeichnis: Auswahl-Pool an Kollegen (betreuter User eines Assistenten), über ALLE
+// Teams des Token-Users. Konvention wie dev/planner/org: {modul}/agent.
+Route::middleware('api.auth')->prefix('core/agent')->name('core.agent.')->group(function () {
+    Route::get('/users', [AgentUsersController::class, 'index'])->name('users');
 });
 
 // Basis-Endpunkt: Aktueller Benutzer (mit Authentifizierung)
