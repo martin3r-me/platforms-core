@@ -270,7 +270,23 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Console\Commands\RebuildToolCatalogsCommand::class,
                 \Platform\Core\Console\Commands\AuditTeamOrphansCommand::class,
                 \Platform\Core\Console\Commands\PurgeStaleRecordsCommand::class,
+                \Platform\Core\Console\Commands\BackfillContextDateTimesCommand::class,
             ]);
+        }
+
+        // Context-Date-Times: Dual-Write für Whitelist-Models, die das Trait
+        // HasContextDateTimes NICHT selbst nutzen (dann registriert das Trait den
+        // Observer bereits in bootHasContextDateTimes()). So greift der Dual-Write
+        // auch ohne Änderung am Fremd-Package. Nicht-installierte Klassen werden
+        // still übersprungen.
+        foreach ((array) config('core.context_date_times.sync', []) as $modelClass => $map) {
+            if (! is_string($modelClass) || ! class_exists($modelClass)) {
+                continue;
+            }
+            if (in_array(\Platform\Core\Traits\HasContextDateTimes::class, class_uses_recursive($modelClass), true)) {
+                continue;
+            }
+            $modelClass::observe(\Platform\Core\Observers\ContextDateTimeObserver::class);
         }
 
         // Error Reporter: Register core namespace
@@ -341,6 +357,7 @@ class CoreServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/verbalization.php', 'verbalization');
         $this->mergeConfigFrom(__DIR__.'/../config/dav.php', 'dav');
         $this->mergeConfigFrom(__DIR__.'/../config/authz.php', 'authz');
+        $this->mergeConfigFrom(__DIR__.'/../config/core.php', 'core');
 
         // Autorisierungs-Kernel (graph-basiert). Resolver + Shadow-Vergleicher.
         $this->app->singleton(\Platform\Core\Authz\AuthzResolver::class);
