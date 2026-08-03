@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Platform\Core\Http\Controllers\AgentAssistantController;
 use Platform\Core\Http\Controllers\AgentInboxController;
 use Platform\Core\Http\Controllers\AgentUsersController;
 use Platform\Core\Http\Controllers\ApiController;
@@ -25,6 +26,8 @@ Route::middleware('api.auth')->prefix('terminal/agent')->name('core.terminal.age
 // Teams des Token-Users. Konvention wie dev/planner/org: {modul}/agent.
 Route::middleware('api.auth')->prefix('core/agent')->name('core.agent.')->group(function () {
     Route::get('/users', [AgentUsersController::class, 'index'])->name('users');
+    // Assistent-Claim (Delegations-DM): Chef-DMs mit ungelesenen Nachrichten + Verlauf.
+    Route::get('/assistant/inbox', [AgentAssistantController::class, 'inbox'])->name('assistant.inbox');
 });
 
 // Basis-Endpunkt: Aktueller Benutzer (mit Authentifizierung)
