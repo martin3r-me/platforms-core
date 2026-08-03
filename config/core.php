@@ -43,6 +43,20 @@ return [
                 'due_date' => ['kind' => ContextDateTimeKind::Due, 'label' => 'Fällig'],
             ],
 
+            // OKR-Zyklen (Klasse heißt Cycle, NICHT OkrCycle). Achtung: okr_cycles hat
+            // KEINE Spalten starts_at/ends_at – das sind Accessor-Attribute auf dem Model
+            // (getStartsAtAttribute/getEndsAtAttribute), die an das verknüpfte
+            // CycleTemplate (okr_cycle_templates.starts_at/ends_at, date) delegieren.
+            // getAttribute() löst diese Accessoren auf, daher greift der Dual-Write
+            // trotzdem; context bleibt der Cycle (per-Zyklus-Band in der Timeline),
+            // team_id kommt aus okr_cycles.team_id. Ändert sich später das Template selbst,
+            // wird der Mirror erst beim nächsten Cycle-Save aktualisiert (Cycle-Save feuert
+            // den Observer, Template-Save nicht) – für die additive Migration akzeptabel.
+            \Platform\Okr\Models\Cycle::class => [
+                'starts_at' => ['kind' => ContextDateTimeKind::Start, 'label' => 'Zyklusstart'],
+                'ends_at' => ['kind' => ContextDateTimeKind::End, 'label' => 'Zyklusende'],
+            ],
+
             // Hinweis PlannerProject: Die früheren Spalten planner_projects.starts_at
             // / ends_at existieren NICHT mehr – die Projekt-Laufzeit wurde nach
             // organization_time_periods migriert (Trait Organization\...\HasPlannedPeriod,

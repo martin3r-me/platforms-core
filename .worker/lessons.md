@@ -29,3 +29,11 @@
   `organization_time_periods` (Trait Organization\HasPlannedPeriod). Spalten-basierter Dual-Write
   ist dort nicht anwendbar. `planner_tasks.due_date` existiert (dateTime, nullable); `started_at`
   gibt es nicht.
+- OKR-Zyklen: Model heißt `Platform\Okr\Models\Cycle` (NICHT OkrCycle). `okr_cycles.starts_at/ends_at`
+  sind KEINE Spalten, sondern Accessoren (`getStartsAtAttribute`/`getEndsAtAttribute`), die an das
+  verknüpfte `CycleTemplate` (`okr_cycle_templates.starts_at/ends_at`, date) delegieren. Der Dual-Write
+  funktioniert trotzdem, weil `getAttribute()` Accessoren auflöst → Whitelist-Eintrag auf `Cycle::class`
+  reicht (context = Cycle, team_id aus okr_cycles). `CycleTemplate` NICHT direkt observen (hat kein
+  team_id → NOT-NULL-Verstoß in core_context_date_times). Gotcha beim Accessor-Pfad: ist die Relation
+  auf der Instanz schon gecacht, spiegelt der Save-Observer den ALTEN Wert – relevante Änderung immer
+  auf frisch geladener Instanz (oder `unsetRelation`) speichern.
