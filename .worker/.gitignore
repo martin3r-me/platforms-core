@@ -1,0 +1,4 @@
+# Nur das Package-Gedächtnis committen, keinen Runtime-Müll.
+*
+!.gitignore
+!lessons.md

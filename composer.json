@@ -21,6 +21,12 @@
       "Platform\\Core\\": "src/"
     }
   },
+  "autoload-dev": {
+    "psr-4": {
+      "Platform\\Core\\Tests\\": "tests/",
+      "Platform\\Core\\Database\\Factories\\": "database/factories/"
+    }
+  },
   "extra": {
     "laravel": {
       "providers": [
