@@ -72,10 +72,17 @@ class MySqlJsonEmbeddingStore implements EmbeddingStoreContract
             return [];
         }
 
-        $firstDim = (int) $candidates->first()->dimensions;
-        if ($firstDim !== $queryDim) {
+        // Dimension-Konsistenz über ALLE Kandidaten prüfen, nicht nur den ersten.
+        // Heterogener Bestand (z.B. nach Änderung der dimensions-Config unter gleichem
+        // provider/model) oder eine abweichende Query-Dimension werden laut gemeldet,
+        // statt einzelne Rows in der Scoring-Schleife still zu überspringen.
+        $storedDims = $candidates
+            ->map(fn($row) => (int) $row->dimensions)
+            ->unique();
+
+        if ($storedDims->count() > 1 || (int) $storedDims->first() !== $queryDim) {
             throw new EmbeddingDimensionMismatchException(
-                expected: $firstDim,
+                expected: (int) $storedDims->first(),
                 got: $queryDim,
                 provider: $provider,
                 model: $model,

@@ -25,8 +25,12 @@ return new class extends Migration
                 ['team_id', 'entity_type', 'entity_id', 'provider', 'model'],
                 'core_embeddings_unique'
             );
+            // Spaltenreihenfolge folgt dem Haupt-Such-Pfad: search() filtert stets
+            // team_id + provider + model und schränkt entity_type nur optional ein.
+            // Daher entity_type als letzte Spalte, damit der Index auch ohne
+            // entity_type-Filter (Cross-Type-Suche) voll greift.
             $table->index(
-                ['team_id', 'entity_type', 'provider', 'model'],
+                ['team_id', 'provider', 'model', 'entity_type'],
                 'core_embeddings_search_idx'
             );
         });

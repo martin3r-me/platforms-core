@@ -52,12 +52,13 @@ use Platform\Core\Contracts\DocumentRendererContract;
 use Platform\Core\Services\Documents\PdfRenderer;
 use Platform\Core\Services\Documents\DocumentTemplateRegistry;
 use Platform\Core\Services\Documents\DocumentService;
-use Platform\Core\Contracts\EmbeddingStoreContract;
 use Platform\Core\Services\EmbeddingProviderRegistry;
 use Platform\Core\Services\EmbeddingService;
+use Platform\Core\Services\EmbeddingStoreRegistry;
 use Platform\Core\Services\GeminiEmbeddingProvider;
 use Platform\Core\Services\MySqlJsonEmbeddingStore;
 use Platform\Core\Services\OpenAiEmbeddingProvider;
+use Platform\Core\Services\QdrantEmbeddingStore;
 use Laravel\Passport\Passport;
 
 // Command-Klasse importieren!
@@ -349,8 +350,32 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(\Platform\Core\Dav\DavModuleRegistry::class);
         // Agent-Config entfernt – Agent ausgelagert
 
-        // Embedding-Infrastruktur (Provider + Store separat, austauschbar)
-        $this->app->singleton(EmbeddingStoreContract::class, MySqlJsonEmbeddingStore::class);
+        // Embedding-Infrastruktur (Provider + Store separat, austauschbar).
+        // Beide Stores werden benannt registriert; die Auswahl erfolgt pro Aufruf
+        // (expliziter Store-Name) oder deklarativ via config('embeddings.routing').
+        $this->app->singleton(EmbeddingStoreRegistry::class, function () {
+            $registry = new EmbeddingStoreRegistry();
+
+            $registry->register('mysql', new MySqlJsonEmbeddingStore());
+
+            $qdrant = config('embeddings.qdrant', []);
+            $registry->register('qdrant', new QdrantEmbeddingStore(
+                url: (string) ($qdrant['url'] ?? 'http://127.0.0.1:6333'),
+                apiKey: $qdrant['api_key'] ?? null,
+                timeout: (int) ($qdrant['timeout'] ?? 30),
+                quantization: $qdrant['quantization'] ?? null,
+                prefix: (string) ($qdrant['collection_prefix'] ?? 'emb'),
+            ));
+
+            return $registry;
+        });
+
+        // Bewusst KEINE Bindung von EmbeddingStoreContract auf einen einzelnen Store:
+        // Die Store-Wahl ist dynamisch (expliziter Store-Name > config('embeddings.routing')
+        // pro entity_type > Default) und braucht den entity_type zum Aufrufzeitpunkt.
+        // Eine Container-Bindung könnte nur den Default liefern und würde das Routing
+        // still umgehen. Zugriff läuft daher immer über EmbeddingStoreRegistry bzw.
+        // EmbeddingService; wer den Default-Store direkt will, nimmt ->default().
         $this->app->singleton(EmbeddingProviderRegistry::class, function () {
             $registry = new EmbeddingProviderRegistry();
 

@@ -8,6 +8,7 @@ use Platform\Core\Contracts\EmbeddingStoreContract;
 use Platform\Core\Exceptions\EmbeddingDimensionMismatchException;
 use Platform\Core\Services\EmbeddingProviderRegistry;
 use Platform\Core\Services\EmbeddingService;
+use Platform\Core\Services\EmbeddingStoreRegistry;
 use Platform\Core\Services\MySqlJsonEmbeddingStore;
 use Platform\Core\Tests\TestCase;
 
@@ -35,9 +36,10 @@ class EmbeddingServiceTest extends TestCase
         $registry = new EmbeddingProviderRegistry();
         $registry->register($provider);
 
-        $store = new MySqlJsonEmbeddingStore();
+        $stores = new EmbeddingStoreRegistry();
+        $stores->register('mysql', new MySqlJsonEmbeddingStore());
 
-        return new EmbeddingService($registry, $store);
+        return new EmbeddingService($registry, $stores);
     }
 
     public function test_round_trip_returns_semantically_closest_match(): void

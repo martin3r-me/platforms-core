@@ -15,6 +15,43 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Store-Backend
+    |--------------------------------------------------------------------------
+    |
+    | Welche EmbeddingStoreContract-Implementation gebunden wird:
+    |   'mysql'  → MySqlJsonEmbeddingStore (Default, JSON + Cosine in PHP,
+    |              gut bis wenige tausend Vektoren pro Tenant)
+    |   'qdrant' → QdrantEmbeddingStore (ANN via Qdrant, für große Korpora 100k+)
+    |
+    | Umschaltung ist reine Config — Service, Job und Provider bleiben gleich.
+    |
+    */
+    'store' => env('EMBEDDING_STORE', 'mysql'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Store-Routing pro Entity-Type
+    |--------------------------------------------------------------------------
+    |
+    | Überschreibt den globalen 'store'-Default je Entity-Type. So kann der große
+    | Rezept-/Pairing-Korpus in Qdrant liegen, während kleinere team-scoped Daten
+    | in MySQL bleiben — ohne dass Aufrufer den Store explizit angeben müssen.
+    |
+    | Priorität: expliziter $store-Parameter am Call  >  dieses Routing  >  'store'.
+    |
+    | Beispiel:
+    |   'routing' => [
+    |       'recipe'       => 'qdrant',
+    |       'food_pairing' => 'qdrant',
+    |   ],
+    |
+    */
+    'routing' => [
+        // 'entity_type' => 'store_name',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | OpenAI Embedding Settings
     |--------------------------------------------------------------------------
     |
@@ -42,5 +79,24 @@ return [
         'api_key' => env('GEMINI_API_KEY'),
         'model' => env('GEMINI_EMBEDDING_MODEL', 'gemini-embedding-001'),
         'dimensions' => (int) env('GEMINI_EMBEDDING_DIMENSIONS', 768),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Qdrant Store Settings
+    |--------------------------------------------------------------------------
+    |
+    | Nur relevant, wenn 'store' === 'qdrant'. URL zeigt bei Co-Location auf
+    | localhost, bei eigenem Server (Hetzner Private Network) auf die private IP.
+    | Qdrant NIE öffentlich exposen — an 127.0.0.1 / privates Netz binden und
+    | API-Key setzen. 'quantization' = 'scalar' senkt den RAM-Bedarf deutlich.
+    |
+    */
+    'qdrant' => [
+        'url' => env('QDRANT_URL', 'http://127.0.0.1:6333'),
+        'api_key' => env('QDRANT_API_KEY'),
+        'timeout' => (int) env('QDRANT_TIMEOUT', 30),
+        'quantization' => env('QDRANT_QUANTIZATION'), // null | 'scalar'
+        'collection_prefix' => env('QDRANT_COLLECTION_PREFIX', 'emb'),
     ],
 ];

@@ -24,6 +24,7 @@ class GenerateEmbeddingJob implements ShouldQueue
         private string $text,
         private ?string $providerName = null,
         private ?array $metadata = null,
+        private ?string $store = null,
     ) {}
 
     public function handle(): void
@@ -36,6 +37,7 @@ class GenerateEmbeddingJob implements ShouldQueue
                 text: $this->text,
                 providerName: $this->providerName,
                 metadata: $this->metadata,
+                store: $this->store,
             );
 
             Log::info('[GenerateEmbeddingJob] Embedded and stored', [

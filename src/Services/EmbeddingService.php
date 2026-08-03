@@ -4,7 +4,6 @@ namespace Platform\Core\Services;
 
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Contracts\EmbeddingProviderContract;
-use Platform\Core\Contracts\EmbeddingStoreContract;
 use Platform\Core\Jobs\GenerateEmbeddingJob;
 use RuntimeException;
 
@@ -19,7 +18,7 @@ class EmbeddingService
 {
     public function __construct(
         private readonly EmbeddingProviderRegistry $providers,
-        private readonly EmbeddingStoreContract $store,
+        private readonly EmbeddingStoreRegistry $stores,
     ) {}
 
     /**
@@ -34,11 +33,13 @@ class EmbeddingService
         ?string $providerName = null,
         ?array $metadata = null,
         bool $force = false,
+        ?string $store = null,
     ): void {
         $provider = $this->resolveProvider($providerName);
+        $storeImpl = $this->stores->resolve($store, $entityType);
         $hash = $this->hashText($text);
 
-        $existing = $this->store->getSourceHash(
+        $existing = $storeImpl->getSourceHash(
             $teamId, $entityType, $entityId,
             $provider->getName(), $provider->getModel(),
         );
@@ -54,7 +55,7 @@ class EmbeddingService
             throw new RuntimeException('Embedding provider returned no vectors.');
         }
 
-        $this->store->store(
+        $storeImpl->store(
             teamId: $teamId,
             entityType: $entityType,
             entityId: $entityId,
@@ -76,12 +77,14 @@ class EmbeddingService
         string $entityType,
         array $entries,
         ?string $providerName = null,
+        ?string $store = null,
     ): void {
         if (count($entries) === 0) {
             return;
         }
 
         $provider = $this->resolveProvider($providerName);
+        $storeImpl = $this->stores->resolve($store, $entityType);
         $providerKey = $provider->getName();
         $modelKey = $provider->getModel();
 
@@ -93,7 +96,7 @@ class EmbeddingService
                 continue;
             }
             $hash = $this->hashText($text);
-            $existing = $this->store->getSourceHash(
+            $existing = $storeImpl->getSourceHash(
                 $teamId, $entityType, $entry['id'],
                 $providerKey, $modelKey,
             );
@@ -125,7 +128,7 @@ class EmbeddingService
             }
 
             foreach ($chunk as $i => $entry) {
-                $this->store->store(
+                $storeImpl->store(
                     teamId: $teamId,
                     entityType: $entityType,
                     entityId: $entry['id'],
@@ -152,14 +155,24 @@ class EmbeddingService
         int $limit = 10,
         float $minScore = 0.0,
         ?string $providerName = null,
+        ?string $store = null,
     ): array {
         $provider = $this->resolveProvider($providerName);
+
+        // Store-Auflösung: expliziter $store gewinnt, sonst Routing über den ersten
+        // Entity-Type. Achtung: Entity-Types aus unterschiedlichen Stores lassen sich
+        // NICHT in einem Aufruf durchsuchen — dann $store explizit setzen oder splitten.
+        $routeType = ($entityTypes !== null && count($entityTypes) > 0)
+            ? (string) $entityTypes[0]
+            : null;
+        $storeImpl = $this->stores->resolve($store, $routeType);
+
         $vectors = $provider->embed([$queryText], 'query');
         if (count($vectors) === 0) {
             return [];
         }
 
-        return $this->store->search(
+        return $storeImpl->search(
             teamId: $teamId,
             queryVector: $vectors[0],
             provider: $provider->getName(),
@@ -173,9 +186,9 @@ class EmbeddingService
     /**
      * Löscht alle Embeddings einer Entität (alle Provider, alle Modelle).
      */
-    public function delete(int $teamId, string $entityType, int|string $entityId): void
+    public function delete(int $teamId, string $entityType, int|string $entityId, ?string $store = null): void
     {
-        $this->store->delete($teamId, $entityType, $entityId);
+        $this->stores->resolve($store, $entityType)->delete($teamId, $entityType, $entityId);
     }
 
     /**
@@ -188,6 +201,7 @@ class EmbeddingService
         string $text,
         ?string $providerName = null,
         ?array $metadata = null,
+        ?string $store = null,
     ): void {
         GenerateEmbeddingJob::dispatch(
             $teamId,
@@ -196,6 +210,7 @@ class EmbeddingService
             $text,
             $providerName,
             $metadata,
+            $store,
         );
     }
 
