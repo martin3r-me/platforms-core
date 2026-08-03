@@ -30,14 +30,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Store-Routing pro Entity-Type
+    | Store-Routing pro Entity-Type (statischer Fallback)
     |--------------------------------------------------------------------------
     |
     | Überschreibt den globalen 'store'-Default je Entity-Type. So kann der große
     | Rezept-/Pairing-Korpus in Qdrant liegen, während kleinere team-scoped Daten
     | in MySQL bleiben — ohne dass Aufrufer den Store explizit angeben müssen.
     |
-    | Priorität: expliziter $store-Parameter am Call  >  dieses Routing  >  'store'.
+    | HINWEIS: Der bevorzugte, lose gekoppelte Weg ist NICHT diese zentrale Map,
+    | sondern die Registrierung durch das jeweilige Modul in dessen ServiceProvider:
+    |
+    |   app(EmbeddingStoreRegistry::class)->route('recipe', 'qdrant');
+    |
+    | So bleibt core entity-agnostisch (core kennt keine Modul-Entities). Diese
+    | Config dient nur als statischer Fallback für Fälle ohne Modul-Registrierung.
+    |
+    | Priorität: expliziter $store-Parameter  >  Modul-route()  >  dieses Routing  >  'store'.
     |
     | Beispiel:
     |   'routing' => [
