@@ -47,6 +47,62 @@ class Team extends Model
     ];
 
     /**
+     * Model-Events registrieren.
+     */
+    protected static function booted(): void
+    {
+        // Beim Anlegen eines Teams bekommt der Owner automatisch das
+        // Organization-Modul – ohne Organization-Verwaltung kann er sein
+        // Team nicht steuern, alles andere ergibt keinen Sinn.
+        static::created(function (Team $team): void {
+            $team->grantOrganizationModuleToOwner();
+        });
+    }
+
+    /**
+     * Weist dem Owner dieses Teams das Organization-Modul zu (idempotent).
+     *
+     * Folgt demselben Muster wie BulkToggleModuleTool: Legacy-modulables-Pivot
+     * mit team_id-Kontext. Root-scoped Module hängen am Root-Team, team-scoped
+     * Module am Team selbst.
+     */
+    public function grantOrganizationModuleToOwner(): void
+    {
+        if (!$this->user_id) {
+            return;
+        }
+
+        $module = Module::where('key', 'organization')->first();
+        if (!$module) {
+            // Organization-Modul (noch) nicht registriert → nichts zu tun.
+            return;
+        }
+
+        $owner = User::find($this->user_id);
+        if (!$owner) {
+            return;
+        }
+
+        $teamId = $module->isRootScoped() ? $this->getRootTeam()->id : $this->id;
+
+        $alreadyGranted = $owner->modules()
+            ->where('module_id', $module->id)
+            ->wherePivot('team_id', $teamId)
+            ->exists();
+
+        if ($alreadyGranted) {
+            return;
+        }
+
+        $owner->modules()->attach($module->id, [
+            'role' => null,
+            'enabled' => true,
+            'guard' => 'web',
+            'team_id' => $teamId,
+        ]);
+    }
+
+    /**
      * Mitglieder dieses Teams.
      */
     public function users(): BelongsToMany
