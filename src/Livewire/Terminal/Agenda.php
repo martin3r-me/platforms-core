@@ -25,15 +25,13 @@ class Agenda extends Component
     }
 
     /**
-     * Receive agenda navigation state from parent Terminal.
+     * Beim ersten Öffnen der App direkt in „Mein Tag" starten. Die Shell hält
+     * keinen Agenda-State mehr — der Terminal-Tab dispatcht nur noch das Event
+     * (siehe openMyDayFromEvent), und für den Erst-Mount reicht dieser Default.
      */
-    #[On('terminal-agenda-state')]
-    public function receiveAgendaState(?int $agendaId = null, string $view = 'board', ?string $dayDate = null): void
+    public function mount(): void
     {
-        $this->activeAgendaId = $agendaId;
-        $this->agendaView = $view;
-        $this->agendaDayDate = $dayDate;
-        unset($this->agendaItems, $this->agendaSlots, $this->agendaBacklogItems, $this->agendaDoneItems, $this->myDayItems, $this->myDayBacklogItems);
+        $this->openMyDay();
     }
 
     #[On('terminal-agenda-open-my-day')]
@@ -217,12 +215,15 @@ class Agenda extends Component
 
     public function navigateDay(string $direction): void
     {
-        $current = $this->agendaDayDate ?: now()->toDateString();
-        $date = \Carbon\Carbon::parse($current);
-
-        $this->agendaDayDate = $direction === 'next'
-            ? $date->addDay()->toDateString()
-            : $date->subDay()->toDateString();
+        if ($direction === 'today') {
+            $this->agendaDayDate = now()->toDateString();
+        } else {
+            $current = $this->agendaDayDate ?: now()->toDateString();
+            $date = \Carbon\Carbon::parse($current);
+            $this->agendaDayDate = $direction === 'next'
+                ? $date->addDay()->toDateString()
+                : $date->subDay()->toDateString();
+        }
 
         unset($this->myDayItems);
     }
