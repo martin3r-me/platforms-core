@@ -662,7 +662,10 @@
 
         <!-- ═══ Sidebar: ExtraFields (now managed by child component) ═══ -->
 
-        <!-- ═══ Sidebar: Agenda (now managed by child component) ═══ -->
+        <!-- ═══ Sidebar: Agenda (Nav-Kind: Liste + Mein Tag + Anlegen) ═══ -->
+        <div x-show="$wire.activeApp === 'agenda'" class="flex-1 min-h-0 flex flex-col">
+          <livewire:core.terminal.agenda-nav lazy wire:key="t-nav-agenda" />
+        </div>
 
         @include('platform::livewire.partials.terminal-comms-sidebar')
 

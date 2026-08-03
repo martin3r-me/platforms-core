@@ -25,44 +25,45 @@ class Agenda extends Component
     }
 
     /**
-     * Beim ersten Öffnen der App direkt in „Mein Tag" starten. Die Shell hält
-     * keinen Agenda-State mehr — der Terminal-Tab dispatcht nur noch das Event
-     * (siehe openMyDayFromEvent), und für den Erst-Mount reicht dieser Default.
+     * Erst-Zustand „Mein Tag". Der laufende Auswahl-State kommt danach vom
+     * Nav-Kind (core.terminal.agenda-nav) via terminal-agenda-state.
      */
     public function mount(): void
     {
         $this->openMyDay();
     }
 
-    #[On('terminal-agenda-open-my-day')]
-    public function openMyDayFromEvent(): void
+    #[On('terminal-agenda-state')]
+    public function receiveAgendaState(?int $agendaId = null, string $view = 'board', ?string $dayDate = null): void
     {
-        $this->openMyDay();
+        $this->activeAgendaId = $agendaId;
+        $this->agendaView = $view;
+        $this->agendaDayDate = $dayDate;
+        unset($this->agendaItems, $this->agendaSlots, $this->agendaBacklogItems, $this->agendaDoneItems, $this->myDayItems, $this->myDayBacklogItems);
     }
 
     // ── Computed Properties ──────────────────────────────────
 
+    /** Nur die aktive Agenda (für den Header). Die volle Liste besitzt das Nav-Kind. */
     #[Computed]
-    public function agendas(): array
+    public function currentAgenda(): ?array
     {
-        $teamId = $this->teamId();
-        if (! $teamId) {
-            return [];
+        if (! $this->activeAgendaId) {
+            return null;
         }
 
-        return TerminalAgenda::forTeam($teamId)
-            ->whereHas('members', fn ($q) => $q->where('user_id', auth()->id()))
-            ->orderBy('name')
-            ->get()
-            ->map(fn ($a) => [
-                'id' => $a->id,
-                'name' => $a->name,
-                'description' => $a->description,
-                'icon' => $a->icon ?? '📋',
-                'item_count' => $a->item_count,
-                'role' => $a->members()->where('user_id', auth()->id())->value('role') ?? 'member',
-            ])
-            ->toArray();
+        $a = TerminalAgenda::find($this->activeAgendaId);
+        if (! $a) {
+            return null;
+        }
+
+        return [
+            'id' => $a->id,
+            'name' => $a->name,
+            'description' => $a->description,
+            'icon' => $a->icon ?? '📋',
+            'role' => $a->members()->where('user_id', auth()->id())->value('role') ?? 'member',
+        ];
     }
 
     #[Computed]
@@ -195,15 +196,8 @@ class Agenda extends Component
     }
 
     // ── Actions ──────────────────────────────────────────────
-
-    public function selectAgenda(int $agendaId): void
-    {
-        $this->activeAgendaId = $agendaId;
-        if ($this->agendaView === 'day') {
-            $this->agendaView = 'board';
-        }
-        unset($this->agendaItems, $this->agendaSlots, $this->agendaBacklogItems, $this->agendaDoneItems);
-    }
+    // Auswahl/Anlegen liegen im Nav-Kind (core.terminal.agenda-nav); hier bleibt
+    // nur, was der Content-Bereich selbst treibt: Tages-Navigation, Items, Löschen.
 
     public function openMyDay(): void
     {
@@ -228,47 +222,6 @@ class Agenda extends Component
         unset($this->myDayItems);
     }
 
-    public function createAgenda(string $name, ?string $description = null, ?string $icon = null): void
-    {
-        $teamId = $this->teamId();
-        if (! $teamId || empty(trim($name))) {
-            return;
-        }
-
-        $agenda = TerminalAgenda::create([
-            'team_id' => $teamId,
-            'name' => trim($name),
-            'description' => $description ? trim($description) : null,
-            'icon' => $icon,
-        ]);
-
-        TerminalAgendaMember::create([
-            'agenda_id' => $agenda->id,
-            'user_id' => auth()->id(),
-            'role' => 'owner',
-        ]);
-
-        $this->activeAgendaId = $agenda->id;
-        $this->agendaView = 'board';
-        unset($this->agendas, $this->agendaItems);
-    }
-
-    public function updateAgenda(int $agendaId, string $name, ?string $description = null, ?string $icon = null): void
-    {
-        $agenda = TerminalAgenda::find($agendaId);
-        if (! $agenda || empty(trim($name))) {
-            return;
-        }
-
-        $agenda->update([
-            'name' => trim($name),
-            'description' => $description ? trim($description) : null,
-            'icon' => $icon ?? $agenda->icon,
-        ]);
-
-        unset($this->agendas);
-    }
-
     public function deleteAgenda(int $agendaId): void
     {
         $agenda = TerminalAgenda::find($agendaId);
@@ -291,7 +244,11 @@ class Agenda extends Component
             $this->activeAgendaId = null;
         }
 
-        unset($this->agendas);
+        unset($this->currentAgenda);
+
+        // Nav-Kind über die Löschung informieren: Liste neu laden + ggf. auf „Mein
+        // Tag" zurückfallen (das dispatcht dann terminal-agenda-state zurück an uns).
+        $this->dispatch('terminal-agenda-deleted', agendaId: $agendaId);
     }
 
     public function getAgendaMembers(): array
@@ -366,7 +323,7 @@ class Agenda extends Component
         ]);
 
         $agenda->refreshItemCount();
-        unset($this->agendaItems, $this->agendas, $this->myDayItems);
+        unset($this->agendaItems, $this->myDayItems);
     }
 
     public function updateAgendaItem(int $itemId, ?string $title = null, ?string $notes = null, ?string $date = null, ?string $timeStart = null, ?string $timeEnd = null, ?string $color = null): void
@@ -413,7 +370,7 @@ class Agenda extends Component
         $agenda = $item->agenda;
         $item->delete();
         $agenda?->refreshItemCount();
-        unset($this->agendaItems, $this->agendas, $this->myDayItems, $this->myDayBacklogItems);
+        unset($this->agendaItems, $this->myDayItems, $this->myDayBacklogItems);
     }
 
     public function detachAgendaItem(int $itemId): void
@@ -426,7 +383,7 @@ class Agenda extends Component
         $agenda = $item->agenda;
         $item->delete();
         $agenda?->refreshItemCount();
-        unset($this->agendaItems, $this->agendas, $this->myDayItems, $this->myDayBacklogItems);
+        unset($this->agendaItems, $this->myDayItems, $this->myDayBacklogItems);
     }
 
     public function toggleAgendaItemDone(int $itemId): void
@@ -438,7 +395,7 @@ class Agenda extends Component
 
         $item->update(['is_done' => ! $item->is_done]);
         $item->agenda?->refreshItemCount();
-        unset($this->agendaItems, $this->agendas, $this->myDayItems, $this->agendaSlots, $this->agendaBacklogItems, $this->agendaDoneItems);
+        unset($this->agendaItems, $this->myDayItems, $this->agendaSlots, $this->agendaBacklogItems, $this->agendaDoneItems);
     }
 
     public function updateAgendaItemOrder(array $items): void
@@ -549,7 +506,7 @@ class Agenda extends Component
         ]);
 
         TerminalAgenda::find($this->activeAgendaId)?->refreshItemCount();
-        unset($this->agendaItems, $this->agendas, $this->agendaBacklogItems, $this->agendaSlots);
+        unset($this->agendaItems, $this->agendaBacklogItems, $this->agendaSlots);
     }
 
     // ── Kanban Slots ─────────────────────────────────────────
@@ -621,7 +578,7 @@ class Agenda extends Component
             TerminalAgenda::find($this->activeAgendaId)?->refreshItemCount();
         }
 
-        unset($this->agendaSlots, $this->agendaBacklogItems, $this->agendaDoneItems, $this->agendaItems, $this->agendas);
+        unset($this->agendaSlots, $this->agendaBacklogItems, $this->agendaDoneItems, $this->agendaItems);
     }
 
     public function updateAgendaSlotOrder(array $slots): void
