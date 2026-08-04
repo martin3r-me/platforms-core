@@ -14,6 +14,13 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Selbstheilend: ein früher fehlgeschlagener Deploy (FK-Name zu lang) konnte
+        // die Tabelle unvollständig – ohne FK – hinterlassen, ohne die Migration zu
+        // verbuchen. Der Rest-Torso würde ein erneutes CREATE mit 1050 blockieren.
+        // Da dies eine reine Create-Migration ist (leere, brandneue Tabelle), ist ein
+        // vorheriges dropIfExists gefahrlos.
+        Schema::dropIfExists('core_context_date_time_occurrences');
+
         Schema::create('core_context_date_time_occurrences', function (Blueprint $table) {
             $table->id();
 
