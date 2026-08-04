@@ -3,7 +3,9 @@
 namespace Platform\Core;
 
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
+use Platform\Core\Database\SafeBlueprint;
 use Livewire\LivewireServiceProvider;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
@@ -69,6 +71,14 @@ class CoreServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
+        // Auto-Shortening für Index-/FK-/Unique-Namen > 64 Zeichen (MySQL/MariaDB-Limit):
+        // ab hier bekommt jede Schema::create/table einen SafeBlueprint (die Facade cacht den
+        // Builder im selben Prozess, boot() läuft vor `artisan migrate`). So laufen naive
+        // Migrations mit langen Tabellen-/Spaltennamen durch, statt am Identifier-Limit zu
+        // scheitern — die häufigste Ursache fehlschlagender (Worker-)Migrations. L12-Resolver-
+        // Signatur: ($connection, $table, $callback).
+        Schema::blueprintResolver(fn ($connection, $table, $callback) => new SafeBlueprint($connection, $table, $callback));
+
         // [SECURITY] PRC Timezone Detection - Früher Check beim Boot
         // Wenn PRC Timezone bereits gesetzt ist, sofort loggen mit Backtrace
         $tz = @date_default_timezone_get();
