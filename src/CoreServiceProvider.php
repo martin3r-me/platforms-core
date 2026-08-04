@@ -281,6 +281,7 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Console\Commands\AuditTeamOrphansCommand::class,
                 \Platform\Core\Console\Commands\PurgeStaleRecordsCommand::class,
                 \Platform\Core\Console\Commands\BackfillContextDateTimesCommand::class,
+                \Platform\Core\Console\Commands\MigrateEmbeddingStoreCommand::class,
             ]);
         }
 
