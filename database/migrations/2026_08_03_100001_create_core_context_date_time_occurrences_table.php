@@ -17,8 +17,11 @@ return new class extends Migration
         Schema::create('core_context_date_time_occurrences', function (Blueprint $table) {
             $table->id();
 
+            // Expliziter FK-Name: der von constrained() abgeleitete Default
+            // (…_core_context_date_time_id_foreign) überschreitet MySQLs
+            // 64-Zeichen-Limit für Identifier.
             $table->foreignId('core_context_date_time_id')
-                ->constrained('core_context_date_times')
+                ->constrained('core_context_date_times', indexName: 'core_ctx_dt_occ_dt_id_foreign')
                 ->cascadeOnDelete();
 
             // In UTC gespeichert, analog zur Parent-Zeile.
