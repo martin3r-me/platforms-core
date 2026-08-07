@@ -28,9 +28,6 @@
         @livewire('core.modal-user')
         @livewire('core.modal-pricing')
         @livewire('core.modal-modules')
-        @if(class_exists(\Platform\Crm\Livewire\ModalComms::class))
-            @livewire('crm.modal-comms')
-        @endif
     @endauth
         
     <livewire:notifications.notices.index />

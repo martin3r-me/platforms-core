@@ -8,13 +8,6 @@
             <img src="/logo.png" alt="Home" class="h-5 w-5 rounded object-contain" />
         </a>
 
-        {{-- Launchpad öffnen (⌘/Strg + ⇧ + L) --}}
-        <button x-data @click="window.dispatchEvent(new Event('open-launchpad'))"
-            class="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-md hover:bg-[color:var(--nx-hover)] transition text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]"
-            title="Launchpad — ⌘/Strg + ⇧ + L">
-            @svg('heroicon-o-rocket-launch', 'w-5 h-5')
-        </button>
-
         {{-- Mobile hamburger --}}
         <button @click="mobileMenuOpen = !mobileMenuOpen"
             class="md:hidden flex items-center justify-center w-8 h-8 rounded-md hover:bg-[color:var(--nx-hover)] transition text-[color:var(--nx-text)]">
@@ -58,41 +51,8 @@
     <div class="flex items-center gap-1">
         {{-- Action buttons (desktop/tablet) --}}
         <div class="hidden md:flex items-center gap-1">
-            {{-- Actions: Check-in, Comms, Terminal --}}
+            {{-- Check-in --}}
             @livewire('core.navbar-checkin')
-
-            <button x-data
-                @click="$dispatch('open-modal-comms')"
-                class="inline-flex items-center justify-center w-7 h-7 rounded-md transition text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)]"
-                title="Kommunikation">
-                @svg('heroicon-o-paper-airplane', 'w-4 h-4')
-            </button>
-
-            {{-- Terminal (bottom) — einziges Panel ohne eigenen Griff (kollabiert vollständig) --}}
-            <button x-data
-                @click="window.dispatchEvent(new CustomEvent('toggle-terminal'))"
-                class="inline-flex items-center justify-center w-7 h-7 rounded-md transition"
-                :class="$store.ui?.m('terminal', 'open')
-                    ? 'text-[color:var(--nx-text)] bg-[color:var(--nx-accent-soft)]'
-                    : 'text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)]'"
-                title="Terminal">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4">
-                    <rect x="3" y="5" width="18" height="8.5" rx="1.5" />
-                    <rect x="3" y="15" width="18" height="4" rx="1.5" fill="currentColor" opacity="0.9" stroke="none" />
-                </svg>
-            </button>
-
-            <div class="h-6 w-px bg-[color:var(--nx-line)] mx-0.5"></div>
-
-            {{-- Algedonic-Signal — Eskalation direkt an die oberste Ebene (Stafford Beer).
-                 Bewusst isoliert zwischen zwei Hairlines, warm-rot wie der Team-Warnzustand. --}}
-            <button x-data
-                @click="$dispatch('open-modal-algedonic')"
-                class="relative inline-flex items-center justify-center w-7 h-7 rounded-md transition text-[color:var(--nx-warning)] hover:text-white hover:bg-[color:var(--nx-warning)] group"
-                title="Algedonic-Signal — direkt an die oberste Ebene (Stafford Beer)">
-                <span class="absolute inset-0 rounded-md bg-[color:var(--nx-warning)] opacity-0 group-hover:opacity-20 animate-pulse"></span>
-                @svg('heroicon-o-bell-alert', 'w-4 h-4 relative')
-            </button>
 
             <div class="h-6 w-px bg-[color:var(--nx-line)] mx-0.5"></div>
 
@@ -206,12 +166,6 @@
                     class="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition">
                     @svg('heroicon-o-sun', 'w-4 h-4 flex-shrink-0')
                     <span>Check-in</span>
-                </button>
-
-                <button type="button" @click="$dispatch('open-modal-comms'); mobileMenuOpen = false"
-                    class="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition">
-                    @svg('heroicon-o-paper-airplane', 'w-4 h-4 flex-shrink-0')
-                    <span>Kommunikation</span>
                 </button>
             </div>
         </div>

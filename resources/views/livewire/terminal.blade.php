@@ -366,12 +366,13 @@
       {{-- Spacer to push unread pills left --}}
       <div class="ml-auto"></div>
 
-      {{-- Launchpad öffnen — rechts in der Leiste; toggelt das Terminal NICHT --}}
-      <button
-        @click.stop="window.dispatchEvent(new Event('open-launchpad'))"
-        class="flex items-center justify-center w-7 h-7 rounded flex-shrink-0 text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5 transition"
-        title="Launchpad — ⌘/Strg + ⇧ + L">
-        @svg('heroicon-o-rocket-launch', 'w-4 h-4')
+      {{-- Algedonic-Signal — Eskalation direkt an die oberste Ebene (Stafford Beer);
+           rechts in der Leiste, toggelt das Terminal NICHT --}}
+      <button x-data
+        @click.stop="$dispatch('open-modal-algedonic')"
+        class="flex items-center justify-center w-7 h-7 rounded flex-shrink-0 text-[color:var(--nx-warning)] hover:text-white hover:bg-[color:var(--nx-warning)] transition"
+        title="Algedonic-Signal — direkt an die oberste Ebene (Stafford Beer)">
+        @svg('heroicon-o-bell-alert', 'w-4 h-4')
       </button>
     </div>
     </div>{{-- /status bar wrapper --}}

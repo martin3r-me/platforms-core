@@ -120,14 +120,8 @@
     @livewire('core.modal-pricing')
     @livewire('core.modal-modules')
     @livewire('core.modal-help')
-    @if(class_exists(\Platform\Crm\Livewire\ModalComms::class))
-      @livewire('crm.modal-comms')
-    @endif
     @livewire('core.modal-simple-tool-playground')
     @livewire('organization.modal-organization')
-
-    {{-- App-Launcher: Hot-Corner-Overlay mit den Modulen des Users (Navbar bleibt bestehen) --}}
-    @livewire('core.launchpad')
   @endauth
 
   @php
