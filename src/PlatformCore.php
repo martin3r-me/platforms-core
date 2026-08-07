@@ -109,6 +109,7 @@ class PlatformCore
         return [
             'clinical'    => ['label' => 'Ärztlich', 'order' => 0.1],
             'praxis_admin' => ['label' => 'Verwaltung', 'order' => 0.2],
+            'catalog'     => ['label' => 'Kataloge', 'order' => 0.3],
             'planning' => ['label' => 'Projekte & Planung', 'order' => 1],
             'content'  => ['label' => 'Kommunikation & Content', 'order' => 2],
             'sales'    => ['label' => 'Vertrieb & Kunden', 'order' => 3],
