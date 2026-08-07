@@ -107,6 +107,8 @@ class PlatformCore
     public static function getModuleGroups(): array
     {
         return [
+            'clinical'    => ['label' => 'Ärztlich', 'order' => 0.1],
+            'praxis_admin' => ['label' => 'Verwaltung', 'order' => 0.2],
             'planning' => ['label' => 'Projekte & Planung', 'order' => 1],
             'content'  => ['label' => 'Kommunikation & Content', 'order' => 2],
             'sales'    => ['label' => 'Vertrieb & Kunden', 'order' => 3],
