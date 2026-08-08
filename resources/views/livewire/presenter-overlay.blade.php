@@ -1,6 +1,56 @@
-{{-- Presenter/Regie-Player: zeigt den aktuellen Schritt (Tour oder Ad-hoc) als Sprechblase.
-     Bleibt stehen bis "Weiter"/"Verstanden"; navigiert bei Bedarf ueber Seitenwechsel hinweg. --}}
+{{-- Presenter/Regie-Player: zeigt den aktuellen Schritt (Tour oder Ad-hoc) als Sprechblase,
+     hebt optional ein Ziel-Element hervor (Spotlight). Rein klick-/load-getrieben, kein Poll. --}}
 <div class="pointer-events-none">
+    <style>
+        .presenter-highlight {
+            position: relative;
+            z-index: 55 !important;
+            border-radius: 8px;
+            outline: 3px solid #0e7c6b;
+            outline-offset: 3px;
+            box-shadow: 0 0 0 5px rgba(14, 124, 107, .30);
+            animation: presenter-pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes presenter-pulse {
+            0%, 100% { box-shadow: 0 0 0 4px rgba(14, 124, 107, .38); }
+            50%      { box-shadow: 0 0 0 11px rgba(14, 124, 107, .10); }
+        }
+    </style>
+    <script>
+        (function () {
+            if (window.__presenterHighlightInit) return;
+            window.__presenterHighlightInit = true;
+            var cur = null;
+            function clear() { if (cur) { cur.classList.remove('presenter-highlight'); cur = null; } }
+            function find(sel) {
+                if (!sel) return null;
+                if (sel.indexOf('text:') === 0) {
+                    var t = sel.slice(5).trim().toLowerCase();
+                    var els = document.querySelectorAll('button, a, [role="button"], label, summary, h1, h2, h3');
+                    for (var i = 0; i < els.length; i++) {
+                        var txt = (els[i].innerText || els[i].value || '').trim().toLowerCase();
+                        if (txt && txt.indexOf(t) !== -1) return els[i];
+                    }
+                    return null;
+                }
+                try { return document.querySelector(sel); } catch (e) { return null; }
+            }
+            window.addEventListener('presenter-highlight', function (e) {
+                clear();
+                var d = e.detail || {};
+                var sel = (d.selector != null) ? d.selector : (Array.isArray(d) && d[0] ? d[0].selector : null);
+                if (!sel) return;
+                setTimeout(function () {
+                    var el = find(sel);
+                    if (!el) return;
+                    el.classList.add('presenter-highlight');
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    cur = el;
+                }, 180);
+            });
+        })();
+    </script>
+
     @if($current)
         <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-[min(680px,calc(100vw-2rem))] pointer-events-auto">
             <div class="relative overflow-hidden rounded-2xl bg-[#15242c] text-white shadow-2xl ring-1 ring-white/10">

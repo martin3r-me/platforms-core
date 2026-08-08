@@ -28,6 +28,13 @@ class PresenterOverlay extends Component
         $this->teamId = auth()->user()?->currentTeam?->id;
         $this->userId = auth()->id();
         $this->syncState();
+        $this->emitHighlight();
+    }
+
+    /** Zielelement (Spotlight) an das globale Highlight-JS im Browser melden — null = löschen. */
+    protected function emitHighlight(): void
+    {
+        $this->dispatch('presenter-highlight', selector: $this->current['highlight'] ?? null);
     }
 
     protected function registry(): PresenterTourRegistry
@@ -50,12 +57,13 @@ class PresenterOverlay extends Component
                     return;
                 }
                 $this->current = [
-                    'mode'     => 'tour',
-                    'title'    => $step['title'] ?? null,
-                    'message'  => (string) ($step['message'] ?? ''),
-                    'speaker'  => $step['speaker'] ?? 'Claude',
-                    'progress' => ((int) ($step['position'] ?? 1)) . ' / ' . ((int) ($step['total'] ?? 1)),
-                    'is_last'  => (bool) ($step['is_last'] ?? false),
+                    'mode'      => 'tour',
+                    'title'     => $step['title'] ?? null,
+                    'message'   => (string) ($step['message'] ?? ''),
+                    'speaker'   => $step['speaker'] ?? 'Claude',
+                    'highlight' => $step['highlight'] ?? null,
+                    'progress'  => ((int) ($step['position'] ?? 1)) . ' / ' . ((int) ($step['total'] ?? 1)),
+                    'is_last'   => (bool) ($step['is_last'] ?? false),
                 ];
                 return;
             }
@@ -109,6 +117,7 @@ class PresenterOverlay extends Component
 
         $this->current = null;
         $this->syncState(); // sofort naechsten Schritt laden / hin-navigieren
+        $this->emitHighlight();
     }
 
     /** Laufende Tour abbrechen. */
@@ -118,6 +127,7 @@ class PresenterOverlay extends Component
             $this->registry()->stop($this->userId, $this->teamId);
         }
         $this->current = null;
+        $this->emitHighlight();
     }
 
     public function render()
