@@ -148,6 +148,11 @@
     </main>
   </div>
     
+  {{-- Presenter-Overlay: Echtzeit-Kommentare (Demo/Screencast), per Cache-Poll --}}
+  @auth
+      @livewire('core.presenter-overlay')
+  @endauth
+
   <livewire:notifications.notices.index />
   @if(config('notifications.show_modal'))
       <livewire:notifications.notices.modal />

@@ -73,4 +73,19 @@ return [
 
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Presenter-Kanal (gefuehrte Demos / Screencasts)
+    |--------------------------------------------------------------------------
+    |
+    | Statischer Token fuer den oeffentlichen Push-Endpoint POST /api/presenter/push
+    | (curl-Clients). Ohne gesetzten Token ist der Endpoint geschlossen (401). Das
+    | MCP-Tool core.presenter.POST braucht KEINEN Token — es laeuft ueber die MCP-Auth.
+    |
+    */
+
+    'presenter' => [
+        'token' => env('PRESENTER_TOKEN'),
+    ],
+
 ];
