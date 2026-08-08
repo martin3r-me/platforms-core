@@ -6,41 +6,67 @@ use Livewire\Component;
 use Platform\Core\Support\Presenter;
 
 /**
- * Globales Overlay im App-Layout (Alias: core.presenter-overlay). Pollt den Presenter-
- * Kanal des aktuellen Teams und zeigt neue Kommentare als Sprechblase.
+ * Globaler Regie-Player im App-Layout (Alias: core.presenter-overlay). Pollt den Presenter-
+ * Kanal des aktuellen Teams und zeigt den aktuellen Schritt als Sprechblase — solange er
+ * nicht bestaetigt ist (server-seitiges acknowledged-Flag), auch ueber Seitenwechsel hinweg.
  *
- * Beim Mount wird die aktuelle Sequenz-ID als "gesehen" gesetzt, damit bereits vorhandene
- * Nachrichten bei einem Seitenwechsel NICHT erneut aufpoppen — es erscheinen nur Kommentare,
- * die nach dem Laden der Seite gepusht werden.
+ * Traegt der Schritt eine navigate-URL und ist der Zuschauer nicht dort, beamt der Player
+ * ihn hin (Livewire-SPA-Redirect). "Verstanden" bestaetigt den Schritt; danach ist der
+ * Browser wieder frei, bis der naechste Schritt gepusht wird.
  */
 class PresenterOverlay extends Component
 {
     public ?int $teamId = null;
-    public int $lastSeenId = 0;
     public ?array $current = null;
 
     public function mount(): void
     {
         $this->teamId = auth()->user()?->currentTeam?->id;
-        $latest = $this->teamId ? Presenter::latest($this->teamId) : null;
-        $this->lastSeenId = (int) ($latest['id'] ?? 0);
+        $this->syncState();
     }
 
     public function tick(): void
     {
+        $this->syncState();
+    }
+
+    /**
+     * Aktuellen, unbestaetigten Schritt laden. Navigiert bei Bedarf (nur wenn der Zuschauer
+     * noch nicht auf der Zielseite ist) und zeigt sonst die Sprechblase.
+     */
+    protected function syncState(): void
+    {
         if (!$this->teamId) {
+            $this->current = null;
             return;
         }
 
-        $latest = Presenter::latest($this->teamId);
-        if ($latest && (int) ($latest['id'] ?? 0) > $this->lastSeenId) {
-            $this->current    = $latest;
-            $this->lastSeenId = (int) $latest['id'];
+        $step = Presenter::latest($this->teamId);
+
+        if (!$step || !empty($step['acknowledged'])) {
+            $this->current = null;
+            return;
         }
+
+        // Navigation: nur ausloesen, wenn der Zuschauer noch nicht auf der Zielseite ist.
+        if (!empty($step['navigate'])) {
+            $targetPath  = trim((string) (parse_url($step['navigate'], PHP_URL_PATH) ?? ''), '/');
+            $currentPath = trim(request()->path(), '/');
+            if ($targetPath !== '' && $targetPath !== $currentPath) {
+                $this->redirect($step['navigate'], navigate: true);
+                return;
+            }
+        }
+
+        $this->current = $step;
     }
 
+    /** Zuschauer hat "Verstanden" geklickt — Schritt bestaetigen. */
     public function dismiss(): void
     {
+        if ($this->teamId && $this->current) {
+            Presenter::acknowledge($this->teamId, (int) $this->current['id']);
+        }
         $this->current = null;
     }
 

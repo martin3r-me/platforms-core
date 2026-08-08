@@ -9,8 +9,9 @@ use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Support\Presenter;
 
 /**
- * Presenter-Push: blendet einen Echtzeit-Kommentar als Sprechblasen-Overlay in den
- * Browsern des aktuellen Teams ein — der Kanal fuer gefuehrte Live-Demos / Screencasts.
+ * Presenter-Push: ein Regie-Schritt (Kommentar + optionale Navigation) als Sprechblasen-
+ * Overlay in den Browsern des aktuellen Teams. Bleibt stehen, bis der Zuschauer bestaetigt.
+ * Der Kanal fuer gefuehrte Live-Demos / Onboarding / Screencasts.
  */
 class PresenterPushTool implements ToolContract, ToolMetadataContract
 {
@@ -21,9 +22,10 @@ class PresenterPushTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /presenter - Zeigt einen Echtzeit-Kommentar als Sprechblasen-Overlay in den Browsern '
-            . 'des aktuellen Teams (Presenter-Kanal fuer gefuehrte Demos/Screencasts). '
-            . 'REQUIRED: message. Optional: title, speaker (default "Claude"), duration (Sekunden, default 9).';
+        return 'POST /presenter - Zeigt einen Regie-Schritt als Sprechblasen-Overlay in den Browsern des '
+            . 'aktuellen Teams (gefuehrte Demos/Screencasts). Der Schritt bleibt stehen, bis der Zuschauer '
+            . '"Verstanden" klickt. REQUIRED: message. Optional: navigate (Pfad, z.B. "/encounter/appointments/9" '
+            . '— beamt den Browser dorthin), title, speaker (default "Claude").';
     }
 
     public function getSchema(): array
@@ -32,9 +34,9 @@ class PresenterPushTool implements ToolContract, ToolMetadataContract
             'type' => 'object',
             'properties' => [
                 'message'  => ['type' => 'string', 'description' => 'Kommentar-Text (REQUIRED).'],
+                'navigate' => ['type' => 'string', 'description' => 'Optionaler Pfad, zu dem der Zuschauer-Browser navigiert wird (z.B. "/encounter/appointments/9").'],
                 'title'    => ['type' => 'string', 'description' => 'Optionale fette Ueberschrift ueber dem Text.'],
                 'speaker'  => ['type' => 'string', 'description' => 'Sprecher-Label (default "Claude").'],
-                'duration' => ['type' => 'integer', 'description' => 'Anzeigedauer in Sekunden (default 9, min 2).'],
             ],
             'required' => ['message'],
         ];
@@ -57,20 +59,21 @@ class PresenterPushTool implements ToolContract, ToolMetadataContract
             $message,
             isset($arguments['title']) && $arguments['title'] !== '' ? (string) $arguments['title'] : null,
             isset($arguments['speaker']) && $arguments['speaker'] !== '' ? (string) $arguments['speaker'] : 'Claude',
-            isset($arguments['duration']) ? max(2, (int) $arguments['duration']) : 9,
+            isset($arguments['navigate']) && $arguments['navigate'] !== '' ? (string) $arguments['navigate'] : null,
         );
 
         return ToolResult::success([
-            'id'      => $id,
-            'team_id' => (int) $teamId,
-            'message' => $message,
+            'id'       => $id,
+            'team_id'  => (int) $teamId,
+            'message'  => $message,
+            'navigate' => $arguments['navigate'] ?? null,
         ]);
     }
 
     public function getMetadata(): array
     {
         return [
-            'read_only' => false, 'category' => 'action', 'tags' => ['core', 'presenter', 'demo', 'overlay'],
+            'read_only' => false, 'category' => 'action', 'tags' => ['core', 'presenter', 'demo', 'overlay', 'tour'],
             'risk_level' => 'write', 'requires_auth' => true, 'requires_team' => true, 'idempotent' => false,
         ];
     }

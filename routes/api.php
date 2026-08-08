@@ -35,7 +35,7 @@ Route::post('/presenter/push', function (Request $request) {
         $message,
         $request->filled('title') ? (string) $request->input('title') : null,
         (string) $request->input('speaker', 'Claude'),
-        $request->filled('duration') ? max(2, (int) $request->input('duration')) : 9,
+        $request->filled('navigate') ? (string) $request->input('navigate') : null,
     );
 
     return response()->json(['ok' => true, 'id' => $id, 'team_id' => $teamId]);
