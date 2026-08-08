@@ -619,6 +619,9 @@ class CoreServiceProvider extends ServiceProvider
         // Entity Link Service (Cross-Module Verknüpfungen)
         $this->app->singleton(\Platform\Core\Services\EntityLinkService::class);
 
+        // Presenter-Tour-Registry (das tour-Modul registriert hier seinen Provider für den globalen Player)
+        $this->app->singleton(\Platform\Core\Support\PresenterTourRegistry::class);
+
         // Versionierung & Audit Services
         $this->app->singleton(\Platform\Core\Services\ModelVersioningService::class);
         $this->app->singleton(\Platform\Core\Services\UndoService::class);
