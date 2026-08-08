@@ -1,6 +1,6 @@
 {{-- Presenter/Regie-Player: zeigt den aktuellen Schritt (Tour oder Ad-hoc) als Sprechblase.
      Bleibt stehen bis "Weiter"/"Verstanden"; navigiert bei Bedarf ueber Seitenwechsel hinweg. --}}
-<div wire:poll.1500ms="tick" class="pointer-events-none">
+<div class="pointer-events-none">
     @if($current)
         <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-[min(680px,calc(100vw-2rem))] pointer-events-auto">
             <div class="relative overflow-hidden rounded-2xl bg-[#15242c] text-white shadow-2xl ring-1 ring-white/10">

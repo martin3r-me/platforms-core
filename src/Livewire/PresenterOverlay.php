@@ -30,11 +30,6 @@ class PresenterOverlay extends Component
         $this->syncState();
     }
 
-    public function tick(): void
-    {
-        $this->syncState();
-    }
-
     protected function registry(): PresenterTourRegistry
     {
         return app(PresenterTourRegistry::class);
