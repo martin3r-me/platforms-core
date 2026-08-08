@@ -622,6 +622,9 @@ class CoreServiceProvider extends ServiceProvider
         // Presenter-Tour-Registry (das tour-Modul registriert hier seinen Provider für den globalen Player)
         $this->app->singleton(\Platform\Core\Support\PresenterTourRegistry::class);
 
+        // Katalog-Vermengungsgruppen-Registry (Katalog-Module registrieren ihre Provider; der Termin prüft darüber)
+        $this->app->singleton(\Platform\Core\Support\CatalogCombinationRegistry::class);
+
         // Versionierung & Audit Services
         $this->app->singleton(\Platform\Core\Services\ModelVersioningService::class);
         $this->app->singleton(\Platform\Core\Services\UndoService::class);
