@@ -948,6 +948,11 @@ class CoreServiceProvider extends ServiceProvider
             try { $registry->register($this->app->make(\Platform\Core\Tools\GetLogTool::class)); } catch (\Throwable $e) {}
         }
 
+        // Presenter (core.presenter.*) — Echtzeit-Kommentar-Overlay für geführte Demos/Screencasts
+        if (class_exists(\Platform\Core\Tools\PresenterPushTool::class) && !$registry->has('core.presenter.POST')) {
+            try { $registry->register($this->app->make(\Platform\Core\Tools\PresenterPushTool::class)); } catch (\Throwable $e) {}
+        }
+
         // Context Files Tools (core.context.files.*)
         // Diese Tools ermöglichen der LLM, Dateien an Context-Objekten zu entdecken, lesen, erstellen und löschen
         if (class_exists(\Platform\Core\Tools\GetContextFilesTool::class) && !$registry->has('core.context.files.GET')) {
