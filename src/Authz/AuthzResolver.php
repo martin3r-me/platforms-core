@@ -65,7 +65,9 @@ class AuthzResolver
      */
     public function may(User $user, string $capability, ?string $resourceType = null, ?int $resourceId = null): bool
     {
-        $teamId = $this->teamId($user);
+        // Strukturelle (Entity-)Prüfung läuft gegen das Root-Team, weil der
+        // Org-Baum dort verankert und materialisiert ist (siehe graphTeamId()).
+        $teamId = $this->graphTeamId($user);
         if ($teamId === null) {
             return false;
         }
@@ -159,7 +161,8 @@ class AuthzResolver
      */
     public function reachableEntityIds(User $user, string $cap = 'read'): array
     {
-        $teamId = $this->teamId($user);
+        // Entity-Reichweite = Root-Team-Baum (Closure/Grants dort materialisiert).
+        $teamId = $this->graphTeamId($user);
         if ($teamId === null) {
             return [];
         }
@@ -216,6 +219,21 @@ class AuthzResolver
     protected function teamId(User $user): ?int
     {
         return optional($user->currentTeam)->id;
+    }
+
+    /**
+     * Team-Anker für den ENTITY-Graphen. Der Org-Baum (Entities, Closure,
+     * resource_links, Rollen-/Relation-Grants) wird bewusst auf Root-Team-Ebene
+     * modelliert und materialisiert — Kind-Teams tragen keine eigenen Entities.
+     * Deshalb muss die strukturelle Sichtbarkeit gegen das Root-Team auflösen,
+     * sonst sieht ein User im Kind-Team nichts, was im (Root-)Baum hängt.
+     * Der Modul-Zugriffs-Pfad (mayUseModule) bleibt bewusst am rohen currentTeam.
+     */
+    protected function graphTeamId(User $user): ?int
+    {
+        $team = $user->currentTeam;
+
+        return $team ? $team->getRootTeam()->id : null;
     }
 
     /**
