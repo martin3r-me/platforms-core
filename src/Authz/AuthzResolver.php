@@ -207,9 +207,9 @@ class AuthzResolver
                 // Subjekt ist der User selbst — und (später) sein Person-Entity.
                 $q->where(fn ($q) => $q->where('subject_type', 'user')->where('subject_id', $user->id));
 
-                $personEntityId = $this->personEntityId($user);
-                if ($personEntityId !== null) {
-                    $q->orWhere(fn ($q) => $q->where('subject_type', 'entity')->where('subject_id', $personEntityId));
+                $personEntityIds = $this->personEntityIds($user);
+                if ($personEntityIds !== []) {
+                    $q->orWhere(fn ($q) => $q->where('subject_type', 'entity')->whereIn('subject_id', $personEntityIds));
                 }
             })
             ->where(fn ($q) => $q->whereNull('valid_from')->orWhere('valid_from', '<=', $now))
@@ -237,22 +237,31 @@ class AuthzResolver
     }
 
     /**
-     * User → Person-Entity (organization). Bewusst weich: existiert die
-     * organization-Tabelle nicht (Kernel ohne organization), gibt es kein
-     * Person-Entity und der Resolver arbeitet rein auf User-Grants.
+     * User → Person-Entities (organization). Ein User kann mit MEHREREN Entities
+     * verknüpft sein (z.B. seine Person-Entity + versehentlich einem Abteilungs-
+     * knoten). Alle zählen, damit ein Grant, der auf irgendeiner dieser Entities
+     * als Subjekt sitzt, nicht verloren geht (sonst greift die "erste"-Auflösung
+     * und ein korrekter Grant auf einer anderen verknüpften Entity wird unsichtbar).
+     * Bewusst weich: existiert die organization-Tabelle nicht (Kernel ohne
+     * organization), gibt es keine Person-Entity und der Resolver arbeitet rein
+     * auf User-Grants.
+     *
+     * @return int[]
      */
-    protected function personEntityId(User $user): ?int
+    protected function personEntityIds(User $user): array
     {
         static $available = null;
         if ($available === null) {
             $available = DB::getSchemaBuilder()->hasTable('organization_entities');
         }
         if (! $available) {
-            return null;
+            return [];
         }
 
         return DB::table('organization_entities')
             ->where('linked_user_id', $user->id)
-            ->value('id');
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 }

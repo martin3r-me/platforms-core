@@ -77,9 +77,9 @@ class AuthzCheckTool implements ToolContract, ToolMetadataContract
 
             if ($structural) {
                 $hasOrg = Schema::hasTable('organization_entities');
-                $personEntityId = $hasOrg
-                    ? DB::table('organization_entities')->where('linked_user_id', $user->id)->value('id')
-                    : null;
+                $personEntityIds = $hasOrg
+                    ? DB::table('organization_entities')->where('linked_user_id', $user->id)->pluck('id')->map(fn ($id) => (int) $id)->all()
+                    : [];
 
                 $q = DB::table('authz_grant as g')
                     ->join('authz_scope_closure as c', 'c.ancestor_id', '=', 'g.scope_id')
@@ -90,10 +90,10 @@ class AuthzCheckTool implements ToolContract, ToolMetadataContract
                     ->whereIn('g.capability', Capability::satisfying($cap))
                     ->where('l.resource_type', $resourceType)
                     ->where('l.resource_id', $resourceId)
-                    ->where(function ($w) use ($user, $personEntityId) {
+                    ->where(function ($w) use ($user, $personEntityIds) {
                         $w->where(fn ($x) => $x->where('g.subject_type', 'user')->where('g.subject_id', $user->id));
-                        if ($personEntityId) {
-                            $w->orWhere(fn ($x) => $x->where('g.subject_type', 'entity')->where('g.subject_id', $personEntityId));
+                        if ($personEntityIds !== []) {
+                            $w->orWhere(fn ($x) => $x->where('g.subject_type', 'entity')->whereIn('g.subject_id', $personEntityIds));
                         }
                     });
 
