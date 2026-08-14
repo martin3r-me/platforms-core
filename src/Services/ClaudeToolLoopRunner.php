@@ -28,7 +28,7 @@ class ClaudeToolLoopRunner
 {
     protected string $baseUrl = 'https://api.anthropic.com/v1';
     protected string $apiVersion = '2023-06-01';
-    protected string $defaultModel = 'claude-sonnet-4-6';
+    protected string $defaultModel = 'claude-sonnet-5';
     protected int $defaultMaxTokens = 4096;
     protected int $maxIterations = 50;
     protected int $timeoutSeconds = 120;
@@ -67,6 +67,7 @@ class ClaudeToolLoopRunner
      *   include_meta_tools?: bool, // Include discover_tools + execute_tool (default: true)
      *   temperature?: float,
      *   thinking?: array,
+     *   effort?: string,           // output_config.effort (low|medium|high|xhigh|max) on models that support it
      *   on_tool_call?: callable,
      *   on_tool_result?: callable,
      *   on_iteration?: callable,
@@ -114,6 +115,7 @@ class ClaudeToolLoopRunner
         $system = $options['system'] ?? null;
         $temperature = $options['temperature'] ?? null;
         $thinking = $options['thinking'] ?? null;
+        $effort = $options['effort'] ?? null;
         $onToolCall = $options['on_tool_call'] ?? null;
         $onToolResult = $options['on_tool_result'] ?? null;
         $onIteration = $options['on_iteration'] ?? null;
@@ -154,15 +156,40 @@ class ClaudeToolLoopRunner
                 $payload['tools'] = $toolDefinitions;
             }
 
-            if ($temperature !== null) {
+            // Sampling params (temperature/top_p/top_k) return HTTP 400 on the current
+            // model generation (Sonnet 5, Opus 4.7/4.8, Fable 5). Only send temperature
+            // on models that still accept it, so switching ANTHROPIC_INFERENCE_MODEL to a
+            // current model doesn't break every call.
+            if ($temperature !== null && $this->modelAcceptsSampling($model)) {
                 $payload['temperature'] = $temperature;
             }
 
             if ($thinking !== null) {
-                $payload['thinking'] = $thinking;
-                if (isset($thinking['budget_tokens'])) {
-                    $payload['max_tokens'] = max($maxTokens, $thinking['budget_tokens'] + 4096);
+                $normalizedThinking = $this->normalizeThinking($thinking, $model);
+                $isAdaptive = ($normalizedThinking['type'] ?? null) === 'adaptive';
+
+                if ($isAdaptive) {
+                    // Skip rather than 400 on models without adaptive-thinking support.
+                    if ($this->modelSupportsAdaptiveThinking($model)) {
+                        $payload['thinking'] = $normalizedThinking;
+                        // Adaptive thinking shares max_tokens with the answer — give it room.
+                        $payload['max_tokens'] = max($payload['max_tokens'], 8192);
+                    }
+                } else {
+                    $payload['thinking'] = $normalizedThinking;
+                    if (isset($normalizedThinking['budget_tokens'])) {
+                        $payload['max_tokens'] = max($maxTokens, $normalizedThinking['budget_tokens'] + 4096);
+                    }
                 }
+            }
+
+            // Effort tunes reasoning depth on models that support output_config.effort
+            // (Opus 4.5+, Sonnet 4.6+, Fable 5). Ignored on models that don't.
+            if ($effort !== null && $this->modelSupportsEffort($model)) {
+                $payload['output_config'] = array_merge(
+                    $payload['output_config'] ?? [],
+                    ['effort' => $effort]
+                );
             }
 
             $response = $this->callApi($apiKey, $payload);
@@ -384,6 +411,64 @@ class ClaudeToolLoopRunner
                 ],
             ];
         }
+    }
+
+    /**
+     * Current-generation models (Sonnet 5, Opus 4.7/4.8, Fable 5/Mythos 5) reject
+     * sampling params (temperature/top_p/top_k) and the extended-thinking
+     * budget_tokens form with HTTP 400.
+     */
+    protected function isCurrentGenerationModel(string $model): bool
+    {
+        return (bool) preg_match('/(sonnet-5|opus-4-7|opus-4-8|fable-5|mythos-5)/', $model);
+    }
+
+    /**
+     * Whether the model still accepts temperature/top_p/top_k.
+     */
+    protected function modelAcceptsSampling(string $model): bool
+    {
+        return ! $this->isCurrentGenerationModel($model);
+    }
+
+    /**
+     * Whether the model supports adaptive thinking (Sonnet 4.6+, Opus 4.6+, Fable 5).
+     * Excludes Sonnet 4.5, Haiku, and older models.
+     */
+    protected function modelSupportsAdaptiveThinking(string $model): bool
+    {
+        return (bool) preg_match('/(sonnet-5|sonnet-4-6|opus-4-6|opus-4-7|opus-4-8|fable-5|mythos-5)/', $model);
+    }
+
+    /**
+     * Whether the model supports the output_config.effort parameter
+     * (Opus 4.5+, Sonnet 4.6+, Fable 5). Not Haiku or Sonnet 4.5.
+     */
+    protected function modelSupportsEffort(string $model): bool
+    {
+        return (bool) preg_match('/(sonnet-5|sonnet-4-6|opus-4-5|opus-4-6|opus-4-7|opus-4-8|fable-5|mythos-5)/', $model);
+    }
+
+    /**
+     * Normalize a thinking config to the shape the target model accepts.
+     * On current-generation models the extended-thinking budget_tokens form is
+     * rejected — collapse it to adaptive thinking (preserving an optional display).
+     * 'adaptive' and 'disabled' pass through unchanged.
+     */
+    protected function normalizeThinking(array $thinking, string $model): array
+    {
+        $type = $thinking['type'] ?? null;
+
+        if ($this->isCurrentGenerationModel($model) && ($type === 'enabled' || isset($thinking['budget_tokens']))) {
+            $adaptive = ['type' => 'adaptive'];
+            if (isset($thinking['display'])) {
+                $adaptive['display'] = $thinking['display'];
+            }
+
+            return $adaptive;
+        }
+
+        return $thinking;
     }
 
     /**
