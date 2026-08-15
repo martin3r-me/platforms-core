@@ -111,7 +111,7 @@ class PlatformCore
             'praxis_admin' => ['label' => 'Verwaltung', 'order' => 0.2],
             'catalog'     => ['label' => 'Kataloge', 'order' => 0.3],
             'planning' => ['label' => 'Projekte & Planung', 'order' => 1],
-            'digital'  => ['label' => 'Digital', 'order' => 1.5],
+            'digital'  => ['label' => 'Sichtbarkeit', 'order' => 1.5],
             'content'  => ['label' => 'Kommunikation & Content', 'order' => 2],
             'sales'    => ['label' => 'Vertrieb & Kunden', 'order' => 3],
             'finance'  => ['label' => 'Finanzen & Verwaltung', 'order' => 4],
