@@ -510,6 +510,10 @@ class CoreServiceProvider extends ServiceProvider
         // KR-Metrik-Registry: Module registrieren ihre KeyResultMetricProvider im Boot.
         $this->app->singleton(\Platform\Core\Services\KeyResultMetricRegistry::class);
 
+        // DWH-Source-Registry: Module registrieren ihre DatawarehouseSourceProviderInterface
+        // im Boot, platform-datawarehouse liest den Katalog darüber aus.
+        $this->app->singleton(\Platform\Core\Services\DatawarehouseSourceRegistry::class);
+
         // Auth Policy Config einbinden und Service binden
         $this->mergeConfigFrom(__DIR__.'/../config/auth-policy.php', 'auth-policy');
         $this->app->singleton(AuthAccessPolicy::class, function () {
