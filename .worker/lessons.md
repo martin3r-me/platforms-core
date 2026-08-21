@@ -48,3 +48,15 @@
 - In dieser Sandbox ist KEIN `php`-Binary installiert (auch kein php8.x) —
   `php -l` ist hier grundsätzlich nicht ausführbar, nicht nur mangels vendor/.
   Syntax-Prüfung neuer/geänderter Dateien nur per sorgfältigem manuellem Review.
+- Hatch-Intakes: Model heißt `Platform\Hatch\Models\HatchProjectIntake`, Tabelle
+  `hatch_project_intakes` (NICHT `hatch_intakes`, wie ein Issue-Titel evtl. suggeriert –
+  Migrationen im Nachbar-Repo `../platform-hatch` prüfen statt dem Issue-Text zu trauen).
+  Spalten `started_at`/`completed_at` existieren (datetime, nullable); eine `deadline`-
+  Spalte existiert (Stand 2026-08) NICHT. Für Context-Date-Times-Dual-Write reicht analog
+  zu PlannerTask/Cycle ein reiner Whitelist-Eintrag in `config/core.php` – kein Trait-Einbau
+  im Fremd-Package nötig (CoreServiceProvider hängt den Observer automatisch an, siehe
+  `foreach (config('core.context_date_times.sync'))` in `CoreServiceProvider::boot()`).
+  Feature-Tests für Fremd-Package-Models (Hatch/Planner/Okr) bilden die echte Tabelle über
+  ein lokales Stub-Model + Test-Tabelle nach (siehe `ContextDateTimeSyncTest`,
+  `ContextDateTimeCycleSyncTest`, `ContextDateTimeHatchIntakeSyncTest`), weil das
+  Fremd-Package im Core-Testbench-Setup nicht installiert ist.
