@@ -57,6 +57,17 @@ return [
                 'ends_at' => ['kind' => ContextDateTimeKind::End, 'label' => 'Zyklusende'],
             ],
 
+            // Hatch-Intakes: hatch_project_intakes.started_at/completed_at (die
+            // Tabelle heißt trotz Issue-Titel "Intake-Deadlines" NICHT hatch_intakes).
+            // Eine deadline-Spalte existiert auf hatch_project_intakes (Stand dieser
+            // Migration) NICHT – daher bewusst kein Deadline-Eintrag ("falls vorhanden"
+            // aus dem Issue trifft hier nicht zu). Sollte die Spalte später ergänzt
+            // werden, hier 'deadline' => ContextDateTimeKind::Deadline nachtragen.
+            \Platform\Hatch\Models\HatchProjectIntake::class => [
+                'started_at' => ['kind' => ContextDateTimeKind::Start, 'label' => 'Start'],
+                'completed_at' => ['kind' => ContextDateTimeKind::End, 'label' => 'Abschluss'],
+            ],
+
             // Hinweis PlannerProject: Die früheren Spalten planner_projects.starts_at
             // / ends_at existieren NICHT mehr – die Projekt-Laufzeit wurde nach
             // organization_time_periods migriert (Trait Organization\...\HasPlannedPeriod,
