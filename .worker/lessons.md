@@ -37,3 +37,14 @@
   team_id → NOT-NULL-Verstoß in core_context_date_times). Gotcha beim Accessor-Pfad: ist die Relation
   auf der Instanz schon gecacht, spiegelt der Save-Observer den ALTEN Wert – relevante Änderung immer
   auf frisch geladener Instanz (oder `unsetRelation`) speichern.
+- Cross-Modul-Provider-Pattern (analog CrmCompanyContactsProviderInterface,
+  EventBookingProviderInterface, KeyResultMetricProvider): Interface in
+  `src/Contracts/`, dazugehörige Plain-PHP-DTOs (keine Eloquent-Abhängigkeit)
+  in einem eigenen Namespace neben Contracts (Vorbild: `Platform\Core\KeyResult\
+  MetricRequest`/`MetricValue`), Multi-Provider-Registry (register/all/get,
+  keyed by string) als Singleton in `src/Services/`, im `CoreServiceProvider::
+  register()` neben den bestehenden Registry-Singletons eintragen. So bleibt
+  Core der einzige gemeinsame Nenner zwischen zwei sonst unabhängigen Modulen.
+- In dieser Sandbox ist KEIN `php`-Binary installiert (auch kein php8.x) —
+  `php -l` ist hier grundsätzlich nicht ausführbar, nicht nur mangels vendor/.
+  Syntax-Prüfung neuer/geänderter Dateien nur per sorgfältigem manuellem Review.
