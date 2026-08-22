@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Platform\Core\Database\Factories\CoreContextDateTimeFactory;
 use Platform\Core\Enums\ContextDateTimeKind;
+use Platform\Core\Observers\CoreContextDateTimeObserver;
 
 /**
  * Ein kontextgebundener Datums-/Zeitpunkt.
@@ -56,6 +57,11 @@ class CoreContextDateTime extends Model
         'is_all_day' => 'boolean',
         'calendar_sync_enabled' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        static::observe(CoreContextDateTimeObserver::class);
+    }
 
     // ── Relations ──────────────────────────────────────────────
 

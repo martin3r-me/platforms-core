@@ -281,6 +281,7 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Console\Commands\AuditTeamOrphansCommand::class,
                 \Platform\Core\Console\Commands\PurgeStaleRecordsCommand::class,
                 \Platform\Core\Console\Commands\BackfillContextDateTimesCommand::class,
+                \Platform\Core\Console\Commands\RefreshExpansionHorizonCommand::class,
                 \Platform\Core\Console\Commands\MigrateEmbeddingStoreCommand::class,
             ]);
         }
@@ -344,6 +345,9 @@ class CoreServiceProvider extends ServiceProvider
             // Verbalization-Feeds: taeglich 04:00, wöchentlich Montag 04:30
             $schedule->command('verbalization:refresh-feeds --cadence=daily')->dailyAt('04:00');
             $schedule->command('verbalization:refresh-feeds --cadence=weekly')->weeklyOn(1, '04:30');
+
+            // Context-Date-Times: rollendes 90-Tage-Occurrences-Fenster nachts auffrischen.
+            $schedule->command('core:context-date-times:refresh-expansion-horizon')->dailyAt('02:30');
         });
 
         // Entity-Pulse: cross-modularer Aggregator-Collector + Template. Wohnt im
