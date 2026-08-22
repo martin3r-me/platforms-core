@@ -124,42 +124,34 @@ class ContextDateTimeSynchronizer
     }
 
     /**
-     * Entfernt die gespiegelten Rows eines Models (beim Löschen der Quelle).
+     * Entfernt ALLE CoreContextDateTime-Einträge eines Kontexts – unabhängig von
+     * ihrer Quelle (Dual-Write-Mirror wie manuell/generisch angehängte Einträge).
      *
-     * @param  array<string, mixed>  $map
+     * Wird beim Löschen des Host-Records aufgerufen: ein gelöschter Host darf
+     * keine verwaisten CoreContextDateTime/Occurrence-Rows hinterlassen
+     * (Lesson Learned aus Issue #147 – unvalidierte/ungepflegte polymorphe
+     * Referenzen sind ein wiederkehrender Fehlerherd).
+     *
      * @param  bool  $force  true = forceDelete (Hard-Delete der Quelle), sonst Soft-Delete
      * @return array{deleted:int}
      */
-    public function purge(Model $model, array $map, bool $force = false): array
+    public function purge(Model $model, bool $force = false): array
     {
         $counts = ['deleted' => 0];
 
-        if (empty($map)) {
-            return $counts;
-        }
+        $rows = CoreContextDateTime::withTrashed()
+            ->where('context_type', $model->getMorphClass())
+            ->where('context_id', $model->getKey())
+            ->get();
 
-        $contextType = $model->getMorphClass();
-        $contextId = $model->getKey();
-        $table = $model->getTable();
-
-        foreach (array_keys($map) as $field) {
-            $source = 'migrated_from:'.$table.'.'.$field;
-
-            $rows = CoreContextDateTime::withTrashed()
-                ->where('context_type', $contextType)
-                ->where('context_id', $contextId)
-                ->where('source', $source)
-                ->get();
-
-            foreach ($rows as $row) {
-                if ($force) {
-                    $row->occurrences()->delete();
-                    $row->forceDelete();
-                    $counts['deleted']++;
-                } elseif ($row->deleted_at === null) {
-                    $row->delete();
-                    $counts['deleted']++;
-                }
+        foreach ($rows as $row) {
+            if ($force) {
+                $row->occurrences()->delete();
+                $row->forceDelete();
+                $counts['deleted']++;
+            } elseif ($row->deleted_at === null) {
+                $row->delete();
+                $counts['deleted']++;
             }
         }
 
