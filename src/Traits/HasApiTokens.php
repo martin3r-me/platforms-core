@@ -48,11 +48,10 @@ trait HasApiTokens
             $this->getKey(), $name, $scopes, $this->getProviderName()
         );
 
-        // Set expiration date if provided
-        if ($expiresAt !== null) {
-            $result->token->expires_at = $expiresAt;
-            $result->token->save();
-        }
+        // Always apply the requested expiration, including null ("never expires"),
+        // since PersonalAccessTokenFactory::make() already stamps its own 1-year default.
+        $result->token->expires_at = $expiresAt;
+        $result->token->save();
 
         return $result;
     }
