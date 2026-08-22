@@ -71,13 +71,21 @@ class CoreServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
-        // Auto-Shortening für Index-/FK-/Unique-Namen > 64 Zeichen (MySQL/MariaDB-Limit):
-        // ab hier bekommt jede Schema::create/table einen SafeBlueprint (die Facade cacht den
-        // Builder im selben Prozess, boot() läuft vor `artisan migrate`). So laufen naive
-        // Migrations mit langen Tabellen-/Spaltennamen durch, statt am Identifier-Limit zu
-        // scheitern — die häufigste Ursache fehlschlagender (Worker-)Migrations. L12-Resolver-
-        // Signatur: ($connection, $table, $callback).
-        Schema::blueprintResolver(fn ($connection, $table, $callback) => new SafeBlueprint($connection, $table, $callback));
+        // Auto-Shortening für Index-/FK-/Unique-Namen > 64 Zeichen (MySQL/MariaDB-Limit) → naive
+        // Migrations mit langen Namen laufen durch, statt zur LAUFZEIT beim migrate/Deploy zu
+        // scheitern (php -l sieht das nie). Häufigste Ursache fehlschlagender (Worker-)Migrations.
+        //
+        // WICHTIG: `Schema::blueprintResolver(...)` allein verpufft — der `db.schema`-Container-Bind
+        // liefert bei JEDEM Facade-Zugriff einen FRISCHEN Builder, der Resolver landet auf einer
+        // Wegwerf-Instanz (empirisch: Resolver kam bei `artisan migrate` nie an). Deshalb binden wir
+        // `db.schema` als SINGLETON mit vor-gesetztem Resolver → stabil über alle Schema::-Zugriffe.
+        $this->app->singleton('db.schema', function ($app) {
+            $builder = $app['db']->connection()->getSchemaBuilder();
+            $builder->blueprintResolver(fn ($connection, $table, $callback) => new SafeBlueprint($connection, $table, $callback));
+
+            return $builder;
+        });
+        \Illuminate\Support\Facades\Facade::clearResolvedInstance('db.schema');
 
         // [SECURITY] PRC Timezone Detection - Früher Check beim Boot
         // Wenn PRC Timezone bereits gesetzt ist, sofort loggen mit Backtrace
