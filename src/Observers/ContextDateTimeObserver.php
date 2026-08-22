@@ -32,14 +32,15 @@ class ContextDateTimeObserver
 
     public function deleted(Model $model): void
     {
-        // Bei SoftDeletes feuert deleted() beim Soft-Delete → Mirror soft-löschen.
+        // Bei SoftDeletes feuert deleted() beim Soft-Delete → alle Context-Date-Times
+        // dieses Kontexts (Mirrors UND manuell angehängte) soft-löschen.
         // forceDeleted() (unten) übernimmt das harte Löschen separat.
-        $this->synchronizer->purge($model, $this->mapFor($model), force: false);
+        $this->synchronizer->purge($model, force: false);
     }
 
     public function forceDeleted(Model $model): void
     {
-        $this->synchronizer->purge($model, $this->mapFor($model), force: true);
+        $this->synchronizer->purge($model, force: true);
     }
 
     /**

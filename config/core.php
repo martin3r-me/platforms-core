@@ -82,6 +82,32 @@ return [
 
         ],
 
+        /*
+        |----------------------------------------------------------------------
+        | Attachable-Models-Whitelist
+        |----------------------------------------------------------------------
+        |
+        | Whitelist der Model-Klassen, an die frei (also NICHT nur als
+        | Spalten-Mirror wie unter `sync`) CoreContextDateTime-Einträge gehängt
+        | werden dürfen – z.B. über eine generische "Termin hinzufügen"-UI.
+        | Wird von {@see \Platform\Core\Rules\AttachableContextType} geprüft.
+        |
+        | Lesson Learned aus Issue #147: context_type bei ContextFile wurde nie
+        | gegen eine Whitelist validiert – jede beliebige Klasse war ein
+        | gültiges morphTo-Ziel. Hier gilt deshalb eine doppelte Prüfung:
+        | die Klasse muss (1) in dieser Liste stehen UND (2) das Marker-Interface
+        | Platform\Core\Contracts\HasContextDateTimes implementieren (i.d.R. über
+        | das Trait Platform\Core\Traits\HasContextDateTimes).
+        |
+        | Wie bei `sync` gilt: FQCN muss nicht installiert sein, Einträge werden
+        | zur Laufzeit per class_exists() geguarded.
+        |
+        */
+
+        'attachable_models' => [
+            // \Platform\Planner\Models\PlannerTask::class,
+        ],
+
     ],
 
     /*

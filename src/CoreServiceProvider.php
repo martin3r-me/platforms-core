@@ -285,12 +285,17 @@ class CoreServiceProvider extends ServiceProvider
             ]);
         }
 
-        // Context-Date-Times: Dual-Write für Whitelist-Models, die das Trait
-        // HasContextDateTimes NICHT selbst nutzen (dann registriert das Trait den
-        // Observer bereits in bootHasContextDateTimes()). So greift der Dual-Write
-        // auch ohne Änderung am Fremd-Package. Nicht-installierte Klassen werden
-        // still übersprungen.
-        foreach ((array) config('core.context_date_times.sync', []) as $modelClass => $map) {
+        // Context-Date-Times: Observer für Whitelist-Models (Dual-Write `sync` UND
+        // `attachable_models`), die das Trait HasContextDateTimes NICHT selbst nutzen
+        // (dann registriert das Trait den Observer bereits in bootHasContextDateTimes()).
+        // So greift Dual-Write/Cascade-Delete auch ohne Änderung am Fremd-Package.
+        // Nicht-installierte Klassen werden still übersprungen.
+        $contextDateTimeModels = array_unique(array_merge(
+            array_keys((array) config('core.context_date_times.sync', [])),
+            array_values((array) config('core.context_date_times.attachable_models', []))
+        ));
+
+        foreach ($contextDateTimeModels as $modelClass) {
             if (! is_string($modelClass) || ! class_exists($modelClass)) {
                 continue;
             }
