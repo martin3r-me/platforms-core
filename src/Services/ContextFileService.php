@@ -113,12 +113,16 @@ class ContextFileService
         $extension = $file->getClientOriginalExtension();
         $mimeType = $file->getMimeType();
         $isImage = str_starts_with($mimeType, 'image/');
+        // SVG ist ein Vektorformat – GD/Intervention kann es nicht dekodieren
+        // ("Unable to decode input"). Solche Dateien werden im Original gespeichert,
+        // ohne WebP-Konvertierung und ohne Raster-Varianten.
+        $isRasterImage = $isImage && ! in_array(strtolower($mimeType), ['image/svg+xml', 'image/svg'], true);
 
         // Optional: Folder-Prefix für organisierte Speicherung
         $folder = rtrim($options['folder'] ?? '', '/');
 
-        // Für Bilder: Original immer als WebP speichern
-        if ($isImage) {
+        // Für Raster-Bilder: Original immer als WebP speichern
+        if ($isRasterImage) {
             // EXIF GPS-Daten extrahieren VOR WebP-Konvertierung
             $gps = $this->extractGpsFromExif($file->getRealPath());
 
@@ -159,7 +163,7 @@ class ContextFileService
         ];
 
         // Bild-Dimensionen und GPS in Meta speichern
-        if ($isImage) {
+        if ($isRasterImage) {
             $meta['width'] = $width;
             $meta['height'] = $height;
             if (isset($gps) && $gps) {
@@ -188,8 +192,8 @@ class ContextFileService
 
         $variantsStatus = 'none';
 
-        // Bildvarianten asynchron generieren (wenn Bild und gewünscht)
-        if ($isImage && ($options['generate_variants'] ?? true)) {
+        // Bildvarianten asynchron generieren (nur Raster-Bilder, kein SVG)
+        if ($isRasterImage && ($options['generate_variants'] ?? true)) {
             $contextFile->update(['variants_status' => 'pending']);
             $variantsStatus = 'pending';
             \Platform\Core\Jobs\GenerateImageVariantsJob::dispatch($contextFile->id);
