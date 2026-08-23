@@ -1,6 +1,5 @@
 <div
-  x-data="terminalShell()"
-  x-init="init()"
+  x-data="terminalShell"
   x-on:toggle-terminal.window="toggle()"
   x-on:toggle-terminal-open.window="if(!open) toggle()"
   x-on:keydown.escape.window="if(fullscreen) toggleFullscreen()"
@@ -1066,7 +1065,8 @@
   </div>
 
   <script>
-    function terminalShell(){
+    document.addEventListener('alpine:init', () => {
+    Alpine.data('terminalShell', () => {
       const STORAGE_KEY = 'terminal_panel_height';
       const SIDEBAR_STORAGE_KEY = 'terminal_sidebar_width';
       const MIN_HEIGHT = 200;
@@ -1208,6 +1208,7 @@
 
         },
       };
-    }
+    });
+    });
   </script>
 </div>
