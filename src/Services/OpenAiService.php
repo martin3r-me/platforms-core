@@ -1502,10 +1502,15 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
                 ];
             } else {
                 // Normale Messages (user, assistant, system)
-                $text = is_array($m['content'] ?? null) ? json_encode($m['content']) : ($m['content'] ?? '');
+                $content = $m['content'] ?? '';
+                if (is_array($content)) {
+                    // Multimodale Parts (z.B. Bild-Input) durchreichen statt zu stringifizieren,
+                    // dabei altes Chat-Completions-Format (text/image_url) auf Responses-Shape normalisieren
+                    $content = $this->normalizeContentPartsForResponses($content);
+                }
                 $input[] = [
                     'role' => $role,
-                    'content' => $text,
+                    'content' => $content,
                 ];
                 
                 // Speichere Index der letzten Assistant-Message (für zukünftige Erweiterungen)
@@ -1516,6 +1521,52 @@ Tools sind verfügbar, wenn du sie benötigst. Tools folgen REST-Logik. Wenn du 
         }
         
         return $input;
+    }
+
+    /**
+     * Normalisiert Content-Parts für die Responses API.
+     * Nimmt sowohl bereits korrektes Responses-Format (input_text/input_image) als auch
+     * das ältere Chat-Completions-Format (type: text / image_url mit {url, detail}) entgegen,
+     * wie es z.B. VerifyExtraFieldValueJob::handle() noch verwendet, damit dieser Aufrufer
+     * abwärtskompatibel bleibt statt mit einem API-Fehler zu brechen.
+     */
+    private function normalizeContentPartsForResponses(array $parts): array
+    {
+        $normalized = [];
+        foreach ($parts as $part) {
+            if (!is_array($part)) {
+                continue;
+            }
+
+            $type = $part['type'] ?? null;
+
+            if ($type === 'text') {
+                $normalized[] = [
+                    'type' => 'input_text',
+                    'text' => $part['text'] ?? '',
+                ];
+                continue;
+            }
+
+            if ($type === 'image_url') {
+                $imageUrl = $part['image_url'] ?? null;
+                $url = is_array($imageUrl) ? ($imageUrl['url'] ?? '') : (string) $imageUrl;
+                $normalizedPart = [
+                    'type' => 'input_image',
+                    'image_url' => $url,
+                ];
+                if (is_array($imageUrl) && isset($imageUrl['detail'])) {
+                    $normalizedPart['detail'] = $imageUrl['detail'];
+                }
+                $normalized[] = $normalizedPart;
+                continue;
+            }
+
+            // Bereits im Responses-Format (input_text/input_image/...) oder unbekannt: durchreichen
+            $normalized[] = $part;
+        }
+
+        return $normalized;
     }
 
     private function logApiError(string $message, int $status, string $body): void
