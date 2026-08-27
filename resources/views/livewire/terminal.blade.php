@@ -947,8 +947,10 @@
         @endif
 
           <!-- ═══ App: Comms ═══ -->
+          {{-- .visible: nur pollen, wenn Comms wirklich sichtbar ist. Sonst rendert
+               sich (bei x-show/display:none) die GANZE Shell alle 5s komplett neu. --}}
           <div x-show="$wire.activeApp === 'comms'" class="flex-1 min-h-0 flex flex-col relative"
-               wire:poll.5s="refreshTimelines">
+               wire:poll.10s.visible="refreshTimelines">
             {{-- Timeline is ALWAYS rendered --}}
             @include('platform::livewire.partials.terminal-comms-timeline')
 
