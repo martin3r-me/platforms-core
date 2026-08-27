@@ -46,6 +46,25 @@ class User extends Authenticatable
         return Attribute::get(fn () => trim($this->name . ' ' . ($this->lastname ?? '')));
     }
 
+    /**
+     * URL zum Avatar statt des rohen base64-Data-URI. Externe URLs werden direkt
+     * zurückgegeben; base64/Data-URIs laufen über die cachebare Avatar-Route
+     * (siehe AvatarController). null → im UI greift der Initialen-Fallback.
+     */
+    public function avatarUrl(): ?string
+    {
+        $avatar = $this->avatar;
+        if (! $avatar) {
+            return null;
+        }
+
+        if (str_starts_with($avatar, 'http://') || str_starts_with($avatar, 'https://')) {
+            return $avatar;
+        }
+
+        return route('core.user.avatar', ['user' => $this->id]);
+    }
+
     public function teams()
     {
         return $this->belongsToMany(Team::class)

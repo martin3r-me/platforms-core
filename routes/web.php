@@ -8,7 +8,11 @@ use Platform\Core\Http\Controllers\CoreAiStreamController;
 use Platform\Core\Http\Controllers\TeamInvitationController;
 use Platform\Core\Http\Controllers\CoreToolPlaygroundController;
 use Platform\Core\Http\Controllers\SimpleToolController;
+use Platform\Core\Http\Controllers\AvatarController;
 
+
+// Avatar-Thumbnail (cachebar) statt base64-Data-URI im HTML. Siehe User::avatarUrl().
+Route::get('/u/{user}/avatar', [AvatarController::class, 'show'])->name('core.user.avatar');
 
 Route::post('/logout', function () {
     $guard = Auth::getDefaultDriver();

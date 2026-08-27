@@ -263,7 +263,7 @@ class Agenda extends Component
             ->map(fn ($m) => [
                 'id' => $m->user_id,
                 'name' => $m->user?->name ?? 'Unbekannt',
-                'avatar' => $m->user?->avatar,
+                'avatar' => $m->user?->avatarUrl(),
                 'initials' => $this->initials($m->user?->name ?? '?'),
                 'role' => $m->role,
             ])

@@ -1213,7 +1213,7 @@ class Terminal extends Component
             ->map(fn ($u) => [
                 'id' => $u->id,
                 'name' => $u->name,
-                'avatar' => $u->avatar,
+                'avatar' => $u->avatarUrl(),
                 'initials' => $this->initials($u->name),
             ])
             ->toArray();
@@ -1374,7 +1374,7 @@ class Terminal extends Component
                     ->with('user:id,name,avatar')
                     ->first();
                 $item['name'] = $other?->user?->name ?? 'Unbekannt';
-                $item['avatar'] = $other?->user?->avatar;
+                $item['avatar'] = $other?->user?->avatarUrl();
                 $item['initials'] = $this->initials($item['name']);
                 $item['other_user_id'] = $other?->user_id;
                 $dms[] = $item;
@@ -1443,7 +1443,7 @@ class Terminal extends Component
         $members = $memberRows->map(fn ($m) => [
             'id' => $m->user_id,
             'name' => $m->user?->name ?? 'Unbekannt',
-            'avatar' => $m->user?->avatar,
+            'avatar' => $m->user?->avatarUrl(),
             'initials' => $this->initials($m->user?->name ?? '?'),
         ])->toArray();
 
@@ -1465,7 +1465,7 @@ class Terminal extends Component
                 ->with('user:id,name,avatar')
                 ->first();
             $data['name'] = $other?->user?->name ?? 'Unbekannt';
-            $data['avatar'] = $other?->user?->avatar;
+            $data['avatar'] = $other?->user?->avatarUrl();
             $data['initials'] = $this->initials($data['name']);
         }
 
