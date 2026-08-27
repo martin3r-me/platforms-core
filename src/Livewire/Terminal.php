@@ -447,7 +447,7 @@ class Terminal extends Component
                     'title' => $title,
                     'message' => $activity->message,
                     'user' => $userName,
-                    'user_avatar' => $activity->user?->avatar,
+                    'user_avatar' => $activity->user?->avatarUrl(),
                     'user_initials' => $this->initials($activity->user?->name ?? '?'),
                     'activity_type' => $activity->activity_type ?? 'system',
                     'is_mine' => $activity->user_id === $currentUserId,
@@ -1181,7 +1181,7 @@ class Terminal extends Component
                     'channel_name' => $channelName ?? 'Kontext',
                     'body_snippet' => \Illuminate\Support\Str::limit($bm->message->body_plain ?? strip_tags($bm->message->body_html), 80),
                     'user_name' => $bm->message->user?->name ?? 'Unbekannt',
-                    'user_avatar' => $bm->message->user?->avatar,
+                    'user_avatar' => $bm->message->user?->avatarUrl(),
                     'user_initials' => $this->initials($bm->message->user?->name ?? '?'),
                     'time' => $bm->message->created_at->format('H:i'),
                     'date' => $bm->message->created_at->translatedFormat('d. M'),
@@ -1264,7 +1264,7 @@ class Terminal extends Component
                     'channel_name' => $channelName ?? 'Kontext',
                     'channel_type' => $m->channel?->type,
                     'user_name' => $m->user?->name ?? 'Unbekannt',
-                    'user_avatar' => $m->user?->avatar,
+                    'user_avatar' => $m->user?->avatarUrl(),
                     'user_initials' => $this->initials($m->user?->name ?? '?'),
                     'snippet' => $snippet,
                     'time' => $m->created_at->format('H:i'),
@@ -1293,6 +1293,43 @@ class Terminal extends Component
             ->whereHas('channel', fn ($q) => $q->where('team_id', $teamId))
             ->with(['channel' => fn ($q) => $q->with('lastMessage:id,body_plain,created_at')])
             ->get();
+
+        // Unread-Counts für ALLE Channels in EINER Query statt COUNT je Channel (N+1).
+        // Zählt Root-Nachrichten neuer als last_read_message_id (bzw. alle, wenn nie gelesen).
+        $channelIds = $memberships->pluck('channel_id')->all();
+        $unreadByChannel = [];
+        if (! empty($channelIds)) {
+            $unreadByChannel = TerminalMessage::query()
+                ->join('terminal_channel_members as cm', function ($join) use ($userId) {
+                    $join->on('cm.channel_id', '=', 'terminal_messages.channel_id')
+                        ->where('cm.user_id', '=', $userId);
+                })
+                ->whereIn('terminal_messages.channel_id', $channelIds)
+                ->whereNull('terminal_messages.parent_id')
+                ->where(function ($q) {
+                    $q->whereNull('cm.last_read_message_id')
+                        ->orWhereColumn('terminal_messages.id', '>', 'cm.last_read_message_id');
+                })
+                ->groupBy('terminal_messages.channel_id')
+                ->selectRaw('terminal_messages.channel_id as cid, COUNT(*) as cnt')
+                ->pluck('cnt', 'cid')
+                ->toArray();
+        }
+
+        // DM-Gegenüber für ALLE DMs in EINER Query statt je DM (N+1). Nur DM-Channels,
+        // damit nicht Avatare aller Mitglieder großer Channels geladen werden.
+        $dmChannelIds = $memberships
+            ->filter(fn ($m) => $m->channel?->type === 'dm')
+            ->pluck('channel_id')
+            ->all();
+        $dmOthers = collect();
+        if (! empty($dmChannelIds)) {
+            $dmOthers = TerminalChannelMember::whereIn('channel_id', $dmChannelIds)
+                ->where('user_id', '!=', $userId)
+                ->with('user:id,name,avatar')
+                ->get()
+                ->keyBy('channel_id');
+        }
 
         $dms = [];
         $channels = [];
@@ -1342,15 +1379,7 @@ class Terminal extends Component
                 continue;
             }
 
-            $unread = 0;
-            if ($membership->last_read_message_id) {
-                $unread = $ch->messages()
-                    ->where('id', '>', $membership->last_read_message_id)
-                    ->whereNull('parent_id')
-                    ->count();
-            } elseif ($ch->message_count > 0) {
-                $unread = $ch->message_count;
-            }
+            $unread = $unreadByChannel[$ch->id] ?? 0;
 
             $lastTimestamp = $ch->lastMessage?->created_at?->timestamp ?? 0;
 
@@ -1369,10 +1398,7 @@ class Terminal extends Component
 
             // For DMs, resolve the other participant's name + avatar
             if ($ch->type === 'dm') {
-                $other = TerminalChannelMember::where('channel_id', $ch->id)
-                    ->where('user_id', '!=', $userId)
-                    ->with('user:id,name,avatar')
-                    ->first();
+                $other = $dmOthers->get($ch->id);
                 $item['name'] = $other?->user?->name ?? 'Unbekannt';
                 $item['avatar'] = $other?->user?->avatarUrl();
                 $item['initials'] = $this->initials($item['name']);
