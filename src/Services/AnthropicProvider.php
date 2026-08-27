@@ -48,9 +48,10 @@ class AnthropicProvider implements LLMProviderContract
         if ($system) {
             $payload['system'] = $system;
         }
-        if (isset($options['temperature'])) {
-            $payload['temperature'] = $options['temperature'];
-        }
+        // Sampling params (temperature/top_p/top_k) geben HTTP 400, weil die aktuell
+        // einzigen hier unterstützten Modelle (siehe getAvailableModels()) sie nicht
+        // akzeptieren — der Aufrufer (z. B. Verbalizer) setzt temperature aber fix.
+        // Bewusst nie weiterreichen statt den Call platzen zu lassen (#814).
 
         $response = Http::timeout(self::TIMEOUT_SECONDS)
             ->withHeaders([
