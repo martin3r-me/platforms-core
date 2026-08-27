@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\Encoders\WebpEncoder;
+use Intervention\Image\Exceptions\DecoderException;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -123,27 +124,41 @@ class ContextFileService
 
         // Für Raster-Bilder: Original immer als WebP speichern
         if ($isRasterImage) {
-            // EXIF GPS-Daten extrahieren VOR WebP-Konvertierung
-            $gps = $this->extractGpsFromExif($file->getRealPath());
+            try {
+                // EXIF GPS-Daten extrahieren VOR WebP-Konvertierung
+                $gps = $this->extractGpsFromExif($file->getRealPath());
 
-            // Bild lesen und als WebP speichern
-            $image = $this->imageManager->read($file->getRealPath());
-            $width = $image->width();
-            $height = $image->height();
+                // Bild lesen und als WebP speichern
+                $image = $this->imageManager->read($file->getRealPath());
+                $width = $image->width();
+                $height = $image->height();
 
-            $webpEncoder = new WebpEncoder(90); // 90% Qualität
-            $webpContent = (string) $image->encode($webpEncoder);
+                $webpEncoder = new WebpEncoder(90); // 90% Qualität
+                $webpContent = (string) $image->encode($webpEncoder);
 
-            // Dateiname: Token + .webp
-            $fileName = "{$token}.webp";
-            $storagePath = $folder ? "{$folder}/{$fileName}" : $fileName;
-            Storage::disk($this->disk)->put($storagePath, $webpContent);
-            $path = $storagePath;
+                // Dateiname: Token + .webp
+                $fileName = "{$token}.webp";
+                $storagePath = $folder ? "{$folder}/{$fileName}" : $fileName;
+                Storage::disk($this->disk)->put($storagePath, $webpContent);
+                $path = $storagePath;
 
-            $mimeType = 'image/webp';
-            $fileSize = strlen($webpContent);
-        } else {
-            // Nicht-Bilder: Original-Format behalten
+                $mimeType = 'image/webp';
+                $fileSize = strlen($webpContent);
+            } catch (DecoderException $e) {
+                // Mimetype meldet "image/*", aber GD/Intervention kann den Inhalt nicht
+                // dekodieren (z.B. HEIC, ICO, beschädigte Datei) – Original unverändert
+                // speichern statt mit 500 zu crashen (vgl. #797).
+                \Log::warning('[ContextFileService] Bild konnte nicht dekodiert werden, speichere Original unverändert', [
+                    'mime_type' => $mimeType,
+                    'original_name' => $file->getClientOriginalName(),
+                    'error' => $e->getMessage(),
+                ]);
+                $isRasterImage = false;
+            }
+        }
+
+        if (! $isRasterImage) {
+            // Nicht-Bilder (oder nicht dekodierbare Bilder): Original-Format behalten
             $fileName = "{$token}.{$extension}";
             $path = Storage::disk($this->disk)->putFileAs($folder, $file, $fileName);
             $path = ltrim($path, '/');
@@ -227,9 +242,23 @@ class ContextFileService
 
         // Original lesen
         $originalContent = Storage::disk($this->disk)->get($contextFile->path);
-        $originalImage = $this->imageManager->read($originalContent);
-        $originalWidth = $originalImage->width();
-        $originalHeight = $originalImage->height();
+
+        try {
+            $originalImage = $this->imageManager->read($originalContent);
+            $originalWidth = $originalImage->width();
+            $originalHeight = $originalImage->height();
+        } catch (DecoderException $e) {
+            // Gespeichertes "Original" ist nicht dekodierbar (z.B. nicht-Bild-Original
+            // nach Fallback in uploadForContext) – keine Varianten generieren statt
+            // mit 500 zu crashen (vgl. #797).
+            \Log::error('[ContextFileService] Original-Bild konnte nicht dekodiert werden, keine Varianten generiert', [
+                'context_file_id' => $contextFile->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+
         $isPortrait = $originalHeight > $originalWidth;
 
         // Varianten-Definitionen: Genau wie im Vorbild (Uploads/Index.php)
