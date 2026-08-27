@@ -5,6 +5,7 @@ namespace Platform\Core\Services;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Contracts\LLMProviderContract;
+use Platform\Core\Models\CoreAiModel;
 
 /**
  * Anthropic Claude Provider — direkter HTTP-Wrapper auf die Messages-API.
@@ -48,10 +49,14 @@ class AnthropicProvider implements LLMProviderContract
         if ($system) {
             $payload['system'] = $system;
         }
-        // Sampling params (temperature/top_p/top_k) geben HTTP 400, weil die aktuell
-        // einzigen hier unterstützten Modelle (siehe getAvailableModels()) sie nicht
-        // akzeptieren — der Aufrufer (z. B. Verbalizer) setzt temperature aber fix.
-        // Bewusst nie weiterreichen statt den Call platzen zu lassen (#814).
+        // Sampling params (temperature/top_p/top_k) geben auf einigen aktuellen Modellen
+        // HTTP 400, der Aufrufer (z. B. Verbalizer) setzt temperature aber fix. Nur
+        // weiterreichen, wenn core_ai_models das Modell explizit als unterstuetzt fuehrt
+        // (DB-driven, analog OpenAiService::isParamSupportedByDb) — unbekannt/false heisst
+        // nicht senden statt raten (#814).
+        if (array_key_exists('temperature', $options) && $this->modelSupportsTemperature($model)) {
+            $payload['temperature'] = $options['temperature'];
+        }
 
         $response = Http::timeout(self::TIMEOUT_SECONDS)
             ->withHeaders([
@@ -110,6 +115,25 @@ class AnthropicProvider implements LLMProviderContract
     public function isAvailable(): bool
     {
         return ! empty(config('ai.anthropic.api_key'));
+    }
+
+    /**
+     * DB-driven: darf temperature an dieses Modell gesendet werden?
+     * true nur bei explizitem core_ai_models.supports_temperature=true;
+     * unbekanntes/fehlendes Modell oder false => nicht senden (sicherer Default).
+     */
+    protected function modelSupportsTemperature(string $model): bool
+    {
+        try {
+            $row = CoreAiModel::query()
+                ->where('model_id', $model)
+                ->whereHas('provider', fn ($q) => $q->where('key', $this->getName()))
+                ->first(['supports_temperature']);
+
+            return $row?->supports_temperature === true;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /**
