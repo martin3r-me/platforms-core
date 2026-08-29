@@ -62,8 +62,24 @@
 
   <!-- Messages -->
   <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain text-[13px]" x-ref="chatBody" wire:key="terminal-messages-{{ $channelId }}"
-       x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)">
+       x-data="{ loadingOlder: false }"
+       x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
+       x-on:scroll.throttle.150ms="
+         if ($el.scrollTop < 120 && $wire.hasMoreMessages && !loadingOlder) {
+           loadingOlder = true;
+           const prevH = $el.scrollHeight, prevTop = $el.scrollTop;
+           $wire.loadOlder().then(() => $nextTick(() => {
+             $el.scrollTop = prevTop + ($el.scrollHeight - prevH);
+             loadingOlder = false;
+           }));
+         }
+       ">
     <div class="py-2 px-4">
+      {{-- Nachlade-Indikator (ältere Nachrichten beim Hochscrollen) --}}
+      <div x-show="loadingOlder" x-cloak class="flex items-center justify-center py-2 text-[11px] text-[var(--t-text-muted)]">
+        <svg class="w-3.5 h-3.5 animate-spin mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+        Ältere werden geladen…
+      </div>
       @php $lastDate = null; $lastUserId = null; $lastTime = null; @endphp
       @forelse($this->messages as $msg)
         @php

@@ -36,6 +36,10 @@ class Chat extends Component
     public ?int $editingMessageId = null;
     public array $onlineUserIds = [];
 
+    /** Fenstergröße: initial die neuesten 30, beim Hochscrollen je +30. */
+    public int $messageLimit = 30;
+    public bool $hasMoreMessages = false;
+
     // ── Channel Sync from Parent ────────────────────────────────
 
     #[On('terminal-chat-channel')]
@@ -43,11 +47,22 @@ class Chat extends Component
     {
         $this->channelId = $channelId;
         $this->editingMessageId = null;
+        $this->messageLimit = 30; // Fenster beim Channel-Wechsel zurücksetzen
         unset($this->messages, $this->activeChannel);
 
         if ($channelId) {
             $this->markAsRead();
         }
+    }
+
+    /** Beim Hochscrollen ältere Nachrichten nachladen (Fenster vergrößern). */
+    public function loadOlder(): void
+    {
+        if (! $this->hasMoreMessages) {
+            return;
+        }
+        $this->messageLimit += 30;
+        unset($this->messages);
     }
 
     // ── Channel Management ─────────────────────────────────────
@@ -676,9 +691,9 @@ class Chat extends Component
             return [];
         }
 
-        // Die NEUESTEN 100 laden (orderByDesc + limit), danach für die Anzeige
-        // wieder aufsteigend (alt→neu). orderBy('id') asc + limit hätte die
-        // ÄLTESTEN 100 geliefert → bei >100 Nachrichten fehlten die neuesten.
+        // Nur die neuesten $messageLimit laden (orderByDesc + limit), eins mehr
+        // holen um zu erkennen, ob noch ältere existieren (hasMoreMessages), dann
+        // für die Anzeige wieder aufsteigend sortieren (alt→neu).
         $messages = TerminalMessage::where('channel_id', $this->channelId)
             ->whereNull('parent_id')
             ->with([
@@ -688,10 +703,12 @@ class Chat extends Component
                 'attachments',
             ])
             ->orderByDesc('id')
-            ->limit(100)
-            ->get()
-            ->sortBy('id')
-            ->values();
+            ->limit($this->messageLimit + 1)
+            ->get();
+
+        $this->hasMoreMessages = $messages->count() > $this->messageLimit;
+
+        $messages = $messages->take($this->messageLimit)->sortBy('id')->values();
 
         $messageIds = $messages->pluck('id')->toArray();
         $pinnedIds = TerminalPin::where('channel_id', $this->channelId)
