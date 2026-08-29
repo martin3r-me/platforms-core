@@ -18,6 +18,8 @@ export function tiptapEditor({
   return {
     editor: null,
     isEmpty: true,
+    sending: false,
+    sendFailed: false,
     _destroyToolbar: null,
     _destroyEmoji: null,
 
@@ -79,31 +81,41 @@ export function tiptapEditor({
       }
     },
 
-    submit() {
-      if (!this.editor || this.editor.isEmpty) return;
+    async submit() {
+      // Guard gegen Doppel-Senden während ein Send läuft (Editor ist dann noch befüllt).
+      if (!this.editor || this.editor.isEmpty || this.sending) return;
 
       const html = this.editor.getHTML();
       const text = this.editor.getText();
       const json = this.editor.getJSON();
 
-      // Reset editor by replacing state directly — bypasses ProseMirror's
-      // transaction system entirely, avoiding "mismatched transaction" errors
-      // that occur when Livewire morph cycles interfere with editor state.
-      const { schema, plugins } = this.editor.view.state;
-      const newState = EditorState.create({
-        doc: schema.node('doc', null, [schema.node('paragraph')]),
-        plugins,
-      });
-      this.editor.view.updateState(newState);
-      this.isEmpty = true;
-
-      if (typeof onSubmit === 'function') {
-        onSubmit(html, text, json);
-      } else {
+      if (typeof onSubmit !== 'function') {
         console.log('tiptapEditor.submit:', { html, text });
+        return;
       }
 
-      this.editor.commands.focus();
+      // Robustes Senden: Editor NICHT sofort leeren. Erst bei bestätigtem Erfolg
+      // leeren; bei Fehler bleibt der Text erhalten (er ist per wire:ignore vor
+      // Morph geschützt), damit keine Nachricht stillschweigend verloren geht.
+      this.sending = true;
+      this.sendFailed = false;
+      try {
+        await onSubmit(html, text, json);
+
+        // Erfolg → Editor-State direkt ersetzen (umgeht ProseMirror-Transaktions-
+        // fehler bei überlappenden Livewire-Morph-Zyklen).
+        const { schema, plugins } = this.editor.view.state;
+        this.editor.view.updateState(EditorState.create({
+          doc: schema.node('doc', null, [schema.node('paragraph')]),
+          plugins,
+        }));
+        this.isEmpty = true;
+      } catch (e) {
+        this.sendFailed = true;
+      } finally {
+        this.sending = false;
+        this.editor.commands.focus();
+      }
     },
 
     destroy() {

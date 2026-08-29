@@ -321,6 +321,7 @@
             <div class="flex flex-wrap gap-1 mt-1 ml-[42px]">
               @foreach($msg['reactions'] as $reaction)
                 <button
+                  wire:key="reaction-{{ $msg['id'] }}-{{ $reaction['emoji'] }}"
                   wire:click="toggleReaction({{ $msg['id'] }}, '{{ $reaction['emoji'] }}')"
                   class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border transition
                     {{ $reaction['reacted'] ? 'border-[var(--t-accent)]/30 bg-[var(--t-accent)]/10 text-[var(--t-accent)]' : 'border-[var(--t-border)]/60 text-[var(--t-text-muted)] hover:border-[var(--t-border)] hover:bg-white/5' }}"
@@ -393,8 +394,14 @@
                }
              } catch(e) {}
              const ids = $data.uploadedFiles.map(f => f.id);
-             $wire.sendMessage(html, text, null, mentions, ids);
-             $data.uploadedFiles = [];
+             // Promise zurückgeben, damit submit() auf Bestätigung wartet und den
+             // Editor nur bei Erfolg leert (sonst Nachricht stillschweigend verloren).
+             return $wire.sendMessage(html, text, null, mentions, ids)
+               .then(() => { $data.uploadedFiles = []; })
+               .catch((e) => {
+                 $dispatch('notice', { type: 'error', title: 'Nicht gesendet', message: 'Nachricht konnte nicht gesendet werden — bitte erneut senden.' });
+                 throw e;
+               });
            },
          }),
          uploadedFiles: [],
@@ -484,10 +491,12 @@
           <div x-ref="editorEl"></div>
         </div>
         <div x-ref="emojiSlot" class="flex-shrink-0"></div>
-        <button type="button" @click="submit()" :disabled="!canSend"
-          :class="canSend ? 'bg-[var(--t-accent)] text-white hover:bg-[var(--t-accent)]/80 cursor-pointer shadow-sm' : 'border border-[var(--t-border)]/60 text-[var(--t-text-muted)] opacity-40 cursor-not-allowed'"
-          class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs transition flex-shrink-0">
-          <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"/></svg>
+        <button type="button" @click="submit()" :disabled="!canSend || sending"
+          :class="(canSend && !sending) ? 'bg-[var(--t-accent)] text-white hover:bg-[var(--t-accent)]/80 cursor-pointer shadow-sm' : 'border border-[var(--t-border)]/60 text-[var(--t-text-muted)] opacity-40 cursor-not-allowed'"
+          class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs transition flex-shrink-0"
+          :title="sendFailed ? 'Senden fehlgeschlagen — erneut versuchen' : 'Senden'">
+          <svg x-show="!sending" class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"/></svg>
+          <svg x-show="sending" x-cloak class="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
         </button>
       </div>
     </div>
