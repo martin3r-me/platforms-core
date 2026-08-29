@@ -48,12 +48,25 @@ class ExecuteToolContract implements ToolContract
                 ],
             ],
             'required' => ['tool'],
+            'additionalProperties' => false,
         ];
     }
 
     public function execute(array $arguments, ToolContext $context): ToolResult
     {
         try {
+            $unknownKeys = array_diff(array_keys($arguments), ['tool', 'arguments']);
+            if (!empty($unknownKeys)) {
+                $hint = in_array('params', $unknownKeys, true)
+                    ? ' Meintest du "arguments" statt "params"?'
+                    : '';
+                return ToolResult::failure(
+                    'Unbekannte(r) Payload-Key(s): "' . implode('", "', $unknownKeys) . '". ' .
+                    'Erlaubt sind nur "tool" und "arguments".' . $hint,
+                    'INVALID_PAYLOAD'
+                );
+            }
+
             $toolName = $arguments['tool'] ?? null;
             $toolArguments = $arguments['arguments'] ?? [];
 
