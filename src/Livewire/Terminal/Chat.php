@@ -676,6 +676,9 @@ class Chat extends Component
             return [];
         }
 
+        // Die NEUESTEN 100 laden (orderByDesc + limit), danach für die Anzeige
+        // wieder aufsteigend (alt→neu). orderBy('id') asc + limit hätte die
+        // ÄLTESTEN 100 geliefert → bei >100 Nachrichten fehlten die neuesten.
         $messages = TerminalMessage::where('channel_id', $this->channelId)
             ->whereNull('parent_id')
             ->with([
@@ -684,9 +687,11 @@ class Chat extends Component
                 'replies' => fn ($q) => $q->with('user:id,name,avatar')->latest()->limit(3),
                 'attachments',
             ])
-            ->orderBy('id')
+            ->orderByDesc('id')
             ->limit(100)
-            ->get();
+            ->get()
+            ->sortBy('id')
+            ->values();
 
         $messageIds = $messages->pluck('id')->toArray();
         $pinnedIds = TerminalPin::where('channel_id', $this->channelId)
