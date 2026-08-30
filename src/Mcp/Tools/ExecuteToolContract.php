@@ -8,6 +8,7 @@ use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Events\ToolExecuted;
 use Platform\Core\Events\ToolFailed;
 use Platform\Core\Tools\ToolRegistry;
+use Platform\Core\Tools\ToolMetadataResolver;
 use Platform\Core\Services\ToolPermissionService;
 use Illuminate\Support\Facades\Log;
 
@@ -125,6 +126,30 @@ class ExecuteToolContract implements ToolContract
                     'tool' => $toolName,
                     'error' => $e->getMessage(),
                 ]);
+            }
+
+            // READ-ONLY-SCOPE: ein Token OHNE Schreibrecht darf nur read_only-Tools ausführen (Lese-
+            // Ausweis, z.B. für den persönlichen Assistenten: sehen mit dem read-Token des Principals,
+            // handeln mit dem eigenen). Bestehende Voll-Token (scope "*") + Session/TransientToken sind
+            // nicht betroffen (tokenCan('*') → true). Nur echte read-scoped Token werden eingeschränkt.
+            // Sicherheits-Prüfung → fail-CLOSED: kann read_only nicht ermittelt werden, wird gesperrt.
+            $user = $context->user;
+            if (method_exists($user, 'tokenCan') && !$user->tokenCan('*') && !$user->tokenCan('write')) {
+                $isReadOnly = false;
+                try {
+                    $isReadOnly = !empty((new ToolMetadataResolver())->resolve($tool)['read_only']);
+                } catch (\Throwable $e) {
+                    Log::warning('[MCP Execute] read_only nicht ermittelbar → sperre für read-only-Token', [
+                        'tool' => $toolName,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+                if (!$isReadOnly) {
+                    return ToolResult::failure(
+                        "Token ist read-only: '{$toolName}' ist ein schreibendes Tool und erfordert den 'write'-Scope.",
+                        'SCOPE_DENIED'
+                    );
+                }
             }
 
             // Tool ausführen

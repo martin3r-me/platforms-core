@@ -19,6 +19,7 @@ class CreateApiTokenCommand extends Command
                             {--name= : Name des Tokens (z.B. "Datawarehouse Token")}
                             {--user-id= : User ID (alternativ zu email)}
                             {--expires= : Ablaufdatum (30_days, 1_year, never)}
+                            {--scope= : Token-Scopes kommagetrennt. Default "*" = alle Tools; "read" = NUR lesende (read_only) Tools (Lese-Ausweis)}
                             {--show : Token direkt anzeigen}';
 
     protected $description = 'Erstellt einen API-Token (Passport) für einen User (z.B. für Datawarehouse)';
@@ -48,14 +49,22 @@ class CreateApiTokenCommand extends Command
         // Ablaufdatum berechnen
         $expiresAt = $this->calculateExpiresAt($expires);
 
+        // Scopes: kommagetrennt, Default "*" (alle Tools). "read" = nur read_only-Tools (durchgesetzt
+        // im MCP-Execute-Chokepoint). So lässt sich ein reiner Lese-Ausweis ausstellen.
+        $scopes = array_values(array_filter(array_map('trim', explode(',', $this->option('scope') ?: '*'))));
+        if (empty($scopes)) {
+            $scopes = ['*'];
+        }
+
         // Token erstellen (Passport)
-        $tokenResult = $user->createToken($tokenName, ['*'], $expiresAt);
+        $tokenResult = $user->createToken($tokenName, $scopes, $expiresAt);
         $token = $tokenResult->accessToken;
 
         $this->info("API-Token erfolgreich erstellt!");
         $this->newLine();
         $this->line("User: {$user->name} ({$user->email})");
         $this->line("Token Name: {$tokenName}");
+        $this->line("Scopes: " . implode(', ', $scopes) . (in_array('*', $scopes, true) ? ' (Vollzugriff)' : ' (nur diese)'));
         $this->line("Ablaufdatum: " . ($expiresAt ? $expiresAt->format('d.m.Y H:i') : 'Nie'));
         $this->newLine();
 
