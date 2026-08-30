@@ -185,24 +185,30 @@ trait HasStandardGetOperations
      */
     protected function applyStandardSort($query, array $arguments, array $allowedSortFields = [], string $defaultSort = 'created_at', string $defaultDir = 'desc'): void
     {
+        $applied = false;
+
         if (!empty($arguments['sort']) && is_array($arguments['sort'])) {
             foreach ($arguments['sort'] as $sort) {
                 if (empty($sort['field']) || empty($sort['dir'])) {
                     continue;
                 }
-                
+
                 $field = $sort['field'];
                 $dir = in_array($sort['dir'], ['asc', 'desc']) ? $sort['dir'] : 'asc';
-                
+
                 // Security: Nur erlaubte Felder (wenn angegeben)
                 if (!empty($allowedSortFields) && !in_array($field, $allowedSortFields)) {
                     continue;
                 }
-                
+
                 $query->orderBy($field, $dir);
+                $applied = true;
             }
-        } else {
-            // Default-Sortierung
+        }
+
+        // Kein sort-Parameter ODER alle angefragten Felder waren nicht erlaubt/gültig
+        // → Default-Sortierung statt eines stillen, undefinierten Query-Ergebnisses.
+        if (!$applied) {
             if (empty($allowedSortFields) || in_array($defaultSort, $allowedSortFields)) {
                 $query->orderBy($defaultSort, $defaultDir);
             }
