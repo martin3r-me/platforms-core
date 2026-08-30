@@ -170,4 +170,19 @@ class ExecuteToolContractTest extends TestCase
         $this->assertTrue($result->success);
         $this->assertEquals('Hallo', $result->data['echo']);
     }
+
+    public function test_token_without_read_scope_is_not_restricted(): void
+    {
+        // OAuth-Connector-Token o.ä.: trägt WEDER read NOCH write/* → KEINE Einschränkung. Nur ein
+        // Token, der `read` positiv trägt (opt-in-Lese-Ausweis), wird eingeschränkt.
+        $ctx = $this->contextWithScopes(fn (string $s) => false);
+
+        $result = $this->contract->execute([
+            'tool' => 'echo',
+            'arguments' => ['message' => 'Hallo'],
+        ], $ctx);
+
+        $this->assertTrue($result->success);
+        $this->assertEquals('Hallo', $result->data['echo']);
+    }
 }

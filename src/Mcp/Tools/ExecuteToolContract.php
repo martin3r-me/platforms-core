@@ -132,15 +132,16 @@ class ExecuteToolContract implements ToolContract
             // Ausweis, z.B. für den persönlichen Assistenten: sehen mit dem read-Token des Principals,
             // handeln mit dem eigenen). Bestehende Voll-Token (scope "*") + Session/TransientToken sind
             // nicht betroffen (tokenCan('*') → true). Nur echte read-scoped Token werden eingeschränkt.
-            // Nur ein POSITIV vorhandener Access-Token OHNE "*"/"write" wird eingeschränkt. Fehlt der
-            // Token (Session/Web, oder ein Auth-Pfad ohne Passport-Token) oder hat er "*"/"write" →
-            // KEINE Einschränkung (availability-safe: blockt niemals bestehende Voll-Agenten). Der MCP-
-            // Pfad hängt den Token via withAccessToken an → hier ist er da. Ist er read-only, greift der
-            // Schutz fail-CLOSED (read_only nicht ermittelbar → gesperrt).
+            // Eingeschränkt wird NUR ein Token, der den `read`-Scope POSITIV trägt UND weder `write`
+            // noch `*` (opt-in-Lese-Ausweis, z.B. per `api:token:create --scope=read`). Alles andere —
+            // Voll-Token (`*`/`write`), OAuth-Connector-Token mit anderen/leeren Scopes, Session ohne
+            // Token — bleibt UNANGETASTET. So blockt der Schutz nur echte Lese-Ausweise, nie legitime
+            // Schreib-Clients. Ist ein solcher Lese-Token vorhanden, greift fail-CLOSED (read_only nicht
+            // ermittelbar → gesperrt). Der MCP-Pfad hängt den Token via withAccessToken an.
             $user = $context->user;
             $accessToken = method_exists($user, 'currentAccessToken') ? $user->currentAccessToken() : null;
             if ($accessToken && method_exists($accessToken, 'can')
-                && !$accessToken->can('*') && !$accessToken->can('write')) {
+                && $accessToken->can('read') && !$accessToken->can('write') && !$accessToken->can('*')) {
                 $isReadOnly = false;
                 try {
                     $isReadOnly = !empty((new ToolMetadataResolver())->resolve($tool)['read_only']);
