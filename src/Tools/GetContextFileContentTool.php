@@ -6,6 +6,7 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\ContextFile;
+use Platform\Core\Services\SpreadsheetParserService;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -30,7 +31,9 @@ class GetContextFileContentTool implements ToolContract
     public function getDescription(): string
     {
         return 'Ruft den Inhalt einer Datei ab. Für Text-Dateien (Code, JSON, Markdown, etc.) wird der '
-            . 'Inhalt direkt zurückgegeben (max. 50KB). Für Bilder wird die URL zurückgegeben. '
+            . 'Inhalt direkt zurückgegeben (max. 50KB). Für Bilder wird die URL zurückgegeben. Für '
+            . 'Tabellenkalkulationen (xlsx/xls) werden die Sheets als strukturierte Rows zurückgegeben '
+            . '(max. 500 Zeilen pro Sheet). '
             . 'Nutze zuerst core.context.files.GET um verfügbare Dateien und deren IDs zu sehen.';
     }
 
@@ -122,6 +125,23 @@ class GetContextFileContentTool implements ToolContract
                 $thumbnail = $file->thumbnail;
                 if ($thumbnail) {
                     $result['thumbnail_url'] = $thumbnail->url;
+                }
+            } elseif (app(SpreadsheetParserService::class)->supports($file->mime_type)) {
+                // Tabellenkalkulation (xlsx/xls) - Sheets als strukturierte Rows zurückgeben (#849)
+                try {
+                    $disk = Storage::disk($file->disk);
+                    if (!$disk->exists($file->path)) {
+                        return ToolResult::error('FILE_NOT_FOUND', 'Datei existiert nicht mehr im Storage');
+                    }
+
+                    $content = $disk->get($file->path);
+                    $parsed = app(SpreadsheetParserService::class)->parse($content, $file->original_name);
+
+                    $result['sheets'] = $parsed['sheets'];
+                    $result['is_spreadsheet'] = true;
+                    $result['hint'] = 'Tabellenblätter als strukturierte Rows zurückgegeben (max. 500 Zeilen pro Sheet, siehe "truncated").';
+                } catch (\Throwable $e) {
+                    return ToolResult::error('PARSE_ERROR', 'Fehler beim Parsen der Tabellenkalkulation: ' . $e->getMessage());
                 }
             } else {
                 // Binary file - return URL for download
