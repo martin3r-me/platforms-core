@@ -33,19 +33,34 @@ class ExecuteToolContractTest extends TestCase
         }
     }
 
-    /** Kontext mit einem User, dessen tokenCan(scope) das Callback abbildet. */
-    private function contextWithScopes(\Closure $tokenCan): ToolContext
+    /**
+     * Kontext mit einem User, dessen currentAccessToken()->can(scope) das Callback abbildet.
+     * $tokenCan === null → gar kein Access-Token (Session-/Edge-Fall).
+     */
+    private function contextWithScopes(?\Closure $tokenCan): ToolContext
     {
-        $user = new class($tokenCan) extends User {
-            public $id = 1;
+        $token = $tokenCan === null ? null : new class($tokenCan) {
             private $cb;
             public function __construct(\Closure $cb)
             {
                 $this->cb = $cb;
             }
-            public function tokenCan(string $scope): bool
+            public function can(string $scope): bool
             {
                 return ($this->cb)($scope);
+            }
+        };
+
+        $user = new class($token) extends User {
+            public $id = 1;
+            private $tok;
+            public function __construct($tok)
+            {
+                $this->tok = $tok;
+            }
+            public function currentAccessToken()
+            {
+                return $this->tok;
             }
         };
 
@@ -131,6 +146,21 @@ class ExecuteToolContractTest extends TestCase
     {
         // Voll-Token (scope "*") → schreibendes Tool bleibt erlaubt (rückwärtskompatibel).
         $ctx = $this->contextWithScopes(fn (string $s) => true);
+
+        $result = $this->contract->execute([
+            'tool' => 'echo',
+            'arguments' => ['message' => 'Hallo'],
+        ], $ctx);
+
+        $this->assertTrue($result->success);
+        $this->assertEquals('Hallo', $result->data['echo']);
+    }
+
+    public function test_missing_access_token_does_not_restrict(): void
+    {
+        // KEIN Access-Token (Session/Edge-Fall) → availability-safe: Schreib-Tool bleibt erlaubt,
+        // niemals ein Totalausfall für Agenten, deren Token nicht angehängt wäre.
+        $ctx = $this->contextWithScopes(null);
 
         $result = $this->contract->execute([
             'tool' => 'echo',

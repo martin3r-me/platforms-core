@@ -132,9 +132,15 @@ class ExecuteToolContract implements ToolContract
             // Ausweis, z.B. für den persönlichen Assistenten: sehen mit dem read-Token des Principals,
             // handeln mit dem eigenen). Bestehende Voll-Token (scope "*") + Session/TransientToken sind
             // nicht betroffen (tokenCan('*') → true). Nur echte read-scoped Token werden eingeschränkt.
-            // Sicherheits-Prüfung → fail-CLOSED: kann read_only nicht ermittelt werden, wird gesperrt.
+            // Nur ein POSITIV vorhandener Access-Token OHNE "*"/"write" wird eingeschränkt. Fehlt der
+            // Token (Session/Web, oder ein Auth-Pfad ohne Passport-Token) oder hat er "*"/"write" →
+            // KEINE Einschränkung (availability-safe: blockt niemals bestehende Voll-Agenten). Der MCP-
+            // Pfad hängt den Token via withAccessToken an → hier ist er da. Ist er read-only, greift der
+            // Schutz fail-CLOSED (read_only nicht ermittelbar → gesperrt).
             $user = $context->user;
-            if (method_exists($user, 'tokenCan') && !$user->tokenCan('*') && !$user->tokenCan('write')) {
+            $accessToken = method_exists($user, 'currentAccessToken') ? $user->currentAccessToken() : null;
+            if ($accessToken && method_exists($accessToken, 'can')
+                && !$accessToken->can('*') && !$accessToken->can('write')) {
                 $isReadOnly = false;
                 try {
                     $isReadOnly = !empty((new ToolMetadataResolver())->resolve($tool)['read_only']);
