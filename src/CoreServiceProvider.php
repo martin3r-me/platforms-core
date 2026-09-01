@@ -1317,6 +1317,15 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Http\Responses\Passport\DenyAuthorizationResponse::class
             );
         }
+
+        // Benannte Token-Scopes registrieren, sonst weist Passport sie als „invalid scope" ab (nur der
+        // Wildcard "*" ist implizit gültig). Nötig für den read-only-Ausweis (`--scope=read`): sehen mit
+        // dem read-Token des Principals, handeln mit dem eigenen. "*" bleibt weiter gültig → bestehende
+        // Voll-Token (Agenten scope ["*"]) und der OAuth-Connector sind unberührt.
+        Passport::tokensCan([
+            'read'  => 'Nur lesende (read_only) Tools — Lese-Ausweis',
+            'write' => 'Schreibende Tools erlaubt',
+        ]);
     }
 
     /**
