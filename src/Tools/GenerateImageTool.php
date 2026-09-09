@@ -43,8 +43,8 @@ class GenerateImageTool implements ToolContract
                 ],
                 'quality' => [
                     'type' => 'string',
-                    'enum' => ['low', 'standard', 'high'],
-                    'description' => 'Bildqualität. "low" für schnelle Generierung, "standard" für normale Qualität, "high" für maximale Details. Standard: standard',
+                    'enum' => ['low', 'medium', 'high', 'auto'],
+                    'description' => 'Bildqualität. "low" für schnelle Generierung, "medium" für normale Qualität, "high" für maximale Details, "auto" lässt das Modell entscheiden. Standard: medium',
                 ],
                 'style' => [
                     'type' => 'string',
@@ -82,7 +82,7 @@ class GenerateImageTool implements ToolContract
 
             // Optional parameters
             $size = $arguments['size'] ?? '1024x1024';
-            $quality = $arguments['quality'] ?? 'standard';
+            $quality = $arguments['quality'] ?? 'medium';
             $style = $arguments['style'] ?? 'vivid';
             $contextType = $arguments['context_type'] ?? null;
             $contextId = $arguments['context_id'] ?? null;
