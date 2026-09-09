@@ -18,7 +18,7 @@ class ImageGenerationService
     private const API_URL = 'https://api.openai.com/v1/images/generations';
     private const DEFAULT_MODEL = 'gpt-image-1.5';
     private const DEFAULT_SIZE = '1024x1024';
-    private const DEFAULT_QUALITY = 'standard';
+    private const DEFAULT_QUALITY = 'medium';
     private const DEFAULT_STYLE = 'vivid';
 
     /**
@@ -34,7 +34,7 @@ class ImageGenerationService
     /**
      * Valid quality options
      */
-    private const VALID_QUALITIES = ['low', 'standard', 'high'];
+    private const VALID_QUALITIES = ['low', 'medium', 'high', 'auto'];
 
     /**
      * Valid style options (gpt-image-1 may not use this, but keep for compatibility)
