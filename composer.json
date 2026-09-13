@@ -13,7 +13,7 @@
       "phpoffice/phpspreadsheet": "^2.1",
     "laravel/mcp": "^0.5.7",
     "laravel/reverb": "^1.0",
-    "spatie/browsershot": "^4.0",
+    "spatie/browsershot": "^5.0.5",
     "sabre/dav": "^4.7",
     "sabre/vobject": "^4.5",
     "simshaun/recurr": "^5.0"
