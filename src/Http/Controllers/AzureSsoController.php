@@ -17,6 +17,12 @@ class AzureSsoController extends Controller
      */
     protected function redirectProvider()
     {
+        // Eigene state-Verwaltung, da der Provider stateless() läuft (Socialite validiert
+        // dann nicht selbst). Ohne das ist der Callback offen für Login-CSRF/Session-Fixation
+        // (Angreifer startet den Flow, Opfer ruft dessen Callback-URL auf).
+        $state = \Illuminate\Support\Str::random(40);
+        session(['azure_sso_state' => $state]);
+
         return Socialite::driver('azure-tenant')
             ->stateless()
             ->scopes([
@@ -35,7 +41,7 @@ class AzureSsoController extends Controller
                 'https://graph.microsoft.com/ChatMessage.Read',
                 'https://graph.microsoft.com/ChatMessage.Send',
             ])
-            ->with(['response_mode' => 'query', 'prompt' => 'select_account']);
+            ->with(['state' => $state, 'response_mode' => 'query', 'prompt' => 'select_account']);
     }
 
     /**
@@ -79,6 +85,20 @@ class AzureSsoController extends Controller
             \Log::warning('Azure SSO error on callback', $request->only('error', 'error_description'));
             return redirect()->route('azure-sso.login')
                 ->with('error', $request->input('error_description', 'Azure SSO error'));
+        }
+
+        // 1b. state-Prüfung gegen Login-CSRF (vor jedem Token-Exchange, da stateless() Socialite
+        // dazu bringt, die eigene Validierung zu überspringen).
+        $expectedState = session('azure_sso_state');
+        session()->forget('azure_sso_state');
+
+        if (! $expectedState || ! hash_equals((string) $expectedState, (string) $request->query('state'))) {
+            \Log::warning('azure-sso: state mismatch', [
+                'session_id' => session()->getId(),
+                'has_expected_state' => (bool) $expectedState,
+                'has_request_state' => $request->has('state'),
+            ]);
+            abort(403, 'Ungültiger Login-Vorgang. Bitte erneut anmelden.');
         }
 
         // 2. Token exchange
