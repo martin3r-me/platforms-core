@@ -5,6 +5,7 @@ namespace Platform\Core\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Platform\Core\PlatformCore;
 use Platform\Core\Contracts\AuthAccessPolicy;
@@ -13,9 +14,15 @@ use Platform\Core\Services\TeamInvitationService;
 class AzureSsoController extends Controller
 {
     /**
+     * Session-Key für den selbst verwalteten Login-CSRF-state (siehe #725).
+     * Eigener Key statt "state", um mit evtl. anderen Login-Flows nicht zu kollidieren.
+     */
+    private const SESSION_STATE_KEY = 'azure_sso_state';
+
+    /**
      * Provider für den initialen Redirect (mit prompt=select_account für Account-Auswahl)
      */
-    protected function redirectProvider()
+    protected function redirectProvider(string $state)
     {
         return Socialite::driver('azure-tenant')
             ->stateless()
@@ -35,7 +42,9 @@ class AzureSsoController extends Controller
                 'https://graph.microsoft.com/ChatMessage.Read',
                 'https://graph.microsoft.com/ChatMessage.Send',
             ])
-            ->with(['response_mode' => 'query', 'prompt' => 'select_account']);
+            // state wird trotz ->stateless() über with() in die Authorize-URL gemergt
+            // (getCodeFields() merged $this->parameters immer dazu, unabhängig von usesState()).
+            ->with(['response_mode' => 'query', 'prompt' => 'select_account', 'state' => $state]);
     }
 
     /**
@@ -49,6 +58,9 @@ class AzureSsoController extends Controller
 
     public function redirectToProvider()
     {
+        $state = Str::random(40);
+        session([self::SESSION_STATE_KEY => $state]);
+
         \Log::debug('Azure SSO redirect', [
             'tenant' => config('azure-sso.tenant') ?? config('azure-sso.tenant_id'),
             'redirect' => config('azure-sso.redirect'),
@@ -56,7 +68,7 @@ class AzureSsoController extends Controller
             'post_login_redirect' => config('azure-sso.post_login_redirect'),
         ]);
 
-        return $this->redirectProvider()->redirect();
+        return $this->redirectProvider($state)->redirect();
     }
 
     public function handleProviderCallback(Request $request)
@@ -72,6 +84,29 @@ class AzureSsoController extends Controller
             'intended_url' => session()->get('url.intended'),
         ]);
 
+        // 1b. Login-CSRF-Schutz: eigener state, da beide Provider ->stateless() nutzen
+        // (Grund: SameSite-Cookies im Teams-iframe). Ohne diesen Check kann ein Angreifer
+        // seinen eigenen Callback (mit seinem eigenen code) dem Opfer unterschieben (#725).
+        // WICHTIG: hash_equals('', '') === true in PHP - beide Werte müssen daher zusätzlich
+        // als nicht-leer geprüft werden, sonst reicht ein Callback ganz ohne state-Parameter
+        // gegen eine Session ohne gespeicherten state (z. B. Erst-Zugriff des Opfers).
+        $sessionState = session(self::SESSION_STATE_KEY);
+        $requestState = $request->query('state');
+        if (
+            ! is_string($sessionState) || $sessionState === ''
+            || ! is_string($requestState) || $requestState === ''
+            || ! hash_equals($sessionState, $requestState)
+        ) {
+            \Log::warning('Azure SSO: state mismatch (moeglicher Login-CSRF-Versuch)', [
+                'session_id' => session()->getId(),
+                'had_session_state' => session()->has(self::SESSION_STATE_KEY),
+                'has_request_state' => $request->has('state'),
+            ]);
+            session()->forget(self::SESSION_STATE_KEY);
+            abort(403, 'Ungültiger Login-Vorgang. Bitte erneut anmelden.');
+        }
+        session()->forget(self::SESSION_STATE_KEY);
+
         /** @var AuthAccessPolicy $policy */
         $policy = app(AuthAccessPolicy::class);
 
@@ -84,8 +119,12 @@ class AzureSsoController extends Controller
         // 2. Token exchange
         \Log::info('Azure SSO: Starting token exchange');
 
+        // Provider-Instanz behalten (nicht nur den User) - getClaims() danach liefert
+        // die bereits signaturgeprüften id_token-Claims (inkl. tid), siehe #723.
+        $provider = $this->callbackProvider();
+
         try {
-            $azureUser = $this->callbackProvider()->user();
+            $azureUser = $provider->user();
 
             \Log::info('Azure SSO: Token exchange successful', [
                 'azure_id' => $azureUser->getId(),
@@ -118,6 +157,23 @@ class AzureSsoController extends Controller
                 'has_avatar' => !empty($avatar),
             ]);
 
+            // tid aus den bereits signaturgeprüften id_token-Claims (validate() in
+            // socialiteproviders/microsoft prüft sig/iss/aud/exp) - kein eigenes JWT-Decoding (#723).
+            $tid = $provider->getClaims()?->tid ?? null;
+
+            if (! $policy->isTenantAllowed($tid)) {
+                \Log::warning('Azure SSO: tenant not allowed', ['tid' => $tid]);
+                abort(403, 'Dieser Microsoft-Tenant ist für diese Instanz nicht freigegeben.');
+            }
+
+            // VOR dem User-Lookup, damit auch kein Bestandsuser reaktiviert wird, dessen
+            // Adresse inzwischen aus der Allowlist gefallen ist (#722).
+            if (! $policy->isEmailAllowed($email)) {
+                \Log::warning('Azure SSO: email not allowed', ['email' => $email, 'tid' => $tid]);
+                return redirect()->route('azure-sso.login')
+                    ->withErrors(['sso' => 'Für diesen Zugang ist kein Konto freigegeben.']);
+            }
+
             $userModelClass = config('azure-sso.user_model') ?: config('auth.providers.users.model');
 
             \Log::info('Azure SSO: Looking up user', [
@@ -136,6 +192,16 @@ class AzureSsoController extends Controller
             // versuche den Nutzer strikt per Email zu finden (Unique-Constraint beachten)
             if (! $user && $email) {
                 $user = $userModelClass::query()->where('email', $email)->first();
+
+                // Bestandsuser wird hier erstmalig per Email an diese azure_id gebunden
+                // (Tenant- und Email-Policy sind zu diesem Zeitpunkt bereits geprüft, #724).
+                if ($user) {
+                    \Log::info('Azure SSO: linked existing account via email', [
+                        'user_id' => $user->id,
+                        'email' => $email,
+                        'tid' => $tid,
+                    ]);
+                }
             }
 
             \Log::info('Azure SSO: User lookup result', [
@@ -285,6 +351,10 @@ class AzureSsoController extends Controller
 
             return redirect()->intended($redirectTo);
 
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            // Echte HTTP-Fehler (z. B. abort(403, ...) aus den Policy-Checks oben) unverändert
+            // durchreichen - nicht als generischen "SSO Login fehlgeschlagen"-Redirect umbiegen.
+            throw $e;
         } catch (\Throwable $e) {
             \Log::error('Azure SSO: User processing failed', [
                 'message' => $e->getMessage(),

@@ -28,6 +28,14 @@ class AzureSsoServiceProvider extends ServiceProvider
 
         $cfg = config('azure-sso');
 
+        // #723: common + leere allowed_tenants-Whitelist ist praktisch immer ein
+        // Konfigurationsfehler - die .All-Graph-Scopes sind sonst der einzige Türsteher
+        // gegen fremde Tenants (siehe Board "Entra SSO — Konsolidierung & Härtung").
+        $tenant = $cfg['tenant'] ?? ($cfg['tenant_id'] ?? 'common');
+        if ($tenant === 'common' && empty(config('auth-policy.allowed_tenants', []))) {
+            \Log::warning('azure-sso: tenant=common ohne auth-policy.allowed_tenants gesetzt — jeder Microsoft-Tenant kann sich einloggen.');
+        }
+
         Socialite::extend('azure-tenant', function () use ($cfg) {
             return Socialite::buildProvider(
                 TenantAwareMicrosoftProvider::class,
