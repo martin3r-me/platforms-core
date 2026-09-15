@@ -143,12 +143,25 @@ class AzureSsoController extends Controller
             abort(403, 'Dieser Microsoft-Tenant ist für diese Instanz nicht freigegeben.');
         }
 
+        // 2c. Email-Allowlist-Check — VOR dem User-Lookup, damit auch kein Bestandsuser
+        // reaktiviert wird, dessen Adresse inzwischen aus AUTH_ALLOWED_EMAILS/-_DOMAINS
+        // gefallen ist. Bewusst außerhalb des folgenden try/catch(\Throwable), sonst würde
+        // ein abort()/redirect hier vom generischen Catch als "SSO Login fehlgeschlagen"
+        // umgedeutet (analog zum isTenantAllowed-Check oben).
+        $email = $azureUser->getEmail()
+                 ?: ($azureUser->user['preferred_username'] ?? $azureUser->user['upn'] ?? null);
+
+        if (! $policy->isEmailAllowed($email)) {
+            \Log::warning('azure-sso: email not allowed', ['email' => $email, 'tid' => $tid]);
+            return redirect()->route('azure-sso.login')->withErrors([
+                'sso' => 'Für diesen Zugang ist kein Konto freigegeben.',
+            ]);
+        }
+
         // User processing - wrapped in try-catch to catch any exceptions
         try {
             $azureId = $azureUser->getId();
             $name    = $azureUser->getName() ?: ($azureUser->user['name'] ?? null);
-            $email   = $azureUser->getEmail()
-                       ?: ($azureUser->user['preferred_username'] ?? $azureUser->user['upn'] ?? null);
             $avatar  = $azureUser->getAvatar();
 
             \Log::info('Azure SSO: Extracted user data', [
