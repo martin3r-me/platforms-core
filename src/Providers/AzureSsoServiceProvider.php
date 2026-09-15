@@ -3,6 +3,7 @@
 namespace Platform\Core\Providers;
 
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Socialite\Facades\Socialite;
 use Platform\Core\Middleware\ResolveAzureTenant;
@@ -27,6 +28,10 @@ class AzureSsoServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
 
         $cfg = config('azure-sso');
+
+        if (empty(config('auth-policy.allowed_tenants', [])) && ($cfg['tenant'] ?? 'common') === 'common') {
+            Log::warning('azure-sso: AUTH_ALLOWED_TENANTS ist leer und azure-sso.tenant steht auf "common" - jeder Microsoft-Tenant kann sich anmelden.');
+        }
 
         Socialite::extend('azure-tenant', function () use ($cfg) {
             return Socialite::buildProvider(

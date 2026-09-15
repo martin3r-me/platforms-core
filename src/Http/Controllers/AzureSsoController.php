@@ -84,8 +84,10 @@ class AzureSsoController extends Controller
         // 2. Token exchange
         \Log::info('Azure SSO: Starting token exchange');
 
+        $provider = $this->callbackProvider();
+
         try {
-            $azureUser = $this->callbackProvider()->user();
+            $azureUser = $provider->user();
 
             \Log::info('Azure SSO: Token exchange successful', [
                 'azure_id' => $azureUser->getId(),
@@ -101,6 +103,24 @@ class AzureSsoController extends Controller
             ]);
             return redirect()->route('azure-sso.login')
                 ->with('error', 'Azure SSO konnte nicht abgeschlossen werden (Token-Exchange).');
+        }
+
+        // 2b. Tenant-Check: tid stammt aus den bereits signaturgeprüften id_token-Claims
+        // (Provider::getClaims() validiert Signatur, iss und exp gegen die JWKS des Tenants).
+        try {
+            $tid = $provider->getClaims()?->tid;
+        } catch (\Throwable $e) {
+            \Log::error('Azure SSO: id_token validation failed', [
+                'message' => $e->getMessage(),
+                'class' => get_class($e),
+            ]);
+            return redirect()->route('azure-sso.login')
+                ->with('error', 'Azure SSO konnte nicht abgeschlossen werden (Token-Validierung).');
+        }
+
+        if (! $policy->isTenantAllowed($tid)) {
+            \Log::warning('azure-sso: tenant not allowed', ['tid' => $tid]);
+            abort(403, 'Dieser Microsoft-Tenant ist für diese Instanz nicht freigegeben.');
         }
 
         // User processing - wrapped in try-catch to catch any exceptions
