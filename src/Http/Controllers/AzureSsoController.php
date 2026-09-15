@@ -156,6 +156,18 @@ class AzureSsoController extends Controller
             // versuche den Nutzer strikt per Email zu finden (Unique-Constraint beachten)
             if (! $user && $email) {
                 $user = $userModelClass::query()->where('email', $email)->first();
+
+                if ($user) {
+                    // Bestehender Account wird per Email an diese azure_id gebunden (Claiming).
+                    // Abgesichert durch Tenant-Bindung (isTenantAllowed) + tid-Check vorgelagert,
+                    // nicht durch eine Verifikation der Email selbst (Work-Accounts haben kein
+                    // email_verified-Claim).
+                    \Log::info('azure-sso: linked existing account via email', [
+                        'user_id' => $user->id,
+                        'email' => $email,
+                        'tid' => $tid,
+                    ]);
+                }
             }
 
             \Log::info('Azure SSO: User lookup result', [
