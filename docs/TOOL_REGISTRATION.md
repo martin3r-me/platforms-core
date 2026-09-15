@@ -101,6 +101,43 @@ protected function registerTools(): void
 3. **Metadata**: Nutze `ToolMetadataContract` für bessere Discovery
 4. **Testing**: Nutze `ToolTestCase` für Tool-Tests
 
+### Tag-Konventionen für Discovery (Kanal- & Handlungs-Tag-Vokabular)
+
+Der `ToolMetadataResolver` leitet Tags automatisch aus den Namens-Segmenten ab (z. B. `terminal.channels.GET`
+→ `["terminal", "channels"]`). Das reicht nicht für zuverlässige Registry-Suche über Tools hinweg, die
+unterschiedlich benannt sind, aber fachlich zusammengehören (z. B. `terminal.channels.GET`,
+`user-connectors.microsoft365.mail.list` und `core.comms.wa_overview.GET` sind alle "Kommunikations-Tools",
+tragen das aber nicht konsistent im Namen).
+
+Für **alle Kommunikations-Tools** (Terminal, E-Mail, Microsoft Teams, WhatsApp/`core.comms.*`, künftige Kanäle)
+gilt deshalb zusätzlich zu den auto-derived Tags ein festes, additives Vokabular über `getMetadata()['tags']`
+(wird mit den Auto-Tags gemergt, siehe `ToolMetadataResolver::applyExplicitMetadata()`):
+
+**Kanal-Tags** (`channel:*`, ein Tool trägt in der Regel genau einen):
+- `channel:terminal` — internes Messaging (Channels/DMs/Gruppenchats)
+- `channel:mail` — E-Mail (z. B. Microsoft365 Outlook)
+- `channel:teams-chat` — Microsoft-Teams 1:1-/Gruppen-Chats
+- `channel:teams-channel` — Microsoft-Teams-Kanäle
+- `channel:whatsapp` — WhatsApp Business (`core.comms.*`)
+
+**Handlungs-Tags** (`action:*`, ein Tool kann mehrere tragen):
+- `action:list` / `action:get` / `action:search` — Lese-Operationen
+- `action:create` / `action:update` / `action:delete` / `action:send` — Schreib-Operationen
+- `action:unread` — Tool liefert (auch) einen Ungelesen-/Unread-Wert. Nur setzen, wenn das Tool diesen Wert
+  tatsächlich zurückgibt — sonst bleibt er über `tool_registry.SEARCH` unauffindbar (das war der konkrete
+  Auslöser dieser Konvention: `core.comms.wa_overview.GET` berechnet Unread-Kontakte, trug aber kein
+  `unread`-Tag).
+
+Der Präfix (`channel:`/`action:`) unterscheidet diese kuratierten Tags bewusst von den bare-word
+Auto-Tags, damit `tool_registry.SEARCH(query="channel:mail")` treffsicher genau die E-Mail-Tools findet,
+unabhängig davon, ob ein einzelnes Tool zusätzlich `"mail"`, `"email"` oder `"outlook"` als Freitext-Tag
+führt.
+
+**Pfadschema für NEUE Kommunikations-Tools**: `<namespace>.<provider?>.<kanal>.<ressource?>.<verb>`
+(Beispiel: `user-connectors.microsoft365.teams.chats.list`). Bestehende Tool-Namen/-Pfade werden dafür
+NICHT geändert — das Schema gilt nur als Empfehlung für neue Tools, die Tag-Vergabe oben ist additiv und
+nicht-brechend für alle bestehenden Tools.
+
 ### Beispiel: Neues Tool hinzufügen
 
 **Schritt 1**: Erstelle Tool-Datei

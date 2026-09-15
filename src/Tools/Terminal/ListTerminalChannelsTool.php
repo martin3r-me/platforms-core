@@ -4,11 +4,12 @@ namespace Platform\Core\Tools\Terminal;
 
 use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
+use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\TerminalChannel;
 use Platform\Core\Models\TerminalChannelMember;
 
-class ListTerminalChannelsTool implements ToolContract
+class ListTerminalChannelsTool implements ToolContract, ToolMetadataContract
 {
     public function getName(): string
     {
@@ -113,5 +114,19 @@ class ListTerminalChannelsTool implements ToolContract
             'channels' => $channels,
             'count' => count($channels),
         ]);
+    }
+
+    public function getMetadata(): array
+    {
+        return [
+            'category' => 'query',
+            'tags' => ['channel:terminal', 'action:list', 'action:unread'],
+            'read_only' => true,
+            'requires_auth' => true,
+            'requires_team' => true,
+            'risk_level' => 'safe',
+            'idempotent' => true,
+            'cost_class' => 'local_db',
+        ];
     }
 }
