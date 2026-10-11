@@ -72,7 +72,7 @@ class OpenAiService
         ];
         
         foreach ($responsesInput as $idx => $input) {
-            if (($input['role'] ?? '') === 'user' && str_contains($input['content'] ?? '', 'Tool-Result:')) {
+            if (($input['role'] ?? '') === 'user' && is_string($input['content'] ?? null) && str_contains($input['content'], 'Tool-Result:')) {
                 $debugInfo['has_tool_results'] = true;
                 $debugInfo['tool_result_inputs'][] = [
                     'index' => $idx,
