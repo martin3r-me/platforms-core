@@ -397,6 +397,14 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->bindIf(\Platform\Core\Contracts\SuggestionProvider::class, \Platform\Core\Support\NullSuggestionProvider::class);
         $this->app->bindIf(\Platform\Core\Contracts\TemplateProvider::class, \Platform\Core\Support\NullTemplateProvider::class);
 
+        // Inbox-Naht nach INNEN (Delivery): Produzenten liefern Items in die persönliche
+        // Inbox. Null-Default, bis der Triage-Kern eine echte Implementierung bindet.
+        // Der Port bleibt dauerhaft in Core; nur der Adapter wird getauscht.
+        $this->app->bindIf(\Platform\Core\Inbox\Contracts\Delivery::class, \Platform\Core\Inbox\Support\NullDelivery::class);
+        // Inbox-Naht nach AUSSEN (SourceDetail): Quell-Module registrieren hier je Kanal
+        // ihren Live-Detail-Provider (Mail-Thread, Meeting-Agenda, Anruf).
+        $this->app->singleton(\Platform\Core\Inbox\Support\SourceDetailRegistry::class);
+
         // DAV-Modul-Registry (CardDAV/CalDAV) – Module registrieren hier ihre Backends.
         $this->app->singleton(\Platform\Core\Dav\DavModuleRegistry::class);
         // Agent-Config entfernt – Agent ausgelagert
