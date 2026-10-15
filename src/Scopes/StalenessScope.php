@@ -54,6 +54,14 @@ class StalenessScope implements Scope
      */
     public function apply(Builder $builder, Model $model): void
     {
+        // Opt-out: Models koennen das automatische Ausblenden deaktivieren,
+        // OHNE die withStale()/onlyStale()-Macros zu verlieren — die werden in
+        // extend() registriert, solange der Scope gesetzt bleibt. Nur apply()
+        // wird uebersprungen.
+        if (method_exists($model, 'isStalenessAutoHideDisabled') && $model->isStalenessAutoHideDisabled()) {
+            return;
+        }
+
         $thresholdDays = method_exists($model, 'getStalenessThresholdDays')
             ? $model->getStalenessThresholdDays()
             : 90;
