@@ -107,6 +107,18 @@ class OpenAiService
                 }
             }
             
+            // Optional: OpenAI-Built-in web_search (wie in streamChat), auch bei tools === false
+            if (!empty($options['include_web_search'])) {
+                $payload['tools'] = $payload['tools'] ?? [];
+                $hasWebSearch = false;
+                foreach ($payload['tools'] as $t) {
+                    if (($t['type'] ?? null) === 'web_search') { $hasWebSearch = true; break; }
+                }
+                if (!$hasWebSearch) {
+                    array_unshift($payload['tools'], ['type' => 'web_search']);
+                }
+            }
+
             // Debug: Log Payload mit Größen-Info für cURL-Fehler-Debugging
             $payloadSize = strlen(json_encode($payload));
             $inputSize = isset($payload['input']) ? strlen(json_encode($payload['input'])) : 0;
@@ -237,12 +249,19 @@ class OpenAiService
             // Versuche verschiedene Response-Formate
             $content = '';
             $toolCalls = null;
+            $sources = [];
+            $webSearchCalls = [];
             
             // Format 1: output[*] (Responses API Format) – wichtig für mehrere Tool-Calls pro Runde
             if (isset($data['output']) && is_array($data['output']) && count($data['output']) > 0) {
                 $toolCalls = [];
                 foreach ($data['output'] as $outputItem) {
                     if (!is_array($outputItem)) { continue; }
+
+                    if (($outputItem['type'] ?? null) === 'web_search_call') {
+                        $webSearchCalls[] = $outputItem;
+                        continue;
+                    }
                 
                     // Responses API kann function_call direkt als output item liefern
                     // Format: {"type":"function_call","name":"...","arguments":"{...}","call_id":"..."}
@@ -289,6 +308,19 @@ class OpenAiService
                                 continue;
                         }
                         
+                            // Quellen: url_citation-Annotations (dedupliziert nach url)
+                            if (($contentItem['type'] ?? null) === 'output_text' && is_array($contentItem['annotations'] ?? null)) {
+                                foreach ($contentItem['annotations'] as $annotation) {
+                                    if (!is_array($annotation) || ($annotation['type'] ?? null) !== 'url_citation' || empty($annotation['url'])) { continue; }
+                                    $sources[$annotation['url']] ??= [
+                                        'url' => $annotation['url'],
+                                        'title' => $annotation['title'] ?? '',
+                                        'start_index' => $annotation['start_index'] ?? 0,
+                                        'end_index' => $annotation['end_index'] ?? 0,
+                                    ];
+                                }
+                            }
+
                             // Text-Content (kann mehrere Segmente enthalten → append)
                         if (isset($contentItem['text']) && is_string($contentItem['text'])) {
                                 $content .= $contentItem['text'];
@@ -375,6 +407,8 @@ class OpenAiService
                 'model' => $data['model'] ?? $model,
                 'tool_calls' => $toolCalls,
                 'finish_reason' => $data['finish_reason'] ?? null,
+                'sources' => array_values($sources),
+                'web_search_calls' => $webSearchCalls,
             ];
         } catch (\Exception $e) {
             Log::error('OpenAI Service Error', [ 'message' => $e->getMessage(), 'trace' => $e->getTraceAsString() ]);
