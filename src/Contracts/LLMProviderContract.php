@@ -18,8 +18,9 @@ interface LLMProviderContract
      * Führt einen Chat-Request aus (non-streaming)
      * 
      * @param array $messages Array von Messages
-     * @param array $options Optionen (model, temperature, max_tokens, etc.)
-     * @return array{content: string, usage: array, model: string, tool_calls: ?array}
+     * @param array $options Optionen (model, temperature, max_tokens, include_web_search etc.;
+     *                       include_web_search aktiviert die Websuche, Provider ohne Websuche ignorieren sie)
+     * @return array{content: string, usage: array, model: string, tool_calls: ?array, sources?: array<int, array{url: string, title: string, start_index: int, end_index: int}>, web_search_calls?: array}
      */
     public function chat(array $messages, array $options = []): array;
 

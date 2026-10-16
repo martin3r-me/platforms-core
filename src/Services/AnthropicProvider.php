@@ -81,6 +81,7 @@ class AnthropicProvider implements LLMProviderContract
             'usage' => $body['usage'] ?? [],
             'model' => $body['model'] ?? $model,
             'tool_calls' => null,
+            'sources' => [], // include_web_search wird von diesem Provider ignoriert
         ];
     }
 

@@ -44,6 +44,8 @@ class OpenAiProvider implements LLMProviderContract
             'usage' => $result['usage'] ?? [],
             'model' => $result['model'] ?? $model,
             'tool_calls' => $result['tool_calls'] ?? null,
+            'sources' => $result['sources'] ?? [],
+            'web_search_calls' => $result['web_search_calls'] ?? [],
         ];
     }
 
