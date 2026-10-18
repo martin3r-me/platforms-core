@@ -1,22 +1,22 @@
 <?php
 
-namespace Platform\Core\Inbox\Support;
+namespace Platform\Core\Flow\Support;
 
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolContract;
-use Platform\Core\Inbox\Contracts\Automation;
+use Platform\Core\Flow\Contracts\Automation;
 use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
 
 /**
- * Basis für die häufigste Automation-Form: Trigger → TOOL. Verbindet einen
- * Engine-Trigger mit einer bestehenden Tool-Aktion (ToolContract::execute) —
- * agent-frei. Genau das Muster für die „automatischen Abläufe": z. B.
- * „Meeting an Knoten → book-time-Tool", „Rechnung → auto-kontieren-Tool".
+ * Basis für die häufigste Automation-Form: Trigger → TOOL. Verbindet ein
+ * Domänen-Event mit einer bestehenden Tool-Aktion (ToolContract::execute) —
+ * agent-frei. Das Muster für „automatische Abläufe": z. B. „Meeting an Knoten →
+ * book-time-Tool", „Rechnung → auto-kontieren-Tool", „Task zugewiesen → deliver".
  *
- * Die Engine/Core nennt KEINE konkrete Tool-Klasse — die Subklasse (im Besitzer-
- * Modul, z. B. organization/finance) benennt ihr eigenes Tool per toolClass().
- * Fehlt das Tool/Modul, passiert still nichts (soft-coupled).
+ * Core nennt KEINE konkrete Tool-Klasse — die Subklasse (im Besitzer-Modul)
+ * benennt ihr eigenes Tool per toolClass(). Fehlt das Tool/Modul, passiert still
+ * nichts (soft-coupled).
  *
  * Subklasse definiert: handles(), toolClass(), arguments(), userId()/teamId().
  */

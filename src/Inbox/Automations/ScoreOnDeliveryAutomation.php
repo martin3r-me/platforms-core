@@ -2,7 +2,7 @@
 
 namespace Platform\Core\Inbox\Automations;
 
-use Platform\Core\Inbox\Contracts\Automation;
+use Platform\Core\Flow\Contracts\Automation;
 use Platform\Core\Inbox\Contracts\Scorer;
 use Platform\Core\Inbox\Events\ItemDelivered;
 use Platform\Core\Inbox\Models\InboxItem;

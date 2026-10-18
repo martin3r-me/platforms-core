@@ -1,13 +1,13 @@
 <?php
 
-namespace Platform\Core\Inbox\Support;
+namespace Platform\Core\Flow\Support;
 
 use Illuminate\Support\Facades\Log;
 
 /**
- * Führt bei einem Engine-Event alle passenden Automationen aus — deterministisch,
+ * Führt bei einem Domänen-Event alle passenden Automationen aus — deterministisch,
  * agent-frei, einzeln fehler-isoliert (eine fehlerhafte Automation reißt die
- * anderen nicht mit). Wird im CoreServiceProvider auf die Engine-Events gelauscht.
+ * anderen nicht mit). Wird im ServiceProvider auf die relevanten Events gelauscht.
  */
 class AutomationRunner
 {
@@ -23,7 +23,7 @@ class AutomationRunner
                     $automation->run($event);
                 }
             } catch (\Throwable $e) {
-                Log::warning('Inbox-Automation fehlgeschlagen', [
+                Log::warning('Flow-Automation fehlgeschlagen', [
                     'automation' => $automation::class,
                     'event'      => $event::class,
                     'error'      => $e->getMessage(),

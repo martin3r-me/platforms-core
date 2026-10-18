@@ -1,14 +1,14 @@
 <?php
 
-namespace Platform\Core\Inbox\Support;
+namespace Platform\Core\Flow\Support;
 
-use Platform\Core\Inbox\Contracts\Automation;
+use Platform\Core\Flow\Contracts\Automation;
 
 /**
- * Sammelstelle der code-deklarierten Automationen. Core registriert seine
- * Defaults beim Boot; Domänen-Module (organization, finance, …) hängen ihre
- * eigenen über app(AutomationRegistry::class)->register(...) dazu — ohne die
- * Engine anzufassen.
+ * Sammelstelle aller code-deklarierten Automationen des Event→Reaktion-Gewebes.
+ * Core registriert Defaults beim Boot; jedes Modul (inbox, drip, planner, …) hängt
+ * seine eigenen über app(AutomationRegistry::class)->register(...) dazu — ohne das
+ * Gewebe anzufassen.
  */
 class AutomationRegistry
 {

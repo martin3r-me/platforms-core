@@ -407,19 +407,21 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->bind(\Platform\Core\Inbox\Contracts\Scorer::class, \Platform\Core\Inbox\Services\BaselineScorer::class);
         // SourceDetail (raus): Quell-Module registrieren je Kanal ihren Detail-Provider.
         $this->app->singleton(\Platform\Core\Inbox\Support\SourceDetailRegistry::class);
-        // Automationen (Trigger→Aktion, agent-frei): Core-Defaults vorregistriert;
-        // Domänen-Module hängen ihre eigenen im boot() dazu.
-        $this->app->singleton(\Platform\Core\Inbox\Support\AutomationRegistry::class, function ($app) {
-            $registry = new \Platform\Core\Inbox\Support\AutomationRegistry();
+        // ── Flow: allgemeines Event→Reaktion-Gewebe (NICHT inbox-spezifisch) ──
+        // Code-deklarierte Automationen, agent-frei. Core registriert Defaults;
+        // jedes Modul (inbox, drip, planner, …) hängt im boot() seine eigenen dazu.
+        $this->app->singleton(\Platform\Core\Flow\Support\AutomationRegistry::class, function ($app) {
+            $registry = new \Platform\Core\Flow\Support\AutomationRegistry();
             $registry->register(new \Platform\Core\Inbox\Automations\ScoreOnDeliveryAutomation(
                 $app->make(\Platform\Core\Inbox\Contracts\Scorer::class)
             ));
             return $registry;
         });
-        // Trigger → Runner: Engine-Events lösen die passenden Automationen aus.
+        // Trigger → Runner: Domänen-Events lösen die passenden Automationen aus.
+        // (Weitere Events — TaskAssigned, StatusChanged … — hier dazuhängen.)
         \Illuminate\Support\Facades\Event::listen(
             \Platform\Core\Inbox\Events\ItemDelivered::class,
-            [\Platform\Core\Inbox\Support\AutomationRunner::class, 'handle'],
+            [\Platform\Core\Flow\Support\AutomationRunner::class, 'handle'],
         );
 
         // DAV-Modul-Registry (CardDAV/CalDAV) – Module registrieren hier ihre Backends.
