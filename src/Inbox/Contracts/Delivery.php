@@ -6,9 +6,9 @@ namespace Platform\Core\Inbox\Contracts;
  * Die EINE Naht nach innen: andere Module liefern ein Item in die persönliche
  * Inbox eines Users, ohne das Triage-Schema direkt anzufassen.
  *
- * Core besitzt diesen Port dauerhaft (Ports & Adapters). Der Triage-Kern bindet
- * die echte Implementierung; fehlt sie, greift der Null-Default (NullDelivery) —
- * reihenfolge-robust, kein class_exists-Guard mehr beim Produzenten nötig.
+ * Core besitzt diesen Port dauerhaft (Ports & Adapters) und bindet den Kern-Writer
+ * (ItemWriter) als Implementierung. Produzenten rufen die Facade
+ * \Platform\Core\Inbox\Inbox::deliver() — kein class_exists-Guard mehr nötig.
  *
  * Bewusst NEUTRAL: Rückgabe ist die Item-ID (int), nicht das Kern-Model. So hängt
  * kein Produzent am konkreten InboxItem — die ID reicht für Deep-Links/Logs.

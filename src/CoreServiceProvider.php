@@ -397,13 +397,30 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->bindIf(\Platform\Core\Contracts\SuggestionProvider::class, \Platform\Core\Support\NullSuggestionProvider::class);
         $this->app->bindIf(\Platform\Core\Contracts\TemplateProvider::class, \Platform\Core\Support\NullTemplateProvider::class);
 
-        // Inbox-Naht nach INNEN (Delivery): Produzenten liefern Items in die persönliche
-        // Inbox. Null-Default, bis der Triage-Kern eine echte Implementierung bindet.
-        // Der Port bleibt dauerhaft in Core; nur der Adapter wird getauscht.
-        $this->app->bindIf(\Platform\Core\Inbox\Contracts\Delivery::class, \Platform\Core\Inbox\Support\NullDelivery::class);
-        // Inbox-Naht nach AUSSEN (SourceDetail): Quell-Module registrieren hier je Kanal
-        // ihren Live-Detail-Provider (Mail-Thread, Meeting-Agenda, Anruf).
+        // ── Inbox-Engine (Core) ─────────────────────────────────────────────
+        // Delivery (rein): Produzenten liefern Items. Jetzt direkt der Core-Kern
+        // (ItemWriter) — die Phase-0-Bridge im inbox-Modul fällt damit weg.
+        $this->app->bind(\Platform\Core\Inbox\Contracts\Delivery::class, \Platform\Core\Inbox\Services\ItemWriter::class);
+        // InboxQuery (Lese-Naht): Consumer (home) lesen den Stream.
+        $this->app->bind(\Platform\Core\Inbox\Contracts\InboxQuery::class, \Platform\Core\Inbox\Services\StreamQuery::class);
+        // Scorer (pluggbar): deterministische Basis-Bewertung; überschreibbar.
+        $this->app->bind(\Platform\Core\Inbox\Contracts\Scorer::class, \Platform\Core\Inbox\Services\BaselineScorer::class);
+        // SourceDetail (raus): Quell-Module registrieren je Kanal ihren Detail-Provider.
         $this->app->singleton(\Platform\Core\Inbox\Support\SourceDetailRegistry::class);
+        // Automationen (Trigger→Aktion, agent-frei): Core-Defaults vorregistriert;
+        // Domänen-Module hängen ihre eigenen im boot() dazu.
+        $this->app->singleton(\Platform\Core\Inbox\Support\AutomationRegistry::class, function ($app) {
+            $registry = new \Platform\Core\Inbox\Support\AutomationRegistry();
+            $registry->register(new \Platform\Core\Inbox\Automations\ScoreOnDeliveryAutomation(
+                $app->make(\Platform\Core\Inbox\Contracts\Scorer::class)
+            ));
+            return $registry;
+        });
+        // Trigger → Runner: Engine-Events lösen die passenden Automationen aus.
+        \Illuminate\Support\Facades\Event::listen(
+            \Platform\Core\Inbox\Events\ItemDelivered::class,
+            [\Platform\Core\Inbox\Support\AutomationRunner::class, 'handle'],
+        );
 
         // DAV-Modul-Registry (CardDAV/CalDAV) – Module registrieren hier ihre Backends.
         $this->app->singleton(\Platform\Core\Dav\DavModuleRegistry::class);
