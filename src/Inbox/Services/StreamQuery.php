@@ -6,15 +6,18 @@ use Platform\Core\Inbox\Contracts\InboxQuery;
 use Platform\Core\Inbox\Enums\Status;
 use Platform\Core\Inbox\Models\InboxItem;
 use Platform\Core\Inbox\Support\SourceDetailRegistry;
+use Platform\Core\Inbox\Support\SourceListRegistry;
 
 /**
  * Lese-Implementierung: Liste quellfrei aus inbox_items, Detail über die
- * SourceDetailRegistry (jedes Quell-Modul liefert sein Kanal-Detail).
+ * SourceDetailRegistry (jedes Quell-Modul liefert sein Kanal-Detail), und EIN
+ * konsolidierter Stream über die SourceListRegistry (Kanal-Listen) + recording nativ.
  */
 class StreamQuery implements InboxQuery
 {
     public function __construct(
         protected SourceDetailRegistry $sourceDetails,
+        protected SourceListRegistry $sourceLists,
     ) {}
 
     public function listForUser(int $userId, int $teamId, ?string $channel = null, ?string $status = null, int $limit = 50): array
@@ -40,6 +43,32 @@ class StreamQuery implements InboxQuery
             'received_at'  => $i->received_at?->toIso8601String(),
             'importance'   => $i->importance_score !== null ? (float) $i->importance_score : null,
         ])->all();
+    }
+
+    public function listStreamForUser(int $userId, int $teamId, int $limit = 25): array
+    {
+        $rows = [];
+
+        // Kanäle aus den registrierten SourceList-Providern (meeting/mail/call/…).
+        foreach ($this->sourceLists->all() as $channel => $provider) {
+            try {
+                $chRows = $provider->listForUser($userId, $teamId, $limit);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            foreach ($chRows as $r) {
+                $r['channel'] = $channel; // Registry-Key ist autoritativ
+                $rows[] = $r;
+            }
+        }
+
+        // recording ist Core-nativ (inbox_items) — kein Quell-Modul nötig.
+        foreach ($this->listForUser($userId, $teamId, 'recording', null, $limit) as $r) {
+            $r['channel'] = 'recording';
+            $rows[] = $r;
+        }
+
+        return $rows;
     }
 
     public function detailForItem(int $inboxItemId): ?array

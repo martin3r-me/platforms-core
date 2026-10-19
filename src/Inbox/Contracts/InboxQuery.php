@@ -17,6 +17,16 @@ interface InboxQuery
     public function listForUser(int $userId, int $teamId, ?string $channel = null, ?string $status = null, int $limit = 50): array;
 
     /**
+     * EIN konsolidierter Stream über alle Kanäle (via SourceListRegistry + Core-
+     * nativem recording). Jede Zeile trägt 'channel' und 'id' (inbox_item-ID);
+     * die Einheit-Konsolidierung macht der Consumer. Ersetzt die kanal-einzelnen
+     * Inbox*QueryContract::listForUser-Aufrufe im home-Eingang.
+     *
+     * @return array<int, array<string,mixed>>
+     */
+    public function listStreamForUser(int $userId, int $teamId, int $limit = 25): array;
+
+    /**
      * Voll-Detail eines Items (nach Auswahl) — Listen-Felder + Live-Detail der Quelle.
      *
      * @return array<string,mixed>|null
