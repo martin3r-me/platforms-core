@@ -68,7 +68,15 @@ class ModalUser extends Component
 
     public function mount()
     {
-        $this->user = auth()->user()->toArray();
+        // Nur die im Formular/Save tatsächlich genutzten Felder halten — NICHT das ganze
+        // User-Modell. toArray() serialisierte den kompletten User (inkl. großer JSON-/Append-
+        // Felder, ~2 MB) in den Livewire wire:snapshot, der auf JEDER Seite der Plattform bei
+        // jedem Request hin- und zurückgeht. Die View bindet ausschließlich user.fullname/email.
+        $user = auth()->user();
+        $this->user = [
+            'fullname' => $user->fullname,
+            'email' => $user->email,
+        ];
     }
 
     public function openModal()
