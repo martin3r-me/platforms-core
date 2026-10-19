@@ -7,15 +7,17 @@ use Platform\Core\Inbox\Models\InboxItem;
 
 /**
  * Triage-Zustandsübergänge des Kerns: Erledigt / Snooze. Wirkt auf die ganze
- * Einheit (Meeting-Serie via ical_uid bzw. Mail-Thread via conversation_id), damit
- * der kollabierte Listeneintrag als Ganzes verschwindet — sonst taucht sofort die
- * nächste Occurrence / nächste Thread-Mail als Repräsentant wieder auf.
+ * Einheit (UnitResolver: Serie/Thread via Keys ∪ verknüpfte Items via Links),
+ * damit der kollabierte Listeneintrag als Ganzes verschwindet — sonst taucht
+ * sofort die nächste Occurrence / das verknüpfte Item als Repräsentant wieder auf.
  *
  * Gehört in den Kern (Zustand ist der kostbare, user-eigene Teil), nicht in die
  * Präsentation (home).
  */
 class TriageService
 {
+    public function __construct(protected UnitResolver $units) {}
+
     /** Erledigt: raus aus dem Eingang (Status = Done). */
     public function markDone(int $itemId): void
     {
@@ -39,36 +41,12 @@ class TriageService
      */
     protected function applyToGroup(int $itemId, array $attrs): void
     {
-        $item = InboxItem::find($itemId);
-        if (! $item) {
+        if (! InboxItem::whereKey($itemId)->exists()) {
             return;
         }
 
         InboxItem::query()
-            ->whereIn('id', $this->groupIds($item))
+            ->whereIn('id', $this->units->unitIds($itemId))
             ->update($attrs);
-    }
-
-    /**
-     * IDs der ganzen Einheit (Serie/Thread) inkl. des Items selbst.
-     *
-     * @return array<int, int>
-     */
-    protected function groupIds(InboxItem $item): array
-    {
-        $col = ! empty($item->ical_uid)
-            ? 'ical_uid'
-            : (! empty($item->conversation_id) ? 'conversation_id' : null);
-
-        if (! $col) {
-            return [(int) $item->id];
-        }
-
-        return InboxItem::query()
-            ->where('user_id', $item->user_id)
-            ->where($col, $item->{$col})
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
     }
 }

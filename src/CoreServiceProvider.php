@@ -407,6 +407,9 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->bind(\Platform\Core\Inbox\Contracts\Scorer::class, \Platform\Core\Inbox\Services\BaselineScorer::class);
         // SourceDetail (raus): Quell-Module registrieren je Kanal ihren Detail-Provider.
         $this->app->singleton(\Platform\Core\Inbox\Support\SourceDetailRegistry::class);
+        // ItemRelations (Link-Naht): Default = keine Links (Einheiten gruppieren nur
+        // über Stream-Keys). Das inbox-Modul bindet die echte Impl über inbox_item_links.
+        $this->app->bindIf(\Platform\Core\Inbox\Contracts\ItemRelations::class, \Platform\Core\Inbox\Support\NullItemRelations::class);
         // ── Flow: allgemeines Event→Reaktion-Gewebe (NICHT inbox-spezifisch) ──
         // Code-deklarierte Automationen, agent-frei. Core registriert Defaults;
         // jedes Modul (inbox, drip, planner, …) hängt im boot() seine eigenen dazu.
