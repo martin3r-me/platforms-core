@@ -415,6 +415,12 @@ class CoreServiceProvider extends ServiceProvider
         // LinkRule-Fabrik: pluggbare Verknüpfungs-Regeln (Aufnahme↔Meeting …).
         // Registry als Singleton; Quell-Module hängen im boot() ihre Regeln ein.
         $this->app->singleton(\Platform\Core\Inbox\Support\LinkRuleRegistry::class);
+        // ItemHandoff (Naht): aus einem Item eine Aufgabe/ein Ticket machen. Default
+        // = kein Ziel; das inbox-Modul bindet die echte Impl (Planner/Helpdesk).
+        $this->app->bindIf(\Platform\Core\Inbox\Contracts\ItemHandoff::class, \Platform\Core\Inbox\Support\NullItemHandoff::class);
+        // ItemLinking (Naht): manuelle Zuordnung (Aufnahme→Termin). Default No-op;
+        // das inbox-Modul bindet die echte Impl (Correlator + Kontext-Kaskade).
+        $this->app->bindIf(\Platform\Core\Inbox\Contracts\ItemLinking::class, \Platform\Core\Inbox\Support\NullItemLinking::class);
         // ── Flow: allgemeines Event→Reaktion-Gewebe (NICHT inbox-spezifisch) ──
         // Code-deklarierte Automationen, agent-frei. Core registriert Defaults;
         // jedes Modul (inbox, drip, planner, …) hängt im boot() seine eigenen dazu.
