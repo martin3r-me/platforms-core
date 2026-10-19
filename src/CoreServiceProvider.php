@@ -412,6 +412,9 @@ class CoreServiceProvider extends ServiceProvider
         // ItemRelations (Link-Naht): Default = keine Links (Einheiten gruppieren nur
         // über Stream-Keys). Das inbox-Modul bindet die echte Impl über inbox_item_links.
         $this->app->bindIf(\Platform\Core\Inbox\Contracts\ItemRelations::class, \Platform\Core\Inbox\Support\NullItemRelations::class);
+        // LinkRule-Fabrik: pluggbare Verknüpfungs-Regeln (Aufnahme↔Meeting …).
+        // Registry als Singleton; Quell-Module hängen im boot() ihre Regeln ein.
+        $this->app->singleton(\Platform\Core\Inbox\Support\LinkRuleRegistry::class);
         // ── Flow: allgemeines Event→Reaktion-Gewebe (NICHT inbox-spezifisch) ──
         // Code-deklarierte Automationen, agent-frei. Core registriert Defaults;
         // jedes Modul (inbox, drip, planner, …) hängt im boot() seine eigenen dazu.
@@ -419,6 +422,10 @@ class CoreServiceProvider extends ServiceProvider
             $registry = new \Platform\Core\Flow\Support\AutomationRegistry();
             $registry->register(new \Platform\Core\Inbox\Automations\ScoreOnDeliveryAutomation(
                 $app->make(\Platform\Core\Inbox\Contracts\Scorer::class)
+            ));
+            // Trigger (ItemDelivered) → Verknüpfungs-Regeln.
+            $registry->register(new \Platform\Core\Inbox\Automations\RunLinkRulesAutomation(
+                $app->make(\Platform\Core\Inbox\Support\LinkRuleRunner::class)
             ));
             return $registry;
         });
