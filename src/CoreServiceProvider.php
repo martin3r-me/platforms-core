@@ -421,6 +421,9 @@ class CoreServiceProvider extends ServiceProvider
         // ItemLinking (Naht): manuelle Zuordnung (Aufnahme→Termin). Default No-op;
         // das inbox-Modul bindet die echte Impl (Correlator + Kontext-Kaskade).
         $this->app->bindIf(\Platform\Core\Inbox\Contracts\ItemLinking::class, \Platform\Core\Inbox\Support\NullItemLinking::class);
+        // RecordingIngestion (Naht): Aufnahme-Produzenten (whisper …) liefern fertige
+        // Transkripte in den Eingang. Default No-op; inbox bindet die Materialisierung.
+        $this->app->bindIf(\Platform\Core\Inbox\Contracts\RecordingIngestion::class, \Platform\Core\Inbox\Support\NullRecordingIngestion::class);
         // ── Flow: allgemeines Event→Reaktion-Gewebe (NICHT inbox-spezifisch) ──
         // Code-deklarierte Automationen, agent-frei. Core registriert Defaults;
         // jedes Modul (inbox, drip, planner, …) hängt im boot() seine eigenen dazu.
