@@ -7,14 +7,63 @@ use Platform\Core\Models\Team;
 use Platform\Core\Models\Module;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Platform\Core\Enums\TeamRole;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 
 class PlatformCore
 {
     // --- Module Registry ---
+
+    /** Schema-Checks einmal pro Prozess statt je Modul und Request (information_schema-Queries). */
+    private static ?bool $modulesTableExists = null;
+    private static ?bool $modulesHasScopeType = null;
+
+    /** Hash der zuletzt in die DB geschriebenen Modul-Config je Key (aus dem Cache, einmal pro Request gelesen). */
+    private static ?array $syncedModuleHashes = null;
+    private const SYNCED_MODULES_CACHE_KEY = 'platform:modules:synced';
+    private const SYNCED_MODULES_TTL = 3600;
+
+    private static bool $syncedModulesDirty = false;
+
+    private static function syncedModuleHashes(): array
+    {
+        if (self::$syncedModuleHashes === null) {
+            try {
+                self::$syncedModuleHashes = (array) Cache::get(self::SYNCED_MODULES_CACHE_KEY, []);
+            } catch (\Throwable $e) {
+                self::$syncedModuleHashes = []; // kein Cache verfügbar → wie bisher immer abgleichen
+            }
+        }
+
+        return self::$syncedModuleHashes;
+    }
+
+    /** Merken und einmal am Request-Ende schreiben (statt einmal je Modul). */
+    private static function rememberSyncedModule(string $key, string $hash): void
+    {
+        self::$syncedModuleHashes[$key] = $hash;
+        if (self::$syncedModulesDirty) {
+            return;
+        }
+        self::$syncedModulesDirty = true;
+        app()->terminating(function () {
+            try {
+                Cache::put(self::SYNCED_MODULES_CACHE_KEY, self::$syncedModuleHashes, self::SYNCED_MODULES_TTL);
+            } catch (\Throwable $e) {
+                // Cache nicht verfügbar — nächster Request gleicht erneut ab
+            }
+            self::$syncedModulesDirty = false;
+        });
+    }
+
+    public static function modulesTableExists(): bool
+    {
+        return self::$modulesTableExists ??= Schema::hasTable('modules');
+    }
+
     public static function registerModule(array $moduleConfig): void
     {
-        if (!Schema::hasTable('modules')) {
+        if (!self::modulesTableExists()) {
             // Tabelle noch nicht migriert – Registrierung überspringen
             return;
         }
@@ -52,7 +101,7 @@ class PlatformCore
         }
 
         // Prüfe ob scope_type Spalte existiert (Migration könnte noch nicht ausgeführt sein)
-        $hasScopeTypeColumn = Schema::hasColumn('modules', 'scope_type');
+        $hasScopeTypeColumn = self::$modulesHasScopeType ??= Schema::hasColumn('modules', 'scope_type');
 
         $updateData = [
             'title'       => $moduleConfig['title'] ?? ucfirst($key),
@@ -66,10 +115,20 @@ class PlatformCore
             $updateData['scope_type'] = $scopeType;
         }
 
-        Module::updateOrCreate(
-            ['key' => $key],
-            $updateData
-        );
+        // Nur schreiben, wenn sich die Config seit dem letzten Abgleich geändert hat —
+        // vorher SELECT (+ ggf. UPDATE) je Modul bei jedem Request.
+        $encoded = json_encode($updateData);
+        $hash = $encoded !== false ? md5($encoded) : null;
+        $synced = self::syncedModuleHashes();
+        if ($hash === null || ($synced[$key] ?? null) !== $hash) {
+            Module::updateOrCreate(
+                ['key' => $key],
+                $updateData
+            );
+            if ($hash !== null) {
+                self::rememberSyncedModule($key, $hash);
+            }
+        }
 
         // Navigation-Daten sicher zusammenführen
         $navigation = $moduleConfig['navigation'] ?? [];
