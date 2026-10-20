@@ -30,19 +30,11 @@ class ModalModules extends Component
             return;
         }
 
-        $rootTeam = $baseTeam->getRootTeam();
-        $rootTeamId = $rootTeam->id;
-        $baseTeamId = $baseTeam->id;
-
         $modules = PlatformCore::getVisibleModules();
 
-        $this->modules = collect($modules)->filter(function ($module) use ($user, $baseTeam) {
-            $moduleModel = \Platform\Core\Models\Module::where('key', $module['key'])->first();
-            if (!$moduleModel) return false;
-
-            // Einheitlich über hasAccess (Graph unter Enforcement, sonst modulables).
-            return $moduleModel->hasAccess($user, $baseTeam);
-        })->values();
+        // Ein gebündelter Zugriffs-Check für alle Module (vorher 2–4 Queries je Modul)
+        $accessible = array_flip(\Platform\Core\Models\Module::accessibleKeys($user, $baseTeam));
+        $this->modules = collect($modules)->filter(fn ($module) => isset($accessible[$module['key']]))->values();
     }
 
     public function switchTeam(int $teamId)

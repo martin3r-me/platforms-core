@@ -41,6 +41,31 @@ class AuthzResolver
     }
 
     /**
+     * Alle Modul-Keys, für die der User im Team einen Grant hat ('*' = alle),
+     * oder null, wenn er dort gar keinen Modul-Grant hat (= nicht migriert).
+     * Eine Query statt hasAnyModuleGrant + mayUseModule je Modul.
+     *
+     * @return string[]|null
+     */
+    public function moduleGrantKeys(User $user, int $teamId): ?array
+    {
+        $keys = $this->baseGrantQuery($user, $teamId)
+            ->where('scope_type', 'module')
+            ->pluck('scope_key')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($keys === []) {
+            // Grant ohne scope_key zählt bei hasAnyModuleGrant mit → nur dann null, wenn wirklich keiner existiert.
+            return $this->hasAnyModuleGrant($user, $teamId) ? [] : null;
+        }
+
+        return $keys;
+    }
+
+    /**
      * Hat der User ÜBERHAUPT irgendeinen Modul-Grant in diesem Team?
      * Dient als "wurde migriert?"-Weiche: nur dann darf der Graph den
      * Modul-Zugang autoritativ entscheiden (sonst Lockout für nicht migrierte User).

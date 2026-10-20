@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Module extends Model
 {
+    private const ACCESS_MEMO = 'platform.module-access-memo';
+
     protected $fillable = [
         'key',
         'title',
@@ -59,57 +61,93 @@ class Module extends Model
      */
     public function hasAccess(User $user, Team $baseTeam): bool
     {
+        return in_array($this->key, self::accessibleKeys($user, $baseTeam), true);
+    }
+
+    /**
+     * Keys aller Module, die der User im Basis-Team nutzen darf — gebündelt
+     * (~5 Queries) statt je Modul 2–4 Queries; gemerkt für den laufenden Request.
+     * Semantik wie bisher je Modul:
+     *  - Team-Scope: root-scoped Module (scope_type=parent) gegen das Root-Team,
+     *    sonst gegen das Basis-Team.
+     *  - Legacy: User-Freigabe (modulables, team_id = Scope-Team, enabled) ODER
+     *    Team-Freigabe (modulables des Scope-Teams, enabled).
+     *  - Unter authz.enforce_modules entscheidet der Graph, sobald der User im
+     *    Scope-Team überhaupt einen Modul-Grant hat (sonst Legacy, kein Lockout).
+     *
+     * @return string[]
+     */
+    public static function accessibleKeys(User $user, Team $baseTeam): array
+    {
+        // Nur im HTTP-Request merken: Queue-Worker/Konsole teilen ein Request-Objekt über viele Jobs.
+        $useMemo = ! app()->runningInConsole();
+        $memo = $useMemo ? request()->attributes->get(self::ACCESS_MEMO, []) : [];
+        $memoKey = $user->getKey() . ':' . $baseTeam->getKey();
+        if (isset($memo[$memoKey])) {
+            return $memo[$memoKey];
+        }
+
         $rootTeam = $baseTeam->getRootTeam();
-        $rootTeamId = $rootTeam->id;
-        $baseTeamId = $baseTeam->id;
+        $teamIds = array_values(array_unique([(int) $baseTeam->id, (int) $rootTeam->id]));
 
-        // Für Root-Scoped Module: Rechte aus Root-Team prüfen
-        // Für Team-Scoped Module: Rechte aus aktuellem Team prüfen
-        if ($this->isRootScoped()) {
-            // Zuerst User-Berechtigung prüfen
-            $hasPermission = $user->modules()
-                ->where('module_id', $this->id)
-                ->wherePivot('team_id', $rootTeamId)
-                ->wherePivot('enabled', true)
-                ->exists();
+        $userEnabled = [];
+        foreach (\Illuminate\Support\Facades\DB::table('modulables')
+            ->where('modulable_type', $user->getMorphClass())
+            ->where('modulable_id', $user->getKey())
+            ->whereIn('team_id', $teamIds)
+            ->where('enabled', true)
+            ->get(['module_id', 'team_id']) as $row) {
+            $userEnabled[$row->module_id . ':' . $row->team_id] = true;
+        }
 
-            // Falls keine User-Berechtigung, Team-Berechtigung prüfen
-            if (!$hasPermission) {
-                $hasPermission = $rootTeam->modules()
-                    ->where('module_id', $this->id)
-                    ->wherePivot('enabled', true)
-                    ->exists();
+        $teamEnabled = [];
+        foreach (\Illuminate\Support\Facades\DB::table('modulables')
+            ->where('modulable_type', $baseTeam->getMorphClass())
+            ->whereIn('modulable_id', $teamIds)
+            ->where('enabled', true)
+            ->get(['module_id', 'modulable_id']) as $row) {
+            $teamEnabled[$row->module_id . ':' . $row->modulable_id] = true;
+        }
+
+        $enforce = (bool) config('authz.enforce_modules');
+        $resolver = $enforce ? app(\Platform\Core\Authz\AuthzResolver::class) : null;
+        $grantKeys = [];
+
+        $keys = [];
+        foreach (static::query()->get(['id', 'key', 'scope_type']) as $module) {
+            $scopeTeamId = $module->isRootScoped() ? (int) $rootTeam->id : (int) $baseTeam->id;
+
+            if ($resolver) {
+                if (! array_key_exists($scopeTeamId, $grantKeys)) {
+                    $grantKeys[$scopeTeamId] = $resolver->moduleGrantKeys($user, $scopeTeamId);
+                }
+                if ($grantKeys[$scopeTeamId] !== null) {
+                    if (in_array($module->key, $grantKeys[$scopeTeamId], true) || in_array('*', $grantKeys[$scopeTeamId], true)) {
+                        $keys[] = $module->key;
+                    }
+                    continue;
+                }
             }
-        } else {
-            // Zuerst User-Berechtigung prüfen
-            $hasPermission = $user->modules()
-                ->where('module_id', $this->id)
-                ->wherePivot('team_id', $baseTeamId)
-                ->wherePivot('enabled', true)
-                ->exists();
 
-            // Falls keine User-Berechtigung, Team-Berechtigung prüfen
-            if (!$hasPermission) {
-                $hasPermission = $baseTeam->modules()
-                    ->where('module_id', $this->id)
-                    ->wherePivot('enabled', true)
-                    ->exists();
+            if (isset($userEnabled[$module->id . ':' . $scopeTeamId]) || isset($teamEnabled[$module->id . ':' . $scopeTeamId])) {
+                $keys[] = $module->key;
             }
         }
 
-        $legacy = $hasPermission;
-
-        // Phase 3 (Modul-Achse): Graph autoritativ — aber nur für MIGRIERTE User.
-        // Wer keinen Modul-Grant hat (nicht in den Graphen überführt), fällt auf
-        // den alten modulables-Stand zurück → kein Lockout. Schaltbar via Flag.
-        if (config('authz.enforce_modules')) {
-            $teamId = $this->isRootScoped() ? $rootTeamId : $baseTeamId;
-            $resolver = app(\Platform\Core\Authz\AuthzResolver::class);
-            if ($resolver->hasAnyModuleGrant($user, $teamId)) {
-                return $resolver->mayUseModule($user, $this->key, $teamId);
-            }
+        if ($useMemo) {
+            $memo[$memoKey] = $keys;
+            request()->attributes->set(self::ACCESS_MEMO, $memo);
         }
 
-        return $legacy;
+        return $keys;
+    }
+
+    /**
+     * Das Memo hängt am laufenden Request (request()->attributes) — nie request-übergreifend.
+     * Wer im SELBEN Request Freigaben ändert und danach erneut prüft, ruft dies auf.
+     */
+    public static function flushAccessMemo(): void
+    {
+        request()->attributes->remove(self::ACCESS_MEMO);
     }
 }

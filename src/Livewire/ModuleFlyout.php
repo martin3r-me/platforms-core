@@ -50,22 +50,13 @@ class ModuleFlyout extends Component
             $this->isAdmin = $pivot && in_array($pivot->role, ['owner', 'admin']);
         }
 
-        $rootTeam = $baseTeam->getRootTeam();
-        $rootTeamId = $rootTeam->id;
-        $baseTeamId = $baseTeam->id;
-
         // Hole alle sichtbaren Module
         $modules = PlatformCore::getVisibleModules();
 
         // Filtere Module nach Berechtigung
-        $this->modules = collect($modules)->filter(function($module) use ($user, $baseTeam) {
-            $moduleModel = \Platform\Core\Models\Module::where('key', $module['key'])->first();
-            if (!$moduleModel) return false;
-
-            // Einheitlich über hasAccess: respektiert unter Enforcement den Graphen,
-            // sonst die modulables (Fallback). Kein direkter modulables-Bypass mehr.
-            return $moduleModel->hasAccess($user, $baseTeam);
-        })->sortBy(function($module) {
+        // Ein gebündelter Zugriffs-Check für alle Module (vorher 2–4 Queries je Modul)
+        $accessible = array_flip(\Platform\Core\Models\Module::accessibleKeys($user, $baseTeam));
+        $this->modules = collect($modules)->filter(fn ($module) => isset($accessible[$module['key']]))->sortBy(function($module) {
             return $module['title'] ?? $module['label'] ?? '';
         })->values();
 
