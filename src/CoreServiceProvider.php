@@ -542,6 +542,16 @@ class CoreServiceProvider extends ServiceProvider
             } catch (\Throwable $e) {
                 // OpenAiProvider braucht OpenAiService — falls nicht resolvebar, ueberspringen.
             }
+            // Lokaler / selbst gehosteter Provider (Ollama/vLLM, OpenAI-kompatibel).
+            // Nur aktiv, wenn ai.local.base_url gesetzt ist — unabhängig von Cloud-Keys.
+            try {
+                $local = new \Platform\Core\Services\LocalProvider();
+                if ($local->isAvailable()) {
+                    $registry->register($local);
+                }
+            } catch (\Throwable $e) {
+                // Local-Provider optional.
+            }
             return $registry;
         });
 

@@ -7,6 +7,22 @@ return [
     ],
 
     /*
+     * Lokaler / selbst gehosteter, OpenAI-kompatibler Inferenz-Server
+     * (Ollama / vLLM / llama.cpp / LM Studio). Unabhängig von externen Anbietern —
+     * ideal für eng umrissene Transformationen (Enrichment, Klassifikation, Triage).
+     * Die Engine läuft als eigener Dienst; Platform spricht sie nur per HTTP an.
+     *   base_url  …/v1 des Servers (z.B. http://127.0.0.1:11434/v1). Leer = aus.
+     *   api_key   optional (vLLM kann einen verlangen; Ollama braucht keinen)
+     *   model     Default-Modell-ID (z.B. qwen2.5:32b-instruct, llama3.3:70b)
+     */
+    'local' => [
+        'base_url' => env('AI_LOCAL_BASE_URL'),
+        'api_key'  => env('AI_LOCAL_API_KEY'),
+        'model'    => env('AI_LOCAL_MODEL', 'qwen2.5:14b-instruct'),
+        'timeout'  => (int) env('AI_LOCAL_TIMEOUT', 120),
+    ],
+
+    /*
      * LLM-Preise in USD pro 1 Mio Tokens. Quelle: Anthropic Pricing.
      * Bei Preisänderungen (z. B. Ende des Sonnet-5-Intro-Tarifs am 2026-08-31)
      * hier anpassen. Match erfolgt per Substring auf die Model-ID; 'default'
