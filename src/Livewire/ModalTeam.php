@@ -81,25 +81,16 @@ class ModalTeam extends Component
 
     public function mount()
     {
+        // Liegt auf jeder Seite im Layout — Daten erst beim Öffnen laden (openModal).
         $this->user = auth()->user()->toArray();
         $this->team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
-        $this->loadTeams();
-        $this->loadAvailableParentTeams();
-        $this->loadCurrentParentTeam();
-        $this->loadMemberRoles();
-        $this->loadBillingData();
-        $this->loadBillingTotals();
-        $this->loadAiUsers();
-        $this->loadAvailableAiModels();
-        $this->loadAvailableAiUsersToAdd();
-        $this->loadCanAddUsers();
-        $this->loadTeamAiModels();
     }
 
     public function openModal()
     {
         $this->modalShow = true;
         $this->team = auth()->user()->currentTeamRelation; // Child-Team (nicht dynamisch)
+        $this->loadTeams();
         $this->loadAvailableParentTeams();
         $this->loadCurrentParentTeam();
         $this->loadMemberRoles();

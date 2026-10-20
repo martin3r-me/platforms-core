@@ -1,6 +1,8 @@
 <div x-data="{ tab: 'team' }" x-init="
     window.addEventListener('open-modal-team', (e) => { tab = e?.detail?.tab || 'team'; });
 ">
+{{-- Nur geöffnet rendern: lag als ~2 MB HTML auf jeder Seite. Öffnen läuft über openModal(). --}}
+@if($modalShow)
 <x-nx-modal size="xl" wire:model="modalShow">
     <x-slot name="header">
         <div class="flex items-center justify-between w-full">
@@ -232,4 +234,5 @@
         </div>
     </x-slot>
 </x-nx-modal>
+@endif
 </div>
