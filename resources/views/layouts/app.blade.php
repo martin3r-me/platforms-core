@@ -121,7 +121,6 @@
     @livewire('core.modal-modules')
     @livewire('core.modal-help')
     @livewire('core.modal-simple-tool-playground')
-    @livewire('organization.modal-organization')
   @endauth
 
   @php
