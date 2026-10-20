@@ -1,3 +1,6 @@
+<div>
+{{-- Nur geöffnet rendern (liegt auf jeder Seite im Layout). --}}
+@if($modalShow)
 <x-ui-modal persistent="true" wire:model="modalShow">
     <x-slot name="header">
         Nutzungsgebühren im Überblick
@@ -45,3 +48,5 @@
         <x-ui-button variant="info" wire:click="closeModal">Schließen</x-ui-button>
     </x-slot>
 </x-ui-modal>
+@endif
+</div>

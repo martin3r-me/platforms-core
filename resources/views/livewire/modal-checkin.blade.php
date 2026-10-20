@@ -1,3 +1,6 @@
+<div>
+{{-- Nur geöffnet rendern (liegt auf jeder Seite im Layout). --}}
+@if($modalShow)
 <x-ui-modal size="xl" wire:model="modalShow">
     <x-slot name="header">
         <div class="flex items-center gap-3">
@@ -285,3 +288,5 @@
         </div>
     </x-slot>
 </x-ui-modal>
+@endif
+</div>

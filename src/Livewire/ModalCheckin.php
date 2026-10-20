@@ -28,10 +28,9 @@ class ModalCheckin extends Component
 
     public function mount(): void
     {
+        // Liegt auf jeder Seite im Layout — Check-ins erst beim Öffnen laden (openModal).
         $this->selectedDate = now()->toDateString();
         $this->windowStart = now()->subDays(6)->toDateString();
-        $this->loadCheckins();
-        $this->loadCheckinForDate($this->selectedDate);
     }
 
     public function openModal(): void

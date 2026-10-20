@@ -24,8 +24,8 @@ class ModalPricing extends Component
 
     public function mount()
     {
+        // Liegt auf jeder Seite im Layout — Nutzungsdaten erst beim Öffnen laden.
         $this->modalShow = false;
-        $this->loadMonthlyUsages();
     }
 
     public function closeModal()
