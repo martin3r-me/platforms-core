@@ -18,7 +18,6 @@ use Platform\Core\Models\User;
 use Platform\Core\Services\ContextFileService;
 use Platform\Core\Terminal\TerminalContext;
 use Platform\Core\Terminal\TerminalAppRegistry;
-use Platform\Organization\Models\OrganizationContext;
 use Illuminate\Support\Str;
 use Platform\Crm\Livewire\Concerns\WithCommsChat;
 use Platform\Crm\Livewire\Concerns\WithCommsChannelSettings;
