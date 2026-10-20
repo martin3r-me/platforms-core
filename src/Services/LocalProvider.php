@@ -58,11 +58,21 @@ class LocalProvider implements LLMProviderContract
         if (isset($options['temperature'])) {
             $payload['temperature'] = $options['temperature'];
         }
-        // JSON-/Schema-Zwang nur durchreichen, wenn der Aufrufer ihn setzt
-        // (vLLM: response_format/guided_json; Ollama: format). Backend-spezifisch
-        // — daher weiterreichen, nicht erzwingen.
+        // JSON-/Schema-Zwang. Ein explizit gesetztes response_format gewinnt;
+        // sonst bauen wir aus json_schema das OpenAI-kompatible response_format
+        // (vLLM unterstützt json_schema; Ollama ignoriert es und hält sich an die
+        // System-Instruktion). Backend-spezifisch — daher nur hier übersetzt.
         if (isset($options['response_format'])) {
             $payload['response_format'] = $options['response_format'];
+        } elseif (isset($options['json_schema']) && is_array($options['json_schema'])) {
+            $payload['response_format'] = [
+                'type' => 'json_schema',
+                'json_schema' => [
+                    'name' => preg_replace('/[^A-Za-z0-9_]+/', '_', (string) ($options['json_schema_name'] ?? 'enrichment')),
+                    'schema' => $options['json_schema'],
+                    'strict' => true,
+                ],
+            ];
         }
 
         $request = Http::timeout((int) config('ai.local.timeout', 120))->asJson()->acceptJson();

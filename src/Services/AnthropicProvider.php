@@ -40,6 +40,20 @@ class AnthropicProvider implements LLMProviderContract
             $system = trim(($system ?? '') . "\n\n" . $options['system']);
         }
 
+        // Structured Output: Anthropic kennt kein response_format. Wir hängen das
+        // JSON-Schema als System-Instruktion an (best effort) — derselbe Port wie
+        // bei OpenAI/Local, nur im Anthropic-Dialekt.
+        if (isset($options['json_schema']) && is_array($options['json_schema'])) {
+            $schemaJson = json_encode(
+                $options['json_schema'],
+                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+            );
+            $system = trim(($system ?? '')
+                . "\n\nDeine Antwort MUSS ein einzelnes gültiges JSON-Objekt sein, das exakt "
+                . "diesem JSON-Schema entspricht (keine Zusatzfelder, keine Markdown-Fences):\n"
+                . $schemaJson);
+        }
+
         $payload = [
             'model' => $model,
             'max_tokens' => $maxTokens,
