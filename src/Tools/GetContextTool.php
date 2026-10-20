@@ -229,6 +229,7 @@ class GetContextTool implements ToolContract
 
                     // VSM-Tools — konzeptionell zentral, unabhängig von Usage-Statistik
                     $result['vsm_tools'] = [
+                        'brief' => 'organization.brief.GET — EINSTIEG bei Aufgaben: object_type + object_id (oder entity_id) → Org-Einheit mit Pfad, Zuständige, Beziehungen, offene Signale, Strategie. Zuerst aufrufen, dann Modul-Tools für CRUD.',
                         'diagnose' => 'organization.entity.summary.GET — Gesundheit einer Entity: Signals, Items, Cashflow, Completion. include_children=true für den ganzen Baum.',
                         'navigate' => 'organization.context.resolve.GET — Von jedem Objekt zur zugehörigen Entity. object_type + object_id → Org-Pfad.',
                         'traverse' => 'organization.entities.GET — entity_type_id oder parent_entity_id für Baum-Navigation.',
