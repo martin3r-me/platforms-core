@@ -6,14 +6,13 @@ use Platform\Core\Models\Team;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Request-scoped Team-Override für MCP/Playground-Kontext.
+ * Request-scoped Team-Override für den MCP-Kontext.
  *
  * Erlaubt es, das aktive Team temporär zu überschreiben, ohne
  * current_team_id in der DB zu ändern. User::currentTeam prüft
  * diesen Override automatisch.
  *
- * Wird vom ToolContractAdapter gesetzt (MCP) und vom
- * SimpleToolController (Playground).
+ * Wird vom ToolContractAdapter gesetzt (MCP).
  */
 class TeamContext
 {

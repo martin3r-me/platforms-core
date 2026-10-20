@@ -6,8 +6,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 use Platform\Core\Http\Controllers\CoreAiStreamController;
 use Platform\Core\Http\Controllers\TeamInvitationController;
-use Platform\Core\Http\Controllers\CoreToolPlaygroundController;
-use Platform\Core\Http\Controllers\SimpleToolController;
 use Platform\Core\Http\Controllers\AvatarController;
 
 
@@ -269,99 +267,6 @@ Route::middleware(['web', 'auth'])->group(function () {
         ]);
     })->name('core.ai.stream.test');
     
-    // Tool Playground (MCP Testing) - Livewire-Komponente
-    Route::get('/core/tools/playground', \Platform\Core\Livewire\ToolPlayground::class)->name('core.tools.playground');
-    Route::get('/core/tools/simple', \Platform\Core\Livewire\SimpleToolPlayground::class)->name('core.tools.simple');
-    Route::middleware(['force.json'])->group(function () {
-        // Minimaler Tool Controller (neu, einfach)
-        Route::post('/core/tools/simple', [SimpleToolController::class, 'handle'])->name('core.tools.simple.handle');
-        Route::get('/core/tools/simple/models', [SimpleToolController::class, 'models'])->name('core.tools.simple.models');
-        
-        Route::post('/core/tools/playground/simulate', [CoreToolPlaygroundController::class, 'simulate'])->name('core.tools.playground.simulate');
-        Route::post('/core/tools/playground/simulate/stream', [CoreToolPlaygroundController::class, 'simulateStream'])->name('core.tools.playground.simulate.stream');
-        Route::post('/core/tools/playground/test', [CoreToolPlaygroundController::class, 'test'])->name('core.tools.playground.test');
-        Route::get('/core/tools/playground/tools', [CoreToolPlaygroundController::class, 'tools'])->name('core.tools.playground.tools');
-        Route::post('/core/tools/playground/discovery', [CoreToolPlaygroundController::class, 'discovery'])->name('core.tools.playground.discovery');
-        Route::post('/core/tools/playground/request', [CoreToolPlaygroundController::class, 'request'])->name('core.tools.playground.request');
-        Route::get('/core/tools/playground/requests', [CoreToolPlaygroundController::class, 'requests'])->name('core.tools.playground.requests');
-        Route::post('/core/tools/playground/clear', [CoreToolPlaygroundController::class, 'clear'])->name('core.tools.playground.clear');
-    });
-
-    // SSE darf NICHT unter force.json laufen, sonst wird Content-Type auf application/json überschrieben.
-    Route::post('/core/tools/simple/stream', [SimpleToolController::class, 'stream'])->name('core.tools.simple.stream');
-
-    // Playground file upload endpoints
-    Route::post('/api/core/playground/upload', function (Request $request) {
-        $user = $request->user();
-        if (!$user || !$user->currentTeamRelation) {
-            return response()->json(['success' => false, 'error' => 'Unauthorized'], 401);
-        }
-
-        $request->validate([
-            'file' => 'required|file|max:10240', // 10MB max
-            'thread_id' => 'required|integer',
-        ]);
-
-        $threadId = (int) $request->input('thread_id');
-        $thread = \Platform\Core\Models\CoreChatThread::find($threadId);
-        if (!$thread) {
-            return response()->json(['success' => false, 'error' => 'Thread not found'], 404);
-        }
-
-        try {
-            $service = app(\Platform\Core\Services\ContextFileService::class);
-            $result = $service->uploadForContext(
-                $request->file('file'),
-                \Platform\Core\Models\CoreChatThread::class,
-                $threadId,
-                [
-                    'keep_original' => false,
-                    'generate_variants' => true,
-                ]
-            );
-
-            return response()->json([
-                'success' => true,
-                'attachment' => [
-                    'id' => $result['id'],
-                    'token' => $result['token'],
-                    'original_name' => $result['original_name'],
-                    'url' => $result['url'],
-                    'mime_type' => $result['mime_type'],
-                    'file_size' => $result['file_size'],
-                    'width' => $result['width'] ?? null,
-                    'height' => $result['height'] ?? null,
-                    'is_image' => str_starts_with($result['mime_type'], 'image/'),
-                    'variants_status' => $result['variants_status'] ?? 'none',
-                ],
-            ]);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
-        }
-    })->name('core.playground.upload');
-
-    Route::delete('/api/core/playground/attachment/{id}', function (Request $request, int $id) {
-        $user = $request->user();
-        if (!$user) {
-            return response()->json(['success' => false, 'error' => 'Unauthorized'], 401);
-        }
-
-        try {
-            $file = \Platform\Core\Models\ContextFile::findOrFail($id);
-
-            // Verify ownership (user or team)
-            if ($file->user_id !== $user->id && (!$user->currentTeamRelation || $file->team_id !== $user->currentTeamRelation->id)) {
-                return response()->json(['success' => false, 'error' => 'Forbidden'], 403);
-            }
-
-            $service = app(\Platform\Core\Services\ContextFileService::class);
-            $service->delete($id);
-
-            return response()->json(['success' => true]);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
-        }
-    })->name('core.playground.attachment.delete');
 });
 
 Route::middleware(['web', 'auth'])->group(function () {

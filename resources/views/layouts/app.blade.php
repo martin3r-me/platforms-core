@@ -120,7 +120,6 @@
     @livewire('core.modal-pricing')
     @livewire('core.modal-modules')
     @livewire('core.modal-help')
-    @livewire('core.modal-simple-tool-playground')
   @endauth
 
   @php
