@@ -22,7 +22,7 @@
         <div x-show="$wire.activeTab === 'profile'" x-transition>
             {{-- User Profile --}}
             <div class="flex items-center gap-4 p-4 bg-[color:var(--nx-bg)] rounded-lg border border-[color:var(--nx-line)]">
-                <x-nx-avatar :name="auth()->user()->fullname ?? auth()->user()->name" :src="auth()->user()->avatar ?? null" size="lg" />
+                <x-nx-avatar :name="auth()->user()->fullname ?? auth()->user()->name" :src="auth()->user()->avatarUrl()" size="lg" />
                 <div class="min-w-0 flex-1">
                     <div class="font-semibold text-[color:var(--nx-text)] truncate">{{ auth()->user()->fullname ?? auth()->user()->name }}</div>
                     <div class="text-sm text-[color:var(--nx-muted)] truncate">{{ auth()->user()->email }}</div>

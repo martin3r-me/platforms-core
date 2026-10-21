@@ -27,7 +27,8 @@ class Navbar extends Component
 
         $this->currentModuleKey = request()->segment(1) ?: null;
         $this->userName = $user->name;
-        $this->userAvatar = $user->avatar ?? null;
+        // URL (gecachtes Thumbnail) statt base64 — sonst ~30 KB im Snapshot + doppelt im HTML jeder Seite
+        $this->userAvatar = $user->avatarUrl();
 
         $team = $user->currentTeam;
         $this->currentTeamName = $team?->name;

@@ -77,7 +77,7 @@
                                     <label class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-[color:var(--nx-hover)] transition-colors {{ $isSelected ? 'bg-[color:var(--nx-accent-soft)] border border-[color:var(--nx-line-strong)]' : '' }}">
                                         <input type="checkbox" wire:click="toggleInitialMember({{ $availableUser->id }})" {{ $isSelected ? 'checked' : '' }} class="rounded border-[color:var(--nx-line-strong)] text-[color:var(--nx-accent)] focus:ring-[color:var(--nx-accent)]" />
                                         <div class="flex items-center gap-2">
-                                            <x-nx-avatar :name="$availableUser->fullname ?? $availableUser->name" :src="$availableUser->avatar ?? null" size="md" />
+                                            <x-nx-avatar :name="$availableUser->fullname ?? $availableUser->name" :src="method_exists($availableUser, 'avatarUrl') ? $availableUser->avatarUrl() : ($availableUser->avatar ?? null)" size="md" />
                                             <span class="text-sm text-[color:var(--nx-text)]">{{ $availableUser->fullname ?? $availableUser->name }}</span>
                                             @if($availableUser->isAiUser())
                                                 <x-nx-badge variant="info">AI</x-nx-badge>
@@ -129,7 +129,7 @@
                     @foreach($team->users ?? [] as $member)
                         <div class="flex items-center justify-between p-4 bg-[color:var(--nx-bg)] rounded-lg border border-[color:var(--nx-line)]">
                             <div class="flex items-center gap-3">
-                                <x-nx-avatar :name="$member->fullname ?? $member->name" :src="$member->avatar ?? null" size="lg" />
+                                <x-nx-avatar :name="$member->fullname ?? $member->name" :src="method_exists($member, 'avatarUrl') ? $member->avatarUrl() : ($member->avatar ?? null)" size="lg" />
                                 <div>
                                     <div class="flex items-center gap-2">
                                         <div class="font-semibold text-[color:var(--nx-text)]">{{ $member->fullname ?? $member->name }}</div>
