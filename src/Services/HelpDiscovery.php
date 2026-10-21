@@ -37,40 +37,10 @@ class HelpDiscovery
             return [];
         }
 
-        $rootTeam = $team->getRootTeam();
-        $teamId = $team->id;
-        $rootTeamId = $rootTeam->id;
+        // Gebündelt (wie Middleware/hasAccess) statt 3 Queries je Modul
+        $accessible = array_flip(\Platform\Core\Models\Module::accessibleKeys($user, $team));
 
-        return collect($tree)->filter(function ($module) use ($user, $team, $rootTeam, $teamId, $rootTeamId) {
-            $moduleModel = \Platform\Core\Models\Module::where('key', $module['key'])->first();
-            if (!$moduleModel) {
-                return false;
-            }
-
-            if ($moduleModel->isRootScoped()) {
-                $userAllowed = $user->modules()
-                    ->where('module_id', $moduleModel->id)
-                    ->wherePivot('team_id', $rootTeamId)
-                    ->wherePivot('enabled', true)
-                    ->exists();
-                $teamAllowed = $rootTeam->modules()
-                    ->where('module_id', $moduleModel->id)
-                    ->wherePivot('enabled', true)
-                    ->exists();
-            } else {
-                $userAllowed = $user->modules()
-                    ->where('module_id', $moduleModel->id)
-                    ->wherePivot('team_id', $teamId)
-                    ->wherePivot('enabled', true)
-                    ->exists();
-                $teamAllowed = $team->modules()
-                    ->where('module_id', $moduleModel->id)
-                    ->wherePivot('enabled', true)
-                    ->exists();
-            }
-
-            return $userAllowed || $teamAllowed;
-        })->values()->toArray();
+        return collect($tree)->filter(fn ($module) => isset($accessible[$module['key']]))->values()->toArray();
     }
 
     /**

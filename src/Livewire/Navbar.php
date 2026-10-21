@@ -85,30 +85,11 @@ class Navbar extends Component
             return [];
         }
 
-        $rootTeam = $baseTeam->getRootTeam();
+        // Gebündelt (wie Middleware/hasAccess) statt 3 Queries je Modul
+        $accessible = array_flip(Module::accessibleKeys($user, $baseTeam));
 
         return collect($allModules)
-            ->filter(function ($module) use ($user, $baseTeam, $rootTeam) {
-                $moduleModel = Module::where('key', $module['key'])->first();
-                if (!$moduleModel) {
-                    return false;
-                }
-
-                $checkTeam = $moduleModel->isRootScoped() ? $rootTeam : $baseTeam;
-
-                $userAllowed = $user->modules()
-                    ->where('module_id', $moduleModel->id)
-                    ->wherePivot('team_id', $checkTeam->id)
-                    ->wherePivot('enabled', true)
-                    ->exists();
-
-                $teamAllowed = $checkTeam->modules()
-                    ->where('module_id', $moduleModel->id)
-                    ->wherePivot('enabled', true)
-                    ->exists();
-
-                return $userAllowed || $teamAllowed;
-            })
+            ->filter(fn ($module) => isset($accessible[$module['key']]))
             ->mapWithKeys(function ($module) {
                 $key = $module['key'];
                 $icon = $module['navigation']['icon'] ?? ($module['icon'] ?? null);
