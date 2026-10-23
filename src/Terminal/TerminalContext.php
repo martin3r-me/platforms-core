@@ -17,7 +17,15 @@ class TerminalContext
         public readonly ?int $contextId = null,
         public readonly ?string $subject = null,
         public readonly ?string $source = null,
+        /** Apps, die die Seite per page-context anbietet (activity, files, tags, time, okr, extrafields, entities). Leer = unbekannt (Terminal). */
+        public readonly array $apps = [],
     ) {}
+
+    /** True when the page explicitly offers the given app via page-context. */
+    public function offers(string $app): bool
+    {
+        return in_array($app, $this->apps, true);
+    }
 
     /** True when the terminal is pinned to a concrete context entity. */
     public function hasContext(): bool
@@ -40,6 +48,7 @@ class TerminalContext
             'context_id'   => $this->contextId,
             'subject'      => $this->subject,
             'source'       => $this->source,
+            'apps'         => $this->apps,
         ];
     }
 
@@ -51,6 +60,7 @@ class TerminalContext
             contextId:   isset($payload['context_id']) ? (int) $payload['context_id'] : null,
             subject:     $payload['subject'] ?? null,
             source:      $payload['source'] ?? null,
+            apps:        $payload['apps'] ?? [],
         );
     }
 }

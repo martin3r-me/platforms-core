@@ -82,7 +82,14 @@ trait HasPageContext
             'source' => $options['source'] ?? null,
         ];
 
-        $this->dispatch('page-context', $context + ['apps' => array_keys(array_filter($apps))]);
+        $efTarget = ! empty($apps['extrafields'])
+            ? (array_key_exists('extrafields_context', $options) ? $options['extrafields_context'] : static::pageContextExtraFieldsTarget($model))
+            : null;
+
+        $this->dispatch('page-context', $context + [
+            'apps' => array_keys(array_filter($apps)),
+            'extrafields' => $efTarget ? ['type' => get_class($efTarget), 'id' => $efTarget->getKey()] : null,
+        ]);
 
         // ── Bisherige Events (Terminal, Key-Result-/Zusatzfeld-Modal) ──
         // comms zuerst: das Terminal setzt beim Kontextwechsel seine Tabs zurück.
@@ -105,13 +112,8 @@ trait HasPageContext
         if (! empty($apps['okr'])) {
             $this->dispatch('keyresult', $ref);
         }
-        if (! empty($apps['extrafields'])) {
-            $target = array_key_exists('extrafields_context', $options)
-                ? $options['extrafields_context']
-                : static::pageContextExtraFieldsTarget($model);
-            if ($target) {
-                $this->dispatch('extrafields', ['context_type' => get_class($target), 'context_id' => $target->getKey()]);
-            }
+        if ($efTarget) {
+            $this->dispatch('extrafields', ['context_type' => get_class($efTarget), 'context_id' => $efTarget->getKey()]);
         }
     }
 

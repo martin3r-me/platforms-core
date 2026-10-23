@@ -144,6 +144,11 @@
         {{ $slot }}
       </div>
     </main>
+
+    {{-- Kontext-Panel (rechts) — erscheint nur, wenn die Seite per page-context ein Modell meldet --}}
+    @auth
+      @livewire('core.context-panel')
+    @endauth
   </div>
     
   {{-- Presenter-Overlay: Echtzeit-Kommentare (Demo/Screencast), per Cache-Poll --}}

@@ -1394,6 +1394,20 @@ class CoreServiceProvider extends ServiceProvider
      */
     protected function registerTerminalApps(): void
     {
+        // Kontextbezogene Core-Apps fürs Kontext-Panel (Verfügbarkeit aus page-context)
+        foreach ([
+            ['time', 'Zeit', 'clock', 10, 'core.terminal.time'],
+            ['activity', 'Aktivität', 'bolt', 20, 'core.terminal.activity'],
+            ['files', 'Dateien', 'paper-clip', 30, 'core.terminal.files'],
+            ['tags', 'Tags', 'tag', 40, 'core.terminal.tags'],
+            ['okr', 'OKR', 'flag', 60, 'core.terminal.okr'],
+            ['extrafields', 'Felder', 'adjustments-horizontal', 70, 'core.terminal.extra-fields'],
+        ] as [$key, $label, $icon, $order, $component]) {
+            \Platform\Core\Terminal\TerminalAppRegistry::register(
+                new \Platform\Core\Terminal\Apps\ContextApp($key, $label, $icon, $order, $component)
+            );
+        }
+
         if (env('TERMINAL_DEMO_APP', false)) {
             \Platform\Core\Terminal\TerminalAppRegistry::register(
                 new \Platform\Core\Terminal\Apps\DemoTerminalApp()
