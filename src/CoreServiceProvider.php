@@ -391,6 +391,9 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(\Platform\Core\Authz\AuthzResolver::class);
         $this->app->singleton(\Platform\Core\Authz\ShadowComparator::class);
 
+        // Seitenkontext des Requests — Seite legt ab, Kontext-Panel im Layout liest (ohne Event-Rundreise).
+        $this->app->scoped(\Platform\Core\Support\PageContextState::class);
+
         // Wissens-/Vorschlags-Ports (Ports & Adapters). Null-Default via bindIf, damit ein
         // Wissens-Modul (knowledge) sie mit echten Adaptern überschreiben kann — reihenfolge-robust.
         // Der Port bleibt IMMER hier im Core; nur der Adapter (lokal/remote) wird getauscht.

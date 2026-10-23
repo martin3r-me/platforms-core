@@ -5,6 +5,7 @@ namespace Platform\Core\Livewire;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Platform\Core\Models\UserUiPreference;
+use Platform\Core\Support\PageContextState;
 use Platform\Core\Terminal\Contracts\TerminalApp;
 use Platform\Core\Terminal\TerminalAppRegistry;
 use Platform\Core\Terminal\TerminalContext;
@@ -31,6 +32,20 @@ class ContextPanel extends Component
     public ?array $extrafields = null;
     public ?string $activeApp = null;
 
+    /** Nicht persistiert — nur innerhalb eines Requests. */
+    protected ?array $uiPreferenceCache = null;
+
+    /**
+     * Die Seite ist im selben Request schon gerendert (Layout kommt danach) und hat
+     * ihren Kontext abgelegt — Panel steht damit sofort im ersten HTML.
+     */
+    public function mount(): void
+    {
+        if ($payload = app(PageContextState::class)->payload) {
+            $this->applyContext($payload);
+        }
+    }
+
     #[On('page-context')]
     public function setPageContext(array $payload = []): void
     {
@@ -45,11 +60,21 @@ class ContextPanel extends Component
             return;
         }
 
-        // Seiten senden page-context bei jedem eigenen Update — unveränderter Kontext → kein Re-Render
+        // Seiten senden page-context bei jedem eigenen Update (und beim Laden, obwohl
+        // mount() den Kontext schon hat) — unveränderter Kontext → kein Re-Render
         if ($payload['model'] === $this->contextType && (int) $payload['modelId'] === $this->contextId
             && array_values($payload['apps'] ?? []) === $this->apps && ($payload['subject'] ?? null) === $this->subject) {
             $this->skipRender();
 
+            return;
+        }
+
+        $this->applyContext($payload);
+    }
+
+    protected function applyContext(array $payload): void
+    {
+        if (empty($payload['model']) || empty($payload['modelId'])) {
             return;
         }
 
@@ -129,14 +154,20 @@ class ContextPanel extends Component
     /** Zuletzt gewählter Reiter (UI-Präferenz, vom Panel per Store gesetzt). */
     protected function preferredApp(): ?string
     {
-        $userId = auth()->id();
-        if (! $userId) {
-            return null;
-        }
-        $state = UserUiPreference::where('user_id', $userId)->value('state');
-        $state = is_string($state) ? json_decode($state, true) : (array) $state;
+        return $this->uiPreference()['app'] ?? null;
+    }
 
-        return data_get($state, 'context_panel.app');
+    /** Panel-Präferenzen des Users (app, open, width) — einmal pro Request gelesen. */
+    protected function uiPreference(): array
+    {
+        if ($this->uiPreferenceCache === null) {
+            $userId = auth()->id();
+            $state = $userId ? UserUiPreference::where('user_id', $userId)->value('state') : null;
+            $state = is_string($state) ? json_decode($state, true) : (array) $state;
+            $this->uiPreferenceCache = (array) data_get($state, 'context_panel', []);
+        }
+
+        return $this->uiPreferenceCache;
     }
 
     public function render()
@@ -148,6 +179,9 @@ class ContextPanel extends Component
             'panelApps' => $apps,
             'active' => $active,
             'activeProps' => $active ? $this->appProps($active->key()) : [],
+            // Startzustand fürs erste HTML (vor Alpine) — sonst springt die Breite beim Laden
+            'initialOpen' => (bool) ($this->uiPreference()['open'] ?? true),
+            'initialWidth' => max(320, min(720, (int) ($this->uiPreference()['width'] ?? 400))),
         ]);
     }
 }

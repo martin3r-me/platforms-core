@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Platform\Core\Contracts\HasDisplayName;
 use Platform\Core\Contracts\HasKeyResultAncestors;
 use Platform\Core\Contracts\InheritsExtraFields;
+use Platform\Core\Support\PageContextState;
 
 /**
  * Seitenkontext für Terminal + Kontext-Panel — ein Weg statt 6–8 Einzel-Events.
@@ -65,6 +66,7 @@ trait HasPageContext
 
         if (! $model || ! $model->getKey()) {
             $source = $this->pageContextOptions()['source'] ?? null;
+            app(PageContextState::class)->payload = null;
             $this->dispatch('page-context', ['model' => null, 'modelId' => null, 'source' => $source]);
             $this->dispatch('comms', ['model' => null, 'modelId' => null, 'source' => $source]);
 
@@ -86,10 +88,13 @@ trait HasPageContext
             ? (array_key_exists('extrafields_context', $options) ? $options['extrafields_context'] : static::pageContextExtraFieldsTarget($model))
             : null;
 
-        $this->dispatch('page-context', $context + [
+        $pageContext = $context + [
             'apps' => array_keys(array_filter($apps)),
             'extrafields' => $efTarget ? ['type' => get_class($efTarget), 'id' => $efTarget->getKey()] : null,
-        ]);
+        ];
+        // Für das Kontext-Panel im Layout (gleicher Request) — Event für spätere Updates
+        app(PageContextState::class)->payload = $pageContext;
+        $this->dispatch('page-context', $pageContext);
 
         // ── Bisherige Events (Terminal, Key-Result-/Zusatzfeld-Modal) ──
         // comms zuerst: das Terminal setzt beim Kontextwechsel seine Tabs zurück.
