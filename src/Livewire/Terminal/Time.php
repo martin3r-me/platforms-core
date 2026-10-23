@@ -417,25 +417,39 @@ class Time extends Component
 
     protected function collectTimeChildContextPairs(array &$pairs): void
     {
-        if (! class_exists($this->contextType)) {
-            return;
-        }
-
-        if (! is_a($this->contextType, HasChildContextRelations::class, true)) {
-            return;
-        }
-
-        $model = $this->contextType::find($this->contextId);
-        if (! $model) {
-            return;
-        }
-
-        foreach ($this->contextType::childContextRelations() as $relationPath) {
-            $this->resolveTimeRelationPathForPairs($model, $relationPath, $pairs);
+        foreach (static::childContextPairs($this->contextType, (int) $this->contextId) as $type => $ids) {
+            foreach ($ids as $id) {
+                $pairs[$type][] = $id;
+            }
         }
     }
 
-    protected function resolveTimeRelationPathForPairs($model, string $path, array &$pairs): void
+    /**
+     * Kind-Kontexte, deren Zeiten mitzählen (z. B. Tasks eines Projekts) —
+     * auch vom Kontext-Panel-Badge genutzt.
+     *
+     * @return array<class-string, array<int, int>>
+     */
+    public static function childContextPairs(string $contextType, int $contextId): array
+    {
+        $pairs = [];
+        if (! class_exists($contextType) || ! is_a($contextType, HasChildContextRelations::class, true)) {
+            return $pairs;
+        }
+
+        $model = $contextType::find($contextId);
+        if (! $model) {
+            return $pairs;
+        }
+
+        foreach ($contextType::childContextRelations() as $relationPath) {
+            static::resolveTimeRelationPathForPairs($model, $relationPath, $pairs);
+        }
+
+        return $pairs;
+    }
+
+    protected static function resolveTimeRelationPathForPairs($model, string $path, array &$pairs): void
     {
         $segments = explode('.', $path);
         $currentModels = collect([$model]);

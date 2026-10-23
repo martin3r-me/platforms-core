@@ -6,6 +6,7 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Platform\Core\Models\UserUiPreference;
 use Platform\Core\Support\PageContextState;
+use Platform\Core\Terminal\Contracts\HasBadge;
 use Platform\Core\Terminal\Contracts\TerminalApp;
 use Platform\Core\Terminal\TerminalAppRegistry;
 use Platform\Core\Terminal\TerminalContext;
@@ -31,6 +32,8 @@ class ContextPanel extends Component
     /** Ziel der Zusatzfeld-Definitionen ['type' => …, 'id' => …] (bei Tasks z. B. das Projekt). */
     public ?array $extrafields = null;
     public ?string $activeApp = null;
+    /** Reiter-Kennzahlen [app => '3'|'12h'|null]; nur Apps mit HasBadge. null = leer. */
+    public array $badges = [];
 
     /** Nicht persistiert — nur innerhalb eines Requests. */
     protected ?array $uiPreferenceCache = null;
@@ -55,7 +58,7 @@ class ContextPanel extends Component
 
                 return;
             }
-            $this->reset(['contextType', 'contextId', 'subject', 'url', 'source', 'apps', 'extrafields', 'activeApp']);
+            $this->reset(['contextType', 'contextId', 'subject', 'url', 'source', 'apps', 'extrafields', 'activeApp', 'badges']);
 
             return;
         }
@@ -86,18 +89,41 @@ class ContextPanel extends Component
         $this->apps = array_values($payload['apps'] ?? []);
         $this->extrafields = $payload['extrafields'] ?? null;
 
-        $available = array_keys($this->panelApps());
+        $apps = $this->panelApps();
+        $available = array_keys($apps);
         if (! in_array($this->activeApp, $available, true)) {
             $preferred = $this->preferredApp();
             $this->activeApp = in_array($preferred, $available, true) ? $preferred : ($available[0] ?? null);
         }
+        $this->refreshBadges($apps);
     }
 
     public function selectApp(string $key): void
     {
-        if (array_key_exists($key, $this->panelApps())) {
+        $apps = $this->panelApps();
+        if (array_key_exists($key, $apps)) {
             $this->activeApp = $key;
+            // Beim Reiterwechsel auffrischen — was man im letzten Reiter angelegt hat, zählt sofort
+            $this->refreshBadges($apps);
         }
+    }
+
+    /** @param array<string, TerminalApp> $apps */
+    protected function refreshBadges(array $apps): void
+    {
+        $context = $this->terminalContext();
+        $badges = [];
+        foreach ($apps as $key => $app) {
+            if (! $app instanceof HasBadge) {
+                continue;
+            }
+            try {
+                $badges[$key] = $app->badge($context);
+            } catch (\Throwable $e) {
+                report($e); // Zähler darf das Panel nie kippen — dann eben ohne Badge
+            }
+        }
+        $this->badges = $badges;
     }
 
     /**
@@ -112,7 +138,18 @@ class ContextPanel extends Component
             return [];
         }
 
-        $context = new TerminalContext(
+        $apps = array_filter(
+            TerminalAppRegistry::availableFor($this->terminalContext()),
+            fn (TerminalApp $app) => $app->group() !== 'native',
+        );
+        uasort($apps, fn (TerminalApp $a, TerminalApp $b) => $a->order() <=> $b->order());
+
+        return $apps;
+    }
+
+    protected function terminalContext(): TerminalContext
+    {
+        return new TerminalContext(
             teamId: auth()->user()?->currentTeam?->id,
             contextType: $this->contextType,
             contextId: $this->contextId,
@@ -120,14 +157,6 @@ class ContextPanel extends Component
             source: $this->source,
             apps: $this->apps,
         );
-
-        $apps = array_filter(
-            TerminalAppRegistry::availableFor($context),
-            fn (TerminalApp $app) => $app->group() !== 'native',
-        );
-        uasort($apps, fn (TerminalApp $a, TerminalApp $b) => $a->order() <=> $b->order());
-
-        return $apps;
     }
 
     /** Props für die App-Komponente — Zusatzfelder hängen am Definitions-Ziel. */

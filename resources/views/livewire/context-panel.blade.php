@@ -12,9 +12,29 @@
         .cp-head { background: var(--cp-head); }
         .cp-docked { box-shadow: -10px 0 24px -14px rgba(15,15,15,.18); }
         .cp-overline { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--nx-faint); }
+        /* Icon-Leiste (eingeklappt) */
         .cp-tab { color: var(--nx-muted); }
         .cp-tab:hover { background: rgba(55,53,47,.06); color: var(--nx-text); }
         .cp-tab-active, .cp-tab-active:hover { background: #fff; color: var(--nx-text); box-shadow: var(--nx-shadow-card); }
+        /* Reiter (offen): eine Zeile, nur der aktive mit Namen, Unterstrich gleitet mit */
+        .cp-tabs { scrollbar-width: none; }
+        .cp-tabs::-webkit-scrollbar { display: none; }
+        .cp-rt { display: inline-flex; align-items: center; height: 34px; padding: 0 8px; gap: 0; border-radius: 6px 6px 0 0;
+                 color: var(--nx-muted); white-space: nowrap; transition: color .15s, background-color .15s, gap .2s; }
+        .cp-rt:hover { color: var(--nx-text); background: rgba(55,53,47,.05); }
+        .cp-rt-label { display: inline-block; max-width: 0; opacity: 0; overflow: hidden; font-size: 12px; font-weight: 500;
+                       transition: max-width .22s ease, opacity .18s ease; }
+        .cp-rt.is-active { color: var(--nx-text); gap: 6px; }
+        .cp-rt.is-active .cp-rt-label { max-width: 140px; opacity: 1; }
+        .cp-rt.is-empty:not(.is-active) { color: var(--nx-faint); opacity: .7; }
+        .cp-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 4px;
+                    margin-left: 4px; border-radius: 999px; font-size: 10px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums;
+                    background: rgba(55,53,47,.08); color: var(--nx-muted); }
+        .cp-rt.is-active .cp-badge { background: var(--nx-text); color: #fff; }
+        .cp-ink { position: absolute; bottom: -1px; height: 2px; border-radius: 2px; background: var(--nx-text);
+                  transition: left .22s ease, width .22s ease; }
+        .cp-rail-badge { position: absolute; top: 1px; right: 1px; min-width: 13px; height: 13px; padding: 0 3px; border-radius: 999px;
+                         font-size: 9px; font-weight: 600; line-height: 13px; text-align: center; background: var(--nx-faint); color: #fff; }
         /* Startbreite vor Alpine (aus der Präferenz) — danach übernimmt :style */
         .cp-aside { width: 44px; }
         @media (min-width: 1440px) { .cp-aside { width: var(--cp-w); } }
@@ -26,7 +46,16 @@
             small: window.matchMedia('(max-width: 767px)').matches,
             overlay: false,
             resizing: false,
+            current: $wire.entangle('activeApp'),
+            ink: { left: 0, width: 0 },
+            moveInk() {
+                const el = this.$refs['tab-' + this.current];
+                if (el) { this.ink = { left: el.offsetLeft + 6, width: el.offsetWidth - 12 }; }
+            },
             init() {
+                this.$watch('current', () => this.$nextTick(() => this.moveInk()));
+                this.$watch('showBody', v => v && this.$nextTick(() => this.moveInk()));
+                this.$nextTick(() => this.moveInk());
                 const w = window.matchMedia('(min-width: 1440px)');
                 const s = window.matchMedia('(max-width: 767px)');
                 w.addEventListener('change', e => { this.wide = e.matches; this.overlay = false; });
@@ -45,6 +74,7 @@
                 this.overlay = false;
             },
             pick(key) {
+                this.current = key;
                 this.$store.ui?.gSet('context_panel', 'app', key);
                 this.$wire.selectApp(key);
             },
@@ -72,12 +102,18 @@
             </button>
             <div class="flex flex-col items-center gap-1 py-2">
                 @foreach ($panelApps as $key => $app)
-                    <button type="button" x-on:click="open('{{ $key }}')" title="{{ $app->label() }}"
+                    @php($badge = $badges[$key] ?? null)
+                    <button type="button" x-on:click="open('{{ $key }}')" title="{{ $app->label() }}{{ $badge ? ' · ' . $badge : '' }}"
+                        :class="{ 'cp-tab-active': current === '{{ $key }}' }"
                         @class([
-                            'cp-tab w-8 h-8 flex items-center justify-center rounded-md transition-colors',
+                            'cp-tab relative w-8 h-8 flex items-center justify-center rounded-md transition-colors',
                             'cp-tab-active' => $activeApp === $key,
-                        ])>
+                        ])
+                        @if (array_key_exists($key, $badges) && ! $badge) style="opacity: .5" @endif>
                         @svg('heroicon-o-' . $app->icon(), 'w-4 h-4')
+                        @if ($badge && preg_match('/^\d+\+?$/', $badge)) {{-- Zeit („12h“) nur im Tooltip --}}
+                            <span class="cp-rail-badge">{{ $badge }}</span>
+                        @endif
                     </button>
                 @endforeach
             </div>
@@ -95,7 +131,7 @@
 
             {{-- Kopf: Datensatz + Einklappen, darunter die Reiter — ein abgesetzter Block --}}
             <div class="cp-head flex-shrink-0 border-b" style="border-color: var(--nx-line-strong)">
-            <div class="flex items-center gap-2 px-3 pt-3 pb-2">
+            <div class="flex items-center gap-2 px-3 pt-3 pb-1">
                 <div class="min-w-0 flex-1">
                     <div class="cp-overline leading-none">Kontext</div>
                     <div class="truncate text-sm font-semibold text-[color:var(--nx-text)] mt-1" title="{{ $subject }}">{{ $subject ?: 'Datensatz' }}</div>
@@ -107,18 +143,27 @@
                 </button>
             </div>
 
-            {{-- Reiter --}}
-            <div class="flex flex-wrap items-center gap-1 px-2 pb-2">
+            {{-- Reiter: eine Zeile, Icon + Zähler; der aktive zeigt seinen Namen --}}
+            <div class="cp-tabs relative flex items-end px-1.5 overflow-x-auto">
                 @foreach ($panelApps as $key => $app)
-                    <button type="button" x-on:click="pick('{{ $key }}')"
+                    @php($badge = $badges[$key] ?? null)
+                    <button type="button" x-ref="tab-{{ $key }}" x-on:click="pick('{{ $key }}')"
+                        title="{{ $app->label() }}{{ $badge ? ' · ' . $badge : '' }}"
+                        x-on:transitionend="moveInk()"
+                        :class="{ 'is-active': current === '{{ $key }}' }"
                         @class([
-                            'cp-tab inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-colors',
-                            'cp-tab-active' => $activeApp === $key,
+                            'cp-rt flex-shrink-0',
+                            'is-active' => $activeApp === $key,
+                            'is-empty' => array_key_exists($key, $badges) && ! $badge,
                         ])>
-                        @svg('heroicon-o-' . $app->icon(), 'w-3.5 h-3.5')
-                        {{ $app->label() }}
+                        @svg('heroicon-o-' . $app->icon(), 'w-4 h-4 flex-shrink-0')
+                        <span class="cp-rt-label">{{ $app->label() }}</span>
+                        @if ($badge)
+                            <span class="cp-badge">{{ $badge }}</span>
+                        @endif
                     </button>
                 @endforeach
+                <span class="cp-ink" :style="{ left: ink.left + 'px', width: ink.width + 'px' }" x-show="ink.width" x-cloak></span>
             </div>
             </div>
 

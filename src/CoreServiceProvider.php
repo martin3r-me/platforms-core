@@ -1397,17 +1397,20 @@ class CoreServiceProvider extends ServiceProvider
      */
     protected function registerTerminalApps(): void
     {
-        // Kontextbezogene Core-Apps fürs Kontext-Panel (Verfügbarkeit aus page-context)
+        // Kontextbezogene Core-Apps fürs Kontext-Panel (Verfügbarkeit aus page-context),
+        // mit Zähler-Badge, wo eine Zahl etwas aussagt
+        $badges = \Platform\Core\Terminal\Apps\ContextBadges::class;
         foreach ([
-            ['time', 'Zeit', 'clock', 10, 'core.terminal.time'],
-            ['activity', 'Aktivität', 'bolt', 20, 'core.terminal.activity'],
-            ['files', 'Dateien', 'paper-clip', 30, 'core.terminal.files'],
-            ['tags', 'Tags', 'tag', 40, 'core.terminal.tags'],
-            ['okr', 'OKR', 'flag', 60, 'core.terminal.okr'],
-            ['extrafields', 'Felder', 'adjustments-horizontal', 70, 'core.terminal.extra-fields'],
-        ] as [$key, $label, $icon, $order, $component]) {
-            \Platform\Core\Terminal\TerminalAppRegistry::register(
-                new \Platform\Core\Terminal\Apps\ContextApp($key, $label, $icon, $order, $component)
+            ['time', 'Zeit', 'clock', 10, 'core.terminal.time', [$badges, 'time']],
+            ['activity', 'Aktivität', 'bolt', 20, 'core.terminal.activity', null],
+            ['files', 'Dateien', 'paper-clip', 30, 'core.terminal.files', [$badges, 'files']],
+            ['tags', 'Tags', 'tag', 40, 'core.terminal.tags', [$badges, 'tags']],
+            ['okr', 'OKR', 'flag', 60, 'core.terminal.okr', null],
+            ['extrafields', 'Felder', 'adjustments-horizontal', 70, 'core.terminal.extra-fields', null],
+        ] as [$key, $label, $icon, $order, $component, $counter]) {
+            \Platform\Core\Terminal\TerminalAppRegistry::register($counter
+                ? new \Platform\Core\Terminal\Apps\CountedContextApp($key, $label, $icon, $order, $component, \Closure::fromCallable($counter))
+                : new \Platform\Core\Terminal\Apps\ContextApp($key, $label, $icon, $order, $component)
             );
         }
 
