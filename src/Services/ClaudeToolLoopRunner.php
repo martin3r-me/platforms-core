@@ -3,7 +3,6 @@
 namespace Platform\Core\Services;
 
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolContract;
@@ -26,8 +25,6 @@ use Platform\Core\Tools\ToolRegistry;
  */
 class ClaudeToolLoopRunner
 {
-    protected string $baseUrl = 'https://api.anthropic.com/v1';
-    protected string $apiVersion = '2023-06-01';
     protected string $defaultModel = 'claude-sonnet-5';
     protected int $defaultMaxTokens = 4096;
     protected int $maxIterations = 50;
@@ -36,10 +33,18 @@ class ClaudeToolLoopRunner
     protected ToolRegistry $registry;
     protected ToolExecutor $executor;
 
-    public function __construct(ToolRegistry $registry, ToolExecutor $executor)
+    /**
+     * Anthropic-Transport. Der Runner macht KEINEN eigenen HTTP-Call mehr an
+     * api.anthropic.com — Key, Endpoint, API-Version und Retry liegen zentral
+     * im {@see AnthropicProvider} (die Chat-Naht). Hier bleibt nur der Loop.
+     */
+    protected AnthropicProvider $anthropic;
+
+    public function __construct(ToolRegistry $registry, ToolExecutor $executor, AnthropicProvider $anthropic)
     {
         $this->registry = $registry;
         $this->executor = $executor;
+        $this->anthropic = $anthropic;
     }
 
     public static function make(): static
@@ -108,7 +113,6 @@ class ClaudeToolLoopRunner
      */
     protected function executeLoop(array $messages, ToolContext $context, array $options): array
     {
-        $apiKey = $this->resolveApiKey();
         $model = $options['model'] ?? $this->defaultModel;
         $maxTokens = $options['max_tokens'] ?? $this->defaultMaxTokens;
         $maxIterations = $options['max_iterations'] ?? $this->maxIterations;
@@ -192,7 +196,10 @@ class ClaudeToolLoopRunner
                 );
             }
 
-            $response = $this->callApi($apiKey, $payload);
+            $response = $this->anthropic->messages($payload, [
+                'timeout' => $this->timeoutSeconds,
+                'max_retries' => 3,
+            ]);
 
             // Accumulate usage
             if (isset($response['usage'])) {
@@ -471,79 +478,4 @@ class ClaudeToolLoopRunner
         return $thinking;
     }
 
-    /**
-     * Call the Anthropic Messages API with retry on rate limit (429).
-     */
-    protected function callApi(string $apiKey, array $payload): array
-    {
-        $maxRetries = 3;
-
-        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
-            $response = Http::timeout($this->timeoutSeconds)
-                ->withHeaders([
-                    'x-api-key' => $apiKey,
-                    'anthropic-version' => $this->apiVersion,
-                    'content-type' => 'application/json',
-                ])
-                ->post("{$this->baseUrl}/messages", $payload);
-
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            $statusCode = $response->status();
-            $body = $response->json();
-            $errorMessage = $body['error']['message'] ?? $response->body();
-            $errorType = $body['error']['type'] ?? 'api_error';
-
-            // Retry on rate limit (429) or overloaded (529) with exponential backoff
-            if (in_array($statusCode, [429, 529]) && $attempt < $maxRetries) {
-                $retryAfter = (int) ($response->header('retry-after') ?: 0);
-                $waitSeconds = max($retryAfter, $attempt * 30);
-
-                Log::warning('[ClaudeToolLoop] Rate limited, retrying', [
-                    'status' => $statusCode,
-                    'attempt' => $attempt,
-                    'wait_seconds' => $waitSeconds,
-                ]);
-
-                sleep($waitSeconds);
-
-                continue;
-            }
-
-            Log::error('[ClaudeToolLoop] API call failed', [
-                'status' => $statusCode,
-                'error_type' => $errorType,
-                'error_message' => $errorMessage,
-                'attempt' => $attempt,
-            ]);
-
-            throw new \RuntimeException(
-                "Anthropic API error ({$statusCode}): [{$errorType}] {$errorMessage}"
-            );
-        }
-
-        throw new \RuntimeException('Anthropic API: max retries exhausted');
-    }
-
-    /**
-     * Resolve the Anthropic API key from config.
-     */
-    protected function resolveApiKey(): string
-    {
-        $key = config('ai.anthropic.api_key', '');
-
-        if ($key === '' || $key === null) {
-            $key = env('ANTHROPIC_API_KEY', '');
-        }
-
-        if (empty($key)) {
-            throw new \RuntimeException(
-                'ANTHROPIC_API_KEY is not configured. Set it in .env or config/services.php.'
-            );
-        }
-
-        return $key;
-    }
 }

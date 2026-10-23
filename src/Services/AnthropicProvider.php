@@ -105,6 +105,81 @@ class AnthropicProvider implements LLMProviderContract
         throw new \BadMethodCallException('AnthropicProvider::streamChat ist in V1 nicht implementiert.');
     }
 
+    /**
+     * Roh-Transport auf die Anthropic Messages-API.
+     *
+     * Nimmt einen bereits fertig gebauten Payload (model/messages/system/tools/
+     * thinking/output_config …) und gibt den dekodierten Response-Body 1:1 zurück.
+     * Das ist die EINZIGE Stelle, die Key, Endpoint, API-Version und Retry besitzt —
+     * der agentische {@see ClaudeToolLoopRunner} baut nur noch Payload + Loop und
+     * ruft hierüber, statt selbst HTTP an api.anthropic.com zu machen.
+     *
+     * Bewusst NICHT im LLMProviderContract: die native Tool-Use-/Content-Block-Form
+     * ist Anthropic-spezifisch; ein geteiltes Interface dafür wäre Überabstraktion
+     * (heute hat nur dieser Provider einen Tool-Loop-Konsumenten).
+     *
+     * @param array<string, mixed> $payload  Vollständiger Messages-API-Payload.
+     * @param array{timeout?: int, max_retries?: int} $options
+     * @return array<string, mixed>  Dekodierter Response-Body (content/usage/stop_reason …).
+     */
+    public function messages(array $payload, array $options = []): array
+    {
+        if (! $this->isAvailable()) {
+            throw new \RuntimeException('AnthropicProvider: ANTHROPIC_API_KEY ist nicht gesetzt.');
+        }
+
+        $timeout = (int) ($options['timeout'] ?? self::TIMEOUT_SECONDS);
+        $maxRetries = max(1, (int) ($options['max_retries'] ?? 3));
+
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            $response = Http::timeout($timeout)
+                ->withHeaders([
+                    'x-api-key' => config('ai.anthropic.api_key'),
+                    'anthropic-version' => self::API_VERSION,
+                    'content-type' => 'application/json',
+                ])
+                ->post(self::BASE_URL . '/messages', $payload);
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            $status = $response->status();
+            $body = $response->json();
+            $errorMessage = $body['error']['message'] ?? $response->body();
+            $errorType = $body['error']['type'] ?? 'api_error';
+
+            // Rate limit (429) / overloaded (529) → exponentielles Backoff.
+            if (in_array($status, [429, 529], true) && $attempt < $maxRetries) {
+                $retryAfter = (int) ($response->header('retry-after') ?: 0);
+                $waitSeconds = max($retryAfter, $attempt * 30);
+
+                Log::warning('AnthropicProvider messages rate limited, retrying', [
+                    'status' => $status,
+                    'attempt' => $attempt,
+                    'wait_seconds' => $waitSeconds,
+                ]);
+
+                sleep($waitSeconds);
+
+                continue;
+            }
+
+            Log::warning('AnthropicProvider messages failed', [
+                'status' => $status,
+                'error_type' => $errorType,
+                'error_message' => mb_substr((string) $errorMessage, 0, 500),
+                'attempt' => $attempt,
+            ]);
+
+            throw new \RuntimeException(
+                "Anthropic API error ({$status}): [{$errorType}] {$errorMessage}"
+            );
+        }
+
+        throw new \RuntimeException('Anthropic API: max retries exhausted');
+    }
+
     public function getAvailableModels(): array
     {
         return [
