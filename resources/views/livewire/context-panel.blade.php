@@ -3,9 +3,17 @@
     ≥1440px: angedockt (offen/eingeklappt, Breite ziehbar, pro User gemerkt)
     768–1439px: Icon-Leiste, Klick öffnet als Overlay
     <768px: schwebender Button, Panel als Vollbild-Overlay
+    Ohne Seitenkontext bleibt nur die schmale Leiste mit dem Algedonic-Signal (unten) —
+    das Signal ist überall erreichbar, Mobil als kleiner schwebender Knopf.
 --}}
+@php
+    $hasContext = $contextId && count($panelApps);
+    // Auf einer Einheit ist sie beim Signal gleich vorausgewählt
+    $algedonicPayload = $hasContext && $contextType === 'Platform\\Organization\\Models\\OrganizationEntity'
+        ? ['payload' => ['entity_id' => $contextId, 'entity_name' => $subject]]
+        : (object) [];
+@endphp
 <div style="display: contents">
-@if ($contextId && count($panelApps))
     <style>
         /* Eigene Fläche: etwas dunkler als Seite (weiß) und Hauptsidebar, Kopf noch eine Stufe tiefer */
         .cp-panel { --cp-bg: #f1f0eb; --cp-head: #e8e7e0; background: var(--cp-bg); }
@@ -39,6 +47,11 @@
         .cp-aside { width: 44px; }
         @media (min-width: 1440px) { .cp-aside { width: var(--cp-w); } }
         @media (max-width: 767px) { .cp-aside { width: 0; } }
+        /* Algedonic-Signal: unten in der Leiste bzw. im Panel-Fuß */
+        .cp-alg { color: var(--nx-danger); transition: background-color .15s, color .15s; }
+        .cp-alg:hover { background: color-mix(in srgb, var(--nx-danger) 10%, transparent); }
+        .cp-foot { border-top: 1px solid var(--nx-line); }
+        .cp-alg-fab { background: var(--nx-surface); color: var(--nx-danger); box-shadow: var(--nx-shadow-pop); }
     </style>
     <aside
         x-data="{
@@ -47,6 +60,8 @@
             overlay: false,
             resizing: false,
             current: $wire.entangle('activeApp'),
+            get hasContext() { return !! this.$wire.contextId; },
+            signal() { this.$dispatch('open-modal-algedonic', @js($algedonicPayload)); this.overlay = false; },
             ink: { left: 0, width: 0 },
             moveInk() {
                 const el = this.$refs['tab-' + this.current];
@@ -63,7 +78,7 @@
             },
             get pinned() { const v = this.$store.ui?.g('context_panel', 'open'); return v === undefined ? true : v; },
             get width() { const v = this.$store.ui?.g('context_panel', 'width'); return Math.max(320, Math.min(720, v === undefined ? 400 : v)); },
-            get docked() { return this.wide && this.pinned; },
+            get docked() { return this.wide && this.pinned && this.hasContext; },
             get showBody() { return this.docked || this.overlay; },
             open(key) {
                 if (key) { this.pick(key); }
@@ -91,9 +106,10 @@
         :style="{ width: small ? '0px' : (docked ? width + 'px' : '44px') }"
         :class="(resizing ? '' : 'transition-all duration-200') + (small ? '' : ' border-l') + (docked ? ' cp-docked' : '')"
         class="terminal-light cp-aside cp-panel relative flex-shrink-0 h-screen"
-        style="--cp-w: {{ $initialOpen ? $initialWidth : 44 }}px; z-index: 5; border-color: var(--nx-line-strong)"
+        style="--cp-w: {{ $hasContext && $initialOpen ? $initialWidth : 44 }}px; z-index: 5; border-color: var(--nx-line-strong)"
         aria-label="Kontext"
     >
+        @if ($hasContext)
         {{-- Icon-Leiste (eingeklappt / schmaler Bildschirm) --}}
         <div x-show="!docked && !small" x-cloak class="h-full w-11 flex flex-col items-center">
             <button type="button" x-on:click="open()" title="Kontext öffnen"
@@ -117,8 +133,19 @@
                     </button>
                 @endforeach
             </div>
+            <div class="mt-auto"></div>
+        </div>
+        @endif
+
+        {{-- Algedonic-Signal in der Leiste — immer unten, auch ohne Kontext --}}
+        <div x-show="!docked && !small" x-cloak class="absolute bottom-0 left-0 w-11 flex justify-center pb-2">
+            <button type="button" x-on:click="signal()" title="Algedonic-Signal — direkt an die oberste Ebene"
+                class="cp-alg w-8 h-8 flex items-center justify-center rounded-md">
+                @svg('heroicon-o-bell-alert', 'w-4 h-4')
+            </button>
         </div>
 
+        @if ($hasContext)
         {{-- Overlay-Hintergrund (nicht angedockt) --}}
         <div x-show="overlay && !docked" x-cloak x-on:click="overlay = false" x-transition.opacity
             class="fixed inset-0 bg-black/20" style="z-index: 39"></div>
@@ -174,6 +201,15 @@
                 @endif
             </div>
 
+            {{-- Fuß: Algedonic-Signal --}}
+            <div class="cp-foot flex-shrink-0 px-2 py-1.5">
+                <button type="button" x-on:click="signal()" title="Direkt an die oberste Ebene"
+                    class="cp-alg w-full inline-flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium">
+                    @svg('heroicon-o-bell-alert', 'w-4 h-4')
+                    Algedonic-Signal
+                </button>
+            </div>
+
             {{-- Breite ziehen (nur angedockt) --}}
             <div x-show="docked" x-on:mousedown.prevent="startResize($event)"
                 class="absolute top-0 left-0 w-1 h-full cursor-ew-resize group/resize" style="z-index: 20">
@@ -187,6 +223,13 @@
             style="bottom: 16px; right: 16px; z-index: 38; box-shadow: var(--nx-shadow-pop)">
             @svg('heroicon-o-squares-2x2', 'w-5 h-5')
         </button>
+        @else
+        {{-- Mobil ohne Kontext: Algedonic-Signal als kleiner Knopf --}}
+        <button type="button" x-show="small" x-cloak x-on:click="signal()" title="Algedonic-Signal"
+            class="cp-alg-fab fixed w-10 h-10 flex items-center justify-center rounded-full"
+            style="bottom: 16px; right: 16px; z-index: 38">
+            @svg('heroicon-o-bell-alert', 'w-5 h-5')
+        </button>
+        @endif
     </aside>
-@endif
 </div>
