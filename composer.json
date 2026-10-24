@@ -23,11 +23,18 @@
       "Platform\\Core\\": "src/"
     }
   },
+  "require-dev": {
+    "orchestra/testbench": "^9.0|^10.0",
+    "phpunit/phpunit": "^10.0|^11.0"
+  },
   "autoload-dev": {
     "psr-4": {
       "Platform\\Core\\Tests\\": "tests/",
       "Platform\\Core\\Database\\Factories\\": "database/factories/"
     }
+  },
+  "scripts": {
+    "test": "phpunit"
   },
   "extra": {
     "laravel": {
