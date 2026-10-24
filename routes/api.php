@@ -2,8 +2,6 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Platform\Core\Http\Controllers\AgentAssistantController;
-use Platform\Core\Http\Controllers\AgentInboxController;
 use Platform\Core\Http\Controllers\AgentUsersController;
 use Platform\Core\Http\Controllers\ApiController;
 
@@ -41,20 +39,10 @@ Route::post('/presenter/push', function (Request $request) {
     return response()->json(['ok' => true, 'id' => $id, 'team_id' => $teamId]);
 })->middleware('throttle:120,1')->name('core.presenter.push');
 
-// Agent-Inbox: token-freier Delta-Kanal für die Chat-Konsumption im Worker-Loop
-// (kontextlose DMs/Threads lesen, acken, antworten — Kontext-Threads sind der Resume-Pfad).
-Route::middleware('api.auth')->prefix('terminal/agent')->name('core.terminal.agent.')->group(function () {
-    Route::get('/inbox', [AgentInboxController::class, 'inbox'])->name('inbox');
-    Route::post('/inbox/ack', [AgentInboxController::class, 'ack'])->name('inbox.ack');
-    Route::post('/reply', [AgentInboxController::class, 'reply'])->name('reply');
-});
-
 // Agent-Verzeichnis: Auswahl-Pool an Kollegen (betreuter User eines Assistenten), über ALLE
 // Teams des Token-Users. Konvention wie dev/planner/org: {modul}/agent.
 Route::middleware('api.auth')->prefix('core/agent')->name('core.agent.')->group(function () {
     Route::get('/users', [AgentUsersController::class, 'index'])->name('users');
-    // Assistent-Claim (Delegations-DM): Chef-DMs mit ungelesenen Nachrichten + Verlauf.
-    Route::get('/assistant/inbox', [AgentAssistantController::class, 'inbox'])->name('assistant.inbox');
 });
 
 // Basis-Endpunkt: Aktueller Benutzer (mit Authentifizierung)

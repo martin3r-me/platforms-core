@@ -103,18 +103,17 @@ protected function registerTools(): void
 
 ### Tag-Konventionen für Discovery (Kanal- & Handlungs-Tag-Vokabular)
 
-Der `ToolMetadataResolver` leitet Tags automatisch aus den Namens-Segmenten ab (z. B. `terminal.channels.GET`
-→ `["terminal", "channels"]`). Das reicht nicht für zuverlässige Registry-Suche über Tools hinweg, die
-unterschiedlich benannt sind, aber fachlich zusammengehören (z. B. `terminal.channels.GET`,
+Der `ToolMetadataResolver` leitet Tags automatisch aus den Namens-Segmenten ab (z. B. `core.comms.wa_overview.GET`
+→ `["core", "comms", "wa_overview"]`). Das reicht nicht für zuverlässige Registry-Suche über Tools hinweg, die
+unterschiedlich benannt sind, aber fachlich zusammengehören (z. B.
 `user-connectors.microsoft365.mail.list` und `core.comms.wa_overview.GET` sind alle "Kommunikations-Tools",
 tragen das aber nicht konsistent im Namen).
 
-Für **alle Kommunikations-Tools** (Terminal, E-Mail, Microsoft Teams, WhatsApp/`core.comms.*`, künftige Kanäle)
+Für **alle Kommunikations-Tools** (E-Mail, Microsoft Teams, WhatsApp/`core.comms.*`, künftige Kanäle)
 gilt deshalb zusätzlich zu den auto-derived Tags ein festes, additives Vokabular über `getMetadata()['tags']`
 (wird mit den Auto-Tags gemergt, siehe `ToolMetadataResolver::applyExplicitMetadata()`):
 
 **Kanal-Tags** (`channel:*`, ein Tool trägt in der Regel genau einen):
-- `channel:terminal` — internes Messaging (Channels/DMs/Gruppenchats)
 - `channel:mail` — E-Mail (z. B. Microsoft365 Outlook)
 - `channel:teams-chat` — Microsoft-Teams 1:1-/Gruppen-Chats
 - `channel:teams-channel` — Microsoft-Teams-Kanäle

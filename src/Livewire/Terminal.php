@@ -7,13 +7,8 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Platform\Core\Models\ContextFile;
-use Platform\Core\Models\TerminalChannel;
-use Platform\Core\Models\TerminalChannelMember;
-use Platform\Core\Models\TerminalMessage;
 use Platform\Core\Models\TerminalAgenda;
 use Platform\Core\Models\TerminalAgendaMember;
-use Platform\Core\Models\TerminalBookmark;
-use Platform\Core\Models\TerminalPin;
 use Platform\Core\Models\User;
 use Platform\Core\Services\ContextFileService;
 use Platform\Core\Terminal\TerminalContext;
@@ -23,7 +18,7 @@ use Platform\Crm\Livewire\Concerns\WithCommsChat;
 use Platform\Crm\Livewire\Concerns\WithCommsChannelSettings;
 
 /**
- * Terminal UI shell with messaging, DMs, group channels, and context awareness.
+ * Terminal UI shell: Agenda, Comms, Feature-Request und Kontext-Apps (der interne Chat ist entfernt).
  */
 class Terminal extends Component
 {
@@ -41,10 +36,8 @@ class Terminal extends Component
     public ?string $contextSource = null;
     public ?string $contextUrl = null;
     public array $contextMeta = [];
-    public ?int $channelId = null;
-    public array $onlineUserIds = [];
-    public string $activeApp = 'chat';
-    public array $availableApps = ['chat' => true, 'agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false, 'feature-request' => true];
+    public string $activeApp = 'agenda';
+    public array $availableApps = ['agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false, 'feature-request' => true];
     // ── Comms App ────────────────────────────────────────────
     public bool $commsInitialized = false;
     public bool $commsShowNewMessage = false;  // overlay panel above timeline
@@ -61,54 +54,7 @@ class Terminal extends Component
 
     // Agenda-App: State + Logik liegen vollständig in core.terminal.agenda (Kind).
 
-    // ── Lifecycle ──────────────────────────────────────────────
-
-    public function mount(): void
-    {
-        // Load last active channel for the user
-        $teamId = $this->teamId();
-        if (! $teamId) {
-            return;
-        }
-
-        // Deep-link: ?channel={id}&message={id}
-        $deepChannel = request()->query('channel');
-        $deepMessage = request()->query('message');
-
-        if ($deepChannel) {
-            $channel = TerminalChannel::where('id', (int) $deepChannel)
-                ->where('team_id', $teamId)
-                ->first();
-
-            if ($channel) {
-                // Verify membership
-                $isMember = TerminalChannelMember::where('channel_id', $channel->id)
-                    ->where('user_id', auth()->id())
-                    ->exists();
-
-                if ($isMember) {
-                    $this->channelId = $channel->id;
-
-                    if ($deepMessage) {
-                        $this->dispatch('scroll-to-message', messageId: (int) $deepMessage);
-                    }
-
-                    return;
-                }
-            }
-        }
-
-        $lastMembership = TerminalChannelMember::where('user_id', auth()->id())
-            ->whereHas('channel', fn ($q) => $q->where('team_id', $teamId))
-            ->latest('updated_at')
-            ->first();
-
-        if ($lastMembership) {
-            $this->channelId = $lastMembership->channel_id;
-        }
-    }
-
-    // ── Context Channel ────────────────────────────────────────
+    // ── Context ────────────────────────────────────────────────
 
     /**
      * Receive context from modules via dispatch('comms', {...}).
@@ -133,7 +79,7 @@ class Terminal extends Component
 
         // Reset available apps when context changes
         if ($model !== $this->contextType || (int) $modelId !== $this->contextId) {
-            $this->availableApps = ['chat' => true, 'agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false, 'feature-request' => true];
+            $this->availableApps = ['agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false, 'feature-request' => true];
             $this->commsInitialized = false;
             $this->commsShowNewMessage = false;
             $this->commsShowSettings = false;
@@ -148,35 +94,6 @@ class Terminal extends Component
         $this->contextSource = $payload['source'] ?? null;
         $this->contextUrl = $payload['url'] ?? null;
         $this->contextMeta = $payload['meta'] ?? [];
-
-        // Persist subject + URL on existing context channel
-        $teamId = $this->teamId();
-        if ($teamId && ($this->contextSubject || ! empty($payload['url']))) {
-            $updates = [];
-            if ($this->contextSubject) {
-                $updates['name'] = $this->contextSubject;
-            }
-            if (! empty($payload['url'])) {
-                $channel = TerminalChannel::forTeam($teamId)
-                    ->forContext($this->contextType, $this->contextId)
-                    ->first();
-                if ($channel) {
-                    $meta = $channel->meta ?? [];
-                    if (($meta['url'] ?? null) !== $payload['url']) {
-                        $meta['url'] = $payload['url'];
-                        $updates['meta'] = $meta;
-                    }
-                    if (! empty($updates)) {
-                        $channel->update($updates);
-                    }
-                }
-            } elseif ($this->contextSubject) {
-                TerminalChannel::forTeam($teamId)
-                    ->forContext($this->contextType, $this->contextId)
-                    ->where(fn ($q) => $q->whereNull('name')->orWhere('name', '!=', $this->contextSubject))
-                    ->update($updates);
-            }
-        }
 
         // Forward context to the Comms chat trait (email + WhatsApp runtime)
         $this->initCommsFromPayload($payload);
@@ -230,7 +147,7 @@ class Terminal extends Component
     }
 
     /**
-     * Open the terminal panel and switch to the current context channel.
+     * Open the terminal panel.
      * Usage: $dispatch('terminal:open') — opens terminal with current page context.
      */
     #[On('terminal:open')]
@@ -241,57 +158,11 @@ class Terminal extends Component
             $this->setContext($payload);
         }
 
-        // Resolve context channel if we have a context
-        if ($this->contextType && $this->contextId) {
-            $this->resolveContextChannel();
-        }
-
         $this->dispatch('toggle-terminal-open');
     }
 
-    public function openContextChannel(): void
-    {
-        if ($this->contextType && $this->contextId) {
-            $this->resolveContextChannel();
-            $this->activeApp = 'chat';
-        }
-    }
-
-    protected function resolveContextChannel(): void
-    {
-        $teamId = $this->teamId();
-        if (! $teamId) {
-            return;
-        }
-
-        $channel = TerminalChannel::forTeam($teamId)
-            ->forContext($this->contextType, $this->contextId)
-            ->first();
-
-        if (! $channel) {
-            $channel = TerminalChannel::create([
-                'team_id' => $teamId,
-                'type' => 'context',
-                'context_type' => $this->contextType,
-                'context_id' => $this->contextId,
-                'name' => $this->contextSubject,
-                'meta' => $this->contextUrl ? ['url' => $this->contextUrl] : null,
-            ]);
-        } elseif ($this->contextSubject && $channel->name !== $this->contextSubject) {
-            $channel->update(['name' => $this->contextSubject]);
-        }
-
-        $this->channelId = $channel->id;
-        $this->ensureMembership($channel);
-
-        // Clear cached computeds so re-render picks up the new channel
-        unset($this->channels, $this->activeChannel);
-
-        $this->dispatch('terminal-chat-channel', channelId: $channel->id);
-    }
-
     /**
-     * Resolve a human-readable breadcrumb for a context channel.
+     * Resolve a human-readable breadcrumb for a context.
      * Uses contextSubject from comms event when available, falls back to model lookup.
      */
     public function getContextBreadcrumb(?string $contextType = null, ?int $contextId = null, ?string $subject = null): ?array
@@ -357,7 +228,7 @@ class Terminal extends Component
 
 
     /**
-     * Load activities for the context entity of the active channel.
+     * Load activities for the context entity.
      */
     #[Computed]
     public function contextActivities(): array
@@ -993,569 +864,6 @@ class Terminal extends Component
         $this->activeApp = 'tags';
     }
 
-    // ── Open / Switch Channel ──────────────────────────────────
-
-    public function openChannel(int $channelId): void
-    {
-        $teamId = $this->teamId();
-        $channel = TerminalChannel::where('id', $channelId)
-            ->where('team_id', $teamId)
-            ->firstOrFail();
-
-        $this->channelId = $channel->id;
-        $this->activeApp = 'chat';
-        $this->ensureMembership($channel);
-        unset($this->channels, $this->activeChannel);
-        $this->dispatch('terminal-chat-channel', channelId: $channel->id);
-    }
-
-    // ── DM ─────────────────────────────────────────────────────
-
-    public function openDm(int $targetUserId): void
-    {
-        $teamId = $this->teamId();
-        if (! $teamId || $targetUserId === auth()->id()) {
-            return;
-        }
-
-        $userIds = [auth()->id(), $targetUserId];
-        $hash = TerminalChannel::makeParticipantHash($userIds);
-
-        $channel = TerminalChannel::forTeam($teamId)
-            ->where('participant_hash', $hash)
-            ->first();
-
-        if (! $channel) {
-            $channel = TerminalChannel::create([
-                'team_id' => $teamId,
-                'type' => 'dm',
-                'participant_hash' => $hash,
-            ]);
-
-            // Add both participants
-            foreach ($userIds as $uid) {
-                TerminalChannelMember::create([
-                    'channel_id' => $channel->id,
-                    'user_id' => $uid,
-                    'role' => 'member',
-                ]);
-            }
-        }
-
-        $this->channelId = $channel->id;
-        $this->activeApp = 'chat';
-        $this->ensureMembership($channel);
-        unset($this->channels, $this->activeChannel);
-        $this->dispatch('terminal-chat-channel', channelId: $channel->id);
-    }
-
-    // ── Group Channel ──────────────────────────────────────────
-
-    public function createChatChannel(string $name, ?string $description = null, ?string $icon = null, array $memberIds = []): void
-    {
-        $teamId = $this->teamId();
-        if (! $teamId || empty(trim($name))) {
-            return;
-        }
-
-        $channel = TerminalChannel::create([
-            'team_id' => $teamId,
-            'type' => 'channel',
-            'name' => trim($name),
-            'description' => $description ? trim($description) : null,
-            'icon' => $icon,
-        ]);
-
-        // Creator becomes owner
-        TerminalChannelMember::create([
-            'channel_id' => $channel->id,
-            'user_id' => auth()->id(),
-            'role' => 'owner',
-        ]);
-
-        // Add selected members
-        foreach ($memberIds as $userId) {
-            if ((int) $userId === auth()->id()) {
-                continue;
-            }
-            TerminalChannelMember::firstOrCreate(
-                ['channel_id' => $channel->id, 'user_id' => (int) $userId],
-                ['role' => 'member']
-            );
-        }
-
-        $this->channelId = $channel->id;
-        $this->activeApp = 'chat';
-        unset($this->channels, $this->activeChannel);
-        $this->dispatch('terminal-chat-channel', channelId: $channel->id);
-    }
-
-    // ── Delete / Leave Channel ─────────────────────────────────
-
-    public function deleteChannel(): void
-    {
-        if (! $this->channelId) {
-            return;
-        }
-
-        $channel = TerminalChannel::findOrFail($this->channelId);
-
-        // Only owners can delete group channels
-        if ($channel->type === 'channel') {
-            $isOwner = TerminalChannelMember::where('channel_id', $channel->id)
-                ->where('user_id', auth()->id())
-                ->where('role', 'owner')
-                ->exists();
-
-            if (! $isOwner) {
-                return;
-            }
-        }
-
-        // Context channels: any member can delete (will be recreated on demand)
-        // DMs: just remove membership (don't delete the channel for the other user)
-        if ($channel->isDm()) {
-            TerminalChannelMember::where('channel_id', $channel->id)
-                ->where('user_id', auth()->id())
-                ->delete();
-        } else {
-            // Channel/Context: cascade delete (FK handles messages, members, etc.)
-            $channel->delete();
-        }
-
-        $this->channelId = null;
-        unset($this->channels, $this->activeChannel);
-        $this->dispatch('terminal-chat-channel', channelId: null);
-    }
-
-    public function leaveChannel(): void
-    {
-        if (! $this->channelId) {
-            return;
-        }
-
-        TerminalChannelMember::where('channel_id', $this->channelId)
-            ->where('user_id', auth()->id())
-            ->delete();
-
-        $this->channelId = null;
-        unset($this->channels, $this->activeChannel);
-        $this->dispatch('terminal-chat-channel', channelId: null);
-    }
-
-    // ── Bookmarks (sidebar) ──────────────────────────────────
-
-    public function getBookmarks(): array
-    {
-        $teamId = $this->teamId();
-        if (! $teamId) {
-            return [];
-        }
-
-        $channelIds = TerminalChannelMember::where('user_id', auth()->id())
-            ->whereHas('channel', fn ($q) => $q->where('team_id', $teamId))
-            ->pluck('channel_id');
-
-        return TerminalBookmark::where('user_id', auth()->id())
-            ->whereHas('message', fn ($q) => $q->whereIn('channel_id', $channelIds))
-            ->with(['message.user:id,name,avatar', 'message.channel:id,name,type,context_type,context_id'])
-            ->latest()
-            ->limit(50)
-            ->get()
-            ->filter(fn ($bm) => $bm->message !== null)
-            ->map(function ($bm) {
-                $channelName = $bm->message->channel?->name;
-                if (! $channelName && $bm->message->channel?->type === 'dm') {
-                    $other = TerminalChannelMember::where('channel_id', $bm->message->channel_id)
-                        ->where('user_id', '!=', auth()->id())
-                        ->with('user:id,name')
-                        ->first();
-                    $channelName = $other?->user?->name ?? 'Chat';
-                }
-
-                return [
-                    'id' => $bm->id,
-                    'message_id' => $bm->message_id,
-                    'channel_id' => $bm->message->channel_id,
-                    'channel_name' => $channelName ?? 'Kontext',
-                    'body_snippet' => \Illuminate\Support\Str::limit($bm->message->body_plain ?? strip_tags($bm->message->body_html), 80),
-                    'user_name' => $bm->message->user?->name ?? 'Unbekannt',
-                    'user_avatar' => $bm->message->user?->avatarUrl(),
-                    'user_initials' => $this->initials($bm->message->user?->name ?? '?'),
-                    'time' => $bm->message->created_at->format('H:i'),
-                    'date' => $bm->message->created_at->translatedFormat('d. M'),
-                ];
-            })
-            ->values()
-            ->toArray();
-    }
-
-    // ── Team Members (for DM picker / mentions) ────────────────
-
-    public function getTeamMembers(): array
-    {
-        $teamId = $this->teamId();
-        if (! $teamId) {
-            return [];
-        }
-
-        $team = auth()->user()?->currentTeam;
-        if (! $team) {
-            return [];
-        }
-
-        return $team
-            ->users()
-            ->where('users.id', '!=', auth()->id())
-            ->select('users.id', 'users.name', 'users.avatar')
-            ->get()
-            ->map(fn ($u) => [
-                'id' => $u->id,
-                'name' => $u->name,
-                'avatar' => $u->avatarUrl(),
-                'initials' => $this->initials($u->name),
-            ])
-            ->toArray();
-    }
-
-    // ── Search ─────────────────────────────────────────────────
-
-    public function searchMessages(string $query): array
-    {
-        $query = trim($query);
-        if (strlen($query) < 2) {
-            return [];
-        }
-
-        $teamId = $this->teamId();
-        if (! $teamId) {
-            return [];
-        }
-
-        $channelIds = TerminalChannelMember::where('user_id', auth()->id())
-            ->whereHas('channel', fn ($q) => $q->where('team_id', $teamId))
-            ->pluck('channel_id');
-
-        return TerminalMessage::whereIn('channel_id', $channelIds)
-            ->where('body_plain', 'LIKE', "%{$query}%")
-            ->with(['user:id,name,avatar', 'channel:id,name,type,context_type,context_id'])
-            ->latest()
-            ->limit(30)
-            ->get()
-            ->map(function (TerminalMessage $m) use ($query) {
-                $plain = $m->body_plain ?? '';
-                $pos = mb_stripos($plain, $query);
-                $start = max(0, $pos - 30);
-                $snippet = ($start > 0 ? '…' : '') . mb_substr($plain, $start, 80) . (mb_strlen($plain) > $start + 80 ? '…' : '');
-
-                $channelName = $m->channel?->name;
-                if (! $channelName && $m->channel?->type === 'dm') {
-                    $other = TerminalChannelMember::where('channel_id', $m->channel_id)
-                        ->where('user_id', '!=', auth()->id())
-                        ->with('user:id,name')
-                        ->first();
-                    $channelName = $other?->user?->name ?? 'Chat';
-                }
-
-                return [
-                    'id' => $m->id,
-                    'channel_id' => $m->channel_id,
-                    'channel_name' => $channelName ?? 'Kontext',
-                    'channel_type' => $m->channel?->type,
-                    'user_name' => $m->user?->name ?? 'Unbekannt',
-                    'user_avatar' => $m->user?->avatarUrl(),
-                    'user_initials' => $this->initials($m->user?->name ?? '?'),
-                    'snippet' => $snippet,
-                    'time' => $m->created_at->format('H:i'),
-                    'date' => $m->created_at->translatedFormat('d. M'),
-                ];
-            })
-            ->toArray();
-    }
-
-    // ── Computed Properties ────────────────────────────────────
-
-    #[Computed]
-    public function channels(): array
-    {
-        $teamId = $this->teamId();
-        if (! $teamId) {
-            return ['dms' => [], 'channels' => [], 'context_groups' => []];
-        }
-
-        $userId = auth()->id();
-        if (! $userId) {
-            return ['dms' => [], 'channels' => [], 'context_groups' => []];
-        }
-
-        $memberships = TerminalChannelMember::where('user_id', $userId)
-            ->whereHas('channel', fn ($q) => $q->where('team_id', $teamId))
-            ->with(['channel' => fn ($q) => $q->with('lastMessage:id,body_plain,created_at')])
-            ->get();
-
-        // Unread-Counts für ALLE Channels in EINER Query statt COUNT je Channel (N+1).
-        // Zählt Root-Nachrichten neuer als last_read_message_id (bzw. alle, wenn nie gelesen).
-        $channelIds = $memberships->pluck('channel_id')->all();
-        $unreadByChannel = [];
-        if (! empty($channelIds)) {
-            $unreadByChannel = TerminalMessage::query()
-                ->join('terminal_channel_members as cm', function ($join) use ($userId) {
-                    $join->on('cm.channel_id', '=', 'terminal_messages.channel_id')
-                        ->where('cm.user_id', '=', $userId);
-                })
-                ->whereIn('terminal_messages.channel_id', $channelIds)
-                ->whereNull('terminal_messages.parent_id')
-                ->where(function ($q) {
-                    $q->whereNull('cm.last_read_message_id')
-                        ->orWhereColumn('terminal_messages.id', '>', 'cm.last_read_message_id');
-                })
-                ->groupBy('terminal_messages.channel_id')
-                ->selectRaw('terminal_messages.channel_id as cid, COUNT(*) as cnt')
-                ->pluck('cnt', 'cid')
-                ->toArray();
-        }
-
-        // DM-Gegenüber für ALLE DMs in EINER Query statt je DM (N+1). Nur DM-Channels,
-        // damit nicht Avatare aller Mitglieder großer Channels geladen werden.
-        $dmChannelIds = $memberships
-            ->filter(fn ($m) => $m->channel?->type === 'dm')
-            ->pluck('channel_id')
-            ->all();
-        $dmOthers = collect();
-        if (! empty($dmChannelIds)) {
-            $dmOthers = TerminalChannelMember::whereIn('channel_id', $dmChannelIds)
-                ->where('user_id', '!=', $userId)
-                ->with('user:id,name,avatar')
-                ->get()
-                ->keyBy('channel_id');
-        }
-
-        $dms = [];
-        $channels = [];
-        $contextGroups = [];
-
-        // Label map for context type group names
-        $groupLabelMap = [
-            'PlannerTask' => 'Tasks', 'Task' => 'Tasks',
-            'PlannerProject' => 'Projekte', 'Project' => 'Projekte',
-            'HelpdeskTicket' => 'Tickets', 'Ticket' => 'Tickets',
-            'CrmContact' => 'Kontakte', 'Contact' => 'Kontakte',
-            'CrmCompany' => 'Unternehmen', 'Company' => 'Unternehmen',
-            'Deal' => 'Deals',
-            'RecruitingApplicant' => 'Bewerber', 'Applicant' => 'Bewerber',
-            'PatientsPatient' => 'Patienten',
-            'NotesNote' => 'Notizen',
-            'NotesFolder' => 'Ordner',
-            'Invoice' => 'Rechnungen',
-            'PcCanvas' => 'Canvas',
-            'Cycle' => 'OKR Cycles',
-            'Okr' => 'OKRs',
-            'Objective' => 'Objectives',
-        ];
-
-        // Icon map (reuse from getContextBreadcrumb)
-        $iconMap = [
-            'Ticket' => '🎫', 'HelpdeskTicket' => '🎫',
-            'Contact' => '👤', 'CrmContact' => '👤',
-            'Company' => '🏢', 'CrmCompany' => '🏢',
-            'Project' => '📋', 'PlannerProject' => '📋',
-            'Applicant' => '📄', 'RecruitingApplicant' => '📄',
-            'Deal' => '💰',
-            'PlannerTask' => '✅', 'Task' => '✅',
-            'Invoice' => '🧾',
-            'PatientsPatient' => '🏥',
-            'PcCanvas' => '🎨',
-            'NotesNote' => '📝',
-            'NotesFolder' => '📁',
-            'Cycle' => '🔄',
-            'Okr' => '🎯',
-            'Objective' => '🎯',
-        ];
-
-        foreach ($memberships as $membership) {
-            $ch = $membership->channel;
-            if (! $ch) {
-                continue;
-            }
-
-            $unread = $unreadByChannel[$ch->id] ?? 0;
-
-            $lastTimestamp = $ch->lastMessage?->created_at?->timestamp ?? 0;
-
-            $item = [
-                'id' => $ch->id,
-                'name' => $ch->name,
-                'icon' => $ch->icon,
-                'type' => $ch->type,
-                'unread' => $unread,
-                'last_message' => $ch->lastMessage?->body_plain
-                    ? \Illuminate\Support\Str::limit($ch->lastMessage->body_plain, 40)
-                    : null,
-                'last_at' => $ch->lastMessage?->created_at?->diffForHumans(short: true),
-                'last_timestamp' => $lastTimestamp,
-            ];
-
-            // For DMs, resolve the other participant's name + avatar
-            if ($ch->type === 'dm') {
-                $other = $dmOthers->get($ch->id);
-                $item['name'] = $other?->user?->name ?? 'Unbekannt';
-                $item['avatar'] = $other?->user?->avatarUrl();
-                $item['initials'] = $this->initials($item['name']);
-                $item['other_user_id'] = $other?->user_id;
-                $dms[] = $item;
-            } elseif ($ch->type === 'channel') {
-                $channels[] = $item;
-            } else {
-                // Context channels — resolve breadcrumb and group by type
-                $breadcrumb = $this->getContextBreadcrumb($ch->context_type, $ch->context_id);
-                // Prefer persisted name, fall back to breadcrumb title (no type prefix — group header shows type)
-                $item['name'] = $item['name'] ?: ($breadcrumb['title'] ?? 'Kontext');
-                $item['context_label'] = $breadcrumb['label'] ?? 'Kontext';
-                $item['context_icon'] = $breadcrumb['icon'] ?? '📎';
-
-                $shortName = class_basename($ch->context_type ?? '');
-                $groupKey = \Illuminate\Support\Str::snake($shortName);
-
-                if (! isset($contextGroups[$groupKey])) {
-                    $contextGroups[$groupKey] = [
-                        'label' => $groupLabelMap[$shortName] ?? $shortName,
-                        'icon' => $iconMap[$shortName] ?? '📎',
-                        'items' => [],
-                        'newest_timestamp' => 0,
-                    ];
-                }
-
-                $contextGroups[$groupKey]['items'][] = $item;
-                if ($lastTimestamp > $contextGroups[$groupKey]['newest_timestamp']) {
-                    $contextGroups[$groupKey]['newest_timestamp'] = $lastTimestamp;
-                }
-            }
-        }
-
-        // Sort DMs and channels: unreads first, then by last_timestamp DESC
-        $sort = fn ($a, $b) => $b['unread'] <=> $a['unread'] ?: $b['last_timestamp'] <=> $a['last_timestamp'];
-        usort($dms, $sort);
-        usort($channels, $sort);
-
-        // Sort items within each context group by last_timestamp DESC
-        foreach ($contextGroups as &$group) {
-            usort($group['items'], fn ($a, $b) => $b['last_timestamp'] <=> $a['last_timestamp']);
-        }
-        unset($group);
-
-        // Sort context groups by newest_timestamp DESC
-        uasort($contextGroups, fn ($a, $b) => $b['newest_timestamp'] <=> $a['newest_timestamp']);
-
-        return ['dms' => $dms, 'channels' => $channels, 'context_groups' => $contextGroups];
-    }
-
-    #[Computed]
-    public function activeChannel(): ?array
-    {
-        if (! $this->channelId) {
-            return null;
-        }
-
-        $channel = TerminalChannel::find($this->channelId);
-        if (! $channel) {
-            return null;
-        }
-
-        $memberRows = TerminalChannelMember::where('channel_id', $channel->id)
-            ->with('user:id,name,avatar')
-            ->get();
-
-        $members = $memberRows->map(fn ($m) => [
-            'id' => $m->user_id,
-            'name' => $m->user?->name ?? 'Unbekannt',
-            'avatar' => $m->user?->avatarUrl(),
-            'initials' => $this->initials($m->user?->name ?? '?'),
-        ])->toArray();
-
-        $data = [
-            'id' => $channel->id,
-            'type' => $channel->type,
-            'name' => $channel->name,
-            'icon' => $channel->icon,
-            'description' => $channel->description,
-            'context_type' => $channel->context_type,
-            'context_id' => $channel->context_id,
-            'member_count' => count($members),
-            'members' => $members,
-        ];
-
-        if ($channel->isDm()) {
-            $other = TerminalChannelMember::where('channel_id', $channel->id)
-                ->where('user_id', '!=', auth()->id())
-                ->with('user:id,name,avatar')
-                ->first();
-            $data['name'] = $other?->user?->name ?? 'Unbekannt';
-            $data['avatar'] = $other?->user?->avatarUrl();
-            $data['initials'] = $this->initials($data['name']);
-        }
-
-        // Pin count for header badge
-        $data['pin_count'] = TerminalPin::where('channel_id', $channel->id)->count();
-
-        // Check if current user can delete this channel
-        $data['can_delete'] = $channel->type === 'channel' && TerminalChannelMember::where('channel_id', $channel->id)
-            ->where('user_id', auth()->id())
-            ->where('role', 'owner')
-            ->exists();
-
-        // Context breadcrumb for context channels
-        $data['context'] = null;
-        if ($channel->isContext()) {
-            $data['context'] = $this->getContextBreadcrumb(
-                $channel->context_type,
-                $channel->context_id,
-            );
-            $data['context_url'] = $channel->meta['url'] ?? null;
-        }
-
-        return $data;
-    }
-
-    // ── Echo Listeners (Presence only — message listeners moved to Chat child) ─
-
-    public function getListeners(): array
-    {
-        $listeners = [];
-
-        try {
-            $teamId = $this->teamId();
-            if ($teamId && auth()->check()) {
-                // Presence channel for online status (used in sidebar + chat header)
-                $listeners["echo-presence:terminal.team.{$teamId},here"] = 'onPresenceHere';
-                $listeners["echo-presence:terminal.team.{$teamId},joining"] = 'onPresenceJoining';
-                $listeners["echo-presence:terminal.team.{$teamId},leaving"] = 'onPresenceLeaving';
-            }
-        } catch (\Throwable $e) {
-            // Fail silently
-        }
-
-        return $listeners;
-    }
-
-    public function onPresenceHere($users): void
-    {
-        $this->onlineUserIds = collect($users)->pluck('id')->map(fn ($id) => (int) $id)->toArray();
-    }
-
-    public function onPresenceJoining($user): void
-    {
-        $id = (int) ($user['id'] ?? $user);
-        if (! in_array($id, $this->onlineUserIds)) {
-            $this->onlineUserIds[] = $id;
-        }
-    }
-
-    public function onPresenceLeaving($user): void
-    {
-        $id = (int) ($user['id'] ?? $user);
-        $this->onlineUserIds = array_values(array_filter($this->onlineUserIds, fn ($uid) => $uid !== $id));
-    }
-
     // ── ExtraFields App ───────────────────────────────────────
 
     #[On('extrafields')]
@@ -1612,22 +920,6 @@ class Terminal extends Component
     }
 
     // ── Private Helpers ────────────────────────────────────────
-
-    protected function ensureMembership(TerminalChannel $channel): void
-    {
-        $userId = auth()->id();
-        if (! $userId) {
-            return;
-        }
-
-        TerminalChannelMember::firstOrCreate(
-            ['channel_id' => $channel->id, 'user_id' => $userId],
-            [
-                'role' => 'member',
-                'last_read_message_id' => $channel->last_message_id,
-            ]
-        );
-    }
 
     protected function broadcastContext(): void
     {

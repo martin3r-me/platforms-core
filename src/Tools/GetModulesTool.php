@@ -73,13 +73,13 @@ class GetModulesTool implements ToolContract
                 ], $modules);
             }
 
-            // Terminal: Internes Messaging-System (Channels, DMs, Gruppenchats).
+            // Terminal: Agenda (der interne Chat ist entfernt).
             if (!isset($modules['terminal'])) {
                 $modules = array_merge([
                     'terminal' => [
                         'key' => 'terminal',
                         'title' => 'Terminal',
-                        'description' => 'Internes Messaging: Channels, DMs, Gruppenchats mit Mitgliederverwaltung. Tools: terminal.channels.GET/POST, terminal.messages.GET/POST, terminal.members.POST.',
+                        'description' => 'Agenda: Agenden, Einträge und Slots. Tools: terminal.agendas.GET/POST/DELETE, terminal.agenda_items.GET/POST/PATCH, terminal.agenda_slots.POST. Internes Messaging gibt es nicht mehr.',
                     ],
                 ], $modules);
             }

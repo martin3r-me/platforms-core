@@ -28,7 +28,7 @@ class CommunicationUnreadTool implements ToolContract, ToolMetadataContract
     public function getDescription(): string
     {
         return 'GET /communication/unread - Kanalübergreifende Unread-Übersicht. Aggregiert echte Ungelesen-Zähler '
-            . 'aus terminal.channels.GET (internes Messaging) und core.comms.wa_overview.GET (WhatsApp). '
+            . 'aus core.comms.wa_overview.GET (WhatsApp). '
             . 'Für Kanäle, deren API strukturell keinen Unread-Wert liefert (Microsoft-Teams-Chats/-Channels, Mail) '
             . 'wird unread_count ehrlich null mit Begründung geliefert statt geraten oder verschwiegen.';
     }
@@ -47,24 +47,6 @@ class CommunicationUnreadTool implements ToolContract, ToolMetadataContract
         $executor = app(ToolExecutor::class);
         $channels = [];
         $totalUnread = 0;
-
-        $terminal = $executor->execute('terminal.channels.GET', [], $context);
-        if ($terminal->success) {
-            $unread = array_sum(array_column($terminal->data['channels'] ?? [], 'unread'));
-            $channels[] = [
-                'channel' => 'terminal',
-                'unread_count' => $unread,
-                'source_tool' => 'terminal.channels.GET',
-            ];
-            $totalUnread += $unread;
-        } else {
-            $channels[] = [
-                'channel' => 'terminal',
-                'unread_count' => null,
-                'source_tool' => 'terminal.channels.GET',
-                'reason' => $terminal->error ?? 'Quelle nicht verfügbar.',
-            ];
-        }
 
         $whatsapp = $executor->execute('core.comms.wa_overview.GET', [], $context);
         if ($whatsapp->success) {
@@ -121,7 +103,6 @@ class CommunicationUnreadTool implements ToolContract, ToolMetadataContract
             'tags' => [
                 'action:unread',
                 'action:list',
-                'channel:terminal',
                 'channel:whatsapp',
                 'channel:teams-chat',
                 'channel:teams-channel',
@@ -134,7 +115,6 @@ class CommunicationUnreadTool implements ToolContract, ToolMetadataContract
             'idempotent' => true,
             'cost_class' => 'local_db',
             'related_tools' => [
-                'terminal.channels.GET',
                 'core.comms.wa_overview.GET',
                 'user-connectors.microsoft365.teams.chats.list',
                 'user-connectors.microsoft365.teams.channels.list',

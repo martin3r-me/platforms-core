@@ -7,12 +7,14 @@ use Livewire\Component;
 use Livewire\WithFileUploads;
 use Platform\Core\Livewire\Terminal\Concerns\WithTerminalContext;
 use Platform\Core\Models\ContextFile;
-use Platform\Core\Models\TerminalMessage;
 
 class Activity extends Component
 {
     use WithFileUploads;
     use WithTerminalContext;
+
+    /** Zwischenablage für Anhänge, bis die Notiz gespeichert ist (context_id = 0). */
+    private const PENDING_ATTACHMENT_CONTEXT = 'core.activity.pending';
 
     public string $activityFilter = 'all';
     public $pendingFiles = [];
@@ -53,7 +55,7 @@ class Activity extends Component
             $activity = $model->activities()->latest()->first();
             if ($activity) {
                 ContextFile::whereIn('id', $attachmentIds)
-                    ->where('context_type', TerminalMessage::class)
+                    ->where('context_type', self::PENDING_ATTACHMENT_CONTEXT)
                     ->where('context_id', 0)
                     ->where('user_id', auth()->id())
                     ->update([
@@ -102,7 +104,7 @@ class Activity extends Component
         foreach ($this->pendingFiles as $file) {
             $contextFile = \Platform\Core\Services\ContextFileService::store(
                 $file,
-                TerminalMessage::class,
+                self::PENDING_ATTACHMENT_CONTEXT,
                 0,
                 $userId,
                 $this->teamId(),

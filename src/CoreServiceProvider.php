@@ -205,14 +205,11 @@ class CoreServiceProvider extends ServiceProvider
             return \Platform\Core\Authz\VisibilityScope::apply($this, $user, $cap);
         });
 
-        // Broadcast Channel Authorization (Terminal WebSocket)
+        // Broadcast Channel Authorization (WebSocket)
         if (class_exists(\Illuminate\Support\Facades\Broadcast::class)) {
             \Illuminate\Support\Facades\Broadcast::routes(['middleware' => ['web', 'auth']]);
             $this->loadRoutesFrom(__DIR__.'/../routes/channels.php');
         }
-
-        // Terminal Notification Types registrieren
-        $this->registerTerminalNotificationTypes();
 
         // Terminal Apps in die Registry eintragen (Plug-in-Seam der Shell)
         $this->registerTerminalApps();
@@ -283,7 +280,6 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Console\Commands\MakeToolCommand::class,
                 \Platform\Core\Console\Commands\AutoFillExtraFieldsCommand::class,
                 \Platform\Core\Console\Commands\CreateMcpClientCommand::class,
-                \Platform\Core\Console\Commands\CleanupTerminalChannelsCommand::class,
                 \Platform\Core\Console\Commands\HelpCacheCommand::class,
                 \Platform\Core\Console\Commands\RebuildToolCatalogsCommand::class,
                 \Platform\Core\Console\Commands\AuditTeamOrphansCommand::class,
@@ -341,9 +337,7 @@ class CoreServiceProvider extends ServiceProvider
             // Silent: Exception handler nicht verfügbar
         }
 
-        // Terminal reminder scheduler
         $this->callAfterResolving(\Illuminate\Console\Scheduling\Schedule::class, function (\Illuminate\Console\Scheduling\Schedule $schedule) {
-            $schedule->job(new \Platform\Core\Jobs\ProcessTerminalRemindersJob)->everyMinute();
             $schedule->job(new \Platform\Core\Jobs\RebuildToolCatalogsJob)->hourly();
 
             // Sonntags 03:00 Uhr: Stale Records purgen + Orphan-Audit
@@ -1196,16 +1190,8 @@ class CoreServiceProvider extends ServiceProvider
             }
         }
 
-        // Terminal Tools (terminal.channels.*, terminal.messages.*, terminal.members.*, terminal.agendas.*, terminal.agenda_items.*)
+        // Terminal-Agenda-Tools (terminal.agendas.*, terminal.agenda_items.*, terminal.agenda_slots.*) — der Chat ist entfernt
         $terminalTools = [
-            \Platform\Core\Tools\Terminal\ListTerminalChannelsTool::class => 'terminal.channels.GET',
-            \Platform\Core\Tools\Terminal\CreateTerminalChannelTool::class => 'terminal.channels.POST',
-            \Platform\Core\Tools\Terminal\GetTerminalMessagesTool::class => 'terminal.messages.GET',
-            \Platform\Core\Tools\Terminal\SendTerminalMessageTool::class => 'terminal.messages.POST',
-            \Platform\Core\Tools\Terminal\ManageTerminalMembersTool::class => 'terminal.members.POST',
-            \Platform\Core\Tools\Terminal\DeleteTerminalMessageTool::class => 'terminal.messages.DELETE',
-            \Platform\Core\Tools\Terminal\UpdateTerminalChannelTool::class => 'terminal.channels.PATCH',
-            \Platform\Core\Tools\Terminal\DeleteTerminalChannelTool::class => 'terminal.channels.DELETE',
             \Platform\Core\Tools\Terminal\ListTerminalAgendasTool::class => 'terminal.agendas.GET',
             \Platform\Core\Tools\Terminal\CreateTerminalAgendaTool::class => 'terminal.agendas.POST',
             \Platform\Core\Tools\Terminal\DeleteTerminalAgendaTool::class => 'terminal.agendas.DELETE',
@@ -1419,34 +1405,6 @@ class CoreServiceProvider extends ServiceProvider
                 new \Platform\Core\Terminal\Apps\DemoTerminalApp()
             );
         }
-    }
-
-    protected function registerTerminalNotificationTypes(): void
-    {
-        if (! class_exists(\Platform\Notifications\NotificationTypeRegistry::class)) {
-            return;
-        }
-
-        \Platform\Notifications\NotificationTypeRegistry::register('terminal.mention', [
-            'label'            => 'Terminal: @Erwähnung',
-            'description'      => 'Du wurdest in einer Nachricht erwähnt.',
-            'group'            => 'terminal',
-            'default_channels' => ['database'],
-        ]);
-
-        \Platform\Notifications\NotificationTypeRegistry::register('terminal.dm', [
-            'label'            => 'Terminal: Direktnachricht',
-            'description'      => 'Du hast eine neue Direktnachricht erhalten.',
-            'group'            => 'terminal',
-            'default_channels' => ['database'],
-        ]);
-
-        \Platform\Notifications\NotificationTypeRegistry::register('terminal.channel_message', [
-            'label'            => 'Terminal: Channel-Nachricht',
-            'description'      => 'Neue Nachricht in einem Channel, dem du angehörst.',
-            'group'            => 'terminal',
-            'default_channels' => ['database'],
-        ]);
     }
 
     protected function loadModuleServiceProviders(): void
