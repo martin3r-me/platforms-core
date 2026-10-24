@@ -15,11 +15,9 @@
 @endphp
 <div style="display: contents">
     <style>
-        /* Eigene Fläche: etwas dunkler als Seite (weiß) und Hauptsidebar, Kopf noch eine Stufe tiefer */
-        .cp-panel { --cp-bg: #f1f0eb; --cp-head: #e8e7e0; background: var(--cp-bg); }
-        .cp-head { background: var(--cp-head); }
+        /* Eigene Fläche: etwas dunkler als Seite (weiß) und Hauptsidebar */
+        .cp-panel { --cp-bg: #f1f0eb; background: var(--cp-bg); }
         .cp-docked { box-shadow: -10px 0 24px -14px rgba(15,15,15,.18); }
-        .cp-overline { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--nx-faint); }
         /* Icon-Leiste (eingeklappt) */
         .cp-tab { color: var(--nx-muted); }
         .cp-tab:hover { background: rgba(55,53,47,.06); color: var(--nx-text); }
@@ -112,9 +110,9 @@
         @if ($hasContext)
         {{-- Icon-Leiste (eingeklappt / schmaler Bildschirm) --}}
         <div x-show="!docked && !small" x-cloak class="h-full w-11 flex flex-col items-center">
-            <button type="button" x-on:click="open()" title="Kontext öffnen"
-                class="cp-head h-11 w-11 flex-shrink-0 flex items-center justify-center border-b border-[color:var(--nx-line)] text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] transition-colors">
-                @svg('heroicon-o-chevron-double-left', 'w-4 h-4')
+            <button type="button" x-on:click="open()" title="Kontext ausklappen"
+                class="h-11 w-11 flex-shrink-0 flex items-center justify-center border-b border-[color:var(--nx-line)] text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition-colors">
+                @svg('heroicon-o-chevron-double-left', 'w-5 h-5')
             </button>
             <div class="flex flex-col items-center gap-1 py-2">
                 @foreach ($panelApps as $key => $app)
@@ -156,22 +154,20 @@
             :style="docked ? '' : ('z-index: 40; box-shadow: var(--nx-shadow-pop); width: ' + (small ? '100vw' : Math.min(width, window.innerWidth - 44) + 'px'))"
             class="cp-panel flex flex-col overflow-hidden">
 
-            {{-- Kopf: Datensatz + Einklappen, darunter die Reiter — ein abgesetzter Block --}}
-            <div class="cp-head flex-shrink-0 border-b" style="border-color: var(--nx-line-strong)">
-            <div class="flex items-center gap-2 px-3 pt-3 pb-1">
-                <div class="min-w-0 flex-1">
-                    <div class="cp-overline leading-none">Kontext</div>
-                    <div class="truncate text-sm font-semibold text-[color:var(--nx-text)] mt-1" title="{{ $subject }}">{{ $subject ?: 'Datensatz' }}</div>
-                </div>
-                <button type="button" x-on:click="close()" :title="docked ? 'Einklappen' : 'Schließen'"
-                    class="inline-flex items-center justify-center w-7 h-7 flex-shrink-0 rounded-md text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)] hover:text-[color:var(--nx-text)] transition-colors">
-                    <span x-show="docked">@svg('heroicon-o-chevron-double-right', 'w-4 h-4')</span>
-                    <span x-show="!docked" x-cloak>@svg('heroicon-o-x-mark', 'w-4 h-4')</span>
+            {{-- Kopf wie die Hauptsidebar: 44px-Zeile (fluchtet mit der Navbar), Pfeil links an der Stelle
+                 des eingeklappten Knopfs, daneben der Datensatz; darunter die Reiter --}}
+            <div class="flex-shrink-0">
+            <div class="h-11 flex items-center border-b border-[color:var(--nx-line)]">
+                <button type="button" x-on:click="close()" :title="docked ? 'Kontext einklappen' : 'Schließen'"
+                    class="h-11 w-11 flex-shrink-0 flex items-center justify-center text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition-colors">
+                    <span x-show="docked">@svg('heroicon-o-chevron-double-right', 'w-5 h-5')</span>
+                    <span x-show="!docked" x-cloak>@svg('heroicon-o-x-mark', 'w-5 h-5')</span>
                 </button>
+                <div class="min-w-0 flex-1 pr-3 truncate text-sm font-semibold text-[color:var(--nx-text)]" title="{{ $subject }}">{{ $subject ?: 'Datensatz' }}</div>
             </div>
 
             {{-- Reiter: eine Zeile, Icon + Zähler; der aktive zeigt seinen Namen --}}
-            <div class="cp-tabs relative flex items-end px-1.5 overflow-x-auto">
+            <div class="cp-tabs relative flex items-end px-1.5 overflow-x-auto border-b border-[color:var(--nx-line)]">
                 @foreach ($panelApps as $key => $app)
                     @php($badge = $badges[$key] ?? null)
                     <button type="button" x-ref="tab-{{ $key }}" x-on:click="pick('{{ $key }}')"
