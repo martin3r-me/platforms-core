@@ -73,16 +73,6 @@ class GetModulesTool implements ToolContract
                 ], $modules);
             }
 
-            // Terminal: Agenda (der interne Chat ist entfernt).
-            if (!isset($modules['terminal'])) {
-                $modules = array_merge([
-                    'terminal' => [
-                        'key' => 'terminal',
-                        'title' => 'Terminal',
-                        'description' => 'Agenda: Agenden, Einträge und Slots. Tools: terminal.agendas.GET/POST/DELETE, terminal.agenda_items.GET/POST/PATCH, terminal.agenda_slots.POST. Internes Messaging gibt es nicht mehr.',
-                    ],
-                ], $modules);
-            }
             
             $result = [
                 'modules' => [],

@@ -115,16 +115,6 @@
       {{-- App switcher tabs — always visible, click opens terminal + switches app --}}
       <div class="flex items-center gap-0.5 flex-shrink-0">
         <div class="w-px h-4 bg-[var(--t-border)] mr-0.5"></div>
-        <button
-          @click.stop="$wire.set('activeApp', 'agenda'); $wire.dispatch('terminal-agenda-open-my-day'); if(!open) toggle()"
-          class="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition"
-          :class="$wire.activeApp === 'agenda'
-            ? 'bg-white/15 text-white'
-            : 'text-[var(--t-text-muted)] hover:text-[var(--t-text)] hover:bg-white/5'"
-        >
-          <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
-          <span class="hidden sm:inline">Agenda</span>
-        </button>
           @if($this->availableApps['activity'])
             @php $activityCount = count($this->contextActivities); @endphp
             <button
@@ -324,7 +314,7 @@
            :class="resizingSidebar ? '' : 'transition-[width] duration-0'"
            :style="'width:' + sidebarWidth + 'px'"
            wire:key="terminal-sidebar"
-           x-show="$wire.activeApp === 'agenda' || $wire.activeApp === 'comms'"
+           x-show="$wire.activeApp === 'comms'"
       >
         <!-- Sidebar resize handle -->
         <div
@@ -335,11 +325,6 @@
           <div class="absolute top-1/2 -translate-y-1/2 right-0 h-8 w-1 rounded-full bg-transparent group-hover/sresize:bg-[var(--t-accent)]/30 transition"></div>
         </div>
 
-
-        <!-- ═══ Sidebar: Agenda (Nav-Kind: Liste + Mein Tag + Anlegen) ═══ -->
-        <div x-show="$wire.activeApp === 'agenda'" class="flex-1 min-h-0 flex flex-col">
-          <livewire:core.terminal.agenda-nav lazy wire:key="t-nav-agenda" />
-        </div>
 
         @include('platform::livewire.partials.terminal-comms-sidebar')
 
@@ -471,10 +456,6 @@
             @endif
           </div>
 
-          <!-- ═══ App: Agenda ═══ -->
-          <div x-show="$wire.activeApp === 'agenda'" class="flex-1 min-h-0 flex flex-col">
-            <livewire:core.terminal.agenda lazy wire:key="t-app-agenda" />
-          </div>
       </div>
     </div>
   </div>

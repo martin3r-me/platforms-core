@@ -108,6 +108,13 @@ class ContextPanel extends Component
         }
     }
 
+    /** Apps melden Änderungen (z. B. Agenda), damit die Zahl am Reiter sofort stimmt. */
+    #[On('context-panel-badges')]
+    public function onBadgesChanged(): void
+    {
+        $this->refreshBadges($this->panelApps());
+    }
+
     /** @param array<string, TerminalApp> $apps */
     protected function refreshBadges(array $apps): void
     {
@@ -128,7 +135,7 @@ class ContextPanel extends Component
 
     /**
      * Apps fürs Panel: alles aus der Registry außer den Terminal-eigenen
-     * (chat/agenda), sortiert nach order — Verknüpfungen zuerst.
+     * (native), sortiert nach order — Verknüpfungen zuerst.
      *
      * @return array<string, TerminalApp>
      */

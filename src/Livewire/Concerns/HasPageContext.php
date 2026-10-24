@@ -12,7 +12,7 @@ use Platform\Core\Support\PageContextState;
  * Seitenkontext für Terminal + Kontext-Panel — ein Weg statt 6–8 Einzel-Events.
  *
  * Die Seite sagt nur, welches Modell sie zeigt; Subject, Beschreibung und die
- * verfügbaren Apps (Aktivität, Dateien, Tags, Zeiten, OKR, Zusatzfelder,
+ * verfügbaren Apps (Aktivität, Dateien, Agenda, Tags, Zeiten, OKR, Zusatzfelder,
  * Organisation) werden aus dem Modell abgeleitet. Liefert pageContext() null
  * (Liste/Dashboard), wird der Kontext ausdrücklich zurückgesetzt.
  *
@@ -133,6 +133,7 @@ trait HasPageContext
         return [
             'activity' => isset($traits['Platform\ActivityLog\Traits\LogsActivity']),
             'files' => true, // Kontext-Dateien sind polymorph, gehen an jedem Modell
+            'agenda' => true, // Agenda (Modul home) hängt polymorph an jedem Modell
             'tags' => isset($traits['Platform\Core\Traits\HasTags']),
             'time' => isset($traits['Platform\Organization\Traits\HasTimeEntries']),
             'okr' => $model instanceof HasKeyResultAncestors,

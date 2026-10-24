@@ -7,8 +7,6 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Platform\Core\Models\ContextFile;
-use Platform\Core\Models\TerminalAgenda;
-use Platform\Core\Models\TerminalAgendaMember;
 use Platform\Core\Models\User;
 use Platform\Core\Services\ContextFileService;
 use Platform\Core\Terminal\TerminalContext;
@@ -18,7 +16,7 @@ use Platform\Crm\Livewire\Concerns\WithCommsChat;
 use Platform\Crm\Livewire\Concerns\WithCommsChannelSettings;
 
 /**
- * Terminal UI shell: Agenda, Comms, Feature-Request und Kontext-Apps (der interne Chat ist entfernt).
+ * Terminal UI shell: Comms, Feature-Request und Kontext-Apps (Chat entfernt, Agenda lebt in home + Kontext-Panel).
  */
 class Terminal extends Component
 {
@@ -36,8 +34,8 @@ class Terminal extends Component
     public ?string $contextSource = null;
     public ?string $contextUrl = null;
     public array $contextMeta = [];
-    public string $activeApp = 'agenda';
-    public array $availableApps = ['agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false, 'feature-request' => true];
+    public string $activeApp = 'feature-request';
+    public array $availableApps = ['activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false, 'feature-request' => true];
     // ── Comms App ────────────────────────────────────────────
     public bool $commsInitialized = false;
     public bool $commsShowNewMessage = false;  // overlay panel above timeline
@@ -51,8 +49,6 @@ class Terminal extends Component
     // ── ExtraFields App ──────────────────────────────────────
     public ?string $efContextType = null;
     public ?int $efContextId = null;
-
-    // Agenda-App: State + Logik liegen vollständig in core.terminal.agenda (Kind).
 
     // ── Context ────────────────────────────────────────────────
 
@@ -79,7 +75,7 @@ class Terminal extends Component
 
         // Reset available apps when context changes
         if ($model !== $this->contextType || (int) $modelId !== $this->contextId) {
-            $this->availableApps = ['agenda' => true, 'activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false, 'feature-request' => true];
+            $this->availableApps = ['activity' => false, 'files' => false, 'tags' => false, 'time' => false, 'okr' => false, 'extrafields' => false, 'comms' => false, 'feature-request' => true];
             $this->commsInitialized = false;
             $this->commsShowNewMessage = false;
             $this->commsShowSettings = false;

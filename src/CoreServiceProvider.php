@@ -1189,22 +1189,6 @@ class CoreServiceProvider extends ServiceProvider
                 try { $registry->register($this->app->make($class)); } catch (\Throwable $e) {}
             }
         }
-
-        // Terminal-Agenda-Tools (terminal.agendas.*, terminal.agenda_items.*, terminal.agenda_slots.*) — der Chat ist entfernt
-        $terminalTools = [
-            \Platform\Core\Tools\Terminal\ListTerminalAgendasTool::class => 'terminal.agendas.GET',
-            \Platform\Core\Tools\Terminal\CreateTerminalAgendaTool::class => 'terminal.agendas.POST',
-            \Platform\Core\Tools\Terminal\DeleteTerminalAgendaTool::class => 'terminal.agendas.DELETE',
-            \Platform\Core\Tools\Terminal\ListTerminalAgendaItemsTool::class => 'terminal.agenda_items.GET',
-            \Platform\Core\Tools\Terminal\ManageTerminalAgendaItemsTool::class => 'terminal.agenda_items.POST',
-            \Platform\Core\Tools\Terminal\UpdateTerminalAgendaItemTool::class => 'terminal.agenda_items.PATCH',
-            \Platform\Core\Tools\Terminal\ManageTerminalAgendaSlotsTool::class => 'terminal.agenda_slots.POST',
-        ];
-        foreach ($terminalTools as $class => $name) {
-            if (class_exists($class) && !$registry->has($name)) {
-                try { $registry->register($this->app->make($class)); } catch (\Throwable $e) {}
-            }
-        }
     }
 
 
