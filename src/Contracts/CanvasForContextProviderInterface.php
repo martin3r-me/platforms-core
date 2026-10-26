@@ -2,6 +2,10 @@
 
 namespace Platform\Core\Contracts;
 
+/**
+ * @deprecated Nur noch vom Alt-Modul project-canvas implementiert. Kanonischer Canvas ist
+ *             der Projekt-Canvas im Planner (planner.canvas.*). Entfaellt nach Deinstallation.
+ */
 interface CanvasForContextProviderInterface
 {
     /**

@@ -7,6 +7,9 @@ namespace Platform\Core\Contracts;
  *
  * Allows any module to provide contextual information to canvas tools,
  * e.g. linking a BMC canvas to a specific project, company, or other entity.
+ *
+ * @deprecated Nur noch vom Alt-Modul project-canvas implementiert. Kanonischer Canvas ist
+ *             der Projekt-Canvas im Planner (planner.canvas.*). Entfaellt nach Deinstallation.
  */
 interface CanvasContextable
 {

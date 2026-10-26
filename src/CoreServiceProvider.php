@@ -616,6 +616,8 @@ class CoreServiceProvider extends ServiceProvider
         });
 
         // Default-Canvas-Resolver binden (können vom Project-Canvas-Modul überschrieben werden)
+        // @deprecated Nur noch fuer das Alt-Modul project-canvas; entfaellt, sobald es aus allen
+        // Instanzen deinstalliert ist. Kanonischer Canvas ist der Projekt-Canvas im Planner.
         $this->app->singleton(CanvasResolverInterface::class, function () {
             return new NullCanvasResolver();
         });
