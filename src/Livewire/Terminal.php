@@ -183,7 +183,7 @@ class Terminal extends Component
             'PlannerTask' => '✅', 'Task' => '✅',
             'Invoice' => '🧾',
             'PatientsPatient' => '🏥',
-            'PcCanvas' => '🎨', 'PlannerProjectCanvas' => '🎨',
+            'PlannerProjectCanvas' => '🎨',
             'Cycle' => '🔄',
             'Okr' => '🎯',
             'Objective' => '🎯',

@@ -26,12 +26,6 @@ use Platform\Core\Contracts\CrmContactLinkManagerInterface;
 use Platform\Core\Services\NullCrmContactLinkManager;
 use Platform\Core\Contracts\CrmEngagementManagerInterface;
 use Platform\Core\Services\NullCrmEngagementManager;
-use Platform\Core\Contracts\CanvasResolverInterface;
-use Platform\Core\Contracts\CanvasOptionsProviderInterface;
-use Platform\Core\Contracts\CanvasForContextProviderInterface;
-use Platform\Core\Services\NullCanvasResolver;
-use Platform\Core\Services\NullCanvasOptionsProvider;
-use Platform\Core\Services\NullCanvasForContextProvider;
 use Platform\Core\Contracts\CatalogArticleSearchProviderInterface;
 use Platform\Core\Contracts\CatalogArticleResolverInterface;
 use Platform\Core\Contracts\CatalogArticleProcurementMapProviderInterface;
@@ -613,19 +607,6 @@ class CoreServiceProvider extends ServiceProvider
         });
         $this->app->singleton(CrmEngagementManagerInterface::class, function () {
             return new NullCrmEngagementManager();
-        });
-
-        // Default-Canvas-Resolver binden (können vom Project-Canvas-Modul überschrieben werden)
-        // @deprecated Nur noch fuer das Alt-Modul project-canvas; entfaellt, sobald es aus allen
-        // Instanzen deinstalliert ist. Kanonischer Canvas ist der Projekt-Canvas im Planner.
-        $this->app->singleton(CanvasResolverInterface::class, function () {
-            return new NullCanvasResolver();
-        });
-        $this->app->singleton(CanvasOptionsProviderInterface::class, function () {
-            return new NullCanvasOptionsProvider();
-        });
-        $this->app->singleton(CanvasForContextProviderInterface::class, function () {
-            return new NullCanvasForContextProvider();
         });
 
         // Default-Catalog-Artikel-Resolver binden (können vom Commerce-Modul überschrieben werden)
