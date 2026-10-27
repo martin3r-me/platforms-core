@@ -13,7 +13,7 @@ use Platform\Core\Support\PageContextState;
  *
  * Die Seite sagt nur, welches Modell sie zeigt; Subject, Beschreibung und die
  * verfügbaren Apps (Aktivität, Dateien, Agenda, Tags, Zeiten, OKR, Zusatzfelder,
- * Organisation) werden aus dem Modell abgeleitet. Liefert pageContext() null
+ * Organisation, Verknüpfungen) werden aus dem Modell abgeleitet. Liefert pageContext() null
  * (Liste/Dashboard), wird der Kontext ausdrücklich zurückgesetzt.
  *
  *   use HasPageContext;
@@ -139,6 +139,7 @@ trait HasPageContext
             'okr' => $model instanceof HasKeyResultAncestors,
             'extrafields' => isset($traits['Platform\Core\Traits\HasExtraFields']),
             'entities' => isset($traits['Platform\Core\Models\Concerns\HasEntityLinks']),
+            'links' => true, // Verknüpfungen (organization) — Seiten schalten per apps ['links' => false] ab
         ];
     }
 

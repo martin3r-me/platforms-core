@@ -17,7 +17,7 @@ class TerminalContext
         public readonly ?int $contextId = null,
         public readonly ?string $subject = null,
         public readonly ?string $source = null,
-        /** Apps, die die Seite per page-context anbietet (activity, files, tags, time, okr, extrafields, entities). Leer = unbekannt (Terminal). */
+        /** Apps, die die Seite per page-context anbietet (activity, files, tags, time, okr, extrafields, entities, links). Leer = unbekannt (Terminal). */
         public readonly array $apps = [],
     ) {}
 
