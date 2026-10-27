@@ -13,10 +13,11 @@ use Platform\Core\Tools\ToolExecutor;
  *
  * Baut absichtlich KEIN eigenes Auth/Caching auf — jede Unter-Quelle läuft durch
  * ToolExecutor::execute() und damit durch deren eigene Permission-/Cache-Logik.
- * Microsoft-Teams-Chats/-Channels und Mail werden bewusst NICHT live abgefragt: der
- * zugrunde liegende Microsoft365-Connector liefert für diese drei strukturell keinen
- * Unread-Wert (Graph-API-Limitierung bzw. fehlender $count-Request), ein Live-Call würde
- * dort nur unnötige externe API-Kosten verursachen, ohne je einen Wert zu liefern.
+ *
+ * Mail und Teams-Chats kommen live über den Microsoft365-Connector: mail.list liefert per
+ * Graph-$count die Zahl ungelesener Posteingangs-Mails, teams.chats.list markiert Chats als
+ * unread (lastMessagePreview.createdDateTime > viewpoint.lastMessageReadDateTime, laut
+ * Graph-Doku chat-list). Teams-Channels kennen in Graph keinen Lesestatus → bleibt null.
  */
 class CommunicationUnreadTool implements ToolContract, ToolMetadataContract
 {
@@ -28,9 +29,9 @@ class CommunicationUnreadTool implements ToolContract, ToolMetadataContract
     public function getDescription(): string
     {
         return 'GET /communication/unread - Kanalübergreifende Unread-Übersicht. Aggregiert echte Ungelesen-Zähler '
-            . 'aus core.comms.wa_overview.GET (WhatsApp). '
-            . 'Für Kanäle, deren API strukturell keinen Unread-Wert liefert (Microsoft-Teams-Chats/-Channels, Mail) '
-            . 'wird unread_count ehrlich null mit Begründung geliefert statt geraten oder verschwiegen.';
+            . 'aus WhatsApp, Outlook-Posteingang (Anzahl ungelesener Mails) und Teams-Chats (Anzahl Chats mit ungelesenen Nachrichten). '
+            . 'Teams-Channels liefern strukturell keinen Unread-Wert — dort und bei fehlender Verbindung ist unread_count '
+            . 'null mit Begründung statt geraten.';
     }
 
     public function getSchema(): array
@@ -68,31 +69,72 @@ class CommunicationUnreadTool implements ToolContract, ToolMetadataContract
             ];
         }
 
-        $channels[] = [
-            'channel' => 'teams-chat',
-            'unread_count' => null,
-            'source_tool' => 'user-connectors.microsoft365.teams.chats.list',
-            'reason' => 'Microsoft Graph liefert für Teams-Chats über diesen Connector keinen Unread-Status.',
-        ];
+        // Teams-Chats: unread je Chat (sortiert nach letzter Aktivität, max. 50 jüngste Chats).
+        $chats = $executor->execute('user-connectors.microsoft365.teams.chats.list', [
+            'unread_only' => true,
+            'include_members' => false,
+            'limit' => 50,
+        ], $context);
+        if ($chats->success) {
+            $unreadChats = count($chats->data['chats'] ?? []);
+            $channels[] = array_filter([
+                'channel' => 'teams-chat',
+                'unread_count' => $unreadChats,
+                'unit' => 'chats',
+                'source_tool' => 'user-connectors.microsoft365.teams.chats.list',
+                // Nur die 50 zuletzt aktiven Chats geprüft — ältere ungelesene sind selten, aber möglich.
+                'note' => !empty($chats->data['next_cursor']) ? 'Geprüft: die 50 zuletzt aktiven Chats.' : null,
+                'reason' => $chats->data['sort_warning'] ?? null,
+            ], fn ($v) => $v !== null);
+            $totalUnread += $unreadChats;
+        } else {
+            $channels[] = [
+                'channel' => 'teams-chat',
+                'unread_count' => null,
+                'source_tool' => 'user-connectors.microsoft365.teams.chats.list',
+                'reason' => $chats->error ?? 'Quelle nicht verfügbar (z. B. keine Microsoft-365-Verbindung).',
+            ];
+        }
 
         $channels[] = [
             'channel' => 'teams-channel',
             'unread_count' => null,
             'source_tool' => 'user-connectors.microsoft365.teams.channels.list',
-            'reason' => 'Microsoft Graph liefert für Teams-Channels keinen Unread-Status (nur last_message_at als Aktivitäts-Proxy).',
+            'reason' => 'Microsoft Graph kennt für Teams-Channels keinen Lesestatus (nur last_message_at per include_last_message als Aktivitäts-Proxy).',
         ];
 
-        $channels[] = [
-            'channel' => 'mail',
-            'unread_count' => null,
-            'source_tool' => 'user-connectors.microsoft365.mail.list',
-            'reason' => 'Connector fragt aktuell kein Graph-$count an (nur is_read-Filter pro Nachricht) — Gesamtzahl ungelesener Mails ist ohne separate Connector-Erweiterung nicht verlässlich ermittelbar.',
-        ];
+        // Mail: Graph-$count ungelesener Mails im Posteingang (eine Mail Payload, body_format none).
+        $mail = $executor->execute('user-connectors.microsoft365.mail.list', [
+            'folder' => 'inbox',
+            'is_read' => false,
+            'per_page' => 1,
+            'body_format' => 'none',
+        ], $context);
+        $mailCount = $mail->success ? ($mail->data['total'] ?? null) : null;
+        if (is_int($mailCount)) {
+            $channels[] = [
+                'channel' => 'mail',
+                'unread_count' => $mailCount,
+                'unit' => 'messages',
+                'scope' => 'inbox',
+                'source_tool' => 'user-connectors.microsoft365.mail.list',
+            ];
+            $totalUnread += $mailCount;
+        } else {
+            $channels[] = [
+                'channel' => 'mail',
+                'unread_count' => null,
+                'source_tool' => 'user-connectors.microsoft365.mail.list',
+                'reason' => $mail->success
+                    ? 'Graph lieferte keine Gesamtzahl.'
+                    : ($mail->error ?? 'Quelle nicht verfügbar (z. B. keine Microsoft-365-Verbindung).'),
+            ];
+        }
 
         return ToolResult::success([
             'channels' => $channels,
             'total_unread' => $totalUnread,
-            'total_unread_note' => 'Summe nur über Kanäle mit tatsächlichem (nicht-null) unread_count.',
+            'total_unread_note' => 'Summe nur über Kanäle mit tatsächlichem (nicht-null) unread_count; Einheiten gemischt (WhatsApp-Kontakte, Teams-Chats, Mails).',
         ]);
     }
 
@@ -113,7 +155,7 @@ class CommunicationUnreadTool implements ToolContract, ToolMetadataContract
             'requires_team' => true,
             'risk_level' => 'safe',
             'idempotent' => true,
-            'cost_class' => 'local_db',
+            'cost_class' => 'external_api_free',
             'related_tools' => [
                 'core.comms.wa_overview.GET',
                 'user-connectors.microsoft365.teams.chats.list',
