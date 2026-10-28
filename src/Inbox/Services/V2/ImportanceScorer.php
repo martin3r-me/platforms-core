@@ -3,7 +3,7 @@
 namespace Platform\Core\Inbox\Services\V2;
 
 use Illuminate\Support\Facades\DB;
-use Platform\Inbox\Models\InboxItem;
+use Platform\Core\Inbox\Models\InboxItem;
 
 /**
  * Computes the per-item importance_score used by the V2 stream sort and the

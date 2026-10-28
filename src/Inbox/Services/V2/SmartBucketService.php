@@ -3,7 +3,7 @@
 namespace Platform\Core\Inbox\Services\V2;
 
 use Illuminate\Database\Eloquent\Builder;
-use Platform\Inbox\Models\InboxItem;
+use Platform\Core\Inbox\Models\InboxItem;
 
 /**
  * Smart buckets for the V2 inbox sidebar. Each bucket is a function that

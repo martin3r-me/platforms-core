@@ -4,7 +4,7 @@ namespace Platform\Core\Inbox\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Platform\Inbox\Models\InboxItem;
+use Platform\Core\Inbox\Models\InboxItem;
 
 /**
  * Thin adapter around the Organization module's EntityDimensionBridge.

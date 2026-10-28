@@ -3,7 +3,7 @@
 namespace Platform\Core\Inbox\Services;
 
 use Illuminate\Support\Facades\DB;
-use Platform\Inbox\Models\InboxItem;
+use Platform\Core\Inbox\Models\InboxItem;
 use Platform\Core\Inbox\Models\InboxItemParticipant;
 use Platform\Core\Inbox\Models\InboxVoiceProfile;
 

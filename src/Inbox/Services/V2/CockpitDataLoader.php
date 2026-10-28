@@ -4,7 +4,7 @@ namespace Platform\Core\Inbox\Services\V2;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Platform\Inbox\Models\InboxItem;
+use Platform\Core\Inbox\Models\InboxItem;
 use Platform\Core\Inbox\Models\InboxItemEnrichment;
 use Platform\Core\Inbox\Services\InboxEntityLinkService;
 

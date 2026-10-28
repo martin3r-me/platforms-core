@@ -3,7 +3,7 @@
 namespace Platform\Core\Inbox\Services\Enrichment;
 
 use Illuminate\Support\Facades\DB;
-use Platform\Inbox\Models\InboxItem;
+use Platform\Core\Inbox\Models\InboxItem;
 
 /**
  * Gate for the RunEnrichmentJob dispatch. Cheap sanity checks before

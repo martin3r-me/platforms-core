@@ -3,7 +3,7 @@
 namespace Platform\Core\Inbox\Services;
 
 use Platform\Core\Inbox\Contracts\ItemHandoff;
-use Platform\Inbox\Models\InboxItem;
+use Platform\Core\Inbox\Models\InboxItem;
 
 /**
  * Core-ItemHandoff-Naht, implementiert über den bestehenden InboxHandoffService.

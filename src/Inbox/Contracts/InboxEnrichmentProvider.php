@@ -3,7 +3,7 @@
 namespace Platform\Core\Inbox\Contracts;
 
 use Platform\Core\Inbox\Models\InboxEnrichmentTemplate;
-use Platform\Inbox\Models\InboxItem;
+use Platform\Core\Inbox\Models\InboxItem;
 use Platform\Core\Inbox\Services\Enrichment\EnrichmentResult;
 
 interface InboxEnrichmentProvider

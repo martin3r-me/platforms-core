@@ -9,7 +9,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Inbox\Models\InboxEnrichmentTemplate;
-use Platform\Inbox\Models\InboxItem;
+use Platform\Core\Inbox\Models\InboxItem;
 use Platform\Core\Inbox\Models\InboxItemEnrichment;
 use Platform\Core\Inbox\Services\Enrichment\EnrichmentProviderRegistry;
 

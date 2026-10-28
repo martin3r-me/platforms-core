@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Platform\Core\Inbox\Enums\Status;
 use Platform\Core\Inbox\Enums\SubscriptionStatus;
-use Platform\Inbox\Models\InboxItem;
+use Platform\Core\Inbox\Models\InboxItem;
 use Platform\Core\Inbox\Models\InboxSenderSubscription;
 
 /**
@@ -207,7 +207,7 @@ class InboxIngestionService
         }
 
         $sourceIds = array_unique(array_map(fn ($r) => (int) $r['source_id'], $inserts));
-        $items = \Platform\Inbox\Models\InboxItem::query()
+        $items = \Platform\Core\Inbox\Models\InboxItem::query()
             ->where('source_type', $sourceMorph)
             ->whereIn('source_id', $sourceIds)
             ->get();
@@ -432,7 +432,7 @@ class InboxIngestionService
 
         $sourceIds = array_unique(array_map(fn ($r) => (int) $r['source_id'], $inserts));
 
-        $items = \Platform\Inbox\Models\InboxItem::query()
+        $items = \Platform\Core\Inbox\Models\InboxItem::query()
             ->where('source_type', $sourceMorph)
             ->whereIn('source_id', $sourceIds)
             ->get();
@@ -463,7 +463,7 @@ class InboxIngestionService
 
         $sourceIds = array_unique(array_map(fn ($r) => (int) $r['source_id'], $inserts));
 
-        $items = \Platform\Inbox\Models\InboxItem::query()
+        $items = \Platform\Core\Inbox\Models\InboxItem::query()
             ->where('source_type', $sourceMorph)
             ->whereIn('source_id', $sourceIds)
             ->get();

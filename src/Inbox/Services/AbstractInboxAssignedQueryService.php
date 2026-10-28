@@ -5,7 +5,7 @@ namespace Platform\Core\Inbox\Services;
 use Illuminate\Support\Carbon;
 use Platform\Core\Inbox\Enums\Channel;
 use Platform\Core\Inbox\Enums\Status;
-use Platform\Inbox\Models\InboxItem;
+use Platform\Core\Inbox\Models\InboxItem;
 
 /**
  * Gemeinsame Basis für die Producer-Push-Kanäle „mir zugewiesen" (Aufgabe, Ticket

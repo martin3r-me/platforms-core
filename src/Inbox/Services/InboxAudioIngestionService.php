@@ -9,7 +9,7 @@ use Platform\Core\Inbox\Enums\Channel;
 use Platform\Core\Inbox\Enums\Status;
 use Platform\Core\Inbox\Jobs\RunEnrichmentJob;
 use Platform\Core\Inbox\Models\InboxEnrichmentTemplate;
-use Platform\Inbox\Models\InboxItem;
+use Platform\Core\Inbox\Models\InboxItem;
 use Platform\Core\Inbox\Models\InboxItemEnrichment;
 use Platform\Core\Inbox\Models\InboxItemParticipant;
 use Platform\Core\Inbox\Models\InboxItemSegment;
@@ -185,7 +185,7 @@ class InboxAudioIngestionService
             if ($audioFile instanceof UploadedFile) {
                 $result = $service->uploadForContext(
                     file: $audioFile,
-                    contextType: \Platform\Inbox\Models\InboxItem::class,
+                    contextType: \Platform\Core\Inbox\Models\InboxItem::class,
                     contextId: $item->id,
                     options: [
                         'folder' => $folder,

@@ -6,7 +6,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Platform\Core\Inbox\Enums\Channel;
 use Platform\Core\Inbox\Enums\InboxItemRelation;
-use Platform\Inbox\Models\InboxItem;
+use Platform\Core\Inbox\Models\InboxItem;
 
 /**
  * Korreliert eingehende Aufnahme-/Transcript-Items (Kanal `recording`) mit dem

@@ -6,7 +6,7 @@ use Platform\Core\Services\LLMProviderRegistry;
 use Platform\Core\Services\LlmCostCalculator;
 use Platform\Core\Inbox\Contracts\InboxEnrichmentProvider;
 use Platform\Core\Inbox\Models\InboxEnrichmentTemplate;
-use Platform\Inbox\Models\InboxItem;
+use Platform\Core\Inbox\Models\InboxItem;
 
 /**
  * Der EINZIGE, anbieter-agnostische Enrichment-Provider.

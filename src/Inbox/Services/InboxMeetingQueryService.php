@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 use Platform\Core\Inbox\Contracts\InboxMeetingQueryContract;
 use Platform\Core\Inbox\Enums\Channel;
 use Platform\Core\Inbox\Enums\Status;
-use Platform\Inbox\Models\InboxItem;
+use Platform\Core\Inbox\Models\InboxItem;
 
 /**
  * Meeting-Query für die persönliche Sicht (home). Die LISTE kommt komplett aus
