@@ -15,7 +15,7 @@ use Platform\Core\Inbox\Models\InboxItemParticipant;
 use Platform\Core\Inbox\Models\InboxItemSegment;
 use Platform\Core\Inbox\Models\InboxSenderSubscription;
 use Platform\Core\Inbox\Models\InboxVoiceProfile;
-use Platform\Inbox\Sources\Plaud\PlaudNoteParser;
+use Platform\Core\Inbox\Sources\Plaud\PlaudNoteParser;
 use Symfony\Component\Uid\UuidV7;
 
 /**

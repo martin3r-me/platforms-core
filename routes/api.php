@@ -4,13 +4,23 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Platform\Core\Http\Controllers\AgentUsersController;
 use Platform\Core\Http\Controllers\ApiController;
+use Platform\Core\Inbox\Http\Controllers\MeetingDiscoveryController;
 
 /**
  * Core API Routes
- * 
+ *
  * Diese Datei enthält die Basis-API-Routen des Cores.
  * Module sollten ihre eigenen API-Routen über ModuleRouter::apiGroup() registrieren.
  */
+
+// Inbox-Engine (Core): Bearer-Auth-API für externe Clients. Der KyberOS-Mac-Client
+// fragt vor einer Aufnahme das aktuell laufende Meeting ab, um die meeting_inbox_item_id
+// mit zurückzuspielen. Früher via ModuleRouter::apiGroup('inbox') im inbox-Modul — seit
+// die Engine in Core lebt, direkt hier (gleicher Pfad /api/inbox/..., gleicher Name).
+Route::middleware('api.auth')->prefix('inbox')->name('inbox.api.')->group(function () {
+    Route::get('/meetings/current', [MeetingDiscoveryController::class, 'current'])
+        ->name('meetings.current');
+});
 
 // Presenter-Kanal: Token-geschuetzter Push fuer externe curl-Clients (gefuehrte Demos/
 // Screencasts). Bewusst OHNE api.auth — statischer Header X-Presenter-Token gegen

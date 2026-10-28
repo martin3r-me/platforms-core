@@ -415,6 +415,11 @@ class CoreServiceProvider extends ServiceProvider
         // RecordingIngestion (Naht): Aufnahme-Produzenten (whisper …) liefern fertige
         // Transkripte in den Eingang. Default No-op; inbox bindet die Materialisierung.
         $this->app->bindIf(\Platform\Core\Inbox\Contracts\RecordingIngestion::class, \Platform\Core\Inbox\Support\NullRecordingIngestion::class);
+        // Die volle Inbox-Engine (Kanal-Routing, Enrichment, Query-/Handoff-/Linking-
+        // Bindings, morphMap, Zeit-Kontext, Source-Adapter, Commands+Scheduler, MCP-
+        // Tools). Nach den Null-Defaults registriert → seine bind()s gewinnen. Früher
+        // das eigenständige inbox-Modul (Platform\Inbox\InboxServiceProvider).
+        $this->app->register(\Platform\Core\Inbox\InboxEngineServiceProvider::class);
         // ── Flow: allgemeines Event→Reaktion-Gewebe (NICHT inbox-spezifisch) ──
         // Code-deklarierte Automationen, agent-frei. Core registriert Defaults;
         // jedes Modul (inbox, drip, planner, …) hängt im boot() seine eigenen dazu.
