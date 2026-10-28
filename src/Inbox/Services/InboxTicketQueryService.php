@@ -1,0 +1,33 @@
+<?php
+
+namespace Platform\Core\Inbox\Services;
+
+use Platform\Core\Inbox\Contracts\InboxTicketQueryContract;
+use Platform\Core\Inbox\Enums\Channel;
+
+/**
+ * Ticket-Sicht: Ticket-Items kommen per deliver() aus dem helpdesk (Zuweisung an
+ * den Nutzer). Alles Gemeinsame steckt in AbstractInboxAssignedQueryService.
+ */
+class InboxTicketQueryService extends AbstractInboxAssignedQueryService implements InboxTicketQueryContract
+{
+    protected function channel(): Channel
+    {
+        return Channel::Ticket;
+    }
+
+    protected function label(): string
+    {
+        return 'Ticket';
+    }
+
+    protected function sourceMorph(): string
+    {
+        return 'helpdesk_ticket';
+    }
+
+    protected function refKey(): string
+    {
+        return 'ticket_id';
+    }
+}
