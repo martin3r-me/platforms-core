@@ -147,6 +147,11 @@ trait WithExtraFields
                 }
             }
 
+            // Für Boolean-Felder: PHP-bool auf die Options-Strings ('1'/'0') normalisieren
+            if ($field['type'] === 'boolean') {
+                $value = $value === null ? null : ($value ? '1' : '0');
+            }
+
             $this->extraFieldValues[$field['id']] = $value;
 
             // Load verification and auto-fill metadata
@@ -277,6 +282,11 @@ trait WithExtraFields
                 } else {
                     $value = ['day' => '', 'month' => '', 'year' => ''];
                 }
+            }
+
+            // Für Boolean-Felder: PHP-bool auf die Options-Strings ('1'/'0') normalisieren
+            if ($field['type'] === 'boolean') {
+                $value = $value === null ? null : ($value ? '1' : '0');
             }
 
             $this->extraFieldValues[$field['id']] = $value;
