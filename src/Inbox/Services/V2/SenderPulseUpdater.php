@@ -3,7 +3,7 @@
 namespace Platform\Core\Inbox\Services\V2;
 
 use Illuminate\Support\Facades\DB;
-use Platform\Inbox\Models\InboxSenderPulse;
+use Platform\Core\Inbox\Models\InboxSenderPulse;
 
 /**
  * Rebuilds the inbox_sender_pulse cache for a single (user, sender) pair:

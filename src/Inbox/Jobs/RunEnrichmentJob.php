@@ -10,7 +10,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Inbox\Models\InboxEnrichmentTemplate;
 use Platform\Inbox\Models\InboxItem;
-use Platform\Inbox\Models\InboxItemEnrichment;
+use Platform\Core\Inbox\Models\InboxItemEnrichment;
 use Platform\Core\Inbox\Services\Enrichment\EnrichmentProviderRegistry;
 
 class RunEnrichmentJob implements ShouldQueue

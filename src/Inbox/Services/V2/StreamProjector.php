@@ -7,8 +7,8 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Platform\Inbox\Models\InboxItem;
-use Platform\Inbox\Models\InboxItemEnrichment;
-use Platform\Inbox\Models\InboxSenderPulse;
+use Platform\Core\Inbox\Models\InboxItemEnrichment;
+use Platform\Core\Inbox\Models\InboxSenderPulse;
 
 /**
  * Projects the smart-bucketed inbox into the sender × thread shape the V2

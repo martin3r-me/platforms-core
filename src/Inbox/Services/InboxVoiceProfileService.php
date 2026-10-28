@@ -4,8 +4,8 @@ namespace Platform\Core\Inbox\Services;
 
 use Illuminate\Support\Facades\DB;
 use Platform\Inbox\Models\InboxItem;
-use Platform\Inbox\Models\InboxItemParticipant;
-use Platform\Inbox\Models\InboxVoiceProfile;
+use Platform\Core\Inbox\Models\InboxItemParticipant;
+use Platform\Core\Inbox\Models\InboxVoiceProfile;
 
 /**
  * Manages cross-recording speaker identity: when a user confirms

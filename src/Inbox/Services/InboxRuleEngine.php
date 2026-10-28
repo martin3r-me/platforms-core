@@ -4,9 +4,9 @@ namespace Platform\Core\Inbox\Services;
 
 use Illuminate\Support\Collection;
 use Platform\Core\Inbox\Enums\Status;
-use Platform\Inbox\Models\InboxAutoLinkEvent;
+use Platform\Core\Inbox\Models\InboxAutoLinkEvent;
 use Platform\Inbox\Models\InboxItem;
-use Platform\Inbox\Models\InboxLinkRule;
+use Platform\Core\Inbox\Models\InboxLinkRule;
 
 class InboxRuleEngine
 {
