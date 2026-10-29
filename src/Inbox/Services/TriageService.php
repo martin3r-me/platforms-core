@@ -36,6 +36,28 @@ class TriageService
         ]);
     }
 
+    /** Ignorieren: dauerhaft wegdrücken (Status = Ignored), ohne „erledigt". */
+    public function ignore(int $itemId): void
+    {
+        $this->applyToGroup($itemId, [
+            'status'     => Status::Ignored->value,
+            'handled_at' => now(),
+        ]);
+    }
+
+    /**
+     * Rückgängig: Einheit zurück in den offenen Eingang (Status = New). Macht
+     * Done/Ignored/Snooze einer frischen Triage wieder auf (Undo).
+     */
+    public function reopen(int $itemId): void
+    {
+        $this->applyToGroup($itemId, [
+            'status'        => Status::New->value,
+            'handled_at'    => null,
+            'snoozed_until' => null,
+        ]);
+    }
+
     /**
      * @param  array<string,mixed>  $attrs
      */
