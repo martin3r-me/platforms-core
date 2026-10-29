@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Platform\Core\Contracts\HasDisplayName;
 use Platform\Core\Inbox\Enums\Channel;
 use Platform\Core\Inbox\Enums\Status;
 use Platform\Core\Models\Team;
@@ -22,7 +23,7 @@ use Symfony\Component\Uid\UuidV7;
  * `inbox_items`. Das frühere Modul-Model (ehemals im inbox-Modul) ist aufgelöst —
  * dies ist das einzige, kanonische InboxItem.
  */
-class InboxItem extends Model
+class InboxItem extends Model implements HasDisplayName
 {
     use HasContextFileReferences;
 
@@ -86,6 +87,25 @@ class InboxItem extends Model
                 $model->uuid = UuidV7::generate();
             }
         });
+    }
+
+    /**
+     * Anzeigename (z. B. im Verknüpfungen-Panel): der Betreff. Fehlt er, die Art
+     * und das Datum — etwa „Aufnahme · 28. Okt.".
+     */
+    public function getDisplayName(): ?string
+    {
+        $subject = trim((string) ($this->subject ?? ''));
+        if ($subject !== '') {
+            return $subject;
+        }
+
+        $art = $this->channel?->label() ?? 'Eingang';
+        $date = $this->received_at
+            ? $this->received_at->copy()->locale('de')->isoFormat('D. MMM')
+            : null;
+
+        return $date ? "{$art} · {$date}" : $art;
     }
 
     public function team(): BelongsTo
