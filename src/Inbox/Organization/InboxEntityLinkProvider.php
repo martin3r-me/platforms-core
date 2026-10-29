@@ -51,8 +51,12 @@ class InboxEntityLinkProvider implements EntityLinkProvider
 
     public function applyEagerLoading(Builder $query, string $morphAlias, string $fqcn): void
     {
-        // Quelle mitladen — Meeting/Anruf brauchen Start/Ende bzw. Dauer für die Eckdaten.
-        $query->with('source');
+        // KEIN pauschales with('source'): die polymorphe Quelle umfasst Kanäle
+        // (z. B. Mail → user_connector_mail_session), deren Morph-Alias auf einer
+        // Instanz ohne das jeweilige Modul NICHT registriert ist — ein Eager-Load
+        // über ALLE Zeilen würde dann beim Auflösen crashen und die ganze
+        // Entity-Seite mit 500 killen. Start/Ende bzw. Dauer braucht nur
+        // Meeting/Anruf; diese laden wir lazy + abgesichert in extractMetadata().
     }
 
     /**
@@ -74,7 +78,10 @@ class InboxEntityLinkProvider implements EntityLinkProvider
         $durationMin = null;
 
         if ($channel === Channel::Meeting) {
-            $source = $model->source;
+            // source lazy + abgesichert: ein nicht registrierter Morph-Alias darf
+            // nur die Eckdaten kosten, nie die Seite crashen. Fehlt die Quelle,
+            // dient received_at als Fallback für die Uhrzeit.
+            $source = $this->safeSource($model);
             $start = $source?->start_at ? Carbon::parse($source->start_at) : $received;
             $end = $source?->end_at ? Carbon::parse($source->end_at) : null;
             $clock = $start?->format('H:i');
@@ -82,7 +89,7 @@ class InboxEntityLinkProvider implements EntityLinkProvider
                 $durationMin = (int) max(0, $start->diffInMinutes($end));
             }
         } elseif ($channel === Channel::Call) {
-            $source = $model->source;
+            $source = $this->safeSource($model);
             $start = $source?->started_at ? Carbon::parse($source->started_at) : $received;
             $clock = $start?->format('H:i');
             if ($source?->duration_seconds) {
@@ -102,6 +109,21 @@ class InboxEntityLinkProvider implements EntityLinkProvider
             'is_done' => $isDone,
             'status' => $isDone ? 'Erledigt' : 'Offen',
         ], fn ($v) => $v !== null);
+    }
+
+    /**
+     * Polymorphe Quelle laden, ohne die Seite zu riskieren: ist der Morph-Alias
+     * auf dieser Instanz nicht registriert (Modul nicht installiert) oder die
+     * Klasse fehlt, wirft die Relation — hier abgefangen, Eckdaten fallen dann
+     * still weg statt die ganze Entity-Seite mit 500 zu sprengen.
+     */
+    private function safeSource(InboxItem $model): mixed
+    {
+        try {
+            return $model->source;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public function metadataDisplayRules(): array
