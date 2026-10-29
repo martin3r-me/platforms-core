@@ -130,12 +130,14 @@ class InboxMailQueryService implements InboxMailQueryContract
 
         return $rows->map(function ($m) use ($item) {
             $when = $m->received_at ?? $m->sent_at ?? $item->received_at ?? null;
+            $split = $this->splitQuoted($this->cleanBody(($m->body ?? null) ?: ($m->body_preview ?? '')));
 
             return [
-                'from' => ($m->from_name ?? null) ?: ($m->from_address ?? 'Unbekannt'),
-                'time' => $this->timeLabel($when ? Carbon::parse($when) : null, true),
-                'body' => $this->cleanBody(($m->body ?? null) ?: ($m->body_preview ?? '')),
-                'me'   => ($m->direction ?? null) === 'outbound',
+                'from'   => ($m->from_name ?? null) ?: ($m->from_address ?? 'Unbekannt'),
+                'time'   => $this->timeLabel($when ? Carbon::parse($when) : null, true),
+                'body'   => $split['main'],
+                'quoted' => $split['quoted'],
+                'me'     => ($m->direction ?? null) === 'outbound',
             ];
         })->values()->all();
     }
@@ -185,6 +187,54 @@ class InboxMailQueryService implements InboxMailQueryContract
         $text = preg_replace("/\n{3,}/", "\n\n", $text);
 
         return trim((string) $text);
+    }
+
+    /**
+     * Mail-Body in „neu" und „zitierter Verlauf" trennen. Der zitierte Teil
+     * (Antwort-Schwänze „On … wrote:", Outlook-Köpfe „Von:/Gesendet:", Trenner,
+     * >-Zitate) wird im Pane eingeklappt, damit nicht in jeder Nachricht die
+     * ganze Vorgeschichte erneut als Wand steht.
+     *
+     * @return array{main: string, quoted: ?string}
+     */
+    protected function splitQuoted(string $text): array
+    {
+        if ($text === '') {
+            return ['main' => '', 'quoted' => null];
+        }
+
+        $markers = [
+            '/\bOn\b.{0,120}?\bwrote:/is',                 // On <date/name> wrote:
+            '/\bAm\b.{0,120}?\bschrieb\b.{0,80}?:/is',     // Am <date> schrieb <name>:
+            '/-{2,}\s*(Original Message|Ursprüngliche Nachricht|Forwarded message|Weitergeleitete Nachricht)\s*-{2,}/i',
+            '/\bVon:\s.{1,200}?\bGesendet:/is',            // Outlook-Kopf (DE)
+            '/\bFrom:\s.{1,200}?\bSent:/is',               // Outlook-Kopf (EN)
+            '/^\s*>.*/m',                                  // erste reine Zitatzeile
+        ];
+
+        $cut = null;
+        foreach ($markers as $re) {
+            if (preg_match($re, $text, $m, PREG_OFFSET_CAPTURE)) {
+                $pos = $m[0][1];
+                if ($cut === null || $pos < $cut) {
+                    $cut = $pos;
+                }
+            }
+        }
+
+        if ($cut === null || $cut <= 0) {
+            return ['main' => trim($text), 'quoted' => null];
+        }
+
+        $main = trim(substr($text, 0, $cut));
+        $quoted = trim(substr($text, $cut));
+
+        // Ist „neu" praktisch leer (ganze Nachricht ist Zitat), lieber alles zeigen.
+        if (mb_strlen($main) < 2) {
+            return ['main' => trim($text), 'quoted' => null];
+        }
+
+        return ['main' => $main, 'quoted' => $quoted !== '' ? $quoted : null];
     }
 
     protected function entities(InboxItem $item): array
