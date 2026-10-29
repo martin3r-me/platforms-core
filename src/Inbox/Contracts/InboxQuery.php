@@ -32,4 +32,13 @@ interface InboxQuery
      * @return array<string,mixed>|null
      */
     public function detailForItem(int $inboxItemId): ?array;
+
+    /**
+     * Echte Zähler des offenen Eingangs (Status New, nicht gesnoozed) direkt aus
+     * inbox_items — ungekappt, pro Kanal + Summe. Für korrekte Badges, unabhängig
+     * vom (pro Kanal limitierten) Stream. Rückgabe: ['all'=>int, '<channel>'=>int, …].
+     *
+     * @return array<string,int>
+     */
+    public function openCountsForUser(int $userId, int $teamId): array;
 }

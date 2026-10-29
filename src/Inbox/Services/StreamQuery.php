@@ -71,6 +71,28 @@ class StreamQuery implements InboxQuery
         return $rows;
     }
 
+    public function openCountsForUser(int $userId, int $teamId): array
+    {
+        $rows = InboxItem::query()
+            ->where('user_id', $userId)
+            ->where('team_id', $teamId)
+            ->open()
+            ->notSnoozed()
+            ->selectRaw('channel, COUNT(*) as cnt')
+            ->groupBy('channel')
+            ->pluck('cnt', 'channel')
+            ->all();
+
+        $counts = ['all' => 0];
+        foreach ($rows as $channel => $cnt) {
+            $key = $channel instanceof \BackedEnum ? $channel->value : (string) $channel;
+            $counts[$key] = (int) $cnt;
+            $counts['all'] += (int) $cnt;
+        }
+
+        return $counts;
+    }
+
     public function detailForItem(int $inboxItemId): ?array
     {
         $item = InboxItem::find($inboxItemId);
