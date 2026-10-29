@@ -182,8 +182,14 @@ class InboxEngineServiceProvider extends ServiceProvider
         // des Knotens aufläuft. Soft-gekoppelt: ohne Organization-Modul No-op.
         try {
             if (class_exists(\Platform\Organization\Services\EntityLinkRegistry::class)) {
-                resolve(\Platform\Organization\Services\EntityLinkRegistry::class)
-                    ->register(new \Platform\Core\Inbox\Organization\InboxEntityLinkProvider());
+                $registry = resolve(\Platform\Organization\Services\EntityLinkRegistry::class);
+                $registry->register(new \Platform\Core\Inbox\Organization\InboxEntityLinkProvider());
+                // Kunden-Tor: Meetings (nur Kundentermine, opt-in je Freigabe). Nur wenn organization
+                // opt_in kennt — sonst erschienen Meetings in jeder Freigabe mit „alle Typen".
+                if (method_exists($registry, 'registerShareView')
+                    && defined(\Platform\Organization\Services\EntityShareService::class . '::SUPPORTS_OPT_IN')) {
+                    $registry->registerShareView(new \Platform\Core\Inbox\Organization\InboxShareView());
+                }
             }
         } catch (\Throwable $e) {
             // Organization-Modul nicht geladen — Meeting-Zeit aggregiert dann nicht.
