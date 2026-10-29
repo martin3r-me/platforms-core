@@ -166,6 +166,7 @@ class PlatformCore
     public static function getModuleGroups(): array
     {
         return [
+            'home'        => ['label' => 'Persönlich', 'order' => 0.05],
             'clinical'    => ['label' => 'Ärztlich', 'order' => 0.1],
             'praxis_admin' => ['label' => 'Verwaltung', 'order' => 0.2],
             'catalog'     => ['label' => 'Kataloge', 'order' => 0.3],
@@ -173,9 +174,12 @@ class PlatformCore
             'digital'  => ['label' => 'Sichtbarkeit', 'order' => 1.5],
             'content'  => ['label' => 'Kommunikation & Content', 'order' => 2],
             'sales'    => ['label' => 'Vertrieb & Kunden', 'order' => 3],
+            'marketing' => ['label' => 'Marketing', 'order' => 3.5],
             'finance'  => ['label' => 'Finanzen & Verwaltung', 'order' => 4],
+            'operations' => ['label' => 'Operations', 'order' => 4.5],
             'hr'       => ['label' => 'Personal & QM', 'order' => 5],
             'tools'    => ['label' => 'Support & Tools', 'order' => 6],
+            'dev'      => ['label' => 'Entwicklung', 'order' => 6.5],
             'admin'    => ['label' => 'Administration', 'order' => 7],
             'other'    => ['label' => 'Sonstige', 'order' => 99],
         ];
