@@ -46,6 +46,30 @@ class TriageService
     }
 
     /**
+     * Backlog aufräumen: ALLE offenen Items eines Users (optional nur eines Kanals)
+     * in einem Rutsch auf Erledigt setzen. Ein UPDATE — auch bei tausenden Items.
+     * Gibt die Zahl der betroffenen Zeilen zurück. Nicht über Undo umkehrbar
+     * (bewusst: deutliche Aktion, vorher bestätigen).
+     */
+    public function markAllDoneForUser(int $userId, int $teamId, ?string $channel = null): int
+    {
+        $query = InboxItem::query()
+            ->where('user_id', $userId)
+            ->where('team_id', $teamId)
+            ->open()
+            ->notSnoozed();
+
+        if ($channel) {
+            $query->where('channel', $channel);
+        }
+
+        return $query->update([
+            'status'     => Status::Done->value,
+            'handled_at' => now(),
+        ]);
+    }
+
+    /**
      * Rückgängig: Einheit zurück in den offenen Eingang (Status = New). Macht
      * Done/Ignored/Snooze einer frischen Triage wieder auf (Undo).
      */

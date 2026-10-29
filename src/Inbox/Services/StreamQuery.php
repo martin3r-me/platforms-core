@@ -62,10 +62,17 @@ class StreamQuery implements InboxQuery
             }
         }
 
-        // recording ist Core-nativ (inbox_items) — kein Quell-Modul nötig.
-        foreach ($this->listForUser($userId, $teamId, 'recording', null, $limit) as $r) {
-            $r['channel'] = 'recording';
-            $rows[] = $r;
+        // Core-native Kanäle ohne eigenes Quell-Modul: recording + message (Teams).
+        // Nur ziehen, wenn kein Provider den Kanal schon liefert (sonst doppelt).
+        $providerChannels = array_keys($this->sourceLists->all());
+        foreach (['recording', 'message'] as $native) {
+            if (in_array($native, $providerChannels, true)) {
+                continue;
+            }
+            foreach ($this->listForUser($userId, $teamId, $native, null, $limit) as $r) {
+                $r['channel'] = $native;
+                $rows[] = $r;
+            }
         }
 
         return $rows;
