@@ -165,14 +165,28 @@ class InboxEngineServiceProvider extends ServiceProvider
             'inbox_sender_subscription' => InboxSenderSubscription::class,
         ];
 
-        // source_type der Meeting-Items ist der Alias 'user_connector_meeting_session'
-        // (bei der Ingestion gesetzt). Ist die Morph-Map erzwungen, muss der Alias
-        // aufgelöst werden können, sonst wirft $item->source (morphTo) beim Laden
-        // "Class user_connector_meeting_session not found". Der Alias gehört dem
-        // UserConnectors-Modul; wir registrieren ihn defensiv mit, wo die Klasse da
-        // ist (soft-coupled — fehlt das Modul, bleibt der Eintrag weg).
-        if (class_exists(\Platform\UserConnectors\Models\UserConnectorMeetingSession::class)) {
-            $morphMap['user_connector_meeting_session'] = \Platform\UserConnectors\Models\UserConnectorMeetingSession::class;
+        // source_type der Connector-Items ist ein Alias wie 'user_connector_mail_session'
+        // (bei der Ingestion gesetzt, siehe config/inbox.php['sources']). Ist die
+        // Morph-Map erzwungen, MUSS jeder genutzte Alias auflösbar sein, sonst wirft
+        // $item->source (morphTo) beim Laden "Class <alias> not found". Die Aliasse
+        // gehören dem UserConnectors-Modul; wir registrieren sie defensiv mit, wo die
+        // Klasse da ist (soft-coupled — fehlt das Modul, bleibt der Eintrag weg).
+        //
+        // Historie: anfangs war nur 'user_connector_meeting_session' registriert, weil
+        // nur der Meeting-Pfad $item->source las. Seit der Verknüpfungen-Panel (Org-
+        // Entity) ALLE verlinkten Inbox-Items über source() rendert, muss auch Mail/
+        // Call/Message aufgelöst werden — sonst crasht eine Mail-Verknüpfung die ganze
+        // Entity-Seite mit "Class user_connector_mail_session not found".
+        $connectorAliases = [
+            'user_connector_mail_session' => \Platform\UserConnectors\Models\UserConnectorMailSession::class,
+            'user_connector_call_session' => \Platform\UserConnectors\Models\UserConnectorCallSession::class,
+            'user_connector_message_session' => \Platform\UserConnectors\Models\UserConnectorMessageSession::class,
+            'user_connector_meeting_session' => \Platform\UserConnectors\Models\UserConnectorMeetingSession::class,
+        ];
+        foreach ($connectorAliases as $alias => $class) {
+            if (class_exists($class)) {
+                $morphMap[$alias] = $class;
+            }
         }
 
         Relation::morphMap($morphMap);
