@@ -140,18 +140,49 @@ class InboxMailQueryService implements InboxMailQueryContract
         })->values()->all();
     }
 
-    /** HTML-Mails auf lesbaren Text reduzieren (kein roher Tag-Salat im Pane). */
+    /**
+     * HTML-Mails auf lesbaren Text reduzieren — robust für Tabellen-Mails (Google-/
+     * Outlook-Einladungen). Kernproblem der naiven Variante: strip_tags lässt
+     * Nachbartexte zusammenkleben („aktualisiertGeändert"), weil nur manche
+     * Block-Tags zu Umbrüchen wurden und Zell-/Inline-Grenzen gar keinen Trenner
+     * bekamen; außerdem blieb CSS aus <style> als Text stehen.
+     *
+     * Strategie: erst Unsichtbares (style/script/head/Kommentare) ganz raus, dann
+     * Blockgrenzen → Umbruch, Zell-/Inline-Grenzen → Leerzeichen, Rest-Tags →
+     * Leerzeichen (nie nahtlos entfernen), Entities dekodieren, Whitespace glätten.
+     */
     protected function cleanBody(?string $body): string
     {
         if (!$body) {
             return '';
         }
-        // <br>/<p>/<div> → Zeilenumbruch, dann Tags weg, Entities dekodieren.
-        $text = preg_replace('#<\s*(br|/p|/div|/tr)\s*/?>#i', "\n", $body);
-        $text = strip_tags((string) $text);
+
+        $text = (string) $body;
+
+        // Unsichtbare Blöcke komplett entfernen (sonst landet CSS/JS als Text im Pane).
+        $text = preg_replace('#<(style|script|head)\b[^>]*>.*?</\1>#is', ' ', $text);
+        $text = preg_replace('#<!--.*?-->#s', ' ', $text);
+
+        // Explizite Umbrüche + Block-Enden → Zeilenumbruch.
+        $text = preg_replace('#<\s*br\s*/?>#i', "\n", $text);
+        $text = preg_replace('#</\s*(p|div|tr|li|ul|ol|h[1-6]|blockquote|table|section|article|header|footer)\s*>#i', "\n", $text);
+
+        // Listenpunkte sichtbar lassen.
+        $text = preg_replace('#<\s*li\b[^>]*>#i', "\n• ", $text);
+
+        // Zell-/Inline-Grenzen → Leerzeichen, damit Worte nicht verschmelzen.
+        $text = preg_replace('#</\s*(td|th|a|span|b|strong|em|i|label|small)\s*>#i', ' ', $text);
+
+        // Alle verbleibenden Tags → Leerzeichen (nie nahtlos schlucken).
+        $text = preg_replace('#<[^>]+>#', ' ', $text);
+
         $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        // überzählige Leerzeilen kollabieren.
-        $text = preg_replace("/\n{3,}/", "\n\n", (string) $text);
+
+        // Whitespace glätten: Leerzeichen/Tabs kollabieren, Umbrüche trimmen,
+        // überzählige Leerzeilen kappen.
+        $text = preg_replace('/[ \t\x{00A0}]+/u', ' ', $text);
+        $text = preg_replace('/ *\n */', "\n", $text);
+        $text = preg_replace("/\n{3,}/", "\n\n", $text);
 
         return trim((string) $text);
     }
