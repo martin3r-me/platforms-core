@@ -7,6 +7,8 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\ContextFile;
 use Platform\Core\Services\ContextFileService;
+use Platform\Core\Support\SichererAbruf;
+use Platform\Core\Support\SichererAbrufFehler;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Http;
@@ -170,7 +172,7 @@ class CreateContextFileTool implements ToolContract
             // Priority 3: Get content from URL if no direct content or base64
             if (!$content && $url) {
                 try {
-                    $response = Http::timeout(30)->get($url);
+                    $response = (new SichererAbruf())->laden($url, self::MAX_URL_FETCH_SIZE, 30);
 
                     if (!$response->successful()) {
                         return ToolResult::error('URL konnte nicht abgerufen werden: HTTP ' . $response->status(), 'URL_FETCH_ERROR');
@@ -192,6 +194,8 @@ class CreateContextFileTool implements ToolContract
                     }
 
                     $contentSource = 'url';
+                } catch (SichererAbrufFehler $e) {
+                    return ToolResult::error('URL nicht abrufbar: ' . $e->getMessage(), 'URL_FETCH_ERROR');
                 } catch (\Exception $e) {
                     return ToolResult::error('Fehler beim Abrufen der URL: ' . $e->getMessage(), 'URL_FETCH_ERROR');
                 }
