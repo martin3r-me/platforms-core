@@ -464,10 +464,13 @@ class EntityPulseSubjectCollector implements SubjectCollectorInterface
             return [];
         }
 
+        // Baseline-Zeitreihe liefert das reporting-Modul — ohne reporting keine Deltas.
+        if (! app()->bound(\Platform\Core\Verbalization\Contracts\BaselineStore::class)) {
+            return [];
+        }
         try {
-            /** @var \Platform\Core\Verbalization\Baseline\BaselineService $svc */
-            $svc = app(\Platform\Core\Verbalization\Baseline\BaselineService::class);
-            $deltas = $svc->deltaFor('entity_pulse', $subjectId, $days, $currentBag);
+            $deltas = app(\Platform\Core\Verbalization\Contracts\BaselineStore::class)
+                ->deltaFor('entity_pulse', $subjectId, $days, $currentBag);
         } catch (\Throwable $e) {
             return [];
         }

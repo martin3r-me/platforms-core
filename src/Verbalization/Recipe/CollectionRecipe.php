@@ -2,7 +2,7 @@
 
 namespace Platform\Core\Verbalization\Recipe;
 
-use Platform\Core\Models\VerbalizationRecipe;
+use Illuminate\Database\Eloquent\Model;
 use Platform\Core\Verbalization\Enums\FactNature;
 
 /**
@@ -33,7 +33,8 @@ final class CollectionRecipe
         public readonly ?int $teamId,
     ) {}
 
-    public static function fromModel(VerbalizationRecipe $m): self
+    /** Aus dem Recipe-Model des reporting-Moduls (Tabelle verbalization_recipes). */
+    public static function fromModel(Model $m): self
     {
         return new self(
             key: $m->key,
@@ -57,7 +58,30 @@ final class CollectionRecipe
      */
     public function sinceWindowDays(): int
     {
-        return \Platform\Core\Verbalization\Baseline\BaselineService::parseWindowDays($this->sinceWindow);
+        return self::parseWindowDays($this->sinceWindow);
+    }
+
+    /**
+     * Uebersetzt Fenster-Kurzformen ("7d", "1w", "30d", "1m", "1y") in Tage.
+     * Rueckgabe 0 bei ungueltigem Input.
+     */
+    public static function parseWindowDays(?string $window): int
+    {
+        if (! $window) {
+            return 0;
+        }
+        if (! preg_match('/^(\d+)\s*([dwmy])$/i', trim($window), $m)) {
+            return 0;
+        }
+        $n = max(1, (int) $m[1]);
+
+        return match (strtolower($m[2])) {
+            'd' => $n,
+            'w' => $n * 7,
+            'm' => $n * 30,
+            'y' => $n * 365,
+            default => 0,
+        };
     }
 
     /**
