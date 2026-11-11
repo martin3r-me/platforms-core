@@ -226,11 +226,6 @@ class CoreServiceProvider extends ServiceProvider
             ->middleware(['web', \Platform\Core\Http\Middleware\NoCacheHeaders::class])
             ->group(__DIR__.'/../routes/public.php');
 
-        // Atom-Feed-Endpoint (cacheable, daher eigene Group ohne NoCacheHeaders)
-        Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
-            ->middleware(['web'])
-            ->group(__DIR__.'/../routes/verbalization-feeds.php');
-
         // Routes registrieren
         Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
             ->middleware(['web', 'detect.module.guard'])
@@ -268,7 +263,6 @@ class CoreServiceProvider extends ServiceProvider
                 \Platform\Core\Console\Commands\TestOpenAiCommand::class,
                 \Platform\Core\Console\Commands\SyncAiModelsCommand::class,
                 \Platform\Core\Console\Commands\ListToolsCommand::class,
-                \Platform\Core\Console\Commands\RefreshVerbalizationFeedsCommand::class,
                 \Platform\Core\Console\Commands\PruneStaleModulesCommand::class,
                 \Platform\Core\Console\Commands\TestToolOrchestrationCommand::class,
                 \Platform\Core\Console\Commands\MakeToolCommand::class,
@@ -338,10 +332,6 @@ class CoreServiceProvider extends ServiceProvider
             $schedule->command('platform:purge-stale-records --force')->weeklyOn(0, '03:00');
             $schedule->command('platform:audit-team-orphans')->weeklyOn(0, '03:30');
 
-            // Verbalization-Feeds: taeglich 04:00, wöchentlich Montag 04:30
-            $schedule->command('verbalization:refresh-feeds --cadence=daily')->dailyAt('04:00');
-            $schedule->command('verbalization:refresh-feeds --cadence=weekly')->weeklyOn(1, '04:30');
-
             // Context-Date-Times: rollendes 90-Tage-Occurrences-Fenster nachts auffrischen.
             $schedule->command('core:context-date-times:refresh-expansion-horizon')->dailyAt('02:30');
         });
@@ -370,7 +360,6 @@ class CoreServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/security.php', 'security');
         $this->mergeConfigFrom(__DIR__.'/../config/checkins.php', 'checkins');
         $this->mergeConfigFrom(__DIR__.'/../config/embeddings.php', 'embeddings');
-        $this->mergeConfigFrom(__DIR__.'/../config/verbalization.php', 'verbalization');
         $this->mergeConfigFrom(__DIR__.'/../config/dav.php', 'dav');
         $this->mergeConfigFrom(__DIR__.'/../config/authz.php', 'authz');
         $this->mergeConfigFrom(__DIR__.'/../config/core.php', 'core');
@@ -492,36 +481,11 @@ class CoreServiceProvider extends ServiceProvider
         });
         $this->app->singleton(EmbeddingService::class);
 
-        // Verbalization Feed-Pipeline (Subject-Collector-Registry, FeedService, RSS-Renderer)
+        // Verbalization-Primitive: Registries, an denen Produzenten ihre Collectoren/
+        // Templates anmelden. Die Engine (Verbalizer, Feeds, Kanäle) gehört reporting.
         $this->app->singleton(\Platform\Core\Verbalization\SubjectCollector\SubjectCollectorRegistry::class);
-        $this->app->singleton(\Platform\Core\Verbalization\Feed\FeedService::class, function ($app) {
-            return new \Platform\Core\Verbalization\Feed\FeedService(
-                $app->make(\Platform\Core\Verbalization\SubjectCollector\SubjectCollectorRegistry::class),
-                $app->make(\Platform\Core\Verbalization\Recipe\RecipeResolver::class),
-                $app->make(\Platform\Core\Verbalization\Verbalizer::class),
-                $app->make(\Platform\Core\Verbalization\Channel\ChannelRendererRegistry::class),
-            );
-        });
-        $this->app->singleton(\Platform\Core\Verbalization\Feed\AtomFeedRenderer::class, function ($app) {
-            return new \Platform\Core\Verbalization\Feed\AtomFeedRenderer(
-                publicBaseUrl: rtrim((string) config('app.url'), '/'),
-            );
-        });
+        $this->app->singleton(\Platform\Core\Verbalization\Template\TemplateRegistry::class);
 
-        // Channel-Renderer-Registry — Kanal-Ebene entkoppelt vom RSS-Renderer.
-        // Weitere Renderer (Email, PDF, Slack, Webhook) klemmen sich hier an, ohne
-        // dass der oeffentliche Endpoint oder der Delivery-Loop veraendert werden muss.
-        $this->app->singleton(\Platform\Core\Verbalization\Channel\ChannelRendererRegistry::class, function ($app) {
-            $registry = new \Platform\Core\Verbalization\Channel\ChannelRendererRegistry();
-            $registry->register(new \Platform\Core\Verbalization\Channel\RssChannelRenderer(
-                $app->make(\Platform\Core\Verbalization\Feed\AtomFeedRenderer::class),
-            ));
-            $registry->register(new \Platform\Core\Verbalization\Channel\ObsidianChannelRenderer(
-                $app->make(\Platform\Core\Services\ObsidianStorageService::class),
-            ));
-            $registry->register(new \Platform\Core\Verbalization\Channel\WebChannelRenderer());
-            return $registry;
-        });
 
         // LLM-Provider-Infrastruktur fuer Verbalizer (und andere Konsumenten).
         $this->app->singleton(\Platform\Core\Services\LLMProviderRegistry::class, function ($app) {
@@ -551,23 +515,11 @@ class CoreServiceProvider extends ServiceProvider
             return $registry;
         });
 
-        // Verbalization: Template-Registry + Verbalizer.
-        $this->app->singleton(\Platform\Core\Verbalization\Template\TemplateRegistry::class);
-        $this->app->singleton(\Platform\Core\Verbalization\Verbalizer::class);
-
         // Content-Rendering-Schicht: Markdown (+Callouts/Applets) → Block-Liste.
         // Design-agnostisch; nx rendert die Blöcke via <x-nx-content>.
         $this->app->singleton(
             \Platform\Core\Content\ContentParser::class,
             \Platform\Core\Content\CommonMarkContentParser::class,
-        );
-
-        // ReportEngine-Facade: Produzenten-Module (planner, org, …) hängen nur an
-        // diesem Contract, nie an der konkreten Engine. Binding zieht später in den
-        // reporting-ServiceProvider um, wenn die Engine aus Core auswandert.
-        $this->app->singleton(
-            \Platform\Core\Verbalization\Contracts\ReportEngine::class,
-            \Platform\Core\Verbalization\CoreVerbalizationEngine::class,
         );
 
         // Passport Contracts binden (für OAuth Authorization Views)
@@ -947,57 +899,6 @@ class CoreServiceProvider extends ServiceProvider
         }
         if (class_exists(\Platform\Core\Tools\SemanticLayer\DryrunTool::class) && !$registry->has('core.semantic_layer.dryrun.POST')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\SemanticLayer\DryrunTool::class)); } catch (\Throwable $e) {}
-        }
-
-        // Verbalization Recipes (core.verbalization.recipes.*)
-        if (class_exists(\Platform\Core\Tools\Verbalization\ListRecipesTool::class) && !$registry->has('core.verbalization.recipes.LIST')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\ListRecipesTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Verbalization\CreateRecipeTool::class) && !$registry->has('core.verbalization.recipes.POST')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\CreateRecipeTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Verbalization\UpdateRecipeTool::class) && !$registry->has('core.verbalization.recipes.PUT')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\UpdateRecipeTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Verbalization\DeleteRecipeTool::class) && !$registry->has('core.verbalization.recipes.DELETE')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\DeleteRecipeTool::class)); } catch (\Throwable $e) {}
-        }
-
-        // Verbalization Feeds (core.verbalization.feeds.* + outputs.LIST)
-        if (class_exists(\Platform\Core\Tools\Verbalization\ListFeedsTool::class) && !$registry->has('core.verbalization.feeds.LIST')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\ListFeedsTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Verbalization\GetFeedTool::class) && !$registry->has('core.verbalization.feeds.GET')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\GetFeedTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Verbalization\CreateFeedTool::class) && !$registry->has('core.verbalization.feeds.POST')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\CreateFeedTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Verbalization\UpdateFeedTool::class) && !$registry->has('core.verbalization.feeds.PUT')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\UpdateFeedTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Verbalization\DeleteFeedTool::class) && !$registry->has('core.verbalization.feeds.DELETE')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\DeleteFeedTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Verbalization\RefreshFeedTool::class) && !$registry->has('core.verbalization.feeds.REFRESH')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\RefreshFeedTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Verbalization\ListOutputsTool::class) && !$registry->has('core.verbalization.outputs.LIST')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\ListOutputsTool::class)); } catch (\Throwable $e) {}
-        }
-
-        // Verbalization Channels (core.verbalization.channels.*)
-        if (class_exists(\Platform\Core\Tools\Verbalization\ListChannelsTool::class) && !$registry->has('core.verbalization.channels.LIST')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\ListChannelsTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Verbalization\CreateChannelTool::class) && !$registry->has('core.verbalization.channels.POST')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\CreateChannelTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Verbalization\UpdateChannelTool::class) && !$registry->has('core.verbalization.channels.PUT')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\UpdateChannelTool::class)); } catch (\Throwable $e) {}
-        }
-        if (class_exists(\Platform\Core\Tools\Verbalization\DeleteChannelTool::class) && !$registry->has('core.verbalization.channels.DELETE')) {
-            try { $registry->register($this->app->make(\Platform\Core\Tools\Verbalization\DeleteChannelTool::class)); } catch (\Throwable $e) {}
         }
 
         // Core AI Models (DB Source of Truth): tools for listing/updating models must be discoverable via module=core

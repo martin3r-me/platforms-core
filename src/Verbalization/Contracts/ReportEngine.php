@@ -13,9 +13,10 @@ use Platform\Core\Verbalization\VerbalizationResult;
  * organization, …) das Berichtswesen ansprechen, ohne die konkrete Engine
  * (Verbalizer/RecipeResolver) zu kennen.
  *
- * Bewusst in Core: jedes Modul hängt nur an diesem Interface, NIE am künftigen
- * reporting-Modul. Die Implementierung wandert später aus Core ins
- * reporting-Modul — nur das Binding zieht um, Consumer bleiben unberührt.
+ * Bewusst in Core: jedes Modul hängt nur an diesem Interface, NIE am
+ * reporting-Modul. Gebunden wird es von reporting; ist das Modul nicht
+ * installiert, ist der Contract ungebunden — Produzenten prüfen per
+ * app()->bound(ReportEngine::class) und verzichten dann.
  *
  * Deckt genau die Engine-Oberfläche ab, die Module heute direkt aufrufen:
  * ein Recipe auflösen + ein Subject verbalisieren. Primitive/Ports (Subject,
