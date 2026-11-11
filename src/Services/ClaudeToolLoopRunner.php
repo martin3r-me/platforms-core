@@ -427,7 +427,7 @@ class ClaudeToolLoopRunner
      */
     protected function isCurrentGenerationModel(string $model): bool
     {
-        return (bool) preg_match('/(sonnet-5|opus-4-7|opus-4-8|fable-5|mythos-5)/', $model);
+        return (bool) preg_match('/(sonnet-5|opus-4-7|opus-4-8|opus-5|fable-5|mythos-5)/', $model);
     }
 
     /**

@@ -62,7 +62,10 @@ class AnthropicProvider implements LLMProviderContract
         if ($system) {
             $payload['system'] = $system;
         }
-        if (isset($options['temperature'])) {
+        // Aktuelle Modellgeneration lehnt temperature mit HTTP 400 ab — dort weglassen
+        // (gleiche Regel wie ClaudeToolLoopRunner::modelAcceptsSampling()).
+        if (isset($options['temperature'])
+            && ! preg_match('/(sonnet-5|opus-4-7|opus-4-8|opus-5|fable-5|mythos-5)/', $model)) {
             $payload['temperature'] = $options['temperature'];
         }
 
