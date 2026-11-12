@@ -11,9 +11,8 @@ use Platform\Core\Tools\ToolRegistry;
 /**
  * Minimaler, CLI-tauglicher Agent-Runner mit Tool-Loop.
  *
- * Standard ist die Claude-API: run() übersetzt Optionen und Rückgabe auf den
- * {@see ClaudeToolLoopRunner}, damit Aufrufer (crm, hcm, planner, recruiting)
- * unverändert bleiben. Mit ai.agent_provider=openai läuft der alte Pfad:
+ * Mit options.provider = 'anthropic' übersetzt run() Optionen und Rückgabe auf den
+ * {@see ClaudeToolLoopRunner} (Opt-in je Aufrufer). Standard ist der OpenAI-Pfad:
  *
  * - ruft OpenAI Responses API per stream an (damit wir response_id + tool calls zuverlässig bekommen)
  * - sammelt function_call(s) aus dem Stream
@@ -52,8 +51,10 @@ class AiToolLoopRunner
      */
     public function run(array $messages, string $model, ToolContext $context, array $options = []): array
     {
-        // Standard: Claude-API (ai.agent_provider). Der OpenAI-Pfad unten bleibt als Fallback.
-        if (config('ai.agent_provider', 'anthropic') === 'anthropic') {
+        // Claude nur auf ausdrücklichen Wunsch des Aufrufers (options.provider = 'anthropic').
+        // Standard bleibt der OpenAI-Pfad — Aufrufer ohne Opt-in (z. B. recruiting)
+        // laufen unverändert.
+        if (($options['provider'] ?? config('ai.agent_provider', 'openai')) === 'anthropic') {
             $anthropic = app(AnthropicProvider::class);
             if ($anthropic->isAvailable()) {
                 return $this->runWithClaude($anthropic, $messages, $model, $context, $options);

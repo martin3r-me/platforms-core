@@ -9,10 +9,10 @@ return [
     ],
 
     /*
-     * Provider für agentische Tool-Loops (AiToolLoopRunner): 'anthropic' (Standard)
-     * oder 'openai' (alter Responses-API-Pfad).
+     * Standard-Provider für agentische Tool-Loops (AiToolLoopRunner), wenn der
+     * Aufrufer keinen wählt: 'openai' (Responses-API). Claude per options.provider.
      */
-    'agent_provider' => env('AI_AGENT_PROVIDER', 'anthropic'),
+    'agent_provider' => env('AI_AGENT_PROVIDER', 'openai'),
 
     /*
      * Lokaler / selbst gehosteter, OpenAI-kompatibler Inferenz-Server
