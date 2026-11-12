@@ -11,13 +11,14 @@ use Illuminate\Support\Str;
  */
 class IntentionVerificationService
 {
-    protected ?OpenAiService $openAiService = null;
+    protected ?AnthropicProvider $llm = null;
 
     public function __construct()
     {
-        // Lazy-Loading: OpenAiService nur wenn nötig
+        // Claude-API (kleines Modell) — ohne Key greift nur das Pattern-Matching
         try {
-            $this->openAiService = app(OpenAiService::class);
+            $provider = app(AnthropicProvider::class);
+            $this->llm = $provider->isAvailable() ? $provider : null;
         } catch (\Throwable $e) {
             // Service nicht verfügbar - Pattern-Matching funktioniert trotzdem
         }
@@ -140,7 +141,7 @@ class IntentionVerificationService
         
         // Wenn Pattern-Matching nichts gefunden hat und LLM verfügbar und aktiviert: Nutze LLM
         $useLLMExtraction = config('tools.intention_verification.use_llm_extraction', true);
-        if ($intention->isEmpty() && $this->openAiService && $useLLMExtraction) {
+        if ($intention->isEmpty() && $this->llm && $useLLMExtraction) {
             $intention = $this->extractWithLLM($userMessage);
         }
         
@@ -216,7 +217,7 @@ class IntentionVerificationService
      */
     protected function extractWithLLM(string $userMessage): Intention
     {
-        if (!$this->openAiService) {
+        if (!$this->llm) {
             return new Intention();
         }
         
@@ -226,10 +227,10 @@ class IntentionVerificationService
             $prompt .= "Antworte NUR mit JSON im Format:\n";
             $prompt .= '{"type": "delete|create|update|read", "target": "was soll geändert werden", "expectedCount": 3, "isAll": false}';
             
-            $response = $this->openAiService->chat([
+            $response = $this->llm->chat([
                 ['role' => 'system', 'content' => 'Du bist ein Intention-Extraktor. Antworte NUR mit JSON.'],
                 ['role' => 'user', 'content' => $prompt]
-            ], 'gpt-4o-mini', ['max_tokens' => 200]);
+            ], ['model' => 'claude-haiku-4-5-20251001', 'max_tokens' => 200]);
             
             $content = $response['content'] ?? '{}';
             // Entferne Markdown-Code-Blöcke falls vorhanden
