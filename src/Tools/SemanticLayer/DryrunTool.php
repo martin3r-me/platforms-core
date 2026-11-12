@@ -8,14 +8,14 @@ use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\SemanticLayer\Services\SemanticLayerResolver;
 use Platform\Core\SemanticLayer\Models\SemanticLayer;
-use Platform\Core\Services\OpenAiService;
+use Platform\Core\Services\AnthropicProvider;
 
 /**
  * core.semantic_layer.dryrun.POST
  *
- * Dünner Adapter, der serverseitig einen LLM-Call gegen OpenAiService::chat()
- * ausführt. Der Semantic Layer wird dort automatisch via CoreContextTool in den
- * System-Prompt gemischt (`with_context=true`). Das Tool liefert den Modell-
+ * Dünner Adapter, der serverseitig einen LLM-Call gegen die Claude-API
+ * (AnthropicProvider::chat()) ausführt. Der aufgelöste Semantic Layer wird vor
+ * den System-Prompt gestellt. Das Tool liefert den Modell-
  * Output 1:1 zurück + zusätzlich `layer_active` + `layer_meta`.
  *
  * Bewusst: kein Tool-Loop, keine State-Effekte, keine Persistenz — reines
@@ -32,7 +32,7 @@ class DryrunTool implements ToolContract, ToolMetadataContract
 
     public function __construct(
         private readonly SemanticLayerResolver $resolver,
-        private readonly OpenAiService $openAi,
+        private readonly AnthropicProvider $claude,
     ) {
     }
 
@@ -164,29 +164,24 @@ class DryrunTool implements ToolContract, ToolMetadataContract
 
         // ---- Build messages ----
         $messages = [];
-        if ($system !== null) {
-            $messages[] = ['role' => 'system', 'content' => $system];
+        $systemParts = array_filter([$layerActive ? $resolved->rendered_block : null, $system]);
+        if ($systemParts !== []) {
+            $messages[] = ['role' => 'system', 'content' => implode("\n\n", $systemParts)];
         }
         $messages[] = ['role' => 'user', 'content' => $prompt];
 
         // ---- Options ----
         $options = [
-            'with_context' => true,
-            'tools' => false,
             'max_tokens' => $maxTokens,
             'temperature' => $temperature,
         ];
-        if ($module !== null) {
-            $options['source_module'] = $module;
+        if ($model !== null) {
+            $options['model'] = $model;
         }
 
         // ---- LLM-Call ----
         try {
-            if ($model !== null) {
-                $result = $this->openAi->chat($messages, $model, $options);
-            } else {
-                $result = $this->openAi->chat($messages, options: $options);
-            }
+            $result = $this->claude->chat($messages, $options);
         } catch (\Throwable $e) {
             return ToolResult::error(
                 'LLM_ERROR',

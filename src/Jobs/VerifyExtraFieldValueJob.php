@@ -10,7 +10,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Models\ContextFile;
 use Platform\Core\Models\CoreExtraFieldValue;
-use Platform\Core\Services\OpenAiService;
+use Platform\Core\Services\AnthropicProvider;
 
 class VerifyExtraFieldValueJob implements ShouldQueue
 {
@@ -23,7 +23,7 @@ class VerifyExtraFieldValueJob implements ShouldQueue
         private int $fieldValueId
     ) {}
 
-    public function handle(OpenAiService $openAi): void
+    public function handle(AnthropicProvider $claude): void
     {
         $fieldValue = CoreExtraFieldValue::with('definition')->find($this->fieldValueId);
 
@@ -81,10 +81,10 @@ class VerifyExtraFieldValueJob implements ShouldQueue
                 if ($file->isImage()) {
                     $hasImages = true;
                     $content[] = [
-                        'type' => 'image_url',
-                        'image_url' => [
+                        'type' => 'image',
+                        'source' => [
+                            'type' => 'url',
                             'url' => $file->getUrlForExternalService(15),
-                            'detail' => 'high',
                         ],
                     ];
                 }
@@ -105,7 +105,7 @@ class VerifyExtraFieldValueJob implements ShouldQueue
             ]);
 
             // Call LLM with Vision
-            $response = $openAi->chat([
+            $response = $claude->chat([
                 [
                     'role' => 'system',
                     'content' => 'Du bist ein Dokument-Verifizierer. Analysiere das Bild und antworte NUR mit einem JSON-Objekt in diesem Format (kein Markdown, keine Code-Blöcke, nur JSON): {"verified": true/false, "confidence": 0-100, "reason": "Kurze Begründung auf Deutsch"}',
@@ -114,9 +114,8 @@ class VerifyExtraFieldValueJob implements ShouldQueue
                     'role' => 'user',
                     'content' => $content,
                 ],
-            ], 'gpt-4o', [
-                'max_tokens' => 500,
-                'tools' => false, // Disable tools for this request
+            ], [
+                'max_tokens' => 1024,
             ]);
 
             Log::info('VerifyExtraFieldValueJob: LLM Response received', [

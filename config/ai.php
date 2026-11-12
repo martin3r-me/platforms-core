@@ -4,7 +4,15 @@ return [
     'anthropic' => [
         'api_key' => env('ANTHROPIC_API_KEY'),
         'inference_model' => env('ANTHROPIC_INFERENCE_MODEL', 'claude-sonnet-5'),
+        // Kleines, schnelles Modell für Klassifikation/Extraktion (Alias 'fast').
+        'fast_model' => env('ANTHROPIC_FAST_MODEL', 'claude-haiku-4-5-20251001'),
     ],
+
+    /*
+     * Provider für agentische Tool-Loops (AiToolLoopRunner): 'anthropic' (Standard)
+     * oder 'openai' (alter Responses-API-Pfad).
+     */
+    'agent_provider' => env('AI_AGENT_PROVIDER', 'anthropic'),
 
     /*
      * Lokaler / selbst gehosteter, OpenAI-kompatibler Inferenz-Server

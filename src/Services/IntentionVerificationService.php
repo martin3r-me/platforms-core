@@ -230,7 +230,7 @@ class IntentionVerificationService
             $response = $this->llm->chat([
                 ['role' => 'system', 'content' => 'Du bist ein Intention-Extraktor. Antworte NUR mit JSON.'],
                 ['role' => 'user', 'content' => $prompt]
-            ], ['model' => 'claude-haiku-4-5-20251001', 'max_tokens' => 200]);
+            ], ['model' => 'fast', 'max_tokens' => 200]);
             
             $content = $response['content'] ?? '{}';
             // Entferne Markdown-Code-Blöcke falls vorhanden

@@ -10,11 +10,13 @@ use Platform\Core\Contracts\LLMProviderContract;
  * Anthropic Claude Provider — direkter HTTP-Wrapper auf die Messages-API.
  *
  * Bewusst schlank: keine Tool-Loop (das macht ClaudeToolLoopRunner),
- * nur ein chat()-Call fuer reine Text-Generierung. Streaming V1 noch nicht.
+ * nur ein chat()-Call fuer Text-Generierung (optional mit serverseitiger
+ * Websuche). Streaming V1 noch nicht.
  */
 class AnthropicProvider implements LLMProviderContract
 {
     public const DEFAULT_MODEL = 'claude-sonnet-4-6';
+    public const FAST_MODEL = 'claude-haiku-4-5-20251001';
     protected const BASE_URL = 'https://api.anthropic.com/v1';
     protected const API_VERSION = '2023-06-01';
     protected const DEFAULT_MAX_TOKENS = 4096;
@@ -31,7 +33,7 @@ class AnthropicProvider implements LLMProviderContract
             throw new \RuntimeException('AnthropicProvider: ANTHROPIC_API_KEY ist nicht gesetzt.');
         }
 
-        $model = $options['model'] ?? $this->getDefaultModel();
+        $model = $this->resolveModel($options['model'] ?? null);
         $maxTokens = $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS;
 
         // Anthropic Messages-API trennt system aus messages heraus.
@@ -82,26 +84,26 @@ class AnthropicProvider implements LLMProviderContract
             $payload['output_config'] = ['effort' => $options['effort']];
         }
 
-        $response = Http::timeout(self::TIMEOUT_SECONDS)
-            ->withHeaders([
-                'x-api-key' => config('ai.anthropic.api_key'),
-                'anthropic-version' => self::API_VERSION,
-                'content-type' => 'application/json',
-            ])
-            ->post(self::BASE_URL . '/messages', $payload);
-
-        if (! $response->successful()) {
-            Log::warning('AnthropicProvider chat failed', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
-            throw new \RuntimeException(
-                'Anthropic API error ' . $response->status() . ': ' . $response->body()
-            );
+        // Websuche als serverseitiges Tool (Anthropic führt die Suche selbst aus).
+        $webSearch = (bool) ($options['web_search'] ?? $options['include_web_search'] ?? false);
+        if ($webSearch) {
+            $payload['tools'] = [self::webSearchTool((int) ($options['web_search_max_uses'] ?? 5))];
         }
 
-        $body = $response->json();
-        $text = collect($body['content'] ?? [])
+        $body = $this->messages($payload, [
+            'timeout' => (int) ($options['timeout'] ?? self::TIMEOUT_SECONDS),
+            'max_retries' => 2,
+        ]);
+        $content = $body['content'] ?? [];
+
+        // Lange Server-Tool-Läufe (Websuche) pausieren mit pause_turn — dann fortsetzen.
+        for ($i = 0; $i < 3 && ($body['stop_reason'] ?? null) === 'pause_turn'; $i++) {
+            $payload['messages'][] = ['role' => 'assistant', 'content' => $body['content'] ?? []];
+            $body = $this->messages($payload, ['timeout' => (int) ($options['timeout'] ?? self::TIMEOUT_SECONDS), 'max_retries' => 2]);
+            $content = array_merge($content, $body['content'] ?? []);
+        }
+
+        $text = collect($content)
             ->filter(fn ($block) => ($block['type'] ?? null) === 'text')
             ->pluck('text')
             ->implode('');
@@ -119,8 +121,48 @@ class AnthropicProvider implements LLMProviderContract
             'usage' => $body['usage'] ?? [],
             'model' => $body['model'] ?? $model,
             'tool_calls' => null,
-            'sources' => [], // include_web_search wird von diesem Provider ignoriert
+            'sources' => $webSearch ? $this->extractSources($content) : [],
         ];
+    }
+
+    /** Serverseitiges Websuche-Tool der Messages-API. */
+    public static function webSearchTool(int $maxUses = 5): array
+    {
+        return ['type' => 'web_search_20250305', 'name' => 'web_search', 'max_uses' => max(1, $maxUses)];
+    }
+
+    /**
+     * Modell auflösen: 'fast' = kleines Modell (ai.anthropic.fast_model), Claude-IDs
+     * unverändert, alles andere (z. B. alte OpenAI-IDs aus Konfiguration/DB) → Default.
+     */
+    public function resolveModel(?string $model): string
+    {
+        if ($model === 'fast') {
+            return (string) config('ai.anthropic.fast_model', self::FAST_MODEL);
+        }
+        if (is_string($model) && str_starts_with($model, 'claude-')) {
+            return $model;
+        }
+
+        return $this->getDefaultModel();
+    }
+
+    /** @return array<int, array{url:string,title:?string}> */
+    protected function extractSources(array $content): array
+    {
+        $sources = [];
+        foreach ($content as $block) {
+            if (($block['type'] ?? null) !== 'web_search_tool_result' || ! is_array($block['content'] ?? null)) {
+                continue;
+            }
+            foreach ($block['content'] as $r) {
+                if (! empty($r['url'])) {
+                    $sources[$r['url']] = ['url' => $r['url'], 'title' => $r['title'] ?? null];
+                }
+            }
+        }
+
+        return array_values($sources);
     }
 
     public function streamChat(array $messages, callable $onDelta, array $options = []): void

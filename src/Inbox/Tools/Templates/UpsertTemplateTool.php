@@ -50,7 +50,7 @@ class UpsertTemplateTool implements ToolContract, ToolMetadataContract
                 'system_prompt' => ['type' => 'string'],
                 'preferred_provider' => [
                     'type' => 'string',
-                    'description' => 'Provider:Model, z. B. "openai:gpt-4o-mini" oder "claude:claude-haiku-4-5".',
+                    'description' => 'Provider:Model, z. B. "claude:claude-haiku-4-5" (Standard) oder "claude:claude-sonnet-5".',
                 ],
                 'output_schema' => [
                     'type' => 'object',
@@ -105,7 +105,7 @@ class UpsertTemplateTool implements ToolContract, ToolMetadataContract
                 'applicable_channels' => array_values((array) $arguments['applicable_channels']),
                 'prompt_template' => (string) $arguments['prompt_template'],
                 'system_prompt' => isset($arguments['system_prompt']) ? (string) $arguments['system_prompt'] : null,
-                'preferred_provider' => $arguments['preferred_provider'] ?? 'openai:gpt-4o-mini',
+                'preferred_provider' => $arguments['preferred_provider'] ?? 'claude:claude-haiku-4-5',
                 'output_schema' => $arguments['output_schema'],
                 'version' => 1,
                 'is_active' => $arguments['is_active'] ?? true,

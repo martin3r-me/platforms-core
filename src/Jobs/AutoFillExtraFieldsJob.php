@@ -11,7 +11,8 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Models\CoreExtraFieldDefinition;
 use Platform\Core\Models\CoreExtraFieldValue;
-use Platform\Core\Services\OpenAiService;
+use Platform\Core\Contracts\LLMProviderContract;
+use Platform\Core\Services\LLMProviderRegistry;
 
 class AutoFillExtraFieldsJob implements ShouldQueue
 {
@@ -25,8 +26,14 @@ class AutoFillExtraFieldsJob implements ShouldQueue
         private int $fieldableId
     ) {}
 
-    public function handle(OpenAiService $openAi): void
+    public function handle(LLMProviderRegistry $registry): void
     {
+        $llm = $registry->getDefaultProvider();
+        if (! $llm) {
+            Log::warning('AutoFillExtraFieldsJob: kein LLM-Provider verfügbar');
+            return;
+        }
+
         // Resolve the model
         if (!class_exists($this->fieldableType)) {
             Log::warning('AutoFillExtraFieldsJob: Model class not found', [
@@ -86,8 +93,8 @@ class AutoFillExtraFieldsJob implements ShouldQueue
 
             try {
                 $value = match ($definition->auto_fill_source) {
-                    'llm' => $this->autoFillWithLlm($openAi, $definition, $context),
-                    'websearch' => $this->autoFillWithWebSearch($openAi, $definition, $context),
+                    'llm' => $this->autoFillWithLlm($llm, $definition, $context),
+                    'websearch' => $this->autoFillWithWebSearch($llm, $definition, $context),
                     default => null,
                 };
 
@@ -150,7 +157,7 @@ class AutoFillExtraFieldsJob implements ShouldQueue
     /**
      * Auto-fill using LLM
      */
-    private function autoFillWithLlm(OpenAiService $openAi, CoreExtraFieldDefinition $definition, string $context): ?string
+    private function autoFillWithLlm(LLMProviderContract $llm, CoreExtraFieldDefinition $definition, string $context): ?string
     {
         $prompt = $definition->auto_fill_prompt ?: "Fülle das Feld '{$definition->label}' basierend auf dem Kontext aus.";
 
@@ -181,12 +188,11 @@ MSG;
 
         $userMessage .= "\n\nAnweisung: {$prompt}";
 
-        $response = $openAi->chat([
+        $response = $llm->chat([
             ['role' => 'system', 'content' => $systemPrompt],
             ['role' => 'user', 'content' => $userMessage],
-        ], 'gpt-4o', [
+        ], [
             'max_tokens' => 200,
-            'tools' => false,
         ]);
 
         $value = $this->extractTextFromResponse($response);
@@ -200,35 +206,16 @@ MSG;
     }
 
     /**
-     * Auto-fill using WebSearch
+     * Auto-fill using WebSearch (serverseitige Websuche des Providers)
      */
-    private function autoFillWithWebSearch(OpenAiService $openAi, CoreExtraFieldDefinition $definition, string $context): ?string
+    private function autoFillWithWebSearch(LLMProviderContract $llm, CoreExtraFieldDefinition $definition, string $context): ?string
     {
         $searchPrompt = $definition->auto_fill_prompt ?: "Finde Informationen für '{$definition->label}'";
 
-        // First, use LLM to generate a good search query
-        $queryResponse = $openAi->chat([
-            ['role' => 'system', 'content' => 'Generiere eine optimale Google-Suchanfrage basierend auf dem Kontext. Antworte NUR mit der Suchanfrage, ohne Erklärungen.'],
-            ['role' => 'user', 'content' => "Kontext:\n{$context}\n\nZiel: {$searchPrompt}"],
-        ], 'gpt-4o-mini', [
-            'max_tokens' => 100,
-            'tools' => false,
-        ]);
-
-        $searchQuery = trim($this->extractTextFromResponse($queryResponse));
-
-        if (empty($searchQuery)) {
-            return null;
-        }
-
-        // Use web_search tool if available, otherwise fall back to LLM with context
-        // For now, we'll simulate web search by using LLM with search-like context
-        // In production, this would integrate with actual web search API
-
         $webSearchPrompt = <<<PROMPT
-Du simulierst eine Web-Suche. Basierend auf der Suchanfrage und dem Kontext, was wäre das wahrscheinlichste Ergebnis für das gesuchte Feld?
+Recherchiere im Web den Wert für das gesuchte Feld.
 
-Suchanfrage: {$searchQuery}
+Ziel: {$searchPrompt}
 
 Kontext:
 {$context}
@@ -236,14 +223,15 @@ Kontext:
 Feld: {$definition->label}
 Feldtyp: {$definition->type}
 
-Antworte NUR mit dem Wert, ohne Erklärungen. Bei Unsicherheit antworte mit "UNKNOWN".
+Antworte NUR mit dem Wert, ohne Erklärungen und ohne Quellenangaben. Bei Unsicherheit antworte mit "UNKNOWN".
 PROMPT;
 
-        $response = $openAi->chat([
+        $response = $llm->chat([
             ['role' => 'user', 'content' => $webSearchPrompt],
-        ], 'gpt-4o', [
-            'max_tokens' => 200,
-            'tools' => false,
+        ], [
+            'max_tokens' => 1024,
+            'web_search' => true,
+            'timeout' => 120,
         ]);
 
         $value = $this->extractTextFromResponse($response);

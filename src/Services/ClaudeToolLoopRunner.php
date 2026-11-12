@@ -70,6 +70,7 @@ class ClaudeToolLoopRunner
      *   system?: string,
      *   tools?: string[],          // Direct tools exposed as individual Anthropic tool definitions
      *   include_meta_tools?: bool, // Include discover_tools + execute_tool (default: true)
+     *   server_tools?: array,      // Anthropic server tools, e.g. [AnthropicProvider::webSearchTool()]
      *   temperature?: float,
      *   thinking?: array,
      *   effort?: string,           // output_config.effort (low|medium|high|xhigh|max) on models that support it
@@ -131,6 +132,11 @@ class ClaudeToolLoopRunner
 
         // Build tool definitions
         $toolDefinitions = $this->buildToolDefinitions($directToolNames, $includeMetaTools);
+        foreach ((array) ($options['server_tools'] ?? []) as $serverTool) {
+            if (is_array($serverTool) && isset($serverTool['type'])) {
+                $toolDefinitions[] = $serverTool;
+            }
+        }
 
         $totalUsage = [
             'input_tokens' => 0,
@@ -237,6 +243,11 @@ class ClaudeToolLoopRunner
             }
 
             if (empty($toolUseBlocks)) {
+                // Server tools (web search) pause long turns — resume with the partial content.
+                if ($stopReason === 'pause_turn') {
+                    $messages[] = ['role' => 'assistant', 'content' => $content];
+                    continue;
+                }
                 break;
             }
 

@@ -9,7 +9,11 @@ use Platform\Core\Tools\ToolExecutor;
 use Platform\Core\Tools\ToolRegistry;
 
 /**
- * Minimaler, CLI-tauglicher Agent-Runner mit Tool-Loop (Responses API best practice).
+ * Minimaler, CLI-tauglicher Agent-Runner mit Tool-Loop.
+ *
+ * Standard ist die Claude-API: run() übersetzt Optionen und Rückgabe auf den
+ * {@see ClaudeToolLoopRunner}, damit Aufrufer (crm, hcm, planner, recruiting)
+ * unverändert bleiben. Mit ai.agent_provider=openai läuft der alte Pfad:
  *
  * - ruft OpenAI Responses API per stream an (damit wir response_id + tool calls zuverlässig bekommen)
  * - sammelt function_call(s) aus dem Stream
@@ -48,6 +52,14 @@ class AiToolLoopRunner
      */
     public function run(array $messages, string $model, ToolContext $context, array $options = []): array
     {
+        // Standard: Claude-API (ai.agent_provider). Der OpenAI-Pfad unten bleibt als Fallback.
+        if (config('ai.agent_provider', 'anthropic') === 'anthropic') {
+            $anthropic = app(AnthropicProvider::class);
+            if ($anthropic->isAvailable()) {
+                return $this->runWithClaude($anthropic, $messages, $model, $context, $options);
+            }
+        }
+
         $maxIterations = (int)($options['max_iterations'] ?? 50);
         if ($maxIterations < 1) { $maxIterations = 1; }
         if ($maxIterations > 200) { $maxIterations = 200; }
@@ -376,6 +388,73 @@ class AiToolLoopRunner
                 $this->openAi->setSkipDiscoveryTools(false);
             }
         }
+    }
+
+    /**
+     * Claude-Pfad: gleiche Optionen und gleiche Rückgabeform wie der OpenAI-Pfad.
+     *   preload_tools → direkte Tools, skip_discovery_tools → ohne execute_tool-Meta-Tool,
+     *   include_web_search → serverseitige Websuche, reasoning.effort → effort.
+     */
+    protected function runWithClaude(AnthropicProvider $anthropic, array $messages, string $model, ToolContext $context, array $options): array
+    {
+        $system = null;
+        $claudeMessages = [];
+        foreach ($messages as $m) {
+            if (($m['role'] ?? null) === 'system') {
+                $system = trim(($system ?? '') . "\n\n" . (string) ($m['content'] ?? ''));
+                continue;
+            }
+            $claudeMessages[] = ['role' => $m['role'] ?? 'user', 'content' => $m['content'] ?? ''];
+        }
+
+        $maxIterations = max(1, min(200, (int) ($options['max_iterations'] ?? 50)));
+        $maxTokens = (int) ($options['max_output_tokens'] ?? ($options['max_tokens'] ?? 2000));
+        $effort = is_array($options['reasoning'] ?? null) ? ($options['reasoning']['effort'] ?? null) : null;
+
+        $preload = array_values(array_filter((array) ($options['preload_tools'] ?? []), 'is_string'));
+        $onIteration = $options['on_iteration'] ?? null;
+
+        $claudeOptions = [
+            'model' => $anthropic->resolveModel($model),
+            // Adaptives Denken teilt sich max_tokens mit der Antwort.
+            'max_tokens' => max($maxTokens, 8192),
+            'max_iterations' => $maxIterations,
+            'system' => $system,
+            'tools' => $preload,
+            'include_meta_tools' => empty($options['skip_discovery_tools']) || $preload === [],
+            'server_tools' => (bool) ($options['include_web_search'] ?? true) ? [AnthropicProvider::webSearchTool()] : [],
+            'on_tool_result' => $options['on_tool_result'] ?? null,
+            'on_iteration' => is_callable($onIteration)
+                ? function (int $iteration, array $response) use ($onIteration) {
+                    $names = [];
+                    $textLen = 0;
+                    foreach ($response['content'] ?? [] as $block) {
+                        if (($block['type'] ?? null) === 'tool_use') {
+                            $names[] = ($block['name'] ?? '') === 'execute_tool'
+                                ? (string) ($block['input']['tool'] ?? '?')
+                                : $this->nameMapper->toCanonical((string) ($block['name'] ?? '?'));
+                        } elseif (($block['type'] ?? null) === 'text') {
+                            $textLen += strlen((string) ($block['text'] ?? ''));
+                        }
+                    }
+                    $onIteration($iteration, $names, $textLen);
+                }
+                : null,
+        ];
+        if (is_string($effort) && $effort !== '') {
+            $claudeOptions['effort'] = $effort;
+        }
+
+        $result = ClaudeToolLoopRunner::make()->run($claudeMessages, $context, $claudeOptions);
+
+        return [
+            'assistant' => trim((string) ($result['assistant_text'] ?? '')),
+            'iterations' => (int) ($result['iterations'] ?? 0),
+            'previous_response_id' => null,
+            'next_input' => null,
+            'last_tool_calls' => [],
+            'all_tool_call_names' => array_values(array_map(fn ($c) => (string) ($c['tool'] ?? '?'), $result['tool_calls'] ?? [])),
+        ];
     }
 }
 
