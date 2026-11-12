@@ -75,6 +75,13 @@ class AnthropicProvider implements LLMProviderContract
             $payload['temperature'] = $options['temperature'];
         }
 
+        // Denktiefe (output_config.effort) — nur auf Modellen, die es kennen
+        // (gleiche Liste wie ClaudeToolLoopRunner::modelSupportsEffort()).
+        if (isset($options['effort'])
+            && preg_match('/(sonnet-5|sonnet-4-6|opus-4-5|opus-4-6|opus-4-7|opus-4-8|fable-5|mythos-5)/', $model)) {
+            $payload['output_config'] = ['effort' => $options['effort']];
+        }
+
         $response = Http::timeout(self::TIMEOUT_SECONDS)
             ->withHeaders([
                 'x-api-key' => config('ai.anthropic.api_key'),
