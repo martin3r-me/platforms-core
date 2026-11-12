@@ -54,6 +54,12 @@ class AnthropicProvider implements LLMProviderContract
                 . $schemaJson);
         }
 
+        // Aktuelle Modellgeneration denkt adaptiv — das Denken teilt sich max_tokens
+        // mit der Antwort. Bei knappem Budget bleibt sonst kein Text übrig.
+        if (preg_match('/(sonnet-5|opus-4-7|opus-4-8|opus-5|fable-5|mythos-5)/', $model)) {
+            $maxTokens = max($maxTokens, 8192);
+        }
+
         $payload = [
             'model' => $model,
             'max_tokens' => $maxTokens,
@@ -92,6 +98,14 @@ class AnthropicProvider implements LLMProviderContract
             ->filter(fn ($block) => ($block['type'] ?? null) === 'text')
             ->pluck('text')
             ->implode('');
+
+        if (trim($text) === '') {
+            Log::warning('AnthropicProvider chat returned no text', [
+                'model' => $body['model'] ?? $model,
+                'stop_reason' => $body['stop_reason'] ?? null,
+                'usage' => $body['usage'] ?? [],
+            ]);
+        }
 
         return [
             'content' => $text,
