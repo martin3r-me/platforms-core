@@ -8,6 +8,24 @@ use Platform\Core\Models\DocumentFolder;
 use Platform\Core\Services\ContextFileService;
 use Platform\Core\Services\Documents\DocumentTemplateRegistry;
 
+// Direkt-Upload (#1023): signierter Einmal-Link aus core.context.files.upload.request, kein weiterer Login nötig.
+Route::match(['put', 'post'], '/context-files/direct-upload/{uuid}', function (Request $request, string $uuid) {
+    $upload = \Platform\Core\Models\ContextFileUpload::where('uuid', $uuid)->where('status', 'pending')->first();
+    if (!$upload || $upload->expires_at->isPast()) {
+        abort(404, 'Upload-Link ungültig, abgelaufen oder bereits verwendet.');
+    }
+    $length = $request->headers->has('Content-Length') ? (int) $request->headers->get('Content-Length') : null;
+    try {
+        app(\Platform\Core\Services\DirectUploadService::class)->receive($upload, $request->getContent(true), $length);
+    } catch (\Throwable $e) {
+        return response()->json(['ok' => false, 'error' => $e->getMessage()], 422);
+    }
+
+    return response()->json(['ok' => true, 'upload_id' => $upload->uuid, 'next' => 'core.context.files.upload.finish']);
+})->middleware('signed')
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class, \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
+    ->name('core.context-files.direct-upload');
+
 Route::get('/form/{token}', PublicExtraFieldForm::class)
     ->name('core.public.extra-field-form');
 
