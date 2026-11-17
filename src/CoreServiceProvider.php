@@ -253,6 +253,7 @@ class CoreServiceProvider extends ServiceProvider
                 TrackBillableUsage::class,
                 CreateMonthlyInvoices::class,
                 \Platform\Core\Console\Commands\AuthzSeedGrantsCommand::class,
+                \Platform\Core\Console\Commands\CleanupDirectUploadsCommand::class,
                 \Platform\Core\Console\Commands\SecurityHashKeyCommand::class,
                 \Platform\Core\Console\Commands\CreateApiTokenCommand::class,
                 \Platform\Core\Console\Commands\CreateEndpointApiTokenCommand::class,
@@ -334,6 +335,9 @@ class CoreServiceProvider extends ServiceProvider
 
             // Context-Date-Times: rollendes 90-Tage-Occurrences-Fenster nachts auffrischen.
             $schedule->command('core:context-date-times:refresh-expansion-horizon')->dailyAt('02:30');
+
+            // Direkt-Uploads (#1023): abgelaufene Links + unverknüpfte Dateien aufräumen
+            $schedule->command('core:context-files:cleanup-uploads')->hourly();
         });
 
         // Entity-Pulse: cross-modularer Aggregator-Collector + Template. Wohnt im
@@ -945,6 +949,9 @@ class CoreServiceProvider extends ServiceProvider
             'core.context.files.upload.start' => \Platform\Core\Tools\StartContextFileUploadTool::class,
             'core.context.files.upload.chunk' => \Platform\Core\Tools\ChunkContextFileUploadTool::class,
             'core.context.files.upload.complete' => \Platform\Core\Tools\CompleteContextFileUploadTool::class,
+            'core.context.files.upload.request' => \Platform\Core\Tools\RequestContextFileUploadTool::class,
+            'core.context.files.upload.finish' => \Platform\Core\Tools\FinishContextFileUploadTool::class,
+            'core.context.files.attach' => \Platform\Core\Tools\AttachContextFileTool::class,
         ] as $uploadToolName => $uploadToolClass) {
             if (class_exists($uploadToolClass) && !$registry->has($uploadToolName)) {
                 try { $registry->register($this->app->make($uploadToolClass)); } catch (\Throwable $e) {}
