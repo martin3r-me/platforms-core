@@ -941,6 +941,15 @@ class CoreServiceProvider extends ServiceProvider
         if (class_exists(\Platform\Core\Tools\CreateContextFileTool::class) && !$registry->has('core.context.files.CREATE')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\CreateContextFileTool::class)); } catch (\Throwable $e) {}
         }
+        foreach ([
+            'core.context.files.upload.start' => \Platform\Core\Tools\StartContextFileUploadTool::class,
+            'core.context.files.upload.chunk' => \Platform\Core\Tools\ChunkContextFileUploadTool::class,
+            'core.context.files.upload.complete' => \Platform\Core\Tools\CompleteContextFileUploadTool::class,
+        ] as $uploadToolName => $uploadToolClass) {
+            if (class_exists($uploadToolClass) && !$registry->has($uploadToolName)) {
+                try { $registry->register($this->app->make($uploadToolClass)); } catch (\Throwable $e) {}
+            }
+        }
         if (class_exists(\Platform\Core\Tools\DeleteContextFileTool::class) && !$registry->has('core.context.files.DELETE')) {
             try { $registry->register($this->app->make(\Platform\Core\Tools\DeleteContextFileTool::class)); } catch (\Throwable $e) {}
         }
