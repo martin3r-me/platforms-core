@@ -14,8 +14,32 @@ class ToolResult
         public readonly mixed $data = null,
         public readonly ?string $error = null,
         public readonly ?string $errorCode = null,
-        public readonly array $metadata = []
+        public readonly array $metadata = [],
+        /** @var array<int, array{data: string, mime: string}> Bild-Anhänge (Binärdaten) */
+        public readonly array $images = []
     ) {}
+
+    /**
+     * Hängt ein Bild an (Binärdaten oder existierender Dateipfad). Mehrfach aufrufbar.
+     * Ohne Bilder bleibt die Tool-Antwort exakt wie bisher (nur Text/JSON).
+     * Grenzen (Größe/Anzahl/Mime) erzwingt der MCP-Adapter.
+     */
+    public function withImage(string $binaryOrPath, string $mime = 'image/png'): self
+    {
+        $binary = $binaryOrPath;
+        if (strlen($binaryOrPath) < 4096 && !str_contains($binaryOrPath, "\0") && @is_file($binaryOrPath)) {
+            $binary = (string) file_get_contents($binaryOrPath);
+        }
+
+        return new self(
+            $this->success,
+            $this->data,
+            $this->error,
+            $this->errorCode,
+            $this->metadata,
+            [...$this->images, ['data' => $binary, 'mime' => $mime]]
+        );
+    }
 
     /**
      * Erstellt ein erfolgreiches Ergebnis

@@ -13,6 +13,10 @@ use Platform\Core\Services\TeamContext;
 use Platform\Core\Models\McpSession;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Response;
+use Laravel\Mcp\ResponseFactory;
+use Platform\Core\Mcp\Content\ImageResponse;
+use Intervention\Image\Drivers\Gd\Driver as GdDriver;
+use Intervention\Image\ImageManager;
 use Laravel\Mcp\Request;
 use Laravel\Passport\Token;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -157,7 +161,7 @@ class ToolContractAdapter extends Tool
     /**
      * Führt das Tool aus und konvertiert das Ergebnis
      */
-    public function handle(Request $request): Response
+    public function handle(Request $request): Response|ResponseFactory
     {
         try {
             // Arguments aus MCP Request extrahieren
@@ -423,7 +427,7 @@ class ToolContractAdapter extends Tool
     /**
      * Konvertiert ToolResult zu MCP Response
      */
-    private function convertToolResult(ToolResult $result): Response
+    private function convertToolResult(ToolResult $result): Response|ResponseFactory
     {
         if (!$result->success) {
             $errorMessage = $result->error ?? 'Unknown error';
@@ -437,14 +441,74 @@ class ToolContractAdapter extends Tool
 
         if (is_array($data) || is_object($data)) {
             $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            return Response::text($json);
+            $text = Response::text($json);
+        } elseif (is_string($data)) {
+            $text = Response::text($data);
+        } else {
+            $text = Response::text((string) $data);
         }
 
-        if (is_string($data)) {
-            return Response::text($data);
+        if (empty($result->images)) {
+            return $text;
         }
 
-        return Response::text((string) $data);
+        $parts = [$text];
+        $skipped = 0;
+        foreach (array_slice($result->images, 0, self::MAX_IMAGES) as $image) {
+            $prepared = $this->prepareImage($image['data'], $image['mime']);
+            if ($prepared === null) {
+                $skipped++;
+                continue;
+            }
+            $parts[] = ImageResponse::fromBase64(base64_encode($prepared['data']), $prepared['mime']);
+        }
+        $skipped += max(0, count($result->images) - self::MAX_IMAGES);
+        if ($skipped > 0) {
+            $parts[] = Response::text("[Hinweis: {$skipped} Bild(er) nicht ausgegeben – Limit " . self::MAX_IMAGES . ' Bilder, ' . (self::MAX_IMAGE_BYTES / 1024) . ' KB je Bild, png/jpeg/webp]');
+        }
+
+        return Response::make($parts);
+    }
+
+    private const MAX_IMAGES = 6;
+    private const MAX_IMAGE_BYTES = 1572864; // 1,5 MB je Bild
+    private const ALLOWED_IMAGE_MIMES = ['image/png', 'image/jpeg', 'image/webp'];
+
+    /**
+     * Prüft Mime/Größe, skaliert zu große Bilder herunter. null = nicht ausgebbar.
+     *
+     * @return array{data: string, mime: string}|null
+     */
+    private function prepareImage(string $binary, string $mime): ?array
+    {
+        if ($binary === '' || !in_array($mime, self::ALLOWED_IMAGE_MIMES, true)) {
+            return null;
+        }
+        if (strlen($binary) <= self::MAX_IMAGE_BYTES) {
+            return ['data' => $binary, 'mime' => $mime];
+        }
+
+        try {
+            $manager = new ImageManager(new GdDriver());
+            $img = $manager->read($binary);
+            $scale = 1.0;
+            for ($i = 0; $i < 5; $i++) {
+                $scale *= 0.75;
+                $copy = $manager->read($binary)->scaleDown(
+                    width: max(1, (int) ($img->width() * $scale)),
+                    height: max(1, (int) ($img->height() * $scale))
+                );
+                $png = $mime === 'image/png';
+                $encoded = $png ? (string) $copy->toPng() : (string) $copy->toJpeg(80);
+                if (strlen($encoded) <= self::MAX_IMAGE_BYTES) {
+                    return ['data' => $encoded, 'mime' => $png ? 'image/png' : 'image/jpeg'];
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[MCP ToolContractAdapter] Bild-Downscaling fehlgeschlagen', ['error' => $e->getMessage()]);
+        }
+
+        return null;
     }
 
     /**

@@ -171,3 +171,17 @@ php artisan make:tool planner.projects.update \
 
 Das System ist **vollständig loose gekoppelt** - Module können beliebig viele Tools registrieren, ohne dass Core etwas davon weiß! 🚀
 
+
+## Bilder als Tool-Ergebnis (MCP Image-Content)
+
+Tools können neben Text/JSON auch Bilder zurückgeben, die der Agent direkt sieht:
+
+```php
+return ToolResult::success(['slide' => 3])
+    ->withImage($pngBinaryOrFilePath, 'image/png'); // mehrfach aufrufbar
+```
+
+- Antwort = JSON-Text (wie bisher) + je Bild ein MCP-Content `{type: "image", data: <base64>, mimeType}`.
+- Grenzen (im `ToolContractAdapter`): max. 6 Bilder, 1,5 MB je Bild (größere werden per intervention/image herunterskaliert), nur `image/png`, `image/jpeg`, `image/webp`. Überzählige/ungültige Bilder werden mit Hinweis-Text übersprungen.
+- Ohne `withImage()` bleibt die Antwort exakt wie zuvor. Token-Schätzung/Event-Tracking zählen nur `data`, nie base64.
+- `laravel/mcp` 0.5.x implementiert `Response::image()` nicht → eigene Klassen `Platform\Core\Mcp\Content\ImageContent`/`ImageResponse`.
