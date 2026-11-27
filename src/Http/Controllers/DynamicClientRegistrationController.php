@@ -34,6 +34,9 @@ class DynamicClientRegistrationController extends Controller
         // Interne Dienste (Open WebUI etc.)
         'https://*.bhgdigital.de/*',
         'https://*.bhgdigital.de:*/*',
+        // Cloudflare MCP-Portal (Zero Trust Access, Account-gebunden)
+        'https://dash.cloudflare.com/59a63fa7224e8f5047e2dd0cadacd4e6/one/access-controls/ai-controls/mcp-server/oauth-callback/*',
+        'https://oauth-callbacks.cloudflareaccess.com/cdn-cgi/access/outbound-oauth-callback',
     ];
 
     /**
